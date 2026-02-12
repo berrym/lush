@@ -142,6 +142,15 @@ void list_traps(void);
 int get_signal_number(const char *signame);
 
 /**
+ * @brief Execute pending trap commands deferred from signal handlers
+ *
+ * Signal handlers set a bitmask instead of calling system() directly.
+ * This function runs the deferred trap commands safely from main loop
+ * context. Should be called at the top of each REPL iteration.
+ */
+void execute_pending_traps(void);
+
+/**
  * @brief Execute all EXIT traps
  *
  * Runs any commands registered for the EXIT (0) pseudo-signal.

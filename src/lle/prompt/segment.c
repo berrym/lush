@@ -12,6 +12,7 @@
 
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/async_worker.h"
+#include "lle/git_command.h"
 #include "lle/prompt/theme.h"
 #include "lle/utf8_support.h"
 
@@ -1112,49 +1113,34 @@ static bool segment_git_is_visible(const lle_prompt_segment_t *self,
 }
 
 /**
- * @brief Run a git command and capture output
+ * @brief Run a git command in the current directory with timeout
  *
- * Executes a git command and captures stdout into the output buffer.
+ * Wrapper around git_command_with_timeout() that constructs a git command
+ * string and returns the exit status compatible with the old interface.
  *
  * @param args        Git command arguments (appended to "git ")
  * @param output      Output buffer for command output (may be NULL)
  * @param output_size Size of output buffer
- * @return Exit status from pclose, or -1 on error
+ * @return Exit status (0 for success), or -1 on error/timeout
  */
 static int run_git_command(const char *args, char *output, size_t output_size) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "git %s 2>/dev/null", args);
 
-    FILE *fp = popen(cmd, "r");
-    if (!fp) {
+    git_cmd_result_t r =
+        git_command_with_timeout(cmd, output, output_size, GIT_CMD_SYNC_TIMEOUT_MS);
+
+    if (r.timed_out) {
         return -1;
     }
-
-    if (output && output_size > 0) {
-        if (fgets(output, output_size, fp) != NULL) {
-            /* Remove trailing newline */
-            size_t len = strlen(output);
-            if (len > 0 && output[len - 1] == '\n') {
-                output[len - 1] = '\0';
-            }
-        } else {
-            output[0] = '\0';
-        }
-    }
-
-    /* Drain any remaining output to prevent child from blocking */
-    char drain[128];
-    while (fgets(drain, sizeof(drain), fp)) {
-    }
-
-    return pclose(fp);
+    return r.exit_status;
 }
 
 /**
  * @brief Check if we're in a git repository (checks parent dirs too)
  *
  * Uses git rev-parse to determine if the current directory is inside
- * a git working tree.
+ * a git working tree. Has a 3-second timeout to prevent hangs.
  *
  * @return true if in a git repository, false otherwise
  */
@@ -1170,6 +1156,7 @@ static bool is_in_git_repo(void) {
  *
  * Runs git commands to retrieve branch name, staged/unstaged/untracked
  * counts, ahead/behind counts, stash count, and conflict status.
+ * All commands have a wall-clock timeout to prevent shell freezes.
  *
  * @param state Pointer to git segment state to populate
  */
@@ -1198,18 +1185,19 @@ static void fetch_git_status(segment_git_state_t *state) {
                         sizeof(state->branch));
     }
 
-    /* Get status counts using git status --porcelain */
-    FILE *fp = popen("git status --porcelain 2>/dev/null", "r");
-    if (fp) {
-        char line[512];
+    /* Get status counts using git status --porcelain (with timeout) */
+    char porcelain[8192] = {0};
+    if (run_git_command("status --porcelain", porcelain,
+                        sizeof(porcelain)) == 0) {
         state->staged = 0;
         state->unstaged = 0;
         state->untracked = 0;
 
-        while (fgets(line, sizeof(line), fp)) {
+        char *line = porcelain;
+        while (*line) {
             if (line[0] == '?') {
                 state->untracked++;
-            } else {
+            } else if (line[0] != '\0' && line[1] != '\0') {
                 if (line[0] != ' ' && line[0] != '?') {
                     state->staged++;
                 }
@@ -1217,8 +1205,14 @@ static void fetch_git_status(segment_git_state_t *state) {
                     state->unstaged++;
                 }
             }
+            /* Advance to next line */
+            char *nl = strchr(line, '\n');
+            if (nl) {
+                line = nl + 1;
+            } else {
+                break;
+            }
         }
-        pclose(fp);
     }
 
     /* Get ahead/behind counts */
@@ -1231,29 +1225,29 @@ static void fetch_git_status(segment_git_state_t *state) {
         state->behind = 0;
     }
 
-    /* Get stash count */
-    FILE *stash_fp = popen("git stash list 2>/dev/null | wc -l", "r");
-    if (stash_fp) {
-        char stash_buf[16];
-        if (fgets(stash_buf, sizeof(stash_buf), stash_fp)) {
-            state->stash_count = atoi(stash_buf);
+    /* Get stash count (with timeout) */
+    char stash_buf[16] = {0};
+    if (run_git_command("stash list --no-decorate", stash_buf,
+                        sizeof(stash_buf)) == 0) {
+        /* Count newlines in output to get stash count */
+        int count = 0;
+        for (char *p = stash_buf; *p; p++) {
+            if (*p == '\n')
+                count++;
         }
-        pclose(stash_fp);
+        /* If output exists but no newline, count as 1 */
+        if (stash_buf[0] && count == 0)
+            count = 1;
+        state->stash_count = count;
     }
 
-    /* Check for merge conflicts (unmerged files) */
+    /* Check for merge conflicts (unmerged files, with timeout) */
     state->has_conflicts = false;
-    FILE *conflict_fp = popen("git ls-files -u 2>/dev/null | head -1", "r");
-    if (conflict_fp) {
-        char conflict_buf[8];
-        if (fgets(conflict_buf, sizeof(conflict_buf), conflict_fp) &&
-            conflict_buf[0]) {
-            state->has_conflicts = true;
-        }
-        /* Drain any remaining output to prevent child from blocking */
-        while (fgets(conflict_buf, sizeof(conflict_buf), conflict_fp)) {
-        }
-        pclose(conflict_fp);
+    char conflict_buf[16] = {0};
+    if (run_git_command("ls-files -u", conflict_buf,
+                        sizeof(conflict_buf)) == 0 &&
+        conflict_buf[0]) {
+        state->has_conflicts = true;
     }
 
     state->cache_valid = true;

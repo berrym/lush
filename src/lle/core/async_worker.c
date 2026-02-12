@@ -11,6 +11,7 @@
  */
 
 #include "lle/async_worker.h"
+#include "lle/git_command.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -364,103 +365,73 @@ static void *lle_async_worker_thread(void *arg) {
  */
 
 /**
- * @brief Run a git command and capture output
+ * @brief Run a git command in a directory with timeout and capture output
  *
- * Executes a shell command using popen and captures the first line of output.
- * The command should include proper stderr redirection as needed.
+ * Uses git -C <dir> to avoid process-wide chdir() which is unsafe from
+ * worker threads. All commands have a wall-clock timeout to prevent hangs.
  *
- * @param cmd Command string to execute
- * @param output Buffer for captured output (may be NULL)
+ * @param cwd         Working directory for git
+ * @param args        Git arguments (e.g., "rev-parse --git-dir")
+ * @param output      Buffer for captured output (may be NULL)
  * @param output_size Size of output buffer
+ * @param timeout_ms  Timeout in milliseconds
  * @return true if command succeeded (exit status 0), false otherwise
  */
-static bool run_git_command(const char *cmd, char *output, size_t output_size) {
-    FILE *fp = popen(cmd, "r");
-    if (!fp) {
-        return false;
-    }
-
-    if (output && output_size > 0) {
-        if (fgets(output, (int)output_size, fp)) {
-            /* Remove trailing newline */
-            size_t len = strlen(output);
-            if (len > 0 && output[len - 1] == '\n') {
-                output[len - 1] = '\0';
-            }
-        } else {
-            output[0] = '\0';
-        }
-    }
-
-    /* Drain any remaining output to prevent pipe blocking */
-    char drain[256];
-    while (fgets(drain, sizeof(drain), fp) != NULL) {
-        /* Discard */
-    }
-
-    int status = pclose(fp);
-    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+static bool run_git_in_dir(const char *cwd, const char *args, char *output,
+                           size_t output_size, uint32_t timeout_ms) {
+    git_cmd_result_t r =
+        git_command_in_dir(cwd, args, output, output_size, timeout_ms);
+    return !r.timed_out && r.exit_status == 0;
 }
 
 /**
  * @brief Get git repository status
  *
  * Gathers comprehensive git status information for a repository.
- * This function runs in the worker thread and may block on git commands.
+ * Uses git -C <cwd> for all commands (no process-wide chdir).
+ * All commands respect the timeout_ms parameter to prevent hangs.
  *
  * @param cwd Working directory of the repository
- * @param timeout_ms Timeout in milliseconds (currently unused)
+ * @param timeout_ms Timeout in milliseconds per git command
  * @param status Output structure for git status data
  * @return LLE_SUCCESS on success
  * @return LLE_ERROR_INVALID_PARAMETER if cwd or status is NULL
- * @return LLE_ERROR_SYSTEM_CALL if directory operations fail
  */
 static lle_result_t lle_async_get_git_status(const char *cwd,
                                              uint32_t timeout_ms,
                                              lle_git_status_data_t *status) {
-    (void)
-        timeout_ms; /* Timeout not implemented - git commands have their own */
-
     if (!cwd || !status) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
+    if (timeout_ms == 0) {
+        timeout_ms = GIT_CMD_ASYNC_TIMEOUT_MS;
+    }
+
     memset(status, 0, sizeof(*status));
 
-    /* Save current directory */
-    char old_cwd[PATH_MAX];
-    if (!getcwd(old_cwd, sizeof(old_cwd))) {
-        return LLE_ERROR_SYSTEM_CALL;
-    }
-
-    /* Change to target directory */
-    if (chdir(cwd) != 0) {
-        return LLE_ERROR_INVALID_PARAMETER;
-    }
-
     /* Check if in git repo */
-    if (!run_git_command("git rev-parse --git-dir 2>/dev/null", NULL, 0)) {
-        chdir(old_cwd);
+    if (!run_git_in_dir(cwd, "rev-parse --git-dir", NULL, 0, timeout_ms)) {
         status->is_git_repo = false;
         return LLE_SUCCESS;
     }
     status->is_git_repo = true;
 
     /* Get branch name */
-    if (run_git_command("git branch --show-current 2>/dev/null", status->branch,
-                        sizeof(status->branch))) {
+    if (run_git_in_dir(cwd, "branch --show-current", status->branch,
+                       sizeof(status->branch), timeout_ms)) {
         /* branch is set */
     } else {
         /* Might be detached HEAD */
         status->is_detached = true;
-        run_git_command("git rev-parse --short HEAD 2>/dev/null",
-                        status->commit, sizeof(status->commit));
+        run_git_in_dir(cwd, "rev-parse --short HEAD", status->commit,
+                       sizeof(status->commit), timeout_ms);
     }
 
     /* Check for detached HEAD explicitly */
     char head_ref[256] = {0};
-    if (run_git_command("git symbolic-ref HEAD 2>/dev/null", head_ref,
-                        sizeof(head_ref))) {
+    if (run_git_in_dir(cwd, "symbolic-ref HEAD", head_ref, sizeof(head_ref),
+                       timeout_ms)) {
         status->is_detached = false;
     } else {
         status->is_detached = true;
@@ -468,22 +439,24 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
 
     /* Get short commit hash */
     if (status->commit[0] == '\0') {
-        run_git_command("git rev-parse --short HEAD 2>/dev/null",
-                        status->commit, sizeof(status->commit));
+        run_git_in_dir(cwd, "rev-parse --short HEAD", status->commit,
+                       sizeof(status->commit), timeout_ms);
     }
 
-    /* Get status counts using git status --porcelain (same as sync version) */
+    /* Get status counts using git status --porcelain */
     status->staged_count = 0;
     status->unstaged_count = 0;
     status->untracked_count = 0;
 
-    FILE *fp = popen("git status --porcelain 2>/dev/null", "r");
-    if (fp) {
-        char line[512];
-        while (fgets(line, sizeof(line), fp)) {
+    char porcelain[8192] = {0};
+    if (run_git_in_dir(cwd, "status --porcelain", porcelain,
+                       sizeof(porcelain), timeout_ms)) {
+        /* Parse porcelain output line by line */
+        char *line = porcelain;
+        while (*line) {
             if (line[0] == '?') {
                 status->untracked_count++;
-            } else {
+            } else if (line[0] != '\0' && line[1] != '\0') {
                 if (line[0] != ' ' && line[0] != '?') {
                     status->staged_count++;
                 }
@@ -491,35 +464,58 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
                     status->unstaged_count++;
                 }
             }
+            /* Advance to next line */
+            char *nl = strchr(line, '\n');
+            if (nl) {
+                line = nl + 1;
+            } else {
+                break;
+            }
         }
-        pclose(fp);
     }
 
     /* Check ahead/behind counts */
     char ahead_behind[64] = {0};
-    if (run_git_command("git rev-list --left-right --count HEAD...@{upstream} "
-                        "2>/dev/null",
-                        ahead_behind, sizeof(ahead_behind))) {
+    if (run_git_in_dir(cwd,
+                       "rev-list --left-right --count HEAD...@{upstream}",
+                       ahead_behind, sizeof(ahead_behind), timeout_ms)) {
         sscanf(ahead_behind, "%d %d", &status->ahead, &status->behind);
     }
 
-    /* Check for merge in progress */
-    char merge_head[8] = {0};
-    if (run_git_command("test -f .git/MERGE_HEAD && echo 1", merge_head,
-                        sizeof(merge_head))) {
-        status->is_merging = (merge_head[0] == '1');
-    }
+    /* Check for merge in progress using git rev-parse */
+    char git_dir[512] = {0};
+    if (run_git_in_dir(cwd, "rev-parse --git-dir", git_dir, sizeof(git_dir),
+                       timeout_ms)) {
+        /* Build absolute path if git_dir is relative */
+        char merge_path[1024];
+        char rebase_merge_path[1024];
+        char rebase_apply_path[1024];
 
-    /* Check for rebase in progress */
-    char rebase_dir[8] = {0};
-    if (run_git_command("test -d .git/rebase-merge -o -d .git/rebase-apply && "
-                        "echo 1",
-                        rebase_dir, sizeof(rebase_dir))) {
-        status->is_rebasing = (rebase_dir[0] == '1');
-    }
+        if (git_dir[0] == '/') {
+            snprintf(merge_path, sizeof(merge_path), "%s/MERGE_HEAD",
+                     git_dir);
+            snprintf(rebase_merge_path, sizeof(rebase_merge_path),
+                     "%s/rebase-merge", git_dir);
+            snprintf(rebase_apply_path, sizeof(rebase_apply_path),
+                     "%s/rebase-apply", git_dir);
+        } else {
+            snprintf(merge_path, sizeof(merge_path), "%s/%s/MERGE_HEAD", cwd,
+                     git_dir);
+            snprintf(rebase_merge_path, sizeof(rebase_merge_path),
+                     "%s/%s/rebase-merge", cwd, git_dir);
+            snprintf(rebase_apply_path, sizeof(rebase_apply_path),
+                     "%s/%s/rebase-apply", cwd, git_dir);
+        }
 
-    /* Restore original directory */
-    chdir(old_cwd);
+        /* Use access() for non-blocking file existence check */
+        if (access(merge_path, F_OK) == 0) {
+            status->is_merging = true;
+        }
+        if (access(rebase_merge_path, F_OK) == 0 ||
+            access(rebase_apply_path, F_OK) == 0) {
+            status->is_rebasing = true;
+        }
+    }
 
     return LLE_SUCCESS;
 }

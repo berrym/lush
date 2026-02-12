@@ -2014,98 +2014,67 @@ lle_prompt_result_t lle_async_worker_submit(
 
 ### 7.3 Git Status Provider
 
+All git commands run from the worker thread use `git -C <dir>` instead of
+`chdir()` (which is process-wide and races with the main thread). Each command
+has a wall-clock timeout enforced via `fork()/exec()/pipe()/select()/waitpid()`
+to prevent indefinite hangs on slow filesystems or unreachable remotes.
+
+See `include/lle/git_command.h` for the timed command execution API and
+`src/lle/core/async_worker.c` for the git status implementation.
+
 ```c
 /**
  * Get git status (runs in worker thread)
+ *
+ * Uses git -C <cwd> for all commands (no process-wide chdir).
+ * All commands respect the timeout_ms parameter via
+ * git_command_in_dir() which uses fork/exec/pipe/select/waitpid.
  */
-static lle_prompt_result_t lle_async_get_git_status(
+static lle_result_t lle_async_get_git_status(
     const char *cwd,
     uint32_t timeout_ms,
     lle_git_status_data_t *status
 ) {
-    (void)timeout_ms;  // TODO: Implement timeout
-    
+    if (!cwd || !status) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+
+    if (timeout_ms == 0) {
+        timeout_ms = GIT_CMD_ASYNC_TIMEOUT_MS;  /* 5000ms default */
+    }
+
     memset(status, 0, sizeof(*status));
-    
-    // Change to directory
-    char old_cwd[PATH_MAX];
-    if (!getcwd(old_cwd, sizeof(old_cwd))) {
-        return LLE_PROMPT_ERROR_INVALID_PARAM;
-    }
-    
-    if (chdir(cwd) != 0) {
-        return LLE_PROMPT_ERROR_INVALID_PARAM;
-    }
-    
-    // Check if in git repo
-    FILE *fp = popen("git rev-parse --git-dir 2>/dev/null", "r");
-    if (!fp) {
-        chdir(old_cwd);
-        return LLE_PROMPT_ERROR_INVALID_PARAM;
-    }
-    
-    char buf[256];
-    if (!fgets(buf, sizeof(buf), fp)) {
-        pclose(fp);
-        chdir(old_cwd);
+
+    /* Check if in git repo (with timeout) */
+    if (!run_git_in_dir(cwd, "rev-parse --git-dir", NULL, 0, timeout_ms)) {
         status->is_git_repo = false;
-        return LLE_PROMPT_SUCCESS;
+        return LLE_SUCCESS;
     }
-    pclose(fp);
     status->is_git_repo = true;
-    
-    // Get branch name
-    fp = popen("git branch --show-current 2>/dev/null", "r");
-    if (fp) {
-        if (fgets(status->branch, sizeof(status->branch), fp)) {
-            size_t len = strlen(status->branch);
-            if (len > 0 && status->branch[len-1] == '\n') {
-                status->branch[len-1] = '\0';
-            }
-        }
-        pclose(fp);
+
+    /* Get branch name */
+    run_git_in_dir(cwd, "branch --show-current",
+                   status->branch, sizeof(status->branch), timeout_ms);
+
+    /* Get status counts from single porcelain call */
+    char porcelain[8192] = {0};
+    if (run_git_in_dir(cwd, "status --porcelain",
+                       porcelain, sizeof(porcelain), timeout_ms)) {
+        /* Parse porcelain output line by line */
+        /* ... count staged, unstaged, untracked ... */
     }
-    
-    // Get staged count
-    fp = popen("git diff --cached --numstat 2>/dev/null | wc -l", "r");
-    if (fp) {
-        if (fgets(buf, sizeof(buf), fp)) {
-            status->staged_count = atoi(buf);
-        }
-        pclose(fp);
+
+    /* Get ahead/behind counts */
+    char ahead_behind[64] = {0};
+    if (run_git_in_dir(cwd, "rev-list --left-right --count HEAD...@{upstream}",
+                       ahead_behind, sizeof(ahead_behind), timeout_ms)) {
+        sscanf(ahead_behind, "%d %d", &status->ahead, &status->behind);
     }
-    
-    // Get unstaged count
-    fp = popen("git diff --numstat 2>/dev/null | wc -l", "r");
-    if (fp) {
-        if (fgets(buf, sizeof(buf), fp)) {
-            status->unstaged_count = atoi(buf);
-        }
-        pclose(fp);
-    }
-    
-    // Get untracked count
-    fp = popen("git ls-files --others --exclude-standard 2>/dev/null | wc -l", "r");
-    if (fp) {
-        if (fgets(buf, sizeof(buf), fp)) {
-            status->untracked_count = atoi(buf);
-        }
-        pclose(fp);
-    }
-    
-    // Get ahead/behind
-    fp = popen("git rev-list --count --left-right @{upstream}...HEAD 2>/dev/null", "r");
-    if (fp) {
-        if (fgets(buf, sizeof(buf), fp)) {
-            sscanf(buf, "%d\t%d", &status->behind_count, &status->ahead_count);
-        }
-        pclose(fp);
-    }
-    
-    // Restore directory
-    chdir(old_cwd);
-    
-    return LLE_PROMPT_SUCCESS;
+
+    /* Check for merge/rebase using access() on git-dir paths */
+    /* ... */
+
+    return LLE_SUCCESS;
 }
 ```
 

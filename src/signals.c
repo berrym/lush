@@ -34,6 +34,17 @@ trap_entry_t *trap_list = NULL;
 static pid_t current_child_pid = 0;
 
 /**
+ * @brief Bitmask of signals with pending trap execution
+ *
+ * Set by the signal handler (async-signal-safe), cleared by
+ * execute_pending_traps() in the main loop. Only signals that
+ * have traps registered will set bits here.
+ *
+ * Bit positions correspond to signal numbers (e.g., bit 2 = SIGINT).
+ */
+static volatile sig_atomic_t pending_trap_signals = 0;
+
+/**
  * @brief Flag set when SIGINT received during readline
  *
  * Volatile because it's modified by signal handler and read by main code.
@@ -233,19 +244,20 @@ static trap_entry_t *find_trap(int signal) {
 }
 
 /**
- * @brief Signal handler that executes trap commands
+ * @brief Signal handler that defers trap commands to the main loop
  *
- * Looks up the trap for the received signal and executes it.
+ * Sets a bit in pending_trap_signals so execute_pending_traps() can
+ * run the trap command safely from the main loop context. This is
+ * async-signal-safe (only sets a volatile sig_atomic_t).
+ *
+ * Previously called system() directly, which is NOT async-signal-safe
+ * and could deadlock or corrupt state.
  *
  * @param signo Signal number received
  */
 static void trap_signal_handler(int signo) {
-    trap_entry_t *trap = find_trap(signo);
-    if (trap && trap->command) {
-        // Execute the trap command
-        // For now, we'll use system() - this could be improved to use the
-        // shell's executor
-        system(trap->command);
+    if (signo > 0 && signo < 32) {
+        pending_trap_signals |= (1 << signo);
     }
 }
 
@@ -392,6 +404,35 @@ int get_signal_number(const char *signame) {
     }
 
     return -1; // Unknown signal
+}
+
+/**
+ * @brief Execute any pending trap commands deferred from signal handlers
+ *
+ * Checks the pending_trap_signals bitmask and runs the corresponding
+ * trap commands. Must be called from the main loop (not signal context)
+ * so that system() and other non-async-signal-safe functions are safe.
+ *
+ * Clears each bit after executing the trap.
+ */
+void execute_pending_traps(void) {
+    sig_atomic_t pending = pending_trap_signals;
+    if (pending == 0) {
+        return;
+    }
+
+    /* Clear all pending bits before executing (if a new signal arrives
+     * during execution, it will set the bit again for next iteration) */
+    pending_trap_signals = 0;
+
+    for (int signo = 1; signo < 32; signo++) {
+        if (pending & (1 << signo)) {
+            trap_entry_t *trap = find_trap(signo);
+            if (trap && trap->command) {
+                system(trap->command);
+            }
+        }
+    }
 }
 
 /**

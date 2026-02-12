@@ -200,15 +200,25 @@ static bool pattern_matches(const char *pattern, const char *key) {
 
 /**
  * @brief Notify subscribers of a value change
+ *
+ * Re-entrancy guard prevents infinite recursion if a callback
+ * modifies a config value (which would trigger notify_change again).
  */
 static void notify_change(const char *key, const creg_value_t *old_value,
                           const creg_value_t *new_value) {
+    static bool in_notify = false;
+    if (in_notify) {
+        return;
+    }
+
+    in_notify = true;
     for (size_t i = 0; i < g_registry.subscriber_count; i++) {
         subscriber_t *sub = &g_registry.subscribers[i];
         if (sub->active && pattern_matches(sub->pattern, key)) {
             sub->callback(key, old_value, new_value, sub->user_data);
         }
     }
+    in_notify = false;
 }
 
 /* ============================================================================

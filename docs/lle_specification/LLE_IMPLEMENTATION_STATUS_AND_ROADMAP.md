@@ -73,7 +73,7 @@ These core systems are implemented, tested, and working in production:
 | **Input Parsing** | input/*.c | 90% | Escape sequences, mouse, UTF-8, state machine |
 | **Core Readline** | lle_readline.c | 95% | Main loop, defensive state machine, watchdog |
 | **Memory Management** | core/memory_management.c | 90% | Pool system, secure memory |
-| **Async Worker** | core/async_worker.c | 85% | Thread pool for non-blocking operations |
+| **Async Worker** | core/async_worker.c | 95% | Thread pool with timed git commands (git_command.c) |
 | **Error Handling** | core/error_handling.c | 85% | Result types, error context |
 
 ### 1.2 Partially Complete Systems (40-70%)
@@ -485,6 +485,7 @@ The original specifications remain as inspiration for what LLE could become, whi
 ---
 
 **Document History**:
+- v2.7 (2026-02-11): Shell freeze/hang hardening - Replaced all popen() git commands with timed fork/exec/pipe/select/waitpid (git_command.c); Removed process-wide chdir() from async worker (uses git -C); Deferred trap execution from signal handler to main loop (was calling system() in signal context); Added SIGWINCH masking during display rendering; EINTR-safe write wrapper for all 35 terminal writes; Signal handler nesting prevention; Event dispatch copy-and-release pattern (fixes mutex-held-during-handler deadlock); Config registry re-entrancy guard; Watchdog coverage extended to full REPL iteration
 - v2.6 (2026-01-01): Session 92 - Removed ~575 lines of broken differential display code (dirty_tracker.c, screen_buffer_diff/apply_diff, partial render); Fixed git segment truncation (async used booleans instead of counts)
 - v2.5 (2025-12-31): Session 91 - GNU readline fully removed; LLE is now the sole line editor
 - v2.4 (2025-12-31): Session 90 - Git segment now uses async worker for non-blocking status fetching; src/prompt.c reorganized with clear LLE/legacy sections; Legacy code marked for future removal

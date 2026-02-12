@@ -3061,6 +3061,13 @@ char *lle_readline(const char *prompt) {
 
     while (!done) {
 
+        /* WATCHDOG: Pet the watchdog at the top of each iteration.
+         * This resets the 10-second alarm timer so it covers the ENTIRE
+         * iteration: rendering, completion, event processing, and input
+         * read. Previously only covered the input read, meaning hangs
+         * in rendering or completion went undetected. */
+        lle_watchdog_pet(0); /* 0 = use default timeout (10 seconds) */
+
         /* WATCHDOG: Check at start of each iteration (defense in depth).
          * This catches cases where the previous iteration got stuck but
          * somehow returned to the loop without hitting the post-read check.
@@ -3131,12 +3138,6 @@ char *lle_readline(const char *prompt) {
 
         /* Read next input event */
         lle_input_event_t *event = NULL;
-
-        /* WATCHDOG: Pet the watchdog before blocking on input read.
-         * This resets the alarm timer. If we get stuck in processing
-         * and don't return here within the timeout, the watchdog fires.
-         */
-        lle_watchdog_pet(0); /* 0 = use default timeout (10 seconds) */
 
         result = lle_input_processor_read_next_event(
             term->input_processor, &event, 100 /* 100ms timeout */

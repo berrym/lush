@@ -48,7 +48,9 @@
 #include "lle/notification.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,6 +58,36 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+
+// ============================================================================
+// EINTR-SAFE WRITE HELPER
+// ============================================================================
+
+/**
+ * @brief Write all bytes to a file descriptor, retrying on EINTR
+ *
+ * A signal interrupting write() mid-escape-sequence can corrupt terminal
+ * state. This wrapper retries on EINTR and handles partial writes.
+ *
+ * @param fd   File descriptor to write to
+ * @param buf  Data to write
+ * @param len  Number of bytes to write
+ * @return true if all bytes written, false on error
+ */
+static bool dc_write_all(int fd, const void *buf, size_t len) {
+    const char *p = (const char *)buf;
+    while (len > 0) {
+        ssize_t n = write(fd, p, len);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            return false;
+        }
+        p += n;
+        len -= (size_t)n;
+    }
+    return true;
+}
 
 // ============================================================================
 // INTERNAL CONSTANTS AND MACROS
@@ -184,11 +216,19 @@ void dc_reset_prompt_display_state(void) {
  * resets display state for the next prompt.
  */
 void dc_finalize_input(void) {
+    /* Block SIGWINCH during terminal output */
+    sigset_t block_set, old_set;
+    sigemptyset(&block_set);
+    sigaddset(&block_set, SIGWINCH);
+    sigprocmask(SIG_BLOCK, &block_set, &old_set);
+
     /* Write newline to move cursor to next line for command output */
-    write(STDOUT_FILENO, "\n", 1);
+    dc_write_all(STDOUT_FILENO, "\n", 1);
 
     /* Reset display state for next prompt */
     dc_reset_prompt_display_state();
+
+    sigprocmask(SIG_SETMASK, &old_set, NULL);
 }
 
 /**
@@ -202,6 +242,12 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
     if (!transient_prompt || !screen_buffer_initialized) {
         return false;
     }
+
+    /* Block SIGWINCH during terminal output to prevent mid-sequence corruption */
+    sigset_t block_set, old_set;
+    sigemptyset(&block_set);
+    sigaddset(&block_set, SIGWINCH);
+    sigprocmask(SIG_BLOCK, &block_set, &old_set);
 
     /*
      * Transient Prompt Replacement (Spec 25 Section 12)
@@ -230,19 +276,19 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
         seq_len = snprintf(seq_buf, sizeof(seq_buf), "\033[%dA",
                            current_screen.cursor_row);
         if (seq_len > 0) {
-            write(STDOUT_FILENO, seq_buf, (size_t)seq_len);
+            dc_write_all(STDOUT_FILENO, seq_buf, (size_t)seq_len);
         }
     }
 
     /* Step 2: Move to column 1 */
-    write(STDOUT_FILENO, "\033[1G", 4);
+    dc_write_all(STDOUT_FILENO, "\033[1G", 4);
 
     /* Step 3: Clear from cursor to end of screen */
-    write(STDOUT_FILENO, "\033[J", 3);
+    dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
     /* Step 4: Write transient prompt */
     if (transient_prompt[0] != '\0') {
-        write(STDOUT_FILENO, transient_prompt, strlen(transient_prompt));
+        dc_write_all(STDOUT_FILENO, transient_prompt, strlen(transient_prompt));
     }
 
     /* Step 5: Write command text (with syntax highlighting if available) */
@@ -267,7 +313,7 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
 
                 if (highlight_result == COMMAND_LAYER_SUCCESS &&
                     highlighted_buffer[0] != '\0') {
-                    write(STDOUT_FILENO, highlighted_buffer,
+                    dc_write_all(STDOUT_FILENO, highlighted_buffer,
                           strlen(highlighted_buffer));
                     wrote_highlighted = true;
                 }
@@ -276,7 +322,7 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
 
         /* Fallback to plain text if highlighting failed */
         if (!wrote_highlighted) {
-            write(STDOUT_FILENO, command_text, strlen(command_text));
+            dc_write_all(STDOUT_FILENO, command_text, strlen(command_text));
         }
     }
 
@@ -291,6 +337,7 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
 
     (void)total_rows; /* Used for documentation, may use later */
 
+    sigprocmask(SIG_SETMASK, &old_set, NULL);
     return true;
 }
 
@@ -395,6 +442,14 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     if (!controller || !controller->is_initialized) {
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
     }
+
+    /* Block SIGWINCH during rendering to prevent a resize signal from
+     * interrupting mid-escape-sequence, which corrupts terminal state.
+     * The signal will be delivered after we restore the mask. */
+    sigset_t block_set, old_set;
+    sigemptyset(&block_set);
+    sigaddset(&block_set, SIGWINCH);
+    sigprocmask(SIG_BLOCK, &block_set, &old_set);
 
     command_layer_t *cmd_layer = controller->compositor->command_layer;
     if (!cmd_layer) {
@@ -559,7 +614,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     /* First render only: Draw prompt once */
     if (!prompt_rendered) {
         if (prompt_buffer[0]) {
-            write(STDOUT_FILENO, prompt_buffer, strlen(prompt_buffer));
+            dc_write_all(STDOUT_FILENO, prompt_buffer, strlen(prompt_buffer));
         }
         prompt_rendered = true;
     }
@@ -575,7 +630,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     int col_len = snprintf(move_to_col, sizeof(move_to_col), "\033[%dG",
                            command_start_col + 1);
     if (col_len > 0) {
-        write(STDOUT_FILENO, move_to_col, col_len);
+        dc_write_all(STDOUT_FILENO, move_to_col, col_len);
     }
 
     /* Step 2: Handle ghost text/menu cleanup from previous render
@@ -598,11 +653,11 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         int down_len =
             snprintf(move_down, sizeof(move_down), "\033[%dB", rows_down);
         if (down_len > 0) {
-            write(STDOUT_FILENO, move_down, down_len);
+            dc_write_all(STDOUT_FILENO, move_down, down_len);
         }
 
         /* Clear from here to end of screen (clears ghost text) */
-        write(STDOUT_FILENO, "\033[J", 3);
+        dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
         /* Move back up to command start row */
         int rows_up = last_terminal_end_row - command_row;
@@ -612,7 +667,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             int up_len =
                 snprintf(move_up, sizeof(move_up), "\033[%dA", rows_up);
             if (up_len > 0) {
-                write(STDOUT_FILENO, move_up, up_len);
+                dc_write_all(STDOUT_FILENO, move_up, up_len);
             }
         }
     } else if (current_screen.cursor_row > command_row) {
@@ -623,13 +678,13 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         char move_up[32];
         int up_len = snprintf(move_up, sizeof(move_up), "\033[%dA", rows_up);
         if (up_len > 0) {
-            write(STDOUT_FILENO, move_up, up_len);
+            dc_write_all(STDOUT_FILENO, move_up, up_len);
         }
     }
 
     /* Step 3: Clear from current position to end of screen
      * This clears only the command area, never touches the prompt */
-    write(STDOUT_FILENO, "\033[J", 3);
+    dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
     /* Step 4: Write command text with continuation prompts
      *
@@ -672,7 +727,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                         }
                     }
                     /* Write the ANSI sequence */
-                    write(STDOUT_FILENO, command_buffer + seq_start,
+                    dc_write_all(STDOUT_FILENO, command_buffer + seq_start,
                           i - seq_start);
                     continue;
                 }
@@ -680,7 +735,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                 /* Handle newlines - move to next visual row and output
                  * continuation prompt */
                 if (ch == '\n') {
-                    write(STDOUT_FILENO, "\n", 1);
+                    dc_write_all(STDOUT_FILENO, "\n", 1);
                     visual_row++;
 
                     /* Get continuation prompt for this visual row */
@@ -689,8 +744,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     if (cont_prompt) {
                         /* Reset ANSI state before writing continuation prompt
                          */
-                        write(STDOUT_FILENO, "\033[0m", 4);
-                        write(STDOUT_FILENO, cont_prompt, strlen(cont_prompt));
+                        dc_write_all(STDOUT_FILENO, "\033[0m", 4);
+                        dc_write_all(STDOUT_FILENO, cont_prompt, strlen(cont_prompt));
                         visual_col =
                             (int)screen_buffer_get_line_prefix_visual_width(
                                 &desired_screen, visual_row);
@@ -712,7 +767,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     int char_width = lle_utf8_codepoint_width(codepoint);
 
                     /* Write the character */
-                    write(STDOUT_FILENO, command_buffer + i, char_bytes);
+                    dc_write_all(STDOUT_FILENO, command_buffer + i, char_bytes);
 
                     /* Update visual position */
                     visual_col += char_width;
@@ -728,7 +783,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     i += char_bytes;
                 } else {
                     /* Invalid UTF-8, write single byte */
-                    write(STDOUT_FILENO, command_buffer + i, 1);
+                    dc_write_all(STDOUT_FILENO, command_buffer + i, 1);
                     visual_col++;
                     if (visual_col >= term_width) {
                         visual_row++;
@@ -739,7 +794,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             }
         } else {
             /* Single-line input - write directly */
-            write(STDOUT_FILENO, command_buffer, strlen(command_buffer));
+            dc_write_all(STDOUT_FILENO, command_buffer, strlen(command_buffer));
         }
     }
 
@@ -763,24 +818,24 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
 
         if (suggestion && *suggestion) {
             /* Write ghost text in BRIGHT_BLACK (dimmed gray) */
-            write(STDOUT_FILENO, "\033[90m",
+            dc_write_all(STDOUT_FILENO, "\033[90m",
                   5); /* Set bright black foreground */
-            write(STDOUT_FILENO, suggestion, strlen(suggestion));
-            write(STDOUT_FILENO, "\033[0m", 4); /* Reset all attributes */
+            dc_write_all(STDOUT_FILENO, suggestion, strlen(suggestion));
+            dc_write_all(STDOUT_FILENO, "\033[0m", 4); /* Reset all attributes */
         }
     }
 
     /* Step 4b: Write completion menu WITHOUT continuation prompts */
     if (menu_text && *menu_text) {
-        write(STDOUT_FILENO, "\n", 1);
-        write(STDOUT_FILENO, menu_text, strlen(menu_text));
+        dc_write_all(STDOUT_FILENO, "\n", 1);
+        dc_write_all(STDOUT_FILENO, menu_text, strlen(menu_text));
     }
 
     /* Step 4c: Write notification below menu (if any)
      * Notification is now tracked in screen_buffer like menu */
     if (notification_text && *notification_text) {
-        write(STDOUT_FILENO, "\n", 1);
-        write(STDOUT_FILENO, notification_text, strlen(notification_text));
+        dc_write_all(STDOUT_FILENO, "\n", 1);
+        dc_write_all(STDOUT_FILENO, notification_text, strlen(notification_text));
     }
 
     /* Step 5: Position cursor at the correct location
@@ -847,7 +902,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         int up_len =
             snprintf(up_seq, sizeof(up_seq), "\033[%dA", rows_to_move_up);
         if (up_len > 0) {
-            write(STDOUT_FILENO, up_seq, up_len);
+            dc_write_all(STDOUT_FILENO, up_seq, up_len);
         }
     }
 
@@ -857,7 +912,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     int col_seq_len =
         snprintf(col_seq, sizeof(col_seq), "\033[%dG", cursor_col + 1);
     if (col_seq_len > 0) {
-        write(STDOUT_FILENO, col_seq, col_seq_len);
+        dc_write_all(STDOUT_FILENO, col_seq, col_seq_len);
     }
 
     DC_DEBUG(
@@ -881,6 +936,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     /* NOTE: fsync() was causing input timeouts after cursor positioning -
      * removed stdout is line-buffered by default and terminal I/O doesn't need
      * fsync */
+
+    /* Restore original signal mask - any pending SIGWINCH will be delivered now */
+    sigprocmask(SIG_SETMASK, &old_set, NULL);
 
     return LAYER_EVENTS_SUCCESS;
 }

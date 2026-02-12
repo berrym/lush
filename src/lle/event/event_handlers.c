@@ -227,41 +227,43 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
         }
     }
 
-    /* Phase 2C: Update system state to PROCESSING */
+    /* Copy-and-release pattern: snapshot matching handlers while holding
+     * the mutex, then release the mutex before calling handlers. This
+     * prevents deadlock if a handler touches the event system. */
+    pthread_mutex_lock(&system->system_mutex);
+
     lle_system_state_t previous_state = system->current_state;
     system->current_state = LLE_STATE_PROCESSING;
 
-    pthread_mutex_lock(&system->system_mutex);
+    /* Snapshot matching handlers (stack-allocated, no malloc needed) */
+    lle_event_handler_t *snapshot[64];
+    size_t snap_count = 0;
 
-    /* Find all handlers for this event type */
-    lle_result_t dispatch_result = LLE_SUCCESS;
-    size_t dispatched = 0;
-
-    for (size_t i = 0; i < system->handler_count; i++) {
-        lle_event_handler_t *h = system->handlers[i];
-
-        if (h->event_type == event->type) {
-            /* Call handler */
-            lle_result_t result = h->handler(event, h->user_data);
-
-            /* Track last error (but continue with other handlers) */
-            if (result != LLE_SUCCESS) {
-                dispatch_result = result;
-            }
-
-            dispatched++;
+    for (size_t i = 0; i < system->handler_count && snap_count < 64; i++) {
+        if (system->handlers[i]->event_type == event->type) {
+            snapshot[snap_count++] = system->handlers[i];
         }
     }
 
     pthread_mutex_unlock(&system->system_mutex);
 
-    /* Update statistics */
-    if (dispatched > 0) {
-        __atomic_fetch_add(&system->events_dispatched, 1, __ATOMIC_SEQ_CST);
+    /* Dispatch WITHOUT holding lock - handlers can safely use event system */
+    lle_result_t dispatch_result = LLE_SUCCESS;
+
+    for (size_t i = 0; i < snap_count; i++) {
+        lle_result_t result = snapshot[i]->handler(event, snapshot[i]->user_data);
+        if (result != LLE_SUCCESS) {
+            dispatch_result = result;
+        }
     }
 
-    /* Phase 2C: Restore previous system state */
+    /* Update statistics and restore state under lock */
+    pthread_mutex_lock(&system->system_mutex);
+    if (snap_count > 0) {
+        system->events_dispatched++;
+    }
     system->current_state = previous_state;
+    pthread_mutex_unlock(&system->system_mutex);
 
     /* Phase 2C: Call post-dispatch hook */
     if (system->post_dispatch_hook) {

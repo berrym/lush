@@ -285,6 +285,11 @@ int main(int argc, char **argv) {
     // Read input (buffering complete syntactic units) until user exits
     // or EOF is read from either stdin or input file
     while (!exit_flag) {
+        // Execute any trap commands deferred from signal handlers.
+        // Signal handlers only set a bitmask (async-signal-safe); the
+        // actual trap command execution happens here in main loop context.
+        execute_pending_traps();
+
         // Read complete command(s) using unified input system
         // This ensures consistent parsing behavior between interactive and
         // non-interactive modes

@@ -190,25 +190,34 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
 
     struct sigaction sa;
 
-    /* SIGWINCH - window resize */
+    /* SIGWINCH - window resize
+     * Block SIGTSTP and SIGCONT while handling SIGWINCH to prevent nesting */
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = handle_sigwinch;
     sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGTSTP);
+    sigaddset(&sa.sa_mask, SIGCONT);
     sa.sa_flags = SA_RESTART; /* Restart interrupted system calls */
 
     if (sigaction(SIGWINCH, &sa, &original_sigwinch) != 0) {
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* SIGTSTP - suspend (Ctrl-Z) */
+    /* SIGTSTP - suspend (Ctrl-Z)
+     * Block SIGWINCH while handling SIGTSTP to prevent nesting */
     sa.sa_handler = handle_sigtstp;
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGWINCH);
     if (sigaction(SIGTSTP, &sa, &original_sigtstp) != 0) {
         sigaction(SIGWINCH, &original_sigwinch, NULL);
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* SIGCONT - resume */
+    /* SIGCONT - resume
+     * Block SIGWINCH while handling SIGCONT to prevent nesting */
     sa.sa_handler = handle_sigcont;
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGWINCH);
     if (sigaction(SIGCONT, &sa, &original_sigcont) != 0) {
         sigaction(SIGWINCH, &original_sigwinch, NULL);
         sigaction(SIGTSTP, &original_sigtstp, NULL);

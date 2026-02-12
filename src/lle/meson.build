@@ -52,6 +52,7 @@ lle_sources += files(
   'core/testing.c',
   'core/hashtable.c',
   'core/async_worker.c',
+  'core/git_command.c',
 )
 
 # ============================================================================

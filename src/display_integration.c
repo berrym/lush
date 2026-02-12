@@ -50,6 +50,7 @@
 
 #include <inttypes.h>
 #include <libgen.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -545,7 +546,7 @@ bool display_integration_get_config(display_integration_config_t *config) {
  * with graceful fallback to existing display functions.
  */
 void display_integration_redisplay(void) {
-    static bool in_display_redisplay = false;
+    static volatile sig_atomic_t in_display_redisplay = 0;
 
     // CRITICAL: Prevent infinite recursion - this was causing stack overflow
     if (in_display_redisplay) {
@@ -554,7 +555,7 @@ void display_integration_redisplay(void) {
         return;
     }
 
-    in_display_redisplay = true;
+    in_display_redisplay = 1;
     integration_stats.total_display_calls++;
 
     // Enhanced Performance Monitoring: Start timing
@@ -589,7 +590,7 @@ void display_integration_redisplay(void) {
             fflush(stdout);
             if (current_prompt)
                 lush_pool_free(current_prompt);
-            in_display_redisplay = false;
+            in_display_redisplay = 0;
             return;
         }
 
@@ -673,7 +674,7 @@ void display_integration_redisplay(void) {
 
                 // Note: current_prompt is managed by readline system, don't
                 // free here
-                in_display_redisplay = false;
+                in_display_redisplay = 0;
                 return; // Success - skip fallback
             }
         } else {
@@ -696,7 +697,7 @@ void display_integration_redisplay(void) {
         ((uint64_t)(end_time.tv_usec - start_time.tv_usec)) * 1000ULL;
     display_integration_record_display_timing(operation_time_ns);
 
-    in_display_redisplay = false;
+    in_display_redisplay = 0;
 }
 
 /**
@@ -704,14 +705,14 @@ void display_integration_redisplay(void) {
  * Provides coordinated prompt updates using layered architecture when enabled.
  */
 void display_integration_prompt_update(void) {
-    static bool in_prompt_update = false;
+    static volatile sig_atomic_t in_prompt_update = 0;
 
     // Prevent infinite recursion
     if (in_prompt_update) {
         return;
     }
 
-    in_prompt_update = true;
+    in_prompt_update = 1;
     integration_stats.total_display_calls++;
 
     // Enhanced Performance Monitoring: Start timing
@@ -744,7 +745,7 @@ void display_integration_prompt_update(void) {
             // Display controller succeeded
             if (current_prompt)
                 lush_pool_free(current_prompt);
-            in_prompt_update = false;
+            in_prompt_update = 0;
             return;
         }
 
@@ -764,7 +765,7 @@ void display_integration_prompt_update(void) {
         ((uint64_t)(end_time.tv_usec - start_time.tv_usec)) * 1000ULL;
     display_integration_record_display_timing(operation_time_ns);
 
-    in_prompt_update = false;
+    in_prompt_update = 0;
 }
 
 /**
@@ -772,7 +773,7 @@ void display_integration_prompt_update(void) {
  * Provides coordinated screen clearing using layered architecture when enabled.
  */
 void display_integration_clear_screen(void) {
-    static bool in_clear_screen = false;
+    static volatile sig_atomic_t in_clear_screen = 0;
 
     // Prevent recursion
     if (in_clear_screen) {
@@ -780,7 +781,7 @@ void display_integration_clear_screen(void) {
         return;
     }
 
-    in_clear_screen = true;
+    in_clear_screen = 1;
     integration_stats.total_display_calls++;
     integration_fallback_reason_t fallback_reason;
 
@@ -791,7 +792,7 @@ void display_integration_clear_screen(void) {
 
         // Graceful fallback to existing system
         do_clear_screen();
-        in_clear_screen = false;
+        in_clear_screen = 0;
         return;
     }
 
@@ -814,7 +815,7 @@ void display_integration_clear_screen(void) {
                         "display_integration: Clear screen completed\n");
             }
 
-            in_clear_screen = false;
+            in_clear_screen = 0;
             return;
         } else {
             // Clear screen failed - log and fallback
@@ -825,7 +826,7 @@ void display_integration_clear_screen(void) {
 
     // Fallback to existing system
     do_clear_screen();
-    in_clear_screen = false;
+    in_clear_screen = 0;
 }
 
 /**
@@ -834,7 +835,7 @@ void display_integration_clear_screen(void) {
  * layered display system handles post-command prompt rendering and caching.
  */
 void display_integration_post_command_update(const char *executed_command) {
-    static bool in_post_command_update = false;
+    static volatile sig_atomic_t in_post_command_update = 0;
 
     // Use standard debug mode configuration
     bool debug_enabled = current_config.debug_mode;
@@ -857,7 +858,7 @@ void display_integration_post_command_update(const char *executed_command) {
         fprintf(stderr, "display_integration: Post-command update starting\n");
     }
 
-    in_post_command_update = true;
+    in_post_command_update = 1;
     integration_stats.total_display_calls++;
 
     // Enhanced Performance Monitoring: Start timing for post-command operation
@@ -871,7 +872,7 @@ void display_integration_post_command_update(const char *executed_command) {
                                       &fallback_reason)) {
         integration_stats.fallback_calls++;
         log_fallback_event("post_command_update", fallback_reason);
-        in_post_command_update = false;
+        in_post_command_update = 0;
         return;
     }
 
@@ -1032,7 +1033,7 @@ void display_integration_post_command_update(const char *executed_command) {
         ((uint64_t)(end_time.tv_usec - start_time.tv_usec)) * 1000ULL;
     display_integration_record_display_timing(operation_time_ns);
 
-    in_post_command_update = false;
+    in_post_command_update = 0;
 }
 
 // ============================================================================
