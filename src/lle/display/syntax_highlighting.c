@@ -981,6 +981,11 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     pos += 2;
                     continue;
                 }
+                if (ch == '\\') {
+                    /* Trailing backslash at end of input - include it and stop */
+                    pos++;
+                    break;
+                }
                 if (is_glob_char(ch))
                     has_glob = true;
                 if (ch == '/')
