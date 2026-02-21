@@ -1313,55 +1313,6 @@ static void segment_git_async_callback(const lle_async_response_t *response,
 }
 
 /**
- * @brief Queue an async git status fetch
- *
- * Non-blocking - queues request and returns immediately.
- * If async is not available or queue fails, returns false.
- */
-static bool queue_async_git_fetch(segment_git_state_t *state) {
-    if (!state || !state->async_initialized || !state->async_worker) {
-        return false;
-    }
-
-    if (!lle_async_worker_is_running(state->async_worker)) {
-        return false;
-    }
-
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) == NULL) {
-        return false;
-    }
-
-    pthread_mutex_lock(&state->async_mutex);
-
-    /* Don't queue if already pending for same directory */
-    if (state->async_pending && strcmp(state->async_cwd, cwd) == 0) {
-        pthread_mutex_unlock(&state->async_mutex);
-        return true; /* Already queued */
-    }
-
-    lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
-    if (!req) {
-        pthread_mutex_unlock(&state->async_mutex);
-        return false;
-    }
-
-    snprintf(req->cwd, sizeof(req->cwd), "%s", cwd);
-
-    if (lle_async_worker_submit(state->async_worker, req) == LLE_SUCCESS) {
-        state->async_pending = true;
-        state->pending_generation = state->cache_generation;
-        snprintf(state->async_cwd, sizeof(state->async_cwd), "%s", cwd);
-        pthread_mutex_unlock(&state->async_mutex);
-        return true;
-    }
-
-    lle_async_request_free(req);
-    pthread_mutex_unlock(&state->async_mutex);
-    return false;
-}
-
-/**
  * @brief Helper to append colored text to buffer
  *
  * Appends text with optional ANSI color prefix and reset suffix.

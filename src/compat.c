@@ -506,16 +506,16 @@ int compat_init(const char *data_dir) {
     /* Preserve target if it was set before init */
     char saved_target[COMPAT_TARGET_MAX] = {0};
     if (g_compat.target_shell[0] != '\0') {
-        strncpy(saved_target, g_compat.target_shell, COMPAT_TARGET_MAX - 1);
+        snprintf(saved_target, sizeof(saved_target), "%s", g_compat.target_shell);
     }
     
     memset(&g_compat, 0, sizeof(g_compat));
     
     /* Restore target or use default */
     if (saved_target[0] != '\0') {
-        strncpy(g_compat.target_shell, saved_target, COMPAT_TARGET_MAX - 1);
+        snprintf(g_compat.target_shell, sizeof(g_compat.target_shell), "%s", saved_target);
     } else {
-        strncpy(g_compat.target_shell, "posix", COMPAT_TARGET_MAX - 1);
+        snprintf(g_compat.target_shell, sizeof(g_compat.target_shell), "%s", "posix");
     }
     
     int total_loaded = 0;
@@ -578,14 +578,19 @@ int compat_init(const char *data_dir) {
     if (get_exe_dir(path_buf, sizeof(path_buf))) {
         char exe_relative[COMPAT_PATH_MAX];
         
+        int ret;
+
         /* Try ../share/lush/compat (installed layout) */
-        snprintf(exe_relative, sizeof(exe_relative), "%s/../share/%s", 
-                 path_buf, COMPAT_SUBDIR);
-        total_loaded += try_load_from_dir(exe_relative);
-        
+        ret = snprintf(exe_relative, sizeof(exe_relative), "%s/../share/%s",
+                       path_buf, COMPAT_SUBDIR);
+        if (ret > 0 && (size_t)ret < sizeof(exe_relative))
+            total_loaded += try_load_from_dir(exe_relative);
+
         /* Try ../data/compat (development layout) */
-        snprintf(exe_relative, sizeof(exe_relative), "%s/../data/compat", path_buf);
-        total_loaded += try_load_from_dir(exe_relative);
+        ret = snprintf(exe_relative, sizeof(exe_relative), "%s/../data/compat",
+                       path_buf);
+        if (ret > 0 && (size_t)ret < sizeof(exe_relative))
+            total_loaded += try_load_from_dir(exe_relative);
     }
     
     /* 6. CWD fallback: ./data/compat */

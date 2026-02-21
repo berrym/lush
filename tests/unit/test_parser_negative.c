@@ -655,11 +655,6 @@ TEST(only_semicolons) {
     ASSERT_PARSE_FAILS(";;;");
 }
 
-TEST(only_newlines_semicolons) {
-    /* This might actually be valid empty input */
-    /* ASSERT_PARSE_FAILS(";\n;\n;"); */
-}
-
 TEST(deeply_nested_unclosed) {
     ASSERT_PARSE_FAILS("((((((((((");
 }
@@ -726,20 +721,6 @@ TEST(recursion_depth_limit) {
 TEST(control_chars_in_input) {
     /* Control characters in command */
     ASSERT_PARSE_FAILS("echo \x01\x02\x03");
-}
-
-TEST(null_in_word) {
-    /* Null byte in middle - this is a C string so it terminates early */
-    /* This test verifies the parser handles the truncated input */
-    char input[] = "echo hel\x00lo";
-    parser_t *p = parser_new(input);
-    if (p) {
-        node_t *n = parser_parse(p);
-        /* Should parse "echo hel" successfully, not fail */
-        /* Actually this is valid, skip this test */
-        if (n) free_node_tree(n);
-        parser_free(p);
-    }
 }
 
 /* ============================================================================

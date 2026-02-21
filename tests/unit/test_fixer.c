@@ -509,7 +509,7 @@ TEST(fixer_write_file_with_backup) {
     ASSERT_EQ(result, FIXER_OK, "write_file with backup should succeed");
     
     /* Verify backup exists */
-    char backup_path[512];
+    char backup_path[520];
     snprintf(backup_path, sizeof(backup_path), "%s.bak", path);
     
     f = fopen(backup_path, "r");

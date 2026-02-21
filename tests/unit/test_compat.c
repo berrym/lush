@@ -319,9 +319,8 @@ TEST(compat_get_entry_count) {
     compat_init(NULL);
 
     size_t count = compat_get_entry_count();
-    /* Should have some entries from built-in data */
     /* Count may be 0 if no data files found, which is okay for testing */
-    ASSERT(count >= 0, "Entry count should be non-negative");
+    (void)count;
 
     compat_cleanup();
 }
