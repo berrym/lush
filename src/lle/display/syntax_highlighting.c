@@ -26,6 +26,7 @@
 /* Include lush headers for command/alias/builtin checks */
 #include "alias.h"
 #include "builtins.h"
+#include "lle/adaptive_terminal_integration.h"
 
 /* Weak symbol for function lookup - overridden in full shell build */
 __attribute__((weak)) bool lle_shell_function_exists(const char *name) {
@@ -37,65 +38,65 @@ __attribute__((weak)) bool lle_shell_function_exists(const char *name) {
 /*                         DEFAULT COLOR SCHEME                               */
 /* ========================================================================== */
 
-/** @brief Default colors (solarized-inspired dark theme) */
+/** @brief Default colors (vivid dark theme, derived from proven 256-color palette) */
 static const lle_syntax_colors_t default_colors = {
     /* Commands */
-    .command_valid = 0x00859900,    /* Green */
-    .command_invalid = 0x00DC322F,  /* Red */
-    .command_builtin = 0x002AA198,  /* Cyan */
-    .command_alias = 0x002AA198,    /* Cyan */
-    .command_function = 0x00268BD2, /* Blue */
+    .command_valid = 0x005FFF00,    /* Bright lime green (256: 82) */
+    .command_invalid = 0x00FF0000,  /* Bright red (256: 196) */
+    .command_builtin = 0x0000FFFF,  /* Bright cyan (256: 51) */
+    .command_alias = 0x0000FFFF,    /* Bright cyan (256: 51) */
+    .command_function = 0x005F87FF, /* Steel blue (256: 69) */
 
     /* Keywords */
-    .keyword = 0x00CB4B16, /* Orange */
+    .keyword = 0x005FAFFF, /* Sky blue (256: 75) */
 
     /* Strings */
-    .string = 0x00B58900,        /* Yellow */
-    .string_escape = 0x00DC322F, /* Red */
+    .string = 0x00FFAF00,        /* Amber (256: 214) */
+    .string_escape = 0x00FF5F5F, /* Salmon (256: 203) */
 
     /* Variables */
-    .variable = 0x006C71C4,         /* Violet */
-    .variable_special = 0x00D33682, /* Magenta */
+    .variable = 0x00D787FF,         /* Light purple (256: 177) */
+    .variable_special = 0x00FF87FF, /* Bright orchid */
 
     /* Paths */
-    .path_valid = 0x00859900,   /* Green */
-    .path_invalid = 0x00DC322F, /* Red */
+    .path_valid = 0x0087D787,   /* Pale green (256: 114) */
+    .path_invalid = 0x00FF0000, /* Bright red (256: 196) */
 
     /* Operators */
-    .pipe = 0x00268BD2,           /* Blue */
-    .redirect = 0x00D33682,       /* Magenta */
-    .operator_other = 0x00839496, /* Base0 (default fg) */
+    .pipe = 0x005F87FF,           /* Steel blue (256: 69) */
+    .redirect = 0x00FF5F5F,       /* Salmon (256: 203) */
+    .operator_other = 0x00D0D0D0, /* Light gray (256: 252) */
 
     /* Assignment */
-    .assignment = 0x006C71C4, /* Violet (same as variable) */
+    .assignment = 0x00D787FF, /* Light purple (same as variable) */
 
     /* Other */
-    .comment = 0x00586E75,   /* Base01 (dim) */
-    .number = 0x002AA198,    /* Cyan */
-    .option = 0x00839496,    /* Base0 */
-    .glob = 0x00CB4B16,      /* Orange */
-    .extglob = 0x00CB4B16,   /* Orange (same as glob) */
-    .glob_qual = 0x00D33682, /* Magenta */
-    .argument = 0x00839496,  /* Base0 */
+    .comment = 0x00808080,   /* Gray (256: 244) */
+    .number = 0x00FFFFAF,    /* Light yellow (256: 229) */
+    .option = 0x0087D7D7,    /* Muted cyan (256: 116) */
+    .glob = 0x00FFAF00,      /* Amber (same as string) */
+    .extglob = 0x00FFAF00,   /* Amber (same as string) */
+    .glob_qual = 0x00D787FF, /* Light purple */
+    .argument = 0x00D0D0D0,  /* Light gray (256: 252) */
 
     /* Here-documents and here-strings */
-    .heredoc_op = 0x00D33682,      /* Magenta (same as redirect) */
-    .heredoc_delim = 0x00B58900,   /* Yellow (same as string) */
-    .heredoc_content = 0x00B58900, /* Yellow (same as string) */
-    .herestring = 0x00B58900,      /* Yellow (same as string) */
+    .heredoc_op = 0x00FF5F5F,      /* Salmon (same as redirect) */
+    .heredoc_delim = 0x00FFAF00,   /* Amber (same as string) */
+    .heredoc_content = 0x00FFAF00, /* Amber (same as string) */
+    .herestring = 0x00FFAF00,      /* Amber (same as string) */
 
     /* Process substitution */
-    .procsub = 0x00D33682, /* Magenta */
+    .procsub = 0x00FF5F5F, /* Salmon */
 
     /* ANSI-C quoting */
-    .string_ansic = 0x00B58900, /* Yellow (same as string) */
+    .string_ansic = 0x00FFAF00, /* Amber (same as string) */
 
     /* Arithmetic expansion */
-    .arithmetic = 0x002AA198, /* Cyan */
+    .arithmetic = 0x0000FFFF, /* Bright cyan (256: 51) */
 
     /* Errors */
-    .error = 0x00DC322F,    /* Red bg */
-    .error_fg = 0x00FFFFFF, /* White fg */
+    .error = 0x00FF0000,    /* Bright red (256: 196) */
+    .error_fg = 0x00FFFFFF, /* White */
 
     /* Attributes */
     .keyword_bold = 1,
@@ -1456,7 +1457,21 @@ int lle_syntax_highlighter_create(lle_syntax_highlighter_t **highlighter) {
     h->validate_commands = true;
     h->validate_paths = true;
     h->highlight_errors = true;
-    h->color_depth = 3; /* Assume truecolor */
+    /* Detect terminal color capabilities via cached detection */
+    lle_terminal_detection_result_t *detection = NULL;
+    if (lle_detect_terminal_capabilities_optimized(&detection) == LLE_SUCCESS
+        && detection) {
+        if (detection->supports_truecolor)
+            h->color_depth = 3;
+        else if (detection->supports_256_colors)
+            h->color_depth = 2;
+        else if (detection->supports_colors)
+            h->color_depth = 1;
+        else
+            h->color_depth = 0;
+    } else {
+        h->color_depth = 3; /* Fallback: assume truecolor */
+    }
 
     /* Create command cache */
     h->command_cache = calloc(1, sizeof(cmd_cache_t));
