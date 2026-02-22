@@ -366,8 +366,12 @@ lle_result_t lle_composer_init(lle_prompt_composer_t *composer,
     composer->config.enable_right_prompt = false;
     composer->config.enable_transient =
         true; /* Transient prompts enabled by default */
-    composer->config.respect_user_ps1 = false;
+    composer->config.respect_user_ps1 = true;
     composer->config.use_external_prompt = false;
+
+    /* PS1/PS2 ownership: theme owns until user overrides (Spec 28) */
+    composer->ps1_owner = PS1_OWNER_THEME;
+    composer->ps2_owner = PS1_OWNER_THEME;
 
     /* Initialize transient prompt state (Spec 25 Section 12) */
     lle_transient_init(&composer->transient);
@@ -760,6 +764,10 @@ lle_result_t lle_composer_set_theme(lle_prompt_composer_t *composer,
         composer->cached_ps2_template = NULL;
     }
 
+    /* Theme switch always takes ownership of PS1/PS2 (Spec 28) */
+    composer->ps1_owner = PS1_OWNER_THEME;
+    composer->ps2_owner = PS1_OWNER_THEME;
+
     /* Apply syntax colors from the new LLE theme */
     lle_display_integration_t *integration =
         lle_display_integration_get_global();
@@ -790,6 +798,21 @@ lle_composer_get_theme(const lle_prompt_composer_t *composer) {
     }
 
     return lle_theme_registry_get_active(composer->themes);
+}
+
+/* ============================================================================
+ * PS1/PS2 Ownership Notification (Spec 28 Phase 2)
+ * ============================================================================
+ */
+
+void lle_prompt_notify_ps1_changed(lle_prompt_composer_t *composer) {
+    if (composer)
+        composer->ps1_owner = PS1_OWNER_USER;
+}
+
+void lle_prompt_notify_ps2_changed(lle_prompt_composer_t *composer) {
+    if (composer)
+        composer->ps2_owner = PS1_OWNER_USER;
 }
 
 /* ============================================================================

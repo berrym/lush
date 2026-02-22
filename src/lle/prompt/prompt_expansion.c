@@ -10,6 +10,7 @@
  */
 
 #include "lle/prompt/prompt_expansion.h"
+#include "lle/utf8_support.h"
 #include "version.h"
 
 #include <limits.h>
@@ -48,11 +49,23 @@ static void buf_append_char(expand_buf_t *b, char c) {
     }
 }
 
+/**
+ * Append a string to the buffer, ensuring UTF-8 sequences are never split.
+ * If the remaining buffer space cannot fit a complete UTF-8 sequence,
+ * truncation stops before the partial sequence rather than splitting it.
+ */
 static void buf_append_str(expand_buf_t *b, const char *s) {
     if (!s)
         return;
     while (*s && b->pos + 1 < b->size) {
-        b->buf[b->pos++] = *s++;
+        int seq_len = lle_utf8_sequence_length((unsigned char)*s);
+        if (seq_len < 1)
+            seq_len = 1; /* Invalid lead byte: copy as single byte */
+        /* Check if the full sequence fits (plus NUL terminator) */
+        if (b->pos + (size_t)seq_len >= b->size)
+            break; /* Would split a UTF-8 sequence — stop here */
+        for (int i = 0; i < seq_len && *s; i++)
+            b->buf[b->pos++] = *s++;
     }
     if (b->size > 0)
         b->buf[b->pos < b->size ? b->pos : b->size - 1] = '\0';
@@ -638,9 +651,18 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
         }
 
         /* ------------------------------------------------------------ */
-        /* Regular character: copy through                              */
+        /* Regular character: copy complete UTF-8 sequence              */
         /* ------------------------------------------------------------ */
-        buf_append_char(&b, *p++);
+        {
+            int seq_len = lle_utf8_sequence_length((unsigned char)*p);
+            if (seq_len < 1)
+                seq_len = 1; /* Invalid lead byte: copy single byte */
+            if (b.pos + (size_t)seq_len >= b.size) {
+                break; /* Would split UTF-8 sequence — stop */
+            }
+            for (int i = 0; i < seq_len && *p; i++)
+                buf_append_char(&b, *p++);
+        }
     }
 
     return LLE_SUCCESS;
@@ -657,6 +679,15 @@ lle_result_t lle_prompt_expand(const char *format, char *output,
         return LLE_ERROR_NULL_POINTER;
 
     output[0] = '\0';
+
+    /* Validate UTF-8 input — reject malformed sequences that would produce
+     * corrupted terminal output.  Fall back to the format string as-is if
+     * it happens to be mostly ASCII (lle_utf8_is_valid is strict). */
+    if (!lle_utf8_is_valid(format, strlen(format))) {
+        /* Best-effort: copy what we can, replacing invalid bytes */
+        snprintf(output, output_size, "%s", "$ ");
+        return LLE_ERROR_INVALID_ENCODING;
+    }
 
     /*
      * Pass 1: Resolve LLE template segments (${...})

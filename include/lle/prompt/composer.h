@@ -54,6 +54,18 @@ extern "C" {
  */
 
 /**
+ * @brief PS1/PS2 ownership — who last set the variable
+ *
+ * Used to implement "respect user PS1": when the user explicitly sets
+ * PS1 (via assignment or shell script), the theme system stops
+ * overwriting it on each prompt cycle. Theme switches always update PS1.
+ */
+typedef enum {
+    PS1_OWNER_THEME, /**< Theme system set PS1 (can be overwritten by theme) */
+    PS1_OWNER_USER   /**< User explicitly set PS1 (theme won't overwrite) */
+} lle_ps1_owner_t;
+
+/**
  * @brief Prompt composer configuration
  */
 typedef struct lle_composer_config {
@@ -101,6 +113,10 @@ typedef struct lle_prompt_composer {
     char cached_left_format[LLE_TEMPLATE_MAX];
     char cached_right_format[LLE_TEMPLATE_MAX];
     char cached_ps2_format[LLE_TEMPLATE_MAX];
+
+    /** @brief PS1/PS2 ownership tracking (Spec 28 Phase 2) */
+    lle_ps1_owner_t ps1_owner; /**< Who last set PS1 */
+    lle_ps1_owner_t ps2_owner; /**< Who last set PS2 */
 
     /** @brief Statistics */
     uint64_t total_renders;
@@ -251,6 +267,29 @@ lle_result_t lle_composer_set_theme(lle_prompt_composer_t *composer,
  */
 const lle_theme_t *
 lle_composer_get_theme(const lle_prompt_composer_t *composer);
+
+/* ============================================================================
+ * PS1/PS2 OWNERSHIP API (Spec 28 Phase 2)
+ * ============================================================================
+ */
+
+/**
+ * @brief Notify that the user explicitly set PS1 or PROMPT
+ *
+ * Called from the executor's variable assignment path when PS1 or PROMPT
+ * is assigned by user code. Sets ps1_owner to PS1_OWNER_USER so the
+ * theme system won't overwrite it on subsequent prompt renders.
+ *
+ * @param composer  Prompt composer (may be NULL — safe to call before init)
+ */
+void lle_prompt_notify_ps1_changed(lle_prompt_composer_t *composer);
+
+/**
+ * @brief Notify that the user explicitly set PS2
+ *
+ * @param composer  Prompt composer (may be NULL)
+ */
+void lle_prompt_notify_ps2_changed(lle_prompt_composer_t *composer);
 
 /* ============================================================================
  * SHELL EVENT INTEGRATION API (Spec 26)

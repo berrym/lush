@@ -16,6 +16,7 @@
 #include "config.h"
 #include "executor.h"
 #include "lle/arena.h"
+#include "lle/adaptive_terminal_integration.h"
 #include "lle/display_integration.h"
 #include "lle/history.h"
 #include "lle/lle_editor.h"
@@ -24,7 +25,9 @@
 #include "lle/lle_shell_hooks.h"
 #include "lle/lle_watchdog.h"
 #include "lle/prompt/composer.h"
+#include "lle/prompt/prompt_expansion.h"
 #include "lle/prompt/segment.h"
+#include "lle/utf8_support.h"
 #include "lle/prompt/theme.h"
 #include "lle/prompt/theme_loader.h"
 #include "lush.h"
@@ -564,6 +567,28 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         return result;
     }
 
+    /* Spec 28 Phase 2: Write theme's format strings to PS1/PS2.
+     * PS1 now holds the format string (with ${segment}, \u, %n escapes),
+     * not the rendered output. The prompt render loop will expand it. */
+    const lle_theme_t *theme =
+        lle_composer_get_theme(integ->prompt_composer);
+    if (theme && strlen(theme->layout.ps1_format) > 0) {
+        symtable_set_global("PS1", theme->layout.ps1_format);
+    } else {
+        symtable_set_global("PS1", "$ ");
+    }
+    if (theme && strlen(theme->layout.ps2_format) > 0) {
+        symtable_set_global("PS2", theme->layout.ps2_format);
+    } else {
+        symtable_set_global("PS2", "> ");
+    }
+    /* Sync PROMPT = PS1 (zsh alias) */
+    char *ps1_val = symtable_get_global("PS1");
+    if (ps1_val) {
+        symtable_set_global("PROMPT", ps1_val);
+        free(ps1_val);
+    }
+
     return LLE_SUCCESS;
 }
 
@@ -702,23 +727,55 @@ void lle_nuclear_reset(void) {
  */
 
 /**
- * @brief Update the shell prompt using the prompt composer
+ * @brief Detect terminal color depth for prompt expansion
  *
- * Renders the prompt using the Spec 25 prompt composer and updates
- * PS1/PS2 shell variables. Falls back to minimal prompts if composer
- * is not available or rendering fails.
+ * @return 0=none, 1=8-color, 2=256-color, 3=truecolor
  */
+static int detect_prompt_color_depth(void) {
+    lle_terminal_detection_result_t *detection = NULL;
+    if (lle_detect_terminal_capabilities_optimized(&detection) == LLE_SUCCESS
+        && detection) {
+        if (detection->supports_truecolor)
+            return 3;
+        if (detection->supports_256_colors)
+            return 2;
+        if (detection->supports_colors)
+            return 1;
+        return 0;
+    }
+    return 3; /* Fallback: assume truecolor */
+}
+
+/**
+ * @brief Update the shell prompt by expanding the PS1 format string
+ *
+ * Spec 28 Phase 2: Reads PS1 as a format string (containing bash \u,
+ * zsh %n, and/or LLE ${segment} escapes), expands it via the unified
+ * prompt expansion engine, and stores the rendered result for display.
+ * PS1 in the symtable retains the format string — it is NOT overwritten
+ * with rendered output.
+ *
+ * The rendered prompt is stored in a static buffer and returned by
+ * lle_shell_get_rendered_prompt().
+ */
+
+/** @brief Static buffer for the last rendered PS1 prompt */
+static char s_rendered_ps1[LLE_PROMPT_OUTPUT_MAX];
+
+/** @brief Get the most recently rendered PS1 prompt */
+const char *lle_shell_get_rendered_prompt(void) {
+    return s_rendered_ps1;
+}
+
 void lle_shell_update_prompt(void) {
     /* Use minimal fallback if LLE integration not available */
     if (!g_lle_integration || !g_lle_integration->prompt_composer) {
-        symtable_set_global("PS1", (getuid() > 0) ? "$ " : "# ");
-        symtable_set_global("PS2", "> ");
+        snprintf(s_rendered_ps1, sizeof(s_rendered_ps1), "%s",
+                 (getuid() > 0) ? "$ " : "# ");
         return;
     }
 
     lle_prompt_composer_t *composer = g_lle_integration->prompt_composer;
-    lle_prompt_output_t output;
-    memset(&output, 0, sizeof(output));
 
     /* Update background job count from executor */
     executor_t *executor = get_global_executor();
@@ -728,18 +785,85 @@ void lle_shell_update_prompt(void) {
         lle_prompt_context_set_job_count(&composer->context, job_count);
     }
 
-    /* Render the prompt */
-    lle_result_t result = lle_composer_render(composer, &output);
-    if (result == LLE_SUCCESS && output.ps1_len > 0) {
-        symtable_set_global("PS1", output.ps1);
-        symtable_set_global("PS2", output.ps2);
-        lle_composer_clear_regeneration_flag(composer);
-        return;
+    /* Read PS1 format string from symtable */
+    char *ps1_fmt = symtable_get_global("PS1");
+    if (!ps1_fmt) {
+        ps1_fmt = strdup((getuid() > 0) ? "$ " : "# ");
+        if (!ps1_fmt) {
+            snprintf(s_rendered_ps1, sizeof(s_rendered_ps1), "$ ");
+            return;
+        }
     }
 
-    /* Rendering failed - use minimal fallback */
-    symtable_set_global("PS1", (getuid() > 0) ? "$ " : "# ");
-    symtable_set_global("PS2", "> ");
+    /* Validate UTF-8 encoding — malformed PS1 would produce corrupted
+     * terminal output.  Replace with safe fallback. */
+    if (!lle_utf8_is_valid(ps1_fmt, strlen(ps1_fmt))) {
+        free(ps1_fmt);
+        ps1_fmt = strdup((getuid() > 0) ? "$ " : "# ");
+        if (!ps1_fmt) {
+            snprintf(s_rendered_ps1, sizeof(s_rendered_ps1), "$ ");
+            return;
+        }
+    }
+
+    /* Build the expansion context with template engine callbacks */
+    lle_template_render_ctx_t render_ctx =
+        lle_composer_create_render_ctx(composer);
+    lle_prompt_expand_ctx_t expand_ctx;
+    memset(&expand_ctx, 0, sizeof(expand_ctx));
+    expand_ctx.template_ctx = &render_ctx;
+    expand_ctx.last_exit_status = composer->context.last_exit_code;
+    expand_ctx.job_count = composer->context.background_job_count;
+    expand_ctx.color_depth = detect_prompt_color_depth();
+
+    /* Prepend newline if configured */
+    size_t offset = 0;
+    if (composer->config.newline_before_prompt) {
+        s_rendered_ps1[0] = '\n';
+        offset = 1;
+    }
+
+    /* Expand PS1 format → rendered output */
+    lle_result_t result = lle_prompt_expand(
+        ps1_fmt, s_rendered_ps1 + offset,
+        sizeof(s_rendered_ps1) - offset, &expand_ctx);
+
+    if (result != LLE_SUCCESS) {
+        /* Write fallback after the newline prefix (if any) */
+        snprintf(s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset,
+                 "%s", (getuid() > 0) ? "$ " : "# ");
+    }
+
+    lle_composer_clear_regeneration_flag(composer);
+    free(ps1_fmt);
+}
+
+/**
+ * @brief Notify that PS1, PS2, or PROMPT was set by user code
+ *
+ * Marks the variable as user-owned so the theme system respects it.
+ * Syncs PROMPT ↔ PS1 bidirectionally.
+ */
+void lle_shell_notify_prompt_var_set(const char *var_name, const char *value) {
+    if (!var_name)
+        return;
+
+    lle_prompt_composer_t *composer =
+        g_lle_integration ? g_lle_integration->prompt_composer : NULL;
+
+    if (strcmp(var_name, "PS1") == 0) {
+        lle_prompt_notify_ps1_changed(composer);
+        /* Sync PROMPT = PS1 */
+        if (value)
+            symtable_set_global("PROMPT", value);
+    } else if (strcmp(var_name, "PROMPT") == 0) {
+        lle_prompt_notify_ps1_changed(composer);
+        /* Sync PS1 = PROMPT */
+        if (value)
+            symtable_set_global("PS1", value);
+    } else if (strcmp(var_name, "PS2") == 0) {
+        lle_prompt_notify_ps2_changed(composer);
+    }
 }
 
 /* ============================================================================
@@ -845,8 +969,8 @@ void lush_update_editing_mode(void) {
  * @brief Shell-facing readline wrapper with statistics tracking
  *
  * Calls LLE's lle_readline() and tracks readline statistics.
- * Handles NULL prompts by retrieving from PS1 after updating
- * the prompt via lle_shell_update_prompt().
+ * Handles NULL prompts by expanding PS1 format string via the
+ * unified prompt expansion engine (Spec 28).
  *
  * @param prompt The prompt string to display, or NULL to use PS1
  * @return Newly allocated line from user, or NULL on EOF/error
@@ -858,29 +982,19 @@ char *lush_readline_with_prompt(const char *prompt) {
 
     g_lle_integration->total_readline_calls++;
 
-    /* If prompt is NULL, retrieve from PS1 (primary prompt)
-     * This is the standard behavior - input.c passes NULL to let
-     * the prompt system generate the themed prompt via
-     * lle_shell_update_prompt()
-     */
+    /* If prompt is NULL, expand PS1 format string (Spec 28 Phase 2).
+     * PS1 now holds the format string with escapes (\u, %n, ${segment}).
+     * lle_shell_update_prompt() expands it into a rendered prompt. */
     const char *effective_prompt = prompt;
-    char *allocated_prompt = NULL;  /* Track if we need to free */
     if (!effective_prompt) {
-        /* Ensure prompt is up-to-date before reading */
         lle_shell_update_prompt();
-        allocated_prompt = symtable_get_global("PS1");
-        effective_prompt = allocated_prompt;
-        if (!effective_prompt) {
-            effective_prompt = "$ "; /* Ultimate fallback */
+        effective_prompt = lle_shell_get_rendered_prompt();
+        if (!effective_prompt || !*effective_prompt) {
+            effective_prompt = "$ ";
         }
     }
 
     char *line = lle_readline(effective_prompt);
-
-    /* Free the allocated prompt if we retrieved it from PS1 */
-    if (allocated_prompt) {
-        free(allocated_prompt);
-    }
 
     if (line) {
         g_lle_integration->successful_reads++;

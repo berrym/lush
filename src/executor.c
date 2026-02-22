@@ -22,6 +22,7 @@
 #include "ht.h"
 #include "init.h"
 #include "lle/lle_shell_event_hub.h"
+#include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
 #include "lush.h"
 #include "node.h"
@@ -6444,6 +6445,13 @@ static int execute_assignment(executor_t *executor, const char *assignment) {
     // POSIX -a (allexport): automatically export assigned variables
     if (result == 0 && should_auto_export()) {
         symtable_export_global(var_name);
+    }
+
+    // Notify LLE prompt system when PS1, PS2, or PROMPT is set by user code
+    if (result == 0 && (strcmp(var_name, "PS1") == 0 ||
+                        strcmp(var_name, "PS2") == 0 ||
+                        strcmp(var_name, "PROMPT") == 0)) {
+        lle_shell_notify_prompt_var_set(var_name, value ? value : "");
     }
 
     if (executor->debug) {

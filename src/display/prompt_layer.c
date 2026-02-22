@@ -35,7 +35,6 @@
 #include "lle/lle_shell_integration.h"
 #include "lle/prompt/composer.h"
 #include "lle/prompt/theme.h"
-#include "symtable.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1093,25 +1092,24 @@ prompt_layer_error_t prompt_layer_generate_from_lush(prompt_layer_t *layer) {
 
     DEBUG_PRINT("Generating prompt from Lush system");
 
-    // Generate prompt using LLE prompt composer
-    lle_shell_update_prompt(); // This updates the global PS1 variable
+    // Expand PS1 format string via unified prompt engine (Spec 28)
+    lle_shell_update_prompt();
 
-    // Get the generated prompt from the symbol table
-    char *ps1_value = symtable_get_global("PS1");
-    if (!ps1_value) {
-        // Fallback to simple prompt
-        ps1_value = "$ ";
-        DEBUG_PRINT("PS1 not found, using simple prompt");
+    // Get the rendered prompt (not the format string in PS1)
+    const char *rendered = lle_shell_get_rendered_prompt();
+    if (!rendered || !*rendered) {
+        rendered = "$ ";
+        DEBUG_PRINT("Rendered prompt empty, using simple prompt");
     }
 
-    // Set the generated content in the layer
-    prompt_layer_error_t result = prompt_layer_set_content(layer, ps1_value);
+    // Set the rendered content in the layer
+    prompt_layer_error_t result = prompt_layer_set_content(layer, rendered);
     if (result != PROMPT_LAYER_SUCCESS) {
         return result;
     }
 
-    DEBUG_PRINT("Generated prompt from Lush: '%.50s%s'", ps1_value,
-                strlen(ps1_value) > 50 ? "..." : "");
+    DEBUG_PRINT("Generated prompt from Lush: '%.50s%s'", rendered,
+                strlen(rendered) > 50 ? "..." : "");
 
     return PROMPT_LAYER_SUCCESS;
 }

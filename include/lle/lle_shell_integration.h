@@ -203,6 +203,29 @@ lle_editor_t *lle_get_global_editor(void);
  */
 void lle_shell_update_prompt(void);
 
+/**
+ * @brief Get the most recently rendered PS1 prompt
+ *
+ * Returns a pointer to the static buffer holding the rendered prompt.
+ * Valid after lle_shell_update_prompt() has been called. The returned
+ * string is the fully expanded prompt ready for display.
+ *
+ * @return Rendered prompt string (static, do not free)
+ */
+const char *lle_shell_get_rendered_prompt(void);
+
+/**
+ * @brief Notify that PS1 or PROMPT was set by user code
+ *
+ * Called from the executor's variable assignment path. Marks PS1 as
+ * user-owned so the theme system won't overwrite it. Also syncs
+ * PROMPT ↔ PS1 bidirectionally.
+ *
+ * @param var_name  Variable that was set ("PS1", "PS2", or "PROMPT")
+ * @param value     The value that was assigned
+ */
+void lle_shell_notify_prompt_var_set(const char *var_name, const char *value);
+
 /* ============================================================================
  * RESET FUNCTIONS (THREE-TIER HIERARCHY)
  * ============================================================================

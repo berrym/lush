@@ -51,6 +51,10 @@ char *rebuild_prompt(void) { return build_prompt(); }
 
 void lle_shell_update_prompt(void) { /* No-op in tests */ }
 
+const char *lle_shell_get_rendered_prompt(void) {
+    return "$ "; /* Default prompt in tests */
+}
+
 /* Note: lush_generate_prompt() is now in libdisplay.a via
  * display_integration.c */
 

@@ -4,7 +4,7 @@
 **Version**: 1.0.0
 **Date**: 2026-02-22
 **Status**: SPECIFICATION - Pre-implementation
-**Dependencies**: Spec 25 (Prompt Theme System), Spec 13 (User Customization), Spec 26 (Adaptive Terminal Integration)
+**Dependencies**: Spec 25 (Prompt Theme System), Spec 13 (User Customization), Spec 26 (Adaptive Terminal Integration), Spec 03 (UTF-8 Index), Spec 04 (Grapheme Detection), Spec 08 (Unicode Compare)
 **Target**: Required for lush v1.5.0 release
 
 ---
@@ -516,10 +516,75 @@ For users upgrading to v1.5.0:
 | **Spec 13** (User Customization) | This spec extends Spec 13 by defining the TOML schema for complete theme customization and ensuring user themes have full built-in parity. |
 | **Spec 26** (Adaptive Terminal) | Color output in prompt expansion uses the unified terminal detection from Spec 26. |
 | **Core Shell** | The prompt expansion engine reuses the existing `transform_prompt()` logic from `executor.c` but extends it to handle zsh and LLE syntaxes. |
+| **Specs 03, 04, 08** (Unicode TR#29) | All prompt content handling uses the LLE UTF-8, grapheme cluster, and Unicode comparison infrastructure. See Section 10. |
 
 ---
 
-## 10. SUCCESS CRITERIA FOR v1.5.0
+## 10. UNICODE AND GRAPHEME-CLUSTER REQUIREMENTS
+
+All prompt expansion, rendering, and comparison code MUST be UTF-8 and grapheme-cluster aware, using the LLE Unicode TR#29 infrastructure as the base technology. Naive byte-level string operations (strlen for width, byte-at-a-time truncation) are prohibited for user-visible content. This applies to all implementation phases.
+
+### 10.1 Core Principle
+
+Prompt content — usernames, hostnames, directory paths, git branch names, segment output — may contain arbitrary UTF-8 text including multi-byte characters (accented Latin, CJK, emoji, combining marks, ZWJ sequences). The prompt system must handle these correctly at every stage:
+
+- **Visual width**: Use `lle_utf8_string_width()` (not `strlen()`) for terminal column calculations. CJK characters occupy 2 columns; combining marks occupy 0 columns; emoji may occupy 2 columns.
+- **Grapheme counting**: Use `lle_utf8_count_graphemes()` when counting user-perceived characters (e.g., for truncation display like "show last N characters of path").
+- **Buffer truncation**: Never split a multi-byte UTF-8 sequence at buffer boundaries. When output must be truncated, back up to the last complete UTF-8 sequence (use `lle_utf8_sequence_length()` to validate).
+- **String comparison**: Use `lle_unicode_strings_equal()` with appropriate options when comparing user content where normalization matters (e.g., filename matching, branch name comparison). NFC normalization ensures that `"café"` matches `"café"` regardless of encoding form.
+- **Input validation**: Validate UTF-8 encoding with `lle_utf8_is_valid()` at system boundaries (reading PS1 from symtable, receiving segment output). Invalid UTF-8 must be handled gracefully — fall back to a safe default rather than producing corrupted terminal output.
+- **Character width detection**: Use `lle_utf8_codepoint_width()` or `lle_is_wide_character()` for per-character width calculations when building display layouts.
+
+### 10.2 When Byte-Level Operations Are Acceptable
+
+ASCII-only syntax parsing does not require Unicode-aware functions. The following are explicitly permitted as byte-level operations:
+
+- **Escape sequence syntax**: Parsing `\X` (bash), `%X` (zsh), `${...}` (LLE) — these syntaxes are defined as ASCII and cannot contain multi-byte characters in their syntax tokens.
+- **ANSI escape sequences**: CSI sequences (`ESC [ ... final_byte`) are 7-bit ASCII. Byte-level scanning for these is correct.
+- **Shell identifier comparison**: Comparing variable names (`PS1`, `PS2`, `PROMPT`) with `strcmp()` — POSIX shell identifiers are ASCII `[a-zA-Z_][a-zA-Z0-9_]*`.
+- **Color specification parsing**: Named colors (`red`, `blue`), numeric codes (`255`), hex codes (`#RRGGBB`) — these are ASCII by definition.
+- **Path separator scanning**: `strchr(path, '/')`, `strrchr(path, '/')` — the ASCII byte `0x2F` cannot appear as a continuation byte in valid UTF-8 multi-byte sequences, making byte-level search safe.
+- **Single-byte ASCII character emission**: Writing `\n`, `\r`, `\\`, `$`, `#`, `%`, `ESC`, `BEL` — these are 7-bit ASCII values.
+
+The distinction is: **syntax is ASCII; content is UTF-8**. All content that originates from or passes through user-visible paths (environment values, filesystem names, command output) must use UTF-8-safe operations.
+
+### 10.3 Required LLE Unicode Infrastructure
+
+All phases of this specification MUST use the following LLE modules where applicable:
+
+| Module | Header | Primary Use in Prompt System |
+|--------|--------|------------------------------|
+| UTF-8 Core | `lle/utf8_support.h` | Sequence length, validation, encode/decode |
+| Grapheme Detection | `lle/unicode_grapheme.h` | Grapheme cluster boundaries, counting |
+| Character Width | `lle/char_width.h` | Display column width (wcwidth equivalent) |
+| String Width | `lle/utf8_support.h` | `lle_utf8_string_width()` for terminal column math |
+| Unicode Compare | `lle/unicode_compare.h` | NFC-normalized string comparison for user content |
+| Unicode Case | `lle/unicode_case.h` | Case conversion for prompt conditionals |
+| UTF-8 Index | `lle/utf8_index.h` | Bidirectional byte/grapheme/display mapping |
+
+### 10.4 Implementation Requirements Per Phase
+
+**Phase 1 (Expansion Engine)**:
+- Buffer append operations must not split UTF-8 multi-byte sequences on truncation
+- UTF-8 input validation at `lle_prompt_expand()` entry point
+- Content substitutions (username, hostname, cwd) pass through as opaque UTF-8 bytes — correct by design since these functions return kernel/libc strings
+
+**Phase 2 (PS1 as Format String)**:
+- UTF-8 validation of PS1/PS2 read from symtable before expansion
+- Rendered prompt visual width calculated with `lle_utf8_string_width()` where needed by display system
+
+**Phase 3 (TOML Theme Configuration)**:
+- Theme format strings from TOML must be validated as UTF-8
+- Segment truncation (e.g., `truncation_length = 3`) operates on grapheme clusters, not bytes
+- Branch name display respects grapheme boundaries
+
+**Phase 4 (User Theme Parity)**:
+- Theme validation reports UTF-8 encoding errors in user theme files
+- Export preserves UTF-8 content correctly
+
+---
+
+## 11. SUCCESS CRITERIA FOR v1.5.0
 
 - [ ] PS1/PS2 are the canonical prompt format strings (not bypassed)
 - [ ] All bash prompt escapes work correctly
@@ -531,8 +596,13 @@ For users upgrading to v1.5.0:
 - [ ] `theme` builtin supports list, switch, reload
 - [ ] All existing tests continue to pass
 - [ ] New test suites for prompt expansion and theme integration
+- [ ] All prompt content handling uses LLE Unicode TR#29 infrastructure
+- [ ] Buffer operations never produce truncated UTF-8 sequences
+- [ ] UTF-8 input validation at all system boundaries
+- [ ] Visual width calculations use `lle_utf8_string_width()`, not `strlen()`
 
 ---
 
 **Last Updated**: 2026-02-22
 **Primary Integration Target**: Spec 25 (Prompt Theme System)
+**Unicode Infrastructure**: LLE Unicode TR#29 (Specs 03, 04, 08)
