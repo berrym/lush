@@ -526,6 +526,17 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
+  # Prompt Expansion Unit Tests (Spec 28 Phase 1)
+  # Tests unified bash/zsh/LLE prompt expansion engine
+  test_prompt_expansion = executable('test_prompt_expansion',
+                                     'tests/lle/unit/test_prompt_expansion.c',
+                                     include_directories: inc,
+                                     dependencies: [lle_dep])
+
+  test('LLE Prompt Expansion', test_prompt_expansion,
+       suite: 'lle-unit',
+       timeout: 30)
+
   # Segment System Unit Tests (Spec 25 Section 5)
   # Tests segment registry, prompt context, and built-in segments
   test_segment_system = executable('test_segment_system',
