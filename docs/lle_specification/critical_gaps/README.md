@@ -27,6 +27,7 @@ Critical gaps are:
 | **25** | Default Keybindings | Spec 13 (User Customization) | ✅ 100% | ✅ 100% | ✅ COMPLETE |
 | **26** | Adaptive Terminal Integration | Spec 02 (Terminal System) | ⚠️ Partial | ✅ 100% | ✅ COMPLETE |
 | **27** | Fuzzy Matching Library | Multiple (autocorrect, completion, history, search) | ❌ N/A | ❌ N/A | ⏸️ Later |
+| **28** | Prompt Variable & Theme Integration | Spec 25 (Prompt Theme System) | ✅ 100% | ❌ 0% | 🔥 v1.5.0 Required |
 
 **CRITICAL DISCOVERY (2025-11-02)**: All critical gap specs were integrated into documentation but **NOT implemented in code**. This represents a severe documentation-reality mismatch that must be addressed.
 
