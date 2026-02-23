@@ -571,6 +571,18 @@ if lle_sources.length() > 0
        suite: 'lle-unit',
        timeout: 30)
 
+  # Powerline Renderer Unit Tests
+  # Tests powerline rendering (colored blocks, arrow separators, composer integration)
+  test_powerline_renderer = executable('test_powerline_renderer',
+                                       ['tests/lle/unit/test_powerline_renderer.c',
+                                        'tests/lle/functional/display_test_stubs.c'],
+                                       include_directories: inc,
+                                       dependencies: [lle_dep, display_dep])
+
+  test('LLE Powerline Renderer', test_powerline_renderer,
+       suite: 'lle-unit',
+       timeout: 30)
+
   # Render cache unit tests
   test_render_cache = executable('test_render_cache',
                                  'tests/lle/unit/test_render_cache.c',

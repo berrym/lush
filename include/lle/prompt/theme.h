@@ -256,6 +256,12 @@ typedef struct lle_segment_config {
     /* Shell level-specific */
     int min_level;     /**< Minimum nesting depth to show (shlvl) */
     bool min_level_set; /**< True if min_level was configured */
+
+    /* Powerline colors (per-segment foreground and background) */
+    lle_color_t fg_color; /**< Foreground color for powerline mode */
+    bool fg_color_set;    /**< True if fg_color was configured */
+    lle_color_t bg_color; /**< Background color for powerline mode */
+    bool bg_color_set;    /**< True if bg_color was configured */
 } lle_segment_config_t;
 
 /* ============================================================================
@@ -305,6 +311,14 @@ typedef enum lle_theme_source {
 } lle_theme_source_t;
 
 /**
+ * @brief Prompt rendering style
+ */
+typedef enum lle_prompt_style {
+    LLE_PROMPT_STYLE_PLAIN,     /**< Default: template-driven rendering */
+    LLE_PROMPT_STYLE_POWERLINE  /**< Powerline: colored blocks with arrow separators */
+} lle_prompt_style_t;
+
+/**
  * @brief Prompt layout configuration
  */
 typedef struct lle_prompt_layout {
@@ -317,6 +331,8 @@ typedef struct lle_prompt_layout {
     bool enable_transient;    /**< Simplify old prompts */
     bool enable_multiline;    /**< Multi-line primary prompt */
     bool compact_mode;        /**< Reduce spacing */
+
+    lle_prompt_style_t style; /**< Rendering style (plain or powerline) */
 
     uint8_t newline_before; /**< Newlines before prompt */
     uint8_t newline_after;  /**< Newlines after prompt */

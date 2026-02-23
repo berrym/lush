@@ -25,6 +25,7 @@
 #   [x] newline_after         - Blank lines after prompt
 #   [x] rps1                  - Right prompt (expanded via Spec 28 engine)
 #   [x] transient             - Transient prompt (expanded via Spec 28 engine)
+#   [x] style                 - "plain" (template) or "powerline" (colored blocks)
 #   [~] enable_multiline      - Parsed but multiline is template-driven
 #   [~] compact_mode          - Parsed but never checked
 #
@@ -91,6 +92,7 @@ rps1 = "${time}"
 transient = "$ "
 
 # Layout options
+style = "plain"                # [x] "plain" (template-driven) or "powerline" (colored blocks)
 enable_right_prompt = false    # [x] RPROMPT expanded; display requires Phase 3 completion
 enable_transient = false       # [x] Routes through Spec 28 expansion engine
 enable_multiline = false       # [~] Parsed but not used (multiline is template-driven)
@@ -349,3 +351,47 @@ show = true
 # Kubernetes context segment — visible when kubectl context exists
 [segments.kubernetes]
 show = true
+
+# ==============================================================================
+# POWERLINE MODE
+# ==============================================================================
+# When style = "powerline", segments render as colored blocks with arrow
+# separators instead of using the template engine. Each segment gets its own
+# foreground and background color; the separator between segments uses the
+# previous segment's bg as its fg and the next segment's bg as its bg.
+#
+# Requires a powerline-patched font (Nerd Fonts, Powerline fonts, etc.)
+#
+# Per-segment fg/bg colors (only used in powerline mode):
+#   fg = "#ffffff"      # Foreground text color
+#   bg = "#0087ff"      # Background block color
+#
+# Segments without explicit fg/bg use sensible defaults (white text on
+# a segment-specific background color).
+#
+# Example powerline theme configuration:
+#
+# [layout]
+# style = "powerline"
+# enable_transient = true
+# transient = "$ "
+# ps2 = " "
+#
+# [segments]
+# enabled = ["user", "directory", "git", "status"]
+#
+# [segments.user]
+# fg = "color255"
+# bg = "color240"
+#
+# [segments.directory]
+# fg = "color255"
+# bg = "color33"
+#
+# [segments.git]
+# fg = "color255"
+# bg = "color135"
+#
+# [segments.status]
+# fg = "color255"
+# bg = "color196"

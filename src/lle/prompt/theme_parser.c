@@ -995,6 +995,13 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
         } else if (strcmp(key, "compact") == 0 &&
                    value->type == LLE_THEME_VALUE_BOOLEAN) {
             theme->layout.compact_mode = value->data.boolean;
+        } else if (strcmp(key, "style") == 0 &&
+                   value->type == LLE_THEME_VALUE_STRING) {
+            if (strcasecmp(value->data.string, "powerline") == 0) {
+                theme->layout.style = LLE_PROMPT_STYLE_POWERLINE;
+            } else {
+                theme->layout.style = LLE_PROMPT_STYLE_PLAIN;
+            }
         }
         return LLE_SUCCESS;
     }
@@ -1084,6 +1091,14 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
                        value->type == LLE_THEME_VALUE_INTEGER) {
                 seg_cfg->min_level = (int)value->data.integer;
                 seg_cfg->min_level_set = true;
+            } else if (strcmp(key, "fg") == 0) {
+                if (apply_color(value, &seg_cfg->fg_color) == LLE_SUCCESS) {
+                    seg_cfg->fg_color_set = true;
+                }
+            } else if (strcmp(key, "bg") == 0) {
+                if (apply_color(value, &seg_cfg->bg_color) == LLE_SUCCESS) {
+                    seg_cfg->bg_color_set = true;
+                }
             }
         }
         return LLE_SUCCESS;

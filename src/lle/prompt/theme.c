@@ -962,16 +962,16 @@ lle_theme_t *lle_theme_create_classic(void) {
 /**
  * @brief Create the powerline theme
  *
- * Powerline-inspired prompt with separator glyphs.
- * Requires a powerline-patched font (Nerd Fonts, Powerline fonts, etc.)
+ * Powerline-style prompt with colored background segments and arrow
+ * separators. Requires a powerline-patched font (Nerd Fonts, etc.)
  *
- * Note: True powerline with colored background segments would require
- * additional composer support for background colors. This theme provides
- * a powerline-style look with foreground colors and separator symbols.
+ * Uses the powerline renderer (not the template engine) for PS1/RPROMPT.
+ * The composer detects layout.style == LLE_PROMPT_STYLE_POWERLINE and
+ * routes rendering through lle_powerline_render().
  *
  * Powerline characters used:
- *   U+E0B0  - Left-pointing solid arrow
- *   U+E0B1  - Left-pointing thin arrow
+ *   U+E0B0  - Left-pointing solid arrow (PS1 separator)
+ *   U+E0B2  - Right-pointing solid arrow (RPROMPT separator)
  *
  * @return Pointer to newly allocated theme, or NULL on allocation failure
  */
@@ -1008,13 +1008,61 @@ lle_theme_t *lle_theme_create_powerline(void) {
              "\xee\x82\xb2"); /* U+E0B2  */
 
     /* Use chevron for prompt symbol */
-    snprintf(theme->symbols.prompt, sizeof(theme->symbols.prompt), "❯");
+    snprintf(theme->symbols.prompt, sizeof(theme->symbols.prompt), "\xe2\x9d\xaf");
 
-    /* Powerline-style layout - separators between colored segments
-     * Without background colors, we use the arrows as visual dividers */
-    snprintf(theme->layout.ps1_format, sizeof(theme->layout.ps1_format),
-             "${user} \xee\x82\xb1 ${directory}${?git: \xee\x82\xb1 ${git}} "
-             "${symbol} ");
+    /* Powerline rendering mode — composer routes to lle_powerline_render() */
+    theme->layout.style = LLE_PROMPT_STYLE_POWERLINE;
+
+    /* Segment order for powerline rendering */
+    snprintf(theme->enabled_segments[0], 32, "user");
+    snprintf(theme->enabled_segments[1], 32, "directory");
+    snprintf(theme->enabled_segments[2], 32, "git");
+    snprintf(theme->enabled_segments[3], 32, "status");
+    theme->enabled_segment_count = 4;
+
+    /* Per-segment powerline colors: bold white text on colored backgrounds.
+     * Use true color #ffffff for fg (palette index 255 gets remapped by
+     * dark terminal colorschemes and becomes unreadable). Bold ensures
+     * legibility on saturated backgrounds. */
+    lle_segment_config_t *cfg;
+    lle_color_t white_bold = lle_color_rgb(255, 255, 255);
+    white_bold.bold = true;
+
+    cfg = &theme->segment_configs[0];
+    snprintf(cfg->name, sizeof(cfg->name), "user");
+    cfg->configured = true;
+    cfg->fg_color = white_bold;
+    cfg->fg_color_set = true;
+    cfg->bg_color = lle_color_rgb(68, 68, 68);    /* #444444 dark gray */
+    cfg->bg_color_set = true;
+
+    cfg = &theme->segment_configs[1];
+    snprintf(cfg->name, sizeof(cfg->name), "directory");
+    cfg->configured = true;
+    cfg->fg_color = white_bold;
+    cfg->fg_color_set = true;
+    cfg->bg_color = lle_color_rgb(0, 95, 175);    /* #005FAF strong blue */
+    cfg->bg_color_set = true;
+
+    cfg = &theme->segment_configs[2];
+    snprintf(cfg->name, sizeof(cfg->name), "git");
+    cfg->configured = true;
+    cfg->fg_color = white_bold;
+    cfg->fg_color_set = true;
+    cfg->bg_color = lle_color_rgb(135, 95, 175);  /* #875FAF medium purple */
+    cfg->bg_color_set = true;
+
+    cfg = &theme->segment_configs[3];
+    snprintf(cfg->name, sizeof(cfg->name), "status");
+    cfg->configured = true;
+    cfg->fg_color = white_bold;
+    cfg->fg_color_set = true;
+    cfg->bg_color = lle_color_rgb(175, 0, 0);     /* #AF0000 strong red */
+    cfg->bg_color_set = true;
+
+    theme->segment_config_count = 4;
+
+    /* PS2 and transient still use template engine */
     snprintf(theme->layout.ps2_format, sizeof(theme->layout.ps2_format),
              "\xee\x82\xb1 "); /* U+E0B1 thin arrow for continuation */
     snprintf(theme->layout.transient_format,

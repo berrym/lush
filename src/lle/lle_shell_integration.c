@@ -25,6 +25,7 @@
 #include "lle/lle_shell_hooks.h"
 #include "lle/lle_watchdog.h"
 #include "lle/prompt/composer.h"
+#include "lle/prompt/powerline.h"
 #include "lle/prompt/prompt_expansion.h"
 #include "lle/prompt/segment.h"
 #include "lle/utf8_support.h"
@@ -806,6 +807,51 @@ void lle_shell_update_prompt(void) {
         executor_update_job_status(executor);
         int job_count = executor_count_jobs(executor);
         lle_prompt_context_set_job_count(&composer->context, job_count);
+    }
+
+    /* Powerline rendering path: bypass PS1 symtable entirely.
+     * The powerline renderer iterates the theme's enabled_segments[]
+     * and generates colored blocks with arrow separators. */
+    const lle_theme_t *active_theme =
+        composer->themes
+            ? lle_theme_registry_get_active(composer->themes)
+            : NULL;
+    if (active_theme &&
+        active_theme->layout.style == LLE_PROMPT_STYLE_POWERLINE &&
+        active_theme->enabled_segment_count > 0) {
+        size_t offset = 0;
+        if (composer->config.newline_before_prompt) {
+            s_rendered_ps1[0] = '\n';
+            offset = 1;
+        }
+
+        lle_result_t pl_result = lle_powerline_render(
+            active_theme, composer->segments, &composer->context,
+            LLE_POWERLINE_LEFT_TO_RIGHT,
+            s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset);
+        if (pl_result != LLE_SUCCESS) {
+            snprintf(s_rendered_ps1 + offset,
+                     sizeof(s_rendered_ps1) - offset, "$ ");
+        } else {
+            /* Append trailing space for cursor separation */
+            size_t len = strlen(s_rendered_ps1);
+            if (len + 1 < sizeof(s_rendered_ps1)) {
+                s_rendered_ps1[len] = ' ';
+                s_rendered_ps1[len + 1] = '\0';
+            }
+        }
+
+        /* Powerline RPROMPT */
+        s_rendered_rprompt[0] = '\0';
+        if (active_theme->layout.enable_right_prompt) {
+            lle_powerline_render(
+                active_theme, composer->segments, &composer->context,
+                LLE_POWERLINE_RIGHT_TO_LEFT,
+                s_rendered_rprompt, sizeof(s_rendered_rprompt));
+        }
+
+        lle_composer_clear_regeneration_flag(composer);
+        return;
     }
 
     /* Read PS1 format string from symtable */

@@ -241,6 +241,7 @@ lle_sources += files(
   'prompt/theme_parser.c',
   'prompt/theme_loader.c',
   'prompt/composer.c',
+  'prompt/powerline_renderer.c',
   'prompt/prompt_expansion.c',
 )
 

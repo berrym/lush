@@ -904,6 +904,9 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
     if (theme->layout.compact_mode) {
         APPEND("compact = true\n");
     }
+    if (theme->layout.style == LLE_PROMPT_STYLE_POWERLINE) {
+        APPEND("style = \"powerline\"\n");
+    }
     APPEND("\n");
 
     /* [segments] section */
@@ -956,6 +959,18 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
         }
         if (seg->show_stash_set) {
             APPEND("show_stash = %s\n", seg->show_stash ? "true" : "false");
+        }
+        if (seg->fg_color_set && seg->fg_color.mode != LLE_COLOR_MODE_NONE) {
+            if (format_color_toml(&seg->fg_color, color_buf,
+                                  sizeof(color_buf)) > 0) {
+                APPEND("fg = %s\n", color_buf);
+            }
+        }
+        if (seg->bg_color_set && seg->bg_color.mode != LLE_COLOR_MODE_NONE) {
+            if (format_color_toml(&seg->bg_color, color_buf,
+                                  sizeof(color_buf)) > 0) {
+                APPEND("bg = %s\n", color_buf);
+            }
         }
         APPEND("\n");
     }

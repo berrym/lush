@@ -7069,6 +7069,23 @@ int bin_display(int argc, char **argv) {
                     g_lle_integration->prompt_composer, theme_name);
 
                 if (result == LLE_SUCCESS) {
+                    /* Sync PS1/PS2 from the new theme */
+                    const lle_theme_t *new_theme = lle_composer_get_theme(
+                        g_lle_integration->prompt_composer);
+                    if (new_theme) {
+                        if (new_theme->layout.style !=
+                            LLE_PROMPT_STYLE_POWERLINE) {
+                            /* Plain themes: write template to PS1 */
+                            if (strlen(new_theme->layout.ps1_format) > 0) {
+                                symtable_set_global(
+                                    "PS1", new_theme->layout.ps1_format);
+                            }
+                        }
+                        if (strlen(new_theme->layout.ps2_format) > 0) {
+                            symtable_set_global(
+                                "PS2", new_theme->layout.ps2_format);
+                        }
+                    }
                     printf("LLE theme set to '%s'\n", theme_name);
                     return 0;
                 } else if (result == LLE_ERROR_NOT_FOUND) {

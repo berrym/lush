@@ -10,6 +10,7 @@
  */
 
 #include "lle/prompt/composer.h"
+#include "lle/prompt/powerline.h"
 #include "display/command_layer.h"
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/display_integration.h"
@@ -622,6 +623,66 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
             strlen(theme->layout.rps1_format) > 0) {
             right_format = theme->layout.rps1_format;
         }
+    }
+
+    /* Powerline rendering path */
+    if (theme && theme->layout.style == LLE_PROMPT_STYLE_POWERLINE &&
+        theme->enabled_segment_count > 0) {
+        lle_result_t pl_result;
+        size_t ps1_offset = 0;
+
+        /* Prepend newline if configured */
+        if (composer->config.newline_before_prompt) {
+            output->ps1[0] = '\n';
+            ps1_offset = 1;
+        }
+
+        /* Render powerline PS1 */
+        pl_result = lle_powerline_render(
+            theme, composer->segments, &composer->context,
+            LLE_POWERLINE_LEFT_TO_RIGHT, output->ps1 + ps1_offset,
+            sizeof(output->ps1) - ps1_offset);
+        if (pl_result != LLE_SUCCESS) {
+            snprintf(output->ps1, sizeof(output->ps1), "$ ");
+        }
+
+        /* Append trailing space for cursor separation */
+        output->ps1_len = strlen(output->ps1);
+        if (output->ps1_len + 1 < sizeof(output->ps1)) {
+            output->ps1[output->ps1_len++] = ' ';
+            output->ps1[output->ps1_len] = '\0';
+        }
+        output->ps1_visual_width = calculate_visual_width(output->ps1);
+        output->is_multiline = (strchr(output->ps1, '\n') != NULL);
+
+        /* Powerline RPROMPT */
+        if (theme->layout.enable_right_prompt) {
+            pl_result = lle_powerline_render(
+                theme, composer->segments, &composer->context,
+                LLE_POWERLINE_RIGHT_TO_LEFT, output->rprompt,
+                sizeof(output->rprompt));
+            if (pl_result == LLE_SUCCESS && strlen(output->rprompt) > 0) {
+                output->has_rprompt = true;
+                output->rprompt_len = strlen(output->rprompt);
+                output->rprompt_visual_width =
+                    calculate_visual_width(output->rprompt);
+            }
+        }
+
+        /* PS2 still uses template engine */
+        lle_template_render_ctx_t render_ctx =
+            lle_composer_create_render_ctx(composer);
+        pl_result =
+            lle_template_evaluate(ps2_format, &render_ctx, output->ps2,
+                                  sizeof(output->ps2));
+        if (pl_result != LLE_SUCCESS) {
+            snprintf(output->ps2, sizeof(output->ps2), "> ");
+        }
+        output->ps2_len = strlen(output->ps2);
+        output->ps2_visual_width = calculate_visual_width(output->ps2);
+
+        composer->total_renders++;
+        return LLE_SUCCESS;
     }
 
     /* Create render context */
