@@ -231,6 +231,32 @@ static bool composer_is_visible(const char *segment_name, const char *property,
 
     lle_prompt_composer_t *composer = ctx->composer;
 
+    /* Check theme's enabled_segments filter (if non-empty, acts as whitelist) */
+    const lle_theme_t *theme = ctx->theme;
+    if (theme && theme->enabled_segment_count > 0) {
+        bool in_whitelist = false;
+        for (size_t i = 0; i < theme->enabled_segment_count; i++) {
+            if (strcmp(theme->enabled_segments[i], segment_name) == 0) {
+                in_whitelist = true;
+                break;
+            }
+        }
+        if (!in_whitelist) {
+            return false;
+        }
+    }
+
+    /* Check per-segment show flag from theme config */
+    if (theme) {
+        for (size_t i = 0; i < theme->segment_config_count; i++) {
+            if (strcmp(theme->segment_configs[i].name, segment_name) == 0 &&
+                theme->segment_configs[i].show_set &&
+                !theme->segment_configs[i].show) {
+                return false;
+            }
+        }
+    }
+
     /* Find segment in registry */
     lle_prompt_segment_t *segment =
         lle_segment_registry_find(composer->segments, segment_name);
@@ -293,22 +319,42 @@ static const char *composer_get_color(const char *color_name, void *user_data) {
         color = &theme->colors.text;
     } else if (strcmp(color_name, "text_dim") == 0) {
         color = &theme->colors.text_dim;
+    } else if (strcmp(color_name, "text_bright") == 0) {
+        color = &theme->colors.text_bright;
+    } else if (strcmp(color_name, "border") == 0) {
+        color = &theme->colors.border;
+    } else if (strcmp(color_name, "background") == 0) {
+        color = &theme->colors.background;
+    } else if (strcmp(color_name, "highlight") == 0) {
+        color = &theme->colors.highlight;
     } else if (strcmp(color_name, "git_clean") == 0) {
         color = &theme->colors.git_clean;
     } else if (strcmp(color_name, "git_dirty") == 0) {
         color = &theme->colors.git_dirty;
     } else if (strcmp(color_name, "git_staged") == 0) {
         color = &theme->colors.git_staged;
+    } else if (strcmp(color_name, "git_untracked") == 0) {
+        color = &theme->colors.git_untracked;
     } else if (strcmp(color_name, "git_branch") == 0) {
         color = &theme->colors.git_branch;
+    } else if (strcmp(color_name, "git_ahead") == 0) {
+        color = &theme->colors.git_ahead;
+    } else if (strcmp(color_name, "git_behind") == 0) {
+        color = &theme->colors.git_behind;
     } else if (strcmp(color_name, "path_home") == 0) {
         color = &theme->colors.path_home;
     } else if (strcmp(color_name, "path_normal") == 0) {
         color = &theme->colors.path_normal;
+    } else if (strcmp(color_name, "path_root") == 0) {
+        color = &theme->colors.path_root;
+    } else if (strcmp(color_name, "path_separator") == 0) {
+        color = &theme->colors.path_separator;
     } else if (strcmp(color_name, "status_ok") == 0) {
         color = &theme->colors.status_ok;
     } else if (strcmp(color_name, "status_error") == 0) {
         color = &theme->colors.status_error;
+    } else if (strcmp(color_name, "status_running") == 0) {
+        color = &theme->colors.status_running;
     }
 
     if (!color || color->mode == LLE_COLOR_MODE_NONE) {

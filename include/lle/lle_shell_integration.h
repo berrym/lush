@@ -215,6 +215,17 @@ void lle_shell_update_prompt(void);
 const char *lle_shell_get_rendered_prompt(void);
 
 /**
+ * @brief Get the most recently rendered RPROMPT (right prompt)
+ *
+ * Returns a pointer to the static buffer holding the rendered right prompt.
+ * Valid after lle_shell_update_prompt() has been called. Empty string if
+ * no RPROMPT/RPS1 is configured.
+ *
+ * @return Rendered right prompt string (static, do not free)
+ */
+const char *lle_shell_get_rendered_rprompt(void);
+
+/**
  * @brief Notify that PS1 or PROMPT was set by user code
  *
  * Called from the executor's variable assignment path. Marks PS1 as

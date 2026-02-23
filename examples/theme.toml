@@ -22,33 +22,33 @@
 # LAYOUT:
 #   [x] ps1, ps2              - Main and continuation prompts
 #   [x] newline_before        - Blank lines before prompt
-#   [x] newline_after         - Blank lines after prompt (Session 89)
-#   [~] rps1                  - Right prompt (parsed, not displayed)
-#   [~] transient             - Transient prompt (parsed, widgets only)
+#   [x] newline_after         - Blank lines after prompt
+#   [x] rps1                  - Right prompt (expanded via Spec 28 engine)
+#   [x] transient             - Transient prompt (expanded via Spec 28 engine)
 #   [~] enable_multiline      - Parsed but multiline is template-driven
 #   [~] compact_mode          - Parsed but never checked
 #
 # COLORS:
 #   [x] primary, secondary, success, warning, error, info
-#   [x] text, text_dim
+#   [x] text, text_dim, text_bright
+#   [x] border, background, highlight
 #   [x] git_clean, git_dirty, git_staged, git_branch
-#   [x] git_ahead, git_behind, git_untracked - Used in git segment (Session 89)
-#   [x] path_normal, path_home
-#   [x] path_root - Used in directory segment when at / (Session 90)
-#   [x] status_ok, status_error
-#   [~] text_bright, border, background, highlight - Parsed, not used
-#   [~] path_separator, status_running - Parsed, not used
+#   [x] git_ahead, git_behind, git_untracked
+#   [x] path_normal, path_home, path_root, path_separator
+#   [x] status_ok, status_error, status_running
 #
 # SYMBOLS:
 #   [x] prompt, prompt_root, continuation, separator_left, separator_right
-#   [x] staged, unstaged, untracked, ahead, behind - Git indicators (Session 89)
-#   [x] branch, stash, conflict - Git symbols (Session 90)
-#   [x] error - Status segment symbol (Session 89)
-#   [x] jobs - Jobs segment symbol (Session 89)
-#   [~] directory, home, success, time - Parsed, not used
+#   [x] staged, unstaged, untracked, ahead, behind - Git indicators
+#   [x] branch, stash, conflict - Git symbols
+#   [x] error, success - Status segment symbols
+#   [x] jobs - Jobs segment symbol
+#   [x] directory, home - Directory segment symbols
+#   [x] time - Time segment symbol
 #
 # SEGMENTS:
-#   [~] enabled array - Parsed but segment filtering not implemented
+#   [x] enabled array - Whitelist filter for visible segments
+#   [x] Per-segment config via [segments.<name>] subsections
 #
 # SYNTAX HIGHLIGHTING:
 #   [x] All syntax colors are fully implemented
@@ -80,20 +80,21 @@ ps1 = "${path}${?git: ${git}}${?status: ${status}}${?jobs: [${jobs}]} $ "
 ps2 = "> "
 
 # Right-side prompt (RPS1) - shown on right edge of terminal
-# NOTE: Right prompts are not yet implemented in the display layer
+# Expanded via the Spec 28 two-pass engine (template + bash/zsh escapes)
+# Set enable_right_prompt = true below to activate
 rps1 = "${time}"
 
 # Transient prompt - replaces old prompts after command execution
-# NOTE: Transient prompts are not yet implemented
+# Expanded via the Spec 28 two-pass engine (template + bash/zsh escapes)
 transient = "$ "
 
 # Layout options
-enable_right_prompt = false    # [~] Parsed but rprompt not displayed
-enable_transient = false       # [~] Partially implemented (widgets only)
+enable_right_prompt = false    # [x] RPROMPT expanded; display requires Phase 3 completion
+enable_transient = false       # [x] Routes through Spec 28 expansion engine
 enable_multiline = false       # [~] Parsed but not used (multiline is template-driven)
 compact_mode = false           # [~] Parsed but not implemented
-newline_before = 0             # [x] Blank lines before prompt
-newline_after = 0              # [x] Blank lines after prompt (Session 89)
+newline_before = 0             # Blank lines before prompt
+newline_after = 0              # Blank lines after prompt
 
 # ==============================================================================
 # SEMANTIC COLORS
@@ -111,9 +112,9 @@ info = "#6C71C4"               # Information (solarized violet)
 # Text colors
 text = "#839496"               # Normal text (solarized base0)
 text_dim = "#586E75"           # Dimmed text (solarized base01)
-text_bright = "#FDF6E3"        # [~] Bright text - parsed but not used
+text_bright = "#FDF6E3"        # Bright text (solarized base3)
 
-# Structural colors - [~] All parsed but not used in rendering
+# Structural colors
 border = "#073642"             # Border/separator (solarized base02)
 background = "#002B36"         # Background (solarized base03)
 highlight = "#073642"          # Highlight (solarized base02)
@@ -124,57 +125,56 @@ git_dirty = "#DC322F"          # Dirty repository
 git_staged = "#B58900"         # Staged changes
 git_untracked = "#6C71C4"      # Untracked files
 git_branch = "#268BD2"         # Branch name
-git_ahead = "#859900"          # Commits ahead (Session 89)
-git_behind = "#DC322F"         # Commits behind (Session 89)
+git_ahead = "#859900"          # Commits ahead
+git_behind = "#DC322F"         # Commits behind
 
 # Path colors
 path_home = "#268BD2"          # Home directory
-path_root = "#DC322F"          # Root directory / (Session 90)
+path_root = "#DC322F"          # Root directory /
 path_normal = "#839496"        # Normal path components
-path_separator = "#586E75"     # [~] Path separator - not even parsed
+path_separator = "#586E75"     # Path separator character
 
 # Status colors
 status_ok = "#859900"          # Success status (exit 0)
 status_error = "#DC322F"       # Error status (non-zero exit)
-status_running = "#B58900"     # [~] Running status - parsed but not used
+status_running = "#B58900"     # Running status indicator
 
 # ==============================================================================
 # SYMBOLS
 # ==============================================================================
-# NOTE: Most symbols below are parsed but NOT used in rendering.
-# Only prompt, prompt_root, continuation, and separators are functional.
+# All symbols below are parsed and applied by their respective segment renderers.
 
 [symbols]
-# Prompt symbols - [x] These work
+# Prompt symbols
 prompt = "$"                   # Main prompt character
 prompt_root = "#"              # Root user prompt
 continuation = ">"             # PS2 continuation
 
-# Powerline separators (requires powerline/nerd fonts) - [x] These work
+# Powerline separators (requires powerline/nerd fonts)
 separator_left = ""           # Left-pointing separator
 separator_right = ""          # Right-pointing separator
 
-# Git symbols - [x] All working (Session 89-90)
+# Git symbols
 branch = ""                   # Branch icon (nerd font)
-staged = "+"                   # Staged changes
-unstaged = "!"                 # Unstaged changes
-untracked = "?"                # Untracked files
-ahead = ""                    # Commits ahead
-behind = ""                   # Commits behind
-stash = ""                    # Stashed changes (Session 90)
-conflict = ""                 # Merge conflict (Session 90)
+staged = "+"                   # Staged changes indicator
+unstaged = "!"                 # Unstaged changes indicator
+untracked = "?"                # Untracked files indicator
+ahead = ""                    # Commits ahead indicator
+behind = ""                   # Commits behind indicator
+stash = ""                    # Stashed changes
+conflict = ""                 # Merge conflict
 
-# Directory symbols - [~] Parsed but not used
-directory = ""                # Directory icon
-home = "~"                     # Home directory
+# Directory symbols - used by directory segment renderer
+directory = ""                # Directory prefix icon
+home = "~"                     # Home directory replacement
 
-# Status symbols - [~] Parsed but not used
+# Status symbols
 error = ""                    # Error indicator
 success = ""                  # Success indicator
 
-# Other - [~] Parsed but not used
-time = ""                     # Time display
-jobs = ""                     # Background jobs
+# Other segment symbols
+time = ""                     # Time segment prefix
+jobs = ""                     # Background jobs prefix
 
 # ==============================================================================
 # ASCII FALLBACK SYMBOLS
@@ -270,9 +270,9 @@ comment_dim = true             # Dim comments
 # ==============================================================================
 # ENABLED SEGMENTS
 # ==============================================================================
-# List of segments to include in the prompt. Order matters.
-# NOTE: [~] This is parsed but segment filtering is NOT implemented.
-# Segments are controlled by their own is_enabled() callbacks, not this list.
+# List of segments to include in the prompt. Acts as a whitelist filter:
+# only segments in this list will be rendered. If omitted or empty, all
+# segments are eligible (controlled by their own is_enabled() callbacks).
 
 [segments]
 enabled = [
@@ -281,3 +281,34 @@ enabled = [
     "status",
     "jobs"
 ]
+
+# ==============================================================================
+# PER-SEGMENT CONFIGURATION
+# ==============================================================================
+# Each segment can be individually configured via [segments.<name>] subsections.
+# Only set values override the defaults; unset fields inherit from the theme.
+
+# Directory segment configuration
+[segments.directory]
+show = true                    # Set false to hide this segment
+style = "full"                 # "full" (default), "short" (truncated intermediates),
+                               # "basename" (last component only)
+truncation_length = 0          # Max path components from the end (0 = no limit)
+                               # e.g., truncation_length = 3 shows ".../foo/bar/baz"
+home_symbol = "~"              # Symbol replacing $HOME in path display
+
+# Git segment configuration
+[segments.git]
+show = true
+show_branch = true             # Show branch name
+show_status = true             # Show dirty/staged/untracked indicators
+show_ahead_behind = true       # Show ahead/behind remote tracking
+show_stash = true              # Show stash indicator
+truncation_length = 0          # Max graphemes for branch name (0 = no limit)
+                               # e.g., truncation_length = 20 shows "feature/very-long-b..."
+
+# Time segment configuration
+[segments.time]
+show = true
+format = "%H:%M:%S"           # strftime format string (default: "%H:%M:%S")
+                               # Examples: "%H:%M" (short), "%I:%M %p" (12-hour)

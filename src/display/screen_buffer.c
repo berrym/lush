@@ -50,6 +50,12 @@ void screen_buffer_init(screen_buffer_t *buffer, int terminal_width) {
     buffer->command_end_row = 0;
     buffer->command_end_col = 0;
 
+    // Initialize RPROMPT fields
+    buffer->rprompt_text[0] = '\0';
+    buffer->rprompt_visual_width = 0;
+    buffer->rprompt_fits = false;
+    buffer->rprompt_col = 0;
+
     // Initialize all prefix pointers to NULL
     for (int i = 0; i < SCREEN_BUFFER_MAX_ROWS; i++) {
         buffer->lines[i].prefix = NULL;
@@ -81,6 +87,12 @@ void screen_buffer_clear(screen_buffer_t *buffer) {
     buffer->total_display_rows = 0;
     buffer->command_end_row = 0;
     buffer->command_end_col = 0;
+
+    // Reset RPROMPT fields
+    buffer->rprompt_text[0] = '\0';
+    buffer->rprompt_visual_width = 0;
+    buffer->rprompt_fits = false;
+    buffer->rprompt_col = 0;
 }
 
 void screen_buffer_cleanup(screen_buffer_t *buffer) {
@@ -105,6 +117,62 @@ void screen_buffer_copy(screen_buffer_t *dest, const screen_buffer_t *src) {
 // ============================================================================
 // TEXT WIDTH CALCULATION
 // ============================================================================
+
+void screen_buffer_set_rprompt(screen_buffer_t *buffer,
+                               const char *rprompt_text) {
+    if (!buffer) {
+        return;
+    }
+
+    /* Clear RPROMPT state */
+    buffer->rprompt_text[0] = '\0';
+    buffer->rprompt_visual_width = 0;
+    buffer->rprompt_fits = false;
+    buffer->rprompt_col = 0;
+
+    if (!rprompt_text || !rprompt_text[0]) {
+        return;
+    }
+
+    /* Copy RPROMPT text (truncate if necessary) */
+    size_t len = strlen(rprompt_text);
+    if (len >= sizeof(buffer->rprompt_text)) {
+        len = sizeof(buffer->rprompt_text) - 1;
+    }
+    memcpy(buffer->rprompt_text, rprompt_text, len);
+    buffer->rprompt_text[len] = '\0';
+
+    /* Calculate visual width (excludes ANSI escape codes) */
+    buffer->rprompt_visual_width =
+        (int)screen_buffer_visual_width(rprompt_text, strlen(rprompt_text));
+
+    if (buffer->rprompt_visual_width <= 0) {
+        return;
+    }
+
+    /* Fit check: RPROMPT fits only on the prompt row (command_start_row).
+     *
+     * If the command text is still on the same row as the prompt, we must
+     * check against command_end_col (the rightmost extent of typed text).
+     * If the command has wrapped to subsequent rows, the prompt row has
+     * only the prompt itself, so command_start_col is the right boundary.
+     *
+     * Either way: rightmost_used_col + 1 (gap) + rprompt_width <= term_width
+     * The 1-column gap prevents prompt/command text and rprompt from touching.
+     */
+    int rightmost_col = buffer->command_start_col;
+    if (buffer->command_end_row == buffer->command_start_row) {
+        /* Command hasn't wrapped — use the actual end of typed text */
+        rightmost_col = buffer->command_end_col;
+    }
+
+    int space_needed = rightmost_col + 1 + buffer->rprompt_visual_width;
+    if (space_needed <= buffer->terminal_width) {
+        buffer->rprompt_fits = true;
+        buffer->rprompt_col =
+            buffer->terminal_width - buffer->rprompt_visual_width;
+    }
+}
 
 size_t screen_buffer_visual_width(const char *text, size_t byte_length) {
     if (!text)

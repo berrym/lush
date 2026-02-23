@@ -862,6 +862,47 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
         APPEND("]\n\n");
     }
 
+    /* [segments.<name>] subsections */
+    for (size_t si = 0; si < theme->segment_config_count; si++) {
+        const lle_segment_config_t *seg = &theme->segment_configs[si];
+        if (!seg->configured) {
+            continue;
+        }
+        APPEND("[segments.%s]\n", seg->name);
+        if (seg->show_set) {
+            APPEND("show = %s\n", seg->show ? "true" : "false");
+        }
+        if (seg->truncation_length_set) {
+            APPEND("truncation_length = %d\n", seg->truncation_length);
+        }
+        if (seg->style_set) {
+            toml_escape_string(seg->style, escaped, sizeof(escaped));
+            APPEND("style = %s\n", escaped);
+        }
+        if (seg->format_set) {
+            toml_escape_string(seg->format, escaped, sizeof(escaped));
+            APPEND("format = %s\n", escaped);
+        }
+        if (seg->home_symbol_set) {
+            toml_escape_string(seg->home_symbol, escaped, sizeof(escaped));
+            APPEND("home_symbol = %s\n", escaped);
+        }
+        if (seg->show_branch_set) {
+            APPEND("show_branch = %s\n", seg->show_branch ? "true" : "false");
+        }
+        if (seg->show_status_set) {
+            APPEND("show_status = %s\n", seg->show_status ? "true" : "false");
+        }
+        if (seg->show_ahead_behind_set) {
+            APPEND("show_ahead_behind = %s\n",
+                   seg->show_ahead_behind ? "true" : "false");
+        }
+        if (seg->show_stash_set) {
+            APPEND("show_stash = %s\n", seg->show_stash ? "true" : "false");
+        }
+        APPEND("\n");
+    }
+
     /* [colors] section */
     APPEND("[colors]\n");
 

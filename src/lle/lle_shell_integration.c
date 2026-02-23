@@ -589,6 +589,13 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         free(ps1_val);
     }
 
+    /* Seed RPROMPT from theme's rps1_format if right prompt is enabled */
+    if (theme && theme->layout.enable_right_prompt &&
+        strlen(theme->layout.rps1_format) > 0) {
+        symtable_set_global("RPROMPT", theme->layout.rps1_format);
+        symtable_set_global("RPS1", theme->layout.rps1_format);
+    }
+
     return LLE_SUCCESS;
 }
 
@@ -767,6 +774,14 @@ const char *lle_shell_get_rendered_prompt(void) {
     return s_rendered_ps1;
 }
 
+/** @brief Static buffer for the last rendered RPROMPT */
+static char s_rendered_rprompt[LLE_PROMPT_OUTPUT_MAX];
+
+/** @brief Get the most recently rendered RPROMPT (right prompt) */
+const char *lle_shell_get_rendered_rprompt(void) {
+    return s_rendered_rprompt;
+}
+
 void lle_shell_update_prompt(void) {
     /* Use minimal fallback if LLE integration not available */
     if (!g_lle_integration || !g_lle_integration->prompt_composer) {
@@ -836,6 +851,21 @@ void lle_shell_update_prompt(void) {
 
     lle_composer_clear_regeneration_flag(composer);
     free(ps1_fmt);
+
+    /* Expand RPROMPT (right prompt) using the same expansion context.
+     * Read from RPROMPT or RPS1 in the symtable. */
+    s_rendered_rprompt[0] = '\0';
+    char *rprompt_fmt = symtable_get_global("RPROMPT");
+    if (!rprompt_fmt) {
+        rprompt_fmt = symtable_get_global("RPS1");
+    }
+    if (rprompt_fmt && rprompt_fmt[0]) {
+        if (lle_utf8_is_valid(rprompt_fmt, strlen(rprompt_fmt))) {
+            lle_prompt_expand(rprompt_fmt, s_rendered_rprompt,
+                              sizeof(s_rendered_rprompt), &expand_ctx);
+        }
+        free(rprompt_fmt);
+    }
 }
 
 /**
@@ -863,6 +893,14 @@ void lle_shell_notify_prompt_var_set(const char *var_name, const char *value) {
             symtable_set_global("PS1", value);
     } else if (strcmp(var_name, "PS2") == 0) {
         lle_prompt_notify_ps2_changed(composer);
+    } else if (strcmp(var_name, "RPROMPT") == 0) {
+        /* Sync RPS1 = RPROMPT */
+        if (value)
+            symtable_set_global("RPS1", value);
+    } else if (strcmp(var_name, "RPS1") == 0) {
+        /* Sync RPROMPT = RPS1 */
+        if (value)
+            symtable_set_global("RPROMPT", value);
     }
 }
 

@@ -47,6 +47,9 @@
 // LLE Notification support (transient hints)
 #include "lle/notification.h"
 
+// LLE Shell integration (RPROMPT)
+#include "lle/lle_shell_integration.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -553,6 +556,15 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
+    /* Pass RPROMPT to screen_buffer for fit calculation.
+     * Must be done after screen_buffer_render() so command_start_col is valid.
+     * The RPROMPT text comes from the shell integration layer which expands
+     * RPROMPT/RPS1 through the Spec 28 two-pass engine. */
+    const char *rprompt = lle_shell_get_rendered_rprompt();
+    if (rprompt && rprompt[0]) {
+        screen_buffer_set_rprompt(&desired_screen, rprompt);
+    }
+
     /* Add menu rows to screen_buffer per SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md
      *
      * This is the key fix: by adding menu rows to screen_buffer AFTER rendering
@@ -685,6 +697,37 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     /* Step 3: Clear from current position to end of screen
      * This clears only the command area, never touches the prompt */
     dc_write_all(STDOUT_FILENO, "\033[J", 3);
+
+    /* Step 3.5: Write RPROMPT (right-aligned on prompt row)
+     *
+     * RPROMPT occupies the right side of the prompt row. It's written after
+     * \033[J clears the command area (which also erases any previous RPROMPT),
+     * so we must redraw it every cycle.
+     *
+     * Sequence: move to rprompt_col, write RPROMPT, move back to command_start.
+     * Only on single-line prompts where command hasn't grown into RPROMPT space.
+     */
+    if (desired_screen.rprompt_fits && desired_screen.rprompt_text[0]) {
+        char rprompt_col_seq[16];
+        int rprompt_col_len =
+            snprintf(rprompt_col_seq, sizeof(rprompt_col_seq), "\033[%dG",
+                     desired_screen.rprompt_col + 1);
+        if (rprompt_col_len > 0) {
+            dc_write_all(STDOUT_FILENO, rprompt_col_seq, (size_t)rprompt_col_len);
+        }
+        dc_write_all(STDOUT_FILENO, desired_screen.rprompt_text,
+                      strlen(desired_screen.rprompt_text));
+        /* Reset attributes after RPROMPT (it may contain colors) */
+        dc_write_all(STDOUT_FILENO, "\033[0m", 4);
+        /* Move back to command start column */
+        char back_col_seq[16];
+        int back_col_len =
+            snprintf(back_col_seq, sizeof(back_col_seq), "\033[%dG",
+                     command_start_col + 1);
+        if (back_col_len > 0) {
+            dc_write_all(STDOUT_FILENO, back_col_seq, (size_t)back_col_len);
+        }
+    }
 
     /* Step 4: Write command text with continuation prompts
      *

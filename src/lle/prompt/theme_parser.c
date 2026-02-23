@@ -1018,6 +1018,69 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
         return LLE_SUCCESS;
     }
 
+    /* [segments.<name>] subsections - per-segment configuration */
+    if (strncmp(section, "segments.", 9) == 0 && section[9] != '\0') {
+        const char *seg_name = section + 9;
+
+        /* Find or create segment config entry */
+        lle_segment_config_t *seg_cfg = NULL;
+        for (size_t i = 0; i < theme->segment_config_count; i++) {
+            if (strcmp(theme->segment_configs[i].name, seg_name) == 0) {
+                seg_cfg = &theme->segment_configs[i];
+                break;
+            }
+        }
+        if (!seg_cfg && theme->segment_config_count < LLE_THEME_MAX_SEGMENT_CONFIGS) {
+            seg_cfg = &theme->segment_configs[theme->segment_config_count++];
+            memset(seg_cfg, 0, sizeof(*seg_cfg));
+            snprintf(seg_cfg->name, sizeof(seg_cfg->name), "%.31s", seg_name);
+            seg_cfg->configured = true;
+        }
+
+        if (seg_cfg) {
+            if (strcmp(key, "show") == 0 && value->type == LLE_THEME_VALUE_BOOLEAN) {
+                seg_cfg->show = value->data.boolean;
+                seg_cfg->show_set = true;
+            } else if (strcmp(key, "truncation_length") == 0 &&
+                       value->type == LLE_THEME_VALUE_INTEGER) {
+                seg_cfg->truncation_length = (int)value->data.integer;
+                seg_cfg->truncation_length_set = true;
+            } else if (strcmp(key, "style") == 0 &&
+                       value->type == LLE_THEME_VALUE_STRING) {
+                snprintf(seg_cfg->style, sizeof(seg_cfg->style), "%.31s",
+                         value->data.string);
+                seg_cfg->style_set = true;
+            } else if (strcmp(key, "format") == 0 &&
+                       value->type == LLE_THEME_VALUE_STRING) {
+                snprintf(seg_cfg->format, sizeof(seg_cfg->format), "%.63s",
+                         value->data.string);
+                seg_cfg->format_set = true;
+            } else if (strcmp(key, "home_symbol") == 0 &&
+                       value->type == LLE_THEME_VALUE_STRING) {
+                snprintf(seg_cfg->home_symbol, sizeof(seg_cfg->home_symbol),
+                         "%.15s", value->data.string);
+                seg_cfg->home_symbol_set = true;
+            } else if (strcmp(key, "show_branch") == 0 &&
+                       value->type == LLE_THEME_VALUE_BOOLEAN) {
+                seg_cfg->show_branch = value->data.boolean;
+                seg_cfg->show_branch_set = true;
+            } else if (strcmp(key, "show_status") == 0 &&
+                       value->type == LLE_THEME_VALUE_BOOLEAN) {
+                seg_cfg->show_status = value->data.boolean;
+                seg_cfg->show_status_set = true;
+            } else if (strcmp(key, "show_ahead_behind") == 0 &&
+                       value->type == LLE_THEME_VALUE_BOOLEAN) {
+                seg_cfg->show_ahead_behind = value->data.boolean;
+                seg_cfg->show_ahead_behind_set = true;
+            } else if (strcmp(key, "show_stash") == 0 &&
+                       value->type == LLE_THEME_VALUE_BOOLEAN) {
+                seg_cfg->show_stash = value->data.boolean;
+                seg_cfg->show_stash_set = true;
+            }
+        }
+        return LLE_SUCCESS;
+    }
+
     /* [colors] section */
     if (strcmp(section, "colors") == 0) {
         lle_color_t *target = NULL;

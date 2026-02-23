@@ -401,6 +401,26 @@ lle_result_t lle_theme_resolve_inheritance(lle_theme_registry_t *registry,
                sizeof(theme->layout.transient_format));
     }
 
+    /* Inherit per-segment configs from parent if not present in child */
+    for (size_t pi = 0; pi < parent->segment_config_count; pi++) {
+        const lle_segment_config_t *parent_cfg = &parent->segment_configs[pi];
+        if (!parent_cfg->configured) {
+            continue;
+        }
+        /* Check if child already has config for this segment */
+        bool found = false;
+        for (size_t ci = 0; ci < theme->segment_config_count; ci++) {
+            if (strcmp(theme->segment_configs[ci].name, parent_cfg->name) == 0) {
+                found = true;
+                break;
+            }
+        }
+        if (!found && theme->segment_config_count < LLE_THEME_MAX_SEGMENT_CONFIGS) {
+            theme->segment_configs[theme->segment_config_count] = *parent_cfg;
+            theme->segment_config_count++;
+        }
+    }
+
     /* Inherit capabilities (additive for inheritable flags) */
     theme->capabilities |= (parent->capabilities & LLE_THEME_CAP_INHERITABLE);
 

@@ -106,6 +106,12 @@ typedef struct {
                             // menu_lines
     int command_end_row;    // Row where command text ends (before ghost/menu)
     int command_end_col;    // Column where command text ends
+
+    // RPROMPT tracking - right-aligned prompt on command_start_row
+    char rprompt_text[512];     // Rendered RPROMPT string (may contain ANSI)
+    int rprompt_visual_width;   // Visual width excluding ANSI escapes
+    bool rprompt_fits;          // True if rprompt fits on prompt row
+    int rprompt_col;            // Starting column (0-based) for rprompt display
 } screen_buffer_t;
 
 // ============================================================================
@@ -195,6 +201,25 @@ void screen_buffer_render_with_continuation(
     screen_buffer_t *buffer, const char *prompt_text, const char *command_text,
     size_t cursor_byte_offset, screen_buffer_continuation_cb continuation_cb,
     void *user_data);
+
+/**
+ * Set RPROMPT (right-aligned prompt) text for display on the prompt row
+ *
+ * Stores the RPROMPT text and calculates whether it fits on the prompt row.
+ * RPROMPT fits if: command_start_col + 1 + rprompt_visual_width <= terminal_width
+ * (the 1-column gap prevents prompt and rprompt from touching).
+ *
+ * When command text grows long enough to overlap, rprompt_fits becomes false
+ * and the rprompt is hidden — matching zsh behavior.
+ *
+ * Must be called AFTER screen_buffer_render() so that command_start_col
+ * is valid.
+ *
+ * @param buffer Buffer to update
+ * @param rprompt_text Rendered RPROMPT string (may contain ANSI escape codes)
+ */
+void screen_buffer_set_rprompt(screen_buffer_t *buffer,
+                                const char *rprompt_text);
 
 /**
  * Calculate visual width of text, handling ANSI codes and UTF-8

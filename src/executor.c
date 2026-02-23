@@ -6447,10 +6447,12 @@ static int execute_assignment(executor_t *executor, const char *assignment) {
         symtable_export_global(var_name);
     }
 
-    // Notify LLE prompt system when PS1, PS2, or PROMPT is set by user code
+    // Notify LLE prompt system when prompt variables are set by user code
     if (result == 0 && (strcmp(var_name, "PS1") == 0 ||
                         strcmp(var_name, "PS2") == 0 ||
-                        strcmp(var_name, "PROMPT") == 0)) {
+                        strcmp(var_name, "PROMPT") == 0 ||
+                        strcmp(var_name, "RPROMPT") == 0 ||
+                        strcmp(var_name, "RPS1") == 0)) {
         lle_shell_notify_prompt_var_set(var_name, value ? value : "");
     }
 

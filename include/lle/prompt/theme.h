@@ -194,6 +194,56 @@ typedef struct lle_symbol_set {
 } lle_symbol_set_t;
 
 /* ============================================================================
+ * PER-SEGMENT CONFIGURATION
+ * ============================================================================
+ */
+
+/** @brief Maximum per-segment configs per theme */
+#define LLE_THEME_MAX_SEGMENT_CONFIGS 16
+
+/**
+ * @brief Per-segment configuration from [segments.<name>] TOML sections
+ *
+ * Each field has a companion *_set flag indicating whether the value was
+ * explicitly configured. Unset fields inherit defaults from the segment
+ * renderer. This allows themes to selectively override specific properties.
+ */
+typedef struct lle_segment_config {
+    char name[32];   /**< Segment name (e.g., "directory", "git") */
+    bool configured; /**< True if any field was set */
+
+    /* Visibility */
+    bool show;     /**< Whether segment is visible */
+    bool show_set; /**< True if show was explicitly configured */
+
+    /* Truncation (meaning is segment-specific: path components, branch chars) */
+    int truncation_length;     /**< Truncation length */
+    bool truncation_length_set; /**< True if truncation_length was configured */
+
+    /* Style variant ("full", "short", "basename") */
+    char style[32]; /**< Style variant name */
+    bool style_set; /**< True if style was configured */
+
+    /* Format string (strftime for time, etc.) */
+    char format[64]; /**< Format string */
+    bool format_set; /**< True if format was configured */
+
+    /* Git-specific booleans */
+    bool show_branch;            /**< Show git branch name */
+    bool show_branch_set;        /**< True if show_branch was configured */
+    bool show_status;            /**< Show git dirty/clean status */
+    bool show_status_set;        /**< True if show_status was configured */
+    bool show_ahead_behind;      /**< Show ahead/behind counts */
+    bool show_ahead_behind_set;  /**< True if show_ahead_behind was configured */
+    bool show_stash;             /**< Show stash indicator */
+    bool show_stash_set;         /**< True if show_stash was configured */
+
+    /* Directory-specific */
+    char home_symbol[LLE_SYMBOL_MAX]; /**< Home directory replacement symbol */
+    bool home_symbol_set; /**< True if home_symbol was configured */
+} lle_segment_config_t;
+
+/* ============================================================================
  * THEME TYPES
  * ============================================================================
  */
@@ -287,6 +337,10 @@ typedef struct lle_theme {
     /* Segment configuration */
     char enabled_segments[LLE_THEME_MAX_SEGMENTS][32];
     size_t enabled_segment_count;
+
+    /* Per-segment configuration from [segments.<name>] TOML sections */
+    lle_segment_config_t segment_configs[LLE_THEME_MAX_SEGMENT_CONFIGS];
+    size_t segment_config_count;
 
     /* Runtime state (not persisted) */
     struct lle_theme *parent; /**< Resolved parent pointer */

@@ -428,6 +428,31 @@ void lle_segment_free(lle_prompt_segment_t *segment) {
 }
 
 /* ========================================================================== */
+/* Per-Segment Config Lookup Helper                                           */
+/* ========================================================================== */
+
+/**
+ * @brief Find per-segment configuration for a named segment
+ *
+ * @param theme  Theme to search (may be NULL)
+ * @param name   Segment name to look up
+ * @return Pointer to config if found, NULL otherwise
+ */
+static const lle_segment_config_t *find_segment_config(const lle_theme_t *theme,
+                                                        const char *name) {
+    if (!theme || !name) {
+        return NULL;
+    }
+    for (size_t i = 0; i < theme->segment_config_count; i++) {
+        if (strcmp(theme->segment_configs[i].name, name) == 0 &&
+            theme->segment_configs[i].configured) {
+            return &theme->segment_configs[i];
+        }
+    }
+    return NULL;
+}
+
+/* ========================================================================== */
 /* Built-in Segment: Directory                                                */
 /* ========================================================================== */
 
@@ -498,27 +523,137 @@ static lle_result_t segment_directory_render(const lle_prompt_segment_t *self,
     const char *display =
         strlen(ctx->cwd_display) > 0 ? ctx->cwd_display : ctx->cwd;
 
-    /* Check if we should apply path_root color (when at filesystem root) */
-    if (theme && ctx->cwd_is_root &&
-        theme->colors.path_root.mode != LLE_COLOR_MODE_NONE) {
+    /* Apply per-segment config: style and truncation */
+    const lle_segment_config_t *cfg = find_segment_config(theme, "directory");
+    char styled_path[PATH_MAX];
+
+    /* Apply home_symbol override */
+    const char *home_sym = "~";
+    if (cfg && cfg->home_symbol_set && cfg->home_symbol[0]) {
+        home_sym = cfg->home_symbol;
+    } else if (theme && theme->symbols.home[0]) {
+        home_sym = theme->symbols.home;
+    }
+
+    /* Start with the display path, applying home_symbol substitution */
+    if (display[0] == '~') {
+        snprintf(styled_path, sizeof(styled_path), "%s%s", home_sym, display + 1);
+    } else {
+        snprintf(styled_path, sizeof(styled_path), "%s", display);
+    }
+
+    /* Apply style variant */
+    if (cfg && cfg->style_set) {
+        if (strcmp(cfg->style, "basename") == 0) {
+            /* Show only the last path component */
+            const char *last_slash = strrchr(styled_path, '/');
+            if (last_slash && last_slash[1]) {
+                memmove(styled_path, last_slash + 1, strlen(last_slash + 1) + 1);
+            }
+        } else if (strcmp(cfg->style, "short") == 0) {
+            /* Truncate intermediate components to first grapheme */
+            char short_path[PATH_MAX] = {0};
+            size_t sp = 0;
+            const char *p = styled_path;
+
+            while (*p && sp < sizeof(short_path) - 1) {
+                /* Find next slash */
+                const char *slash = strchr(p, '/');
+                if (!slash) {
+                    /* Last component - keep fully */
+                    size_t remaining = strlen(p);
+                    if (sp + remaining < sizeof(short_path)) {
+                        memcpy(short_path + sp, p, remaining);
+                        sp += remaining;
+                    }
+                    break;
+                }
+
+                /* Not the last component - take first grapheme only */
+                size_t comp_len = (size_t)(slash - p);
+                if (comp_len > 0) {
+                    int seq_len = lle_utf8_sequence_length((unsigned char)*p);
+                    if (seq_len < 1) seq_len = 1;
+                    size_t copy = (size_t)seq_len < comp_len
+                                      ? (size_t)seq_len : comp_len;
+                    if (sp + copy < sizeof(short_path)) {
+                        memcpy(short_path + sp, p, copy);
+                        sp += copy;
+                    }
+                }
+                /* Copy the slash */
+                if (sp < sizeof(short_path) - 1) {
+                    short_path[sp++] = '/';
+                }
+                p = slash + 1;
+            }
+            short_path[sp] = '\0';
+            snprintf(styled_path, sizeof(styled_path), "%s", short_path);
+        }
+        /* "full" style is the default - no modification needed */
+    }
+
+    /* Apply truncation_length (limits number of trailing path components) */
+    if (cfg && cfg->truncation_length_set && cfg->truncation_length > 0) {
+        int max_components = cfg->truncation_length;
+        /* Count path components from the end */
+        size_t path_len = strlen(styled_path);
+        int comp_count = 0;
+        size_t cut_pos = path_len;
+        for (size_t i = path_len; i > 0; i--) {
+            if (styled_path[i - 1] == '/') {
+                comp_count++;
+                if (comp_count >= max_components) {
+                    cut_pos = i;
+                    break;
+                }
+            }
+        }
+        if (comp_count >= max_components && cut_pos < path_len) {
+            memmove(styled_path, styled_path + cut_pos,
+                    path_len - cut_pos + 1);
+        }
+    }
+
+    display = styled_path;
+
+    /* Apply directory prefix symbol from theme */
+    char prefixed_display[PATH_MAX + LLE_SYMBOL_MAX];
+    if (theme && theme->symbols.directory[0]) {
+        snprintf(prefixed_display, sizeof(prefixed_display), "%s%s",
+                 theme->symbols.directory, display);
+        display = prefixed_display;
+    }
+
+    /* Choose color based on location */
+    const lle_color_t *color = NULL;
+    if (theme) {
+        if (ctx->cwd_is_root &&
+            theme->colors.path_root.mode != LLE_COLOR_MODE_NONE) {
+            color = &theme->colors.path_root;
+        } else if (ctx->cwd_is_home &&
+                   theme->colors.path_home.mode != LLE_COLOR_MODE_NONE) {
+            color = &theme->colors.path_home;
+        } else if (theme->colors.path_normal.mode != LLE_COLOR_MODE_NONE) {
+            color = &theme->colors.path_normal;
+        }
+    }
+
+    if (color) {
         static const char *reset = "\033[0m";
         char color_code[32];
-        lle_color_to_ansi(&theme->colors.path_root, true, color_code,
-                          sizeof(color_code));
-
-        snprintf(output->content, sizeof(output->content), "%s%.470s%s", color_code,
-                 display, reset);
+        lle_color_to_ansi(color, true, color_code, sizeof(color_code));
+        snprintf(output->content, sizeof(output->content), "%s%.470s%s",
+                 color_code, display, reset);
         output->content_len = strlen(output->content);
         output->visual_width = lle_utf8_string_width(display, strlen(display));
     } else {
-        /* Standard path display */
         size_t display_len = strlen(display);
         size_t copy_len = (display_len < sizeof(output->content) - 1)
                               ? display_len
                               : sizeof(output->content) - 1;
         memcpy(output->content, display, copy_len);
         output->content[copy_len] = '\0';
-
         output->content_len = copy_len;
         output->visual_width = lle_utf8_string_width(output->content, copy_len);
     }
@@ -747,12 +882,31 @@ static lle_result_t segment_time_render(const lle_prompt_segment_t *self,
                                         const lle_theme_t *theme,
                                         lle_segment_output_t *output) {
     (void)self;
-    (void)theme;
 
-    strftime(output->content, sizeof(output->content), "%H:%M:%S",
-             &ctx->current_tm);
+    /* Use format from per-segment config, or default */
+    const char *fmt = "%H:%M:%S";
+    const lle_segment_config_t *cfg = find_segment_config(theme, "time");
+    if (cfg && cfg->format_set && cfg->format[0]) {
+        fmt = cfg->format;
+    }
+
+    /* Apply time symbol prefix from theme */
+    const char *sym_time =
+        (theme && theme->symbols.time[0]) ? theme->symbols.time : "";
+
+    char time_str[128];
+    strftime(time_str, sizeof(time_str), fmt, &ctx->current_tm);
+
+    if (sym_time[0]) {
+        snprintf(output->content, sizeof(output->content), "%s%s",
+                 sym_time, time_str);
+    } else {
+        snprintf(output->content, sizeof(output->content), "%s", time_str);
+    }
+
     output->content_len = strlen(output->content);
-    output->visual_width = output->content_len;
+    output->visual_width = lle_utf8_string_width(output->content,
+                                                  output->content_len);
     output->is_empty = false;
     output->needs_separator = true;
 
@@ -1414,6 +1568,16 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
         return LLE_SUCCESS;
     }
 
+    /* Per-segment config controls which sub-components are visible */
+    const lle_segment_config_t *cfg = find_segment_config(theme, "git");
+    bool cfg_show_branch = !cfg || !cfg->show_branch_set || cfg->show_branch;
+    bool cfg_show_status = !cfg || !cfg->show_status_set || cfg->show_status;
+    bool cfg_show_ab = !cfg || !cfg->show_ahead_behind_set ||
+                       cfg->show_ahead_behind;
+    bool cfg_show_stash = !cfg || !cfg->show_stash_set || cfg->show_stash;
+    int cfg_trunc = (cfg && cfg->truncation_length_set)
+                        ? cfg->truncation_length : 0;
+
     /* Get symbols from theme or use defaults */
     const char *sym_staged =
         (theme && theme->symbols.staged[0]) ? theme->symbols.staged : "+";
@@ -1450,74 +1614,116 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
     buf[pos++] = '(';
     visual_width++;
 
-    /* Add branch symbol if configured */
-    if (sym_branch[0]) {
-        size_t sym_len = strlen(sym_branch);
-        if (pos + sym_len < buf_size) {
-            memcpy(buf + pos, sym_branch, sym_len);
-            pos += sym_len;
-            visual_width += lle_utf8_string_width(sym_branch, sym_len);
+    if (cfg_show_branch) {
+        /* Add branch symbol if configured */
+        if (sym_branch[0]) {
+            size_t sym_len = strlen(sym_branch);
+            if (pos + sym_len < buf_size) {
+                memcpy(buf + pos, sym_branch, sym_len);
+                pos += sym_len;
+                visual_width += lle_utf8_string_width(sym_branch, sym_len);
+            }
+        }
+
+        /* Optionally truncate branch name to cfg_trunc graphemes */
+        const char *branch_display = state->branch;
+        char truncated_branch[256];
+        if (cfg_trunc > 0) {
+            size_t byte_pos = 0;
+            int graphemes = 0;
+            size_t src_len = strlen(state->branch);
+            while (byte_pos < src_len && graphemes < cfg_trunc) {
+                int seq_len = lle_utf8_sequence_length(
+                    (unsigned char)state->branch[byte_pos]);
+                if (seq_len < 1) seq_len = 1;
+                if (byte_pos + (size_t)seq_len > src_len) break;
+                byte_pos += (size_t)seq_len;
+                graphemes++;
+            }
+            if (byte_pos < src_len) {
+                /* Truncated - copy and add ellipsis */
+                size_t copy_len = byte_pos < sizeof(truncated_branch) - 4
+                                      ? byte_pos
+                                      : sizeof(truncated_branch) - 4;
+                memcpy(truncated_branch, state->branch, copy_len);
+                truncated_branch[copy_len] = '\0';
+                /* Append Unicode ellipsis */
+                size_t tl = strlen(truncated_branch);
+                if (tl + 4 < sizeof(truncated_branch)) {
+                    truncated_branch[tl] = '\xe2';
+                    truncated_branch[tl + 1] = '\x80';
+                    truncated_branch[tl + 2] = '\xa6';
+                    truncated_branch[tl + 3] = '\0';
+                }
+                branch_display = truncated_branch;
+            }
+        }
+
+        size_t branch_len = strlen(branch_display);
+        if (pos + branch_len < buf_size) {
+            memcpy(buf + pos, branch_display, branch_len);
+            pos += branch_len;
+            visual_width +=
+                lle_utf8_string_width(branch_display, branch_len);
         }
     }
 
-    size_t branch_len = strlen(state->branch);
-    if (pos + branch_len < buf_size) {
-        memcpy(buf + pos, state->branch, branch_len);
-        pos += branch_len;
-        visual_width += lle_utf8_string_width(state->branch, branch_len);
+    /* Status indicators with colors (gated by show_status) */
+    if (cfg_show_status) {
+        bool has_status =
+            (state->staged > 0 || state->unstaged > 0 || state->untracked > 0);
+        if (has_status) {
+            buf[pos++] = ' ';
+            visual_width++;
+        }
+
+        if (state->staged > 0) {
+            char indicator[32];
+            snprintf(indicator, sizeof(indicator), "%.15s%d", sym_staged,
+                     state->staged);
+            visual_width += append_colored(buf, buf_size, &pos, indicator,
+                                           color_staged, reset);
+        }
+        if (state->unstaged > 0) {
+            char indicator[32];
+            snprintf(indicator, sizeof(indicator), "%.15s%d", sym_unstaged,
+                     state->unstaged);
+            visual_width += append_colored(buf, buf_size, &pos, indicator,
+                                           color_unstaged, reset);
+        }
+        if (state->untracked > 0) {
+            char indicator[32];
+            snprintf(indicator, sizeof(indicator), "%.15s%d", sym_untracked,
+                     state->untracked);
+            visual_width += append_colored(buf, buf_size, &pos, indicator,
+                                           color_untracked, reset);
+        }
     }
 
-    /* Status indicators with colors */
-    bool has_status =
-        (state->staged > 0 || state->unstaged > 0 || state->untracked > 0);
-    if (has_status) {
-        buf[pos++] = ' ';
-        visual_width++;
+    /* Ahead/behind with colors (gated by show_ahead_behind) */
+    if (cfg_show_ab) {
+        if (state->ahead > 0 || state->behind > 0) {
+            buf[pos++] = ' ';
+            visual_width++;
+        }
+        if (state->ahead > 0) {
+            char indicator[32];
+            snprintf(indicator, sizeof(indicator), "%.15s%d", sym_ahead,
+                     state->ahead);
+            visual_width += append_colored(buf, buf_size, &pos, indicator,
+                                           color_ahead, reset);
+        }
+        if (state->behind > 0) {
+            char indicator[32];
+            snprintf(indicator, sizeof(indicator), "%.15s%d", sym_behind,
+                     state->behind);
+            visual_width += append_colored(buf, buf_size, &pos, indicator,
+                                           color_behind, reset);
+        }
     }
 
-    if (state->staged > 0) {
-        char indicator[32];
-        snprintf(indicator, sizeof(indicator), "%.15s%d", sym_staged,
-                 state->staged);
-        visual_width +=
-            append_colored(buf, buf_size, &pos, indicator, color_staged, reset);
-    }
-    if (state->unstaged > 0) {
-        char indicator[32];
-        snprintf(indicator, sizeof(indicator), "%.15s%d", sym_unstaged,
-                 state->unstaged);
-        visual_width += append_colored(buf, buf_size, &pos, indicator,
-                                       color_unstaged, reset);
-    }
-    if (state->untracked > 0) {
-        char indicator[32];
-        snprintf(indicator, sizeof(indicator), "%.15s%d", sym_untracked,
-                 state->untracked);
-        visual_width += append_colored(buf, buf_size, &pos, indicator,
-                                       color_untracked, reset);
-    }
-
-    /* Ahead/behind with colors */
-    if (state->ahead > 0 || state->behind > 0) {
-        buf[pos++] = ' ';
-        visual_width++;
-    }
-    if (state->ahead > 0) {
-        char indicator[32];
-        snprintf(indicator, sizeof(indicator), "%.15s%d", sym_ahead, state->ahead);
-        visual_width +=
-            append_colored(buf, buf_size, &pos, indicator, color_ahead, reset);
-    }
-    if (state->behind > 0) {
-        char indicator[32];
-        snprintf(indicator, sizeof(indicator), "%.15s%d", sym_behind,
-                 state->behind);
-        visual_width +=
-            append_colored(buf, buf_size, &pos, indicator, color_behind, reset);
-    }
-
-    /* Stash indicator */
-    if (state->stash_count > 0) {
+    /* Stash indicator (gated by show_stash) */
+    if (cfg_show_stash && state->stash_count > 0) {
         buf[pos++] = ' ';
         visual_width++;
         char indicator[32];
@@ -1527,7 +1733,7 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
             append_colored(buf, buf_size, &pos, indicator, NULL, NULL);
     }
 
-    /* Conflict indicator - use error color for prominence */
+    /* Conflict indicator - always shown (safety, not configurable) */
     if (state->has_conflicts) {
         buf[pos++] = ' ';
         visual_width++;

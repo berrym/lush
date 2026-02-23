@@ -30,6 +30,7 @@
 #include "lle/lle_editor.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/prompt/composer.h"
+#include "lle/prompt/prompt_expansion.h"
 #include "lle/widget_hooks.h"
 #include "lle/widget_system.h"
 
@@ -419,11 +420,22 @@ static lle_result_t widget_transient_prompt(lle_editor_t *editor,
         return LLE_SUCCESS;
     }
 
-    /* Render transient format using template engine */
+    /* Render transient format through Spec 28 two-pass expansion engine.
+     * This routes the transient format string through lle_prompt_expand()
+     * which handles bash \X, zsh %X, and LLE ${segment} syntax. */
+    lle_template_render_ctx_t render_ctx =
+        lle_composer_create_render_ctx(composer);
+
+    lle_prompt_expand_ctx_t expand_ctx;
+    memset(&expand_ctx, 0, sizeof(expand_ctx));
+    expand_ctx.template_ctx = &render_ctx;
+    expand_ctx.last_exit_status = composer->context.last_exit_code;
+    expand_ctx.job_count = composer->context.background_job_count;
+
     char transient_output[LLE_TRANSIENT_OUTPUT_MAX];
-    lle_result_t result = lle_composer_render_template(
-        composer, theme->layout.transient_format, transient_output,
-        sizeof(transient_output));
+    lle_result_t result = lle_prompt_expand(
+        theme->layout.transient_format, transient_output,
+        sizeof(transient_output), &expand_ctx);
 
     if (result != LLE_SUCCESS) {
         return LLE_SUCCESS; /* Graceful degradation on render failure */

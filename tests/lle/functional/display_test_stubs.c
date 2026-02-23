@@ -55,6 +55,10 @@ const char *lle_shell_get_rendered_prompt(void) {
     return "$ "; /* Default prompt in tests */
 }
 
+const char *lle_shell_get_rendered_rprompt(void) {
+    return ""; /* No right prompt in tests */
+}
+
 /* Note: lush_generate_prompt() is now in libdisplay.a via
  * display_integration.c */
 
