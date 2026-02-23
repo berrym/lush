@@ -820,7 +820,8 @@ void lle_shell_update_prompt(void) {
         active_theme->layout.style == LLE_PROMPT_STYLE_POWERLINE &&
         active_theme->enabled_segment_count > 0) {
         size_t offset = 0;
-        if (composer->config.newline_before_prompt) {
+        if (composer->config.newline_before_prompt &&
+            !active_theme->layout.compact_mode) {
             s_rendered_ps1[0] = '\n';
             offset = 1;
         }
@@ -839,6 +840,17 @@ void lle_shell_update_prompt(void) {
                 s_rendered_ps1[len] = ' ';
                 s_rendered_ps1[len + 1] = '\0';
             }
+        }
+
+        /* Strip newlines when multiline is disabled */
+        if (!active_theme->layout.enable_multiline) {
+            size_t i = 0, j = 0;
+            while (s_rendered_ps1[i] != '\0') {
+                if (s_rendered_ps1[i] != '\n')
+                    s_rendered_ps1[j++] = s_rendered_ps1[i];
+                i++;
+            }
+            s_rendered_ps1[j] = '\0';
         }
 
         /* Powerline RPROMPT */
@@ -885,9 +897,10 @@ void lle_shell_update_prompt(void) {
     expand_ctx.job_count = composer->context.background_job_count;
     expand_ctx.color_depth = detect_prompt_color_depth();
 
-    /* Prepend newline if configured */
+    /* Prepend newline if configured (compact_mode suppresses) */
     size_t offset = 0;
-    if (composer->config.newline_before_prompt) {
+    if (composer->config.newline_before_prompt &&
+        !(active_theme && active_theme->layout.compact_mode)) {
         s_rendered_ps1[0] = '\n';
         offset = 1;
     }
@@ -901,6 +914,17 @@ void lle_shell_update_prompt(void) {
         /* Write fallback after the newline prefix (if any) */
         snprintf(s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset,
                  "%s", (getuid() > 0) ? "$ " : "# ");
+    }
+
+    /* Strip newlines when multiline is disabled */
+    if (active_theme && !active_theme->layout.enable_multiline) {
+        size_t i = 0, j = 0;
+        while (s_rendered_ps1[i] != '\0') {
+            if (s_rendered_ps1[i] != '\n')
+                s_rendered_ps1[j++] = s_rendered_ps1[i];
+            i++;
+        }
+        s_rendered_ps1[j] = '\0';
     }
 
     lle_composer_clear_regeneration_flag(composer);

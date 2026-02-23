@@ -26,8 +26,8 @@
 #   [x] rps1                  - Right prompt (expanded via Spec 28 engine)
 #   [x] transient             - Transient prompt (expanded via Spec 28 engine)
 #   [x] style                 - "plain" (template) or "powerline" (colored blocks)
-#   [~] enable_multiline      - Parsed but multiline is template-driven
-#   [~] compact_mode          - Parsed but never checked
+#   [x] enable_multiline      - Strips newlines from PS1 when false
+#   [x] compact_mode          - Suppresses newline_before/newline_after
 #
 # COLORS:
 #   [x] primary, secondary, success, warning, error, info
@@ -95,8 +95,8 @@ transient = "$ "
 style = "plain"                # [x] "plain" (template-driven) or "powerline" (colored blocks)
 enable_right_prompt = false    # [x] RPROMPT expanded; display requires Phase 3 completion
 enable_transient = false       # [x] Routes through Spec 28 expansion engine
-enable_multiline = false       # [~] Parsed but not used (multiline is template-driven)
-compact_mode = false           # [~] Parsed but not implemented
+enable_multiline = false       # [x] Strips newlines from PS1 when false
+compact_mode = false           # [x] Suppresses newline_before/newline_after
 newline_before = 0             # Blank lines before prompt
 newline_after = 0              # Blank lines after prompt
 

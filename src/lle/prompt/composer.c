@@ -584,6 +584,25 @@ static size_t calculate_visual_width(const char *str) {
 }
 
 /**
+ * @brief Strip newline characters from a string in-place
+ *
+ * Used by enable_multiline=false to force single-line PS1 output.
+ *
+ * @return New length of the string
+ */
+static size_t strip_newlines(char *str) {
+    size_t read = 0, write = 0;
+    while (str[read] != '\0') {
+        if (str[read] != '\n') {
+            str[write++] = str[read];
+        }
+        read++;
+    }
+    str[write] = '\0';
+    return write;
+}
+
+/**
  * @brief Render a complete prompt
  *
  * Renders PS1, PS2, and optional right prompt using the active theme
@@ -631,8 +650,9 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
         lle_result_t pl_result;
         size_t ps1_offset = 0;
 
-        /* Prepend newline if configured */
-        if (composer->config.newline_before_prompt) {
+        /* Prepend newline if configured (compact_mode suppresses) */
+        if (composer->config.newline_before_prompt &&
+            !theme->layout.compact_mode) {
             output->ps1[0] = '\n';
             ps1_offset = 1;
         }
@@ -652,6 +672,12 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
             output->ps1[output->ps1_len++] = ' ';
             output->ps1[output->ps1_len] = '\0';
         }
+
+        /* Strip newlines when multiline is disabled */
+        if (!theme->layout.enable_multiline) {
+            output->ps1_len = strip_newlines(output->ps1);
+        }
+
         output->ps1_visual_width = calculate_visual_width(output->ps1);
         output->is_multiline = (strchr(output->ps1, '\n') != NULL);
 
@@ -692,8 +718,10 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
     /* Render PS1 */
     lle_result_t result;
 
-    /* Prepend newline for visual separation if enabled */
-    if (composer->config.newline_before_prompt) {
+    /* Prepend newline for visual separation if enabled (compact_mode suppresses) */
+    bool prepend_newline = composer->config.newline_before_prompt &&
+                           !(theme && theme->layout.compact_mode);
+    if (prepend_newline) {
         output->ps1[0] = '\n';
         result = lle_template_evaluate(
             left_format, &render_ctx, output->ps1 + 1, sizeof(output->ps1) - 1);
@@ -709,14 +737,20 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
     }
     output->ps1_len = strlen(output->ps1);
 
-    /* Append newlines after prompt if configured in theme */
-    if (theme && theme->layout.newline_after > 0) {
+    /* Append newlines after prompt if configured in theme (compact_mode suppresses) */
+    if (theme && theme->layout.newline_after > 0 &&
+        !theme->layout.compact_mode) {
         for (int i = 0; i < theme->layout.newline_after &&
                         output->ps1_len < sizeof(output->ps1) - 2;
              i++) {
             output->ps1[output->ps1_len++] = '\n';
         }
         output->ps1[output->ps1_len] = '\0';
+    }
+
+    /* Strip newlines when multiline is disabled */
+    if (theme && !theme->layout.enable_multiline) {
+        output->ps1_len = strip_newlines(output->ps1);
     }
 
     output->ps1_visual_width = calculate_visual_width(output->ps1);
