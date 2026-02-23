@@ -18,6 +18,7 @@
 
 #include <pthread.h>
 #include <pwd.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -1821,14 +1822,495 @@ lle_prompt_segment_t *lle_segment_create_git(void) {
 }
 
 /* ========================================================================== */
+/* Built-in Segment: Shell Level (shlvl)                                      */
+/* ========================================================================== */
+
+static bool segment_shlvl_is_visible(const lle_prompt_segment_t *self,
+                                      const lle_prompt_context_t *ctx) {
+    (void)self;
+    int min_level = 2;
+    return ctx->shlvl >= min_level;
+}
+
+static lle_result_t segment_shlvl_render(const lle_prompt_segment_t *self,
+                                          const lle_prompt_context_t *ctx,
+                                          const lle_theme_t *theme,
+                                          lle_segment_output_t *output) {
+    (void)self;
+
+    int min_level = 2;
+    const lle_segment_config_t *cfg = find_segment_config(theme, "shlvl");
+    if (cfg && cfg->min_level_set && cfg->min_level > 0) {
+        min_level = cfg->min_level;
+    }
+
+    if (ctx->shlvl < min_level) {
+        output->is_empty = true;
+        return LLE_SUCCESS;
+    }
+
+    const char *sym = "";
+    if (theme && theme->symbols.shlvl[0]) {
+        sym = theme->symbols.shlvl;
+    }
+
+    snprintf(output->content, sizeof(output->content), "%s%d", sym,
+             ctx->shlvl);
+    output->content_len = strlen(output->content);
+    output->visual_width = output->content_len;
+    output->is_empty = false;
+    output->needs_separator = true;
+    return LLE_SUCCESS;
+}
+
+lle_prompt_segment_t *lle_segment_create_shlvl(void) {
+    lle_prompt_segment_t *seg = lle_segment_create(
+        "shlvl", "Shell nesting level",
+        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
+    if (!seg)
+        return NULL;
+    seg->is_visible = segment_shlvl_is_visible;
+    seg->render = segment_shlvl_render;
+    return seg;
+}
+
+/* ========================================================================== */
+/* Built-in Segment: SSH Indicator                                            */
+/* ========================================================================== */
+
+static bool segment_ssh_is_visible(const lle_prompt_segment_t *self,
+                                    const lle_prompt_context_t *ctx) {
+    (void)self;
+    return ctx->is_ssh_session;
+}
+
+static lle_result_t segment_ssh_render(const lle_prompt_segment_t *self,
+                                        const lle_prompt_context_t *ctx,
+                                        const lle_theme_t *theme,
+                                        lle_segment_output_t *output) {
+    (void)self;
+
+    const lle_segment_config_t *cfg = find_segment_config(theme, "ssh");
+    bool full_style = false;
+    if (cfg && cfg->style_set && strcmp(cfg->style, "full") == 0) {
+        full_style = true;
+    }
+
+    if (full_style) {
+        snprintf(output->content, sizeof(output->content), "%s@%s",
+                 ctx->username, ctx->hostname);
+    } else {
+        const char *sym = "SSH";
+        if (theme && theme->symbols.ssh[0]) {
+            sym = theme->symbols.ssh;
+        }
+        snprintf(output->content, sizeof(output->content), "%s", sym);
+    }
+
+    output->content_len = strlen(output->content);
+    output->visual_width = output->content_len;
+    output->is_empty = false;
+    output->needs_separator = true;
+    return LLE_SUCCESS;
+}
+
+lle_prompt_segment_t *lle_segment_create_ssh(void) {
+    lle_prompt_segment_t *seg = lle_segment_create(
+        "ssh", "SSH session indicator",
+        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
+    if (!seg)
+        return NULL;
+    seg->is_visible = segment_ssh_is_visible;
+    seg->render = segment_ssh_render;
+    return seg;
+}
+
+/* ========================================================================== */
+/* Built-in Segment: Command Duration                                         */
+/* ========================================================================== */
+
+static bool segment_cmd_duration_is_visible(const lle_prompt_segment_t *self,
+                                             const lle_prompt_context_t *ctx) {
+    (void)self;
+    return ctx->last_cmd_duration_ms >= 2000;
+}
+
+static lle_result_t
+segment_cmd_duration_render(const lle_prompt_segment_t *self,
+                            const lle_prompt_context_t *ctx,
+                            const lle_theme_t *theme,
+                            lle_segment_output_t *output) {
+    (void)self;
+
+    int min_time = 2000;
+    const lle_segment_config_t *cfg =
+        find_segment_config(theme, "cmd_duration");
+    if (cfg && cfg->min_time_set && cfg->min_time > 0) {
+        min_time = cfg->min_time;
+    }
+
+    if ((int)ctx->last_cmd_duration_ms < min_time) {
+        output->is_empty = true;
+        return LLE_SUCCESS;
+    }
+
+    const char *sym = "took ";
+    if (theme && theme->symbols.duration[0]) {
+        sym = theme->symbols.duration;
+    }
+
+    uint64_t ms = ctx->last_cmd_duration_ms;
+    if (ms < 60000) {
+        /* Under a minute: "took 3.2s" */
+        snprintf(output->content, sizeof(output->content), "%s%u.%us", sym,
+                 (unsigned)(ms / 1000), (unsigned)((ms % 1000) / 100));
+    } else if (ms < 3600000) {
+        /* Under an hour: "took 1m 42s" */
+        unsigned min = (unsigned)(ms / 60000);
+        unsigned sec = (unsigned)((ms % 60000) / 1000);
+        snprintf(output->content, sizeof(output->content), "%s%um %us", sym,
+                 min, sec);
+    } else {
+        /* Hours: "took 2h 5m" */
+        unsigned hrs = (unsigned)(ms / 3600000);
+        unsigned min = (unsigned)((ms % 3600000) / 60000);
+        snprintf(output->content, sizeof(output->content), "%s%uh %um", sym,
+                 hrs, min);
+    }
+
+    output->content_len = strlen(output->content);
+    output->visual_width = output->content_len;
+    output->is_empty = false;
+    output->needs_separator = true;
+    return LLE_SUCCESS;
+}
+
+lle_prompt_segment_t *lle_segment_create_cmd_duration(void) {
+    lle_prompt_segment_t *seg = lle_segment_create(
+        "cmd_duration", "Last command execution time",
+        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC);
+    if (!seg)
+        return NULL;
+    seg->is_visible = segment_cmd_duration_is_visible;
+    seg->render = segment_cmd_duration_render;
+    return seg;
+}
+
+/* ========================================================================== */
+/* Built-in Segment: Virtual Environment                                      */
+/* ========================================================================== */
+
+static bool segment_virtualenv_is_visible(const lle_prompt_segment_t *self,
+                                           const lle_prompt_context_t *ctx) {
+    (void)self;
+    (void)ctx;
+    const char *venv = getenv("VIRTUAL_ENV");
+    if (venv && venv[0])
+        return true;
+    const char *conda = getenv("CONDA_DEFAULT_ENV");
+    return (conda && conda[0]);
+}
+
+static lle_result_t
+segment_virtualenv_render(const lle_prompt_segment_t *self,
+                          const lle_prompt_context_t *ctx,
+                          const lle_theme_t *theme,
+                          lle_segment_output_t *output) {
+    (void)self;
+    (void)ctx;
+
+    const lle_segment_config_t *cfg =
+        find_segment_config(theme, "virtualenv");
+    bool full_style = false;
+    if (cfg && cfg->style_set && strcmp(cfg->style, "full") == 0) {
+        full_style = true;
+    }
+
+    const char *sym = "py:";
+    if (theme && theme->symbols.virtualenv[0]) {
+        sym = theme->symbols.virtualenv;
+    }
+
+    const char *venv = getenv("VIRTUAL_ENV");
+    const char *conda = getenv("CONDA_DEFAULT_ENV");
+    const char *name = NULL;
+
+    if (venv && venv[0]) {
+        if (full_style) {
+            name = venv;
+        } else {
+            /* Basename: last component of path */
+            const char *slash = strrchr(venv, '/');
+            name = slash ? slash + 1 : venv;
+        }
+    } else if (conda && conda[0]) {
+        name = conda; /* Conda names are already short */
+    }
+
+    if (!name || !name[0]) {
+        output->is_empty = true;
+        return LLE_SUCCESS;
+    }
+
+    snprintf(output->content, sizeof(output->content), "%s%s", sym, name);
+    output->content_len = strlen(output->content);
+    output->visual_width = output->content_len;
+    output->is_empty = false;
+    output->needs_separator = true;
+    return LLE_SUCCESS;
+}
+
+lle_prompt_segment_t *lle_segment_create_virtualenv(void) {
+    lle_prompt_segment_t *seg = lle_segment_create(
+        "virtualenv", "Python virtual environment",
+        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC);
+    if (!seg)
+        return NULL;
+    seg->is_visible = segment_virtualenv_is_visible;
+    seg->render = segment_virtualenv_render;
+    return seg;
+}
+
+/* ========================================================================== */
+/* Built-in Segment: Container                                                */
+/* ========================================================================== */
+
+/**
+ * @brief Detect container runtime
+ *
+ * Detection order:
+ * 1. $container env var (set by systemd-nspawn, Podman)
+ * 2. /.dockerenv file (Docker)
+ * 3. /run/.containerenv file (Podman)
+ *
+ * @return Static string identifying the runtime, or NULL if not in container
+ */
+static const char *detect_container_runtime(void) {
+    const char *env = getenv("container");
+    if (env && env[0])
+        return env;
+
+    struct stat st;
+    if (stat("/.dockerenv", &st) == 0)
+        return "docker";
+    if (stat("/run/.containerenv", &st) == 0)
+        return "podman";
+
+    return NULL;
+}
+
+static bool segment_container_is_visible(const lle_prompt_segment_t *self,
+                                          const lle_prompt_context_t *ctx) {
+    (void)self;
+    (void)ctx;
+    return detect_container_runtime() != NULL;
+}
+
+static lle_result_t
+segment_container_render(const lle_prompt_segment_t *self,
+                         const lle_prompt_context_t *ctx,
+                         const lle_theme_t *theme,
+                         lle_segment_output_t *output) {
+    (void)self;
+    (void)ctx;
+
+    const char *runtime = detect_container_runtime();
+    if (!runtime) {
+        output->is_empty = true;
+        return LLE_SUCCESS;
+    }
+
+    const char *sym = "ctr:";
+    if (theme && theme->symbols.container[0]) {
+        sym = theme->symbols.container;
+    }
+
+    snprintf(output->content, sizeof(output->content), "%s%s", sym, runtime);
+    output->content_len = strlen(output->content);
+    output->visual_width = output->content_len;
+    output->is_empty = false;
+    output->needs_separator = true;
+    return LLE_SUCCESS;
+}
+
+lle_prompt_segment_t *lle_segment_create_container(void) {
+    lle_prompt_segment_t *seg = lle_segment_create(
+        "container", "Container runtime indicator",
+        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
+    if (!seg)
+        return NULL;
+    seg->is_visible = segment_container_is_visible;
+    seg->render = segment_container_render;
+    return seg;
+}
+
+/* ========================================================================== */
+/* Built-in Segment: AWS Profile                                              */
+/* ========================================================================== */
+
+static bool segment_aws_is_visible(const lle_prompt_segment_t *self,
+                                    const lle_prompt_context_t *ctx) {
+    (void)self;
+    (void)ctx;
+    const char *profile = getenv("AWS_PROFILE");
+    return (profile && profile[0]);
+}
+
+static lle_result_t segment_aws_render(const lle_prompt_segment_t *self,
+                                        const lle_prompt_context_t *ctx,
+                                        const lle_theme_t *theme,
+                                        lle_segment_output_t *output) {
+    (void)self;
+    (void)ctx;
+
+    const char *profile = getenv("AWS_PROFILE");
+    if (!profile || !profile[0]) {
+        output->is_empty = true;
+        return LLE_SUCCESS;
+    }
+
+    const char *sym = "aws:";
+    if (theme && theme->symbols.aws[0]) {
+        sym = theme->symbols.aws;
+    }
+
+    snprintf(output->content, sizeof(output->content), "%s%s", sym, profile);
+    output->content_len = strlen(output->content);
+    output->visual_width = output->content_len;
+    output->is_empty = false;
+    output->needs_separator = true;
+    return LLE_SUCCESS;
+}
+
+lle_prompt_segment_t *lle_segment_create_aws(void) {
+    lle_prompt_segment_t *seg =
+        lle_segment_create("aws", "AWS profile indicator",
+                           LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC);
+    if (!seg)
+        return NULL;
+    seg->is_visible = segment_aws_is_visible;
+    seg->render = segment_aws_render;
+    return seg;
+}
+
+/* ========================================================================== */
+/* Built-in Segment: Kubernetes Context                                       */
+/* ========================================================================== */
+
+/**
+ * @brief Read current-context from kubeconfig file
+ *
+ * Simple line scan for "current-context:" in the kubeconfig YAML.
+ * No full YAML parser — just finds the line and extracts the value.
+ *
+ * @param buf    Output buffer for context name
+ * @param bufsz  Size of output buffer
+ * @return true if context was found, false otherwise
+ */
+static bool read_kube_context(char *buf, size_t bufsz) {
+    const char *kubeconfig = getenv("KUBECONFIG");
+    char path[PATH_MAX];
+
+    if (kubeconfig && kubeconfig[0]) {
+        snprintf(path, sizeof(path), "%s", kubeconfig);
+        /* KUBECONFIG can be colon-separated; use only the first path */
+        char *colon = strchr(path, ':');
+        if (colon)
+            *colon = '\0';
+    } else {
+        const char *home = getenv("HOME");
+        if (!home)
+            return false;
+        snprintf(path, sizeof(path), "%s/.kube/config", home);
+    }
+
+    FILE *fp = fopen(path, "r");
+    if (!fp)
+        return false;
+
+    char line[512];
+    bool found = false;
+    while (fgets(line, sizeof(line), fp)) {
+        /* Look for "current-context:" at start of line */
+        const char *prefix = "current-context:";
+        size_t plen = strlen(prefix);
+        if (strncmp(line, prefix, plen) == 0) {
+            const char *val = line + plen;
+            /* Skip whitespace */
+            while (*val == ' ' || *val == '\t')
+                val++;
+            /* Strip trailing newline/whitespace */
+            size_t vlen = strlen(val);
+            while (vlen > 0 &&
+                   (val[vlen - 1] == '\n' || val[vlen - 1] == '\r' ||
+                    val[vlen - 1] == ' '))
+                vlen--;
+            if (vlen > 0) {
+                snprintf(buf, bufsz, "%.*s", (int)vlen, val);
+                found = true;
+            }
+            break;
+        }
+    }
+
+    fclose(fp);
+    return found;
+}
+
+static bool segment_kubernetes_is_visible(const lle_prompt_segment_t *self,
+                                           const lle_prompt_context_t *ctx) {
+    (void)self;
+    (void)ctx;
+    char buf[128];
+    return read_kube_context(buf, sizeof(buf));
+}
+
+static lle_result_t
+segment_kubernetes_render(const lle_prompt_segment_t *self,
+                          const lle_prompt_context_t *ctx,
+                          const lle_theme_t *theme,
+                          lle_segment_output_t *output) {
+    (void)self;
+    (void)ctx;
+
+    char context[128];
+    if (!read_kube_context(context, sizeof(context))) {
+        output->is_empty = true;
+        return LLE_SUCCESS;
+    }
+
+    const char *sym = "k8s:";
+    if (theme && theme->symbols.kubernetes[0]) {
+        sym = theme->symbols.kubernetes;
+    }
+
+    snprintf(output->content, sizeof(output->content), "%s%s", sym, context);
+    output->content_len = strlen(output->content);
+    output->visual_width = output->content_len;
+    output->is_empty = false;
+    output->needs_separator = true;
+    return LLE_SUCCESS;
+}
+
+lle_prompt_segment_t *lle_segment_create_kubernetes(void) {
+    lle_prompt_segment_t *seg = lle_segment_create(
+        "kubernetes", "Kubernetes context",
+        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC | LLE_SEG_CAP_CACHEABLE);
+    if (!seg)
+        return NULL;
+    seg->is_visible = segment_kubernetes_is_visible;
+    seg->render = segment_kubernetes_render;
+    return seg;
+}
+
+/* ========================================================================== */
 /* Register Built-in Segments                                                 */
 /* ========================================================================== */
 
 /**
  * @brief Register all built-in segments
  *
- * Creates and registers all built-in segments (directory, user, host,
- * time, status, jobs, symbol, git) with the registry.
+ * Creates and registers all built-in segments with the registry.
  *
  * @param registry Pointer to initialized registry
  * @return Number of segments successfully registered
@@ -1841,10 +2323,14 @@ size_t lle_segment_register_builtins(lle_segment_registry_t *registry) {
     size_t count = 0;
 
     lle_prompt_segment_t *segments[] = {
-        lle_segment_create_directory(), lle_segment_create_user(),
-        lle_segment_create_host(),      lle_segment_create_time(),
-        lle_segment_create_status(),    lle_segment_create_jobs(),
-        lle_segment_create_symbol(),    lle_segment_create_git(),
+        lle_segment_create_directory(),    lle_segment_create_user(),
+        lle_segment_create_host(),         lle_segment_create_time(),
+        lle_segment_create_status(),       lle_segment_create_jobs(),
+        lle_segment_create_symbol(),       lle_segment_create_git(),
+        lle_segment_create_shlvl(),        lle_segment_create_ssh(),
+        lle_segment_create_cmd_duration(), lle_segment_create_virtualenv(),
+        lle_segment_create_container(),    lle_segment_create_aws(),
+        lle_segment_create_kubernetes(),
     };
 
     for (size_t i = 0; i < sizeof(segments) / sizeof(segments[0]); i++) {

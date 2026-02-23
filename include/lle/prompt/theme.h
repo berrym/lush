@@ -191,6 +191,13 @@ typedef struct lle_symbol_set {
     char success[LLE_SYMBOL_MAX];         /**< Success indicator */
     char time[LLE_SYMBOL_MAX];            /**< Time display */
     char jobs[LLE_SYMBOL_MAX];            /**< Background jobs */
+    char shlvl[LLE_SYMBOL_MAX];           /**< Shell nesting level */
+    char ssh[LLE_SYMBOL_MAX];             /**< SSH session indicator */
+    char duration[LLE_SYMBOL_MAX];        /**< Command duration prefix */
+    char virtualenv[LLE_SYMBOL_MAX];      /**< Virtual environment */
+    char container[LLE_SYMBOL_MAX];       /**< Container runtime */
+    char aws[LLE_SYMBOL_MAX];             /**< AWS profile */
+    char kubernetes[LLE_SYMBOL_MAX];      /**< Kubernetes context */
 } lle_symbol_set_t;
 
 /* ============================================================================
@@ -241,6 +248,14 @@ typedef struct lle_segment_config {
     /* Directory-specific */
     char home_symbol[LLE_SYMBOL_MAX]; /**< Home directory replacement symbol */
     bool home_symbol_set; /**< True if home_symbol was configured */
+
+    /* Duration-specific */
+    int min_time;     /**< Minimum duration in ms to show (cmd_duration) */
+    bool min_time_set; /**< True if min_time was configured */
+
+    /* Shell level-specific */
+    int min_level;     /**< Minimum nesting depth to show (shlvl) */
+    bool min_level_set; /**< True if min_level was configured */
 } lle_segment_config_t;
 
 /* ============================================================================

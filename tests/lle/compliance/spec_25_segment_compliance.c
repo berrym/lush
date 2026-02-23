@@ -450,7 +450,7 @@ static void test_register_builtins(void) {
     lle_segment_registry_t registry;
     lle_segment_registry_init(&registry);
     size_t count = lle_segment_register_builtins(&registry);
-    COMPLIANCE_ASSERT(count == 8, "registers 8 built-in segments");
+    COMPLIANCE_ASSERT(count == 15, "registers 15 built-in segments");
     COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "directory") != NULL,
                       "directory segment registered");
     COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "git") != NULL,
@@ -467,6 +467,20 @@ static void test_register_builtins(void) {
                       "jobs segment registered");
     COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "symbol") != NULL,
                       "symbol segment registered");
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "shlvl") != NULL,
+                      "shlvl segment registered");
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "ssh") != NULL,
+                      "ssh segment registered");
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "cmd_duration") != NULL,
+                      "cmd_duration segment registered");
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "virtualenv") != NULL,
+                      "virtualenv segment registered");
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "container") != NULL,
+                      "container segment registered");
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "aws") != NULL,
+                      "aws segment registered");
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "kubernetes") != NULL,
+                      "kubernetes segment registered");
     lle_segment_registry_cleanup(&registry);
     TEST_PASS();
 

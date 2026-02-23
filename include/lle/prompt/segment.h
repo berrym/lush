@@ -464,6 +464,69 @@ lle_prompt_segment_t *lle_segment_create_jobs(void);
  */
 lle_prompt_segment_t *lle_segment_create_symbol(void);
 
+/**
+ * @brief Create shell level segment
+ *
+ * Shows nesting depth when SHLVL > 1.
+ *
+ * @return New segment or NULL on error
+ */
+lle_prompt_segment_t *lle_segment_create_shlvl(void);
+
+/**
+ * @brief Create SSH indicator segment
+ *
+ * Shows indicator when running in an SSH session.
+ *
+ * @return New segment or NULL on error
+ */
+lle_prompt_segment_t *lle_segment_create_ssh(void);
+
+/**
+ * @brief Create command duration segment
+ *
+ * Shows last command's execution time when above threshold.
+ *
+ * @return New segment or NULL on error
+ */
+lle_prompt_segment_t *lle_segment_create_cmd_duration(void);
+
+/**
+ * @brief Create virtual environment segment
+ *
+ * Shows Python virtual environment name from $VIRTUAL_ENV or $CONDA_DEFAULT_ENV.
+ *
+ * @return New segment or NULL on error
+ */
+lle_prompt_segment_t *lle_segment_create_virtualenv(void);
+
+/**
+ * @brief Create container segment
+ *
+ * Shows container runtime when running inside Docker/Podman/LXC.
+ *
+ * @return New segment or NULL on error
+ */
+lle_prompt_segment_t *lle_segment_create_container(void);
+
+/**
+ * @brief Create AWS profile segment
+ *
+ * Shows $AWS_PROFILE when set.
+ *
+ * @return New segment or NULL on error
+ */
+lle_prompt_segment_t *lle_segment_create_aws(void);
+
+/**
+ * @brief Create Kubernetes context segment
+ *
+ * Shows current kubectl context from kubeconfig.
+ *
+ * @return New segment or NULL on error
+ */
+lle_prompt_segment_t *lle_segment_create_kubernetes(void);
+
 #ifdef __cplusplus
 }
 #endif

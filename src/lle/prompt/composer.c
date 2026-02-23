@@ -120,6 +120,20 @@ static const lle_color_t *get_segment_color(const lle_theme_t *theme,
         return &theme->colors.text_dim;
     } else if (strcmp(segment_name, "symbol") == 0) {
         return &theme->colors.primary;
+    } else if (strcmp(segment_name, "shlvl") == 0) {
+        return &theme->colors.info;
+    } else if (strcmp(segment_name, "ssh") == 0) {
+        return &theme->colors.warning;
+    } else if (strcmp(segment_name, "cmd_duration") == 0) {
+        return &theme->colors.warning;
+    } else if (strcmp(segment_name, "virtualenv") == 0) {
+        return &theme->colors.success;
+    } else if (strcmp(segment_name, "container") == 0) {
+        return &theme->colors.info;
+    } else if (strcmp(segment_name, "aws") == 0) {
+        return &theme->colors.warning;
+    } else if (strcmp(segment_name, "kubernetes") == 0) {
+        return &theme->colors.info;
     }
 
     return NULL;

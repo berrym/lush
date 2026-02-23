@@ -71,7 +71,9 @@ inherits_from = "default"      # Optional: inherit unset values from another the
 
 [layout]
 # Main prompt format (PS1)
-# Available segments: ${user}, ${host}, ${path}, ${git}, ${status}, ${jobs}, ${time}
+# Available segments: ${user}, ${host}, ${directory}, ${git}, ${status}, ${jobs},
+#   ${time}, ${symbol}, ${shlvl}, ${ssh}, ${cmd_duration}, ${virtualenv},
+#   ${container}, ${aws}, ${kubernetes}
 # Conditional syntax: ${?condition:content} - only show if condition is true
 # Example conditions: git (in repo), jobs (has bg jobs), status (non-zero exit)
 ps1 = "${path}${?git: ${git}}${?status: ${status}}${?jobs: [${jobs}]} $ "
@@ -312,3 +314,38 @@ truncation_length = 0          # Max graphemes for branch name (0 = no limit)
 show = true
 format = "%H:%M:%S"           # strftime format string (default: "%H:%M:%S")
                                # Examples: "%H:%M" (short), "%I:%M %p" (12-hour)
+
+# Shell level segment — visible when nested (SHLVL > 1)
+[segments.shlvl]
+show = true
+min_level = 2                  # Minimum SHLVL to show (default: 2)
+
+# SSH indicator segment — visible when in SSH session
+[segments.ssh]
+show = true
+style = "symbol"               # "symbol" (default) shows SSH indicator,
+                               # "full" shows user@host
+
+# Command duration segment — visible when last command was slow
+[segments.cmd_duration]
+show = true
+min_time = 2000                # Minimum duration in ms to show (default: 2000)
+                               # e.g., min_time = 5000 only shows commands > 5s
+
+# Virtual environment segment — visible when Python venv is active
+[segments.virtualenv]
+show = true
+style = "basename"             # "basename" (default) shows venv name only,
+                               # "full" shows entire path
+
+# Container segment — visible inside Docker/Podman/LXC
+[segments.container]
+show = true
+
+# AWS profile segment — visible when $AWS_PROFILE is set
+[segments.aws]
+show = true
+
+# Kubernetes context segment — visible when kubectl context exists
+[segments.kubernetes]
+show = true

@@ -711,6 +711,13 @@ void lle_symbol_set_init_unicode(lle_symbol_set_t *symbols) {
     snprintf(symbols->error, sizeof(symbols->error), "%s", "✗");
     snprintf(symbols->success, sizeof(symbols->success), "%s", "✓");
     snprintf(symbols->jobs, sizeof(symbols->jobs), "%s", "⚙");
+    snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "↕");
+    snprintf(symbols->ssh, sizeof(symbols->ssh), "%s", "SSH");
+    snprintf(symbols->duration, sizeof(symbols->duration), "%s", "took ");
+    snprintf(symbols->virtualenv, sizeof(symbols->virtualenv), "%s", "py:");
+    snprintf(symbols->container, sizeof(symbols->container), "%s", "ctr:");
+    snprintf(symbols->aws, sizeof(symbols->aws), "%s", "aws:");
+    snprintf(symbols->kubernetes, sizeof(symbols->kubernetes), "%s", "k8s:");
 }
 
 /**
@@ -743,6 +750,13 @@ void lle_symbol_set_init_ascii(lle_symbol_set_t *symbols) {
     snprintf(symbols->error, sizeof(symbols->error), "%s", "x");
     snprintf(symbols->success, sizeof(symbols->success), "%s", "o");
     snprintf(symbols->jobs, sizeof(symbols->jobs), "%s", "*");
+    snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "L");
+    snprintf(symbols->ssh, sizeof(symbols->ssh), "%s", "SSH");
+    snprintf(symbols->duration, sizeof(symbols->duration), "%s", "took ");
+    snprintf(symbols->virtualenv, sizeof(symbols->virtualenv), "%s", "py:");
+    snprintf(symbols->container, sizeof(symbols->container), "%s", "ctr:");
+    snprintf(symbols->aws, sizeof(symbols->aws), "%s", "aws:");
+    snprintf(symbols->kubernetes, sizeof(symbols->kubernetes), "%s", "k8s:");
 }
 
 /**
@@ -824,6 +838,15 @@ void lle_symbol_set_init_nerd_font(lle_symbol_set_t *symbols) {
              "\xef\x82\x85"); /* U+F085  */
     snprintf(symbols->time, sizeof(symbols->time),
              "\xef\x80\x97"); /* U+F017  */
+
+    /* Environment/context symbols */
+    snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "↕");
+    snprintf(symbols->ssh, sizeof(symbols->ssh), "%s", "SSH");
+    snprintf(symbols->duration, sizeof(symbols->duration), "%s", "took ");
+    snprintf(symbols->virtualenv, sizeof(symbols->virtualenv), "%s", "py:");
+    snprintf(symbols->container, sizeof(symbols->container), "%s", "ctr:");
+    snprintf(symbols->aws, sizeof(symbols->aws), "%s", "aws:");
+    snprintf(symbols->kubernetes, sizeof(symbols->kubernetes), "%s", "k8s:");
 }
 
 /* ============================================================================

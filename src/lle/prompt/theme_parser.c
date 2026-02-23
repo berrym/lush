@@ -1076,6 +1076,14 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
                        value->type == LLE_THEME_VALUE_BOOLEAN) {
                 seg_cfg->show_stash = value->data.boolean;
                 seg_cfg->show_stash_set = true;
+            } else if (strcmp(key, "min_time") == 0 &&
+                       value->type == LLE_THEME_VALUE_INTEGER) {
+                seg_cfg->min_time = (int)value->data.integer;
+                seg_cfg->min_time_set = true;
+            } else if (strcmp(key, "min_level") == 0 &&
+                       value->type == LLE_THEME_VALUE_INTEGER) {
+                seg_cfg->min_level = (int)value->data.integer;
+                seg_cfg->min_level_set = true;
             }
         }
         return LLE_SUCCESS;
