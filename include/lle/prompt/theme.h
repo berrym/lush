@@ -342,6 +342,9 @@ typedef struct lle_theme {
     lle_segment_config_t segment_configs[LLE_THEME_MAX_SEGMENT_CONFIGS];
     size_t segment_config_count;
 
+    /* Source file tracking (for hot-reload) */
+    char filepath[PATH_MAX]; /**< Source file path (empty if builtin) */
+
     /* Runtime state (not persisted) */
     struct lle_theme *parent; /**< Resolved parent pointer */
     bool is_active;           /**< Currently active */

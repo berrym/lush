@@ -792,6 +792,14 @@ void lle_shell_update_prompt(void) {
 
     lle_prompt_composer_t *composer = g_lle_integration->prompt_composer;
 
+    /* Theme hot-reload: check if the active theme's file changed on disk */
+    if (config.display_theme_hot_reload && composer->themes) {
+        if (lle_theme_check_hot_reload(composer->themes)) {
+            lle_composer_set_theme(composer,
+                                  composer->themes->active_theme_name);
+        }
+    }
+
     /* Update background job count from executor */
     executor_t *executor = get_global_executor();
     if (executor) {

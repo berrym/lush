@@ -412,6 +412,10 @@ static config_option_t config_options[] = {
      &config.display_transient_prompt,
      "Enable transient prompts (simplify previous prompts in scrollback)",
      config_validate_bool, NULL},
+    {"display.theme_hot_reload", CONFIG_TYPE_BOOL, CONFIG_SECTION_DISPLAY,
+     &config.display_theme_hot_reload,
+     "Auto-reload theme when its file changes on disk",
+     config_validate_bool, NULL},
     {"display.performance_monitoring", CONFIG_TYPE_BOOL, CONFIG_SECTION_DISPLAY,
      &config.display_performance_monitoring,
      "Enable display performance monitoring", config_validate_bool, NULL},
@@ -764,6 +768,9 @@ static void display_sync_to_runtime(void) {
     if (config_registry_get_boolean("display.transient_prompt", &bval) == CREG_SUCCESS) {
         config.display_transient_prompt = bval;
     }
+    if (config_registry_get_boolean("display.theme_hot_reload", &bval) == CREG_SUCCESS) {
+        config.display_theme_hot_reload = bval;
+    }
     if (config_registry_get_integer("display.optimization_level", &ival) == CREG_SUCCESS) {
         config.display_optimization_level = (int)ival;
     }
@@ -776,6 +783,7 @@ static void display_sync_from_runtime(void) {
     config_registry_set_boolean("display.syntax_highlighting", config.display_syntax_highlighting);
     config_registry_set_boolean("display.autosuggestions", config.display_autosuggestions);
     config_registry_set_boolean("display.transient_prompt", config.display_transient_prompt);
+    config_registry_set_boolean("display.theme_hot_reload", config.display_theme_hot_reload);
     config_registry_set_integer("display.optimization_level", config.display_optimization_level);
 }
 
@@ -2110,6 +2118,7 @@ void config_set_defaults(void) {
     config.display_autosuggestions = true;
     config.display_transient_prompt =
         true; // Transient prompts enabled by default (Spec 25 Section 12)
+    config.display_theme_hot_reload = true; // Auto-reload theme on file change
     config.display_newline_before_prompt =
         true; // Visual separation before prompt (default on)
     config.display_performance_monitoring = false;

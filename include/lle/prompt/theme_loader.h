@@ -165,6 +165,21 @@ size_t lle_theme_reload_user_themes(lle_theme_registry_t *registry);
 lle_result_t lle_theme_reload_by_name(lle_theme_registry_t *registry,
                                       const char *name);
 
+/**
+ * @brief Check if the active theme's file has been modified
+ *
+ * Compares the active theme's source file mtime against a cached value.
+ * If the file has changed, reloads the theme from disk automatically.
+ * Returns true if the theme was reloaded, false otherwise.
+ *
+ * Safe to call frequently (uses stat() only). Ignores builtin themes
+ * and themes without a source filepath.
+ *
+ * @param registry  Theme registry to check
+ * @return true if theme was reloaded, false otherwise
+ */
+bool lle_theme_check_hot_reload(lle_theme_registry_t *registry);
+
 /* ============================================================================
  * THEME EXPORT API
  * ============================================================================

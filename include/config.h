@@ -232,6 +232,7 @@ typedef struct {
     bool display_syntax_highlighting;    /**< Enable syntax highlighting */
     bool display_autosuggestions;        /**< Enable autosuggestions */
     bool display_transient_prompt;       /**< Enable transient prompts */
+    bool display_theme_hot_reload;       /**< Auto-reload theme on file change */
     bool display_newline_before_prompt;  /**< Print newline before prompt */
     bool display_performance_monitoring; /**< Enable performance monitoring */
     int display_optimization_level;      /**< Optimization level (0-4) */

@@ -5936,6 +5936,8 @@ int bin_display(int argc, char **argv) {
             printf("  syntax on|off           - Control syntax highlighting\n");
             printf("  transient on|off        - Control transient prompts\n");
             printf(
+                "  hot-reload on|off       - Control theme hot-reload\n");
+            printf(
                 "  newline-before on|off   - Control newline before prompt\n");
             printf("  multiline on|off        - Control multiline editing\n");
             printf("  theme [list|set <name>] - Control LLE prompt theme\n");
@@ -6710,6 +6712,43 @@ int bin_display(int argc, char **argv) {
                 fprintf(stderr,
                         "display lle transient: Invalid option '%s' (use 'on' "
                         "or 'off')\n",
+                        state);
+                return 1;
+            }
+
+        } else if (strcmp(lle_cmd, "hot-reload") == 0) {
+            /* Control theme hot-reload (auto-reload on file change) */
+            if (argc < 4) {
+                printf("Theme hot-reload: %s\n",
+                       config.display_theme_hot_reload ? "enabled"
+                                                       : "disabled");
+                printf("Usage: display lle hot-reload on|off\n");
+                printf("\nAutomatically reloads the active theme when its\n");
+                printf("TOML file is modified on disk.\n");
+                return 0;
+            }
+
+            const char *state = argv[3];
+            if (strcmp(state, "on") == 0) {
+                config.display_theme_hot_reload = true;
+                if (config_registry_is_initialized()) {
+                    config_registry_set_boolean("display.theme_hot_reload",
+                                                true);
+                }
+                printf("Theme hot-reload enabled\n");
+                return 0;
+            } else if (strcmp(state, "off") == 0) {
+                config.display_theme_hot_reload = false;
+                if (config_registry_is_initialized()) {
+                    config_registry_set_boolean("display.theme_hot_reload",
+                                                false);
+                }
+                printf("Theme hot-reload disabled\n");
+                return 0;
+            } else {
+                fprintf(stderr,
+                        "display lle hot-reload: Invalid option '%s' (use "
+                        "'on' or 'off')\n",
                         state);
                 return 1;
             }

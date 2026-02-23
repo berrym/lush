@@ -217,6 +217,9 @@ lle_result_t lle_theme_load_from_file(const char *filepath, lle_theme_t *theme,
         /* Mark theme source as USER (loaded from file) */
         theme->source = LLE_THEME_SOURCE_USER;
 
+        /* Store source filepath for hot-reload */
+        snprintf(theme->filepath, sizeof(theme->filepath), "%s", filepath);
+
         if (result) {
             result->status = LLE_SUCCESS;
             snprintf(result->theme_name, sizeof(result->theme_name), "%s",
@@ -548,6 +551,60 @@ lle_result_t lle_theme_reload_by_name(lle_theme_registry_t *registry,
     }
 
     return LLE_ERROR_NOT_FOUND;
+}
+
+/* ============================================================================
+ * Hot-Reload Check
+ * ============================================================================
+ */
+
+/** Cached mtime and path for the active theme's source file */
+static time_t s_hot_reload_mtime;
+static char s_hot_reload_path[PATH_MAX];
+
+bool lle_theme_check_hot_reload(lle_theme_registry_t *registry) {
+    if (!registry) {
+        return false;
+    }
+
+    const lle_theme_t *active = lle_theme_registry_get_active(registry);
+    if (!active || active->source != LLE_THEME_SOURCE_USER) {
+        return false;
+    }
+
+    /* No filepath means no file to watch */
+    if (!active->filepath[0]) {
+        return false;
+    }
+
+    /* If the active theme changed (different path), reset cache */
+    if (strcmp(s_hot_reload_path, active->filepath) != 0) {
+        snprintf(s_hot_reload_path, sizeof(s_hot_reload_path), "%s",
+                 active->filepath);
+
+        struct stat st;
+        if (stat(s_hot_reload_path, &st) == 0) {
+            s_hot_reload_mtime = st.st_mtime;
+        }
+        return false; /* First check after switch — just cache, don't reload */
+    }
+
+    /* stat() the file and compare mtime */
+    struct stat st;
+    if (stat(s_hot_reload_path, &st) != 0) {
+        return false; /* File gone or inaccessible */
+    }
+
+    if (st.st_mtime == s_hot_reload_mtime) {
+        return false; /* No change */
+    }
+
+    /* File modified — reload */
+    s_hot_reload_mtime = st.st_mtime;
+
+    lle_result_t result =
+        lle_theme_reload_by_name(registry, active->name);
+    return (result == LLE_SUCCESS);
 }
 
 /* ============================================================================

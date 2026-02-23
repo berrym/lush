@@ -75,6 +75,8 @@
 #include "lle/lle_editor.h"            /* Proper LLE editor architecture */
 #include "lle/lle_readline_state.h"    /* State machine for input handling */
 #include "lle/lle_shell_integration.h" /* Spec 26: Shell integration */
+#include "lle/prompt/composer.h"       /* lle_composer_set_theme */
+#include "lle/prompt/theme_loader.h"   /* lle_theme_check_hot_reload */
 #include "lle/lle_watchdog.h" /* Watchdog timer for deadlock detection */
 #include "lle/memory_management.h"
 #include "lle/terminal_abstraction.h"
@@ -91,6 +93,7 @@ lle_result_t lle_history_next(lle_editor_t *editor);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 /* Global LLE editor instance (proper architecture) */
@@ -3170,6 +3173,27 @@ char *lle_readline(const char *prompt) {
          * Idle waiting for user input is completely normal.
          * The watchdog catches actual processing freezes. */
         if (result == LLE_ERROR_TIMEOUT || event == NULL) {
+            /* Theme hot-reload check (~every 2 seconds during idle) */
+            if (config.display_theme_hot_reload && g_lle_integration &&
+                g_lle_integration->prompt_composer) {
+                struct timespec now;
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                static time_t s_last_theme_check;
+                if (now.tv_sec - s_last_theme_check >= 2) {
+                    s_last_theme_check = now.tv_sec;
+                    lle_prompt_composer_t *composer =
+                        g_lle_integration->prompt_composer;
+                    if (composer->themes &&
+                        lle_theme_check_hot_reload(composer->themes)) {
+                        lle_composer_set_theme(
+                            composer,
+                            composer->themes->active_theme_name);
+                        lle_shell_update_prompt();
+                        dc_reset_prompt_display_state();
+                        refresh_display(&ctx);
+                    }
+                }
+            }
             continue;
         }
 
