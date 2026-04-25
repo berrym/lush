@@ -646,6 +646,98 @@ TEST(parse_function_body_keyword_form_subshell) {
 }
 
 /* ============================================================================
+ * REGRESSION TESTS — Issue #43
+ * Function definitions must accept trailing redirections after the body,
+ * matching bash and zsh. Until the fix lands, every test below fails with
+ * `expected command name, got '>'/'<'/'2>'/etc.` because the parser leaves
+ * the redirection token at command position and tries to parse a new
+ * statement.
+ * ============================================================================
+ */
+
+TEST(parse_function_trailing_redir_out) {
+    parser_t *parser = parser_new("f() { echo x; } > /tmp/lush_test");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "POSIX form with > redirect must parse");
+    ASSERT(!parser_has_error(parser),
+           "POSIX form with > redirect must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_trailing_redir_keyword_form) {
+    parser_t *parser = parser_new("function f { echo x; } > /tmp/lush_test");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "keyword form with > redirect must parse");
+    ASSERT(!parser_has_error(parser),
+           "keyword form with > redirect must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_trailing_redir_keyword_parens_form) {
+    parser_t *parser = parser_new("function f() { echo x; } > /tmp/lush_test");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "keyword+parens form with > redirect must parse");
+    ASSERT(!parser_has_error(parser),
+           "keyword+parens form with > redirect must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_trailing_redir_stderr) {
+    parser_t *parser = parser_new("f() { echo x; } 2> /tmp/lush_test");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with 2> redirect must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with 2> redirect must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_trailing_redir_in) {
+    parser_t *parser = parser_new("f() { read line; } < /tmp/lush_test");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with < redirect must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with < redirect must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_trailing_redir_append) {
+    parser_t *parser = parser_new("f() { echo x; } >> /tmp/lush_test");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with >> redirect must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with >> redirect must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_trailing_redir_subshell_body) {
+    /* Cross-checks Issue #46 + #43: non-brace body + trailing redir.
+     * The redirection may end up attached to the subshell (consumed by
+     * parse_subshell's own trailing-redir call) rather than the function
+     * node; either is functionally equivalent at runtime. The test only
+     * asserts that the input parses cleanly. */
+    parser_t *parser = parser_new("f() ( echo x ) > /tmp/lush_test");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with subshell body + > redirect must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with subshell body + > redirect must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+/* ============================================================================
  * GROUPING TESTS
  * ============================================================================
  */
@@ -986,6 +1078,15 @@ int main(void) {
     RUN_TEST(parse_function_body_case);
     RUN_TEST(parse_function_body_arith);
     RUN_TEST(parse_function_body_keyword_form_subshell);
+
+    printf("\nRegression tests — Issue #43 (function trailing redirections):\n");
+    RUN_TEST(parse_function_trailing_redir_out);
+    RUN_TEST(parse_function_trailing_redir_keyword_form);
+    RUN_TEST(parse_function_trailing_redir_keyword_parens_form);
+    RUN_TEST(parse_function_trailing_redir_stderr);
+    RUN_TEST(parse_function_trailing_redir_in);
+    RUN_TEST(parse_function_trailing_redir_append);
+    RUN_TEST(parse_function_trailing_redir_subshell_body);
     
     printf("\nGrouping tests:\n");
     RUN_TEST(parse_subshell);

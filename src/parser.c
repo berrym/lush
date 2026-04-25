@@ -4071,6 +4071,15 @@ parse_function_body:
         }
         add_child_node(function_node, body);
         parser_pop_context(parser);
+
+        // Trailing redirections after the body: `f() ( ... ) > out`.
+        // The compound-body parsers (subshell, if, etc.) consume their own
+        // trailing redirections, so any redirection that reaches here is
+        // attached to the function definition itself.
+        if (!parse_trailing_redirections(parser, function_node)) {
+            free_node_tree(function_node);
+            return NULL;
+        }
         return function_node;
     }
 
@@ -4125,6 +4134,14 @@ parse_function_body:
     }
 
     parser_pop_context(parser);
+
+    // Trailing redirections after `}`: `f() { ...; } > out 2>&1`.
+    // Without this, the redirection token would be left at command position
+    // and the next statement would error with "expected command name".
+    if (!parse_trailing_redirections(parser, function_node)) {
+        free_node_tree(function_node);
+        return NULL;
+    }
 
     return function_node;
 }
