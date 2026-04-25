@@ -9,6 +9,7 @@
 #include "lle/error_handling.h"
 #include "lle/prompt/prompt_expansion.h"
 #include "lle/prompt/template.h"
+#include "test_framework.h"
 #include "version.h"
 
 #include <pwd.h>
@@ -17,60 +18,17 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Test counters */
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("Running test: %s\n", #name);                                   \
-        test_##name();                                                         \
-    } while (0)
-
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  FAILED: %s (line %d)\n", #cond, __LINE__);               \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAILED: %s == %s (%d != %d, line %d)\n", #a, #b,         \
-                   (int)(a), (int)(b), __LINE__);                              \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("  FAILED: '%s' == '%s' (line %d)\n", (a), (b), __LINE__);  \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_CONTAINS(haystack, needle)                                  \
-    do {                                                                       \
-        if (strstr((haystack), (needle)) == NULL) {                            \
-            printf("  FAILED: '%s' contains '%s' (line %d)\n", (haystack),     \
-                   (needle), __LINE__);                                        \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define PASS()                                                                 \
-    do {                                                                       \
-        printf("  PASSED\n");                                                  \
-        tests_passed++;                                                        \
-    } while (0)
+/* Wrap older 2-arg / no-arg ASSERT forms over the shared framework so
+ * the test bodies don't need editing. PASS() is now a no-op. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
+#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT_EQ(a, b) ASSERT((a) == (b))
+#define ASSERT_STR_EQ(a, b) ASSERT(strcmp((a), (b)) == 0)
+#define ASSERT_STR_CONTAINS(haystack, needle) \
+    ASSERT(strstr((haystack), (needle)) != NULL)
+#define PASS() ((void)0)
 
 /* Default context for most tests: no template engine, truecolor */
 static lle_prompt_expand_ctx_t make_ctx(void) {
@@ -935,10 +893,5 @@ int main(void) {
     /* Buffer limits */
     RUN_TEST(small_buffer);
 
-    printf("\n===========================================\n");
-    printf("Test Results: %d passed, %d failed, %d total\n", tests_passed,
-           tests_failed, tests_passed + tests_failed);
-    printf("===========================================\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

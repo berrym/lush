@@ -521,10 +521,11 @@ if lle_sources.length() > 0
 
   # Template Engine Unit Tests (Spec 25 Section 6)
   # Tests template parsing and rendering with segments, conditionals, colors
-  test_template_engine = executable('test_template_engine',
-                                    'tests/lle/unit/test_template_engine.c',
-                                    include_directories: inc,
-                                    dependencies: [lle_dep])
+  test_template_engine = executable(
+    'test_template_engine',
+    'tests/lle/unit/test_template_engine.c',
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep])
 
   test('LLE Template Engine', test_template_engine,
        suite: 'lle-unit',
@@ -532,10 +533,11 @@ if lle_sources.length() > 0
 
   # Prompt Expansion Unit Tests (Spec 28 Phase 1)
   # Tests unified bash/zsh/LLE prompt expansion engine
-  test_prompt_expansion = executable('test_prompt_expansion',
-                                     'tests/lle/unit/test_prompt_expansion.c',
-                                     include_directories: inc,
-                                     dependencies: [lle_dep])
+  test_prompt_expansion = executable(
+    'test_prompt_expansion',
+    'tests/lle/unit/test_prompt_expansion.c',
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep])
 
   test('LLE Prompt Expansion', test_prompt_expansion,
        suite: 'lle-unit',
@@ -543,10 +545,11 @@ if lle_sources.length() > 0
 
   # Segment System Unit Tests (Spec 25 Section 5)
   # Tests segment registry, prompt context, and built-in segments
-  test_segment_system = executable('test_segment_system',
-                                   'tests/lle/unit/test_segment_system.c',
-                                   include_directories: inc,
-                                   dependencies: [lle_dep])
+  test_segment_system = executable(
+    'test_segment_system',
+    'tests/lle/unit/test_segment_system.c',
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep])
 
   test('LLE Segment System', test_segment_system,
        suite: 'lle-unit',
