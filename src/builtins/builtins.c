@@ -15,6 +15,7 @@
 #include "alias.h"
 #include "arithmetic.h"
 #include "compat.h"
+#include "lush_fork.h"
 #include "dirstack.h"
 #include "config.h"
 #include "config_registry.h"
@@ -7502,7 +7503,7 @@ int bin_command(int argc, char **argv) {
     }
 
     /* Fork and execute */
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
 
     if (pid < 0) {
         /* Fork failed */
@@ -7996,7 +7997,7 @@ int bin_env(int argc, char **argv) {
     }
     
     /* Run command with modified environment */
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid < 0) {
         int saved_errno = errno;
         shell_error_t *error = shell_error_create(

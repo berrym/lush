@@ -21,6 +21,7 @@
 
 #include "executor.h"
 #include "lush.h"
+#include "lush_fork.h"
 #include "node.h"
 #include "shell_error.h"
 #include "symtable.h"
@@ -594,7 +595,7 @@ static int setup_here_document(const char *delimiter, bool strip_tabs) {
         return 1;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         shell_error_t *error = shell_error_create(
             SHELL_ERR_FORK_FAILED, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
@@ -694,7 +695,7 @@ static int setup_here_document_with_content(const char *content) {
         return 1;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         shell_error_t *error = shell_error_create(
             SHELL_ERR_FORK_FAILED, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
@@ -1125,6 +1126,18 @@ int save_file_descriptors(redirection_state_t *state) {
     if (!state) {
         return 1;
     }
+
+    // Flush stdio buffers BEFORE installing the new file descriptors so any
+    // pending buffered content goes to its original destination rather than
+    // the redirection target. dup2 only changes the kernel-level fd; libc
+    // stdio still holds bytes destined for fd 1/2, and a later flush (or
+    // automatic flush triggered by a builtin or buffer fill) would write
+    // those bytes through the new fd, silently contaminating the redirected
+    // file. The symmetric flush in restore_file_descriptors handles the
+    // other direction (output produced while redirected must reach the
+    // redirected fd before it is closed).
+    fflush(stdout);
+    fflush(stderr);
 
     // Initialize state
     state->stdin_saved = false;

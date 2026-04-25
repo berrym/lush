@@ -25,6 +25,7 @@
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
 #include "lush.h"
+#include "lush_fork.h"
 #include "node.h"
 #include "parser.h"
 #include "redirection.h"
@@ -1539,7 +1540,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         return 1;
     }
 
-    pid_t left_pid = fork();
+    pid_t left_pid = lush_fork();
     if (left_pid == -1) {
         executor_error_add(executor, SHELL_ERR_FORK_FAILED,
                            pipeline->loc, "failed to fork for pipeline: %s", strerror(errno));
@@ -1566,7 +1567,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         _exit(result);
     }
 
-    pid_t right_pid = fork();
+    pid_t right_pid = lush_fork();
     if (right_pid == -1) {
         executor_error_add(executor, SHELL_ERR_FORK_FAILED,
                            pipeline->loc, "failed to fork for pipeline: %s", strerror(errno));
@@ -2780,7 +2781,7 @@ static int execute_coproc(executor_t *executor, node_t *coproc_node) {
         return 1;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         close(pipe_to_coproc[0]);
         close(pipe_to_coproc[1]);
@@ -3881,7 +3882,7 @@ static int execute_external_command_with_redirection(executor_t *executor,
         fflush(stderr);
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         set_executor_error(executor, "Failed to fork");
         return 1;
@@ -4089,7 +4090,7 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
     executor_push_context(executor, subshell->loc, "in subshell");
 
     // Fork a new process for the subshell
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         executor_error_add(executor, SHELL_ERR_FORK_FAILED,
                            subshell->loc, "failed to fork for subshell: %s", strerror(errno));
@@ -6013,7 +6014,7 @@ static int execute_external_command_with_setup(executor_t *executor,
         fflush(stderr);
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         set_executor_error(executor, "Failed to fork");
         return 1;
@@ -10164,7 +10165,7 @@ static char *expand_command_substitution(executor_t *executor,
         return strdup("");
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         close(pipefd[0]);
         close(pipefd[1]);
@@ -11298,7 +11299,7 @@ int executor_execute_background(executor_t *executor, node_t *command) {
     if (!shell_opts.job_control) {
         // When job control is disabled, execute in background without job
         // tracking
-        pid_t pid = fork();
+        pid_t pid = lush_fork();
         if (pid == -1) {
             fprintf(stderr, "Failed to fork for background process\n");
             return 1;
@@ -11324,7 +11325,7 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         command_line = command->first_child->val.str;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         fprintf(stderr, "Failed to fork for background job\n");
         return 1;
@@ -11612,7 +11613,7 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
         return 1;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         set_executor_error(executor,
                            "Failed to fork for builtin with captured stdout");
@@ -12732,7 +12733,7 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
         return NULL;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         close(pipefd[0]);
         close(pipefd[1]);
