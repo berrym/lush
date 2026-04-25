@@ -889,7 +889,7 @@ endif
   if fs.exists('tests/lle/unit/test_unicode_case_compare.c')
     test_unicode_case_compare = executable('test_unicode_case_compare',
                                            'tests/lle/unit/test_unicode_case_compare.c',
-                                           include_directories: inc,
+                                           include_directories: [inc, include_directories('tests')],
                                            dependencies: [lle_dep])
     test('LLE Unicode Case and Compare', test_unicode_case_compare,
          suite: 'lle-unit',
