@@ -2140,6 +2140,7 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
     content[0] = '\0';
 
     size_t line_start = content_start;
+    bool found_delimiter_line = false;
     while (line_start < tokenizer->input_length) {
         // Find end of current line
         size_t line_end = line_start;
@@ -2169,6 +2170,7 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
         // Check if this line matches the delimiter
         if (strcmp(line_content, match_delimiter) == 0) {
             // Found delimiter - stop collecting
+            found_delimiter_line = true;
             free(line);
             break;
         }
@@ -2200,6 +2202,24 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 
         // Move to next line
         line_start = line_end + 1;
+    }
+
+    // EOF reached without finding the delimiter — issue #44.
+    // Treat this as a parse error rather than silently accepting the
+    // partial body. Bash warns at parse time; lush -n needs an error
+    // because exit code is the only signal available to tooling.
+    if (!found_delimiter_line) {
+        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_EOF,
+                                   "the delimiter must appear alone on a "
+                                   "line; for <<- it may be preceded by tabs",
+                                   "unterminated here-document: expected "
+                                   "delimiter '%s' but reached end of input",
+                                   match_delimiter);
+        free(content);
+        if (unquoted_delimiter) {
+            free(unquoted_delimiter);
+        }
+        return NULL;
     }
 
     // Update tokenizer position to after the delimiter line

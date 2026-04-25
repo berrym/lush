@@ -604,9 +604,31 @@ TEST(heredoc_invalid_delimiter) {
     ASSERT_PARSE_FAILS("cat << <<");
 }
 
-/* NOTE: heredoc_unclosed - this requires EOF to be reached without finding
- * the delimiter. This is detected but may not be a parse error in the
- * traditional sense - it's an incomplete input condition. */
+/* Issue #44: a heredoc whose delimiter is never reached (EOF first) was
+ * previously accepted silently — the body was treated as valid input and
+ * `lush -n` reported success. Bash warns. Lush now treats this as a
+ * parse error so that incomplete input is signaled to tooling and to
+ * the user, since silent acceptance is dangerous and indistinguishable
+ * from a successful parse. */
+TEST(heredoc_unclosed_plain) {
+    ASSERT_PARSE_FAILS("cat <<EOF\nbody line\n");
+}
+
+TEST(heredoc_unclosed_strip) {
+    /* <<- variant (tab-stripping form) */
+    ASSERT_PARSE_FAILS("cat <<-EOF\n\tbody line\n");
+}
+
+TEST(heredoc_unclosed_quoted_delim) {
+    /* Quoted delimiter (no expansion) — same diagnostic should apply */
+    ASSERT_PARSE_FAILS("cat <<'EOF'\nbody line\n");
+}
+
+TEST(heredoc_unclosed_with_partial_match) {
+    /* Body contains a line that LOOKS like the delimiter but isn't (has
+     * trailing characters). Must still be flagged as unterminated. */
+    ASSERT_PARSE_FAILS("cat <<EOF\nbody\nEOFx\n");
+}
 
 /* ============================================================================
  * INVALID COMPOUND CONSTRUCTS
@@ -907,7 +929,10 @@ int main(void) {
     reset_category();
     RUN_TEST(heredoc_no_delimiter);
     RUN_TEST(heredoc_invalid_delimiter);
-    /* heredoc_unclosed - incomplete input, not structural error */
+    RUN_TEST(heredoc_unclosed_plain);
+    RUN_TEST(heredoc_unclosed_strip);
+    RUN_TEST(heredoc_unclosed_quoted_delim);
+    RUN_TEST(heredoc_unclosed_with_partial_match);
     print_category_summary("Invalid Heredoc");
 
     printf("Invalid Compound Constructs:\n");
