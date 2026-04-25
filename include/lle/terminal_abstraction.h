@@ -575,12 +575,12 @@ void lle_display_content_destroy(lle_display_content_t *content);
 /* Lush Display Client Operations */
 lle_result_t
 lle_lush_display_client_init(lle_lush_display_client_t **client,
-                               lush_display_context_t *display_context,
-                               lle_terminal_capabilities_t *capabilities);
+                             lush_display_context_t *display_context,
+                             lle_terminal_capabilities_t *capabilities);
 void lle_lush_display_client_destroy(lle_lush_display_client_t *client);
 lle_result_t
 lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
-                                         lle_display_content_t *content);
+                                       lle_display_content_t *content);
 
 /* Input Event Processing */
 lle_result_t lle_input_processor_init(lle_input_processor_t **processor,

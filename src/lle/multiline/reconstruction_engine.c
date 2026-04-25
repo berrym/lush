@@ -53,7 +53,8 @@ static size_t get_indent_for_line(lle_command_structure_t *structure,
 /**
  * @brief Get default reconstruction engine options
  * @param options Pointer to options structure to populate
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if options is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if options is
+ * NULL
  */
 lle_result_t lle_reconstruction_engine_get_default_options(
     lle_reconstruction_options_t *options) {

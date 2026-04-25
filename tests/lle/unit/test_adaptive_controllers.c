@@ -60,13 +60,16 @@ static void test_context_initialization(void) {
         lle_adaptive_context_t *context = NULL;
         res = lle_initialize_adaptive_context(&context, detection, NULL);
 
-        /* In non-TTY environments (CI), mode may be NONE which returns an error */
+        /* In non-TTY environments (CI), mode may be NONE which returns an error
+         */
         if (has_tty || detection->recommended_mode != LLE_ADAPTIVE_MODE_NONE) {
             TEST_ASSERT(res == LLE_SUCCESS, "Context initialization succeeds");
             TEST_ASSERT(context != NULL, "Context is created");
         } else {
-            /* Non-interactive mode - context init returns feature not available */
-            TEST_ASSERT(res == LLE_ERROR_FEATURE_NOT_AVAILABLE || res == LLE_SUCCESS,
+            /* Non-interactive mode - context init returns feature not available
+             */
+            TEST_ASSERT(res == LLE_ERROR_FEATURE_NOT_AVAILABLE ||
+                            res == LLE_SUCCESS,
                         "Context initialization handles non-TTY correctly");
             printf("  [SKIP] Context creation skipped (no TTY)\n");
             tests_run++;
@@ -96,7 +99,8 @@ static void test_context_initialization(void) {
 static void test_interface_creation(void) {
     printf("\nInterface Creation Tests:\n");
 
-    /* Check if we have a TTY - interface creation requires interactive terminal */
+    /* Check if we have a TTY - interface creation requires interactive terminal
+     */
     bool has_tty = isatty(STDIN_FILENO) || isatty(STDOUT_FILENO);
 
     lle_adaptive_interface_t *interface = NULL;
@@ -108,7 +112,8 @@ static void test_interface_creation(void) {
         TEST_ASSERT(interface != NULL, "Interface is created");
     } else {
         /* Non-TTY - interface creation returns feature not available */
-        TEST_ASSERT(res == LLE_ERROR_FEATURE_NOT_AVAILABLE || res == LLE_SUCCESS,
+        TEST_ASSERT(res == LLE_ERROR_FEATURE_NOT_AVAILABLE ||
+                        res == LLE_SUCCESS,
                     "Interface creation handles non-TTY correctly");
         if (res != LLE_SUCCESS) {
             printf("  [SKIP] Interface creation skipped (no TTY)\n");

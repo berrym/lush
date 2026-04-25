@@ -127,7 +127,8 @@ lle_result_t lle_event_handler_unregister(lle_event_system_t *system,
  * @brief Unregister all handlers for a specific event type
  * @param system The event system containing the handlers
  * @param type The event type to remove all handlers for
- * @return LLE_SUCCESS if at least one handler was removed, LLE_ERROR_NOT_FOUND otherwise
+ * @return LLE_SUCCESS if at least one handler was removed, LLE_ERROR_NOT_FOUND
+ * otherwise
  */
 lle_result_t lle_event_handler_unregister_all(lle_event_system_t *system,
                                               lle_event_kind_t type) {
@@ -251,7 +252,8 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
     lle_result_t dispatch_result = LLE_SUCCESS;
 
     for (size_t i = 0; i < snap_count; i++) {
-        lle_result_t result = snapshot[i]->handler(event, snapshot[i]->user_data);
+        lle_result_t result =
+            snapshot[i]->handler(event, snapshot[i]->user_data);
         if (result != LLE_SUCCESS) {
             dispatch_result = result;
         }

@@ -49,7 +49,8 @@
  *
  * @param fd File descriptor to lock
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if fd is invalid,
- *         LLE_ERROR_TIMEOUT if lock cannot be acquired, or LLE_ERROR_SYSTEM_CALL on error
+ *         LLE_ERROR_TIMEOUT if lock cannot be acquired, or
+ * LLE_ERROR_SYSTEM_CALL on error
  */
 static lle_result_t lle_history_file_lock(int fd) {
     if (fd < 0) {
@@ -109,7 +110,8 @@ static lle_result_t lle_history_file_unlock(int fd) {
  * @param str Input string to escape
  * @param output Output buffer for escaped string
  * @param output_size Size of output buffer in bytes
- * @return LLE_SUCCESS on success, or LLE_ERROR_INVALID_PARAMETER if parameters are invalid
+ * @return LLE_SUCCESS on success, or LLE_ERROR_INVALID_PARAMETER if parameters
+ * are invalid
  */
 static lle_result_t lle_escape_string(const char *str, char *output,
                                       size_t output_size) {
@@ -154,7 +156,8 @@ static lle_result_t lle_escape_string(const char *str, char *output,
  * @param str Input escaped string
  * @param output Output buffer for unescaped string
  * @param output_size Size of output buffer in bytes
- * @return LLE_SUCCESS on success, or LLE_ERROR_INVALID_PARAMETER if parameters are invalid
+ * @return LLE_SUCCESS on success, or LLE_ERROR_INVALID_PARAMETER if parameters
+ * are invalid
  */
 static lle_result_t lle_unescape_string(const char *str, char *output,
                                         size_t output_size) {
@@ -196,8 +199,9 @@ static lle_result_t lle_unescape_string(const char *str, char *output,
  * @param entry History entry to format
  * @param line Output buffer for formatted line
  * @param line_size Size of output buffer in bytes
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are invalid,
- *         LLE_ERROR_OUT_OF_MEMORY on allocation failure, or LLE_ERROR_BUFFER_OVERFLOW if line too long
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are
+ * invalid, LLE_ERROR_OUT_OF_MEMORY on allocation failure, or
+ * LLE_ERROR_BUFFER_OVERFLOW if line too long
  */
 static lle_result_t lle_history_format_entry(const lle_history_entry_t *entry,
                                              char *line, size_t line_size) {
@@ -248,7 +252,8 @@ static lle_result_t lle_history_format_entry(const lle_history_entry_t *entry,
  * @param line Input TSV line to parse
  * @param entry Output pointer for created entry (NULL if line is comment/empty)
  * @param memory_pool Memory pool for allocation (currently uses global pool)
- * @return LLE_SUCCESS on success, or LLE_ERROR_INVALID_PARAMETER if parameters are invalid
+ * @return LLE_SUCCESS on success, or LLE_ERROR_INVALID_PARAMETER if parameters
+ * are invalid
  */
 static lle_result_t lle_history_parse_line(const char *line,
                                            lle_history_entry_t **entry,
@@ -321,12 +326,13 @@ static lle_result_t lle_history_parse_line(const char *line,
 /**
  * @brief Save all history entries to file
  *
- * Writes all history entries to a TSV file with locking for multi-process safety.
+ * Writes all history entries to a TSV file with locking for multi-process
+ * safety.
  *
  * @param core History core engine containing entries to save
  * @param file_path Path to history file to write
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are invalid,
- *         LLE_ERROR_IO_ERROR on file operations failure, or other error codes
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are
+ * invalid, LLE_ERROR_IO_ERROR on file operations failure, or other error codes
  */
 lle_result_t lle_history_save_to_file(lle_history_core_t *core,
                                       const char *file_path) {
@@ -419,8 +425,8 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
  *
  * @param entry History entry to append
  * @param file_path Path to history file to append to
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are invalid,
- *         LLE_ERROR_IO_ERROR on file operations failure, or other error codes
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are
+ * invalid, LLE_ERROR_IO_ERROR on file operations failure, or other error codes
  */
 lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
                                       const char *file_path) {
@@ -487,8 +493,8 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
  *
  * @param core History core engine to populate with loaded entries
  * @param file_path Path to history file to read
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are invalid,
- *         LLE_ERROR_IO_ERROR on file read failure, or other error codes
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters are
+ * invalid, LLE_ERROR_IO_ERROR on file read failure, or other error codes
  */
 lle_result_t lle_history_load_from_file(lle_history_core_t *core,
                                         const char *file_path) {

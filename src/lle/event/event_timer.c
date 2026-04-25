@@ -125,8 +125,8 @@ static void remove_timer_at_index(lle_timer_system_t *ts, size_t index) {
 /**
  * @brief Initialize the timer subsystem
  * @param system The event system to initialize timers for
- * @return LLE_SUCCESS on success, LLE_ERROR_ALREADY_INITIALIZED if already init,
- *         or other error code on failure
+ * @return LLE_SUCCESS on success, LLE_ERROR_ALREADY_INITIALIZED if already
+ * init, or other error code on failure
  */
 lle_result_t lle_event_timer_system_init(lle_event_system_t *system) {
     if (!system) {

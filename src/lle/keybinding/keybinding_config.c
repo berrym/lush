@@ -650,7 +650,8 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
  * @brief Load keybinding configuration from the user's config file
  * @param manager Keybinding manager to configure
  * @param result Structure to store load results and any errors
- * @return LLE_SUCCESS on success, LLE_ERROR_NOT_FOUND if file missing (optional)
+ * @return LLE_SUCCESS on success, LLE_ERROR_NOT_FOUND if file missing
+ * (optional)
  */
 lle_result_t
 lle_keybinding_load_user_config(lle_keybinding_manager_t *manager,

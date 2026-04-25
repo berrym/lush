@@ -69,9 +69,9 @@ lle_result_t lle_history_config_create_default(lle_history_config_t **config,
     cfg->load_on_init = false; /* Phase 3 - disable auto-load for now */
 
     /* Behavior settings */
-    cfg->ignore_duplicates = false;  /* Phase 4 - deduplication */
-    cfg->dedup_strategy = LLE_DEDUP_KEEP_RECENT;          /* Default strategy */
-    cfg->dedup_scope = LLE_HISTORY_DEDUP_SCOPE_SESSION;   /* Default scope */
+    cfg->ignore_duplicates = false;              /* Phase 4 - deduplication */
+    cfg->dedup_strategy = LLE_DEDUP_KEEP_RECENT; /* Default strategy */
+    cfg->dedup_scope = LLE_HISTORY_DEDUP_SCOPE_SESSION; /* Default scope */
     cfg->ignore_space_prefix = true; /* Standard shell behavior */
     cfg->save_timestamps = true;
     cfg->save_working_dir = true;

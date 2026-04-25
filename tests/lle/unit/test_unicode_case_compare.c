@@ -65,7 +65,8 @@ static int tests_failed = 0;
 
 /* ============================================================================
  * UNICODE CASE CONVERSION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static void test_case_ascii_upper(void) {
     TEST("ASCII uppercase conversion");
@@ -101,7 +102,7 @@ static void test_case_latin1_upper(void) {
     TEST("Latin-1 uppercase conversion (accented)");
     char out[32];
     /* cafe with accented e (U+00E9) -> CAFE with E-acute (U+00C9) */
-    const char *input = "caf\xC3\xA9";  /* cafe in UTF-8 */
+    const char *input = "caf\xC3\xA9"; /* cafe in UTF-8 */
     size_t len = lle_utf8_toupper(input, strlen(input), out, sizeof(out));
     ASSERT_TRUE(len != (size_t)-1, "Conversion should succeed");
     out[len] = '\0';
@@ -113,7 +114,7 @@ static void test_case_latin1_lower(void) {
     TEST("Latin-1 lowercase conversion (accented)");
     char out[32];
     /* CAFE with E-acute (U+00C9) -> cafe with e-acute (U+00E9) */
-    const char *input = "CAF\xC3\x89";  /* CAFE in UTF-8 */
+    const char *input = "CAF\xC3\x89"; /* CAFE in UTF-8 */
     size_t len = lle_utf8_tolower(input, strlen(input), out, sizeof(out));
     ASSERT_TRUE(len != (size_t)-1, "Conversion should succeed");
     out[len] = '\0';
@@ -127,7 +128,8 @@ static void test_case_codepoint_upper(void) {
     ASSERT_EQ(lle_unicode_toupper_codepoint('z'), 'Z', "z -> Z");
     ASSERT_EQ(lle_unicode_toupper_codepoint('A'), 'A', "A unchanged");
     ASSERT_EQ(lle_unicode_toupper_codepoint('5'), '5', "digit unchanged");
-    ASSERT_EQ(lle_unicode_toupper_codepoint(0x00E9), 0x00C9, "e-acute -> E-acute");
+    ASSERT_EQ(lle_unicode_toupper_codepoint(0x00E9), 0x00C9,
+              "e-acute -> E-acute");
     PASS();
 }
 
@@ -137,7 +139,8 @@ static void test_case_codepoint_lower(void) {
     ASSERT_EQ(lle_unicode_tolower_codepoint('Z'), 'z', "Z -> z");
     ASSERT_EQ(lle_unicode_tolower_codepoint('a'), 'a', "a unchanged");
     ASSERT_EQ(lle_unicode_tolower_codepoint('5'), '5', "digit unchanged");
-    ASSERT_EQ(lle_unicode_tolower_codepoint(0x00C9), 0x00E9, "E-acute -> e-acute");
+    ASSERT_EQ(lle_unicode_tolower_codepoint(0x00C9), 0x00E9,
+              "E-acute -> e-acute");
     PASS();
 }
 
@@ -186,7 +189,7 @@ static void test_case_empty_string(void) {
 
 static void test_case_buffer_too_small(void) {
     TEST("Buffer too small returns error");
-    char out[3];  /* Too small for "HELLO" */
+    char out[3]; /* Too small for "HELLO" */
     size_t len = lle_utf8_toupper("hello", 5, out, sizeof(out));
     ASSERT_EQ(len, (size_t)-1, "Should return error for small buffer");
     PASS();
@@ -194,7 +197,8 @@ static void test_case_buffer_too_small(void) {
 
 /* ============================================================================
  * UNICODE STRING COMPARISON TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static void test_compare_equal_ascii(void) {
     TEST("ASCII string equality");
@@ -247,7 +251,8 @@ static void test_compare_unicode_strings(void) {
 
 /* ============================================================================
  * UNICODE PREFIX MATCHING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static void test_prefix_ascii(void) {
     TEST("ASCII prefix matching");
@@ -296,13 +301,15 @@ static void test_prefix_case_insensitive(void) {
 
 /* ============================================================================
  * NFC NORMALIZATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static void test_nfc_ascii_passthrough(void) {
     TEST("NFC normalization - ASCII passthrough");
     char out[32];
     size_t out_len;
-    int result = lle_unicode_normalize_nfc("hello", 5, out, sizeof(out), &out_len);
+    int result =
+        lle_unicode_normalize_nfc("hello", 5, out, sizeof(out), &out_len);
     ASSERT_EQ(result, 0, "Normalization should succeed");
     out[out_len] = '\0';
     ASSERT_STR_EQ(out, "hello", "ASCII unchanged after NFC");
@@ -315,7 +322,8 @@ static void test_nfc_precomposed(void) {
     size_t out_len;
     /* e-acute (U+00E9) is already NFC */
     const char *input = "caf\xC3\xA9";
-    int result = lle_unicode_normalize_nfc(input, strlen(input), out, sizeof(out), &out_len);
+    int result = lle_unicode_normalize_nfc(input, strlen(input), out,
+                                           sizeof(out), &out_len);
     ASSERT_EQ(result, 0, "Normalization should succeed");
     out[out_len] = '\0';
     ASSERT_STR_EQ(out, input, "Precomposed unchanged");
@@ -324,7 +332,8 @@ static void test_nfc_precomposed(void) {
 
 /* ============================================================================
  * COMBINING CHARACTER TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static void test_combining_class(void) {
     TEST("Combining class detection");
@@ -332,7 +341,8 @@ static void test_combining_class(void) {
     ASSERT_EQ(lle_unicode_combining_class('A'), 0, "A has class 0");
     ASSERT_EQ(lle_unicode_combining_class('a'), 0, "a has class 0");
     /* Combining acute accent (U+0301) has class 230 */
-    ASSERT_EQ(lle_unicode_combining_class(0x0301), 230, "Combining acute has class 230");
+    ASSERT_EQ(lle_unicode_combining_class(0x0301), 230,
+              "Combining acute has class 230");
     PASS();
 }
 
@@ -347,7 +357,8 @@ static void test_is_combining(void) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("\n");

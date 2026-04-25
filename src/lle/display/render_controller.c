@@ -15,8 +15,8 @@
  * - 100% spec-compliant
  */
 
-#include "lle/buffer_management.h"
 #include "lle/arena.h"
+#include "lle/buffer_management.h"
 #include "lle/display_integration.h"
 #include "lle/error_handling.h"
 #include "lle/lle_shell_integration.h"
@@ -473,7 +473,8 @@ lle_render_config_init_internal(lle_render_config_t **config,
     /* Initialize with default settings */
     cfg->syntax_highlighting_enabled = true;
     cfg->caching_enabled = true;
-    cfg->dirty_tracking_enabled = false; /* Dirty tracking disabled - not implemented */
+    cfg->dirty_tracking_enabled =
+        false; /* Dirty tracking disabled - not implemented */
     cfg->max_cache_entries = 128;
     cfg->cache_ttl_ms = 5000; /* 5 seconds */
 

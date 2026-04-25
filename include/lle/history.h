@@ -72,7 +72,8 @@ typedef enum lle_history_dedup_strategy {
  */
 typedef enum lle_history_dedup_scope {
     LLE_HISTORY_DEDUP_SCOPE_NONE = 0, /* No deduplication */
-    LLE_HISTORY_DEDUP_SCOPE_SESSION,  /* Within current session (~1000 entries) */
+    LLE_HISTORY_DEDUP_SCOPE_SESSION,  /* Within current session (~1000 entries)
+                                       */
     LLE_HISTORY_DEDUP_SCOPE_RECENT,   /* Last N entries (default 100) */
     LLE_HISTORY_DEDUP_SCOPE_GLOBAL    /* Entire history */
 } lle_history_dedup_scope_t;
@@ -1558,7 +1559,8 @@ lle_history_dedup_set_unicode_normalize(lle_history_dedup_engine_t *dedup,
  * all existing duplicates in the history.
  *
  * @param dedup Dedup engine
- * @param duplicates_removed Output for count of duplicates marked as deleted (may be NULL)
+ * @param duplicates_removed Output for count of duplicates marked as deleted
+ * (may be NULL)
  * @return LLE_SUCCESS or error code
  */
 lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,

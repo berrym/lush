@@ -572,7 +572,8 @@ lle_result_t lle_unix_interface_get_window_size(lle_unix_interface_t *interface,
  *
  * @param keycode Key code value from parser
  * @param key_type Key type classification from parser
- * @return Corresponding special key enum value, or LLE_KEY_UNKNOWN if not mapped
+ * @return Corresponding special key enum value, or LLE_KEY_UNKNOWN if not
+ * mapped
  */
 static lle_special_key_t convert_key_code(uint32_t keycode,
                                           lle_key_type_t key_type) {
@@ -697,7 +698,8 @@ static lle_key_modifier_t convert_modifiers(lle_key_modifiers_t parser_mods) {
  *
  * @param parsed Parsed input from sequence parser
  * @param event Output input event structure to populate
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if inputs are NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if inputs are
+ * NULL
  */
 static lle_result_t
 convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
@@ -848,9 +850,11 @@ static int get_utf8_length(unsigned char first_byte) {
  * @param interface Unix interface for reading additional bytes from terminal
  * @param first_byte First byte already read from input
  * @param codepoint_out Output for decoded Unicode codepoint
- * @param utf8_bytes Output buffer for complete UTF-8 bytes (must be at least 8 bytes)
+ * @param utf8_bytes Output buffer for complete UTF-8 bytes (must be at least 8
+ * bytes)
  * @param byte_count_out Output for number of bytes in sequence (1-4)
- * @return LLE_SUCCESS on success (always succeeds, uses replacement char on error)
+ * @return LLE_SUCCESS on success (always succeeds, uses replacement char on
+ * error)
  */
 static lle_result_t decode_utf8(lle_unix_interface_t *interface,
                                 unsigned char first_byte,

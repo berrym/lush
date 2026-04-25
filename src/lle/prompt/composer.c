@@ -10,11 +10,11 @@
  */
 
 #include "lle/prompt/composer.h"
-#include "lle/prompt/powerline.h"
 #include "display/command_layer.h"
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/display_integration.h"
 #include "lle/lle_shell_event_hub.h"
+#include "lle/prompt/powerline.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -246,7 +246,8 @@ static bool composer_is_visible(const char *segment_name, const char *property,
 
     lle_prompt_composer_t *composer = ctx->composer;
 
-    /* Check theme's enabled_segments filter (if non-empty, acts as whitelist) */
+    /* Check theme's enabled_segments filter (if non-empty, acts as whitelist)
+     */
     const lle_theme_t *theme = ctx->theme;
     if (theme && theme->enabled_segment_count > 0) {
         bool in_whitelist = false;
@@ -404,7 +405,8 @@ static const char *composer_get_color(const char *color_name, void *user_data) {
  * @param composer Pointer to composer structure to initialize
  * @param segments Pointer to segment registry (may be NULL)
  * @param themes   Pointer to theme registry (may be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if composer is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if composer is
+ * NULL
  */
 lle_result_t lle_composer_init(lle_prompt_composer_t *composer,
                                lle_segment_registry_t *segments,
@@ -698,9 +700,8 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
         /* PS2 still uses template engine */
         lle_template_render_ctx_t render_ctx =
             lle_composer_create_render_ctx(composer);
-        pl_result =
-            lle_template_evaluate(ps2_format, &render_ctx, output->ps2,
-                                  sizeof(output->ps2));
+        pl_result = lle_template_evaluate(ps2_format, &render_ctx, output->ps2,
+                                          sizeof(output->ps2));
         if (pl_result != LLE_SUCCESS) {
             snprintf(output->ps2, sizeof(output->ps2), "> ");
         }
@@ -718,7 +719,8 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
     /* Render PS1 */
     lle_result_t result;
 
-    /* Prepend newline for visual separation if enabled (compact_mode suppresses) */
+    /* Prepend newline for visual separation if enabled (compact_mode
+     * suppresses) */
     bool prepend_newline = composer->config.newline_before_prompt &&
                            !(theme && theme->layout.compact_mode);
     if (prepend_newline) {
@@ -737,7 +739,8 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
     }
     output->ps1_len = strlen(output->ps1);
 
-    /* Append newlines after prompt if configured in theme (compact_mode suppresses) */
+    /* Append newlines after prompt if configured in theme (compact_mode
+     * suppresses) */
     if (theme && theme->layout.newline_after > 0 &&
         !theme->layout.compact_mode) {
         for (int i = 0; i < theme->layout.newline_after &&
@@ -823,7 +826,8 @@ lle_result_t lle_composer_render_template(lle_prompt_composer_t *composer,
  * @param composer    Pointer to composer
  * @param exit_code   Exit code of last command
  * @param duration_ms Duration of last command in milliseconds
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if composer is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if composer is
+ * NULL
  */
 lle_result_t lle_composer_update_context(lle_prompt_composer_t *composer,
                                          int exit_code, uint64_t duration_ms) {
@@ -944,7 +948,8 @@ lle_result_t lle_composer_set_theme(lle_prompt_composer_t *composer,
  * @brief Get the currently active theme
  *
  * @param composer Pointer to initialized composer
- * @return Pointer to active theme, or NULL if no theme registry or no active theme
+ * @return Pointer to active theme, or NULL if no theme registry or no active
+ * theme
  */
 const lle_theme_t *
 lle_composer_get_theme(const lle_prompt_composer_t *composer) {
@@ -1088,7 +1093,8 @@ static void composer_on_post_command(void *event_data, void *user_data) {
  * events to keep the prompt context synchronized with shell state.
  *
  * @param composer  Pointer to initialized composer
- * @param event_hub Pointer to shell event hub (may be NULL to skip registration)
+ * @param event_hub Pointer to shell event hub (may be NULL to skip
+ * registration)
  * @return LLE_SUCCESS on success, error code on failure
  */
 lle_result_t
@@ -1165,7 +1171,8 @@ lle_composer_register_shell_events(lle_prompt_composer_t *composer,
  * Removes all registered event handlers from the shell event hub.
  *
  * @param composer Pointer to composer
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if composer is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if composer is
+ * NULL
  */
 lle_result_t
 lle_composer_unregister_shell_events(lle_prompt_composer_t *composer) {

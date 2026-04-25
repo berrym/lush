@@ -30,14 +30,14 @@ typedef struct lle_structure_analyzer lle_structure_analyzer_t;
  * @brief Parsed line information structure
  */
 typedef struct lle_parsed_line {
-    char *content;                   /**< Line content */
-    size_t length;                   /**< Length of content */
-    size_t line_number;              /**< Line number in command */
-    size_t indent_level;             /**< Indentation level */
-    bool has_continuation;           /**< Whether line ends with continuation */
+    char *content;         /**< Line content */
+    size_t length;         /**< Length of content */
+    size_t line_number;    /**< Line number in command */
+    size_t indent_level;   /**< Indentation level */
+    bool has_continuation; /**< Whether line ends with continuation */
     lle_keyword_type_t primary_keyword; /**< Primary keyword on line */
-    size_t keyword_count;            /**< Number of keywords on line */
-    struct lle_parsed_line *next;    /**< Next line in list */
+    size_t keyword_count;               /**< Number of keywords on line */
+    struct lle_parsed_line *next;       /**< Next line in list */
 } lle_parsed_line_t;
 
 /**
@@ -51,19 +51,20 @@ typedef struct lle_multiline_parse_result {
     bool is_complete;                   /**< Whether command is complete */
     bool has_syntax_error;              /**< Whether syntax error detected */
     size_t total_length;                /**< Total character length */
-    lle_keyword_type_t expected_keyword; /**< Expected closing keyword (if incomplete) */
-    void *reserved[2];                  /**< Reserved for future use */
+    lle_keyword_type_t
+        expected_keyword; /**< Expected closing keyword (if incomplete) */
+    void *reserved[2];    /**< Reserved for future use */
 } lle_multiline_parse_result_t;
 
 /**
  * @brief Parser configuration structure
  */
 typedef struct lle_parser_config {
-    bool preserve_indentation;  /**< Whether to preserve original indentation */
-    bool detect_continuations;  /**< Whether to detect continuation characters */
-    bool validate_syntax;       /**< Whether to validate syntax */
-    size_t max_lines;           /**< Maximum lines to parse (safety limit) */
-    void *reserved[4];          /**< Reserved for future use */
+    bool preserve_indentation; /**< Whether to preserve original indentation */
+    bool detect_continuations; /**< Whether to detect continuation characters */
+    bool validate_syntax;      /**< Whether to validate syntax */
+    size_t max_lines;          /**< Maximum lines to parse (safety limit) */
+    void *reserved[4];         /**< Reserved for future use */
 } lle_parser_config_t;
 
 /**

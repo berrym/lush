@@ -343,7 +343,8 @@ static void *lle_async_worker_thread(void *arg) {
             break;
         }
 
-        /* Update stats before callback so they're visible when callback signals */
+        /* Update stats before callback so they're visible when callback signals
+         */
         pthread_mutex_lock(&worker->queue_mutex);
         worker->total_completed++;
         pthread_mutex_unlock(&worker->queue_mutex);
@@ -449,8 +450,8 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
     status->untracked_count = 0;
 
     char porcelain[8192] = {0};
-    if (run_git_in_dir(cwd, "status --porcelain", porcelain,
-                       sizeof(porcelain), timeout_ms)) {
+    if (run_git_in_dir(cwd, "status --porcelain", porcelain, sizeof(porcelain),
+                       timeout_ms)) {
         /* Parse porcelain output line by line */
         char *line = porcelain;
         while (*line) {
@@ -476,8 +477,7 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
 
     /* Check ahead/behind counts */
     char ahead_behind[64] = {0};
-    if (run_git_in_dir(cwd,
-                       "rev-list --left-right --count HEAD...@{upstream}",
+    if (run_git_in_dir(cwd, "rev-list --left-right --count HEAD...@{upstream}",
                        ahead_behind, sizeof(ahead_behind), timeout_ms)) {
         sscanf(ahead_behind, "%d %d", &status->ahead, &status->behind);
     }
@@ -492,8 +492,7 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
         char rebase_apply_path[1024];
 
         if (git_dir[0] == '/') {
-            snprintf(merge_path, sizeof(merge_path), "%s/MERGE_HEAD",
-                     git_dir);
+            snprintf(merge_path, sizeof(merge_path), "%s/MERGE_HEAD", git_dir);
             snprintf(rebase_merge_path, sizeof(rebase_merge_path),
                      "%s/rebase-merge", git_dir);
             snprintf(rebase_apply_path, sizeof(rebase_apply_path),

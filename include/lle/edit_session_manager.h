@@ -56,12 +56,12 @@ typedef enum lle_edit_operation_type {
  * @brief Edit operation record structure
  */
 typedef struct lle_edit_operation {
-    lle_edit_operation_type_t type; /**< Operation type */
-    size_t offset;                  /**< Position in buffer */
-    size_t length;                  /**< Length of affected text */
-    char *text;                     /**< Operation data */
-    size_t text_length;             /**< Length of operation data */
-    struct timespec timestamp;      /**< Operation timestamp */
+    lle_edit_operation_type_t type;  /**< Operation type */
+    size_t offset;                   /**< Position in buffer */
+    size_t length;                   /**< Length of affected text */
+    char *text;                      /**< Operation data */
+    size_t text_length;              /**< Length of operation data */
+    struct timespec timestamp;       /**< Operation timestamp */
     struct lle_edit_operation *next; /**< Next operation in list */
 } lle_edit_operation_t;
 
@@ -69,33 +69,34 @@ typedef struct lle_edit_operation {
  * @brief Edit session information structure
  */
 typedef struct lle_edit_session {
-    uint64_t session_id;              /**< Session identification */
-    lle_edit_session_state_t state;   /**< Current session state */
-    size_t entry_index;               /**< History entry being edited */
-    char *original_text;              /**< Original text before editing */
-    size_t original_length;           /**< Length of original text */
-    char *current_text;               /**< Current edited content */
-    size_t current_length;            /**< Length of current content */
-    lle_command_structure_t *structure; /**< Command structure */
+    uint64_t session_id;                   /**< Session identification */
+    lle_edit_session_state_t state;        /**< Current session state */
+    size_t entry_index;                    /**< History entry being edited */
+    char *original_text;                   /**< Original text before editing */
+    size_t original_length;                /**< Length of original text */
+    char *current_text;                    /**< Current edited content */
+    size_t current_length;                 /**< Length of current content */
+    lle_command_structure_t *structure;    /**< Command structure */
     lle_edit_operation_t *first_operation; /**< First edit operation */
     lle_edit_operation_t *last_operation;  /**< Last edit operation */
-    size_t operation_count;           /**< Number of operations */
-    struct timespec start_time;       /**< Session start time */
-    struct timespec last_modified;    /**< Last modification time */
-    bool has_modifications;           /**< Whether session has modifications */
-    bool multiline_mode;              /**< Whether in multiline mode */
-    void *reserved[2];                /**< Reserved for future use */
+    size_t operation_count;                /**< Number of operations */
+    struct timespec start_time;            /**< Session start time */
+    struct timespec last_modified;         /**< Last modification time */
+    bool has_modifications; /**< Whether session has modifications */
+    bool multiline_mode;    /**< Whether in multiline mode */
+    void *reserved[2];      /**< Reserved for future use */
 } lle_edit_session_t;
 
 /**
  * @brief Session manager configuration structure
  */
 typedef struct lle_session_manager_config {
-    size_t max_sessions;        /**< Maximum concurrent sessions */
-    uint32_t session_timeout_ms; /**< Session timeout (milliseconds, 0 = no timeout) */
-    bool track_operations;      /**< Track edit operations */
-    size_t max_operations;      /**< Maximum operations per session */
-    void *reserved[4];          /**< Reserved for future use */
+    size_t max_sessions;         /**< Maximum concurrent sessions */
+    uint32_t session_timeout_ms; /**< Session timeout (milliseconds, 0 = no
+                                    timeout) */
+    bool track_operations;       /**< Track edit operations */
+    size_t max_operations;       /**< Maximum operations per session */
+    void *reserved[4];           /**< Reserved for future use */
 } lle_session_manager_config_t;
 
 /**

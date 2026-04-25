@@ -1,6 +1,7 @@
 /**
  * @file history_forensics.c
- * @brief LLE History System - Forensic Tracking Implementation (Spec 09 Phase 4 Day 11)
+ * @brief LLE History System - Forensic Tracking Implementation (Spec 09 Phase 4
+ * Day 11)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
@@ -45,8 +46,8 @@
  * @brief Get terminal device name
  *
  * Retrieves the name of the terminal device associated with standard input.
- * Falls back to "unknown_tty" if connected to a terminal but name is unavailable,
- * or "not_a_tty" if not connected to a terminal.
+ * Falls back to "unknown_tty" if connected to a terminal but name is
+ * unavailable, or "not_a_tty" if not connected to a terminal.
  *
  * @param buffer Output buffer for terminal name
  * @param size Buffer size in bytes
@@ -84,7 +85,8 @@ static bool get_terminal_name(char *buffer, size_t size) {
  * Allocates memory from the LLE memory pool and copies the input string.
  *
  * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation fails
+ * @return Pointer to duplicated string, or NULL if str is NULL or allocation
+ * fails
  */
 static char *pool_strdup(const char *str) {
     if (!str)
@@ -130,7 +132,8 @@ uint64_t lle_forensic_get_timestamp_ns(void) {
  * directory, and high-precision timestamp.
  *
  * @param context Output structure for forensic data (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if context is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if context is
+ * NULL
  */
 lle_result_t lle_forensic_capture_context(lle_forensic_context_t *context) {
     if (!context) {
@@ -177,7 +180,8 @@ lle_result_t lle_forensic_capture_context(lle_forensic_context_t *context) {
  *
  * @param entry History entry to populate (must not be NULL)
  * @param context Forensic context to apply (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if entry or context is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if entry or
+ * context is NULL
  */
 lle_result_t
 lle_forensic_apply_to_entry(lle_history_entry_t *entry,

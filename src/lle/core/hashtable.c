@@ -214,10 +214,9 @@ void lle_hashtable_config_init_default(lle_hashtable_config_t *config) {
     config->hashtable_name = NULL;
 }
 
-lle_result_t
-lle_hashtable_config_create_pooled(lle_hashtable_config_t **config,
-                                   lush_memory_pool_t *memory_pool,
-                                   const char *name) {
+lle_result_t lle_hashtable_config_create_pooled(lle_hashtable_config_t **config,
+                                                lush_memory_pool_t *memory_pool,
+                                                const char *name) {
     if (!config || !memory_pool) {
         return LLE_ERROR_INVALID_PARAMETER;
     }

@@ -40,7 +40,8 @@
 
 /* ============================================================================
  * HOOK TYPES
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Shell hook function types
@@ -58,7 +59,8 @@ typedef enum {
 
 /* ============================================================================
  * LIFECYCLE FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize the shell hooks bridge
@@ -93,7 +95,8 @@ bool lle_shell_hooks_initialized(void);
 
 /* ============================================================================
  * HOOK QUERY FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if a hook function is defined
@@ -117,7 +120,8 @@ const char *lle_shell_hook_name(lle_hook_type_t hook_type);
 
 /* ============================================================================
  * MANUAL HOOK INVOCATION
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Manually call a hook function
@@ -130,7 +134,8 @@ const char *lle_shell_hook_name(lle_hook_type_t hook_type);
  *
  * @param hook_type Type of hook to call
  * @param argc Number of arguments (0 for most hooks, 2 for preexec)
- * @param argv Argument vector (argv[0] = hook name, argv[1] = command for preexec)
+ * @param argv Argument vector (argv[0] = hook name, argv[1] = command for
+ * preexec)
  * @return Exit status of the hook function, or 0 if not defined
  */
 int lle_shell_hook_call(lle_hook_type_t hook_type, int argc, char **argv);
@@ -149,7 +154,8 @@ int lle_shell_hook_call_by_name(const char *hook_name, int argc, char **argv);
 
 /* ============================================================================
  * HOOK STATISTICS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get the number of times a hook has been called
@@ -168,7 +174,8 @@ void lle_shell_hook_reset_stats(void);
 
 /* ============================================================================
  * RECURSION PROTECTION
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if we're currently inside a hook

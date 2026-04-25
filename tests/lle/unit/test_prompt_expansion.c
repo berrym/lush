@@ -40,7 +40,7 @@ static int tests_failed = 0;
 #define ASSERT_EQ(a, b)                                                        \
     do {                                                                       \
         if ((a) != (b)) {                                                      \
-            printf("  FAILED: %s == %s (%d != %d, line %d)\n", #a, #b,        \
+            printf("  FAILED: %s == %s (%d != %d, line %d)\n", #a, #b,         \
                    (int)(a), (int)(b), __LINE__);                              \
             tests_failed++;                                                    \
             return;                                                            \
@@ -223,8 +223,8 @@ TEST(bash_time_ampm) {
     lle_result_t r = lle_prompt_expand("\\@", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     /* Should contain AM or PM */
-    ASSERT(strstr(out, "AM") || strstr(out, "PM") ||
-           strstr(out, "am") || strstr(out, "pm"));
+    ASSERT(strstr(out, "AM") || strstr(out, "PM") || strstr(out, "am") ||
+           strstr(out, "pm"));
     PASS();
 }
 
@@ -565,8 +565,7 @@ TEST(zsh_exit_status) {
 TEST(zsh_date_format) {
     char out[256];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r =
-        lle_prompt_expand("%D{%Y-%m-%d}", out, sizeof(out), &ctx);
+    lle_result_t r = lle_prompt_expand("%D{%Y-%m-%d}", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     /* Should be YYYY-MM-DD format */
     ASSERT(strlen(out) == 10);
@@ -621,8 +620,7 @@ TEST(zsh_standout) {
 TEST(zsh_fg_color_named) {
     char out[128];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r =
-        lle_prompt_expand("%F{red}hi%f", out, sizeof(out), &ctx);
+    lle_result_t r = lle_prompt_expand("%F{red}hi%f", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT_STR_CONTAINS(out, "\033[31m"); /* red = 30+1 */
     ASSERT_STR_CONTAINS(out, "hi");
@@ -633,8 +631,7 @@ TEST(zsh_fg_color_named) {
 TEST(zsh_fg_color_numeric) {
     char out[128];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r =
-        lle_prompt_expand("%F{82}hi%f", out, sizeof(out), &ctx);
+    lle_result_t r = lle_prompt_expand("%F{82}hi%f", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT_STR_CONTAINS(out, "\033[38;5;82m");
     ASSERT_STR_CONTAINS(out, "hi");
@@ -655,8 +652,7 @@ TEST(zsh_fg_color_hex) {
 TEST(zsh_bg_color) {
     char out[128];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    lle_result_t r =
-        lle_prompt_expand("%K{blue}bg%k", out, sizeof(out), &ctx);
+    lle_result_t r = lle_prompt_expand("%K{blue}bg%k", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT_STR_CONTAINS(out, "\033[44m"); /* blue bg = 40+4 */
     ASSERT_STR_CONTAINS(out, "bg");
@@ -681,8 +677,7 @@ TEST(zsh_color_none) {
     char out[128];
     lle_prompt_expand_ctx_t ctx = make_ctx();
     ctx.color_depth = 0; /* no color */
-    lle_result_t r =
-        lle_prompt_expand("%F{red}hi%f", out, sizeof(out), &ctx);
+    lle_result_t r = lle_prompt_expand("%F{red}hi%f", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     /* No ANSI escape for color, just the text and reset */
     ASSERT_STR_CONTAINS(out, "hi");
@@ -826,8 +821,8 @@ TEST(all_three_syntaxes) {
     ctx.template_ctx = &tctx;
 
     /* All three: LLE ${...}, bash \u, zsh %j */
-    lle_result_t r = lle_prompt_expand("\\u ${directory} %j\\$ ", out,
-                                       sizeof(out), &ctx);
+    lle_result_t r =
+        lle_prompt_expand("\\u ${directory} %j\\$ ", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     struct passwd *pw = getpwuid(getuid());
     if (pw)

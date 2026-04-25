@@ -241,9 +241,10 @@ lle_result_t lle_completion_source_commands(lle_memory_pool_t *memory_pool,
                         desc = full_path;
                     }
 
-                    lle_result_t res = lle_completion_result_add_with_description(
-                        result, entry->d_name, " ", LLE_COMPLETION_TYPE_COMMAND,
-                        800, desc);
+                    lle_result_t res =
+                        lle_completion_result_add_with_description(
+                            result, entry->d_name, " ",
+                            LLE_COMPLETION_TYPE_COMMAND, 800, desc);
 
                     if (res != LLE_SUCCESS && final_result == LLE_SUCCESS) {
                         final_result = res;

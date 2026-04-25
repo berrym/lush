@@ -32,25 +32,25 @@ typedef struct lle_multiline_parser lle_multiline_parser_t;
  * @brief Reconstruction options for command processing
  */
 typedef struct lle_reconstruction_options {
-    bool apply_indentation;     /**< Whether to apply automatic indentation */
-    char indent_char;           /**< Indentation character (' ' or '\t') */
-    uint8_t spaces_per_level;   /**< Spaces per indentation level */
-    bool preserve_line_breaks;  /**< Whether to preserve original line breaks */
-    bool normalize_whitespace;  /**< Whether to normalize whitespace */
-    size_t max_output_length;   /**< Maximum output length (safety limit) */
-    void *reserved[4];          /**< Reserved for future use */
+    bool apply_indentation;    /**< Whether to apply automatic indentation */
+    char indent_char;          /**< Indentation character (' ' or '\t') */
+    uint8_t spaces_per_level;  /**< Spaces per indentation level */
+    bool preserve_line_breaks; /**< Whether to preserve original line breaks */
+    bool normalize_whitespace; /**< Whether to normalize whitespace */
+    size_t max_output_length;  /**< Maximum output length (safety limit) */
+    void *reserved[4];         /**< Reserved for future use */
 } lle_reconstruction_options_t;
 
 /**
  * @brief Reconstructed command result structure
  */
 typedef struct lle_reconstructed_command {
-    char *text;              /**< Reconstructed command text */
-    size_t length;           /**< Length of reconstructed text */
-    size_t line_count;       /**< Number of lines in result */
-    size_t *line_offsets;    /**< Offset of each line in text */
+    char *text;               /**< Reconstructed command text */
+    size_t length;            /**< Length of reconstructed text */
+    size_t line_count;        /**< Number of lines in result */
+    size_t *line_offsets;     /**< Offset of each line in text */
     bool indentation_applied; /**< Whether indentation was applied */
-    void *reserved[2];       /**< Reserved for future use */
+    void *reserved[2];        /**< Reserved for future use */
 } lle_reconstructed_command_t;
 
 /**
@@ -93,7 +93,8 @@ lle_result_t lle_reconstruction_engine_reconstruct(
  * @param structure Command structure
  * @param original_text Original command text
  * @param original_length Length of original text
- * @param indented_text Output parameter for indented text (allocated by function)
+ * @param indented_text Output parameter for indented text (allocated by
+ * function)
  * @param indented_length Output parameter for indented text length
  * @return LLE_SUCCESS on success, error code on failure
  */
@@ -107,7 +108,8 @@ lle_result_t lle_reconstruction_engine_apply_indentation(
  * @param engine Reconstruction engine instance
  * @param command_text Command text to normalize
  * @param command_length Length of command text
- * @param normalized_text Output parameter for normalized text (allocated by function)
+ * @param normalized_text Output parameter for normalized text (allocated by
+ * function)
  * @param normalized_length Output parameter for normalized text length
  * @return LLE_SUCCESS on success, error code on failure
  */

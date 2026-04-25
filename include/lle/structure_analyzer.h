@@ -29,27 +29,28 @@ typedef struct lle_structure_analyzer lle_structure_analyzer_t;
  * @brief Configuration for structure analysis
  */
 typedef struct lle_analyzer_config {
-    size_t max_nesting_depth;   /**< Maximum nesting depth to analyze */
-    bool detect_incomplete;     /**< Whether to detect incomplete constructs */
-    bool validate_syntax;       /**< Whether to perform syntax validation */
-    bool track_indentation;     /**< Whether to track indentation */
-    size_t max_command_length;  /**< Maximum command length to analyze (safety limit) */
-    void *reserved[4];          /**< Reserved for future use */
+    size_t max_nesting_depth;  /**< Maximum nesting depth to analyze */
+    bool detect_incomplete;    /**< Whether to detect incomplete constructs */
+    bool validate_syntax;      /**< Whether to perform syntax validation */
+    bool track_indentation;    /**< Whether to track indentation */
+    size_t max_command_length; /**< Maximum command length to analyze (safety
+                                  limit) */
+    void *reserved[4];         /**< Reserved for future use */
 } lle_analyzer_config_t;
 
 /**
  * @brief Analysis context for tracking state during parsing
  */
 typedef struct lle_analysis_context {
-    size_t current_line;     /**< Current line being analyzed */
-    size_t current_offset;   /**< Current character offset in command */
-    size_t current_depth;    /**< Current nesting depth */
-    bool in_quoted_string;   /**< Whether currently inside a quoted string */
-    char quote_char;         /**< Quote character if in_quoted_string is true */
-    bool last_was_escape;    /**< Whether last character was an escape */
-    bool in_comment;         /**< Whether currently inside a comment */
-    size_t indent_level;     /**< Current indentation level */
-    void *reserved[4];       /**< Reserved for future use */
+    size_t current_line;   /**< Current line being analyzed */
+    size_t current_offset; /**< Current character offset in command */
+    size_t current_depth;  /**< Current nesting depth */
+    bool in_quoted_string; /**< Whether currently inside a quoted string */
+    char quote_char;       /**< Quote character if in_quoted_string is true */
+    bool last_was_escape;  /**< Whether last character was an escape */
+    bool in_comment;       /**< Whether currently inside a comment */
+    size_t indent_level;   /**< Current indentation level */
+    void *reserved[4];     /**< Reserved for future use */
 } lle_analysis_context_t;
 
 /**
@@ -131,7 +132,8 @@ lle_result_t lle_structure_analyzer_detect_type(
  * @param command_text Command text to analyze
  * @param command_length Length of command text
  * @param is_complete Output parameter for completeness status
- * @param missing_keyword Output parameter for missing closing keyword type (if incomplete)
+ * @param missing_keyword Output parameter for missing closing keyword type (if
+ * incomplete)
  * @return LLE_SUCCESS on success, error code on failure
  */
 lle_result_t

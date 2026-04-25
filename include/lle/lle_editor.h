@@ -139,7 +139,7 @@ typedef struct lle_editor {
 
     /* Memory management */
     lush_memory_pool_t *lush_pool; /* Lush memory pool (source) */
-    lle_memory_pool_t *lle_pool;       /* LLE memory pool (wrapper) */
+    lle_memory_pool_t *lle_pool;   /* LLE memory pool (wrapper) */
 
     /* Editor statistics */
     uint64_t total_keystrokes;   /* Total keys processed */
@@ -163,8 +163,7 @@ typedef struct lle_editor {
  * @param pool Memory pool for allocations (NULL = use global pool)
  * @return LLE_SUCCESS or error code
  */
-lle_result_t lle_editor_create(lle_editor_t **editor,
-                               lush_memory_pool_t *pool);
+lle_result_t lle_editor_create(lle_editor_t **editor, lush_memory_pool_t *pool);
 
 /**
  * Destroy editor context

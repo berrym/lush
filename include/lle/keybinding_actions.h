@@ -325,8 +325,8 @@ lle_result_t lle_previous_line(lle_editor_t *editor);
  * boundary was hit (first line for up, last line for down).
  */
 typedef struct {
-    lle_result_t result;  /**< Operation result code */
-    bool hit_boundary;    /**< True if cursor was already at boundary */
+    lle_result_t result; /**< Operation result code */
+    bool hit_boundary;   /**< True if cursor was already at boundary */
 } lle_line_nav_result_t;
 
 /**
@@ -356,8 +356,8 @@ lle_line_nav_result_t lle_next_line_ex(lle_editor_t *editor);
 /**
  * @brief Next line (multiline buffer navigation)
  *
- * Moves cursor down one line while preserving column position via sticky_column.
- * Returns success with no-op if already on last line.
+ * Moves cursor down one line while preserving column position via
+ * sticky_column. Returns success with no-op if already on last line.
  *
  * @param editor Editor instance
  * @return LLE_SUCCESS or error code
@@ -489,7 +489,8 @@ lle_result_t lle_insert_completions(lle_editor_t *editor);
  * For multiline: checks if command is complete before accepting.
  *
  * @note This is a legacy simple action that sets the line_accepted flag.
- *       New code should use lle_accept_line_context() for direct readline integration.
+ *       New code should use lle_accept_line_context() for direct readline
+ * integration.
  *
  * @param editor Editor instance
  * @return LLE_SUCCESS or error code
@@ -497,19 +498,22 @@ lle_result_t lle_insert_completions(lle_editor_t *editor);
 lle_result_t lle_accept_line(lle_editor_t *editor);
 
 /**
- * @brief Accept line with context (Return, Ctrl-M, Ctrl-J) - Context-Aware Action
+ * @brief Accept line with context (Return, Ctrl-M, Ctrl-J) - Context-Aware
+ * Action
  *
  * Full readline-aware ENTER key handler with direct access to readline context.
  * Checks for incomplete input using continuation state, handles history
  * integration, and directly manages readline completion (done/final_line).
  *
  * Behavior:
- * - Incomplete input: Inserts newline, syncs cursor, refreshes display, continues editing
+ * - Incomplete input: Inserts newline, syncs cursor, refreshes display,
+ * continues editing
  * - Complete input: Adds to history, sets done=true, returns final line
  *
  * This is a context-aware action that requires readline_context_t access.
  *
- * @param ctx Readline context with full access to buffer, history, completion state
+ * @param ctx Readline context with full access to buffer, history, completion
+ * state
  * @return LLE_SUCCESS on successful handling
  */
 lle_result_t lle_accept_line_context(struct readline_context *ctx);
@@ -531,7 +535,8 @@ lle_result_t lle_abort_line(lle_editor_t *editor);
  * @brief Abort line with context (Ctrl-G) - Context-Aware Action
  *
  * Emacs-style abort that cancels current input and returns empty line to shell.
- * Directly manages readline completion state (done/final_line) without using flags.
+ * Directly manages readline completion state (done/final_line) without using
+ * flags.
  *
  * This eliminates the abort_requested flag pattern which caused state
  * persistence bugs across readline sessions.
@@ -651,7 +656,8 @@ lle_result_t lle_newline(lle_editor_t *editor);
  * @brief Insert literal newline (Shift-Enter, Alt-Enter)
  *
  * Inserts a newline at cursor position regardless of completion status.
- * Useful for editing complete multiline commands when adding lines in the middle.
+ * Useful for editing complete multiline commands when adding lines in the
+ * middle.
  *
  * @param editor Editor instance
  * @return LLE_SUCCESS or error code

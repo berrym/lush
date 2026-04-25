@@ -45,23 +45,24 @@ typedef enum lle_transfer_direction {
  * @brief Transfer options structure
  */
 typedef struct lle_transfer_options {
-    bool apply_reconstruction;  /**< Apply reconstruction when loading to buffer */
-    bool parse_multiline;       /**< Parse multiline structure when loading */
-    bool preserve_indentation;  /**< Preserve indentation */
-    bool create_new_entry;      /**< Create new entry vs update existing */
-    void *reserved[4];          /**< Reserved for future use */
+    bool apply_reconstruction; /**< Apply reconstruction when loading to buffer
+                                */
+    bool parse_multiline;      /**< Parse multiline structure when loading */
+    bool preserve_indentation; /**< Preserve indentation */
+    bool create_new_entry;     /**< Create new entry vs update existing */
+    void *reserved[4];         /**< Reserved for future use */
 } lle_transfer_options_t;
 
 /**
  * @brief Transfer result structure
  */
 typedef struct lle_transfer_result {
-    bool success;            /**< Success flag */
-    size_t entry_index;      /**< Entry index (for history operations) */
-    size_t buffer_position;  /**< Buffer position (for buffer operations) */
+    bool success;             /**< Success flag */
+    size_t entry_index;       /**< Entry index (for history operations) */
+    size_t buffer_position;   /**< Buffer position (for buffer operations) */
     size_t bytes_transferred; /**< Bytes transferred */
-    bool is_multiline;       /**< Whether multiline structure was detected */
-    void *reserved[2];       /**< Reserved for future use */
+    bool is_multiline;        /**< Whether multiline structure was detected */
+    void *reserved[2];        /**< Reserved for future use */
 } lle_transfer_result_t;
 
 /**

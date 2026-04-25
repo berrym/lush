@@ -1,6 +1,7 @@
 /**
  * @file template.h
- * @brief LLE Prompt Template Engine - Type Definitions and Function Declarations
+ * @brief LLE Prompt Template Engine - Type Definitions and Function
+ * Declarations
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *

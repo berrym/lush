@@ -1,6 +1,7 @@
 /**
  * @file history_search.c
- * @brief LLE History System - Search Engine Implementation (Spec 09 Phase 3 Day 8)
+ * @brief LLE History System - Search Engine Implementation (Spec 09 Phase 3 Day
+ * 8)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
@@ -90,7 +91,8 @@ struct lle_history_search_results {
  * Allocates memory from the LLE memory pool and copies the input string.
  *
  * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation fails
+ * @return Pointer to duplicated string, or NULL if str is NULL or allocation
+ * fails
  */
 static char *pool_strdup(const char *str) {
     if (!str)
@@ -198,7 +200,8 @@ static int compare_results_by_score(const void *a, const void *b) {
  *
  * @param haystack String to search in (may be NULL)
  * @param needle String to search for (may be NULL)
- * @return Pointer to first match in haystack, or NULL if not found or NULL inputs
+ * @return Pointer to first match in haystack, or NULL if not found or NULL
+ * inputs
  */
 static const char *stristr(const char *haystack, const char *needle) {
     if (!haystack || !needle)
@@ -224,7 +227,8 @@ static const char *stristr(const char *haystack, const char *needle) {
  *
  * @param str String to check (may be NULL)
  * @param prefix Prefix to match (may be NULL)
- * @return true if str starts with prefix (case-insensitive), false otherwise or on NULL inputs
+ * @return true if str starts with prefix (case-insensitive), false otherwise or
+ * on NULL inputs
  */
 static bool str_starts_with_i(const char *str, const char *prefix) {
     if (!str || !prefix)
@@ -244,7 +248,8 @@ static bool str_starts_with_i(const char *str, const char *prefix) {
  * Uses memory pool allocation.
  *
  * @param max_results Maximum number of results to store (0 = default of 100)
- * @return Pointer to new search results container, or NULL on allocation failure
+ * @return Pointer to new search results container, or NULL on allocation
+ * failure
  */
 lle_history_search_results_t *
 lle_history_search_results_create(size_t max_results) {
@@ -744,7 +749,8 @@ size_t lle_history_search_results_get_count(
  *
  * @param results Search results container (may be NULL)
  * @param index Index of result to retrieve (0-based)
- * @return Pointer to search result, or NULL if results is NULL or index out of bounds
+ * @return Pointer to search result, or NULL if results is NULL or index out of
+ * bounds
  */
 const lle_search_result_t *
 lle_history_search_results_get(const lle_history_search_results_t *results,

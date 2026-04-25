@@ -268,7 +268,8 @@ lle_result_t lle_event_filter_enable(lle_event_system_t *system,
  * @param name The name of the filter to disable
  * @return LLE_SUCCESS on success, LLE_ERROR_NOT_FOUND if filter not found
  *
- * Disabled filters are skipped during event dispatch but retain their statistics.
+ * Disabled filters are skipped during event dispatch but retain their
+ * statistics.
  */
 lle_result_t lle_event_filter_disable(lle_event_system_t *system,
                                       const char *name) {

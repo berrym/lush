@@ -31,14 +31,15 @@
 /* Weak symbol for function lookup - overridden in full shell build */
 __attribute__((weak)) bool lle_shell_function_exists(const char *name) {
     (void)name;
-    return false;  /* Default: no functions in standalone LLE */
+    return false; /* Default: no functions in standalone LLE */
 }
 
 /* ========================================================================== */
 /*                         DEFAULT COLOR SCHEME                               */
 /* ========================================================================== */
 
-/** @brief Default colors (vivid dark theme, derived from proven 256-color palette) */
+/** @brief Default colors (vivid dark theme, derived from proven 256-color
+ * palette) */
 static const lle_syntax_colors_t default_colors = {
     /* Commands */
     .command_valid = 0x005FFF00,    /* Bright lime green (256: 82) */
@@ -120,9 +121,9 @@ static const lle_syntax_colors_t default_colors = {
  * for cache expiration checking.
  */
 typedef struct cmd_cache_entry {
-    char *command;                  /**< @brief Command string (heap-allocated) */
-    lle_syntax_token_type_t type;   /**< @brief Cached token type result */
-    time_t timestamp;               /**< @brief Cache entry creation timestamp */
+    char *command;                /**< @brief Command string (heap-allocated) */
+    lle_syntax_token_type_t type; /**< @brief Cached token type result */
+    time_t timestamp;             /**< @brief Cache entry creation timestamp */
 } cmd_cache_entry_t;
 
 /**
@@ -132,7 +133,8 @@ typedef struct cmd_cache_entry {
  * repeated PATH searches for frequently used commands.
  */
 typedef struct cmd_cache {
-    cmd_cache_entry_t entries[CMD_CACHE_SIZE];  /**< @brief Cache entries array */
+    cmd_cache_entry_t
+        entries[CMD_CACHE_SIZE]; /**< @brief Cache entries array */
 } cmd_cache_t;
 
 /**
@@ -209,8 +211,7 @@ static const char *hook_array_variables[] = {
     "preexec",            /* Simple hook array */
     "chpwd",              /* Simple hook array */
     "PROMPT_COMMAND",     /* Bash: command/array run before prompt */
-    NULL
-};
+    NULL};
 
 /**
  * @brief Check if a variable name is a hook array (special variable)
@@ -295,7 +296,8 @@ static bool is_extglob_prefix(char c) {
  * @return true if this is an extended glob like ?(, *(, +(, @(, !(
  */
 static bool is_extglob_start(const char *input, size_t pos, size_t len) {
-    if (pos + 1 >= len) return false;
+    if (pos + 1 >= len)
+        return false;
     return is_extglob_prefix(input[pos]) && input[pos + 1] == '(';
 }
 
@@ -310,11 +312,13 @@ static bool is_extglob_start(const char *input, size_t pos, size_t len) {
  */
 static bool is_glob_qualifier(const char *input, size_t pos, size_t len) {
     /* Must have *( followed by single char and ) */
-    if (pos + 3 >= len) return false;
-    if (input[pos] != '*' || input[pos + 1] != '(') return false;
+    if (pos + 3 >= len)
+        return false;
+    if (input[pos] != '*' || input[pos + 1] != '(')
+        return false;
     /* Check for single-char qualifier: ., /, @, *, etc. */
     char qual = input[pos + 2];
-    if (input[pos + 3] == ')' && 
+    if (input[pos + 3] == ')' &&
         (qual == '.' || qual == '/' || qual == '@' || qual == '*' ||
          qual == 'r' || qual == 'w' || qual == 'x')) {
         return true;
@@ -488,8 +492,8 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
             }
         } else {
             /* $VAR format */
-            while (*var_end && (isalnum((unsigned char)*var_end) ||
-                                *var_end == '_')) {
+            while (*var_end &&
+                   (isalnum((unsigned char)*var_end) || *var_end == '_')) {
                 var_end++;
             }
             rest = var_end;
@@ -616,8 +620,9 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
     highlighter->token_count = 0;
 
     size_t pos = 0;
-    bool expect_command = true;      /* Next word is a command */
-    bool after_function_keyword = false; /* Previous token was 'function' keyword */
+    bool expect_command = true; /* Next word is a command */
+    bool after_function_keyword =
+        false; /* Previous token was 'function' keyword */
 
     while (pos < input_len) {
         /* Skip whitespace */
@@ -755,11 +760,13 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     pos++;
                     vtype = LLE_TOKEN_VARIABLE_SPECIAL;
                 }
-                /* ${...} brace expansion - extract variable name for hook check */
+                /* ${...} brace expansion - extract variable name for hook check
+                 */
                 else if (next == '{') {
                     pos++; /* Skip { */
                     size_t var_name_start = pos;
-                    /* Scan to find end of variable name (before : or } or other modifier) */
+                    /* Scan to find end of variable name (before : or } or other
+                     * modifier) */
                     while (pos < input_len && input[pos] != '}' &&
                            input[pos] != ':' && input[pos] != '#' &&
                            input[pos] != '%' && input[pos] != '/' &&
@@ -769,7 +776,8 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     size_t var_name_len = pos - var_name_start;
                     /* Check if it's a hook array variable */
                     if (var_name_len > 0 &&
-                        is_hook_array_variable(input + var_name_start, var_name_len)) {
+                        is_hook_array_variable(input + var_name_start,
+                                               var_name_len)) {
                         vtype = LLE_TOKEN_VARIABLE_SPECIAL;
                     }
                     /* Continue to closing brace */
@@ -805,7 +813,8 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     }
                     /* Check if it's a hook array variable */
                     size_t var_name_len = pos - var_name_start;
-                    if (is_hook_array_variable(input + var_name_start, var_name_len)) {
+                    if (is_hook_array_variable(input + var_name_start,
+                                               var_name_len)) {
                         vtype = LLE_TOKEN_VARIABLE_SPECIAL;
                     }
                 }
@@ -961,8 +970,10 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             pos += 2; /* Skip ?( or *( etc. */
             int depth = 1;
             while (pos < input_len && depth > 0) {
-                if (input[pos] == '(') depth++;
-                else if (input[pos] == ')') depth--;
+                if (input[pos] == '(')
+                    depth++;
+                else if (input[pos] == ')')
+                    depth--;
                 pos++;
             }
             add_token(highlighter, LLE_TOKEN_EXTGLOB, token_start, pos);
@@ -983,7 +994,8 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     continue;
                 }
                 if (ch == '\\') {
-                    /* Trailing backslash at end of input - include it and stop */
+                    /* Trailing backslash at end of input - include it and stop
+                     */
                     pos++;
                     break;
                 }
@@ -1027,8 +1039,8 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     }
                     /* Check for () */
                     bool is_posix_func_def = false;
-                    if (lookahead + 1 < input_len &&
-                        input[lookahead] == '(' && input[lookahead + 1] == ')') {
+                    if (lookahead + 1 < input_len && input[lookahead] == '(' &&
+                        input[lookahead + 1] == ')') {
                         is_posix_func_def = true;
                     }
 
@@ -1039,11 +1051,15 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     /* Check for VAR=value assignment prefix */
                     else if (is_assignment(input + token_start, word_len)) {
                         /* Find the '=' to get the variable name length */
-                        const char *eq = memchr(input + token_start, '=', word_len);
+                        const char *eq =
+                            memchr(input + token_start, '=', word_len);
                         if (eq) {
-                            size_t var_name_len = (size_t)(eq - (input + token_start));
-                            /* Check for hook array assignment (special highlight) */
-                            if (is_hook_array_variable(input + token_start, var_name_len)) {
+                            size_t var_name_len =
+                                (size_t)(eq - (input + token_start));
+                            /* Check for hook array assignment (special
+                             * highlight) */
+                            if (is_hook_array_variable(input + token_start,
+                                                       var_name_len)) {
                                 type = LLE_TOKEN_VARIABLE_SPECIAL;
                             } else {
                                 type = LLE_TOKEN_ASSIGNMENT;
@@ -1053,15 +1069,17 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         }
                         /* Keep expect_command = true because command follows */
                         /* e.g., "VAR=value command arg1 arg2" */
-                    } else if (is_shell_keyword(input + token_start, word_len)) {
+                    } else if (is_shell_keyword(input + token_start,
+                                                word_len)) {
                         type = LLE_TOKEN_KEYWORD;
                         /* Check if this is the 'function' keyword */
                         if (word_len == 8 &&
                             strncmp(input + token_start, "function", 8) == 0) {
                             after_function_keyword = true;
                         }
-                        /* Block-ending keywords (done, fi, esac, etc.) don't expect
-                           a command after them. Block-starting keywords do. */
+                        /* Block-ending keywords (done, fi, esac, etc.) don't
+                           expect a command after them. Block-starting keywords
+                           do. */
                         if (is_block_ending_keyword(input + token_start,
                                                     word_len)) {
                             expect_command = false;
@@ -1459,8 +1477,8 @@ int lle_syntax_highlighter_create(lle_syntax_highlighter_t **highlighter) {
     h->highlight_errors = true;
     /* Detect terminal color capabilities via cached detection */
     lle_terminal_detection_result_t *detection = NULL;
-    if (lle_detect_terminal_capabilities_optimized(&detection) == LLE_SUCCESS
-        && detection) {
+    if (lle_detect_terminal_capabilities_optimized(&detection) == LLE_SUCCESS &&
+        detection) {
         if (detection->supports_truecolor)
             h->color_depth = 3;
         else if (detection->supports_256_colors)
@@ -1510,13 +1528,14 @@ void lle_syntax_highlighter_set_colors(lle_syntax_highlighter_t *highlighter,
                                        const lle_syntax_colors_t *colors) {
     if (!highlighter || !colors)
         return;
-    
+
     /* Merge colors: only apply non-zero values from the source, preserving
      * defaults for unspecified colors. This allows themes to partially
      * override syntax colors without clearing unspecified ones to black. */
-#define MERGE_COLOR(field) \
-    if (colors->field != 0) highlighter->colors.field = colors->field
-    
+#define MERGE_COLOR(field)                                                     \
+    if (colors->field != 0)                                                    \
+    highlighter->colors.field = colors->field
+
     MERGE_COLOR(command_valid);
     MERGE_COLOR(command_invalid);
     MERGE_COLOR(command_builtin);
@@ -1549,9 +1568,9 @@ void lle_syntax_highlighter_set_colors(lle_syntax_highlighter_t *highlighter,
     MERGE_COLOR(arithmetic);
     MERGE_COLOR(error);
     MERGE_COLOR(error_fg);
-    
+
 #undef MERGE_COLOR
-    
+
     /* Boolean attributes are always copied (they default to false) */
     highlighter->colors.keyword_bold = colors->keyword_bold;
     highlighter->colors.command_bold = colors->command_bold;

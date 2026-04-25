@@ -234,7 +234,8 @@ bool lle_event_queue_empty(lle_event_system_t *system) {
  * @param system The event system to query
  * @return true if no more events can be queued, false otherwise
  *
- * In Phase 2, both main and priority queues must be full for this to return true.
+ * In Phase 2, both main and priority queues must be full for this to return
+ * true.
  */
 bool lle_event_queue_full(lle_event_system_t *system) {
     if (!system || !system->queue) {

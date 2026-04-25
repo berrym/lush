@@ -191,7 +191,8 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
     /* Remove trailing newline from output */
     if (output && output_size > 0) {
         size_t len = strlen(output);
-        while (len > 0 && (output[len - 1] == '\n' || output[len - 1] == '\r')) {
+        while (len > 0 &&
+               (output[len - 1] == '\n' || output[len - 1] == '\r')) {
             output[--len] = '\0';
         }
     }

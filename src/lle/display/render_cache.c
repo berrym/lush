@@ -343,8 +343,8 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
 
     /* Use factory pattern to create hashtable */
     lle_hashtable_factory_t *factory = NULL;
-    lle_result_t factory_result = lle_hashtable_factory_init(
-        &factory, (lush_memory_pool_t *)memory_pool);
+    lle_result_t factory_result =
+        lle_hashtable_factory_init(&factory, (lush_memory_pool_t *)memory_pool);
     if (factory_result != LLE_SUCCESS) {
         lle_pool_free(c);
         return factory_result;

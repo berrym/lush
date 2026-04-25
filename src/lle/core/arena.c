@@ -22,7 +22,8 @@
 
 /* ============================================================================
  * INTERNAL HELPERS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * Align a size up to the specified alignment
@@ -131,7 +132,8 @@ static void arena_link_to_parent(lle_arena_t *arena, lle_arena_t *parent) {
 
 /* ============================================================================
  * LIFECYCLE FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 lle_arena_t *lle_arena_create(lle_arena_t *parent, const char *name,
                               size_t initial_size) {
@@ -259,7 +261,8 @@ void lle_arena_destroy_children(lle_arena_t *arena) {
 
 /* ============================================================================
  * ALLOCATION FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 void *lle_arena_alloc(lle_arena_t *arena, size_t size) {
     if (!arena || size == 0) {
@@ -292,9 +295,9 @@ void *lle_arena_alloc(lle_arena_t *arena, size_t size) {
     }
 
     /* Allocate new chunk - at least default size or requested size */
-    size_t new_chunk_size =
-        aligned_size > arena->default_chunk_size ? aligned_size
-                                                 : arena->default_chunk_size;
+    size_t new_chunk_size = aligned_size > arena->default_chunk_size
+                                ? aligned_size
+                                : arena->default_chunk_size;
 
     lle_arena_chunk_t *new_chunk = arena_alloc_chunk(new_chunk_size);
     if (!new_chunk) {
@@ -447,7 +450,8 @@ char *lle_arena_sprintf(lle_arena_t *arena, const char *format, ...) {
 
 /* ============================================================================
  * UTILITY FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 size_t lle_arena_get_allocated(lle_arena_t *arena, bool include_children) {
     if (!arena) {
@@ -584,13 +588,15 @@ void lle_arena_print_tree(lle_arena_t *root) {
     size_t child_count = lle_arena_get_child_count(root, true);
 
     fprintf(stderr, "==================\n");
-    fprintf(stderr, "Total: %zu bytes used, %zu bytes allocated, %zu children\n",
+    fprintf(stderr,
+            "Total: %zu bytes used, %zu bytes allocated, %zu children\n",
             total_size, total_allocated, child_count);
 }
 
 /* ============================================================================
  * SCRATCH / TEMPORARY ALLOCATION
- * ============================================================================ */
+ * ============================================================================
+ */
 
 lle_arena_scratch_t lle_arena_scratch_begin(lle_arena_t *arena) {
     lle_arena_scratch_t scratch = {0};

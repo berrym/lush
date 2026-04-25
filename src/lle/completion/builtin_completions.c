@@ -18,14 +18,12 @@
 // ============================================================================
 
 static const char *signal_names[] = {
-    "EXIT", "HUP",  "INT",  "QUIT", "ILL",  "TRAP", "ABRT", "BUS",
-    "FPE",  "KILL", "USR1", "SEGV", "USR2", "PIPE", "ALRM", "TERM",
-    "CHLD", "CONT", "STOP", "TSTP", "TTIN", "TTOU", "URG",  "XCPU",
-    "XFSZ", "VTALRM", "PROF", "WINCH", "IO", "SYS", NULL};
+    "EXIT", "HUP",    "INT",  "QUIT",  "ILL",  "TRAP", "ABRT", "BUS",
+    "FPE",  "KILL",   "USR1", "SEGV",  "USR2", "PIPE", "ALRM", "TERM",
+    "CHLD", "CONT",   "STOP", "TSTP",  "TTIN", "TTOU", "URG",  "XCPU",
+    "XFSZ", "VTALRM", "PROF", "WINCH", "IO",   "SYS",  NULL};
 
-const char **lle_builtin_get_signal_names(void) {
-    return signal_names;
-}
+const char **lle_builtin_get_signal_names(void) { return signal_names; }
 
 // ============================================================================
 // OPTION DEFINITIONS
@@ -219,12 +217,13 @@ static const lle_builtin_subcommand_t display_lle_history_dedup_scope_vals[] = {
 };
 
 /* display lle history dedup strategy values */
-static const lle_builtin_subcommand_t display_lle_history_dedup_strategy_vals[] = {
-    {"ignore", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"keep-recent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"keep-frequent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"merge", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"keep-all", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+static const lle_builtin_subcommand_t
+    display_lle_history_dedup_strategy_vals[] = {
+        {"ignore", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {"keep-recent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {"keep-frequent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {"merge", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {"keep-all", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle history dedup subcommands */
@@ -276,7 +275,8 @@ static const lle_builtin_subcommand_t display_lle_subcmds[] = {
      sizeof(display_lle_theme_subcmds) / sizeof(display_lle_theme_subcmds[0]),
      NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"history", display_lle_history_subcmds,
-     sizeof(display_lle_history_subcmds) / sizeof(display_lle_history_subcmds[0]),
+     sizeof(display_lle_history_subcmds) /
+         sizeof(display_lle_history_subcmds[0]),
      NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"reset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"keybindings", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -514,9 +514,7 @@ const lle_builtin_completion_spec_t *lle_builtin_get_spec(const char *name) {
     return NULL;
 }
 
-size_t lle_builtin_get_spec_count(void) {
-    return builtin_specs_count;
-}
+size_t lle_builtin_get_spec_count(void) { return builtin_specs_count; }
 
 // ============================================================================
 // CONTEXT PARSING
@@ -601,9 +599,9 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
 /**
  * @brief Generate signal name completions
  */
-static lle_result_t generate_signal_completions(lle_memory_pool_t *pool,
-                                                const char *prefix,
-                                                lle_completion_result_t *result) {
+static lle_result_t
+generate_signal_completions(lle_memory_pool_t *pool, const char *prefix,
+                            lle_completion_result_t *result) {
     (void)pool; /* Completions allocated via result's pool */
     size_t prefix_len = prefix ? strlen(prefix) : 0;
 
@@ -652,15 +650,15 @@ static lle_result_t generate_job_completions(lle_memory_pool_t *pool,
  *
  * Gets available themes from the theme registry.
  */
-static lle_result_t generate_theme_completions(lle_memory_pool_t *pool,
-                                               const char *prefix,
-                                               lle_completion_result_t *result) {
+static lle_result_t
+generate_theme_completions(lle_memory_pool_t *pool, const char *prefix,
+                           lle_completion_result_t *result) {
     (void)pool; /* Completions allocated via result's pool */
     /* All built-in theme names */
-    static const char *themes[] = {"default",     "minimal",   "powerline",
-                                   "classic",     "nerd",      "informative",
-                                   "two_line",    "corporate", "dark",
-                                   "light",       "colorful",  NULL};
+    static const char *themes[] = {"default",  "minimal",   "powerline",
+                                   "classic",  "nerd",      "informative",
+                                   "two_line", "corporate", "dark",
+                                   "light",    "colorful",  NULL};
 
     size_t prefix_len = prefix ? strlen(prefix) : 0;
 
@@ -680,9 +678,9 @@ static lle_result_t generate_theme_completions(lle_memory_pool_t *pool,
 /**
  * @brief Generate alias completions for unalias
  */
-static lle_result_t generate_alias_completions(lle_memory_pool_t *pool,
-                                               const char *prefix,
-                                               lle_completion_result_t *result) {
+static lle_result_t
+generate_alias_completions(lle_memory_pool_t *pool, const char *prefix,
+                           lle_completion_result_t *result) {
     /* Use the existing alias completion source */
     return lle_completion_source_aliases(pool, prefix, result);
 }
@@ -695,63 +693,39 @@ static lle_result_t generate_alias_completions(lle_memory_pool_t *pool,
  */
 static const char *shell_feature_names[] = {
     /* Arrays */
-    "indexed_arrays",
-    "associative_arrays",
-    "array_zero_indexed",
+    "indexed_arrays", "associative_arrays", "array_zero_indexed",
     "array_append",
     /* Arithmetic */
-    "arith_command",
-    "let_builtin",
+    "arith_command", "let_builtin",
     /* Tests */
-    "extended_test",
-    "regex_match",
-    "pattern_match",
+    "extended_test", "regex_match", "pattern_match",
     /* Redirection */
-    "process_substitution",
-    "pipe_stderr",
-    "append_both",
-    "coproc",
+    "process_substitution", "pipe_stderr", "append_both", "coproc",
     /* Parameter expansion */
-    "case_modification",
-    "substring_expansion",
-    "pattern_substitution",
-    "indirect_expansion",
-    "param_transformation",
+    "case_modification", "substring_expansion", "pattern_substitution",
+    "indirect_expansion", "param_transformation",
     /* Globbing */
-    "extended_glob",
-    "null_glob",
-    "dot_glob",
+    "extended_glob", "null_glob", "dot_glob",
     /* Brace expansion */
     "brace_expansion",
     /* Control flow */
-    "case_fallthrough",
-    "select_loop",
-    "time_keyword",
+    "case_fallthrough", "select_loop", "time_keyword",
     /* Behavior */
-    "word_split_default",
-    "auto_cd",
-    "auto_pushd",
-    "cdable_vars",
+    "word_split_default", "auto_cd", "auto_pushd", "cdable_vars",
     /* Advanced */
-    "nameref",
-    "anonymous_functions",
-    "return_anywhere",
+    "nameref", "anonymous_functions", "return_anywhere",
     /* Zsh-specific */
-    "glob_qualifiers",
-    "hook_functions",
-    "zsh_param_flags",
-    "plugin_system",
-    NULL
-};
+    "glob_qualifiers", "hook_functions", "zsh_param_flags", "plugin_system",
+    NULL};
 
 /**
  * @brief Generate shell feature completions for setopt/unsetopt
  *
  * Provides completion for shell feature names.
  */
-static lle_result_t generate_feature_completions(lle_memory_pool_t *pool,
-                                                 const char *prefix,
-                                                 lle_completion_result_t *result) {
+static lle_result_t
+generate_feature_completions(lle_memory_pool_t *pool, const char *prefix,
+                             lle_completion_result_t *result) {
     (void)pool; /* Completions allocated via result's pool */
     size_t prefix_len = prefix ? strlen(prefix) : 0;
 
@@ -772,10 +746,9 @@ static lle_result_t generate_feature_completions(lle_memory_pool_t *pool,
 /**
  * @brief Generate completions based on argument type
  */
-static lle_result_t
-generate_dynamic_completions(lle_memory_pool_t *pool,
-                             lle_builtin_arg_type_t arg_type, const char *prefix,
-                             lle_completion_result_t *result) {
+static lle_result_t generate_dynamic_completions(
+    lle_memory_pool_t *pool, lle_builtin_arg_type_t arg_type,
+    const char *prefix, lle_completion_result_t *result) {
     switch (arg_type) {
     case LLE_BUILTIN_ARG_NONE:
         return LLE_SUCCESS;
@@ -839,11 +812,9 @@ bool lle_builtin_completions_applicable(const lle_context_analyzer_t *context) {
 // MAIN COMPLETION GENERATOR
 // ============================================================================
 
-lle_result_t
-lle_builtin_completions_generate(lle_memory_pool_t *pool,
-                                 const lle_context_analyzer_t *context,
-                                 const char *prefix,
-                                 lle_completion_result_t *result) {
+lle_result_t lle_builtin_completions_generate(
+    lle_memory_pool_t *pool, const lle_context_analyzer_t *context,
+    const char *prefix, lle_completion_result_t *result) {
     if (!pool || !context || !result) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
@@ -890,7 +861,8 @@ lle_builtin_completions_generate(lle_memory_pool_t *pool,
     if (prefix_len == 0 || match_prefix[0] == '-') {
         for (size_t i = 0; i < option_count; i++) {
             const char *opt_name = options[i].name;
-            if (prefix_len == 0 || strncmp(opt_name, match_prefix, prefix_len) == 0) {
+            if (prefix_len == 0 ||
+                strncmp(opt_name, match_prefix, prefix_len) == 0) {
                 lle_result_t res = lle_completion_result_add_with_description(
                     result, opt_name, " ", LLE_COMPLETION_TYPE_CUSTOM, 800,
                     options[i].description);

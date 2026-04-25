@@ -51,7 +51,8 @@ extern "C" {
 
 /* ============================================================================
  * CONFIGURATION
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** Enable arena statistics tracking (set to 0 to disable for performance) */
 #ifndef LLE_ARENA_STATS
@@ -69,7 +70,8 @@ extern "C" {
 
 /* ============================================================================
  * DATA STRUCTURES
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * Arena chunk - contiguous memory region allocated from lush pool
@@ -92,10 +94,11 @@ typedef struct lle_arena_chunk_t {
  */
 typedef struct lle_arena_t {
     /* Arena identity and hierarchy */
-    const char *name;              /**< Debug name (e.g., "edit_session") */
-    struct lle_arena_t *parent;    /**< Parent arena (NULL for root) */
-    struct lle_arena_t *first_child;  /**< First child arena */
-    struct lle_arena_t *next_sibling; /**< Next sibling in parent's child list */
+    const char *name;                /**< Debug name (e.g., "edit_session") */
+    struct lle_arena_t *parent;      /**< Parent arena (NULL for root) */
+    struct lle_arena_t *first_child; /**< First child arena */
+    struct lle_arena_t
+        *next_sibling; /**< Next sibling in parent's child list */
 
     /* Memory management */
     lle_arena_chunk_t *first_chunk;   /**< First chunk (always present) */
@@ -121,12 +124,13 @@ typedef struct lle_arena_t {
 typedef enum lle_arena_flags_t {
     LLE_ARENA_FLAG_NONE = 0,
     LLE_ARENA_FLAG_ZERO_ALLOC = 0x0001, /**< Zero-initialize all allocations */
-    LLE_ARENA_FLAG_NO_GROW = 0x0002,    /**< Don't allocate new chunks if full */
+    LLE_ARENA_FLAG_NO_GROW = 0x0002, /**< Don't allocate new chunks if full */
 } lle_arena_flags_t;
 
 /* ============================================================================
  * LIFECYCLE FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * Create a new arena
@@ -205,7 +209,8 @@ void lle_arena_destroy_children(lle_arena_t *arena);
 
 /* ============================================================================
  * ALLOCATION FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * Allocate memory from arena
@@ -248,7 +253,8 @@ void *lle_arena_calloc(lle_arena_t *arena, size_t count, size_t size);
  *
  * Performance: O(1) with up to (alignment-1) bytes of padding
  */
-void *lle_arena_alloc_aligned(lle_arena_t *arena, size_t size, size_t alignment);
+void *lle_arena_alloc_aligned(lle_arena_t *arena, size_t size,
+                              size_t alignment);
 
 /**
  * Duplicate string in arena
@@ -296,7 +302,8 @@ char *lle_arena_sprintf(lle_arena_t *arena, const char *format, ...)
 
 /* ============================================================================
  * UTILITY FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * Get total bytes allocated from arena
@@ -363,7 +370,8 @@ void lle_arena_print_tree(lle_arena_t *root);
 
 /* ============================================================================
  * SCRATCH / TEMPORARY ALLOCATION
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * Temporary allocation marker for scratch allocations

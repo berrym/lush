@@ -79,7 +79,8 @@ static custom_source_entry_t *find_entry_by_name(const char *name) {
 }
 
 /**
- * @brief Wrapper generate function - adapts custom source callback to internal format
+ * @brief Wrapper generate function - adapts custom source callback to internal
+ * format
  *
  * The internal source manager passes (pool, context, prefix, result) but
  * custom sources expect (user_data, context, prefix, result).
@@ -88,7 +89,8 @@ static custom_source_entry_t *find_entry_by_name(const char *name) {
  * @param context Context analyzer for command position analysis
  * @param prefix Current word prefix to complete
  * @param result Output result to populate with completions
- * @return LLE_SUCCESS always (individual source errors are logged but not propagated)
+ * @return LLE_SUCCESS always (individual source errors are logged but not
+ * propagated)
  */
 static lle_result_t
 custom_generate_wrapper(lle_memory_pool_t *pool,
@@ -142,7 +144,8 @@ custom_generate_wrapper(lle_memory_pool_t *pool,
  *
  * Individual applicability is checked in custom_generate_wrapper.
  *
- * @param context Context analyzer (unused, individual sources filter themselves)
+ * @param context Context analyzer (unused, individual sources filter
+ * themselves)
  * @return true always - custom sources filter internally
  */
 static bool custom_applicable_wrapper(const lle_context_analyzer_t *context) {

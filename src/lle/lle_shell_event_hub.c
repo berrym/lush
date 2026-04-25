@@ -360,7 +360,8 @@ void lle_fire_directory_changed(const char *old_dir, const char *new_dir) {
 /**
  * @brief Fire a pre-command event
  *
- * Called before a command is executed. Records start time for duration tracking.
+ * Called before a command is executed. Records start time for duration
+ * tracking.
  *
  * @param command The command about to be executed
  * @param is_background True if command will run in background

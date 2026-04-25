@@ -94,8 +94,8 @@ bool lle_unicode_is_lower(uint32_t cp);
  * @return Number of bytes written to output (excluding null terminator),
  *         or (size_t)-1 on error (invalid UTF-8, buffer too small)
  */
-size_t lle_utf8_toupper(const char *input, size_t input_len,
-                        char *output, size_t output_size);
+size_t lle_utf8_toupper(const char *input, size_t input_len, char *output,
+                        size_t output_size);
 
 /**
  * @brief Convert a UTF-8 string to lowercase
@@ -111,8 +111,8 @@ size_t lle_utf8_toupper(const char *input, size_t input_len,
  * @return Number of bytes written to output (excluding null terminator),
  *         or (size_t)-1 on error (invalid UTF-8, buffer too small)
  */
-size_t lle_utf8_tolower(const char *input, size_t input_len,
-                        char *output, size_t output_size);
+size_t lle_utf8_tolower(const char *input, size_t input_len, char *output,
+                        size_t output_size);
 
 /**
  * @brief Convert first character of UTF-8 string to uppercase
@@ -126,8 +126,8 @@ size_t lle_utf8_tolower(const char *input, size_t input_len,
  * @param output_size Size of output buffer in bytes
  * @return Number of bytes written to output, or (size_t)-1 on error
  */
-size_t lle_utf8_toupper_first(const char *input, size_t input_len,
-                              char *output, size_t output_size);
+size_t lle_utf8_toupper_first(const char *input, size_t input_len, char *output,
+                              size_t output_size);
 
 /**
  * @brief Convert first character of UTF-8 string to lowercase
@@ -141,8 +141,8 @@ size_t lle_utf8_toupper_first(const char *input, size_t input_len,
  * @param output_size Size of output buffer in bytes
  * @return Number of bytes written to output, or (size_t)-1 on error
  */
-size_t lle_utf8_tolower_first(const char *input, size_t input_len,
-                              char *output, size_t output_size);
+size_t lle_utf8_tolower_first(const char *input, size_t input_len, char *output,
+                              size_t output_size);
 
 /**
  * @brief Case-fold a UTF-8 string for case-insensitive comparison
@@ -157,7 +157,7 @@ size_t lle_utf8_tolower_first(const char *input, size_t input_len,
  * @param output_size Size of output buffer in bytes
  * @return Number of bytes written to output, or (size_t)-1 on error
  */
-size_t lle_utf8_casefold(const char *input, size_t input_len,
-                         char *output, size_t output_size);
+size_t lle_utf8_casefold(const char *input, size_t input_len, char *output,
+                         size_t output_size);
 
 #endif /* LLE_UNICODE_CASE_H */

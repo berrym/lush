@@ -359,7 +359,7 @@ struct lle_buffer_t {
     lle_buffer_flags_t flags; /* Buffer status flags */
 
     /* Memory management */
-    lle_buffer_pool_t *pool;           /* Associated buffer pool */
+    lle_buffer_pool_t *pool;         /* Associated buffer pool */
     lush_memory_pool_t *memory_pool; /* Lush memory pool reference */
 
     /* Security - Minimal Secure Mode (Spec 15 Phase 1) */
@@ -488,7 +488,7 @@ struct lle_change_tracker_t {
 
     /* Memory management */
     lush_memory_pool_t *memory_pool; /* Memory pool */
-    size_t memory_used;                /* Memory used */
+    size_t memory_used;              /* Memory used */
 };
 
 /**

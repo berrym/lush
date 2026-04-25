@@ -575,7 +575,8 @@ static grapheme_cluster_break_t lle_get_gcb_property(uint32_t codepoint) {
  * @brief Check if there's a grapheme cluster boundary between two codepoints
  * @param prev_cp Previous codepoint
  * @param curr_cp Current codepoint
- * @param prev_ri_count Count of preceding Regional Indicator codepoints (for GB12/13)
+ * @param prev_ri_count Count of preceding Regional Indicator codepoints (for
+ * GB12/13)
  * @return true if boundary exists, false if no break
  *
  * Implements the complete UAX #29 grapheme cluster boundary rules.

@@ -136,7 +136,8 @@ lle_edit_session_manager_create(lle_edit_session_manager_t **manager,
 /**
  * @brief Destroy an edit session manager and all active sessions
  * @param manager The manager to destroy
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if manager is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if manager is
+ * NULL
  */
 lle_result_t
 lle_edit_session_manager_destroy(lle_edit_session_manager_t *manager) {

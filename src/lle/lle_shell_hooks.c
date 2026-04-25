@@ -11,9 +11,9 @@
  */
 
 #include "lle/lle_shell_hooks.h"
+#include "executor.h"
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_integration.h"
-#include "executor.h"
 #include "lush.h"
 #include "shell_mode.h"
 #include "symtable.h"
@@ -26,7 +26,8 @@
 
 /* ============================================================================
  * STATIC STATE
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** Whether hooks are initialized */
 static bool g_hooks_initialized = false;
@@ -58,7 +59,8 @@ static const char *g_hook_array_names[LLE_HOOK_COUNT] = {
 
 /* ============================================================================
  * INTERNAL HELPERS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Call a hook function via the executor
@@ -83,7 +85,8 @@ static int call_hook_function(lle_hook_type_t hook_type, const char *arg) {
         return 0;
     }
 
-    // Use executor's hook calling mechanism (handles recursion guard internally)
+    // Use executor's hook calling mechanism (handles recursion guard
+    // internally)
     int result = executor_call_hook(executor, hook_name, arg);
 
     // Update statistics
@@ -271,7 +274,8 @@ static void execute_prompt_command(void) {
 
 /* ============================================================================
  * EVENT HANDLERS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Handler for POST_COMMAND events -> precmd hook
@@ -362,7 +366,8 @@ static void hook_chpwd_handler(void *event_data, void *user_data) {
 
 /* ============================================================================
  * LIFECYCLE FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize the shell hooks bridge
@@ -373,7 +378,8 @@ void lle_shell_hooks_init(void) {
     }
 
     // Check if any hook feature is enabled
-    // PROMPT_COMMAND (Bash) or HOOK_FUNCTIONS (Zsh) both need POST_COMMAND events
+    // PROMPT_COMMAND (Bash) or HOOK_FUNCTIONS (Zsh) both need POST_COMMAND
+    // events
     bool need_hooks = shell_mode_allows(FEATURE_HOOK_FUNCTIONS) ||
                       shell_mode_allows(FEATURE_PROMPT_COMMAND);
     if (!need_hooks) {
@@ -390,17 +396,18 @@ void lle_shell_hooks_init(void) {
     // Register POST_COMMAND handler for precmd hooks and PROMPT_COMMAND
     // This runs for both Zsh-style hooks and Bash-style PROMPT_COMMAND
     lle_shell_event_hub_register(hub, LLE_SHELL_EVENT_POST_COMMAND,
-                                  hook_precmd_handler, NULL, "precmd-hook");
+                                 hook_precmd_handler, NULL, "precmd-hook");
 
     // The following only make sense if FEATURE_HOOK_FUNCTIONS is enabled
     if (shell_mode_allows(FEATURE_HOOK_FUNCTIONS)) {
         // preexec is triggered by PRE_COMMAND (before command runs)
         lle_shell_event_hub_register(hub, LLE_SHELL_EVENT_PRE_COMMAND,
-                                      hook_preexec_handler, NULL, "preexec-hook");
+                                     hook_preexec_handler, NULL,
+                                     "preexec-hook");
 
         // chpwd is triggered by DIRECTORY_CHANGED
         lle_shell_event_hub_register(hub, LLE_SHELL_EVENT_DIRECTORY_CHANGED,
-                                      hook_chpwd_handler, NULL, "chpwd-hook");
+                                     hook_chpwd_handler, NULL, "chpwd-hook");
     }
 
     g_hooks_initialized = true;
@@ -419,11 +426,11 @@ void lle_shell_hooks_cleanup(void) {
         lle_shell_event_hub_t *hub = g_lle_integration->event_hub;
 
         lle_shell_event_hub_unregister(hub, LLE_SHELL_EVENT_POST_COMMAND,
-                                        "precmd-hook");
+                                       "precmd-hook");
         lle_shell_event_hub_unregister(hub, LLE_SHELL_EVENT_PRE_COMMAND,
-                                        "preexec-hook");
+                                       "preexec-hook");
         lle_shell_event_hub_unregister(hub, LLE_SHELL_EVENT_DIRECTORY_CHANGED,
-                                        "chpwd-hook");
+                                       "chpwd-hook");
     }
 
     g_hooks_initialized = false;
@@ -432,13 +439,12 @@ void lle_shell_hooks_cleanup(void) {
 /**
  * @brief Check if shell hooks are initialized
  */
-bool lle_shell_hooks_initialized(void) {
-    return g_hooks_initialized;
-}
+bool lle_shell_hooks_initialized(void) { return g_hooks_initialized; }
 
 /* ============================================================================
  * HOOK QUERY FUNCTIONS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if a hook function is defined
@@ -461,11 +467,12 @@ bool lle_shell_hook_defined(lle_hook_type_t hook_type) {
     // Use executor_call_hook with a NULL check - if hook returns 0 and
     // no function exists, that's the same as if it ran successfully.
     // We need a way to check if the function exists without calling it.
-    // For now, we'll rely on the fact that executor_call_hook checks internally.
+    // For now, we'll rely on the fact that executor_call_hook checks
+    // internally.
     // TODO: Add executor_function_exists() for clean checking
-    
-    // Workaround: Check if the function name is in the executor's function table
-    // by attempting to call with special marker - but this isn't ideal.
+
+    // Workaround: Check if the function name is in the executor's function
+    // table by attempting to call with special marker - but this isn't ideal.
     // For now, just return true if the feature is enabled - the hook will
     // silently do nothing if the function isn't defined.
     return shell_mode_allows(FEATURE_HOOK_FUNCTIONS);
@@ -483,7 +490,8 @@ const char *lle_shell_hook_name(lle_hook_type_t hook_type) {
 
 /* ============================================================================
  * MANUAL HOOK INVOCATION
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Manually call a hook function
@@ -525,12 +533,13 @@ int lle_shell_hook_call_by_name(const char *hook_name, int argc, char **argv) {
         }
     }
 
-    return -1;  // Unknown hook name
+    return -1; // Unknown hook name
 }
 
 /* ============================================================================
  * HOOK STATISTICS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get the number of times a hook has been called
@@ -553,7 +562,8 @@ void lle_shell_hook_reset_stats(void) {
 
 /* ============================================================================
  * RECURSION PROTECTION
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if we're currently inside a hook
@@ -565,6 +575,4 @@ bool lle_shell_hook_in_progress(void) {
 /**
  * @brief Get the currently executing hook type
  */
-lle_hook_type_t lle_shell_hook_current(void) {
-    return g_current_hook;
-}
+lle_hook_type_t lle_shell_hook_current(void) { return g_current_hook; }

@@ -204,7 +204,8 @@ lle_result_t lle_kill_ring_clear(lle_kill_ring_t *ring);
  * - Any non-yank command breaks the yank chain
  * - Next M-y will error until another C-y is performed
  *
- * @note This should be called after any editor operation that isn't yank/yank-pop
+ * @note This should be called after any editor operation that isn't
+ * yank/yank-pop
  * @note Does not clear kill ring contents, only yank state
  */
 lle_result_t lle_kill_ring_reset_yank_state(lle_kill_ring_t *ring);

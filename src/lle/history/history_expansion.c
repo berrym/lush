@@ -1,6 +1,7 @@
 /**
  * @file history_expansion.c
- * @brief LLE History System - History Expansion Implementation (Spec 09 Phase 3 Day 10)
+ * @brief LLE History System - History Expansion Implementation (Spec 09 Phase 3
+ * Day 10)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
@@ -99,7 +100,8 @@ static lle_expansion_context_t g_expansion_ctx = {
  * Allocates memory from the LLE memory pool and copies the input string.
  *
  * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation fails
+ * @return Pointer to duplicated string, or NULL if str is NULL or allocation
+ * fails
  */
 static char *pool_strdup(const char *str) {
     if (!str)
@@ -201,7 +203,8 @@ static ssize_t find_expansion_marker(const char *str, size_t start_pos) {
  *
  * @param str String starting with number or -number (must not be NULL)
  * @param number Output for parsed number (must not be NULL)
- * @param is_relative Output - true if relative (!-n), false if absolute (!n) (must not be NULL)
+ * @param is_relative Output - true if relative (!-n), false if absolute (!n)
+ * (must not be NULL)
  * @param consumed Output - number of characters consumed (must not be NULL)
  * @return true on success, false on parse error or NULL parameters
  */
@@ -331,10 +334,12 @@ static bool perform_quick_substitution(const char *last_command,
  * Handles !!, !n, !-n, !?string, and !string expansion types.
  * Populates result with the expanded command and metadata.
  *
- * @param expansion_str The expansion string (without leading !) (must not be NULL)
+ * @param expansion_str The expansion string (without leading !) (must not be
+ * NULL)
  * @param result Output for expansion result (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters invalid,
- *         LLE_ERROR_NOT_FOUND if referenced entry not found, LLE_ERROR_OUT_OF_MEMORY on allocation failure
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
+ * invalid, LLE_ERROR_NOT_FOUND if referenced entry not found,
+ * LLE_ERROR_OUT_OF_MEMORY on allocation failure
  */
 static lle_result_t expand_single_reference(const char *expansion_str,
                                             lle_expansion_result_t *result) {
@@ -511,7 +516,8 @@ static lle_result_t expand_single_reference(const char *expansion_str,
  * Must be called before using any expansion functions.
  *
  * @param history_core History core instance (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if history_core is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if history_core
+ * is NULL
  */
 lle_result_t lle_history_expansion_init(lle_history_core_t *history_core) {
     if (!history_core) {
@@ -571,13 +577,14 @@ bool lle_history_expansion_needed(const char *command) {
 /**
  * @brief Expand history references in a command line
  *
- * Expands all history references (!!, !n, !-n, !string, ^old^new, etc.) in the command.
- * The result must be freed by the caller using lle_pool_free().
+ * Expands all history references (!!, !n, !-n, !string, ^old^new, etc.) in the
+ * command. The result must be freed by the caller using lle_pool_free().
  *
  * @param command Original command with history references (must not be NULL)
- * @param expanded Output pointer for expanded command (allocated, caller must free) (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters invalid,
- *         LLE_ERROR_NOT_INITIALIZED if expansion system not initialized,
+ * @param expanded Output pointer for expanded command (allocated, caller must
+ * free) (must not be NULL)
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
+ * invalid, LLE_ERROR_NOT_INITIALIZED if expansion system not initialized,
  *         LLE_ERROR_INVALID_STATE if recursion depth exceeded,
  *         LLE_ERROR_NOT_FOUND if referenced entry not found,
  *         LLE_ERROR_BUFFER_OVERFLOW if expanded command too long,

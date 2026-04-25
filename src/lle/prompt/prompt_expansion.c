@@ -177,8 +177,8 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
         if (sscanf(spec + 1, "%2x%2x%2x", &r, &g, &bl) == 3) {
             if (color_depth >= 3) {
                 char esc[32];
-                snprintf(esc, sizeof(esc), "\033[%d;2;%u;%u;%um",
-                         fg ? 38 : 48, r, g, bl);
+                snprintf(esc, sizeof(esc), "\033[%d;2;%u;%u;%um", fg ? 38 : 48,
+                         r, g, bl);
                 buf_append_str(b, esc);
             } else if (color_depth >= 2) {
                 /* Approximate to 256-color cube */
@@ -218,9 +218,8 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
         const char *name;
         int code;
     } named[] = {
-        {"black", 0},   {"red", 1},  {"green", 2},  {"yellow", 3},
-        {"blue", 4},    {"magenta", 5}, {"cyan", 6}, {"white", 7},
-        {"default", 9},
+        {"black", 0},   {"red", 1},  {"green", 2}, {"yellow", 3},  {"blue", 4},
+        {"magenta", 5}, {"cyan", 6}, {"white", 7}, {"default", 9},
     };
     for (size_t i = 0; i < sizeof(named) / sizeof(named[0]); i++) {
         if (strcmp(spec, named[i].name) == 0) {
@@ -255,7 +254,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
             if (*p == '[') {
                 buf_append_char(&b, *p++);
                 /* Copy parameter bytes + final byte */
-                while (*p && *p < 0x40)  {
+                while (*p && *p < 0x40) {
                     buf_append_char(&b, *p++);
                 }
                 if (*p) {
@@ -425,8 +424,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 unsigned int val = 0;
                 int digits = 0;
                 while (digits < 2 &&
-                       ((*p >= '0' && *p <= '9') ||
-                        (*p >= 'a' && *p <= 'f') ||
+                       ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') ||
                         (*p >= 'A' && *p <= 'F'))) {
                     if (*p >= '0' && *p <= '9')
                         val = val * 16 + (unsigned int)(*p - '0');
@@ -474,7 +472,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, host);
                 break;
             }
-            case 'd': /* fall through */
+            case 'd':   /* fall through */
             case '/': { /* full cwd */
                 char cwd[PATH_MAX];
                 get_cwd_full(cwd, sizeof(cwd));
@@ -487,7 +485,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, cwd);
                 break;
             }
-            case 'c': /* fall through */
+            case 'c':   /* fall through */
             case '.': { /* cwd tail component */
                 char cwd[PATH_MAX];
                 get_cwd_basename(cwd, sizeof(cwd));
@@ -511,7 +509,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case 't': /* fall through */
+            case 't':   /* fall through */
             case '@': { /* time 12h am/pm */
                 time_t now = time(NULL);
                 struct tm tm_buf;
@@ -705,9 +703,8 @@ lle_result_t lle_prompt_expand(const char *format, char *output,
     char intermediate[EXPAND_BUF_SIZE];
 
     if (ctx->template_ctx) {
-        lle_result_t r = lle_template_evaluate(format, ctx->template_ctx,
-                                               intermediate,
-                                               sizeof(intermediate));
+        lle_result_t r = lle_template_evaluate(
+            format, ctx->template_ctx, intermediate, sizeof(intermediate));
         if (r != LLE_SUCCESS)
             return r;
         pass2_input = intermediate;

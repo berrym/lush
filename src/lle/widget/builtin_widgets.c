@@ -433,9 +433,9 @@ static lle_result_t widget_transient_prompt(lle_editor_t *editor,
     expand_ctx.job_count = composer->context.background_job_count;
 
     char transient_output[LLE_TRANSIENT_OUTPUT_MAX];
-    lle_result_t result = lle_prompt_expand(
-        theme->layout.transient_format, transient_output,
-        sizeof(transient_output), &expand_ctx);
+    lle_result_t result =
+        lle_prompt_expand(theme->layout.transient_format, transient_output,
+                          sizeof(transient_output), &expand_ctx);
 
     if (result != LLE_SUCCESS) {
         return LLE_SUCCESS; /* Graceful degradation on render failure */

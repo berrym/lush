@@ -71,7 +71,7 @@ typedef struct lle_builtin_subcommand {
 
     /* Nested subcommands (for hierarchies like display lle theme) */
     const struct lle_builtin_subcommand *subcommands; /**< Child subcommands */
-    size_t subcommand_count;                          /**< Number of subcommands */
+    size_t subcommand_count; /**< Number of subcommands */
 
     /* Options for this subcommand */
     const lle_builtin_option_t *options; /**< Options array */
@@ -139,11 +139,9 @@ bool lle_builtin_completions_applicable(const lle_context_analyzer_t *context);
  * @param result Result structure to append completions to
  * @return LLE_SUCCESS or error code
  */
-lle_result_t
-lle_builtin_completions_generate(lle_memory_pool_t *pool,
-                                 const lle_context_analyzer_t *context,
-                                 const char *prefix,
-                                 lle_completion_result_t *result);
+lle_result_t lle_builtin_completions_generate(
+    lle_memory_pool_t *pool, const lle_context_analyzer_t *context,
+    const char *prefix, lle_completion_result_t *result);
 
 /**
  * @brief Get all defined signal names for trap completion

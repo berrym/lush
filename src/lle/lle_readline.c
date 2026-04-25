@@ -70,15 +70,15 @@
 #include "lle/history.h"    /* History system for UP/DOWN navigation */
 #include "lle/keybinding.h" /* Keybinding manager for Group 1+ migration */
 #include "lle/keybinding_actions.h"    /* Smart arrow navigation functions */
-#include "lle/notification.h"          /* Notification system for hints */
 #include "lle/keybinding_config.h"     /* User keybinding configuration */
 #include "lle/lle_editor.h"            /* Proper LLE editor architecture */
 #include "lle/lle_readline_state.h"    /* State machine for input handling */
 #include "lle/lle_shell_integration.h" /* Spec 26: Shell integration */
-#include "lle/prompt/composer.h"       /* lle_composer_set_theme */
-#include "lle/prompt/theme_loader.h"   /* lle_theme_check_hot_reload */
 #include "lle/lle_watchdog.h" /* Watchdog timer for deadlock detection */
 #include "lle/memory_management.h"
+#include "lle/notification.h"        /* Notification system for hints */
+#include "lle/prompt/composer.h"     /* lle_composer_set_theme */
+#include "lle/prompt/theme_loader.h" /* lle_theme_check_hot_reload */
 #include "lle/terminal_abstraction.h"
 #include "lle/unicode_compare.h" /* TR#29 compliant Unicode prefix matching */
 #include "lle/widget_hooks.h"    /* Widget hooks for lifecycle events */
@@ -142,8 +142,7 @@ populate_history_config_from_lush_config(lle_history_config_t *hist_config) {
     if (config.lle_history_file && config.lle_history_file[0] != '\0') {
         hist_config->history_file_path = config.lle_history_file;
     } else {
-        hist_config->history_file_path =
-            NULL; /* Use default ~/.lush_history */
+        hist_config->history_file_path = NULL; /* Use default ~/.lush_history */
     }
     hist_config->auto_save = true;    /* Always auto-save for safety */
     hist_config->load_on_init = true; /* Load existing history on startup */
@@ -248,7 +247,8 @@ typedef struct readline_context {
     lle_readline_state_t previous_state; /* For debugging/recovery */
 
     /* Notification system for transient hints (multiline history hint, etc.) */
-    lle_notification_state_t notification; /* Notification state (inline, not pointer) */
+    lle_notification_state_t
+        notification; /* Notification state (inline, not pointer) */
 } readline_context_t;
 
 /* ============================================================================
@@ -379,15 +379,17 @@ static void update_autosuggestion(readline_context_t *ctx) {
 
     size_t input_len = ctx->buffer->length;
 
-    /* Limit history search to prevent hangs with very large histories */
-    #define MAX_SUGGESTION_SEARCH_ITERATIONS 5000
+/* Limit history search to prevent hangs with very large histories */
+#define MAX_SUGGESTION_SEARCH_ITERATIONS 5000
     size_t iterations = 0;
 
     /* Search backwards (most recent first) */
-    for (size_t i = count; i > 0 && iterations < MAX_SUGGESTION_SEARCH_ITERATIONS; i--, iterations++) {
+    for (size_t i = count;
+         i > 0 && iterations < MAX_SUGGESTION_SEARCH_ITERATIONS;
+         i--, iterations++) {
         /* Check watchdog every 500 iterations to allow abort on timeout */
         if (iterations > 0 && (iterations % 500) == 0 && lle_watchdog_check()) {
-            return;  /* Watchdog fired - abort suggestion search */
+            return; /* Watchdog fired - abort suggestion search */
         }
 
         lle_history_entry_t *entry = NULL;
@@ -2170,7 +2172,8 @@ static void show_multiline_history_hint(readline_context_t *ctx,
     }
 
     /* Show the hint notification */
-    const char *msg = "Use Ctrl+P/Ctrl+N for history navigation in multiline mode";
+    const char *msg =
+        "Use Ctrl+P/Ctrl+N for history navigation in multiline mode";
     lle_notification_show_with_trigger(&ctx->notification, msg,
                                        LLE_NOTIFICATION_HINT, trigger);
 
@@ -2191,13 +2194,15 @@ static void show_multiline_history_hint(readline_context_t *ctx,
  * @param ctx Readline context
  * @param action The action being performed (or NONE for generic action)
  */
-static void maybe_dismiss_notification(readline_context_t *ctx,
-                                       lle_notification_trigger_action_t action) {
+static void
+maybe_dismiss_notification(readline_context_t *ctx,
+                           lle_notification_trigger_action_t action) {
     if (!ctx || !lle_notification_is_visible(&ctx->notification)) {
         return;
     }
 
-    if (lle_notification_should_dismiss_for_action(&ctx->notification, action)) {
+    if (lle_notification_should_dismiss_for_action(&ctx->notification,
+                                                   action)) {
         lle_notification_dismiss(&ctx->notification);
 
         /* Clear from display controller */
@@ -2789,8 +2794,8 @@ char *lle_readline(const char *prompt) {
      * 8KB initial size is sufficient for typical editing session. */
     lle_arena_t *edit_arena = NULL;
     if (g_lle_integration && g_lle_integration->session_arena) {
-        edit_arena = lle_arena_create(g_lle_integration->session_arena,
-                                      "edit", 8 * 1024);
+        edit_arena = lle_arena_create(g_lle_integration->session_arena, "edit",
+                                      8 * 1024);
     }
 
     /* === STEP 5.6: Create kill buffer === */
@@ -2947,7 +2952,8 @@ char *lle_readline(const char *prompt) {
                                             lle_accept_line_context,
                                             "accept-line");
 
-        /* UP/DOWN: Context-aware arrow keys with multiline notification hints */
+        /* UP/DOWN: Context-aware arrow keys with multiline notification hints
+         */
         lle_keybinding_manager_bind_context(keybinding_manager, "UP",
                                             lle_smart_up_arrow_context,
                                             "smart-up-arrow");
@@ -3186,8 +3192,7 @@ char *lle_readline(const char *prompt) {
                     if (composer->themes &&
                         lle_theme_check_hot_reload(composer->themes)) {
                         lle_composer_set_theme(
-                            composer,
-                            composer->themes->active_theme_name);
+                            composer, composer->themes->active_theme_name);
                         lle_shell_update_prompt();
                         dc_reset_prompt_display_state();
                         refresh_display(&ctx);

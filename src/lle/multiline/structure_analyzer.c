@@ -139,7 +139,8 @@ lle_structure_analyzer_create(lle_structure_analyzer_t **analyzer,
 /**
  * @brief Destroy a structure analyzer and release resources
  * @param analyzer The analyzer to destroy
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if analyzer is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if analyzer is
+ * NULL
  */
 lle_result_t
 lle_structure_analyzer_destroy(lle_structure_analyzer_t *analyzer) {

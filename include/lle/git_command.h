@@ -36,8 +36,8 @@ extern "C" {
  * @brief Result of a timed git command execution
  */
 typedef struct {
-    int exit_status;  /**< Shell exit status, or -1 on timeout/error */
-    bool timed_out;   /**< true if command was killed due to timeout */
+    int exit_status; /**< Shell exit status, or -1 on timeout/error */
+    bool timed_out;  /**< true if command was killed due to timeout */
 } git_cmd_result_t;
 
 /**

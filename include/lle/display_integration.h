@@ -350,8 +350,6 @@ typedef struct {
     bool throttling_enabled;       /**< Throttling enabled flag */
 } lle_frame_scheduler_t;
 
-
-
 /**
  * @brief Render metrics
  *
@@ -462,7 +460,7 @@ struct lle_display_cache_t {
     lle_display_cache_policy_t *policy; /**< Cache policy (LRU) */
     lle_cache_metrics_t *metrics;       /**< Cache metrics */
     pthread_rwlock_t cache_lock;        /**< Thread safety lock */
-    lush_memory_pool_t *memory_pool;  /**< Lush memory pool for cache */
+    lush_memory_pool_t *memory_pool;    /**< Lush memory pool for cache */
 };
 
 /**
@@ -542,7 +540,7 @@ struct lle_event_router_t {
 struct lle_event_translator_t {
     void *lle_event_system; /**< LLE event system reference (opaque) */
     layer_event_system_t *lush_events; /**< Lush event system reference */
-    lle_memory_pool_t *memory_pool;      /**< Memory pool for translations */
+    lle_memory_pool_t *memory_pool;    /**< Memory pool for translations */
 };
 
 /**
@@ -803,10 +801,9 @@ struct lle_display_integration_t {
     lle_composition_manager_t *comp_manager;    /**< Composition manager */
 
     /* Lush system integration */
-    display_controller_t
-        *lush_display;            /**< Existing Lush display controller */
-    void *theme_system;             /**< Existing theme system (opaque) */
-    lle_memory_pool_t *memory_pool; /**< Lush memory pool */
+    display_controller_t *lush_display; /**< Existing Lush display controller */
+    void *theme_system;                 /**< Existing theme system (opaque) */
+    lle_memory_pool_t *memory_pool;     /**< Lush memory pool */
 
     /* Performance and coordination */
     lle_display_metrics_t *perf_metrics; /**< Display performance monitoring */

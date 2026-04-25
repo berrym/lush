@@ -103,8 +103,8 @@ lle_terminal_abstraction_init(lle_terminal_abstraction_t **abstraction,
     }
 
     /* Step 6: Initialize as Lush display layer client */
-    result = lle_lush_display_client_init(&abs->display_client,
-                                            lush_display, abs->capabilities);
+    result = lle_lush_display_client_init(&abs->display_client, lush_display,
+                                          abs->capabilities);
     if (result != LLE_SUCCESS) {
         lle_display_generator_destroy(abs->display_generator);
         lle_internal_state_destroy(abs->internal_state);

@@ -64,8 +64,8 @@ static const lle_integration_config_t DEFAULT_CONFIG = {
  * @param component Output pointer for allocated component (must not be NULL)
  * @param pool Memory pool (currently unused, uses global pool)
  * @param size Size of component to allocate in bytes
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if component is NULL,
- *         LLE_ERROR_OUT_OF_MEMORY on allocation failure
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if component is
+ * NULL, LLE_ERROR_OUT_OF_MEMORY on allocation failure
  */
 static lle_result_t init_stub_component(void **component,
                                         lle_memory_pool_t *pool, size_t size) {

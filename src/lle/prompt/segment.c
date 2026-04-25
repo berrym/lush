@@ -34,7 +34,8 @@
  * Sets up an empty segment registry for storing and managing prompt segments.
  *
  * @param registry Pointer to registry structure to initialize
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if registry is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if registry is
+ * NULL
  */
 lle_result_t lle_segment_registry_init(lle_segment_registry_t *registry) {
     if (!registry) {
@@ -52,7 +53,8 @@ lle_result_t lle_segment_registry_init(lle_segment_registry_t *registry) {
  *
  * Frees all registered segments and resets the registry to uninitialized state.
  *
- * @param registry Pointer to registry to cleanup (ignored if NULL or not initialized)
+ * @param registry Pointer to registry to cleanup (ignored if NULL or not
+ * initialized)
  */
 void lle_segment_registry_cleanup(lle_segment_registry_t *registry) {
     if (!registry || !registry->initialized) {
@@ -77,9 +79,11 @@ void lle_segment_registry_cleanup(lle_segment_registry_t *registry) {
  * it is called during registration.
  *
  * @param registry Pointer to initialized registry
- * @param segment  Pointer to segment to register (ownership transferred to registry)
+ * @param segment  Pointer to segment to register (ownership transferred to
+ * registry)
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if invalid,
- *         LLE_ERROR_BUFFER_OVERFLOW if registry full, LLE_ERROR_INVALID_STATE if duplicate name
+ *         LLE_ERROR_BUFFER_OVERFLOW if registry full, LLE_ERROR_INVALID_STATE
+ * if duplicate name
  */
 lle_result_t lle_segment_registry_register(lle_segment_registry_t *registry,
                                            lle_prompt_segment_t *segment) {
@@ -144,7 +148,8 @@ lle_segment_registry_find(const lle_segment_registry_t *registry,
  * fills it with pointers to segment name strings (up to max_names).
  *
  * @param registry  Pointer to initialized registry
- * @param names     Optional output array for segment name pointers (may be NULL)
+ * @param names     Optional output array for segment name pointers (may be
+ * NULL)
  * @param max_names Maximum number of names to store in array
  * @return Total count of registered segments
  */
@@ -171,7 +176,8 @@ size_t lle_segment_registry_list(const lle_segment_registry_t *registry,
  * Calls the invalidate_cache function on each registered segment that has one.
  * Used when the prompt context changes (e.g., directory change).
  *
- * @param registry Pointer to initialized registry (ignored if NULL or not initialized)
+ * @param registry Pointer to initialized registry (ignored if NULL or not
+ * initialized)
  */
 void lle_segment_registry_invalidate_all(lle_segment_registry_t *registry) {
     if (!registry || !registry->initialized) {
@@ -440,7 +446,7 @@ void lle_segment_free(lle_prompt_segment_t *segment) {
  * @return Pointer to config if found, NULL otherwise
  */
 static const lle_segment_config_t *find_segment_config(const lle_theme_t *theme,
-                                                        const char *name) {
+                                                       const char *name) {
     if (!theme || !name) {
         return NULL;
     }
@@ -538,7 +544,8 @@ static lle_result_t segment_directory_render(const lle_prompt_segment_t *self,
 
     /* Start with the display path, applying home_symbol substitution */
     if (display[0] == '~') {
-        snprintf(styled_path, sizeof(styled_path), "%s%s", home_sym, display + 1);
+        snprintf(styled_path, sizeof(styled_path), "%s%s", home_sym,
+                 display + 1);
     } else {
         snprintf(styled_path, sizeof(styled_path), "%s", display);
     }
@@ -549,7 +556,8 @@ static lle_result_t segment_directory_render(const lle_prompt_segment_t *self,
             /* Show only the last path component */
             const char *last_slash = strrchr(styled_path, '/');
             if (last_slash && last_slash[1]) {
-                memmove(styled_path, last_slash + 1, strlen(last_slash + 1) + 1);
+                memmove(styled_path, last_slash + 1,
+                        strlen(last_slash + 1) + 1);
             }
         } else if (strcmp(cfg->style, "short") == 0) {
             /* Truncate intermediate components to first grapheme */
@@ -574,9 +582,10 @@ static lle_result_t segment_directory_render(const lle_prompt_segment_t *self,
                 size_t comp_len = (size_t)(slash - p);
                 if (comp_len > 0) {
                     int seq_len = lle_utf8_sequence_length((unsigned char)*p);
-                    if (seq_len < 1) seq_len = 1;
-                    size_t copy = (size_t)seq_len < comp_len
-                                      ? (size_t)seq_len : comp_len;
+                    if (seq_len < 1)
+                        seq_len = 1;
+                    size_t copy =
+                        (size_t)seq_len < comp_len ? (size_t)seq_len : comp_len;
                     if (sp + copy < sizeof(short_path)) {
                         memcpy(short_path + sp, p, copy);
                         sp += copy;
@@ -611,8 +620,7 @@ static lle_result_t segment_directory_render(const lle_prompt_segment_t *self,
             }
         }
         if (comp_count >= max_components && cut_pos < path_len) {
-            memmove(styled_path, styled_path + cut_pos,
-                    path_len - cut_pos + 1);
+            memmove(styled_path, styled_path + cut_pos, path_len - cut_pos + 1);
         }
     }
 
@@ -899,15 +907,15 @@ static lle_result_t segment_time_render(const lle_prompt_segment_t *self,
     strftime(time_str, sizeof(time_str), fmt, &ctx->current_tm);
 
     if (sym_time[0]) {
-        snprintf(output->content, sizeof(output->content), "%s%s",
-                 sym_time, time_str);
+        snprintf(output->content, sizeof(output->content), "%s%s", sym_time,
+                 time_str);
     } else {
         snprintf(output->content, sizeof(output->content), "%s", time_str);
     }
 
     output->content_len = strlen(output->content);
-    output->visual_width = lle_utf8_string_width(output->content,
-                                                  output->content_len);
+    output->visual_width =
+        lle_utf8_string_width(output->content, output->content_len);
     output->is_empty = false;
     output->needs_separator = true;
 
@@ -1177,11 +1185,12 @@ typedef struct {
     /* Async worker state */
     lle_async_worker_t *async_worker;
     pthread_mutex_t async_mutex;
-    bool async_pending;         /**< Async request in flight */
-    char async_cwd[PATH_MAX];   /**< CWD for pending request */
-    bool async_initialized;     /**< Async system initialized */
-    uint64_t cache_generation;  /**< Incremented on each cache invalidation */
-    uint64_t pending_generation; /**< Generation when async request was queued */
+    bool async_pending;        /**< Async request in flight */
+    char async_cwd[PATH_MAX];  /**< CWD for pending request */
+    bool async_initialized;    /**< Async system initialized */
+    uint64_t cache_generation; /**< Incremented on each cache invalidation */
+    uint64_t
+        pending_generation; /**< Generation when async request was queued */
 } segment_git_state_t;
 
 /* Forward declaration for async callback */
@@ -1282,8 +1291,8 @@ static int run_git_command(const char *args, char *output, size_t output_size) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd), "git %s 2>/dev/null", args);
 
-    git_cmd_result_t r =
-        git_command_with_timeout(cmd, output, output_size, GIT_CMD_SYNC_TIMEOUT_MS);
+    git_cmd_result_t r = git_command_with_timeout(cmd, output, output_size,
+                                                  GIT_CMD_SYNC_TIMEOUT_MS);
 
     if (r.timed_out) {
         return -1;
@@ -1342,8 +1351,8 @@ static void fetch_git_status(segment_git_state_t *state) {
 
     /* Get status counts using git status --porcelain (with timeout) */
     char porcelain[8192] = {0};
-    if (run_git_command("status --porcelain", porcelain,
-                        sizeof(porcelain)) == 0) {
+    if (run_git_command("status --porcelain", porcelain, sizeof(porcelain)) ==
+        0) {
         state->staged = 0;
         state->unstaged = 0;
         state->untracked = 0;
@@ -1399,8 +1408,8 @@ static void fetch_git_status(segment_git_state_t *state) {
     /* Check for merge conflicts (unmerged files, with timeout) */
     state->has_conflicts = false;
     char conflict_buf[16] = {0};
-    if (run_git_command("ls-files -u", conflict_buf,
-                        sizeof(conflict_buf)) == 0 &&
+    if (run_git_command("ls-files -u", conflict_buf, sizeof(conflict_buf)) ==
+            0 &&
         conflict_buf[0]) {
         state->has_conflicts = true;
     }
@@ -1552,11 +1561,11 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
     /* Fetch git status if cache invalid */
     if (!state->cache_valid) {
         /* Always do synchronous fetch when cache is invalid.
-         * 
+         *
          * Previously this tried async first and rendered with stale data,
          * but that caused the git prompt to show outdated status until
          * a second command was executed (issue #25).
-         * 
+         *
          * After a command completes, the user is waiting for the prompt
          * anyway, so a brief sync fetch is acceptable for accuracy. */
         fetch_git_status(state);
@@ -1573,11 +1582,11 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
     const lle_segment_config_t *cfg = find_segment_config(theme, "git");
     bool cfg_show_branch = !cfg || !cfg->show_branch_set || cfg->show_branch;
     bool cfg_show_status = !cfg || !cfg->show_status_set || cfg->show_status;
-    bool cfg_show_ab = !cfg || !cfg->show_ahead_behind_set ||
-                       cfg->show_ahead_behind;
+    bool cfg_show_ab =
+        !cfg || !cfg->show_ahead_behind_set || cfg->show_ahead_behind;
     bool cfg_show_stash = !cfg || !cfg->show_stash_set || cfg->show_stash;
-    int cfg_trunc = (cfg && cfg->truncation_length_set)
-                        ? cfg->truncation_length : 0;
+    int cfg_trunc =
+        (cfg && cfg->truncation_length_set) ? cfg->truncation_length : 0;
 
     /* Get symbols from theme or use defaults */
     const char *sym_staged =
@@ -1636,8 +1645,10 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
             while (byte_pos < src_len && graphemes < cfg_trunc) {
                 int seq_len = lle_utf8_sequence_length(
                     (unsigned char)state->branch[byte_pos]);
-                if (seq_len < 1) seq_len = 1;
-                if (byte_pos + (size_t)seq_len > src_len) break;
+                if (seq_len < 1)
+                    seq_len = 1;
+                if (byte_pos + (size_t)seq_len > src_len)
+                    break;
                 byte_pos += (size_t)seq_len;
                 graphemes++;
             }
@@ -1664,8 +1675,7 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
         if (pos + branch_len < buf_size) {
             memcpy(buf + pos, branch_display, branch_len);
             pos += branch_len;
-            visual_width +=
-                lle_utf8_string_width(branch_display, branch_len);
+            visual_width += lle_utf8_string_width(branch_display, branch_len);
         }
     }
 
@@ -1788,7 +1798,7 @@ static void segment_git_invalidate(lle_prompt_segment_t *self) {
     if (state) {
         pthread_mutex_lock(&state->async_mutex);
         state->cache_valid = false;
-        state->cache_generation++;  /* Invalidate any in-flight async requests */
+        state->cache_generation++; /* Invalidate any in-flight async requests */
         pthread_mutex_unlock(&state->async_mutex);
     }
 }
@@ -1826,16 +1836,16 @@ lle_prompt_segment_t *lle_segment_create_git(void) {
 /* ========================================================================== */
 
 static bool segment_shlvl_is_visible(const lle_prompt_segment_t *self,
-                                      const lle_prompt_context_t *ctx) {
+                                     const lle_prompt_context_t *ctx) {
     (void)self;
     int min_level = 2;
     return ctx->shlvl >= min_level;
 }
 
 static lle_result_t segment_shlvl_render(const lle_prompt_segment_t *self,
-                                          const lle_prompt_context_t *ctx,
-                                          const lle_theme_t *theme,
-                                          lle_segment_output_t *output) {
+                                         const lle_prompt_context_t *ctx,
+                                         const lle_theme_t *theme,
+                                         lle_segment_output_t *output) {
     (void)self;
 
     int min_level = 2;
@@ -1854,8 +1864,7 @@ static lle_result_t segment_shlvl_render(const lle_prompt_segment_t *self,
         sym = theme->symbols.shlvl;
     }
 
-    snprintf(output->content, sizeof(output->content), "%s%d", sym,
-             ctx->shlvl);
+    snprintf(output->content, sizeof(output->content), "%s%d", sym, ctx->shlvl);
     output->content_len = strlen(output->content);
     output->visual_width = output->content_len;
     output->is_empty = false;
@@ -1864,9 +1873,9 @@ static lle_result_t segment_shlvl_render(const lle_prompt_segment_t *self,
 }
 
 lle_prompt_segment_t *lle_segment_create_shlvl(void) {
-    lle_prompt_segment_t *seg = lle_segment_create(
-        "shlvl", "Shell nesting level",
-        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
+    lle_prompt_segment_t *seg =
+        lle_segment_create("shlvl", "Shell nesting level",
+                           LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
     if (!seg)
         return NULL;
     seg->is_visible = segment_shlvl_is_visible;
@@ -1879,15 +1888,15 @@ lle_prompt_segment_t *lle_segment_create_shlvl(void) {
 /* ========================================================================== */
 
 static bool segment_ssh_is_visible(const lle_prompt_segment_t *self,
-                                    const lle_prompt_context_t *ctx) {
+                                   const lle_prompt_context_t *ctx) {
     (void)self;
     return ctx->is_ssh_session;
 }
 
 static lle_result_t segment_ssh_render(const lle_prompt_segment_t *self,
-                                        const lle_prompt_context_t *ctx,
-                                        const lle_theme_t *theme,
-                                        lle_segment_output_t *output) {
+                                       const lle_prompt_context_t *ctx,
+                                       const lle_theme_t *theme,
+                                       lle_segment_output_t *output) {
     (void)self;
 
     const lle_segment_config_t *cfg = find_segment_config(theme, "ssh");
@@ -1915,9 +1924,9 @@ static lle_result_t segment_ssh_render(const lle_prompt_segment_t *self,
 }
 
 lle_prompt_segment_t *lle_segment_create_ssh(void) {
-    lle_prompt_segment_t *seg = lle_segment_create(
-        "ssh", "SSH session indicator",
-        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
+    lle_prompt_segment_t *seg =
+        lle_segment_create("ssh", "SSH session indicator",
+                           LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
     if (!seg)
         return NULL;
     seg->is_visible = segment_ssh_is_visible;
@@ -1930,16 +1939,14 @@ lle_prompt_segment_t *lle_segment_create_ssh(void) {
 /* ========================================================================== */
 
 static bool segment_cmd_duration_is_visible(const lle_prompt_segment_t *self,
-                                             const lle_prompt_context_t *ctx) {
+                                            const lle_prompt_context_t *ctx) {
     (void)self;
     return ctx->last_cmd_duration_ms >= 2000;
 }
 
-static lle_result_t
-segment_cmd_duration_render(const lle_prompt_segment_t *self,
-                            const lle_prompt_context_t *ctx,
-                            const lle_theme_t *theme,
-                            lle_segment_output_t *output) {
+static lle_result_t segment_cmd_duration_render(
+    const lle_prompt_segment_t *self, const lle_prompt_context_t *ctx,
+    const lle_theme_t *theme, lle_segment_output_t *output) {
     (void)self;
 
     int min_time = 2000;
@@ -1986,9 +1993,9 @@ segment_cmd_duration_render(const lle_prompt_segment_t *self,
 }
 
 lle_prompt_segment_t *lle_segment_create_cmd_duration(void) {
-    lle_prompt_segment_t *seg = lle_segment_create(
-        "cmd_duration", "Last command execution time",
-        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC);
+    lle_prompt_segment_t *seg =
+        lle_segment_create("cmd_duration", "Last command execution time",
+                           LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC);
     if (!seg)
         return NULL;
     seg->is_visible = segment_cmd_duration_is_visible;
@@ -2001,7 +2008,7 @@ lle_prompt_segment_t *lle_segment_create_cmd_duration(void) {
 /* ========================================================================== */
 
 static bool segment_virtualenv_is_visible(const lle_prompt_segment_t *self,
-                                           const lle_prompt_context_t *ctx) {
+                                          const lle_prompt_context_t *ctx) {
     (void)self;
     (void)ctx;
     const char *venv = getenv("VIRTUAL_ENV");
@@ -2011,16 +2018,14 @@ static bool segment_virtualenv_is_visible(const lle_prompt_segment_t *self,
     return (conda && conda[0]);
 }
 
-static lle_result_t
-segment_virtualenv_render(const lle_prompt_segment_t *self,
-                          const lle_prompt_context_t *ctx,
-                          const lle_theme_t *theme,
-                          lle_segment_output_t *output) {
+static lle_result_t segment_virtualenv_render(const lle_prompt_segment_t *self,
+                                              const lle_prompt_context_t *ctx,
+                                              const lle_theme_t *theme,
+                                              lle_segment_output_t *output) {
     (void)self;
     (void)ctx;
 
-    const lle_segment_config_t *cfg =
-        find_segment_config(theme, "virtualenv");
+    const lle_segment_config_t *cfg = find_segment_config(theme, "virtualenv");
     bool full_style = false;
     if (cfg && cfg->style_set && strcmp(cfg->style, "full") == 0) {
         full_style = true;
@@ -2061,9 +2066,9 @@ segment_virtualenv_render(const lle_prompt_segment_t *self,
 }
 
 lle_prompt_segment_t *lle_segment_create_virtualenv(void) {
-    lle_prompt_segment_t *seg = lle_segment_create(
-        "virtualenv", "Python virtual environment",
-        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC);
+    lle_prompt_segment_t *seg =
+        lle_segment_create("virtualenv", "Python virtual environment",
+                           LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_DYNAMIC);
     if (!seg)
         return NULL;
     seg->is_visible = segment_virtualenv_is_visible;
@@ -2100,17 +2105,16 @@ static const char *detect_container_runtime(void) {
 }
 
 static bool segment_container_is_visible(const lle_prompt_segment_t *self,
-                                          const lle_prompt_context_t *ctx) {
+                                         const lle_prompt_context_t *ctx) {
     (void)self;
     (void)ctx;
     return detect_container_runtime() != NULL;
 }
 
-static lle_result_t
-segment_container_render(const lle_prompt_segment_t *self,
-                         const lle_prompt_context_t *ctx,
-                         const lle_theme_t *theme,
-                         lle_segment_output_t *output) {
+static lle_result_t segment_container_render(const lle_prompt_segment_t *self,
+                                             const lle_prompt_context_t *ctx,
+                                             const lle_theme_t *theme,
+                                             lle_segment_output_t *output) {
     (void)self;
     (void)ctx;
 
@@ -2134,9 +2138,9 @@ segment_container_render(const lle_prompt_segment_t *self,
 }
 
 lle_prompt_segment_t *lle_segment_create_container(void) {
-    lle_prompt_segment_t *seg = lle_segment_create(
-        "container", "Container runtime indicator",
-        LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
+    lle_prompt_segment_t *seg =
+        lle_segment_create("container", "Container runtime indicator",
+                           LLE_SEG_CAP_OPTIONAL | LLE_SEG_CAP_CACHEABLE);
     if (!seg)
         return NULL;
     seg->is_visible = segment_container_is_visible;
@@ -2149,7 +2153,7 @@ lle_prompt_segment_t *lle_segment_create_container(void) {
 /* ========================================================================== */
 
 static bool segment_aws_is_visible(const lle_prompt_segment_t *self,
-                                    const lle_prompt_context_t *ctx) {
+                                   const lle_prompt_context_t *ctx) {
     (void)self;
     (void)ctx;
     const char *profile = getenv("AWS_PROFILE");
@@ -2157,9 +2161,9 @@ static bool segment_aws_is_visible(const lle_prompt_segment_t *self,
 }
 
 static lle_result_t segment_aws_render(const lle_prompt_segment_t *self,
-                                        const lle_prompt_context_t *ctx,
-                                        const lle_theme_t *theme,
-                                        lle_segment_output_t *output) {
+                                       const lle_prompt_context_t *ctx,
+                                       const lle_theme_t *theme,
+                                       lle_segment_output_t *output) {
     (void)self;
     (void)ctx;
 
@@ -2241,9 +2245,8 @@ static bool read_kube_context(char *buf, size_t bufsz) {
                 val++;
             /* Strip trailing newline/whitespace */
             size_t vlen = strlen(val);
-            while (vlen > 0 &&
-                   (val[vlen - 1] == '\n' || val[vlen - 1] == '\r' ||
-                    val[vlen - 1] == ' '))
+            while (vlen > 0 && (val[vlen - 1] == '\n' ||
+                                val[vlen - 1] == '\r' || val[vlen - 1] == ' '))
                 vlen--;
             if (vlen > 0) {
                 snprintf(buf, bufsz, "%.*s", (int)vlen, val);
@@ -2258,18 +2261,17 @@ static bool read_kube_context(char *buf, size_t bufsz) {
 }
 
 static bool segment_kubernetes_is_visible(const lle_prompt_segment_t *self,
-                                           const lle_prompt_context_t *ctx) {
+                                          const lle_prompt_context_t *ctx) {
     (void)self;
     (void)ctx;
     char buf[128];
     return read_kube_context(buf, sizeof(buf));
 }
 
-static lle_result_t
-segment_kubernetes_render(const lle_prompt_segment_t *self,
-                          const lle_prompt_context_t *ctx,
-                          const lle_theme_t *theme,
-                          lle_segment_output_t *output) {
+static lle_result_t segment_kubernetes_render(const lle_prompt_segment_t *self,
+                                              const lle_prompt_context_t *ctx,
+                                              const lle_theme_t *theme,
+                                              lle_segment_output_t *output) {
     (void)self;
     (void)ctx;
 

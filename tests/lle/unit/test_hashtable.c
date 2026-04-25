@@ -67,8 +67,7 @@ static int tests_failed = 0;
 
 /* Mock memory pool */
 static int mock_pool_dummy = 42;
-static lush_memory_pool_t *mock_pool =
-    (lush_memory_pool_t *)&mock_pool_dummy;
+static lush_memory_pool_t *mock_pool = (lush_memory_pool_t *)&mock_pool_dummy;
 
 /* Stubs for Lush memory pool functions */
 lush_memory_pool_system_t *global_memory_pool = NULL;

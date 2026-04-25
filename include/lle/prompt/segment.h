@@ -494,7 +494,8 @@ lle_prompt_segment_t *lle_segment_create_cmd_duration(void);
 /**
  * @brief Create virtual environment segment
  *
- * Shows Python virtual environment name from $VIRTUAL_ENV or $CONDA_DEFAULT_ENV.
+ * Shows Python virtual environment name from $VIRTUAL_ENV or
+ * $CONDA_DEFAULT_ENV.
  *
  * @return New segment or NULL on error
  */

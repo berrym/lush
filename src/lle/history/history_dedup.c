@@ -70,8 +70,8 @@ struct lle_history_dedup_engine {
  * @param command Command string to normalize (must not be NULL)
  * @param normalized Output buffer for normalized command (must not be NULL)
  * @param normalized_size Size of normalized buffer in bytes
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL,
- *         LLE_ERROR_BUFFER_OVERFLOW if command is too long for buffer
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL, LLE_ERROR_BUFFER_OVERFLOW if command is too long for buffer
  */
 static lle_result_t normalize_command(const lle_history_dedup_engine_t *dedup,
                                       const char *command, char *normalized,
@@ -130,7 +130,8 @@ static lle_result_t normalize_command(const lle_history_dedup_engine_t *dedup,
  * @param dedup Dedup engine with comparison configuration (may be NULL)
  * @param cmd1 First command to compare (may be NULL)
  * @param cmd2 Second command to compare (may be NULL)
- * @return true if commands are equal, false otherwise or if any parameter is NULL
+ * @return true if commands are equal, false otherwise or if any parameter is
+ * NULL
  */
 static bool commands_equal(const lle_history_dedup_engine_t *dedup,
                            const char *cmd1, const char *cmd2) {
@@ -186,7 +187,8 @@ static bool commands_equal(const lle_history_dedup_engine_t *dedup,
  *
  * @param new_entry Entry to update (keep) (must not be NULL)
  * @param old_entry Entry being merged (will be discarded) (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if either entry is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if either entry
+ * is NULL
  */
 static lle_result_t
 merge_forensic_metadata(lle_history_entry_t *new_entry,
@@ -248,8 +250,8 @@ merge_forensic_metadata(lle_history_entry_t *new_entry,
  * @param history_core History core to deduplicate (must not be NULL)
  * @param strategy Deduplication strategy to use
  * @param scope Deduplication scope (how far back to scan for duplicates)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if dedup or history_core is NULL,
- *         LLE_ERROR_OUT_OF_MEMORY on allocation failure
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if dedup or
+ * history_core is NULL, LLE_ERROR_OUT_OF_MEMORY on allocation failure
  */
 lle_result_t lle_history_dedup_create(lle_history_dedup_engine_t **dedup,
                                       lle_history_core_t *history_core,
@@ -312,8 +314,8 @@ lle_result_t lle_history_dedup_destroy(lle_history_dedup_engine_t *dedup) {
  * @param dedup Dedup engine (must not be NULL)
  * @param new_entry Entry to check for duplicates (must not be NULL)
  * @param duplicate_entry Output for found duplicate entry (may be NULL)
- * @return LLE_SUCCESS if duplicate found, LLE_ERROR_NOT_FOUND if not a duplicate,
- *         LLE_ERROR_INVALID_PARAMETER if dedup or new_entry is NULL,
+ * @return LLE_SUCCESS if duplicate found, LLE_ERROR_NOT_FOUND if not a
+ * duplicate, LLE_ERROR_INVALID_PARAMETER if dedup or new_entry is NULL,
  *         LLE_ERROR_INVALID_STATE if history_core is not set
  */
 lle_result_t lle_history_dedup_check(lle_history_dedup_engine_t *dedup,
@@ -413,9 +415,10 @@ lle_result_t lle_history_dedup_check(lle_history_dedup_engine_t *dedup,
  *
  * @param dedup Dedup engine (must not be NULL)
  * @param keep_entry Entry to keep (must not be NULL)
- * @param discard_entry Entry to discard (must not be NULL, will be marked deleted)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL
- *         or entries are not duplicates
+ * @param discard_entry Entry to discard (must not be NULL, will be marked
+ * deleted)
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL or entries are not duplicates
  */
 lle_result_t lle_history_dedup_merge(lle_history_dedup_engine_t *dedup,
                                      lle_history_entry_t *keep_entry,
@@ -448,13 +451,14 @@ lle_result_t lle_history_dedup_merge(lle_history_dedup_engine_t *dedup,
 /**
  * @brief Apply deduplication strategy to new entry
  *
- * Checks for duplicates and applies the configured strategy (IGNORE, KEEP_RECENT,
- * KEEP_FREQUENT, MERGE_METADATA, or KEEP_ALL).
+ * Checks for duplicates and applies the configured strategy (IGNORE,
+ * KEEP_RECENT, KEEP_FREQUENT, MERGE_METADATA, or KEEP_ALL).
  *
  * @param dedup Dedup engine (must not be NULL)
  * @param new_entry New entry to check and possibly reject (must not be NULL)
  * @param entry_rejected Output indicating if entry was rejected (may be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if dedup or new_entry is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if dedup or
+ * new_entry is NULL
  */
 lle_result_t lle_history_dedup_apply(lle_history_dedup_engine_t *dedup,
                                      lle_history_entry_t *new_entry,
@@ -613,7 +617,8 @@ lle_result_t lle_history_dedup_cleanup(lle_history_dedup_engine_t *dedup,
  *
  * @param dedup Dedup engine (must not be NULL)
  * @param strategy New strategy to use (must be valid)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if dedup is NULL or strategy invalid
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if dedup is NULL
+ * or strategy invalid
  */
 lle_result_t
 lle_history_dedup_set_strategy(lle_history_dedup_engine_t *dedup,
@@ -634,11 +639,13 @@ lle_history_dedup_set_strategy(lle_history_dedup_engine_t *dedup,
 /**
  * @brief Get deduplication statistics
  *
- * Returns counts of detected, merged, and ignored duplicates, plus current strategy.
+ * Returns counts of detected, merged, and ignored duplicates, plus current
+ * strategy.
  *
  * @param dedup Dedup engine (must not be NULL)
  * @param stats Output structure for statistics (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if either parameter is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if either
+ * parameter is NULL
  */
 lle_result_t
 lle_history_dedup_get_stats(const lle_history_dedup_engine_t *dedup,
@@ -715,7 +722,8 @@ lle_history_dedup_set_unicode_normalize(lle_history_dedup_engine_t *dedup,
  * frequently used (KEEP_FREQUENT) entry and marks all others as DELETED.
  *
  * @param dedup Dedup engine (must not be NULL)
- * @param duplicates_removed Output for count of duplicates marked as deleted (may be NULL)
+ * @param duplicates_removed Output for count of duplicates marked as deleted
+ * (may be NULL)
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if dedup is NULL,
  *         LLE_ERROR_INVALID_STATE if history_core is not set
  */
@@ -773,7 +781,8 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
                 case LLE_DEDUP_IGNORE:
                 case LLE_DEDUP_KEEP_RECENT:
                 case LLE_DEDUP_MERGE_METADATA:
-                    /* Keep the more recent entry (higher index = more recent) */
+                    /* Keep the more recent entry (higher index = more recent)
+                     */
                     keep = entry_j;
                     discard = entry_i;
                     break;
@@ -805,7 +814,8 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
                     removed++;
                     dedup->duplicates_merged++;
 
-                    /* If we discarded entry_i, break inner loop and move to next i */
+                    /* If we discarded entry_i, break inner loop and move to
+                     * next i */
                     if (discard == entry_i) {
                         break;
                     }

@@ -121,17 +121,17 @@ typedef struct lle_nested_construct {
  * @brief Command structure information
  */
 typedef struct lle_command_structure {
-    lle_construct_type_t primary_type;     /**< Primary construct type */
-    lle_keyword_position_t *first_keyword; /**< First keyword in list */
-    size_t keyword_count;                  /**< Number of keywords */
+    lle_construct_type_t primary_type;      /**< Primary construct type */
+    lle_keyword_position_t *first_keyword;  /**< First keyword in list */
+    size_t keyword_count;                   /**< Number of keywords */
     lle_nested_construct_t *root_construct; /**< Root of nesting tree */
-    size_t max_depth;                      /**< Maximum nesting depth */
-    lle_indentation_info_t *indentation;   /**< Indentation information */
-    lle_line_mapping_t *line_mapping;      /**< Line boundaries */
-    bool is_complete;                      /**< Structure is complete */
-    bool has_syntax_error;                 /**< Syntax error detected */
-    size_t total_lines;                    /**< Total number of lines */
-    lle_memory_pool_t *pool;               /**< Memory pool for allocations */
+    size_t max_depth;                       /**< Maximum nesting depth */
+    lle_indentation_info_t *indentation;    /**< Indentation information */
+    lle_line_mapping_t *line_mapping;       /**< Line boundaries */
+    bool is_complete;                       /**< Structure is complete */
+    bool has_syntax_error;                  /**< Syntax error detected */
+    size_t total_lines;                     /**< Total number of lines */
+    lle_memory_pool_t *pool;                /**< Memory pool for allocations */
 } lle_command_structure_t;
 
 /**

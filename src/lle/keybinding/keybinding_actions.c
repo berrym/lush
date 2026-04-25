@@ -17,7 +17,6 @@
 #include "config.h" /* For lle_dedup_navigation config option */
 #include "display_controller.h"
 #include "display_integration.h"
-#include "lle/notification.h" /* For multiline history hint notifications */
 #include "lle/buffer_management.h"
 #include "lle/completion/completion_generator.h"
 #include "lle/completion/completion_menu_logic.h"
@@ -26,6 +25,7 @@
 #include "lle/history.h"
 #include "lle/keybinding.h"
 #include "lle/kill_ring.h"
+#include "lle/notification.h"     /* For multiline history hint notifications */
 #include "lle/unicode_compare.h"  /* For Unicode-aware dedup comparison */
 #include "lle/unicode_grapheme.h" /* For grapheme boundary detection */
 #include "lle/utf8_support.h"     /* For UTF-8 decoding */
@@ -288,7 +288,8 @@ static size_t find_word_end(const char *text, size_t len, size_t pos) {
 /**
  * @brief Trigger display refresh after completion changes
  *
- * With proper architecture, menu changes are picked up automatically via events.
+ * With proper architecture, menu changes are picked up automatically via
+ * events.
  *
  * @param dc Display controller instance
  */
@@ -2161,7 +2162,8 @@ static bool history_nav_pop_display(lle_editor_t *editor, size_t *index) {
     }
 
     editor->history_nav_display_count--;
-    *index = editor->history_nav_display_stack[editor->history_nav_display_count];
+    *index =
+        editor->history_nav_display_stack[editor->history_nav_display_count];
     return true;
 }
 
@@ -2276,8 +2278,8 @@ lle_result_t lle_history_next(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Pop the current entry from display stack (the one we're currently viewing)
-     * This removes it so the next "up" will show it again */
+    /* Pop the current entry from display stack (the one we're currently
+     * viewing) This removes it so the next "up" will show it again */
     size_t current_idx;
     if (!history_nav_pop_display(editor, &current_idx)) {
         /* Stack was empty - back to current line */
@@ -2288,13 +2290,14 @@ lle_result_t lle_history_next(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Also remove from seen set so it can be shown again on next up navigation */
+    /* Also remove from seen set so it can be shown again on next up navigation
+     */
     /* Note: We don't have a remove-from-seen function, but that's okay because
      * the seen set prevents showing duplicates during a single up-navigation
      * session. When we go down and then up again, we want to see the entry.
      * The simplest fix is to clear the seen set when we start going down,
      * but that would break if user goes up-down-up-down randomly.
-     * 
+     *
      * Better approach: Don't clear seen set. The entry will still be in the
      * seen set, but since we popped it from display stack, pressing up again
      * will find the NEXT unseen entry. This is actually correct behavior. */
@@ -2315,14 +2318,16 @@ lle_result_t lle_history_next(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Peek at the next entry on the stack (don't pop - we want to display it) */
+    /* Peek at the next entry on the stack (don't pop - we want to display it)
+     */
     size_t next_idx =
-        editor->history_nav_display_stack[editor->history_nav_display_count - 1];
+        editor
+            ->history_nav_display_stack[editor->history_nav_display_count - 1];
 
     /* Retrieve and display the entry */
     lle_history_entry_t *entry = NULL;
-    lle_result_t result =
-        lle_history_get_entry_by_index(editor->history_system, next_idx, &entry);
+    lle_result_t result = lle_history_get_entry_by_index(editor->history_system,
+                                                         next_idx, &entry);
 
     if (result == LLE_SUCCESS && entry && entry->command) {
         lle_buffer_clear(editor->buffer);
@@ -2580,7 +2585,8 @@ lle_result_t lle_complete(lle_editor_t *editor) {
             lle_pool_free((void *)context.word);
         }
         /* No menu despite multiple completions - clear state to avoid stuck
-         * active flag. This also frees the result since current_state owns it. */
+         * active flag. This also frees the result since current_state owns it.
+         */
         lle_completion_system_clear(editor->completion_system);
         return LLE_SUCCESS;
     }

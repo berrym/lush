@@ -107,7 +107,8 @@ static bool file_source_applicable(const lle_context_analyzer_t *context) {
                     spec->default_arg_type == LLE_BUILTIN_ARG_DIRECTORY) {
                     return true;
                 }
-                /* If builtin has subcommands, suppress generic file completion */
+                /* If builtin has subcommands, suppress generic file completion
+                 */
                 if (spec->subcommand_count > 0) {
                     return false;
                 }
@@ -355,10 +356,11 @@ lle_result_t lle_source_manager_create(lle_memory_pool_t *pool,
         return res;
     }
 
-    /* Register builtin argument completions (options, subcommands, dynamic args) */
-    res = lle_source_manager_register(manager, LLE_SOURCE_CUSTOM, "builtin_args",
-                                      lle_builtin_completions_generate,
-                                      lle_builtin_completions_applicable);
+    /* Register builtin argument completions (options, subcommands, dynamic
+     * args) */
+    res = lle_source_manager_register(
+        manager, LLE_SOURCE_CUSTOM, "builtin_args",
+        lle_builtin_completions_generate, lle_builtin_completions_applicable);
     if (res != LLE_SUCCESS) {
         return res;
     }

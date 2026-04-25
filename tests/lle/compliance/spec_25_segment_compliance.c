@@ -471,15 +471,18 @@ static void test_register_builtins(void) {
                       "shlvl segment registered");
     COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "ssh") != NULL,
                       "ssh segment registered");
-    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "cmd_duration") != NULL,
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "cmd_duration") !=
+                          NULL,
                       "cmd_duration segment registered");
-    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "virtualenv") != NULL,
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "virtualenv") !=
+                          NULL,
                       "virtualenv segment registered");
     COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "container") != NULL,
                       "container segment registered");
     COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "aws") != NULL,
                       "aws segment registered");
-    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "kubernetes") != NULL,
+    COMPLIANCE_ASSERT(lle_segment_registry_find(&registry, "kubernetes") !=
+                          NULL,
                       "kubernetes segment registered");
     lle_segment_registry_cleanup(&registry);
     TEST_PASS();

@@ -58,7 +58,8 @@ lle_result_t lle_command_structure_create(lle_command_structure_t **structure,
 /**
  * @brief Destroy a command structure and free all resources
  * @param structure The structure to destroy
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if structure is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if structure is
+ * NULL
  */
 lle_result_t lle_command_structure_destroy(lle_command_structure_t *structure) {
     if (!structure) {

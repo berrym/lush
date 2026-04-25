@@ -46,7 +46,8 @@ extern "C" {
  * @brief Completion context type
  */
 typedef enum {
-    LLE_COMPLETION_CONTEXT_COMMAND,  /**< Command position (first word or after |;&) */
+    LLE_COMPLETION_CONTEXT_COMMAND,  /**< Command position (first word or after
+                                        |;&) */
     LLE_COMPLETION_CONTEXT_ARGUMENT, /**< Command argument position */
     LLE_COMPLETION_CONTEXT_VARIABLE, /**< Variable completion (starts with $) */
     LLE_COMPLETION_CONTEXT_UNKNOWN   /**< Unknown context */

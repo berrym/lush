@@ -121,9 +121,8 @@ TEST(powerline_render_null_params) {
     char output[1024];
 
     /* All NULL params should fail gracefully */
-    lle_result_t r = lle_powerline_render(NULL, NULL, NULL,
-                                           LLE_POWERLINE_LEFT_TO_RIGHT,
-                                           output, sizeof(output));
+    lle_result_t r = lle_powerline_render(
+        NULL, NULL, NULL, LLE_POWERLINE_LEFT_TO_RIGHT, output, sizeof(output));
     ASSERT_EQ(r, LLE_ERROR_INVALID_PARAMETER);
 
     /* NULL output buffer */
@@ -133,8 +132,7 @@ TEST(powerline_render_null_params) {
     memset(&ctx, 0, sizeof(ctx));
 
     r = lle_powerline_render(theme, &g_segments, &ctx,
-                              LLE_POWERLINE_LEFT_TO_RIGHT,
-                              NULL, 0);
+                             LLE_POWERLINE_LEFT_TO_RIGHT, NULL, 0);
     ASSERT_EQ(r, LLE_ERROR_INVALID_PARAMETER);
 
     free(theme);
@@ -142,8 +140,8 @@ TEST(powerline_render_null_params) {
 
 TEST(powerline_render_empty_segments) {
     /* Theme with no enabled segments should produce empty output */
-    lle_theme_t *theme = lle_theme_create(
-        "empty", "Empty test theme", LLE_THEME_CATEGORY_MINIMAL);
+    lle_theme_t *theme = lle_theme_create("empty", "Empty test theme",
+                                          LLE_THEME_CATEGORY_MINIMAL);
     ASSERT_NOT_NULL(theme);
     theme->layout.style = LLE_PROMPT_STYLE_POWERLINE;
     theme->enabled_segment_count = 0;
@@ -153,8 +151,8 @@ TEST(powerline_render_empty_segments) {
 
     char output[1024];
     lle_result_t r = lle_powerline_render(theme, &g_segments, &ctx,
-                                           LLE_POWERLINE_LEFT_TO_RIGHT,
-                                           output, sizeof(output));
+                                          LLE_POWERLINE_LEFT_TO_RIGHT, output,
+                                          sizeof(output));
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT_STR_EQ(output, "");
 
@@ -180,8 +178,8 @@ TEST(powerline_render_left_to_right_basic) {
 
     char output[4096];
     lle_result_t r = lle_powerline_render(theme, &g_segments, &ctx,
-                                           LLE_POWERLINE_LEFT_TO_RIGHT,
-                                           output, sizeof(output));
+                                          LLE_POWERLINE_LEFT_TO_RIGHT, output,
+                                          sizeof(output));
     ASSERT_EQ(r, LLE_SUCCESS);
 
     /* Must produce non-empty output */
@@ -214,8 +212,8 @@ TEST(powerline_render_right_to_left_basic) {
 
     char output[4096];
     lle_result_t r = lle_powerline_render(theme, &g_segments, &ctx,
-                                           LLE_POWERLINE_RIGHT_TO_LEFT,
-                                           output, sizeof(output));
+                                          LLE_POWERLINE_RIGHT_TO_LEFT, output,
+                                          sizeof(output));
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT(strlen(output) > 0);
     ASSERT_TRUE(contains_ansi(output));
@@ -241,11 +239,11 @@ TEST(powerline_render_has_bg_colors) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "/tmp");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx,
-                          LLE_POWERLINE_LEFT_TO_RIGHT,
-                          output, sizeof(output));
+    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
+                         output, sizeof(output));
 
-    /* Background colors use ESC[48;5;Nm (256-color) or ESC[48;2;R;G;Bm (true) */
+    /* Background colors use ESC[48;5;Nm (256-color) or ESC[48;2;R;G;Bm (true)
+     */
     ASSERT_TRUE(contains(output, "\033[48;5;") ||
                 contains(output, "\033[48;2;"));
 
@@ -272,9 +270,8 @@ TEST(powerline_render_separator_count) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "~");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx,
-                          LLE_POWERLINE_LEFT_TO_RIGHT,
-                          output, sizeof(output));
+    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
+                         output, sizeof(output));
 
     /* Count left-arrow separators (U+E0B0 = 0xEE 0x82 0xB0) */
     int sep_count = count_occurrences(output, "\xee\x82\xb0");
@@ -300,9 +297,8 @@ TEST(powerline_render_segment_content_present) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "~/code");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx,
-                          LLE_POWERLINE_LEFT_TO_RIGHT,
-                          output, sizeof(output));
+    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
+                         output, sizeof(output));
 
     /* Segment content should be embedded in the output */
     ASSERT_TRUE(contains(output, "alice"));
@@ -326,9 +322,8 @@ TEST(powerline_strips_segment_ansi) {
     snprintf(ctx.cwd_display, sizeof(ctx.cwd_display), "~/project");
 
     char output[4096];
-    lle_powerline_render(theme, &g_segments, &ctx,
-                          LLE_POWERLINE_LEFT_TO_RIGHT,
-                          output, sizeof(output));
+    lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
+                         output, sizeof(output));
 
     /* Segment renderers embed colors like ESC[38;5;33m (path_normal) and
      * ESC[0m (reset) in their content. The powerline renderer must strip

@@ -16,9 +16,9 @@
  * Spec 02: Terminal Abstraction - Subsystem 5
  */
 
-#include "lle/terminal_abstraction.h"
 #include "lle/arena.h"
 #include "lle/lle_shell_integration.h"
+#include "lle/terminal_abstraction.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>

@@ -55,7 +55,7 @@ struct lle_keybinding_manager {
     lle_strstr_hashtable_t *bindings;     /* Key sequence -> entry mapping */
     lle_keymap_mode_t current_mode;       /* Active keymap mode */
     lle_key_sequence_buffer_t seq_buffer; /* Multi-key sequence buffer */
-    lush_memory_pool_t *pool;           /* Memory pool for allocations */
+    lush_memory_pool_t *pool;             /* Memory pool for allocations */
 
     /* Performance tracking */
     uint64_t total_lookups;

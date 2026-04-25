@@ -201,5 +201,3 @@ lle_display_integration_cleanup(lle_display_integration_t *integration) {
  * lle_render_output_free) are implemented in render_controller.c - the
  * spec-compliant implementation with full sub-component support (buffer
  * renderer, cursor renderer, cache, etc.) */
-
-

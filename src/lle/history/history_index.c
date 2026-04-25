@@ -163,7 +163,8 @@ void lle_history_index_destroy(lle_hashtable_t *index) {
  * @param index Hashtable index (must not be NULL)
  * @param entry_id Entry ID (key)
  * @param entry Entry pointer (value) (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or entry is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or entry
+ * is NULL
  */
 lle_result_t lle_history_index_insert(lle_hashtable_t *index, uint64_t entry_id,
                                       lle_history_entry_t *entry) {
@@ -185,8 +186,10 @@ lle_result_t lle_history_index_insert(lle_hashtable_t *index, uint64_t entry_id,
  *
  * @param index Hashtable index (must not be NULL)
  * @param entry_id Entry ID to lookup
- * @param entry Output pointer for found entry (NULL if not found) (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or entry is NULL
+ * @param entry Output pointer for found entry (NULL if not found) (must not be
+ * NULL)
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or entry
+ * is NULL
  */
 lle_result_t lle_history_index_lookup(lle_hashtable_t *index, uint64_t entry_id,
                                       lle_history_entry_t **entry) {
@@ -253,7 +256,8 @@ lle_result_t lle_history_index_clear(lle_hashtable_t *index) {
  *
  * @param index Hashtable index (must not be NULL)
  * @param size Output pointer for size (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or size is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if index or size
+ * is NULL
  */
 lle_result_t lle_history_index_get_size(lle_hashtable_t *index, size_t *size) {
     if (!index || !size) {
@@ -330,9 +334,11 @@ lle_result_t lle_history_rebuild_index(lle_history_core_t *core) {
  *
  * @param core History core (must not be NULL)
  * @param n Number of entries to retrieve
- * @param entries Output array (caller must allocate at least n pointers) (must not be NULL)
+ * @param entries Output array (caller must allocate at least n pointers) (must
+ * not be NULL)
  * @param count Output pointer for actual number retrieved (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL
  */
 lle_result_t lle_history_get_last_n_entries(lle_history_core_t *core, size_t n,
                                             lle_history_entry_t **entries,
@@ -368,8 +374,8 @@ lle_result_t lle_history_get_last_n_entries(lle_history_core_t *core, size_t n,
  * @param core History core (must not be NULL)
  * @param reverse_index Reverse index (0 = newest)
  * @param entry Output pointer for entry (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if core or entry is NULL,
- *         LLE_ERROR_INVALID_RANGE if reverse_index is out of bounds
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if core or entry
+ * is NULL, LLE_ERROR_INVALID_RANGE if reverse_index is out of bounds
  */
 lle_result_t
 lle_history_get_entry_by_reverse_index(lle_history_core_t *core,

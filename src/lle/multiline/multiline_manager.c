@@ -409,7 +409,8 @@ lle_result_t lle_multiline_manager_init(lle_multiline_manager_t **manager,
 /**
  * @brief Destroy a multiline manager and free resources
  * @param manager The manager to destroy
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if manager is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if manager is
+ * NULL
  */
 lle_result_t lle_multiline_manager_destroy(lle_multiline_manager_t *manager) {
     if (!manager) {

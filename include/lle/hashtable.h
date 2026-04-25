@@ -77,7 +77,7 @@ typedef enum {
 struct lle_hashtable_config {
     /* Memory management */
     lush_memory_pool_t *memory_pool; /**< Lush memory pool */
-    bool use_memory_pool;              /**< Enable memory pool integration */
+    bool use_memory_pool;            /**< Enable memory pool integration */
 
     /* Hash configuration */
     ht_hash hash_function; /**< Hash function (default: FNV1A) */
@@ -106,7 +106,7 @@ struct lle_hashtable_config {
  * @brief Memory context for hashtable memory pool integration
  */
 struct lle_hashtable_memory_context {
-    lush_memory_pool_t *pool; /**< Memory pool reference */
+    lush_memory_pool_t *pool;   /**< Memory pool reference */
     size_t allocations;         /**< Allocation counter */
     size_t deallocations;       /**< Deallocation counter */
     size_t bytes_allocated;     /**< Total bytes allocated */
@@ -180,7 +180,7 @@ struct lle_generic_hashtable {
  * @brief Hashtable factory for creating configured hashtables
  */
 struct lle_hashtable_factory {
-    lush_memory_pool_t *memory_pool;      /**< Memory pool reference */
+    lush_memory_pool_t *memory_pool;        /**< Memory pool reference */
     lle_hashtable_config_t *default_config; /**< Default configuration */
     lle_hashtable_registry_t *registry;     /**< Registry for tracking */
     ht_callbacks_t default_callbacks;       /**< Default memory callbacks */
@@ -201,7 +201,7 @@ struct lle_hashtable_registry {
  * @brief Global hashtable system
  */
 struct lle_hashtable_system {
-    lush_memory_pool_t *memory_pool;     /**< Memory pool reference */
+    lush_memory_pool_t *memory_pool;       /**< Memory pool reference */
     lle_hashtable_factory_t *factory;      /**< Hashtable factory */
     lle_hashtable_monitor_t *monitor;      /**< Performance monitoring */
     lle_hashtable_registry_t *registry;    /**< Active hashtable registry */
@@ -270,10 +270,9 @@ void lle_hashtable_config_init_default(lle_hashtable_config_t *config);
 /**
  * @brief Create configuration for memory pool integration
  */
-lle_result_t
-lle_hashtable_config_create_pooled(lle_hashtable_config_t **config,
-                                   lush_memory_pool_t *memory_pool,
-                                   const char *name);
+lle_result_t lle_hashtable_config_create_pooled(lle_hashtable_config_t **config,
+                                                lush_memory_pool_t *memory_pool,
+                                                const char *name);
 
 /* ============================================================================
  * STRING-TO-STRING HASHTABLE OPERATIONS

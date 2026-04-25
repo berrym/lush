@@ -43,26 +43,26 @@ typedef struct lle_formatting_options {
     lle_formatting_style_t style; /**< Overall formatting style */
     char indent_char;             /**< Indentation character (' ' or '\t') */
     uint8_t spaces_per_level;     /**< Spaces per indentation level */
-    bool break_long_lines;        /**< Break lines longer than max_line_length */
-    size_t max_line_length;       /**< Maximum line length (0 = no limit) */
-    bool normalize_spaces;        /**< Normalize whitespace */
-    bool trim_trailing;           /**< Trim trailing whitespace */
-    bool break_pipes;             /**< Break pipelines into multiple lines */
-    bool align_pipe_operators;    /**< Align pipe operators vertically */
-    bool space_around_operators;  /**< Add spaces around operators */
-    bool space_after_keywords;    /**< Add space after keywords */
-    void *reserved[4];            /**< Reserved for future use */
+    bool break_long_lines;       /**< Break lines longer than max_line_length */
+    size_t max_line_length;      /**< Maximum line length (0 = no limit) */
+    bool normalize_spaces;       /**< Normalize whitespace */
+    bool trim_trailing;          /**< Trim trailing whitespace */
+    bool break_pipes;            /**< Break pipelines into multiple lines */
+    bool align_pipe_operators;   /**< Align pipe operators vertically */
+    bool space_around_operators; /**< Add spaces around operators */
+    bool space_after_keywords;   /**< Add space after keywords */
+    void *reserved[4];           /**< Reserved for future use */
 } lle_formatting_options_t;
 
 /**
  * @brief Formatted command result structure
  */
 typedef struct lle_formatted_command {
-    char *text;                        /**< Formatted command text */
-    size_t length;                     /**< Length of formatted text */
+    char *text;                           /**< Formatted command text */
+    size_t length;                        /**< Length of formatted text */
     lle_formatting_style_t style_applied; /**< Formatting applied */
-    bool was_reformatted;              /**< Whether reformatting occurred */
-    void *reserved[2];                 /**< Reserved for future use */
+    bool was_reformatted;                 /**< Whether reformatting occurred */
+    void *reserved[2];                    /**< Reserved for future use */
 } lle_formatted_command_t;
 
 /**
@@ -105,7 +105,8 @@ lle_result_t lle_formatting_engine_format(lle_formatting_engine_t *engine,
  * @param command_text Command text to format
  * @param command_length Length of command text
  * @param style Formatting style to apply
- * @param formatted_text Output parameter for formatted text (allocated by function)
+ * @param formatted_text Output parameter for formatted text (allocated by
+ * function)
  * @param formatted_length Output parameter for formatted text length
  * @return LLE_SUCCESS on success, error code on failure
  */
@@ -121,7 +122,8 @@ lle_result_t lle_formatting_engine_apply_style(lle_formatting_engine_t *engine,
  * @param engine Formatting engine instance
  * @param command_text Command text to normalize
  * @param command_length Length of command text
- * @param normalized_text Output parameter for normalized text (allocated by function)
+ * @param normalized_text Output parameter for normalized text (allocated by
+ * function)
  * @param normalized_length Output parameter for normalized text length
  * @return LLE_SUCCESS on success, error code on failure
  */

@@ -70,9 +70,10 @@ typedef enum {
  * and trigger information for suppress-on-repeat logic.
  */
 typedef struct lle_notification_state {
-    char message[LLE_NOTIFICATION_MAX_MESSAGE]; /**< Notification message text */
-    lle_notification_type_t type;               /**< Visual style type */
-    bool visible;            /**< Whether notification is currently visible */
+    char
+        message[LLE_NOTIFICATION_MAX_MESSAGE]; /**< Notification message text */
+    lle_notification_type_t type;              /**< Visual style type */
+    bool visible; /**< Whether notification is currently visible */
     lle_notification_trigger_action_t
         trigger_action; /**< Action that triggered this notification */
 } lle_notification_state_t;
@@ -129,11 +130,10 @@ lle_result_t lle_notification_show(lle_notification_state_t *state,
  * @param trigger_action Action that triggered this notification
  * @return LLE_SUCCESS on success, error code on failure
  */
-lle_result_t
-lle_notification_show_with_trigger(lle_notification_state_t *state,
-                                   const char *message,
-                                   lle_notification_type_t type,
-                                   lle_notification_trigger_action_t trigger_action);
+lle_result_t lle_notification_show_with_trigger(
+    lle_notification_state_t *state, const char *message,
+    lle_notification_type_t type,
+    lle_notification_trigger_action_t trigger_action);
 
 /**
  * @brief Dismiss the current notification
@@ -169,8 +169,9 @@ bool lle_notification_is_visible(const lle_notification_state_t *state);
  * @param size Size of buffer
  * @return Pointer to buf on success, NULL if notification not visible or error
  */
-const char *lle_notification_get_styled_text(const lle_notification_state_t *state,
-                                             char *buf, size_t size);
+const char *
+lle_notification_get_styled_text(const lle_notification_state_t *state,
+                                 char *buf, size_t size);
 
 /**
  * @brief Check if an action should dismiss the notification

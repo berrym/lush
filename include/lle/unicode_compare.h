@@ -89,7 +89,8 @@ bool lle_unicode_strings_equal_n(const char *str1, size_t len1,
  * @param output Output buffer for normalized string
  * @param output_size Size of output buffer
  * @param output_len Receives actual length of normalized string
- * @return 0 on success, negative on error (-1: Invalid parameter, -2: Buffer too small, -3: Invalid UTF-8)
+ * @return 0 on success, negative on error (-1: Invalid parameter, -2: Buffer
+ * too small, -3: Invalid UTF-8)
  */
 int lle_unicode_normalize_nfc(const char *input, size_t input_len, char *output,
                               size_t output_size, size_t *output_len);
@@ -97,7 +98,8 @@ int lle_unicode_normalize_nfc(const char *input, size_t input_len, char *output,
 /**
  * @brief Check if a codepoint is a combining character
  * @param codepoint Unicode codepoint to check
- * @return true if the codepoint is a combining character (Mn, Mc, Me categories)
+ * @return true if the codepoint is a combining character (Mn, Mc, Me
+ * categories)
  */
 bool lle_unicode_is_combining(uint32_t codepoint);
 

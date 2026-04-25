@@ -45,35 +45,35 @@ static lle_color_t default_segment_bg(const char *name) {
     /* True color backgrounds — palette indices get remapped by terminal
      * colorschemes and produce unpredictable results. */
     if (strcmp(name, "user") == 0)
-        return lle_color_rgb(68, 68, 68);      /* #444444 dark gray */
+        return lle_color_rgb(68, 68, 68); /* #444444 dark gray */
     if (strcmp(name, "host") == 0)
-        return lle_color_rgb(68, 68, 68);      /* #444444 dark gray */
+        return lle_color_rgb(68, 68, 68); /* #444444 dark gray */
     if (strcmp(name, "directory") == 0)
-        return lle_color_rgb(0, 95, 175);      /* #005FAF strong blue */
+        return lle_color_rgb(0, 95, 175); /* #005FAF strong blue */
     if (strcmp(name, "git") == 0)
-        return lle_color_rgb(135, 95, 175);    /* #875FAF medium purple */
+        return lle_color_rgb(135, 95, 175); /* #875FAF medium purple */
     if (strcmp(name, "status") == 0)
-        return lle_color_rgb(175, 0, 0);       /* #AF0000 strong red */
+        return lle_color_rgb(175, 0, 0); /* #AF0000 strong red */
     if (strcmp(name, "jobs") == 0)
-        return lle_color_rgb(175, 95, 0);      /* #AF5F00 orange */
+        return lle_color_rgb(175, 95, 0); /* #AF5F00 orange */
     if (strcmp(name, "time") == 0)
-        return lle_color_rgb(58, 58, 58);      /* #3A3A3A dim gray */
+        return lle_color_rgb(58, 58, 58); /* #3A3A3A dim gray */
     if (strcmp(name, "shlvl") == 0)
-        return lle_color_rgb(68, 68, 68);      /* #444444 dark gray */
+        return lle_color_rgb(68, 68, 68); /* #444444 dark gray */
     if (strcmp(name, "ssh") == 0)
-        return lle_color_rgb(175, 95, 0);      /* #AF5F00 amber */
+        return lle_color_rgb(175, 95, 0); /* #AF5F00 amber */
     if (strcmp(name, "cmd_duration") == 0)
-        return lle_color_rgb(175, 95, 0);      /* #AF5F00 orange */
+        return lle_color_rgb(175, 95, 0); /* #AF5F00 orange */
     if (strcmp(name, "virtualenv") == 0)
-        return lle_color_rgb(0, 135, 0);       /* #008700 green */
+        return lle_color_rgb(0, 135, 0); /* #008700 green */
     if (strcmp(name, "container") == 0)
-        return lle_color_rgb(0, 135, 135);     /* #008787 teal */
+        return lle_color_rgb(0, 135, 135); /* #008787 teal */
     if (strcmp(name, "aws") == 0)
-        return lle_color_rgb(175, 95, 0);      /* #AF5F00 orange */
+        return lle_color_rgb(175, 95, 0); /* #AF5F00 orange */
     if (strcmp(name, "kubernetes") == 0)
-        return lle_color_rgb(0, 95, 175);      /* #005FAF blue */
+        return lle_color_rgb(0, 95, 175); /* #005FAF blue */
     /* Fallback: dark gray */
-    return lle_color_rgb(68, 68, 68);          /* #444444 */
+    return lle_color_rgb(68, 68, 68); /* #444444 */
 }
 
 /**
@@ -85,8 +85,7 @@ static lle_color_t default_segment_bg(const char *name) {
 static void resolve_segment_colors(const lle_theme_t *theme,
                                    const char *segment_name,
                                    const lle_prompt_context_t *ctx,
-                                   lle_color_t *fg_out,
-                                   lle_color_t *bg_out) {
+                                   lle_color_t *fg_out, lle_color_t *bg_out) {
     /* Default foreground: bold true-color white (palette 255 gets remapped
      * by dark terminal colorschemes and becomes unreadable) */
     lle_color_t fg = lle_color_rgb(255, 255, 255);
@@ -157,9 +156,7 @@ static void buf_append_color_bg(append_ctx_t *a, const lle_color_t *color) {
     }
 }
 
-static void buf_append_reset(append_ctx_t *a) {
-    buf_append(a, "\033[0m", 4);
-}
+static void buf_append_reset(append_ctx_t *a) { buf_append(a, "\033[0m", 4); }
 
 /* ============================================================================
  * ANSI Stripping
@@ -183,9 +180,8 @@ static size_t strip_ansi(const char *src, char *dst, size_t dst_size) {
         if (src[i] == '\033' && src[i + 1] == '[') {
             /* Skip ESC [ ... until final byte (0x40-0x7E) */
             i += 2;
-            while (src[i] != '\0' &&
-                   !((unsigned char)src[i] >= 0x40 &&
-                     (unsigned char)src[i] <= 0x7E)) {
+            while (src[i] != '\0' && !((unsigned char)src[i] >= 0x40 &&
+                                       (unsigned char)src[i] <= 0x7E)) {
                 i++;
             }
             /* i now points to the final byte (or NUL); loop increment
@@ -268,9 +264,8 @@ static size_t collect_visible_segments(const lle_theme_t *theme,
  * Each segment: [bg][fg] content [separator with color transition]
  * Final segment gets a trailing separator fading to terminal default.
  */
-static void render_left_to_right(const powerline_segment_t *segs,
-                                 size_t count, const char *separator,
-                                 append_ctx_t *a) {
+static void render_left_to_right(const powerline_segment_t *segs, size_t count,
+                                 const char *separator, append_ctx_t *a) {
     for (size_t i = 0; i < count; i++) {
         const powerline_segment_t *seg = &segs[i];
 
@@ -304,9 +299,8 @@ static void render_left_to_right(const powerline_segment_t *segs,
  * Leading separator before each segment, content follows.
  * First segment gets a leading separator on terminal default bg.
  */
-static void render_right_to_left(const powerline_segment_t *segs,
-                                 size_t count, const char *separator,
-                                 append_ctx_t *a) {
+static void render_right_to_left(const powerline_segment_t *segs, size_t count,
+                                 const char *separator, append_ctx_t *a) {
     for (size_t i = 0; i < count; i++) {
         const powerline_segment_t *seg = &segs[i];
 
@@ -356,9 +350,8 @@ lle_result_t lle_powerline_render(const lle_theme_t *theme,
 
     /* Collect visible segments */
     powerline_segment_t visible[POWERLINE_MAX_VISIBLE];
-    size_t count =
-        collect_visible_segments(theme, segments, context, visible,
-                                POWERLINE_MAX_VISIBLE);
+    size_t count = collect_visible_segments(theme, segments, context, visible,
+                                            POWERLINE_MAX_VISIBLE);
 
     if (count == 0) {
         return LLE_SUCCESS;

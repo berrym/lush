@@ -789,8 +789,8 @@ void lle_update_average_time(struct timespec *average,
  */
 lle_result_t
 lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
-                                   lush_memory_pool_t *lush_pool,
-                                   lle_memory_pool_type_t pool_type) {
+                                 lush_memory_pool_t *lush_pool,
+                                 lle_memory_pool_type_t pool_type) {
     if (!lle_pool) {
         return LLE_ERROR_NULL_POINTER;
     }
@@ -1194,13 +1194,10 @@ lle_result_t lle_memory_transition_state(lle_memory_manager_t *manager,
  * ============================================================================
  */
 
-lush_memory_pool_t *lush_get_memory_pools(void) {
-    return global_memory_pool;
-}
+lush_memory_pool_t *lush_get_memory_pools(void) { return global_memory_pool; }
 
-lle_result_t
-lle_analyze_lush_memory_config(lush_memory_pool_t *lush_pools,
-                                 lle_memory_config_t *lush_config) {
+lle_result_t lle_analyze_lush_memory_config(lush_memory_pool_t *lush_pools,
+                                            lle_memory_config_t *lush_config) {
     if (!lush_pools || !lush_config)
         return LLE_ERROR_NULL_POINTER;
 

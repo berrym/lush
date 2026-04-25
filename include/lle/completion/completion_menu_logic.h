@@ -105,7 +105,8 @@ lle_result_t lle_completion_menu_page_down(lle_completion_menu_state_t *state);
 /**
  * @brief Move selection up by one page
  *
- * A page is defined by visible_count items. Does not wrap - stops at first item.
+ * A page is defined by visible_count items. Does not wrap - stops at first
+ * item.
  *
  * @param state Menu state to update
  * @return LLE_SUCCESS on success, error code on failure
@@ -115,7 +116,8 @@ lle_result_t lle_completion_menu_page_up(lle_completion_menu_state_t *state);
 /**
  * @brief Jump to the next category
  *
- * Categories are determined by completion type. Wraps to first category if at end.
+ * Categories are determined by completion type. Wraps to first category if at
+ * end.
  *
  * @param state Menu state to update
  * @return LLE_SUCCESS on success, error code on failure
@@ -126,7 +128,8 @@ lle_completion_menu_next_category(lle_completion_menu_state_t *state);
 /**
  * @brief Jump to the previous category
  *
- * Categories are determined by completion type. Wraps to last category if at beginning.
+ * Categories are determined by completion type. Wraps to last category if at
+ * beginning.
  *
  * @param state Menu state to update
  * @return LLE_SUCCESS on success, error code on failure

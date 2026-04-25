@@ -81,9 +81,10 @@ struct lle_completion_source {
  * @brief Source manager - registry of all completion sources
  */
 struct lle_source_manager {
-    lle_completion_source_t *sources[MAX_COMPLETION_SOURCES]; /**< Registered sources */
-    size_t num_sources;     /**< Number of registered sources */
-    lle_memory_pool_t *pool; /**< Memory pool for allocations */
+    lle_completion_source_t
+        *sources[MAX_COMPLETION_SOURCES]; /**< Registered sources */
+    size_t num_sources;                   /**< Number of registered sources */
+    lle_memory_pool_t *pool;              /**< Memory pool for allocations */
 };
 
 /**

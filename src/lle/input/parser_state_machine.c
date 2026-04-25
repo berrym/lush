@@ -118,7 +118,8 @@ lle_parser_state_machine_transition(lle_parser_state_machine_t *state_machine,
 }
 
 /**
- * @brief Main processing function - analyzes input and determines state transitions
+ * @brief Main processing function - analyzes input and determines state
+ * transitions
  *
  * This is a lightweight function that examines the input data and determines
  * which parser state should handle it. The actual parsing is done by the

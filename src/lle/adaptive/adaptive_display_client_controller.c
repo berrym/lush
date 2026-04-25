@@ -278,7 +278,8 @@ static void lle_render_pipeline_append_color(lle_render_pipeline_t *pipe,
  * @param pipe The render pipeline.
  * @param text The text to append.
  * @param length The length of the text in bytes.
- * @return LLE_SUCCESS on success, LLE_ERROR_OUT_OF_MEMORY on allocation failure.
+ * @return LLE_SUCCESS on success, LLE_ERROR_OUT_OF_MEMORY on allocation
+ * failure.
  */
 static lle_result_t lle_render_pipeline_append_text(lle_render_pipeline_t *pipe,
                                                     const char *text,
@@ -853,7 +854,8 @@ lle_display_client_handle_resize(lle_display_client_controller_t *client,
  *
  * @param client The display client controller.
  * @param lines_read Output pointer for lines read count, or NULL to skip.
- * @param displays_updated Output pointer for display update count, or NULL to skip.
+ * @param displays_updated Output pointer for display update count, or NULL to
+ * skip.
  * @param errors Output pointer for error count, or NULL to skip.
  * @return LLE_SUCCESS on success, or an error code on failure.
  */

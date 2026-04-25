@@ -223,8 +223,9 @@ typedef struct lle_segment_config {
     bool show;     /**< Whether segment is visible */
     bool show_set; /**< True if show was explicitly configured */
 
-    /* Truncation (meaning is segment-specific: path components, branch chars) */
-    int truncation_length;     /**< Truncation length */
+    /* Truncation (meaning is segment-specific: path components, branch chars)
+     */
+    int truncation_length;      /**< Truncation length */
     bool truncation_length_set; /**< True if truncation_length was configured */
 
     /* Style variant ("full", "short", "basename") */
@@ -236,25 +237,25 @@ typedef struct lle_segment_config {
     bool format_set; /**< True if format was configured */
 
     /* Git-specific booleans */
-    bool show_branch;            /**< Show git branch name */
-    bool show_branch_set;        /**< True if show_branch was configured */
-    bool show_status;            /**< Show git dirty/clean status */
-    bool show_status_set;        /**< True if show_status was configured */
-    bool show_ahead_behind;      /**< Show ahead/behind counts */
-    bool show_ahead_behind_set;  /**< True if show_ahead_behind was configured */
-    bool show_stash;             /**< Show stash indicator */
-    bool show_stash_set;         /**< True if show_stash was configured */
+    bool show_branch;           /**< Show git branch name */
+    bool show_branch_set;       /**< True if show_branch was configured */
+    bool show_status;           /**< Show git dirty/clean status */
+    bool show_status_set;       /**< True if show_status was configured */
+    bool show_ahead_behind;     /**< Show ahead/behind counts */
+    bool show_ahead_behind_set; /**< True if show_ahead_behind was configured */
+    bool show_stash;            /**< Show stash indicator */
+    bool show_stash_set;        /**< True if show_stash was configured */
 
     /* Directory-specific */
     char home_symbol[LLE_SYMBOL_MAX]; /**< Home directory replacement symbol */
-    bool home_symbol_set; /**< True if home_symbol was configured */
+    bool home_symbol_set;             /**< True if home_symbol was configured */
 
     /* Duration-specific */
-    int min_time;     /**< Minimum duration in ms to show (cmd_duration) */
+    int min_time;      /**< Minimum duration in ms to show (cmd_duration) */
     bool min_time_set; /**< True if min_time was configured */
 
     /* Shell level-specific */
-    int min_level;     /**< Minimum nesting depth to show (shlvl) */
+    int min_level;      /**< Minimum nesting depth to show (shlvl) */
     bool min_level_set; /**< True if min_level was configured */
 
     /* Powerline colors (per-segment foreground and background) */
@@ -314,8 +315,9 @@ typedef enum lle_theme_source {
  * @brief Prompt rendering style
  */
 typedef enum lle_prompt_style {
-    LLE_PROMPT_STYLE_PLAIN,     /**< Default: template-driven rendering */
-    LLE_PROMPT_STYLE_POWERLINE  /**< Powerline: colored blocks with arrow separators */
+    LLE_PROMPT_STYLE_PLAIN,    /**< Default: template-driven rendering */
+    LLE_PROMPT_STYLE_POWERLINE /**< Powerline: colored blocks with arrow
+                                  separators */
 } lle_prompt_style_t;
 
 /**

@@ -120,8 +120,8 @@ static void convert_toml_value_to_theme_value(const toml_value_t *src,
                 calloc(src->data.array.count, sizeof(lle_theme_value_t));
             if (dst->data.array.items) {
                 for (size_t i = 0; i < src->data.array.count; i++) {
-                    convert_toml_value_to_theme_value(&src->data.array.items[i],
-                                                      &dst->data.array.items[i]);
+                    convert_toml_value_to_theme_value(
+                        &src->data.array.items[i], &dst->data.array.items[i]);
                 }
             }
         } else {
@@ -162,8 +162,10 @@ static void convert_toml_value_to_theme_value(const toml_value_t *src,
  * will be ready to parse key-value pairs from the TOML-subset format.
  *
  * @param parser Pointer to parser structure to initialize
- * @param input  TOML-subset input string to parse (must remain valid during parsing)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parser or input is NULL
+ * @param input  TOML-subset input string to parse (must remain valid during
+ * parsing)
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parser or
+ * input is NULL
  */
 lle_result_t lle_theme_parser_init(lle_theme_parser_t *parser,
                                    const char *input) {
@@ -218,8 +220,8 @@ void lle_theme_parser_reset(lle_theme_parser_t *parser) {
  * @param parser    Pointer to initialized parser
  * @param callback  Function to call for each parsed key-value pair
  * @param user_data User context passed to callback function
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parser or callback is NULL,
- *         or LLE_ERROR_INVALID_FORMAT on parse error
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parser or
+ * callback is NULL, or LLE_ERROR_INVALID_FORMAT on parse error
  */
 lle_result_t lle_theme_parser_parse(lle_theme_parser_t *parser,
                                     lle_theme_parser_callback_t callback,
@@ -230,8 +232,8 @@ lle_result_t lle_theme_parser_parse(lle_theme_parser_t *parser,
 
     /* Initialize generic TOML parser */
     toml_parser_t toml_parser;
-    toml_result_t result =
-        toml_parser_init_with_length(&toml_parser, parser->input, parser->input_len);
+    toml_result_t result = toml_parser_init_with_length(
+        &toml_parser, parser->input, parser->input_len);
     if (result != TOML_SUCCESS) {
         snprintf(parser->error_msg, sizeof(parser->error_msg),
                  "Failed to initialize TOML parser");
@@ -239,14 +241,13 @@ lle_result_t lle_theme_parser_parse(lle_theme_parser_t *parser,
     }
 
     /* Set up adapter context */
-    theme_parser_adapter_t adapter = {
-        .user_callback = callback,
-        .user_data = user_data,
-        .theme_parser = parser
-    };
+    theme_parser_adapter_t adapter = {.user_callback = callback,
+                                      .user_data = user_data,
+                                      .theme_parser = parser};
 
     /* Parse using generic parser with adapter */
-    result = toml_parser_parse(&toml_parser, theme_parser_adapter_callback, &adapter);
+    result = toml_parser_parse(&toml_parser, theme_parser_adapter_callback,
+                               &adapter);
 
     /* Sync state from generic parser to theme parser */
     parser->pos = toml_parser.pos;
@@ -341,7 +342,8 @@ size_t lle_theme_parser_error_column(const lle_theme_parser_t *parser) {
  *
  * @param value Pointer to value structure to set
  * @param str   String content to store
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if value or str is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if value or str
+ * is NULL
  */
 lle_result_t lle_theme_value_set_string(lle_theme_value_t *value,
                                         const char *str) {
@@ -432,8 +434,8 @@ void lle_theme_value_free(lle_theme_value_t *value) {
  * @param key     Key name to look up
  * @param out     Output buffer for string value
  * @param out_len Size of output buffer
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters invalid,
- *         LLE_ERROR_NOT_FOUND if key not found
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
+ * invalid, LLE_ERROR_NOT_FOUND if key not found
  */
 lle_result_t lle_theme_value_table_get_string(const lle_theme_value_t *value,
                                               const char *key, char *out,
@@ -469,8 +471,8 @@ lle_result_t lle_theme_value_table_get_string(const lle_theme_value_t *value,
  * @param value Pointer to table value to search
  * @param key   Key name to look up
  * @param out   Output pointer for integer value
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters invalid,
- *         LLE_ERROR_NOT_FOUND if key not found
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
+ * invalid, LLE_ERROR_NOT_FOUND if key not found
  */
 lle_result_t lle_theme_value_table_get_integer(const lle_theme_value_t *value,
                                                const char *key, int64_t *out) {
@@ -505,8 +507,8 @@ lle_result_t lle_theme_value_table_get_integer(const lle_theme_value_t *value,
  * @param value Pointer to table value to search
  * @param key   Key name to look up
  * @param out   Output pointer for boolean value
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters invalid,
- *         LLE_ERROR_NOT_FOUND if key not found
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
+ * invalid, LLE_ERROR_NOT_FOUND if key not found
  */
 lle_result_t lle_theme_value_table_get_boolean(const lle_theme_value_t *value,
                                                const char *key, bool *out) {
@@ -580,8 +582,8 @@ static int hex_digit(char c) {
  *
  * @param spec  Color specification string
  * @param color Output structure for parsed color
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if spec or color is NULL,
- *         LLE_ERROR_INVALID_FORMAT if color format is invalid
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if spec or color
+ * is NULL, LLE_ERROR_INVALID_FORMAT if color format is invalid
  */
 lle_result_t lle_parse_color_spec(const char *spec, lle_color_t *color) {
     if (!spec || !color) {
@@ -681,8 +683,9 @@ lle_result_t lle_parse_color_spec(const char *spec, lle_color_t *color) {
  *
  * @param value Pointer to table value containing color definition
  * @param color Output structure for parsed color with attributes
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if value or color is NULL
- *         or value is not a table, LLE_ERROR_INVALID_FORMAT if color spec is invalid
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if value or color
+ * is NULL or value is not a table, LLE_ERROR_INVALID_FORMAT if color spec is
+ * invalid
  */
 lle_result_t lle_parse_color_table(const lle_theme_value_t *value,
                                    lle_color_t *color) {
@@ -757,7 +760,8 @@ typedef struct {
  * Converts a theme category name string to the corresponding enum value.
  *
  * @param str Category name (case-insensitive)
- * @return Corresponding lle_theme_category_t value, or LLE_THEME_CATEGORY_CUSTOM if unknown
+ * @return Corresponding lle_theme_category_t value, or
+ * LLE_THEME_CATEGORY_CUSTOM if unknown
  */
 static lle_theme_category_t parse_category(const char *str) {
     if (strcasecmp(str, "minimal") == 0)
@@ -1037,7 +1041,8 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
                 break;
             }
         }
-        if (!seg_cfg && theme->segment_config_count < LLE_THEME_MAX_SEGMENT_CONFIGS) {
+        if (!seg_cfg &&
+            theme->segment_config_count < LLE_THEME_MAX_SEGMENT_CONFIGS) {
             seg_cfg = &theme->segment_configs[theme->segment_config_count++];
             memset(seg_cfg, 0, sizeof(*seg_cfg));
             snprintf(seg_cfg->name, sizeof(seg_cfg->name), "%.31s", seg_name);
@@ -1045,7 +1050,8 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
         }
 
         if (seg_cfg) {
-            if (strcmp(key, "show") == 0 && value->type == LLE_THEME_VALUE_BOOLEAN) {
+            if (strcmp(key, "show") == 0 &&
+                value->type == LLE_THEME_VALUE_BOOLEAN) {
                 seg_cfg->show = value->data.boolean;
                 seg_cfg->show_set = true;
             } else if (strcmp(key, "truncation_length") == 0 &&
@@ -1343,8 +1349,8 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
  *
  * @param parser Pointer to initialized parser
  * @param theme  Pointer to theme structure to populate
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parser or theme is NULL,
- *         or error code from parsing
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parser or
+ * theme is NULL, or error code from parsing
  */
 lle_result_t lle_theme_parser_parse_to_theme(lle_theme_parser_t *parser,
                                              lle_theme_t *theme) {

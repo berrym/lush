@@ -194,7 +194,8 @@ lle_terminal_state_update_dimensions(lle_terminal_state_t *state) {
 /**
  * @brief Create a performance statistics tracking structure.
  *
- * @return Pointer to created statistics structure, or NULL on allocation failure.
+ * @return Pointer to created statistics structure, or NULL on allocation
+ * failure.
  */
 static lle_terminal_performance_stats_t *
 lle_terminal_performance_stats_create(void) {
@@ -599,9 +600,8 @@ static size_t lle_calculate_optimal_buffer_size(
  * @param memory_pool Memory pool for allocations.
  * @return LLE_SUCCESS on success, or an error code on failure.
  */
-lle_result_t
-lle_initialize_native_controller(lle_adaptive_context_t *context,
-                                 lush_memory_pool_t *memory_pool) {
+lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
+                                              lush_memory_pool_t *memory_pool) {
 
     lle_native_controller_t *native =
         calloc(1, sizeof(lle_native_controller_t));

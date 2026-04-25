@@ -51,7 +51,8 @@ static void ensure_visible(lle_completion_menu_state_t *state) {
 /**
  * @brief Get number of columns from menu state
  *
- * Uses the dynamically calculated value from lle_completion_menu_update_layout().
+ * Uses the dynamically calculated value from
+ * lle_completion_menu_update_layout().
  *
  * @param state Menu state to query
  * @return Number of columns (defaults to 1)

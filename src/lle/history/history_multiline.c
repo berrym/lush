@@ -62,8 +62,8 @@ static size_t count_newlines(const char *str) {
  * @param original Original multiline command (must not be NULL)
  * @param flattened Output buffer for flattened command (must not be NULL)
  * @param flattened_size Size of output buffer in bytes
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL,
- *         LLE_ERROR_BUFFER_OVERFLOW if command is too long for buffer
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL, LLE_ERROR_BUFFER_OVERFLOW if command is too long for buffer
  */
 static lle_result_t flatten_command(const char *original, char *flattened,
                                     size_t flattened_size) {
@@ -125,7 +125,8 @@ static lle_result_t flatten_command(const char *original, char *flattened,
  * Allocates memory from the LLE memory pool and copies the input string.
  *
  * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation fails
+ * @return Pointer to duplicated string, or NULL if str is NULL or allocation
+ * fails
  */
 static char *pool_strdup(const char *str) {
     if (!str) {
@@ -152,7 +153,8 @@ static char *pool_strdup(const char *str) {
  *
  * @param command Command string to check (must not be NULL)
  * @param is_multiline Output for multiline detection result (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL
  */
 lle_result_t lle_history_detect_multiline(const char *command,
                                           bool *is_multiline) {
@@ -175,7 +177,8 @@ lle_result_t lle_history_detect_multiline(const char *command,
  *
  * @param command Command string to analyze (must not be NULL)
  * @param info Output structure for multiline information (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL
  */
 lle_result_t
 lle_history_detect_multiline_structure(const char *command,
@@ -231,8 +234,9 @@ lle_history_detect_multiline_structure(const char *command,
  *
  * @param entry History entry to update (must not be NULL)
  * @param original_multiline Original multiline command (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL,
- *         LLE_ERROR_OUT_OF_MEMORY on allocation failure, LLE_ERROR_BUFFER_OVERFLOW if too long
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL, LLE_ERROR_OUT_OF_MEMORY on allocation failure,
+ * LLE_ERROR_BUFFER_OVERFLOW if too long
  */
 lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
                                             const char *original_multiline) {
@@ -297,14 +301,16 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
 /**
  * @brief Reconstruct multiline command for editing
  *
- * Retrieves the command in the specified format (original, flattened, or compact).
+ * Retrieves the command in the specified format (original, flattened, or
+ * compact).
  *
  * @param entry History entry to reconstruct from (must not be NULL)
  * @param buffer Output buffer for reconstructed command (must not be NULL)
  * @param buffer_size Size of output buffer in bytes
  * @param format Desired output format (ORIGINAL, FLATTENED, or COMPACT)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters invalid,
- *         LLE_ERROR_INVALID_STATE if no source available, LLE_ERROR_BUFFER_OVERFLOW if too long
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
+ * invalid, LLE_ERROR_INVALID_STATE if no source available,
+ * LLE_ERROR_BUFFER_OVERFLOW if too long
  */
 lle_result_t
 lle_history_reconstruct_multiline(const lle_history_entry_t *entry,
@@ -365,7 +371,8 @@ lle_history_reconstruct_multiline(const lle_history_entry_t *entry,
  * @param command Output pointer for command string (must not be NULL)
  * @param command_length Output for command length (must not be NULL)
  * @param is_multiline Output for multiline flag (may be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if required parameters are NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if required
+ * parameters are NULL
  */
 lle_result_t
 lle_history_get_multiline_for_buffer(const lle_history_entry_t *entry,
@@ -400,8 +407,8 @@ lle_history_get_multiline_for_buffer(const lle_history_entry_t *entry,
  * @param entry History entry to load (must not be NULL)
  * @param buffer_context Context to pass to load function (must not be NULL)
  * @param load_fn Function to call for loading (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL,
- *         or error from load_fn
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL, or error from load_fn
  */
 lle_result_t
 lle_history_load_multiline_into_buffer(const lle_history_entry_t *entry,
@@ -433,10 +440,11 @@ lle_history_load_multiline_into_buffer(const lle_history_entry_t *entry,
  * with text pointers, lengths, line numbers, and indentation.
  *
  * @param command Command string to analyze (must not be NULL)
- * @param lines Output pointer for line array (must not be NULL, caller must free)
+ * @param lines Output pointer for line array (must not be NULL, caller must
+ * free)
  * @param line_count Output for number of lines (must not be NULL)
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter is NULL,
- *         LLE_ERROR_OUT_OF_MEMORY on allocation failure
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if any parameter
+ * is NULL, LLE_ERROR_OUT_OF_MEMORY on allocation failure
  */
 lle_result_t
 lle_history_analyze_multiline_lines(const char *command,
@@ -523,8 +531,8 @@ lle_history_free_multiline_lines(lle_history_multiline_line_t *lines) {
  * @param formatted Output buffer for formatted command (must not be NULL)
  * @param formatted_size Size of output buffer in bytes
  * @param base_indent Number of spaces to add at the start of each line
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters invalid,
- *         LLE_ERROR_BUFFER_OVERFLOW if formatted command is too long
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if parameters
+ * invalid, LLE_ERROR_BUFFER_OVERFLOW if formatted command is too long
  */
 lle_result_t lle_history_format_multiline(const char *command, char *formatted,
                                           size_t formatted_size,
@@ -594,7 +602,8 @@ bool lle_history_is_multiline(const lle_history_entry_t *entry) {
  * Returns the original multiline format of a command with preserved formatting.
  *
  * @param entry History entry to get multiline from (may be NULL)
- * @return Pointer to original multiline string, or NULL if not multiline or entry is NULL
+ * @return Pointer to original multiline string, or NULL if not multiline or
+ * entry is NULL
  */
 const char *
 lle_history_get_original_multiline(const lle_history_entry_t *entry) {

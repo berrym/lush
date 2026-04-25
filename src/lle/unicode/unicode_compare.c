@@ -502,7 +502,8 @@ bool lle_unicode_compose(uint32_t base, uint32_t combining,
  * @param output Output buffer for normalized string
  * @param output_size Size of output buffer
  * @param output_len Output: length of normalized string
- * @return 0 on success, -1 for invalid params, -2 buffer too small, -3 invalid UTF-8
+ * @return 0 on success, -1 for invalid params, -2 buffer too small, -3 invalid
+ * UTF-8
  */
 int lle_unicode_normalize_nfc(const char *input, size_t input_len, char *output,
                               size_t output_size, size_t *output_len) {

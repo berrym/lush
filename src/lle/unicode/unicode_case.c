@@ -496,8 +496,8 @@ bool lle_unicode_is_lower(uint32_t cp) {
 /**
  * @brief Convert a UTF-8 string to uppercase
  */
-size_t lle_utf8_toupper(const char *input, size_t input_len,
-                        char *output, size_t output_size) {
+size_t lle_utf8_toupper(const char *input, size_t input_len, char *output,
+                        size_t output_size) {
     if (!input || !output || output_size == 0) {
         return (size_t)-1;
     }
@@ -509,8 +509,8 @@ size_t lle_utf8_toupper(const char *input, size_t input_len,
 
     while (in_ptr < in_end) {
         uint32_t codepoint;
-        int seq_len = lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr,
-                                                &codepoint);
+        int seq_len =
+            lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr, &codepoint);
         if (seq_len <= 0) {
             return (size_t)-1; /* Invalid UTF-8 */
         }
@@ -538,8 +538,8 @@ size_t lle_utf8_toupper(const char *input, size_t input_len,
 /**
  * @brief Convert a UTF-8 string to lowercase
  */
-size_t lle_utf8_tolower(const char *input, size_t input_len,
-                        char *output, size_t output_size) {
+size_t lle_utf8_tolower(const char *input, size_t input_len, char *output,
+                        size_t output_size) {
     if (!input || !output || output_size == 0) {
         return (size_t)-1;
     }
@@ -551,8 +551,8 @@ size_t lle_utf8_tolower(const char *input, size_t input_len,
 
     while (in_ptr < in_end) {
         uint32_t codepoint;
-        int seq_len = lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr,
-                                                &codepoint);
+        int seq_len =
+            lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr, &codepoint);
         if (seq_len <= 0) {
             return (size_t)-1; /* Invalid UTF-8 */
         }
@@ -580,8 +580,8 @@ size_t lle_utf8_tolower(const char *input, size_t input_len,
 /**
  * @brief Convert first character of UTF-8 string to uppercase
  */
-size_t lle_utf8_toupper_first(const char *input, size_t input_len,
-                              char *output, size_t output_size) {
+size_t lle_utf8_toupper_first(const char *input, size_t input_len, char *output,
+                              size_t output_size) {
     if (!input || !output || output_size == 0) {
         return (size_t)-1;
     }
@@ -598,8 +598,8 @@ size_t lle_utf8_toupper_first(const char *input, size_t input_len,
 
     /* Process first character */
     uint32_t codepoint;
-    int seq_len = lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr,
-                                            &codepoint);
+    int seq_len =
+        lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr, &codepoint);
     if (seq_len <= 0) {
         return (size_t)-1;
     }
@@ -634,8 +634,8 @@ size_t lle_utf8_toupper_first(const char *input, size_t input_len,
 /**
  * @brief Convert first character of UTF-8 string to lowercase
  */
-size_t lle_utf8_tolower_first(const char *input, size_t input_len,
-                              char *output, size_t output_size) {
+size_t lle_utf8_tolower_first(const char *input, size_t input_len, char *output,
+                              size_t output_size) {
     if (!input || !output || output_size == 0) {
         return (size_t)-1;
     }
@@ -652,8 +652,8 @@ size_t lle_utf8_tolower_first(const char *input, size_t input_len,
 
     /* Process first character */
     uint32_t codepoint;
-    int seq_len = lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr,
-                                            &codepoint);
+    int seq_len =
+        lle_utf8_decode_codepoint(in_ptr, in_end - in_ptr, &codepoint);
     if (seq_len <= 0) {
         return (size_t)-1;
     }
@@ -697,8 +697,8 @@ size_t lle_utf8_tolower_first(const char *input, size_t input_len,
  * For shell usage, simple lowercase is sufficient for the vast majority
  * of real-world cases.
  */
-size_t lle_utf8_casefold(const char *input, size_t input_len,
-                         char *output, size_t output_size) {
+size_t lle_utf8_casefold(const char *input, size_t input_len, char *output,
+                         size_t output_size) {
     /* For now, case folding is equivalent to lowercase */
     return lle_utf8_tolower(input, input_len, output, output_size);
 }

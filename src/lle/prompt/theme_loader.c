@@ -602,8 +602,7 @@ bool lle_theme_check_hot_reload(lle_theme_registry_t *registry) {
     /* File modified — reload */
     s_hot_reload_mtime = st.st_mtime;
 
-    lle_result_t result =
-        lle_theme_reload_by_name(registry, active->name);
+    lle_result_t result = lle_theme_reload_by_name(registry, active->name);
     return (result == LLE_SUCCESS);
 }
 

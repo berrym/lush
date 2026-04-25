@@ -31,12 +31,12 @@ static uint64_t get_current_time_us(void) {
  * @brief Key sequence mapping table entry
  */
 typedef struct {
-    const char *sequence;        /**< Escape sequence bytes */
-    size_t sequence_len;         /**< Length of sequence */
-    lle_key_type_t type;         /**< Key type classification */
-    uint32_t keycode;            /**< Key code value */
+    const char *sequence;          /**< Escape sequence bytes */
+    size_t sequence_len;           /**< Length of sequence */
+    lle_key_type_t type;           /**< Key type classification */
+    uint32_t keycode;              /**< Key code value */
     lle_key_modifiers_t modifiers; /**< Modifier flags */
-    const char *key_name;        /**< Human-readable key name */
+    const char *key_name;          /**< Human-readable key name */
 } key_mapping_entry_t;
 
 /**

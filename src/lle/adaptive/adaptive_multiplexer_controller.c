@@ -543,8 +543,10 @@ const char *lle_multiplexer_type_name(lle_multiplexer_type_t type) {
  *
  * @param mux The multiplexer controller.
  * @param lines_read Output pointer for lines read count, or NULL to skip.
- * @param adapted_sequences Output pointer for adapted sequence count, or NULL to skip.
- * @param passthrough_ops Output pointer for passthrough operation count, or NULL to skip.
+ * @param adapted_sequences Output pointer for adapted sequence count, or NULL
+ * to skip.
+ * @param passthrough_ops Output pointer for passthrough operation count, or
+ * NULL to skip.
  * @return LLE_SUCCESS on success, or an error code on failure.
  */
 lle_result_t lle_multiplexer_get_stats(const lle_multiplexer_controller_t *mux,

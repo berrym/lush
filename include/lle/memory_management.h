@@ -399,10 +399,9 @@ void *lle_pool_allocate_fast(lle_memory_pool_t *pool, size_t size);
 void lle_pool_free_fast(lle_memory_pool_t *pool, void *ptr);
 
 /* Lush Memory Pool Integration Bridge */
-lle_result_t
-lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
-                                   lush_memory_pool_t *lush_pool,
-                                   lle_memory_pool_type_t pool_type);
+lle_result_t lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
+                                              lush_memory_pool_t *lush_pool,
+                                              lle_memory_pool_type_t pool_type);
 void lle_memory_pool_destroy(lle_memory_pool_t *pool);
 
 /* Memory State Management */
@@ -421,9 +420,8 @@ lle_result_t lle_memory_shutdown_pools(lle_memory_manager_t *manager);
 /* Lush Integration */
 lle_result_t lle_integrate_with_lush_memory(lle_memory_manager_t *manager);
 lush_memory_pool_t *lush_get_memory_pools(void);
-lle_result_t
-lle_analyze_lush_memory_config(lush_memory_pool_t *lush_pools,
-                                 lle_memory_config_t *lush_config);
+lle_result_t lle_analyze_lush_memory_config(lush_memory_pool_t *lush_pools,
+                                            lle_memory_config_t *lush_config);
 lle_result_t
 lle_create_specialized_pool(lle_memory_manager_t *manager,
                             const lle_memory_pool_config_t *pool_config);

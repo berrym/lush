@@ -1,6 +1,7 @@
 /**
  * @file history_interactive_search.c
- * @brief LLE History System - Interactive Search Implementation (Spec 09 Phase 3 Day 9)
+ * @brief LLE History System - Interactive Search Implementation (Spec 09 Phase
+ * 3 Day 9)
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
@@ -48,7 +49,8 @@
  * Allocates memory from the LLE memory pool and copies the input string.
  *
  * @param str String to duplicate (may be NULL)
- * @return Pointer to duplicated string, or NULL if str is NULL or allocation fails
+ * @return Pointer to duplicated string, or NULL if str is NULL or allocation
+ * fails
  */
 static char *pool_strdup(const char *str) {
     if (!str)
@@ -243,9 +245,11 @@ static bool perform_search(void) {
  * active, it will be cancelled first.
  *
  * @param history_core History core engine (must not be NULL)
- * @param current_line Current line buffer (will be saved for cancel, may be NULL)
+ * @param current_line Current line buffer (will be saved for cancel, may be
+ * NULL)
  * @param cursor_pos Current cursor position
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if history_core is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if history_core
+ * is NULL
  */
 lle_result_t
 lle_history_interactive_search_init(lle_history_core_t *history_core,
@@ -439,7 +443,8 @@ lle_result_t lle_history_interactive_search_prev(void) {
  * for placing this command in the input buffer. The returned string is
  * owned by the search session and must be copied before the next search.
  *
- * @return Command string (owned by search session, must be copied) or NULL if no active session or no results
+ * @return Command string (owned by search session, must be copied) or NULL if
+ * no active session or no results
  */
 const char *lle_history_interactive_search_accept(void) {
     lle_interactive_search_session_t *session = &g_search_session;
@@ -483,7 +488,8 @@ const char *lle_history_interactive_search_accept(void) {
  * Returns the original line that was active when search started.
  * Frees search results and marks the session as inactive.
  *
- * @return Original line (owned by session, must be copied) or NULL if no active session
+ * @return Original line (owned by session, must be copied) or NULL if no active
+ * session
  */
 const char *lle_history_interactive_search_cancel(void) {
     lle_interactive_search_session_t *session = &g_search_session;
@@ -531,7 +537,8 @@ bool lle_history_interactive_search_is_active(void) {
  *
  * Returns the current search query string entered by the user.
  *
- * @return Current query string (read-only), or empty string if no active session
+ * @return Current query string (read-only), or empty string if no active
+ * session
  */
 const char *lle_history_interactive_search_get_query(void) {
     if (!g_search_session.active) {
@@ -561,7 +568,8 @@ const char *lle_history_interactive_search_get_prompt(void) {
  * Returns the command that is currently highlighted in the search results.
  * This is what would be accepted if the user presses Enter.
  *
- * @return Current command (read-only) or NULL if no active session, no results, or index out of bounds
+ * @return Current command (read-only) or NULL if no active session, no results,
+ * or index out of bounds
  */
 const char *lle_history_interactive_search_get_current_command(void) {
     lle_interactive_search_session_t *session = &g_search_session;
@@ -607,9 +615,12 @@ lle_interactive_search_state_t lle_history_interactive_search_get_state(void) {
  *
  * Returns cumulative statistics about search performance since last reset.
  *
- * @param searches_performed Output for number of searches performed (may be NULL)
- * @param total_time_us Output for total search time in microseconds (may be NULL)
- * @param avg_time_us Output for average search time in microseconds (may be NULL)
+ * @param searches_performed Output for number of searches performed (may be
+ * NULL)
+ * @param total_time_us Output for total search time in microseconds (may be
+ * NULL)
+ * @param avg_time_us Output for average search time in microseconds (may be
+ * NULL)
  * @return LLE_SUCCESS always
  */
 lle_result_t

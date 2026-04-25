@@ -15,8 +15,8 @@
 #include "lle/lle_shell_integration.h"
 #include "config.h"
 #include "executor.h"
-#include "lle/arena.h"
 #include "lle/adaptive_terminal_integration.h"
+#include "lle/arena.h"
 #include "lle/display_integration.h"
 #include "lle/history.h"
 #include "lle/lle_editor.h"
@@ -28,9 +28,9 @@
 #include "lle/prompt/powerline.h"
 #include "lle/prompt/prompt_expansion.h"
 #include "lle/prompt/segment.h"
-#include "lle/utf8_support.h"
 #include "lle/prompt/theme.h"
 #include "lle/prompt/theme_loader.h"
+#include "lle/utf8_support.h"
 #include "lush.h"
 #include "lush_memory_pool.h"
 #include "shell_mode.h"
@@ -234,8 +234,7 @@ lle_result_t lle_shell_integration_init(void) {
     /* Step 2: Create session arena - root of arena hierarchy
      * The session arena owns all LLE memory for the shell session.
      * 64KB initial size, grows as needed. */
-    lle_arena_t *session_arena =
-        lle_arena_create(NULL, "session", 64 * 1024);
+    lle_arena_t *session_arena = lle_arena_create(NULL, "session", 64 * 1024);
     if (!session_arena) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
@@ -271,7 +270,7 @@ lle_result_t lle_shell_integration_init(void) {
     /* Note: We set g_lle_integration temporarily so hooks can register */
     g_lle_integration = integ;
     lle_shell_hooks_init();
-    g_lle_integration = NULL;  /* Will be set permanently at end */
+    g_lle_integration = NULL; /* Will be set permanently at end */
 
     /* Step 5: Create and configure LLE editor */
     result = create_and_configure_editor(integ);
@@ -399,7 +398,8 @@ static void lle_shell_integration_atexit_handler(void) {
 /**
  * @brief Get the global shell integration instance
  *
- * @return Pointer to the global shell integration instance, or NULL if not initialized
+ * @return Pointer to the global shell integration instance, or NULL if not
+ * initialized
  */
 lle_shell_integration_t *lle_get_shell_integration(void) {
     return g_lle_integration;
@@ -571,8 +571,7 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     /* Spec 28 Phase 2: Write theme's format strings to PS1/PS2.
      * PS1 now holds the format string (with ${segment}, \u, %n escapes),
      * not the rendered output. The prompt render loop will expand it. */
-    const lle_theme_t *theme =
-        lle_composer_get_theme(integ->prompt_composer);
+    const lle_theme_t *theme = lle_composer_get_theme(integ->prompt_composer);
     if (theme && strlen(theme->layout.ps1_format) > 0) {
         symtable_set_global("PS1", theme->layout.ps1_format);
     } else {
@@ -741,8 +740,8 @@ void lle_nuclear_reset(void) {
  */
 static int detect_prompt_color_depth(void) {
     lle_terminal_detection_result_t *detection = NULL;
-    if (lle_detect_terminal_capabilities_optimized(&detection) == LLE_SUCCESS
-        && detection) {
+    if (lle_detect_terminal_capabilities_optimized(&detection) == LLE_SUCCESS &&
+        detection) {
         if (detection->supports_truecolor)
             return 3;
         if (detection->supports_256_colors)
@@ -771,17 +770,13 @@ static int detect_prompt_color_depth(void) {
 static char s_rendered_ps1[LLE_PROMPT_OUTPUT_MAX];
 
 /** @brief Get the most recently rendered PS1 prompt */
-const char *lle_shell_get_rendered_prompt(void) {
-    return s_rendered_ps1;
-}
+const char *lle_shell_get_rendered_prompt(void) { return s_rendered_ps1; }
 
 /** @brief Static buffer for the last rendered RPROMPT */
 static char s_rendered_rprompt[LLE_PROMPT_OUTPUT_MAX];
 
 /** @brief Get the most recently rendered RPROMPT (right prompt) */
-const char *lle_shell_get_rendered_rprompt(void) {
-    return s_rendered_rprompt;
-}
+const char *lle_shell_get_rendered_rprompt(void) { return s_rendered_rprompt; }
 
 void lle_shell_update_prompt(void) {
     /* Use minimal fallback if LLE integration not available */
@@ -797,7 +792,7 @@ void lle_shell_update_prompt(void) {
     if (config.display_theme_hot_reload && composer->themes) {
         if (lle_theme_check_hot_reload(composer->themes)) {
             lle_composer_set_theme(composer,
-                                  composer->themes->active_theme_name);
+                                   composer->themes->active_theme_name);
         }
     }
 
@@ -813,9 +808,8 @@ void lle_shell_update_prompt(void) {
      * The powerline renderer iterates the theme's enabled_segments[]
      * and generates colored blocks with arrow separators. */
     const lle_theme_t *active_theme =
-        composer->themes
-            ? lle_theme_registry_get_active(composer->themes)
-            : NULL;
+        composer->themes ? lle_theme_registry_get_active(composer->themes)
+                         : NULL;
     if (active_theme &&
         active_theme->layout.style == LLE_PROMPT_STYLE_POWERLINE &&
         active_theme->enabled_segment_count > 0) {
@@ -828,11 +822,11 @@ void lle_shell_update_prompt(void) {
 
         lle_result_t pl_result = lle_powerline_render(
             active_theme, composer->segments, &composer->context,
-            LLE_POWERLINE_LEFT_TO_RIGHT,
-            s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset);
+            LLE_POWERLINE_LEFT_TO_RIGHT, s_rendered_ps1 + offset,
+            sizeof(s_rendered_ps1) - offset);
         if (pl_result != LLE_SUCCESS) {
-            snprintf(s_rendered_ps1 + offset,
-                     sizeof(s_rendered_ps1) - offset, "$ ");
+            snprintf(s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset,
+                     "$ ");
         } else {
             /* Append trailing space for cursor separation */
             size_t len = strlen(s_rendered_ps1);
@@ -858,8 +852,8 @@ void lle_shell_update_prompt(void) {
         if (active_theme->layout.enable_right_prompt) {
             lle_powerline_render(
                 active_theme, composer->segments, &composer->context,
-                LLE_POWERLINE_RIGHT_TO_LEFT,
-                s_rendered_rprompt, sizeof(s_rendered_rprompt));
+                LLE_POWERLINE_RIGHT_TO_LEFT, s_rendered_rprompt,
+                sizeof(s_rendered_rprompt));
         }
 
         lle_composer_clear_regeneration_flag(composer);
@@ -906,14 +900,14 @@ void lle_shell_update_prompt(void) {
     }
 
     /* Expand PS1 format → rendered output */
-    lle_result_t result = lle_prompt_expand(
-        ps1_fmt, s_rendered_ps1 + offset,
-        sizeof(s_rendered_ps1) - offset, &expand_ctx);
+    lle_result_t result =
+        lle_prompt_expand(ps1_fmt, s_rendered_ps1 + offset,
+                          sizeof(s_rendered_ps1) - offset, &expand_ctx);
 
     if (result != LLE_SUCCESS) {
         /* Write fallback after the newline prefix (if any) */
-        snprintf(s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset,
-                 "%s", (getuid() > 0) ? "$ " : "# ");
+        snprintf(s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset, "%s",
+                 (getuid() > 0) ? "$ " : "# ");
     }
 
     /* Strip newlines when multiline is disabled */

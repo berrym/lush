@@ -27,7 +27,8 @@
  * starts with no themes and "minimal" as the default theme name.
  *
  * @param registry Pointer to registry structure to initialize
- * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if registry is NULL
+ * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if registry is
+ * NULL
  */
 lle_result_t lle_theme_registry_init(lle_theme_registry_t *registry) {
     if (!registry) {
@@ -47,7 +48,8 @@ lle_result_t lle_theme_registry_init(lle_theme_registry_t *registry) {
  *
  * Frees all registered themes and resets the registry to uninitialized state.
  *
- * @param registry Pointer to registry to cleanup (ignored if NULL or not initialized)
+ * @param registry Pointer to registry to cleanup (ignored if NULL or not
+ * initialized)
  */
 void lle_theme_registry_cleanup(lle_theme_registry_t *registry) {
     if (!registry || !registry->initialized) {
@@ -73,9 +75,11 @@ void lle_theme_registry_cleanup(lle_theme_registry_t *registry) {
  * resolves the parent theme and applies inherited properties.
  *
  * @param registry Pointer to initialized registry
- * @param theme    Pointer to theme to register (ownership transferred to registry)
+ * @param theme    Pointer to theme to register (ownership transferred to
+ * registry)
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if invalid,
- *         LLE_ERROR_BUFFER_OVERFLOW if registry full, LLE_ERROR_INVALID_STATE if duplicate name
+ *         LLE_ERROR_BUFFER_OVERFLOW if registry full, LLE_ERROR_INVALID_STATE
+ * if duplicate name
  */
 lle_result_t lle_theme_registry_register(lle_theme_registry_t *registry,
                                          lle_theme_t *theme) {
@@ -187,7 +191,8 @@ lle_result_t lle_theme_registry_set_active(lle_theme_registry_t *registry,
  * Returns the currently active theme in the registry.
  *
  * @param registry Pointer to initialized registry
- * @return Pointer to active theme, or NULL if no theme active or invalid registry
+ * @return Pointer to active theme, or NULL if no theme active or invalid
+ * registry
  */
 lle_theme_t *
 lle_theme_registry_get_active(const lle_theme_registry_t *registry) {
@@ -285,7 +290,8 @@ void lle_theme_free(lle_theme_t *theme) { free(theme); }
  * @param registry Pointer to registry containing parent theme
  * @param theme    Pointer to theme with inherits_from set
  * @return LLE_SUCCESS on success, LLE_ERROR_INVALID_PARAMETER if invalid,
- *         LLE_ERROR_NOT_FOUND if parent not found, LLE_ERROR_INVALID_STATE on cycle
+ *         LLE_ERROR_NOT_FOUND if parent not found, LLE_ERROR_INVALID_STATE on
+ * cycle
  */
 lle_result_t lle_theme_resolve_inheritance(lle_theme_registry_t *registry,
                                            lle_theme_t *theme) {
@@ -410,12 +416,14 @@ lle_result_t lle_theme_resolve_inheritance(lle_theme_registry_t *registry,
         /* Check if child already has config for this segment */
         bool found = false;
         for (size_t ci = 0; ci < theme->segment_config_count; ci++) {
-            if (strcmp(theme->segment_configs[ci].name, parent_cfg->name) == 0) {
+            if (strcmp(theme->segment_configs[ci].name, parent_cfg->name) ==
+                0) {
                 found = true;
                 break;
             }
         }
-        if (!found && theme->segment_config_count < LLE_THEME_MAX_SEGMENT_CONFIGS) {
+        if (!found &&
+            theme->segment_config_count < LLE_THEME_MAX_SEGMENT_CONFIGS) {
             theme->segment_configs[theme->segment_config_count] = *parent_cfg;
             theme->segment_config_count++;
         }
@@ -799,7 +807,7 @@ void lle_symbol_set_init_nerd_font(lle_symbol_set_t *symbols) {
 
     /* Powerline separators (U+E0B0, U+E0B2) */
     snprintf(symbols->separator_left, sizeof(symbols->separator_left),
-             "\xee\x82\xb0");  /* U+E0B0  */
+             "\xee\x82\xb0"); /* U+E0B0  */
     snprintf(symbols->separator_right, sizeof(symbols->separator_right),
              "\xee\x82\xb2"); /* U+E0B2  */
 
@@ -807,37 +815,34 @@ void lle_symbol_set_init_nerd_font(lle_symbol_set_t *symbols) {
     snprintf(symbols->branch, sizeof(symbols->branch),
              "\xee\x82\xa0 "); /* U+E0A0  + space */
     snprintf(symbols->staged, sizeof(symbols->staged),
-             "\xef\x81\xa7");  /* U+F067  */
+             "\xef\x81\xa7"); /* U+F067  */
     snprintf(symbols->unstaged, sizeof(symbols->unstaged),
              "\xef\x81\x80"); /* U+F040  */
     snprintf(symbols->untracked, sizeof(symbols->untracked),
              "\xef\x84\xa8"); /* U+F128  */
     snprintf(symbols->ahead, sizeof(symbols->ahead),
-             "\xef\x81\xa2");  /* U+F062  */
+             "\xef\x81\xa2"); /* U+F062  */
     snprintf(symbols->behind, sizeof(symbols->behind),
              "\xef\x81\xa3"); /* U+F063  */
     snprintf(symbols->stash, sizeof(symbols->stash),
-             "\xef\x80\x9c");  /* U+F01C  */
+             "\xef\x80\x9c"); /* U+F01C  */
     snprintf(symbols->conflict, sizeof(symbols->conflict),
              "\xef\x83\xa7"); /* U+F0E7  */
 
     /* Directory symbols */
     snprintf(symbols->directory, sizeof(symbols->directory),
              "\xef\x81\xbb"); /* U+F07B  */
-    snprintf(symbols->home, sizeof(symbols->home),
-             "\xef\x80\x95");  /* U+F015  */
+    snprintf(symbols->home, sizeof(symbols->home), "\xef\x80\x95"); /* U+F015 */
 
     /* Status symbols */
     snprintf(symbols->error, sizeof(symbols->error),
-             "\xef\x81\x97");   /* U+F057  */
+             "\xef\x81\x97"); /* U+F057  */
     snprintf(symbols->success, sizeof(symbols->success),
              "\xef\x81\x98"); /* U+F058  */
 
     /* Other symbols */
-    snprintf(symbols->jobs, sizeof(symbols->jobs),
-             "\xef\x82\x85"); /* U+F085  */
-    snprintf(symbols->time, sizeof(symbols->time),
-             "\xef\x80\x97"); /* U+F017  */
+    snprintf(symbols->jobs, sizeof(symbols->jobs), "\xef\x82\x85"); /* U+F085 */
+    snprintf(symbols->time, sizeof(symbols->time), "\xef\x80\x97"); /* U+F017 */
 
     /* Environment/context symbols */
     snprintf(symbols->shlvl, sizeof(symbols->shlvl), "%s", "↕");
@@ -1008,7 +1013,8 @@ lle_theme_t *lle_theme_create_powerline(void) {
              "\xee\x82\xb2"); /* U+E0B2  */
 
     /* Use chevron for prompt symbol */
-    snprintf(theme->symbols.prompt, sizeof(theme->symbols.prompt), "\xe2\x9d\xaf");
+    snprintf(theme->symbols.prompt, sizeof(theme->symbols.prompt),
+             "\xe2\x9d\xaf");
 
     /* Powerline rendering mode — composer routes to lle_powerline_render() */
     theme->layout.style = LLE_PROMPT_STYLE_POWERLINE;
@@ -1033,7 +1039,7 @@ lle_theme_t *lle_theme_create_powerline(void) {
     cfg->configured = true;
     cfg->fg_color = white_bold;
     cfg->fg_color_set = true;
-    cfg->bg_color = lle_color_rgb(68, 68, 68);    /* #444444 dark gray */
+    cfg->bg_color = lle_color_rgb(68, 68, 68); /* #444444 dark gray */
     cfg->bg_color_set = true;
 
     cfg = &theme->segment_configs[1];
@@ -1041,7 +1047,7 @@ lle_theme_t *lle_theme_create_powerline(void) {
     cfg->configured = true;
     cfg->fg_color = white_bold;
     cfg->fg_color_set = true;
-    cfg->bg_color = lle_color_rgb(0, 95, 175);    /* #005FAF strong blue */
+    cfg->bg_color = lle_color_rgb(0, 95, 175); /* #005FAF strong blue */
     cfg->bg_color_set = true;
 
     cfg = &theme->segment_configs[2];
@@ -1049,7 +1055,7 @@ lle_theme_t *lle_theme_create_powerline(void) {
     cfg->configured = true;
     cfg->fg_color = white_bold;
     cfg->fg_color_set = true;
-    cfg->bg_color = lle_color_rgb(135, 95, 175);  /* #875FAF medium purple */
+    cfg->bg_color = lle_color_rgb(135, 95, 175); /* #875FAF medium purple */
     cfg->bg_color_set = true;
 
     cfg = &theme->segment_configs[3];
@@ -1057,7 +1063,7 @@ lle_theme_t *lle_theme_create_powerline(void) {
     cfg->configured = true;
     cfg->fg_color = white_bold;
     cfg->fg_color_set = true;
-    cfg->bg_color = lle_color_rgb(175, 0, 0);     /* #AF0000 strong red */
+    cfg->bg_color = lle_color_rgb(175, 0, 0); /* #AF0000 strong red */
     cfg->bg_color_set = true;
 
     theme->segment_config_count = 4;
@@ -1172,9 +1178,9 @@ lle_theme_t *lle_theme_create_two_line(void) {
  * @return Pointer to newly allocated theme, or NULL on allocation failure
  */
 lle_theme_t *lle_theme_create_nerd(void) {
-    lle_theme_t *theme = lle_theme_create(
-        "nerd", "Nerd Font icons theme (requires Nerd Font)",
-        LLE_THEME_CATEGORY_POWERLINE);
+    lle_theme_t *theme =
+        lle_theme_create("nerd", "Nerd Font icons theme (requires Nerd Font)",
+                         LLE_THEME_CATEGORY_POWERLINE);
     if (!theme) {
         return NULL;
     }
@@ -1188,24 +1194,25 @@ lle_theme_t *lle_theme_create_nerd(void) {
     lle_symbol_set_init_nerd_font(&theme->symbols);
 
     /* Colors - vibrant 256-color palette */
-    theme->colors.primary = lle_color_256(39);       /* Bright blue */
-    theme->colors.secondary = lle_color_256(245);    /* Gray */
-    theme->colors.path_normal = lle_color_256(33);   /* Blue */
-    theme->colors.git_branch = lle_color_256(141);   /* Light purple */
-    theme->colors.git_staged = lle_color_256(83);    /* Green */
-    theme->colors.git_dirty = lle_color_256(214);    /* Orange */
-    theme->colors.git_untracked = lle_color_256(245);/* Gray */
-    theme->colors.git_ahead = lle_color_256(39);     /* Blue */
-    theme->colors.git_behind = lle_color_256(202);   /* Orange-red */
-    theme->colors.git_clean = lle_color_256(82);     /* Green */
-    theme->colors.error = lle_color_256(196);        /* Red */
-    theme->colors.success = lle_color_256(82);       /* Green */
-    theme->colors.text = lle_color_256(255);         /* White */
-    theme->colors.text_dim = lle_color_256(245);     /* Gray */
+    theme->colors.primary = lle_color_256(39);        /* Bright blue */
+    theme->colors.secondary = lle_color_256(245);     /* Gray */
+    theme->colors.path_normal = lle_color_256(33);    /* Blue */
+    theme->colors.git_branch = lle_color_256(141);    /* Light purple */
+    theme->colors.git_staged = lle_color_256(83);     /* Green */
+    theme->colors.git_dirty = lle_color_256(214);     /* Orange */
+    theme->colors.git_untracked = lle_color_256(245); /* Gray */
+    theme->colors.git_ahead = lle_color_256(39);      /* Blue */
+    theme->colors.git_behind = lle_color_256(202);    /* Orange-red */
+    theme->colors.git_clean = lle_color_256(82);      /* Green */
+    theme->colors.error = lle_color_256(196);         /* Red */
+    theme->colors.success = lle_color_256(82);        /* Green */
+    theme->colors.text = lle_color_256(255);          /* White */
+    theme->colors.text_dim = lle_color_256(245);      /* Gray */
 
     /* Layout with Nerd Font folder icon (U+F07B) */
     snprintf(theme->layout.ps1_format, sizeof(theme->layout.ps1_format),
-             "${user}@${host} \xef\x81\xbb ${directory}${?git: (${git})} ${symbol} ");
+             "${user}@${host} \xef\x81\xbb ${directory}${?git: (${git})} "
+             "${symbol} ");
     snprintf(theme->layout.ps2_format, sizeof(theme->layout.ps2_format),
              "... ");
     snprintf(theme->layout.transient_format,

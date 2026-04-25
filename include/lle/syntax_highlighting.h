@@ -79,13 +79,14 @@ typedef enum lle_syntax_token_type {
     LLE_TOKEN_BRACE_END,      /**< Brace group end } */
 
     /* Other */
-    LLE_TOKEN_COMMENT,      /**< Comment (# ...) */
-    LLE_TOKEN_OPTION,       /**< Command option (-v, --verbose) */
-    LLE_TOKEN_ARGUMENT,     /**< Generic argument */
-    LLE_TOKEN_GLOB,         /**< Glob pattern (*, ?, [...]) */
-    LLE_TOKEN_EXTGLOB,      /**< Extended glob ?(pat), *(pat), +(pat), @(pat), !(pat) */
-    LLE_TOKEN_GLOB_QUAL,    /**< Glob qualifier *(.), *(/) */
-    LLE_TOKEN_ESCAPE,       /**< Escape sequence (\x) */
+    LLE_TOKEN_COMMENT,  /**< Comment (# ...) */
+    LLE_TOKEN_OPTION,   /**< Command option (-v, --verbose) */
+    LLE_TOKEN_ARGUMENT, /**< Generic argument */
+    LLE_TOKEN_GLOB,     /**< Glob pattern (*, ?, [...]) */
+    LLE_TOKEN_EXTGLOB, /**< Extended glob ?(pat), *(pat), +(pat), @(pat), !(pat)
+                        */
+    LLE_TOKEN_GLOB_QUAL, /**< Glob qualifier *(.), *(/) */
+    LLE_TOKEN_ESCAPE,    /**< Escape sequence (\x) */
 
     /* Here-documents and here-strings */
     LLE_TOKEN_HEREDOC_OP,      /**< Heredoc operator (<<, <<-, <<') */

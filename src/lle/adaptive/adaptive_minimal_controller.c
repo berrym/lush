@@ -312,7 +312,8 @@ static const char *lle_basic_history_get(lle_basic_history_t *history,
  *
  * Allocates and initializes a completion structure with default capacity.
  *
- * @return Pointer to the created completion system, or NULL on allocation failure.
+ * @return Pointer to the created completion system, or NULL on allocation
+ * failure.
  */
 static lle_simple_completion_t *lle_simple_completion_create(void) {
     lle_simple_completion_t *completion =
@@ -637,7 +638,8 @@ size_t lle_minimal_get_history_count(lle_minimal_controller_t *minimal) {
  *
  * @param minimal The minimal controller.
  * @param lines_read Output pointer for lines read count, or NULL to skip.
- * @param history_entries Output pointer for history entries added, or NULL to skip.
+ * @param history_entries Output pointer for history entries added, or NULL to
+ * skip.
  * @param completions Output pointer for completions performed, or NULL to skip.
  * @return LLE_SUCCESS on success, or an error code on failure.
  */

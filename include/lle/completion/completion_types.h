@@ -45,7 +45,8 @@ extern "C" {
  * @brief Completion type classification for categorization and display
  */
 typedef enum {
-    LLE_COMPLETION_TYPE_BUILTIN,   /**< Shell built-in commands (cd, echo, etc.) */
+    LLE_COMPLETION_TYPE_BUILTIN,   /**< Shell built-in commands (cd, echo, etc.)
+                                    */
     LLE_COMPLETION_TYPE_COMMAND,   /**< External commands from PATH */
     LLE_COMPLETION_TYPE_FILE,      /**< Regular files */
     LLE_COMPLETION_TYPE_DIRECTORY, /**< Directories */
@@ -109,10 +110,10 @@ typedef struct lle_completion_result {
  */
 typedef struct {
     lle_completion_type_t type; /**< Completion type */
-    const char *type_name;      /**< Human-readable name ("Command", "File", etc.) */
+    const char *type_name; /**< Human-readable name ("Command", "File", etc.) */
     const char
-        *category_name;    /**< Category name for grouping ("COMMANDS", "FILES") */
-    const char *indicator; /**< Visual indicator (symbol/emoji) */
+        *category_name; /**< Category name for grouping ("COMMANDS", "FILES") */
+    const char *indicator;    /**< Visual indicator (symbol/emoji) */
     int32_t default_priority; /**< Default priority for ranking (0-1000) */
 } lle_completion_type_info_t;
 

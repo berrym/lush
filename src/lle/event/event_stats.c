@@ -182,7 +182,8 @@ lle_event_enhanced_stats_get_all_types(lle_event_system_t *system,
  * @brief Get event processing cycle statistics
  * @param system The event system to query
  * @param cycles Output: number of processing cycles completed (may be NULL)
- * @param total_time Output: total time spent in cycles in microseconds (may be NULL)
+ * @param total_time Output: total time spent in cycles in microseconds (may be
+ * NULL)
  * @param min_time Output: minimum cycle time in microseconds (may be NULL)
  * @param max_time Output: maximum cycle time in microseconds (may be NULL)
  * @return LLE_SUCCESS on success, or error code on failure
@@ -227,7 +228,8 @@ lle_result_t lle_event_enhanced_stats_get_cycles(lle_event_system_t *system,
  * @brief Get maximum observed queue depths
  * @param system The event system to query
  * @param max_main_depth Output: maximum main queue depth seen (may be NULL)
- * @param max_priority_depth Output: maximum priority queue depth seen (may be NULL)
+ * @param max_priority_depth Output: maximum priority queue depth seen (may be
+ * NULL)
  * @return LLE_SUCCESS on success, or error code on failure
  */
 lle_result_t

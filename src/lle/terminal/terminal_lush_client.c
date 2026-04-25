@@ -36,14 +36,13 @@
  */
 lle_result_t
 lle_lush_display_client_init(lle_lush_display_client_t **client,
-                               lush_display_context_t *display_context,
-                               lle_terminal_capabilities_t *capabilities) {
+                             lush_display_context_t *display_context,
+                             lle_terminal_capabilities_t *capabilities) {
     if (!client || !display_context || !capabilities) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    lle_lush_display_client_t *c =
-        calloc(1, sizeof(lle_lush_display_client_t));
+    lle_lush_display_client_t *c = calloc(1, sizeof(lle_lush_display_client_t));
     if (!c) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
@@ -139,7 +138,7 @@ static lle_result_t LLE_MAYBE_UNUSED convert_to_lush_format(
  */
 lle_result_t
 lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
-                                         lle_display_content_t *content) {
+                                       lle_display_content_t *content) {
     if (!client || !content) {
         return LLE_ERROR_INVALID_PARAMETER;
     }

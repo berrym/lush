@@ -46,7 +46,7 @@ lush_memory_pool_config_t *lush_pool_get_default_config(void) {
 }
 
 int lush_pool_init(lush_memory_pool_t *pool,
-                     lush_memory_pool_config_t *config) {
+                   lush_memory_pool_config_t *config) {
     (void)pool;
     (void)config;
     return 0;
