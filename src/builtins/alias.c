@@ -288,9 +288,12 @@ static const char *find_equals(const char *str) {
  * and escape sequences in double-quoted strings.
  *
  * @param assignment The assignment string to parse (e.g., "ll='ls -l'")
- * @param name Output pointer for the alias name (newly allocated, caller must free)
- * @param value Output pointer for the alias value (newly allocated, caller must free)
- * @return true on success, false on failure (no equals sign or allocation error)
+ * @param name Output pointer for the alias name (newly allocated, caller must
+ * free)
+ * @param value Output pointer for the alias value (newly allocated, caller must
+ * free)
+ * @return true on success, false on failure (no equals sign or allocation
+ * error)
  */
 static bool parse_alias_assignment(const char *assignment, char **name,
                                    char **value) {
@@ -490,8 +493,8 @@ char *expand_aliases_recursive(const char *name, int max_depth) {
  * boundary detection.
  *
  * @param command The command line to process
- * @return Newly allocated string with the first word expanded (caller must free),
- *         or a copy of the original command if no alias found
+ * @return Newly allocated string with the first word expanded (caller must
+ * free), or a copy of the original command if no alias found
  */
 char *expand_first_word_alias(const char *command) {
     if (!command) {

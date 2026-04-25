@@ -27,58 +27,58 @@ typedef enum {
     TOK_VARIABLE,          // Variable reference ($var, ${var}, etc.)
 
     // Operators and separators
-    TOK_SEMICOLON,        // ;
-    TOK_PIPE,             // |
-    TOK_AND,              // &
-    TOK_LOGICAL_AND,      // &&
-    TOK_LOGICAL_OR,       // ||
-    TOK_REDIRECT_IN,      // <
-    TOK_REDIRECT_OUT,     // >
-    TOK_APPEND,           // >>
-    TOK_HEREDOC,          // <<
-    TOK_HEREDOC_STRIP,    // <<-
-    TOK_HERESTRING,       // <<<
-    TOK_REDIRECT_ERR,     // N> (any fd output, e.g., 2>, 3>)
-    TOK_REDIRECT_IN_FD,   // N< (any fd input, e.g., 3<, 4<)
-    TOK_REDIRECT_BOTH,    // &>
-    TOK_APPEND_ERR,       // 2>>
+    TOK_SEMICOLON,         // ;
+    TOK_PIPE,              // |
+    TOK_AND,               // &
+    TOK_LOGICAL_AND,       // &&
+    TOK_LOGICAL_OR,        // ||
+    TOK_REDIRECT_IN,       // <
+    TOK_REDIRECT_OUT,      // >
+    TOK_APPEND,            // >>
+    TOK_HEREDOC,           // <<
+    TOK_HEREDOC_STRIP,     // <<-
+    TOK_HERESTRING,        // <<<
+    TOK_REDIRECT_ERR,      // N> (any fd output, e.g., 2>, 3>)
+    TOK_REDIRECT_IN_FD,    // N< (any fd input, e.g., 3<, 4<)
+    TOK_REDIRECT_BOTH,     // &>
+    TOK_APPEND_ERR,        // 2>>
     TOK_REDIRECT_FD,       // &1, &2, etc.
     TOK_REDIRECT_FD_ALLOC, // {varname}> - fd allocation (bash 4.1+/zsh)
     TOK_REDIRECT_CLOBBER,  // >|
-    TOK_ASSIGN,           // =
-    TOK_NOT_EQUAL,        // !=
-    TOK_PLUS,             // +
-    TOK_MINUS,            // -
-    TOK_MULTIPLY,         // *
-    TOK_DIVIDE,           // /
-    TOK_MODULO,           // %
-    TOK_GLOB,             // * (when used for globbing)
-    TOK_QUESTION,         // ?
-    TOK_COMMAND_SUB,      // $(...)
-    TOK_ARITH_EXP,        // $((...))
-    TOK_BACKQUOTE,        // `
+    TOK_ASSIGN,            // =
+    TOK_NOT_EQUAL,         // !=
+    TOK_PLUS,              // +
+    TOK_MINUS,             // -
+    TOK_MULTIPLY,          // *
+    TOK_DIVIDE,            // /
+    TOK_MODULO,            // %
+    TOK_GLOB,              // * (when used for globbing)
+    TOK_QUESTION,          // ?
+    TOK_COMMAND_SUB,       // $(...)
+    TOK_ARITH_EXP,         // $((...))
+    TOK_BACKQUOTE,         // `
 
     // Delimiters
-    TOK_LPAREN,         // (
-    TOK_RPAREN,         // )
-    TOK_DOUBLE_LPAREN,  // (( - arithmetic command start
-    TOK_DOUBLE_RPAREN,  // )) - arithmetic command end
-    TOK_LBRACE,         // {
-    TOK_RBRACE,         // }
-    TOK_LBRACKET,       // [
-    TOK_RBRACKET,       // ]
+    TOK_LPAREN,          // (
+    TOK_RPAREN,          // )
+    TOK_DOUBLE_LPAREN,   // (( - arithmetic command start
+    TOK_DOUBLE_RPAREN,   // )) - arithmetic command end
+    TOK_LBRACE,          // {
+    TOK_RBRACE,          // }
+    TOK_LBRACKET,        // [
+    TOK_RBRACKET,        // ]
     TOK_DOUBLE_LBRACKET, // [[ - extended test start
     TOK_DOUBLE_RBRACKET, // ]] - extended test end
 
     // Extended operators (Phase 1-2)
-    TOK_PLUS_ASSIGN,   // += - append to array or add to integer
-    TOK_REGEX_MATCH,   // =~ - regex match operator in [[ ]]
+    TOK_PLUS_ASSIGN, // += - append to array or add to integer
+    TOK_REGEX_MATCH, // =~ - regex match operator in [[ ]]
 
     // Process substitution and extended pipes (Phase 3)
-    TOK_PROC_SUB_IN,   // <( - process substitution input
-    TOK_PROC_SUB_OUT,  // >( - process substitution output
-    TOK_PIPE_STDERR,   // |& - pipe both stdout and stderr
-    TOK_APPEND_BOTH,   // &>> - append both stdout and stderr
+    TOK_PROC_SUB_IN,  // <( - process substitution input
+    TOK_PROC_SUB_OUT, // >( - process substitution output
+    TOK_PIPE_STDERR,  // |& - pipe both stdout and stderr
+    TOK_APPEND_BOTH,  // &>> - append both stdout and stderr
 
     // Control flow extensions (Phase 5)
     TOK_CASE_FALLTHROUGH, // ;& - case fall-through (execute next without test)
@@ -99,9 +99,9 @@ typedef enum {
     TOK_ESAC,
     TOK_UNTIL,
     TOK_FUNCTION,
-    TOK_SELECT,           // select keyword for select loop
-    TOK_TIME,             // time keyword for timing pipelines
-    TOK_COPROC,           // coproc keyword for coprocesses
+    TOK_SELECT, // select keyword for select loop
+    TOK_TIME,   // time keyword for timing pipelines
+    TOK_COPROC, // coproc keyword for coprocesses
 
     // Special
     TOK_NEWLINE,    // \n (significant in shell)
@@ -136,7 +136,8 @@ typedef struct tokenizer {
 
 /* ============================================================================
  * Tokenizer Lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a new tokenizer for input string
@@ -155,7 +156,8 @@ void tokenizer_free(tokenizer_t *tokenizer);
 
 /* ============================================================================
  * Token Operations
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get the current token
@@ -200,7 +202,8 @@ bool tokenizer_consume(tokenizer_t *tokenizer, token_type_t type);
 
 /* ============================================================================
  * Token Utilities
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get human-readable name for token type
@@ -236,7 +239,8 @@ bool token_is_word_like(token_type_t type);
 
 /* ============================================================================
  * Tokenizer Control
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Enable or disable keyword recognition

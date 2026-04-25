@@ -227,12 +227,14 @@ TEST(parse_string_with_escapes) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    toml_parser_init(&parser, "text = \"line1\\nline2\\ttab\\\"quote\\\\backslash\"");
+    toml_parser_init(&parser,
+                     "text = \"line1\\nline2\\ttab\\\"quote\\\\backslash\"");
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.count, 1);
-    ASSERT_STR_EQ(ctx.values[0].data.string, "line1\nline2\ttab\"quote\\backslash");
+    ASSERT_STR_EQ(ctx.values[0].data.string,
+                  "line1\nline2\ttab\"quote\\backslash");
 
     free_test_ctx(&ctx);
     toml_parser_cleanup(&parser);
@@ -310,7 +312,7 @@ TEST(error_unicode_escape_incomplete) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    toml_parser_init(&parser, "bad = \"\\u00E\"");  /* Only 3 hex digits */
+    toml_parser_init(&parser, "bad = \"\\u00E\""); /* Only 3 hex digits */
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_ERROR_INVALID_FORMAT);
@@ -324,7 +326,7 @@ TEST(error_unicode_escape_invalid_hex) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    toml_parser_init(&parser, "bad = \"\\u00GG\"");  /* G is not hex */
+    toml_parser_init(&parser, "bad = \"\\u00GG\""); /* G is not hex */
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_ERROR_INVALID_FORMAT);
@@ -338,7 +340,7 @@ TEST(error_unicode_escape_surrogate) {
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    toml_parser_init(&parser, "bad = \"\\uD800\"");  /* High surrogate */
+    toml_parser_init(&parser, "bad = \"\\uD800\""); /* High surrogate */
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_ERROR_INVALID_FORMAT);
@@ -861,8 +863,8 @@ TEST(value_table_get_string) {
     ASSERT_STR_EQ(buf, "test");
 
     /* Test not found */
-    result =
-        toml_value_table_get_string(&ctx.values[0], "missing", buf, sizeof(buf));
+    result = toml_value_table_get_string(&ctx.values[0], "missing", buf,
+                                         sizeof(buf));
     ASSERT_EQ(result, TOML_ERROR_NOT_FOUND);
 
     toml_value_free(&ctx.values[0]);
@@ -877,7 +879,8 @@ TEST(value_table_get_integer) {
     toml_parser_parse(&parser, test_callback, &ctx);
 
     int64_t val;
-    toml_result_t result = toml_value_table_get_integer(&ctx.values[0], "x", &val);
+    toml_result_t result =
+        toml_value_table_get_integer(&ctx.values[0], "x", &val);
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(val, 100);
 

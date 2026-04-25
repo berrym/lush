@@ -12,8 +12,8 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "redirection.h"
 #include "node.h"
+#include "redirection.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -70,7 +70,8 @@
 
 /* ============================================================================
  * FILE DESCRIPTOR SAVE/RESTORE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(save_file_descriptors_basic) {
     redirection_state_t state = {0};
@@ -178,7 +179,8 @@ TEST(multiple_save_restore_cycles) {
 
 /* ============================================================================
  * REDIRECTION NODE DETECTION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(is_redirection_node_output) {
     node_t *node = new_node(NODE_REDIR_OUT);
@@ -202,7 +204,8 @@ TEST(is_redirection_node_append) {
     node_t *node = new_node(NODE_REDIR_APPEND);
     ASSERT_NOT_NULL(node, "Node creation should succeed");
 
-    ASSERT(is_redirection_node(node), "NODE_REDIR_APPEND should be redirection");
+    ASSERT(is_redirection_node(node),
+           "NODE_REDIR_APPEND should be redirection");
 
     free_node_tree(node);
 }
@@ -211,7 +214,8 @@ TEST(is_redirection_node_heredoc) {
     node_t *node = new_node(NODE_REDIR_HEREDOC);
     ASSERT_NOT_NULL(node, "Node creation should succeed");
 
-    ASSERT(is_redirection_node(node), "NODE_REDIR_HEREDOC should be redirection");
+    ASSERT(is_redirection_node(node),
+           "NODE_REDIR_HEREDOC should be redirection");
 
     free_node_tree(node);
 }
@@ -220,7 +224,8 @@ TEST(is_redirection_node_herestring) {
     node_t *node = new_node(NODE_REDIR_HERESTRING);
     ASSERT_NOT_NULL(node, "Node creation should succeed");
 
-    ASSERT(is_redirection_node(node), "NODE_REDIR_HERESTRING should be redirection");
+    ASSERT(is_redirection_node(node),
+           "NODE_REDIR_HERESTRING should be redirection");
 
     free_node_tree(node);
 }
@@ -238,7 +243,8 @@ TEST(is_redirection_node_command) {
     node_t *node = new_node(NODE_COMMAND);
     ASSERT_NOT_NULL(node, "Node creation should succeed");
 
-    ASSERT(!is_redirection_node(node), "NODE_COMMAND should not be redirection");
+    ASSERT(!is_redirection_node(node),
+           "NODE_COMMAND should not be redirection");
 
     free_node_tree(node);
 }
@@ -267,7 +273,8 @@ TEST(is_redirection_node_null) {
 
 /* ============================================================================
  * REDIRECTION COUNTING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(count_redirections_none) {
     node_t *cmd = new_node(NODE_COMMAND);
@@ -334,7 +341,8 @@ TEST(count_redirections_null) {
 
 /* ============================================================================
  * REDIRECTION ERROR TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(redirection_error_basic) {
     /* Should not crash - output goes to stderr */
@@ -362,7 +370,8 @@ TEST(redirection_error_null_message) {
 
 /* ============================================================================
  * COMPLEX REDIRECTION SCENARIOS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(complex_command_with_redirections) {
     /* Simulate: cmd arg1 > out.txt 2> err.txt < in.txt */
@@ -417,7 +426,8 @@ TEST(herestring_detection) {
 
 /* ============================================================================
  * FD MANAGEMENT EDGE CASES
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(save_with_closed_stdin) {
     redirection_state_t state = {0};
@@ -432,7 +442,7 @@ TEST(save_with_closed_stdin) {
 
 TEST(state_initialization) {
     redirection_state_t state;
-    memset(&state, 0xFF, sizeof(state));  /* Fill with garbage */
+    memset(&state, 0xFF, sizeof(state)); /* Fill with garbage */
 
     /* Manually initialize */
     state.saved_stdin = -1;
@@ -451,7 +461,8 @@ TEST(state_initialization) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running redirection.c tests...\n\n");

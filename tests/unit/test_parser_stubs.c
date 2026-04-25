@@ -6,13 +6,14 @@
  * to avoid pulling in the entire executor and other heavy dependencies.
  */
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 /* ============================================================================
  * Function Parameter Stubs (from executor.c)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 typedef struct function_param {
     char *name;
@@ -23,12 +24,13 @@ typedef struct function_param {
 function_param_t *create_function_param(const char *name,
                                         const char *default_value) {
     function_param_t *param = malloc(sizeof(function_param_t));
-    if (!param) return NULL;
-    
+    if (!param)
+        return NULL;
+
     param->name = name ? strdup(name) : NULL;
     param->default_value = default_value ? strdup(default_value) : NULL;
     param->next = NULL;
-    
+
     return param;
 }
 
@@ -44,15 +46,15 @@ void free_function_params(function_param_t *params) {
 
 /* ============================================================================
  * POSIX Mode Stub
- * ============================================================================ */
+ * ============================================================================
+ */
 
-bool is_posix_mode_enabled(void) {
-    return false;
-}
+bool is_posix_mode_enabled(void) { return false; }
 
 /* ============================================================================
  * Error Function Stubs (from errors.c)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -77,7 +79,8 @@ void error_syscall(const char *str) {
 
 /* ============================================================================
  * Global Variables
- * ============================================================================ */
+ * ============================================================================
+ */
 
 #include "lush.h"
 
@@ -85,6 +88,4 @@ int last_exit_status = 0;
 shell_options_t shell_opts = {0};
 
 /* Interactive shell stub */
-bool is_interactive_shell(void) {
-    return false;
-}
+bool is_interactive_shell(void) { return false; }

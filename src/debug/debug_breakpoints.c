@@ -377,13 +377,15 @@ void debug_handle_user_input(debug_context_t *ctx, const char *input) {
         debug_inspect_all_variables(ctx);
     } else if (strcmp(trimmed, "mode") == 0) {
         // Show current shell mode
-        debug_printf(ctx, "Shell mode: %s\n", shell_mode_name(shell_mode_get()));
-        debug_printf(ctx, "Strict mode: %s\n", 
+        debug_printf(ctx, "Shell mode: %s\n",
+                     shell_mode_name(shell_mode_get()));
+        debug_printf(ctx, "Strict mode: %s\n",
                      shell_mode_is_strict() ? "enabled" : "disabled");
     } else if (strncmp(trimmed, "mode ", 5) == 0) {
         // Set shell mode
         char *mode_name = trimmed + 5;
-        while (*mode_name == ' ') mode_name++;  // Skip whitespace
+        while (*mode_name == ' ')
+            mode_name++; // Skip whitespace
         shell_mode_t new_mode;
         if (strcmp(mode_name, "posix") == 0 || strcmp(mode_name, "sh") == 0) {
             new_mode = SHELL_MODE_POSIX;
@@ -394,19 +396,21 @@ void debug_handle_user_input(debug_context_t *ctx, const char *input) {
         } else if (strcmp(mode_name, "lush") == 0) {
             new_mode = SHELL_MODE_LUSH;
         } else {
-            debug_printf(ctx, "Unknown mode: %s (valid: posix, bash, zsh, lush)\n", 
+            debug_printf(ctx,
+                         "Unknown mode: %s (valid: posix, bash, zsh, lush)\n",
                          mode_name);
             free(cmd);
             return;
         }
         if (shell_mode_set(new_mode)) {
-            debug_printf(ctx, "Shell mode set to: %s\n", shell_mode_name(new_mode));
+            debug_printf(ctx, "Shell mode set to: %s\n",
+                         shell_mode_name(new_mode));
         } else {
             debug_printf(ctx, "Cannot change mode (strict mode enabled)\n");
         }
     } else if (strcmp(trimmed, "features") == 0) {
         // List all features and their status
-        debug_printf(ctx, "Shell features (mode: %s):\n", 
+        debug_printf(ctx, "Shell features (mode: %s):\n",
                      shell_mode_name(shell_mode_get()));
         for (int i = 0; i < FEATURE_COUNT; i++) {
             const char *name = shell_feature_name((shell_feature_t)i);
@@ -416,7 +420,8 @@ void debug_handle_user_input(debug_context_t *ctx, const char *input) {
     } else if (strncmp(trimmed, "feature ", 8) == 0) {
         // Query or toggle a specific feature
         char *feat_name = trimmed + 8;
-        while (*feat_name == ' ') feat_name++;
+        while (*feat_name == ' ')
+            feat_name++;
         shell_feature_t feat;
         if (shell_feature_parse(feat_name, &feat)) {
             debug_printf(ctx, "Feature '%s': %s\n", feat_name,
@@ -590,8 +595,7 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
             debug_printf(ctx, "Warning: Cannot access controlling terminal for "
                               "interactive debugging.\n");
             debug_printf(
-                ctx,
-                "Run lush interactively for full debugging experience.\n");
+                ctx, "Run lush interactively for full debugging experience.\n");
             debug_printf(ctx, "Continuing execution...\n");
             ctx->step_mode = false;
             return;
@@ -712,8 +716,10 @@ void debug_print_help(debug_context_t *ctx) {
     debug_printf(ctx, "\n");
     debug_printf(ctx, "Shell Mode Commands:\n");
     debug_printf(ctx, "  mode           - Show current shell mode\n");
-    debug_printf(ctx, "  mode <name>    - Set shell mode (posix, bash, zsh, lush)\n");
-    debug_printf(ctx, "  features       - List all features and their status\n");
+    debug_printf(
+        ctx, "  mode <name>    - Set shell mode (posix, bash, zsh, lush)\n");
+    debug_printf(ctx,
+                 "  features       - List all features and their status\n");
     debug_printf(ctx, "  feature <name> - Query a specific feature\n");
     debug_printf(ctx, "\n");
     debug_printf(ctx, "  h, help        - Show this help\n");

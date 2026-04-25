@@ -30,8 +30,8 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "parser.h"
 #include "node.h"
+#include "parser.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,7 +97,8 @@ static void print_category_summary(const char *name) {
             parser_free(_p);                                                   \
             return;                                                            \
         }                                                                      \
-        if (_n) free_node_tree(_n);                                            \
+        if (_n)                                                                \
+            free_node_tree(_n);                                                \
         parser_free(_p);                                                       \
     } while (0)
 
@@ -106,13 +107,9 @@ static void print_category_summary(const char *name) {
  * ============================================================================
  */
 
-TEST(unclosed_double_quote) {
-    ASSERT_PARSE_FAILS("echo \"hello");
-}
+TEST(unclosed_double_quote) { ASSERT_PARSE_FAILS("echo \"hello"); }
 
-TEST(unclosed_single_quote) {
-    ASSERT_PARSE_FAILS("echo 'hello");
-}
+TEST(unclosed_single_quote) { ASSERT_PARSE_FAILS("echo 'hello"); }
 
 TEST(unclosed_double_quote_multiline) {
     ASSERT_PARSE_FAILS("echo \"hello\nworld");
@@ -122,160 +119,103 @@ TEST(unclosed_single_quote_multiline) {
     ASSERT_PARSE_FAILS("echo 'hello\nworld");
 }
 
-TEST(unclosed_backtick) {
-    ASSERT_PARSE_FAILS("echo `pwd");
-}
+TEST(unclosed_backtick) { ASSERT_PARSE_FAILS("echo `pwd"); }
 
-TEST(unclosed_dollar_paren) {
-    ASSERT_PARSE_FAILS("echo $(pwd");
-}
+TEST(unclosed_dollar_paren) { ASSERT_PARSE_FAILS("echo $(pwd"); }
 
 TEST(unclosed_double_quote_with_escape) {
     ASSERT_PARSE_FAILS("echo \"hello\\");
 }
 
-TEST(unclosed_nested_quotes) {
-    ASSERT_PARSE_FAILS("echo \"$(echo 'test)\"");
-}
+TEST(unclosed_nested_quotes) { ASSERT_PARSE_FAILS("echo \"$(echo 'test)\""); }
 
 /* ============================================================================
  * UNCLOSED BRACES AND PARENTHESES
  * ============================================================================
  */
 
-TEST(unclosed_subshell) {
-    ASSERT_PARSE_FAILS("( echo hello");
-}
+TEST(unclosed_subshell) { ASSERT_PARSE_FAILS("( echo hello"); }
 
-TEST(unclosed_brace_group) {
-    ASSERT_PARSE_FAILS("{ echo hello");
-}
+TEST(unclosed_brace_group) { ASSERT_PARSE_FAILS("{ echo hello"); }
 
 /* NOTE: unclosed_variable_brace removed - validation happens at expansion time,
  * not parse time. The tokenizer treats ${VAR as a partial token that gets
  * completed or errors during expansion. This is consistent with how shells
- * traditionally work - parameter expansion syntax is validated during expansion. */
+ * traditionally work - parameter expansion syntax is validated during
+ * expansion. */
 
-TEST(unclosed_arithmetic_paren) {
-    ASSERT_PARSE_FAILS("echo $((1 + 2)");
-}
+TEST(unclosed_arithmetic_paren) { ASSERT_PARSE_FAILS("echo $((1 + 2)"); }
 
-TEST(unclosed_arithmetic_double) {
-    ASSERT_PARSE_FAILS("(( x = 1");
-}
+TEST(unclosed_arithmetic_double) { ASSERT_PARSE_FAILS("(( x = 1"); }
 
-TEST(unclosed_extended_test) {
-    ASSERT_PARSE_FAILS("[[ -f file");
-}
+TEST(unclosed_extended_test) { ASSERT_PARSE_FAILS("[[ -f file"); }
 
 /* NOTE: unclosed_array_bracket removed - same as unclosed_variable_brace,
  * array subscript syntax is validated during expansion, not parsing. */
 
-TEST(extra_close_paren) {
-    ASSERT_PARSE_FAILS("echo hello )");
-}
+TEST(extra_close_paren) { ASSERT_PARSE_FAILS("echo hello )"); }
 
-TEST(extra_close_brace) {
-    ASSERT_PARSE_FAILS("echo hello }");
-}
+TEST(extra_close_brace) { ASSERT_PARSE_FAILS("echo hello }"); }
 
-TEST(mismatched_paren_brace) {
-    ASSERT_PARSE_FAILS("( echo hello }");
-}
+TEST(mismatched_paren_brace) { ASSERT_PARSE_FAILS("( echo hello }"); }
 
-TEST(mismatched_brace_paren) {
-    ASSERT_PARSE_FAILS("{ echo hello )");
-}
+TEST(mismatched_brace_paren) { ASSERT_PARSE_FAILS("{ echo hello )"); }
 
 /* ============================================================================
  * UNCLOSED CONTROL STRUCTURES
  * ============================================================================
  */
 
-TEST(if_no_fi) {
-    ASSERT_PARSE_FAILS("if true; then echo yes");
-}
+TEST(if_no_fi) { ASSERT_PARSE_FAILS("if true; then echo yes"); }
 
-TEST(if_no_then_no_fi) {
-    ASSERT_PARSE_FAILS("if true; echo yes");
-}
+TEST(if_no_then_no_fi) { ASSERT_PARSE_FAILS("if true; echo yes"); }
 
-TEST(for_no_done) {
-    ASSERT_PARSE_FAILS("for x in a b; do echo $x");
-}
+TEST(for_no_done) { ASSERT_PARSE_FAILS("for x in a b; do echo $x"); }
 
-TEST(for_no_do_no_done) {
-    ASSERT_PARSE_FAILS("for x in a b; echo $x");
-}
+TEST(for_no_do_no_done) { ASSERT_PARSE_FAILS("for x in a b; echo $x"); }
 
-TEST(while_no_done) {
-    ASSERT_PARSE_FAILS("while true; do echo loop");
-}
+TEST(while_no_done) { ASSERT_PARSE_FAILS("while true; do echo loop"); }
 
-TEST(while_no_do_no_done) {
-    ASSERT_PARSE_FAILS("while true; echo loop");
-}
+TEST(while_no_do_no_done) { ASSERT_PARSE_FAILS("while true; echo loop"); }
 
-TEST(until_no_done) {
-    ASSERT_PARSE_FAILS("until false; do echo loop");
-}
+TEST(until_no_done) { ASSERT_PARSE_FAILS("until false; do echo loop"); }
 
-TEST(case_no_esac) {
-    ASSERT_PARSE_FAILS("case x in a) echo a;;");
-}
+TEST(case_no_esac) { ASSERT_PARSE_FAILS("case x in a) echo a;;"); }
 
-TEST(case_no_in) {
-    ASSERT_PARSE_FAILS("case x a) echo a;; esac");
-}
+TEST(case_no_in) { ASSERT_PARSE_FAILS("case x a) echo a;; esac"); }
 
-TEST(select_no_done) {
-    ASSERT_PARSE_FAILS("select x in a b; do echo $x");
-}
+TEST(select_no_done) { ASSERT_PARSE_FAILS("select x in a b; do echo $x"); }
 
 /* ============================================================================
  * MISSING KEYWORDS
  * ============================================================================
  */
 
-TEST(if_missing_then) {
-    ASSERT_PARSE_FAILS("if true; echo yes; fi");
-}
+TEST(if_missing_then) { ASSERT_PARSE_FAILS("if true; echo yes; fi"); }
 
-TEST(if_missing_condition) {
-    ASSERT_PARSE_FAILS("if ; then echo yes; fi");
-}
+TEST(if_missing_condition) { ASSERT_PARSE_FAILS("if ; then echo yes; fi"); }
 
 TEST(elif_missing_then) {
     ASSERT_PARSE_FAILS("if true; then echo 1; elif true; echo 2; fi");
 }
 
-TEST(for_missing_do) {
-    ASSERT_PARSE_FAILS("for x in a b; echo $x; done");
-}
+TEST(for_missing_do) { ASSERT_PARSE_FAILS("for x in a b; echo $x; done"); }
 
 TEST(for_missing_variable) {
     ASSERT_PARSE_FAILS("for in a b; do echo x; done");
 }
 
-TEST(while_missing_do) {
-    ASSERT_PARSE_FAILS("while true; echo loop; done");
-}
+TEST(while_missing_do) { ASSERT_PARSE_FAILS("while true; echo loop; done"); }
 
 TEST(while_missing_condition) {
     ASSERT_PARSE_FAILS("while ; do echo loop; done");
 }
 
-TEST(until_missing_do) {
-    ASSERT_PARSE_FAILS("until false; echo loop; done");
-}
+TEST(until_missing_do) { ASSERT_PARSE_FAILS("until false; echo loop; done"); }
 
-TEST(case_missing_in) {
-    ASSERT_PARSE_FAILS("case x a) echo a;; esac");
-}
+TEST(case_missing_in) { ASSERT_PARSE_FAILS("case x a) echo a;; esac"); }
 
-TEST(case_missing_paren) {
-    ASSERT_PARSE_FAILS("case x in a echo a;; esac");
-}
+TEST(case_missing_paren) { ASSERT_PARSE_FAILS("case x in a echo a;; esac"); }
 
 TEST(case_missing_double_semi) {
     /* Note: single ;; is required between case arms */
@@ -287,45 +227,25 @@ TEST(case_missing_double_semi) {
  * ============================================================================
  */
 
-TEST(stray_fi) {
-    ASSERT_PARSE_FAILS("fi");
-}
+TEST(stray_fi) { ASSERT_PARSE_FAILS("fi"); }
 
-TEST(stray_done) {
-    ASSERT_PARSE_FAILS("done");
-}
+TEST(stray_done) { ASSERT_PARSE_FAILS("done"); }
 
-TEST(stray_esac) {
-    ASSERT_PARSE_FAILS("esac");
-}
+TEST(stray_esac) { ASSERT_PARSE_FAILS("esac"); }
 
-TEST(stray_then) {
-    ASSERT_PARSE_FAILS("then echo yes");
-}
+TEST(stray_then) { ASSERT_PARSE_FAILS("then echo yes"); }
 
-TEST(stray_else) {
-    ASSERT_PARSE_FAILS("else echo no");
-}
+TEST(stray_else) { ASSERT_PARSE_FAILS("else echo no"); }
 
-TEST(stray_elif) {
-    ASSERT_PARSE_FAILS("elif true; then echo yes");
-}
+TEST(stray_elif) { ASSERT_PARSE_FAILS("elif true; then echo yes"); }
 
-TEST(stray_do) {
-    ASSERT_PARSE_FAILS("do echo yes; done");
-}
+TEST(stray_do) { ASSERT_PARSE_FAILS("do echo yes; done"); }
 
-TEST(stray_in) {
-    ASSERT_PARSE_FAILS("in a b c");
-}
+TEST(stray_in) { ASSERT_PARSE_FAILS("in a b c"); }
 
-TEST(double_then) {
-    ASSERT_PARSE_FAILS("if true; then then echo yes; fi");
-}
+TEST(double_then) { ASSERT_PARSE_FAILS("if true; then then echo yes; fi"); }
 
-TEST(double_do) {
-    ASSERT_PARSE_FAILS("for x in a; do do echo $x; done");
-}
+TEST(double_do) { ASSERT_PARSE_FAILS("for x in a; do do echo $x; done"); }
 
 TEST(double_else) {
     ASSERT_PARSE_FAILS("if true; then echo 1; else else echo 2; fi");
@@ -336,100 +256,66 @@ TEST(double_else) {
  * ============================================================================
  */
 
-TEST(triple_pipe) {
-    ASSERT_PARSE_FAILS("echo a ||| echo b");
-}
+TEST(triple_pipe) { ASSERT_PARSE_FAILS("echo a ||| echo b"); }
 
-TEST(triple_and) {
-    ASSERT_PARSE_FAILS("echo a &&& echo b");
-}
+TEST(triple_and) { ASSERT_PARSE_FAILS("echo a &&& echo b"); }
 
-TEST(bare_pipe) {
-    ASSERT_PARSE_FAILS("| echo");
-}
+TEST(bare_pipe) { ASSERT_PARSE_FAILS("| echo"); }
 
-TEST(bare_and_and) {
-    ASSERT_PARSE_FAILS("&& echo");
-}
+TEST(bare_and_and) { ASSERT_PARSE_FAILS("&& echo"); }
 
-TEST(bare_or_or) {
-    ASSERT_PARSE_FAILS("|| echo");
-}
+TEST(bare_or_or) { ASSERT_PARSE_FAILS("|| echo"); }
 
-TEST(trailing_pipe) {
-    ASSERT_PARSE_FAILS("echo hello |");
-}
+TEST(trailing_pipe) { ASSERT_PARSE_FAILS("echo hello |"); }
 
-TEST(trailing_and_and) {
-    ASSERT_PARSE_FAILS("echo hello &&");
-}
+TEST(trailing_and_and) { ASSERT_PARSE_FAILS("echo hello &&"); }
 
-TEST(trailing_or_or) {
-    ASSERT_PARSE_FAILS("echo hello ||");
-}
+TEST(trailing_or_or) { ASSERT_PARSE_FAILS("echo hello ||"); }
 
 /* NOTE: double_semicolon_outside_case - lush currently accepts this,
  * treating ;; as case terminator syntax that may appear in certain contexts.
  * This could be tightened but isn't strictly a parse error. */
 
-TEST(bare_ampersand_ampersand) {
-    ASSERT_PARSE_FAILS("&");
-}
+TEST(bare_ampersand_ampersand) { ASSERT_PARSE_FAILS("&"); }
 
 /* ============================================================================
  * INVALID REDIRECTIONS
  * ============================================================================
  */
 
-TEST(redirect_no_target) {
-    ASSERT_PARSE_FAILS("echo hello >");
-}
+TEST(redirect_no_target) { ASSERT_PARSE_FAILS("echo hello >"); }
 
-TEST(redirect_in_no_target) {
-    ASSERT_PARSE_FAILS("cat <");
-}
+TEST(redirect_in_no_target) { ASSERT_PARSE_FAILS("cat <"); }
 
-TEST(redirect_append_no_target) {
-    ASSERT_PARSE_FAILS("echo hello >>");
-}
+TEST(redirect_append_no_target) { ASSERT_PARSE_FAILS("echo hello >>"); }
 
-TEST(redirect_fd_no_target) {
-    ASSERT_PARSE_FAILS("cmd 2>");
-}
+TEST(redirect_fd_no_target) { ASSERT_PARSE_FAILS("cmd 2>"); }
 
 TEST(redirect_double_target) {
     /* Two targets without space between them - may parse as single word */
     ASSERT_PARSE_FAILS("echo > > file");
 }
 
-TEST(redirect_heredoc_no_delimiter) {
-    ASSERT_PARSE_FAILS("cat <<");
-}
+TEST(redirect_heredoc_no_delimiter) { ASSERT_PARSE_FAILS("cat <<"); }
 
-TEST(redirect_herestring_no_content) {
-    ASSERT_PARSE_FAILS("cat <<<");
-}
+TEST(redirect_herestring_no_content) { ASSERT_PARSE_FAILS("cat <<<"); }
 
 TEST(redirect_invalid_fd) {
     /* Very large fd number - implementation dependent */
     ASSERT_PARSE_FAILS("echo hello 999999999999999999999>");
 }
 
-TEST(redirect_bare_ampersand) {
-    ASSERT_PARSE_FAILS("echo hello >&");
-}
+TEST(redirect_bare_ampersand) { ASSERT_PARSE_FAILS("echo hello >&"); }
 
-TEST(redirect_fd_dup_invalid) {
-    ASSERT_PARSE_FAILS("echo hello 2>&");
-}
+TEST(redirect_fd_dup_invalid) { ASSERT_PARSE_FAILS("echo hello 2>&"); }
 
 /* ============================================================================
  * INVALID VARIABLE SYNTAX
- * 
+ *
  * NOTE: Most variable syntax validation happens at expansion time, not parse
  * time. This is because the parser sees "123=value" as a simple word - the
  * determination of whether it's a valid assignment happens later.
- * 
+ *
  * Tests here focus on what the PARSER can reject structurally.
  * ============================================================================
  */
@@ -441,7 +327,8 @@ TEST(redirect_fd_dup_invalid) {
 
 TEST(variable_empty_name) {
     /* "=value" with nothing before = is structurally ambiguous but typically
-     * parsed as a word. Whether this should error at parse time is debatable. */
+     * parsed as a word. Whether this should error at parse time is debatable.
+     */
     ASSERT_PARSE_FAILS("=value");
 }
 
@@ -455,38 +342,26 @@ TEST(variable_empty_name) {
  * ============================================================================
  */
 
-TEST(function_no_body) {
-    ASSERT_PARSE_FAILS("foo()");
-}
+TEST(function_no_body) { ASSERT_PARSE_FAILS("foo()"); }
 
 /* NOTE: function_invalid_name (123() { ... }) - bash actually accepts this
  * at parse time (it's a valid function definition syntactically).
  * Whether lush should reject it is a design decision. Currently accepts. */
 
-TEST(function_missing_paren) {
-    ASSERT_PARSE_FAILS("foo( { echo x; }");
-}
+TEST(function_missing_paren) { ASSERT_PARSE_FAILS("foo( { echo x; }"); }
 
-TEST(function_extra_paren) {
-    ASSERT_PARSE_FAILS("foo()) { echo x; }");
-}
+TEST(function_extra_paren) { ASSERT_PARSE_FAILS("foo()) { echo x; }"); }
 
-TEST(function_keyword_no_body) {
-    ASSERT_PARSE_FAILS("function foo");
-}
+TEST(function_keyword_no_body) { ASSERT_PARSE_FAILS("function foo"); }
 
-TEST(function_keyword_no_name) {
-    ASSERT_PARSE_FAILS("function { echo x; }");
-}
+TEST(function_keyword_no_name) { ASSERT_PARSE_FAILS("function { echo x; }"); }
 
 TEST(function_reserved_name_if) {
     /* Using reserved word as function name */
     ASSERT_PARSE_FAILS("if() { echo x; }");
 }
 
-TEST(function_reserved_name_for) {
-    ASSERT_PARSE_FAILS("for() { echo x; }");
-}
+TEST(function_reserved_name_for) { ASSERT_PARSE_FAILS("for() { echo x; }"); }
 
 TEST(function_reserved_name_while) {
     ASSERT_PARSE_FAILS("while() { echo x; }");
@@ -497,9 +372,7 @@ TEST(function_reserved_name_while) {
  * ============================================================================
  */
 
-TEST(case_empty_pattern) {
-    ASSERT_PARSE_FAILS("case x in ) echo x;; esac");
-}
+TEST(case_empty_pattern) { ASSERT_PARSE_FAILS("case x in ) echo x;; esac"); }
 
 TEST(case_pattern_no_close_paren) {
     ASSERT_PARSE_FAILS("case x in a echo x;; esac");
@@ -520,24 +393,20 @@ TEST(case_leading_pipe_in_pattern) {
 
 /* ============================================================================
  * INVALID EXTENDED TEST SYNTAX
- * 
+ *
  * NOTE: [[ ]] parsing is complex. The content inside is parsed with different
  * rules than regular commands. Some validation may happen at evaluation time.
  * ============================================================================
  */
 
-TEST(extended_test_unclosed) {
-    ASSERT_PARSE_FAILS("[[ -f file");
-}
+TEST(extended_test_unclosed) { ASSERT_PARSE_FAILS("[[ -f file"); }
 
 /* NOTE: extended_test_single_bracket_and - [ ] is actually a command (test),
  * not special syntax. "[ -f file && -r file ]" parses as two commands:
  * "[ -f file" (incomplete) "&&" "-r file ]". The error is structural.
  * However, this is complex to detect at parse time. */
 
-TEST(extended_test_unbalanced_parens) {
-    ASSERT_PARSE_FAILS("[[ ( -f file ]]");
-}
+TEST(extended_test_unbalanced_parens) { ASSERT_PARSE_FAILS("[[ ( -f file ]]"); }
 
 /* NOTE: extended_test_double_operator, missing_operand, trailing_and -
  * These are semantic errors within [[ ]] that may be checked during
@@ -548,13 +417,9 @@ TEST(extended_test_unbalanced_parens) {
  * ============================================================================
  */
 
-TEST(arith_cmd_unclosed) {
-    ASSERT_PARSE_FAILS("(( x = 1");
-}
+TEST(arith_cmd_unclosed) { ASSERT_PARSE_FAILS("(( x = 1"); }
 
-TEST(arith_cmd_extra_close) {
-    ASSERT_PARSE_FAILS("(( x = 1 )))");
-}
+TEST(arith_cmd_extra_close) { ASSERT_PARSE_FAILS("(( x = 1 )))"); }
 
 /* NOTE: arith_cmd_empty - "(( ))" is actually valid in bash (evaluates to
  * false/1). The arithmetic evaluator handles empty expressions. */
@@ -564,13 +429,9 @@ TEST(arith_cmd_extra_close) {
  * ============================================================================
  */
 
-TEST(proc_sub_in_unclosed) {
-    ASSERT_PARSE_FAILS("cat <(echo hello");
-}
+TEST(proc_sub_in_unclosed) { ASSERT_PARSE_FAILS("cat <(echo hello"); }
 
-TEST(proc_sub_out_unclosed) {
-    ASSERT_PARSE_FAILS("tee >(cat");
-}
+TEST(proc_sub_out_unclosed) { ASSERT_PARSE_FAILS("tee >(cat"); }
 
 /* NOTE: proc_sub_empty - "<()" with empty command is accepted by bash.
  * It creates a process substitution that immediately exits. */
@@ -580,24 +441,18 @@ TEST(proc_sub_out_unclosed) {
  * ============================================================================
  */
 
-TEST(array_unclosed) {
-    ASSERT_PARSE_FAILS("arr=(a b c");
-}
+TEST(array_unclosed) { ASSERT_PARSE_FAILS("arr=(a b c"); }
 
 /* NOTE: array_index_unclosed - validated at expansion time, not parse time */
 
-TEST(array_no_equals) {
-    ASSERT_PARSE_FAILS("arr(a b c)");
-}
+TEST(array_no_equals) { ASSERT_PARSE_FAILS("arr(a b c)"); }
 
 /* ============================================================================
  * INVALID HEREDOC SYNTAX
  * ============================================================================
  */
 
-TEST(heredoc_no_delimiter) {
-    ASSERT_PARSE_FAILS("cat <<");
-}
+TEST(heredoc_no_delimiter) { ASSERT_PARSE_FAILS("cat <<"); }
 
 TEST(heredoc_invalid_delimiter) {
     /* Delimiter with special characters - may be implementation dependent */
@@ -610,9 +465,7 @@ TEST(heredoc_invalid_delimiter) {
  * parse error so that incomplete input is signaled to tooling and to
  * the user, since silent acceptance is dangerous and indistinguishable
  * from a successful parse. */
-TEST(heredoc_unclosed_plain) {
-    ASSERT_PARSE_FAILS("cat <<EOF\nbody line\n");
-}
+TEST(heredoc_unclosed_plain) { ASSERT_PARSE_FAILS("cat <<EOF\nbody line\n"); }
 
 TEST(heredoc_unclosed_strip) {
     /* <<- variant (tab-stripping form) */
@@ -635,33 +488,21 @@ TEST(heredoc_unclosed_with_partial_match) {
  * ============================================================================
  */
 
-TEST(pipe_into_keyword) {
-    ASSERT_PARSE_FAILS("echo hello | fi");
-}
+TEST(pipe_into_keyword) { ASSERT_PARSE_FAILS("echo hello | fi"); }
 
-TEST(pipe_from_keyword) {
-    ASSERT_PARSE_FAILS("done | cat");
-}
+TEST(pipe_from_keyword) { ASSERT_PARSE_FAILS("done | cat"); }
 
-TEST(semicolon_after_pipe) {
-    ASSERT_PARSE_FAILS("echo a |; cat");
-}
+TEST(semicolon_after_pipe) { ASSERT_PARSE_FAILS("echo a |; cat"); }
 
-TEST(and_after_pipe) {
-    ASSERT_PARSE_FAILS("echo a |&& cat");
-}
+TEST(and_after_pipe) { ASSERT_PARSE_FAILS("echo a |&& cat"); }
 
 /* NOTE: brace_group_no_semicolon - "{ echo hello}" without semicolon before }
  * is actually valid in some contexts. The word "hello}" gets parsed as an
  * argument. This is tricky edge case behavior. */
 
-TEST(empty_command_in_pipe) {
-    ASSERT_PARSE_FAILS("echo a | | cat");
-}
+TEST(empty_command_in_pipe) { ASSERT_PARSE_FAILS("echo a | | cat"); }
 
-TEST(empty_command_in_and) {
-    ASSERT_PARSE_FAILS("echo a && && echo b");
-}
+TEST(empty_command_in_and) { ASSERT_PARSE_FAILS("echo a && && echo b"); }
 
 TEST(nested_unclosed_structures) {
     ASSERT_PARSE_FAILS("if true; then for x in a; do echo $x; fi");
@@ -677,17 +518,11 @@ TEST(only_semicolons) {
     ASSERT_PARSE_FAILS(";;;");
 }
 
-TEST(deeply_nested_unclosed) {
-    ASSERT_PARSE_FAILS("((((((((((");
-}
+TEST(deeply_nested_unclosed) { ASSERT_PARSE_FAILS("(((((((((("); }
 
-TEST(many_unclosed_braces) {
-    ASSERT_PARSE_FAILS("{{{{{{{{{{");
-}
+TEST(many_unclosed_braces) { ASSERT_PARSE_FAILS("{{{{{{{{{{"); }
 
-TEST(alternating_unclosed) {
-    ASSERT_PARSE_FAILS("({({({");
-}
+TEST(alternating_unclosed) { ASSERT_PARSE_FAILS("({({({"); }
 
 /**
  * @brief Test that deeply nested valid syntax triggers depth limit
@@ -700,42 +535,48 @@ TEST(recursion_depth_limit) {
     /* Generate deeply nested subshells: ((( ... ))) */
     /* PARSER_MAX_RECURSION_DEPTH is 256, so we need more than that */
     const int depth = 300;
-    size_t len = depth * 2 + 10;  /* ( * depth + echo + ) * depth */
+    size_t len = depth * 2 + 10; /* ( * depth + echo + ) * depth */
     char *input = malloc(len);
-    if (!input) return;
-    
+    if (!input)
+        return;
+
     char *p = input;
     for (int i = 0; i < depth; i++) {
         *p++ = '(';
     }
-    *p++ = 'e'; *p++ = 'c'; *p++ = 'h'; *p++ = 'o';
+    *p++ = 'e';
+    *p++ = 'c';
+    *p++ = 'h';
+    *p++ = 'o';
     for (int i = 0; i < depth; i++) {
         *p++ = ')';
     }
     *p = '\0';
-    
+
     /* This should fail due to depth limit, not parse successfully */
     parser_t *parser = parser_new(input);
     if (!parser) {
         free(input);
         return;
     }
-    
+
     node_t *ast = parser_parse(parser);
     int has_error = parser_has_error(parser);
-    
+
     if (!has_error && ast != NULL) {
         printf(" FAILED\n");
-        printf("      Expected recursion depth error for %d-deep nesting\n", depth);
+        printf("      Expected recursion depth error for %d-deep nesting\n",
+               depth);
         tests_failed++;
         free_node_tree(ast);
         parser_free(parser);
         free(input);
         return;
     }
-    
+
     /* Success - parser correctly rejected deeply nested input */
-    if (ast) free_node_tree(ast);
+    if (ast)
+        free_node_tree(ast);
     parser_free(parser);
     free(input);
 }
@@ -750,9 +591,7 @@ TEST(control_chars_in_input) {
  * ============================================================================
  */
 
-TEST(coproc_no_command) {
-    ASSERT_PARSE_FAILS("coproc");
-}
+TEST(coproc_no_command) { ASSERT_PARSE_FAILS("coproc"); }
 
 /* ============================================================================
  * MAIN

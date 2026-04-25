@@ -90,7 +90,8 @@
 
 /* ============================================================================
  * SOURCE LOCATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(source_loc_unknown) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
@@ -101,13 +102,11 @@ TEST(source_loc_unknown) {
 }
 
 TEST(source_loc_valid) {
-    source_location_t loc = {
-        .filename = "test.sh",
-        .line = 10,
-        .column = 5,
-        .offset = 100,
-        .length = 15
-    };
+    source_location_t loc = {.filename = "test.sh",
+                             .line = 10,
+                             .column = 5,
+                             .offset = 100,
+                             .length = 15};
     ASSERT(SOURCE_LOC_VALID(loc), "Location with line > 0 should be valid");
     ASSERT_STR_EQ(loc.filename, "test.sh", "Filename should match");
     ASSERT_EQ(loc.line, 10, "Line should match");
@@ -122,23 +121,19 @@ TEST(source_loc_here) {
 
 /* ============================================================================
  * ERROR CREATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(error_create_basic) {
-    source_location_t loc = {
-        .filename = "test.sh",
-        .line = 5,
-        .column = 10,
-        .offset = 50,
-        .length = 3
-    };
+    source_location_t loc = {.filename = "test.sh",
+                             .line = 5,
+                             .column = 10,
+                             .offset = 50,
+                             .length = 3};
 
-    shell_error_t *err = shell_error_create(
-        SHELL_ERR_UNEXPECTED_TOKEN,
-        SHELL_SEVERITY_ERROR,
-        loc,
-        "unexpected token '%s'", ";"
-    );
+    shell_error_t *err =
+        shell_error_create(SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR,
+                           loc, "unexpected token '%s'", ";");
 
     ASSERT_NOT_NULL(err, "shell_error_create should return non-NULL");
     ASSERT_EQ(err->code, SHELL_ERR_UNEXPECTED_TOKEN, "Error code should match");
@@ -153,24 +148,30 @@ TEST(error_create_basic) {
 TEST(error_create_all_severities) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
-    shell_error_t *note = shell_error_create(SHELL_OK, SHELL_SEVERITY_NOTE, loc, "note");
+    shell_error_t *note =
+        shell_error_create(SHELL_OK, SHELL_SEVERITY_NOTE, loc, "note");
     ASSERT_NOT_NULL(note, "Note creation should succeed");
     ASSERT_EQ(note->severity, SHELL_SEVERITY_NOTE, "Severity should be NOTE");
     shell_error_free(note);
 
-    shell_error_t *warn = shell_error_create(SHELL_OK, SHELL_SEVERITY_WARNING, loc, "warning");
+    shell_error_t *warn =
+        shell_error_create(SHELL_OK, SHELL_SEVERITY_WARNING, loc, "warning");
     ASSERT_NOT_NULL(warn, "Warning creation should succeed");
-    ASSERT_EQ(warn->severity, SHELL_SEVERITY_WARNING, "Severity should be WARNING");
+    ASSERT_EQ(warn->severity, SHELL_SEVERITY_WARNING,
+              "Severity should be WARNING");
     shell_error_free(warn);
 
-    shell_error_t *err = shell_error_create(SHELL_OK, SHELL_SEVERITY_ERROR, loc, "error");
+    shell_error_t *err =
+        shell_error_create(SHELL_OK, SHELL_SEVERITY_ERROR, loc, "error");
     ASSERT_NOT_NULL(err, "Error creation should succeed");
     ASSERT_EQ(err->severity, SHELL_SEVERITY_ERROR, "Severity should be ERROR");
     shell_error_free(err);
 
-    shell_error_t *fatal = shell_error_create(SHELL_OK, SHELL_SEVERITY_FATAL, loc, "fatal");
+    shell_error_t *fatal =
+        shell_error_create(SHELL_OK, SHELL_SEVERITY_FATAL, loc, "fatal");
     ASSERT_NOT_NULL(fatal, "Fatal creation should succeed");
-    ASSERT_EQ(fatal->severity, SHELL_SEVERITY_FATAL, "Severity should be FATAL");
+    ASSERT_EQ(fatal->severity, SHELL_SEVERITY_FATAL,
+              "Severity should be FATAL");
     shell_error_free(fatal);
 }
 
@@ -179,20 +180,15 @@ TEST(error_create_parse_errors) {
 
     /* Test various parse error codes */
     shell_error_code_t codes[] = {
-        SHELL_ERR_UNEXPECTED_TOKEN,
-        SHELL_ERR_UNEXPECTED_EOF,
-        SHELL_ERR_UNCLOSED_QUOTE,
-        SHELL_ERR_UNCLOSED_SUBST,
-        SHELL_ERR_UNCLOSED_CONTROL,
-        SHELL_ERR_INVALID_REDIRECT,
-        SHELL_ERR_INVALID_FUNCTION,
-        SHELL_ERR_INVALID_ARRAY,
-        SHELL_ERR_RESERVED_WORD,
-        SHELL_ERR_HEREDOC_DELIMITER
-    };
+        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_ERR_UNEXPECTED_EOF,
+        SHELL_ERR_UNCLOSED_QUOTE,   SHELL_ERR_UNCLOSED_SUBST,
+        SHELL_ERR_UNCLOSED_CONTROL, SHELL_ERR_INVALID_REDIRECT,
+        SHELL_ERR_INVALID_FUNCTION, SHELL_ERR_INVALID_ARRAY,
+        SHELL_ERR_RESERVED_WORD,    SHELL_ERR_HEREDOC_DELIMITER};
 
     for (size_t i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
-        shell_error_t *err = shell_error_create(codes[i], SHELL_SEVERITY_ERROR, loc, "test");
+        shell_error_t *err =
+            shell_error_create(codes[i], SHELL_SEVERITY_ERROR, loc, "test");
         ASSERT_NOT_NULL(err, "Error creation should succeed");
         ASSERT_EQ(err->code, codes[i], "Error code should match");
         shell_error_free(err);
@@ -203,18 +199,14 @@ TEST(error_create_runtime_errors) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
     shell_error_code_t codes[] = {
-        SHELL_ERR_COMMAND_NOT_FOUND,
-        SHELL_ERR_PERMISSION_DENIED,
-        SHELL_ERR_FILE_NOT_FOUND,
-        SHELL_ERR_DIVISION_BY_ZERO,
-        SHELL_ERR_READONLY_VAR,
-        SHELL_ERR_UNBOUND_VARIABLE,
-        SHELL_ERR_PIPE_FAILED,
-        SHELL_ERR_FORK_FAILED
-    };
+        SHELL_ERR_COMMAND_NOT_FOUND, SHELL_ERR_PERMISSION_DENIED,
+        SHELL_ERR_FILE_NOT_FOUND,    SHELL_ERR_DIVISION_BY_ZERO,
+        SHELL_ERR_READONLY_VAR,      SHELL_ERR_UNBOUND_VARIABLE,
+        SHELL_ERR_PIPE_FAILED,       SHELL_ERR_FORK_FAILED};
 
     for (size_t i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
-        shell_error_t *err = shell_error_create(codes[i], SHELL_SEVERITY_ERROR, loc, "test");
+        shell_error_t *err =
+            shell_error_create(codes[i], SHELL_SEVERITY_ERROR, loc, "test");
         ASSERT_NOT_NULL(err, "Error creation should succeed");
         ASSERT_EQ(err->code, codes[i], "Error code should match");
         shell_error_free(err);
@@ -228,17 +220,19 @@ TEST(error_free_null) {
 
 /* ============================================================================
  * ERROR DECORATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(error_set_suggestion) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
-    shell_error_t *err = shell_error_create(
-        SHELL_ERR_COMMAND_NOT_FOUND, SHELL_SEVERITY_ERROR, loc, "command not found"
-    );
+    shell_error_t *err =
+        shell_error_create(SHELL_ERR_COMMAND_NOT_FOUND, SHELL_SEVERITY_ERROR,
+                           loc, "command not found");
 
     shell_error_set_suggestion(err, "Did you mean 'ls'?");
     ASSERT_NOT_NULL(err->suggestion, "Suggestion should be set");
-    ASSERT(strstr(err->suggestion, "ls") != NULL, "Suggestion should contain 'ls'");
+    ASSERT(strstr(err->suggestion, "ls") != NULL,
+           "Suggestion should contain 'ls'");
 
     shell_error_free(err);
 }
@@ -246,25 +240,25 @@ TEST(error_set_suggestion) {
 TEST(error_set_detail) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
     shell_error_t *err = shell_error_create(
-        SHELL_ERR_UNCLOSED_QUOTE, SHELL_SEVERITY_ERROR, loc, "unclosed quote"
-    );
+        SHELL_ERR_UNCLOSED_QUOTE, SHELL_SEVERITY_ERROR, loc, "unclosed quote");
 
     shell_error_set_detail(err, "The quote started at line 5");
     ASSERT_NOT_NULL(err->detail, "Detail should be set");
-    ASSERT(strstr(err->detail, "line 5") != NULL, "Detail should contain 'line 5'");
+    ASSERT(strstr(err->detail, "line 5") != NULL,
+           "Detail should contain 'line 5'");
 
     shell_error_free(err);
 }
 
 TEST(error_set_source_line) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
-    shell_error_t *err = shell_error_create(
-        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "test"
-    );
+    shell_error_t *err = shell_error_create(SHELL_ERR_UNEXPECTED_TOKEN,
+                                            SHELL_SEVERITY_ERROR, loc, "test");
 
     shell_error_set_source_line(err, "echo $foo bar", 5, 9);
     ASSERT_NOT_NULL(err->source_line, "Source line should be set");
-    ASSERT_STR_EQ(err->source_line, "echo $foo bar", "Source line should match");
+    ASSERT_STR_EQ(err->source_line, "echo $foo bar",
+                  "Source line should match");
     ASSERT_EQ(err->highlight_start, 5, "Highlight start should match");
     ASSERT_EQ(err->highlight_end, 9, "Highlight end should match");
 
@@ -273,17 +267,17 @@ TEST(error_set_source_line) {
 
 /* ============================================================================
  * ERROR CHAINING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(error_set_cause) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
     shell_error_t *cause = shell_error_create(
-        SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR, loc, "file not found"
-    );
-    shell_error_t *err = shell_error_create(
-        SHELL_ERR_COMMAND_NOT_FOUND, SHELL_SEVERITY_ERROR, loc, "command failed"
-    );
+        SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR, loc, "file not found");
+    shell_error_t *err =
+        shell_error_create(SHELL_ERR_COMMAND_NOT_FOUND, SHELL_SEVERITY_ERROR,
+                           loc, "command failed");
 
     shell_error_set_cause(err, cause);
     ASSERT(err->cause == cause, "Cause should be linked");
@@ -294,14 +288,14 @@ TEST(error_set_cause) {
 
 TEST(error_push_context) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
-    shell_error_t *err = shell_error_create(
-        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "test"
-    );
+    shell_error_t *err = shell_error_create(SHELL_ERR_UNEXPECTED_TOKEN,
+                                            SHELL_SEVERITY_ERROR, loc, "test");
 
     shell_error_push_context(err, "while parsing function '%s'", "myfunc");
     ASSERT_EQ(err->context_depth, 1, "Context depth should be 1");
     ASSERT_NOT_NULL(err->context_stack[0], "Context should be set");
-    ASSERT(strstr(err->context_stack[0], "myfunc") != NULL, "Context should contain function name");
+    ASSERT(strstr(err->context_stack[0], "myfunc") != NULL,
+           "Context should contain function name");
 
     shell_error_push_context(err, "in file '%s'", "script.sh");
     ASSERT_EQ(err->context_depth, 2, "Context depth should be 2");
@@ -311,9 +305,8 @@ TEST(error_push_context) {
 
 TEST(error_context_max_depth) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
-    shell_error_t *err = shell_error_create(
-        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "test"
-    );
+    shell_error_t *err = shell_error_create(SHELL_ERR_UNEXPECTED_TOKEN,
+                                            SHELL_SEVERITY_ERROR, loc, "test");
 
     /* Push more than max contexts */
     for (int i = 0; i < SHELL_ERROR_CONTEXT_MAX + 5; i++) {
@@ -321,20 +314,21 @@ TEST(error_context_max_depth) {
     }
 
     /* Should cap at max */
-    ASSERT(err->context_depth <= SHELL_ERROR_CONTEXT_MAX, "Context depth should be capped");
+    ASSERT(err->context_depth <= SHELL_ERROR_CONTEXT_MAX,
+           "Context depth should be capped");
 
     shell_error_free(err);
 }
 
 /* ============================================================================
  * ERROR COLLECTOR TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(collector_new) {
     const char *source = "echo hello\necho world\n";
-    shell_error_collector_t *collector = shell_error_collector_new(
-        source, strlen(source), "test.sh", 0
-    );
+    shell_error_collector_t *collector =
+        shell_error_collector_new(source, strlen(source), "test.sh", 0);
 
     ASSERT_NOT_NULL(collector, "Collector creation should succeed");
     ASSERT_EQ(collector->count, 0, "Initial count should be 0");
@@ -345,20 +339,17 @@ TEST(collector_new) {
 }
 
 TEST(collector_add_error) {
-    shell_error_collector_t *collector = shell_error_collector_new(
-        NULL, 0, "test.sh", 0
-    );
+    shell_error_collector_t *collector =
+        shell_error_collector_new(NULL, 0, "test.sh", 0);
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
     shell_error_t *err1 = shell_error_create(
-        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "error 1"
-    );
+        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "error 1");
     shell_error_collector_add(collector, err1);
     ASSERT_EQ(collector->count, 1, "Count should be 1");
 
     shell_error_t *err2 = shell_error_create(
-        SHELL_ERR_UNEXPECTED_EOF, SHELL_SEVERITY_ERROR, loc, "error 2"
-    );
+        SHELL_ERR_UNEXPECTED_EOF, SHELL_SEVERITY_ERROR, loc, "error 2");
     shell_error_collector_add(collector, err2);
     ASSERT_EQ(collector->count, 2, "Count should be 2");
 
@@ -366,33 +357,31 @@ TEST(collector_add_error) {
 }
 
 TEST(collector_add_warning) {
-    shell_error_collector_t *collector = shell_error_collector_new(
-        NULL, 0, "test.sh", 0
-    );
+    shell_error_collector_t *collector =
+        shell_error_collector_new(NULL, 0, "test.sh", 0);
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
-    shell_error_t *warn = shell_error_create(
-        SHELL_OK, SHELL_SEVERITY_WARNING, loc, "warning"
-    );
+    shell_error_t *warn =
+        shell_error_create(SHELL_OK, SHELL_SEVERITY_WARNING, loc, "warning");
     shell_error_collector_add(collector, warn);
 
     /* Warnings go to warning_count, not count */
     ASSERT_EQ(collector->warning_count, 1, "Warning count should be 1");
-    ASSERT_EQ(collector->count, 0, "Error count should be 0 (only warnings added)");
-    ASSERT(!shell_error_collector_has_errors(collector), "Should not have errors (only warnings)");
+    ASSERT_EQ(collector->count, 0,
+              "Error count should be 0 (only warnings added)");
+    ASSERT(!shell_error_collector_has_errors(collector),
+           "Should not have errors (only warnings)");
 
     shell_error_collector_free(collector);
 }
 
 TEST(collector_add_fatal) {
-    shell_error_collector_t *collector = shell_error_collector_new(
-        NULL, 0, "test.sh", 0
-    );
+    shell_error_collector_t *collector =
+        shell_error_collector_new(NULL, 0, "test.sh", 0);
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
     shell_error_t *fatal = shell_error_create(
-        SHELL_ERR_ASSERTION, SHELL_SEVERITY_FATAL, loc, "fatal error"
-    );
+        SHELL_ERR_ASSERTION, SHELL_SEVERITY_FATAL, loc, "fatal error");
     shell_error_collector_add(collector, fatal);
 
     ASSERT(collector->has_fatal, "Should have fatal error");
@@ -402,30 +391,30 @@ TEST(collector_add_fatal) {
 }
 
 TEST(collector_full) {
-    shell_error_collector_t *collector = shell_error_collector_new(
-        NULL, 0, "test.sh", 3
-    );
+    shell_error_collector_t *collector =
+        shell_error_collector_new(NULL, 0, "test.sh", 3);
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
-    ASSERT(!shell_error_collector_full(collector), "Should not be full initially");
+    ASSERT(!shell_error_collector_full(collector),
+           "Should not be full initially");
 
     for (int i = 0; i < 3; i++) {
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "error %d", i
-        );
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR,
+                               loc, "error %d", i);
         shell_error_collector_add(collector, err);
     }
 
-    ASSERT(shell_error_collector_full(collector), "Should be full after max errors");
+    ASSERT(shell_error_collector_full(collector),
+           "Should be full after max errors");
 
     shell_error_collector_free(collector);
 }
 
 TEST(collector_get_line) {
     const char *source = "line one\nline two\nline three\n";
-    shell_error_collector_t *collector = shell_error_collector_new(
-        source, strlen(source), "test.sh", 0
-    );
+    shell_error_collector_t *collector =
+        shell_error_collector_new(source, strlen(source), "test.sh", 0);
 
     char *line1 = shell_error_collector_get_line(collector, 1);
     ASSERT_NOT_NULL(line1, "Line 1 should be returned");
@@ -452,7 +441,8 @@ TEST(collector_free_null) {
 
 /* ============================================================================
  * ERROR CODE STRING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(error_code_str_parse) {
     const char *str = shell_error_code_str(SHELL_ERR_UNEXPECTED_TOKEN);
@@ -491,27 +481,26 @@ TEST(error_severity_str) {
 
 /* ============================================================================
  * ERROR DISPLAY TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(error_display_basic) {
-    source_location_t loc = {
-        .filename = "test.sh",
-        .line = 5,
-        .column = 10,
-        .offset = 50,
-        .length = 3
-    };
+    source_location_t loc = {.filename = "test.sh",
+                             .line = 5,
+                             .column = 10,
+                             .offset = 50,
+                             .length = 3};
 
-    shell_error_t *err = shell_error_create(
-        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "unexpected token"
-    );
+    shell_error_t *err =
+        shell_error_create(SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR,
+                           loc, "unexpected token");
     shell_error_set_source_line(err, "echo hello world", 5, 10);
 
     /* Should not crash - redirect to /dev/null in practice */
     FILE *null_out = fopen("/dev/null", "w");
     if (null_out) {
         shell_error_display(err, null_out, false);
-        shell_error_display(err, null_out, true);  /* With color */
+        shell_error_display(err, null_out, true); /* With color */
         fclose(null_out);
     }
 
@@ -519,19 +508,16 @@ TEST(error_display_basic) {
 }
 
 TEST(error_display_all) {
-    shell_error_collector_t *collector = shell_error_collector_new(
-        "echo hello\necho world\n", 22, "test.sh", 0
-    );
+    shell_error_collector_t *collector =
+        shell_error_collector_new("echo hello\necho world\n", 22, "test.sh", 0);
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
     shell_error_t *err1 = shell_error_create(
-        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "error 1"
-    );
+        SHELL_ERR_UNEXPECTED_TOKEN, SHELL_SEVERITY_ERROR, loc, "error 1");
     shell_error_collector_add(collector, err1);
 
     shell_error_t *err2 = shell_error_create(
-        SHELL_ERR_UNEXPECTED_EOF, SHELL_SEVERITY_WARNING, loc, "warning"
-    );
+        SHELL_ERR_UNEXPECTED_EOF, SHELL_SEVERITY_WARNING, loc, "warning");
     shell_error_collector_add(collector, err2);
 
     /* Should not crash */
@@ -546,10 +532,12 @@ TEST(error_display_all) {
 
 /* ============================================================================
  * INTERNAL ERROR MACRO TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(internal_error_macro) {
-    shell_error_t *err = SHELL_ERROR_INTERNAL(SHELL_ERR_ASSERTION, "internal failure");
+    shell_error_t *err =
+        SHELL_ERROR_INTERNAL(SHELL_ERR_ASSERTION, "internal failure");
     ASSERT_NOT_NULL(err, "Internal error macro should work");
     ASSERT_EQ(err->code, SHELL_ERR_ASSERTION, "Code should match");
     ASSERT_EQ(err->severity, SHELL_SEVERITY_FATAL, "Should be fatal");
@@ -559,7 +547,8 @@ TEST(internal_error_macro) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running shell_error.c tests...\n\n");

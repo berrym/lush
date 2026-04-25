@@ -227,13 +227,13 @@ void terminal_control_destroy(terminal_control_t *control) {
     }
 
     terminal_control_cleanup(control);
-    
+
     /* Destroy base terminal if we own it */
     if (control->base_terminal) {
         base_terminal_destroy(control->base_terminal);
         control->base_terminal = NULL;
     }
-    
+
     free(control);
 }
 

@@ -11,54 +11,59 @@
  * and parameter validation.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
-#include "display/terminal_control.h"
 #include "display/base_terminal.h"
+#include "display/terminal_control.h"
 
 /* Test framework macros */
 static int tests_run = 0;
 static int tests_passed = 0;
 
-#define ASSERT(cond) do { \
-    if (!(cond)) { \
-        printf("  FAIL: %s (line %d)\n", #cond, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if ((a) != (b)) { \
-        printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_EQ(a, b)                                                        \
+    do {                                                                       \
+        if ((a) != (b)) {                                                      \
+            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NOT_NULL(ptr) do { \
-    if ((ptr) == NULL) { \
-        printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NOT_NULL(ptr)                                                   \
+    do {                                                                       \
+        if ((ptr) == NULL) {                                                   \
+            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NULL(ptr) do { \
-    if ((ptr) != NULL) { \
-        printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NULL(ptr)                                                       \
+    do {                                                                       \
+        if ((ptr) != NULL) {                                                   \
+            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define RUN_TEST(test) do { \
-    printf("  Running %s...\n", #test); \
-    tests_run++; \
-    if (test()) { \
-        tests_passed++; \
-        printf("  PASS: %s\n", #test); \
-    } \
-} while(0)
+#define RUN_TEST(test)                                                         \
+    do {                                                                       \
+        printf("  Running %s...\n", #test);                                    \
+        tests_run++;                                                           \
+        if (test()) {                                                          \
+            tests_passed++;                                                    \
+            printf("  PASS: %s\n", #test);                                     \
+        }                                                                      \
+    } while (0)
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -72,16 +77,16 @@ static int test_error_string_success(void) {
 }
 
 static int test_error_string_invalid_param(void) {
-    const char *msg = terminal_control_error_string(
-        TERMINAL_CONTROL_ERROR_INVALID_PARAM);
+    const char *msg =
+        terminal_control_error_string(TERMINAL_CONTROL_ERROR_INVALID_PARAM);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_memory_allocation(void) {
-    const char *msg = terminal_control_error_string(
-        TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION);
+    const char *msg =
+        terminal_control_error_string(TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
@@ -96,8 +101,8 @@ static int test_error_string_capability_detection(void) {
 }
 
 static int test_error_string_sequence_too_long(void) {
-    const char *msg = terminal_control_error_string(
-        TERMINAL_CONTROL_ERROR_SEQUENCE_TOO_LONG);
+    const char *msg =
+        terminal_control_error_string(TERMINAL_CONTROL_ERROR_SEQUENCE_TOO_LONG);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
@@ -136,20 +141,20 @@ static int test_error_string_terminal_not_ready(void) {
 }
 
 static int test_error_string_unknown(void) {
-    const char *msg = terminal_control_error_string(
-        (terminal_control_error_t)9999);
+    const char *msg =
+        terminal_control_error_string((terminal_control_error_t)9999);
     ASSERT_NOT_NULL(msg);
     /* Should return some string for unknown errors */
     return 1;
 }
 
 static int test_error_strings_are_different(void) {
-    const char *success = terminal_control_error_string(
-        TERMINAL_CONTROL_SUCCESS);
-    const char *invalid = terminal_control_error_string(
-        TERMINAL_CONTROL_ERROR_INVALID_PARAM);
-    const char *memory = terminal_control_error_string(
-        TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION);
+    const char *success =
+        terminal_control_error_string(TERMINAL_CONTROL_SUCCESS);
+    const char *invalid =
+        terminal_control_error_string(TERMINAL_CONTROL_ERROR_INVALID_PARAM);
+    const char *memory =
+        terminal_control_error_string(TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION);
 
     ASSERT(strcmp(success, invalid) != 0);
     ASSERT(strcmp(success, memory) != 0);
@@ -169,70 +174,80 @@ static int test_color_default(void) {
 }
 
 static int test_color_from_basic_black(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_BLACK);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_BLACK);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_BLACK);
     return 1;
 }
 
 static int test_color_from_basic_red(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_RED);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_RED);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_RED);
     return 1;
 }
 
 static int test_color_from_basic_green(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_GREEN);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_GREEN);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_GREEN);
     return 1;
 }
 
 static int test_color_from_basic_yellow(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_YELLOW);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_YELLOW);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_YELLOW);
     return 1;
 }
 
 static int test_color_from_basic_blue(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_BLUE);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_BLUE);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_BLUE);
     return 1;
 }
 
 static int test_color_from_basic_magenta(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_MAGENTA);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_MAGENTA);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_MAGENTA);
     return 1;
 }
 
 static int test_color_from_basic_cyan(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_CYAN);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_CYAN);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_CYAN);
     return 1;
 }
 
 static int test_color_from_basic_white(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_WHITE);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_WHITE);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_WHITE);
     return 1;
 }
 
 static int test_color_from_basic_bright_black(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_BRIGHT_BLACK);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_BRIGHT_BLACK);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_BRIGHT_BLACK);
     return 1;
 }
 
 static int test_color_from_basic_bright_white(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_BRIGHT_WHITE);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_BRIGHT_WHITE);
     ASSERT_EQ(color.type, TERMINAL_COLOR_TYPE_BASIC);
     ASSERT_EQ(color.value.basic, TERMINAL_COLOR_BRIGHT_WHITE);
     return 1;
@@ -252,7 +267,8 @@ static int test_color_from_basic_max_value(void) {
 
 static int test_create_null_base_terminal(void) {
     terminal_control_t *tc = terminal_control_create(NULL);
-    /* Should handle NULL gracefully - either return NULL or create with NULL base */
+    /* Should handle NULL gracefully - either return NULL or create with NULL
+     * base */
     /* Implementation may vary */
     if (tc) {
         terminal_control_destroy(tc);
@@ -322,8 +338,7 @@ static int test_update_size_null_control(void) {
  * ============================================================ */
 
 static int test_move_cursor_null_control(void) {
-    terminal_control_error_t result =
-        terminal_control_move_cursor(NULL, 1, 1);
+    terminal_control_error_t result = terminal_control_move_cursor(NULL, 1, 1);
     ASSERT_EQ(result, TERMINAL_CONTROL_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -427,8 +442,7 @@ static int test_set_style_null_control(void) {
 }
 
 static int test_reset_formatting_null_control(void) {
-    terminal_control_error_t result =
-        terminal_control_reset_formatting(NULL);
+    terminal_control_error_t result = terminal_control_reset_formatting(NULL);
     ASSERT_EQ(result, TERMINAL_CONTROL_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -446,16 +460,18 @@ static int test_generate_cursor_sequence_null_control(void) {
 }
 
 static int test_generate_cursor_sequence_null_buffer(void) {
-    /* Can't test without a valid control, but test that NULL buffer is handled */
-    ssize_t result = terminal_control_generate_cursor_sequence(
-        NULL, 1, 1, NULL, 64);
+    /* Can't test without a valid control, but test that NULL buffer is handled
+     */
+    ssize_t result =
+        terminal_control_generate_cursor_sequence(NULL, 1, 1, NULL, 64);
     ASSERT(result < 0);
     return 1;
 }
 
 static int test_generate_color_sequence_null_control(void) {
     char buffer[64];
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_RED);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_RED);
     ssize_t result = terminal_control_generate_color_sequence(
         NULL, color, false, buffer, sizeof(buffer));
     ASSERT(result < 0);
@@ -475,7 +491,8 @@ static int test_generate_style_sequence_null_control(void) {
  * ============================================================ */
 
 static int test_validate_color_null_control(void) {
-    terminal_color_t color = terminal_control_color_from_basic(TERMINAL_COLOR_RED);
+    terminal_color_t color =
+        terminal_control_color_from_basic(TERMINAL_COLOR_RED);
     bool result = terminal_control_validate_color(NULL, color);
     ASSERT(!result);
     return 1;
@@ -497,8 +514,8 @@ static int test_get_performance_metrics_null_control(void) {
     uint64_t seqs;
     double hit_rate;
     uint64_t avg_time;
-    terminal_control_error_t result =
-        terminal_control_get_performance_metrics(NULL, &seqs, &hit_rate, &avg_time);
+    terminal_control_error_t result = terminal_control_get_performance_metrics(
+        NULL, &seqs, &hit_rate, &avg_time);
     ASSERT(result != TERMINAL_CONTROL_SUCCESS);
     return 1;
 }
@@ -580,24 +597,22 @@ static int test_capability_flags_distinct(void) {
 
 static int test_capability_flags_are_powers_of_two(void) {
     /* Each capability should be a power of 2 for bitwise operations */
-    terminal_capability_flags_t caps[] = {
-        TERMINAL_CAP_COLOR_8,
-        TERMINAL_CAP_COLOR_16,
-        TERMINAL_CAP_COLOR_256,
-        TERMINAL_CAP_COLOR_TRUECOLOR,
-        TERMINAL_CAP_CURSOR_POSITIONING,
-        TERMINAL_CAP_CURSOR_VISIBILITY,
-        TERMINAL_CAP_UNICODE,
-        TERMINAL_CAP_BOLD,
-        TERMINAL_CAP_ITALIC,
-        TERMINAL_CAP_UNDERLINE,
-        TERMINAL_CAP_REVERSE,
-        TERMINAL_CAP_STRIKETHROUGH,
-        TERMINAL_CAP_ALTERNATE_SCREEN,
-        TERMINAL_CAP_MOUSE_REPORTING,
-        TERMINAL_CAP_BRACKETED_PASTE,
-        TERMINAL_CAP_WINDOW_TITLE
-    };
+    terminal_capability_flags_t caps[] = {TERMINAL_CAP_COLOR_8,
+                                          TERMINAL_CAP_COLOR_16,
+                                          TERMINAL_CAP_COLOR_256,
+                                          TERMINAL_CAP_COLOR_TRUECOLOR,
+                                          TERMINAL_CAP_CURSOR_POSITIONING,
+                                          TERMINAL_CAP_CURSOR_VISIBILITY,
+                                          TERMINAL_CAP_UNICODE,
+                                          TERMINAL_CAP_BOLD,
+                                          TERMINAL_CAP_ITALIC,
+                                          TERMINAL_CAP_UNDERLINE,
+                                          TERMINAL_CAP_REVERSE,
+                                          TERMINAL_CAP_STRIKETHROUGH,
+                                          TERMINAL_CAP_ALTERNATE_SCREEN,
+                                          TERMINAL_CAP_MOUSE_REPORTING,
+                                          TERMINAL_CAP_BRACKETED_PASTE,
+                                          TERMINAL_CAP_WINDOW_TITLE};
 
     for (size_t i = 0; i < sizeof(caps) / sizeof(caps[0]); i++) {
         /* A power of 2 has exactly one bit set */
@@ -689,7 +704,8 @@ static int test_version_constants_positive(void) {
 
 static int test_max_sequence_length_reasonable(void) {
     ASSERT(TERMINAL_CONTROL_MAX_SEQUENCE_LENGTH > 0);
-    ASSERT(TERMINAL_CONTROL_MAX_SEQUENCE_LENGTH >= 32); /* At least 32 for safety */
+    ASSERT(TERMINAL_CONTROL_MAX_SEQUENCE_LENGTH >=
+           32); /* At least 32 for safety */
     return 1;
 }
 
@@ -711,13 +727,20 @@ static int test_cache_size_reasonable(void) {
 static int test_error_codes_distinct(void) {
     ASSERT_EQ((int)TERMINAL_CONTROL_SUCCESS, 0);
     ASSERT(TERMINAL_CONTROL_ERROR_INVALID_PARAM != TERMINAL_CONTROL_SUCCESS);
-    ASSERT(TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION != TERMINAL_CONTROL_SUCCESS);
-    ASSERT(TERMINAL_CONTROL_ERROR_CAPABILITY_DETECTION != TERMINAL_CONTROL_SUCCESS);
-    ASSERT(TERMINAL_CONTROL_ERROR_SEQUENCE_TOO_LONG != TERMINAL_CONTROL_SUCCESS);
-    ASSERT(TERMINAL_CONTROL_ERROR_UNSUPPORTED_OPERATION != TERMINAL_CONTROL_SUCCESS);
-    ASSERT(TERMINAL_CONTROL_ERROR_COLOR_OUT_OF_RANGE != TERMINAL_CONTROL_SUCCESS);
-    ASSERT(TERMINAL_CONTROL_ERROR_POSITION_OUT_OF_RANGE != TERMINAL_CONTROL_SUCCESS);
-    ASSERT(TERMINAL_CONTROL_ERROR_TERMINAL_NOT_READY != TERMINAL_CONTROL_SUCCESS);
+    ASSERT(TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION !=
+           TERMINAL_CONTROL_SUCCESS);
+    ASSERT(TERMINAL_CONTROL_ERROR_CAPABILITY_DETECTION !=
+           TERMINAL_CONTROL_SUCCESS);
+    ASSERT(TERMINAL_CONTROL_ERROR_SEQUENCE_TOO_LONG !=
+           TERMINAL_CONTROL_SUCCESS);
+    ASSERT(TERMINAL_CONTROL_ERROR_UNSUPPORTED_OPERATION !=
+           TERMINAL_CONTROL_SUCCESS);
+    ASSERT(TERMINAL_CONTROL_ERROR_COLOR_OUT_OF_RANGE !=
+           TERMINAL_CONTROL_SUCCESS);
+    ASSERT(TERMINAL_CONTROL_ERROR_POSITION_OUT_OF_RANGE !=
+           TERMINAL_CONTROL_SUCCESS);
+    ASSERT(TERMINAL_CONTROL_ERROR_TERMINAL_NOT_READY !=
+           TERMINAL_CONTROL_SUCCESS);
     return 1;
 }
 

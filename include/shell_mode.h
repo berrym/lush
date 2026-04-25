@@ -23,7 +23,8 @@
 
 /* ============================================================================
  * Shell Mode Types
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Shell compatibility modes
@@ -32,16 +33,17 @@
  * and behavioral semantics.
  */
 typedef enum {
-    SHELL_MODE_POSIX,  /**< Strict POSIX sh compliance - minimal features */
-    SHELL_MODE_BASH,   /**< Bash 5.x compatibility mode */
-    SHELL_MODE_ZSH,    /**< Zsh compatibility mode */
-    SHELL_MODE_LUSH, /**< Lush-native: curated best of both (default) */
-    SHELL_MODE_COUNT   /**< Number of shell modes (for array sizing) */
+    SHELL_MODE_POSIX, /**< Strict POSIX sh compliance - minimal features */
+    SHELL_MODE_BASH,  /**< Bash 5.x compatibility mode */
+    SHELL_MODE_ZSH,   /**< Zsh compatibility mode */
+    SHELL_MODE_LUSH,  /**< Lush-native: curated best of both (default) */
+    SHELL_MODE_COUNT  /**< Number of shell modes (for array sizing) */
 } shell_mode_t;
 
 /* ============================================================================
  * Feature Flags
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Shell feature flags
@@ -73,24 +75,24 @@ typedef enum {
     FEATURE_COPROC,               /**< coproc command */
 
     /* Extended Parameter Expansion (Phase 4) */
-    FEATURE_CASE_MODIFICATION,   /**< ${var^^}, ${var,,} */
-    FEATURE_SUBSTRING_EXPANSION, /**< ${var:offset:length} */
-    FEATURE_PATTERN_SUBSTITUTION,/**< ${var/pattern/replacement} */
-    FEATURE_INDIRECT_EXPANSION,  /**< ${!var}, ${!prefix*} */
-    FEATURE_PARAM_TRANSFORMATION,/**< ${var@Q}, ${var@E}, etc. */
+    FEATURE_CASE_MODIFICATION,    /**< ${var^^}, ${var,,} */
+    FEATURE_SUBSTRING_EXPANSION,  /**< ${var:offset:length} */
+    FEATURE_PATTERN_SUBSTITUTION, /**< ${var/pattern/replacement} */
+    FEATURE_INDIRECT_EXPANSION,   /**< ${!var}, ${!prefix*} */
+    FEATURE_PARAM_TRANSFORMATION, /**< ${var@Q}, ${var@E}, etc. */
 
     /* Extended Globbing */
     FEATURE_EXTENDED_GLOB, /**< extglob: ?(pat), *(pat), etc. */
-    FEATURE_NULL_GLOB,     /**< Null glob: unmatched patterns expand to nothing */
-    FEATURE_DOT_GLOB,      /**< Include dotfiles in glob matches */
-    FEATURE_GLOBSTAR,      /**< ** matches recursively through directories */
+    FEATURE_NULL_GLOB, /**< Null glob: unmatched patterns expand to nothing */
+    FEATURE_DOT_GLOB,  /**< Include dotfiles in glob matches */
+    FEATURE_GLOBSTAR,  /**< ** matches recursively through directories */
 
     /* Brace Expansion */
     FEATURE_BRACE_EXPANSION, /**< {a,b,c} and {1..10} brace expansion */
 
     /* Quoting Extensions */
-    FEATURE_ANSI_QUOTING,    /**< $'...' ANSI-C quoting with escape sequences */
-    FEATURE_LOCALE_QUOTING,  /**< $"..." locale-aware quoting (gettext) */
+    FEATURE_ANSI_QUOTING,   /**< $'...' ANSI-C quoting with escape sequences */
+    FEATURE_LOCALE_QUOTING, /**< $"..." locale-aware quoting (gettext) */
 
     /* Control Flow Extensions (Phase 5) */
     FEATURE_CASE_FALLTHROUGH, /**< ;& and ;;& in case statements */
@@ -99,16 +101,17 @@ typedef enum {
 
     /* Behavior Defaults */
     FEATURE_WORD_SPLIT_DEFAULT, /**< Word splitting on by default (Bash) */
-    FEATURE_AUTO_CD,            /**< Auto-cd to directories without cd command */
-    FEATURE_AUTO_PUSHD,         /**< Auto-push directories to stack on cd */
-    FEATURE_CDABLE_VARS,        /**< Treat unset vars as directory names for cd */
+    FEATURE_AUTO_CD,     /**< Auto-cd to directories without cd command */
+    FEATURE_AUTO_PUSHD,  /**< Auto-push directories to stack on cd */
+    FEATURE_CDABLE_VARS, /**< Treat unset vars as directory names for cd */
 
     /* History Behavior */
-    FEATURE_HISTAPPEND,         /**< Append to history file instead of overwrite */
-    FEATURE_INC_APPEND_HISTORY, /**< Append each command immediately (better crash recovery) */
-    FEATURE_SHARE_HISTORY,      /**< Share history between concurrent sessions */
-    FEATURE_HIST_VERIFY,        /**< Verify history expansion before execution */
-    FEATURE_CHECKJOBS,          /**< Warn about running jobs on exit */
+    FEATURE_HISTAPPEND, /**< Append to history file instead of overwrite */
+    FEATURE_INC_APPEND_HISTORY, /**< Append each command immediately (better
+                                   crash recovery) */
+    FEATURE_SHARE_HISTORY, /**< Share history between concurrent sessions */
+    FEATURE_HIST_VERIFY,   /**< Verify history expansion before execution */
+    FEATURE_CHECKJOBS,     /**< Warn about running jobs on exit */
 
     /* Function Enhancements (Phase 6) */
     FEATURE_NAMEREF,             /**< local -n nameref variables */
@@ -116,12 +119,13 @@ typedef enum {
     FEATURE_RETURN_ANYWHERE,     /**< return from sourced scripts */
 
     /* Zsh-Specific (Phase 7) */
-    FEATURE_GLOB_QUALIFIERS,      /**< Zsh glob qualifiers: *(.) *(/) */
-    FEATURE_HOOK_FUNCTIONS,       /**< precmd, preexec, chpwd hooks */
-    FEATURE_SIMPLE_HOOK_ARRAYS,   /**< precmd+=(fn) in addition to precmd_functions+=(fn) */
-    FEATURE_PROMPT_COMMAND,       /**< Bash PROMPT_COMMAND (string and array) */
-    FEATURE_ZSH_PARAM_FLAGS,      /**< Zsh-style parameter flags */
-    FEATURE_PLUGIN_SYSTEM,        /**< Dynamic plugin loading system */
+    FEATURE_GLOB_QUALIFIERS,    /**< Zsh glob qualifiers: *(.) *(/) */
+    FEATURE_HOOK_FUNCTIONS,     /**< precmd, preexec, chpwd hooks */
+    FEATURE_SIMPLE_HOOK_ARRAYS, /**< precmd+=(fn) in addition to
+                                   precmd_functions+=(fn) */
+    FEATURE_PROMPT_COMMAND,     /**< Bash PROMPT_COMMAND (string and array) */
+    FEATURE_ZSH_PARAM_FLAGS,    /**< Zsh-style parameter flags */
+    FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
 
     /* Sentinel - must be last */
     FEATURE_COUNT /**< Number of features (for array sizing) */
@@ -129,7 +133,8 @@ typedef enum {
 
 /* ============================================================================
  * Shell Mode State
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Shell mode state structure
@@ -139,10 +144,11 @@ typedef enum {
  * regardless of the current mode.
  */
 typedef struct {
-    shell_mode_t current_mode;                /**< Active shell mode */
-    bool feature_overrides[FEATURE_COUNT];    /**< Override values per feature */
-    bool feature_override_set[FEATURE_COUNT]; /**< Which features are overridden */
-    bool strict_mode;                         /**< Disallow runtime mode changes */
+    shell_mode_t current_mode;             /**< Active shell mode */
+    bool feature_overrides[FEATURE_COUNT]; /**< Override values per feature */
+    bool feature_override_set[FEATURE_COUNT]; /**< Which features are overridden
+                                               */
+    bool strict_mode; /**< Disallow runtime mode changes */
 } shell_mode_state_t;
 
 /** @brief Global shell mode state */
@@ -150,7 +156,8 @@ extern shell_mode_state_t g_shell_mode_state;
 
 /* ============================================================================
  * Mode Query Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if a feature is allowed in the current mode
@@ -193,7 +200,8 @@ bool shell_mode_set(shell_mode_t mode);
 
 /* ============================================================================
  * Feature Override Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Enable a specific feature regardless of mode
@@ -240,7 +248,8 @@ bool shell_feature_is_overridden(shell_feature_t feature);
 
 /* ============================================================================
  * Mode Information Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get the name of a shell mode
@@ -300,7 +309,8 @@ bool shell_feature_parse(const char *name, shell_feature_t *feature);
 
 /* ============================================================================
  * Initialization and Lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize the shell mode system
@@ -336,7 +346,8 @@ bool shell_mode_is_strict(void);
 
 /* ============================================================================
  * Shebang Detection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Detect shell mode from shebang line
@@ -352,7 +363,8 @@ bool shell_mode_detect_from_shebang(const char *shebang, shell_mode_t *mode);
 
 /* ============================================================================
  * Debugging and Introspection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Print current mode and feature states

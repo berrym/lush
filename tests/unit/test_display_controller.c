@@ -11,10 +11,10 @@
  * minimal dependencies.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "display/display_controller.h"
 
@@ -22,49 +22,56 @@
 static int tests_run = 0;
 static int tests_passed = 0;
 
-#define ASSERT(cond) do { \
-    if (!(cond)) { \
-        printf("  FAIL: %s (line %d)\n", #cond, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if ((a) != (b)) { \
-        printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_EQ(a, b)                                                        \
+    do {                                                                       \
+        if ((a) != (b)) {                                                      \
+            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_STR_EQ(a, b) do { \
-    if (strcmp((a), (b)) != 0) { \
-        printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b), __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_STR_EQ(a, b)                                                    \
+    do {                                                                       \
+        if (strcmp((a), (b)) != 0) {                                           \
+            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
+                   __LINE__);                                                  \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NOT_NULL(ptr) do { \
-    if ((ptr) == NULL) { \
-        printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NOT_NULL(ptr)                                                   \
+    do {                                                                       \
+        if ((ptr) == NULL) {                                                   \
+            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NULL(ptr) do { \
-    if ((ptr) != NULL) { \
-        printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NULL(ptr)                                                       \
+    do {                                                                       \
+        if ((ptr) != NULL) {                                                   \
+            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define RUN_TEST(test) do { \
-    printf("  Running %s...\n", #test); \
-    tests_run++; \
-    if (test()) { \
-        tests_passed++; \
-        printf("  PASS: %s\n", #test); \
-    } \
-} while(0)
+#define RUN_TEST(test)                                                         \
+    do {                                                                       \
+        printf("  Running %s...\n", #test);                                    \
+        tests_run++;                                                           \
+        if (test()) {                                                          \
+            tests_passed++;                                                    \
+            printf("  PASS: %s\n", #test);                                     \
+        }                                                                      \
+    } while (0)
 
 /* ============================================================
  * CREATE/DESTROY TESTS
@@ -182,23 +189,24 @@ static int test_create_default_config_sets_values(void) {
  * ============================================================ */
 
 static int test_error_string_success(void) {
-    const char *msg = display_controller_error_string(DISPLAY_CONTROLLER_SUCCESS);
+    const char *msg =
+        display_controller_error_string(DISPLAY_CONTROLLER_SUCCESS);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_invalid_param(void) {
-    const char *msg = display_controller_error_string(
-        DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
+    const char *msg =
+        display_controller_error_string(DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_null_pointer(void) {
-    const char *msg = display_controller_error_string(
-        DISPLAY_CONTROLLER_ERROR_NULL_POINTER);
+    const char *msg =
+        display_controller_error_string(DISPLAY_CONTROLLER_ERROR_NULL_POINTER);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
@@ -229,8 +237,8 @@ static int test_error_string_composition_failed(void) {
 }
 
 static int test_error_string_cache_full(void) {
-    const char *msg = display_controller_error_string(
-        DISPLAY_CONTROLLER_ERROR_CACHE_FULL);
+    const char *msg =
+        display_controller_error_string(DISPLAY_CONTROLLER_ERROR_CACHE_FULL);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
@@ -246,18 +254,18 @@ static int test_error_string_buffer_too_small(void) {
 
 static int test_error_string_unknown_error(void) {
     /* Test with an invalid error code */
-    const char *msg = display_controller_error_string(
-        (display_controller_error_t)9999);
+    const char *msg =
+        display_controller_error_string((display_controller_error_t)9999);
     ASSERT_NOT_NULL(msg);
     /* Should return some string even for unknown errors */
     return 1;
 }
 
 static int test_error_strings_are_different(void) {
-    const char *success = display_controller_error_string(
-        DISPLAY_CONTROLLER_SUCCESS);
-    const char *invalid = display_controller_error_string(
-        DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
+    const char *success =
+        display_controller_error_string(DISPLAY_CONTROLLER_SUCCESS);
+    const char *invalid =
+        display_controller_error_string(DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
     const char *memory = display_controller_error_string(
         DISPLAY_CONTROLLER_ERROR_MEMORY_ALLOCATION);
 
@@ -286,8 +294,8 @@ static int test_init_null_controller(void) {
 
 static int test_display_null_controller(void) {
     char output[1024];
-    display_controller_error_t result =
-        display_controller_display(NULL, "prompt", "command", output, sizeof(output));
+    display_controller_error_t result = display_controller_display(
+        NULL, "prompt", "command", output, sizeof(output));
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -323,8 +331,8 @@ static int test_display_not_initialized(void) {
     ASSERT_NOT_NULL(dc);
 
     char output[1024];
-    display_controller_error_t result =
-        display_controller_display(dc, "prompt", "command", output, sizeof(output));
+    display_controller_error_t result = display_controller_display(
+        dc, "prompt", "command", output, sizeof(output));
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED);
 
     display_controller_destroy(dc);
@@ -337,9 +345,8 @@ static int test_display_not_initialized(void) {
 
 static int test_display_with_cursor_null_controller(void) {
     char output[1024];
-    display_controller_error_t result =
-        display_controller_display_with_cursor(NULL, "prompt", "command", 0,
-                                               false, output, sizeof(output));
+    display_controller_error_t result = display_controller_display_with_cursor(
+        NULL, "prompt", "command", 0, false, output, sizeof(output));
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -348,9 +355,8 @@ static int test_display_with_cursor_null_output(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    display_controller_error_t result =
-        display_controller_display_with_cursor(dc, "prompt", "command", 0,
-                                               false, NULL, 1024);
+    display_controller_error_t result = display_controller_display_with_cursor(
+        dc, "prompt", "command", 0, false, NULL, 1024);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
 
     display_controller_destroy(dc);
@@ -362,9 +368,8 @@ static int test_display_with_cursor_not_initialized(void) {
     ASSERT_NOT_NULL(dc);
 
     char output[1024];
-    display_controller_error_t result =
-        display_controller_display_with_cursor(dc, "prompt", "command", 0,
-                                               false, output, sizeof(output));
+    display_controller_error_t result = display_controller_display_with_cursor(
+        dc, "prompt", "command", 0, false, output, sizeof(output));
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED);
 
     display_controller_destroy(dc);
@@ -377,9 +382,8 @@ static int test_display_with_cursor_not_initialized(void) {
 
 static int test_update_null_controller(void) {
     char output[1024];
-    display_controller_error_t result =
-        display_controller_update(NULL, "prompt", "command", output,
-                                  sizeof(output), NULL);
+    display_controller_error_t result = display_controller_update(
+        NULL, "prompt", "command", output, sizeof(output), NULL);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -401,9 +405,8 @@ static int test_update_not_initialized(void) {
     ASSERT_NOT_NULL(dc);
 
     char output[1024];
-    display_controller_error_t result =
-        display_controller_update(dc, "prompt", "command", output,
-                                  sizeof(output), NULL);
+    display_controller_error_t result = display_controller_update(
+        dc, "prompt", "command", output, sizeof(output), NULL);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED);
 
     display_controller_destroy(dc);
@@ -427,8 +430,7 @@ static int test_refresh_null_controller(void) {
  * ============================================================ */
 
 static int test_cleanup_null_controller(void) {
-    display_controller_error_t result =
-        display_controller_cleanup(NULL);
+    display_controller_error_t result = display_controller_cleanup(NULL);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_NULL_POINTER);
     return 1;
 }
@@ -450,8 +452,7 @@ static int test_cleanup_uninitialized_controller(void) {
  * ============================================================ */
 
 static int test_clear_screen_null_controller(void) {
-    display_controller_error_t result =
-        display_controller_clear_screen(NULL);
+    display_controller_error_t result = display_controller_clear_screen(NULL);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_NULL_POINTER);
     return 1;
 }
@@ -460,8 +461,7 @@ static int test_clear_screen_not_initialized(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    display_controller_error_t result =
-        display_controller_clear_screen(dc);
+    display_controller_error_t result = display_controller_clear_screen(dc);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED);
 
     display_controller_destroy(dc);
@@ -624,7 +624,8 @@ static int test_get_performance_null_output(void) {
     return 1;
 }
 
-/* NOTE: display_controller_update_performance_monitoring is declared but not implemented */
+/* NOTE: display_controller_update_performance_monitoring is declared but not
+ * implemented */
 
 static int test_reset_performance_metrics_null_controller(void) {
     display_controller_error_t result =
@@ -639,7 +640,8 @@ static int test_reset_performance_metrics_null_controller(void) {
 
 static int test_set_optimization_level_null_controller(void) {
     display_controller_error_t result =
-        display_controller_set_optimization_level(NULL, DISPLAY_OPTIMIZATION_STANDARD);
+        display_controller_set_optimization_level(
+            NULL, DISPLAY_OPTIMIZATION_STANDARD);
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
     return 1;
 }
@@ -656,8 +658,7 @@ static int test_set_adaptive_optimization_null_controller(void) {
  * ============================================================ */
 
 static int test_clear_cache_null_controller(void) {
-    display_controller_error_t result =
-        display_controller_clear_cache(NULL);
+    display_controller_error_t result = display_controller_clear_cache(NULL);
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
     return 1;
 }
@@ -672,8 +673,7 @@ static int test_validate_cache_null_controller(void) {
 }
 
 static int test_optimize_cache_null_controller(void) {
-    display_controller_error_t result =
-        display_controller_optimize_cache(NULL);
+    display_controller_error_t result = display_controller_optimize_cache(NULL);
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
     return 1;
 }
@@ -694,8 +694,7 @@ static int test_get_config_null_output(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    display_controller_error_t result =
-        display_controller_get_config(dc, NULL);
+    display_controller_error_t result = display_controller_get_config(dc, NULL);
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
 
     display_controller_destroy(dc);
@@ -715,8 +714,7 @@ static int test_set_config_null_config(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    display_controller_error_t result =
-        display_controller_set_config(dc, NULL);
+    display_controller_error_t result = display_controller_set_config(dc, NULL);
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
 
     display_controller_destroy(dc);
@@ -834,7 +832,8 @@ static int test_prepare_shell_integration_null_controller(void) {
 static int test_get_integration_interface_null_controller(void) {
     char buffer[256];
     display_controller_error_t result =
-        display_controller_get_integration_interface(NULL, buffer, sizeof(buffer));
+        display_controller_get_integration_interface(NULL, buffer,
+                                                     sizeof(buffer));
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
     return 1;
 }
@@ -842,7 +841,8 @@ static int test_get_integration_interface_null_controller(void) {
 static int test_generate_diagnostic_report_null_controller(void) {
     char buffer[4096];
     display_controller_error_t result =
-        display_controller_generate_diagnostic_report(NULL, buffer, sizeof(buffer));
+        display_controller_generate_diagnostic_report(NULL, buffer,
+                                                      sizeof(buffer));
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
     return 1;
 }
@@ -935,11 +935,15 @@ static int test_error_code_values(void) {
     ASSERT_EQ((int)DISPLAY_CONTROLLER_SUCCESS, 0);
 
     /* Verify error codes are distinct from success */
-    ASSERT(DISPLAY_CONTROLLER_ERROR_INVALID_PARAM != DISPLAY_CONTROLLER_SUCCESS);
+    ASSERT(DISPLAY_CONTROLLER_ERROR_INVALID_PARAM !=
+           DISPLAY_CONTROLLER_SUCCESS);
     ASSERT(DISPLAY_CONTROLLER_ERROR_NULL_POINTER != DISPLAY_CONTROLLER_SUCCESS);
-    ASSERT(DISPLAY_CONTROLLER_ERROR_MEMORY_ALLOCATION != DISPLAY_CONTROLLER_SUCCESS);
-    ASSERT(DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED != DISPLAY_CONTROLLER_SUCCESS);
-    ASSERT(DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED != DISPLAY_CONTROLLER_SUCCESS);
+    ASSERT(DISPLAY_CONTROLLER_ERROR_MEMORY_ALLOCATION !=
+           DISPLAY_CONTROLLER_SUCCESS);
+    ASSERT(DISPLAY_CONTROLLER_ERROR_INITIALIZATION_FAILED !=
+           DISPLAY_CONTROLLER_SUCCESS);
+    ASSERT(DISPLAY_CONTROLLER_ERROR_NOT_INITIALIZED !=
+           DISPLAY_CONTROLLER_SUCCESS);
 
     return 1;
 }
@@ -1069,7 +1073,8 @@ int main(void) {
     printf("\n=== Performance Monitoring Null/Invalid Param Tests ===\n");
     RUN_TEST(test_get_performance_null_controller);
     RUN_TEST(test_get_performance_null_output);
-    /* NOTE: test_update_performance_monitoring_null_controller skipped - function not implemented */
+    /* NOTE: test_update_performance_monitoring_null_controller skipped -
+     * function not implemented */
     RUN_TEST(test_reset_performance_metrics_null_controller);
 
     printf("\n=== Optimization Null/Invalid Param Tests ===\n");

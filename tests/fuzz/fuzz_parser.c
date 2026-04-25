@@ -14,14 +14,15 @@
  * Build with AFL++ (GCC or Clang):
  *   CC=afl-clang-fast meson setup build -Denable_fuzzing=true -Dfuzzer=afl
  *   meson compile -C build fuzz_parser_afl
- *   afl-fuzz -i tests/fuzz/corpus/parser/ -o findings/ -- ./build/fuzz_parser_afl
+ *   afl-fuzz -i tests/fuzz/corpus/parser/ -o findings/ --
+ * ./build/fuzz_parser_afl
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "parser.h"
 #include "node.h"
+#include "parser.h"
 #include "shell_mode.h"
 
 #include <stdint.h>

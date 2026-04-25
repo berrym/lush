@@ -67,12 +67,12 @@ extern "C" {
  * @brief TOML parser result codes
  */
 typedef enum toml_result {
-    TOML_SUCCESS = 0,              /**< Operation succeeded */
-    TOML_ERROR_INVALID_PARAMETER,  /**< NULL or invalid parameter */
-    TOML_ERROR_INVALID_FORMAT,     /**< Parse error in input */
-    TOML_ERROR_OUT_OF_MEMORY,      /**< Memory allocation failed */
-    TOML_ERROR_NOT_FOUND,          /**< Key not found in table */
-    TOML_ERROR_CALLBACK_ABORT      /**< Callback requested abort */
+    TOML_SUCCESS = 0,             /**< Operation succeeded */
+    TOML_ERROR_INVALID_PARAMETER, /**< NULL or invalid parameter */
+    TOML_ERROR_INVALID_FORMAT,    /**< Parse error in input */
+    TOML_ERROR_OUT_OF_MEMORY,     /**< Memory allocation failed */
+    TOML_ERROR_NOT_FOUND,         /**< Key not found in table */
+    TOML_ERROR_CALLBACK_ABORT     /**< Callback requested abort */
 } toml_result_t;
 
 /* ============================================================================

@@ -96,13 +96,12 @@ static void setup_pool(void) {
     ASSERT(err == LUSH_POOL_SUCCESS, "Pool init should succeed");
 }
 
-static void teardown_pool(void) {
-    lush_pool_shutdown();
-}
+static void teardown_pool(void) { lush_pool_shutdown(); }
 
 /* ============================================================================
  * CONFIGURATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(get_default_config) {
     lush_pool_config_t config = lush_pool_get_default_config();
@@ -117,11 +116,13 @@ TEST(get_display_optimized_config) {
     ASSERT(config.large_pool_blocks > 0, "Should have large pool blocks");
 }
 
-/* Note: get_minimal_config test removed - function declared but not implemented */
+/* Note: get_minimal_config test removed - function declared but not implemented
+ */
 
 /* ============================================================================
  * INITIALIZATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_init_default) {
     lush_pool_config_t config = lush_pool_get_default_config();
@@ -132,7 +133,8 @@ TEST(pool_init_default) {
 
 TEST(pool_init_null_config) {
     lush_pool_error_t err = lush_pool_init(NULL);
-    ASSERT_EQ(err, LUSH_POOL_SUCCESS, "Init with NULL config should use defaults");
+    ASSERT_EQ(err, LUSH_POOL_SUCCESS,
+              "Init with NULL config should use defaults");
     lush_pool_shutdown();
 }
 
@@ -151,7 +153,7 @@ TEST(pool_double_init) {
     lush_pool_error_t err = lush_pool_init(&config);
     /* May succeed (reinit) or fail gracefully */
     lush_pool_shutdown();
-    (void)err;  /* Suppress unused warning */
+    (void)err; /* Suppress unused warning */
 }
 
 TEST(pool_shutdown_without_init) {
@@ -161,14 +163,15 @@ TEST(pool_shutdown_without_init) {
 
 /* ============================================================================
  * ALLOCATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_alloc_small) {
     setup_pool();
 
     void *ptr = lush_pool_alloc(64);
     ASSERT_NOT_NULL(ptr, "Small allocation should succeed");
-    memset(ptr, 0xAB, 64);  /* Write to verify usability */
+    memset(ptr, 0xAB, 64); /* Write to verify usability */
     lush_pool_free(ptr);
 
     teardown_pool();
@@ -257,7 +260,8 @@ TEST(pool_free_null) {
 
 /* ============================================================================
  * REALLOC TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_realloc_grow) {
     setup_pool();
@@ -315,7 +319,8 @@ TEST(pool_realloc_zero_size) {
 
 /* ============================================================================
  * CALLOC TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_calloc_basic) {
     setup_pool();
@@ -348,7 +353,8 @@ TEST(pool_calloc_large) {
 
 /* ============================================================================
  * STRDUP TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_strdup_basic) {
     setup_pool();
@@ -401,7 +407,8 @@ TEST(pool_strdup_long) {
 
 /* ============================================================================
  * STATISTICS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_get_stats) {
     lush_pool_config_t config = lush_pool_get_default_config();
@@ -436,7 +443,8 @@ TEST(pool_reset_stats) {
 
 /* ============================================================================
  * POOL INFO TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_get_recommended_size) {
     lush_pool_size_t size;
@@ -454,7 +462,8 @@ TEST(pool_get_recommended_size) {
     ASSERT_EQ(size, LUSH_POOL_XLARGE, "8192 bytes should use XLARGE pool");
 }
 
-/* Note: pool_get_pool_info test removed - function declared but not implemented */
+/* Note: pool_get_pool_info test removed - function declared but not implemented
+ */
 
 TEST(pool_is_healthy) {
     setup_pool();
@@ -486,11 +495,13 @@ TEST(pool_is_pool_pointer) {
     teardown_pool();
 }
 
-/* Note: pool_validate_integrity and pool_maintenance tests removed - functions declared but not implemented */
+/* Note: pool_validate_integrity and pool_maintenance tests removed - functions
+ * declared but not implemented */
 
 /* ============================================================================
  * ERROR HANDLING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_error_string) {
     const char *str;
@@ -535,14 +546,15 @@ TEST(pool_set_debug_mode) {
 
 /* ============================================================================
  * PERFORMANCE TARGET TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_meets_performance_targets) {
     setup_pool();
 
     /* Just verify the function doesn't crash - actual performance may vary */
     bool meets = lush_pool_meets_performance_targets();
-    (void)meets;  /* Result is system-dependent */
+    (void)meets; /* Result is system-dependent */
 
     teardown_pool();
 }
@@ -567,20 +579,23 @@ TEST(pool_get_memory_usage) {
 
 /* ============================================================================
  * PREALLOCATE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
-/* Note: pool_preallocate test removed - function declared but not implemented */
+/* Note: pool_preallocate test removed - function declared but not implemented
+ */
 
 /* ============================================================================
  * STRESS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pool_stress_alloc_free) {
     setup_pool();
 
     /* Many allocations and frees */
     for (int i = 0; i < 1000; i++) {
-        size_t size = (i % 4) * 100 + 50;  /* Vary sizes */
+        size_t size = (i % 4) * 100 + 50; /* Vary sizes */
         void *ptr = lush_pool_alloc(size);
         ASSERT_NOT_NULL(ptr, "Stress allocation should succeed");
         memset(ptr, 0xAA, size);
@@ -610,7 +625,8 @@ TEST(pool_stress_mixed_sizes) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running lush_memory_pool.c tests...\n\n");
@@ -664,7 +680,8 @@ int main(void) {
     RUN_TEST(pool_is_pool_pointer);
 
     printf("\nValidation Tests:\n");
-    /* pool_validate_integrity and pool_maintenance tests removed - functions not implemented */
+    /* pool_validate_integrity and pool_maintenance tests removed - functions
+     * not implemented */
 
     printf("\nError Handling Tests:\n");
     RUN_TEST(pool_error_string);

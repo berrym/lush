@@ -42,7 +42,7 @@ typedef struct parser {
 
     /* Structured error collection (Phase 2 error management) */
     shell_error_collector_t *error_collector;
-    const char *source_name;  /* Script name for error display */
+    const char *source_name; /* Script name for error display */
 
     /* Parser context stack for context-aware error messages */
     const char *context_stack[PARSER_CONTEXT_MAX];
@@ -54,7 +54,8 @@ typedef struct parser {
 
 /* ============================================================================
  * Parser Lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a new parser for input string
@@ -93,7 +94,8 @@ void parser_free(parser_t *parser);
 
 /* ============================================================================
  * Parsing Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Parse input into an AST
@@ -113,7 +115,8 @@ node_t *parser_parse_command_line(parser_t *parser);
 
 /* ============================================================================
  * Error Handling
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if parser has an error
@@ -133,7 +136,8 @@ const char *parser_error(parser_t *parser);
 
 /* ============================================================================
  * Structured Error Collection (Phase 2)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Convert a token to a source location
@@ -144,7 +148,8 @@ const char *parser_error(parser_t *parser);
  * @param filename Source filename (or NULL for default)
  * @return Source location structure
  */
-source_location_t token_to_source_location(token_t *token, const char *filename);
+source_location_t token_to_source_location(token_t *token,
+                                           const char *filename);
 
 /**
  * @brief Add a structured error to the parser's error collector
@@ -181,7 +186,8 @@ shell_error_collector_t *parser_get_error_collector(parser_t *parser);
 
 /* ============================================================================
  * Parser Context Stack (for context-aware error messages)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Push a parsing context onto the stack
@@ -218,7 +224,8 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
 
 /* ============================================================================
  * Recursion Depth Tracking (Stack Overflow Protection)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Enter a recursive parsing operation

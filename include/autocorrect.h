@@ -59,8 +59,8 @@ typedef struct {
  */
 typedef struct {
     correction_t suggestions[MAX_CORRECTIONS]; /**< Array of suggestions */
-    int count;                                 /**< Number of suggestions found */
-    char *original_command;                    /**< Original misspelled command */
+    int count;              /**< Number of suggestions found */
+    char *original_command; /**< Original misspelled command */
 } correction_results_t;
 
 /** @brief Forward declaration for executor integration */
@@ -112,7 +112,8 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
  * @brief Present correction suggestions to user and get selection
  *
  * @param results Correction results from autocorrect_find_suggestions
- * @param selected_command Output buffer for selected command (MAX_COMMAND_LENGTH)
+ * @param selected_command Output buffer for selected command
+ * (MAX_COMMAND_LENGTH)
  * @return true if user selected a correction, false if cancelled/declined
  */
 bool autocorrect_prompt_user(const correction_results_t *results,
@@ -126,7 +127,8 @@ bool autocorrect_prompt_user(const correction_results_t *results,
 void autocorrect_free_results(correction_results_t *results);
 
 /**
- * @brief Calculate similarity score between two commands using multiple algorithms
+ * @brief Calculate similarity score between two commands using multiple
+ * algorithms
  *
  * @param command1 First command
  * @param command2 Second command

@@ -134,15 +134,12 @@ static const config_enum_def_t lle_dedup_strategy_enum = {
 
 // Shell Mode mappings (Phase 0: Extended Language Support)
 static const config_enum_mapping_t shell_mode_mappings[] = {
-    {"posix", SHELL_MODE_POSIX},
-    {"sh", SHELL_MODE_POSIX},  /* Alias for posix */
-    {"bash", SHELL_MODE_BASH},
-    {"zsh", SHELL_MODE_ZSH},
-    {"lush", SHELL_MODE_LUSH},
-    {NULL, 0} // Sentinel
+    {"posix", SHELL_MODE_POSIX}, {"sh", SHELL_MODE_POSIX}, /* Alias for posix */
+    {"bash", SHELL_MODE_BASH},   {"zsh", SHELL_MODE_ZSH},
+    {"lush", SHELL_MODE_LUSH},   {NULL, 0} // Sentinel
 };
-static const config_enum_def_t shell_mode_enum = {
-    shell_mode_mappings, SHELL_MODE_LUSH};
+static const config_enum_def_t shell_mode_enum = {shell_mode_mappings,
+                                                  SHELL_MODE_LUSH};
 
 // ============================================================================
 // CONFIGURATION OPTION DEFINITIONS
@@ -414,8 +411,8 @@ static config_option_t config_options[] = {
      config_validate_bool, NULL},
     {"display.theme_hot_reload", CONFIG_TYPE_BOOL, CONFIG_SECTION_DISPLAY,
      &config.display_theme_hot_reload,
-     "Auto-reload theme when its file changes on disk",
-     config_validate_bool, NULL},
+     "Auto-reload theme when its file changes on disk", config_validate_bool,
+     NULL},
     {"display.performance_monitoring", CONFIG_TYPE_BOOL, CONFIG_SECTION_DISPLAY,
      &config.display_performance_monitoring,
      "Enable display performance monitoring", config_validate_bool, NULL},
@@ -528,18 +525,26 @@ static void behavior_sync_from_runtime(void);
  * History Section Options
  * -------------------------------------------------------------------------- */
 static const creg_option_t history_options[] = {
-    {"enabled", CREG_VALUE_BOOLEAN,
+    {"enabled",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable command history", true},
-    {"size", CREG_VALUE_INTEGER,
+     "Enable command history",
+     true},
+    {"size",
+     CREG_VALUE_INTEGER,
      {.type = CREG_VALUE_INTEGER, .data.integer = 1000},
-     "Maximum history entries", true},
-    {"no_dups", CREG_VALUE_BOOLEAN,
+     "Maximum history entries",
+     true},
+    {"no_dups",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Remove duplicate entries", true},
-    {"timestamps", CREG_VALUE_BOOLEAN,
+     "Remove duplicate entries",
+     true},
+    {"timestamps",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Record timestamps", true},
+     "Record timestamps",
+     true},
 };
 
 static const creg_section_t history_section = {
@@ -556,21 +561,31 @@ static const creg_section_t history_section = {
  * Shell Section Options (POSIX options + mode)
  * -------------------------------------------------------------------------- */
 static const creg_option_t shell_options[] = {
-    {"mode", CREG_VALUE_STRING,
+    {"mode",
+     CREG_VALUE_STRING,
      {.type = CREG_VALUE_STRING, .data.string = "lush"},
-     "Shell compatibility mode", true},
-    {"errexit", CREG_VALUE_BOOLEAN,
+     "Shell compatibility mode",
+     true},
+    {"errexit",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Exit on command failure (set -e)", true},
-    {"nounset", CREG_VALUE_BOOLEAN,
+     "Exit on command failure (set -e)",
+     true},
+    {"nounset",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Error on unset variables (set -u)", true},
-    {"xtrace", CREG_VALUE_BOOLEAN,
+     "Error on unset variables (set -u)",
+     true},
+    {"xtrace",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Trace execution (set -x)", true},
-    {"pipefail", CREG_VALUE_BOOLEAN,
+     "Trace execution (set -x)",
+     true},
+    {"pipefail",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Pipeline failure detection", true},
+     "Pipeline failure detection",
+     true},
 };
 
 static const creg_section_t shell_section = {
@@ -587,18 +602,26 @@ static const creg_section_t shell_section = {
  * Display Section Options
  * -------------------------------------------------------------------------- */
 static const creg_option_t display_options[] = {
-    {"syntax_highlighting", CREG_VALUE_BOOLEAN,
+    {"syntax_highlighting",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable syntax highlighting", true},
-    {"autosuggestions", CREG_VALUE_BOOLEAN,
+     "Enable syntax highlighting",
+     true},
+    {"autosuggestions",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable Fish-style autosuggestions", true},
-    {"transient_prompt", CREG_VALUE_BOOLEAN,
+     "Enable Fish-style autosuggestions",
+     true},
+    {"transient_prompt",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Enable transient prompts", true},
-    {"optimization_level", CREG_VALUE_INTEGER,
+     "Enable transient prompts",
+     true},
+    {"optimization_level",
+     CREG_VALUE_INTEGER,
      {.type = CREG_VALUE_INTEGER, .data.integer = 2},
-     "Display optimization level (0-4)", true},
+     "Display optimization level (0-4)",
+     true},
 };
 
 static const creg_section_t display_section = {
@@ -615,15 +638,21 @@ static const creg_section_t display_section = {
  * Completion Section Options
  * -------------------------------------------------------------------------- */
 static const creg_option_t completion_options[] = {
-    {"enabled", CREG_VALUE_BOOLEAN,
+    {"enabled",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable tab completion", true},
-    {"fuzzy", CREG_VALUE_BOOLEAN,
+     "Enable tab completion",
+     true},
+    {"fuzzy",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable fuzzy matching", true},
-    {"case_sensitive", CREG_VALUE_BOOLEAN,
+     "Enable fuzzy matching",
+     true},
+    {"case_sensitive",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Case-sensitive completion", true},
+     "Case-sensitive completion",
+     true},
 };
 
 static const creg_section_t completion_section = {
@@ -640,15 +669,21 @@ static const creg_section_t completion_section = {
  * Behavior Section Options
  * -------------------------------------------------------------------------- */
 static const creg_option_t behavior_options[] = {
-    {"auto_cd", CREG_VALUE_BOOLEAN,
+    {"auto_cd",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Auto-cd to directories", true},
-    {"spell_correction", CREG_VALUE_BOOLEAN,
+     "Auto-cd to directories",
+     true},
+    {"spell_correction",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable spell correction", true},
-    {"confirm_exit", CREG_VALUE_BOOLEAN,
+     "Enable spell correction",
+     true},
+    {"confirm_exit",
+     CREG_VALUE_BOOLEAN,
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Confirm before exit", true},
+     "Confirm before exit",
+     true},
 };
 
 static const creg_section_t behavior_section = {
@@ -681,7 +716,8 @@ static void history_sync_to_runtime(void) {
     if (config_registry_get_boolean("history.no_dups", &bval) == CREG_SUCCESS) {
         config.history_no_dups = bval;
     }
-    if (config_registry_get_boolean("history.timestamps", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("history.timestamps", &bval) ==
+        CREG_SUCCESS) {
         config.history_timestamps = bval;
     }
 }
@@ -693,7 +729,8 @@ static void history_sync_from_runtime(void) {
     config_registry_set_boolean("history.enabled", config.history_enabled);
     config_registry_set_integer("history.size", config.history_size);
     config_registry_set_boolean("history.no_dups", config.history_no_dups);
-    config_registry_set_boolean("history.timestamps", config.history_timestamps);
+    config_registry_set_boolean("history.timestamps",
+                                config.history_timestamps);
 }
 
 /**
@@ -703,13 +740,17 @@ static void shell_sync_to_runtime(void) {
     bool bval;
     char sval[CREG_VALUE_STRING_MAX];
 
-    if (config_registry_get_string("shell.mode", sval, sizeof(sval)) == CREG_SUCCESS) {
+    if (config_registry_get_string("shell.mode", sval, sizeof(sval)) ==
+        CREG_SUCCESS) {
         /* Map mode string to enum - use Unicode comparison */
-        if (lle_unicode_strings_equal(sval, "posix", &LLE_UNICODE_COMPARE_DEFAULT)) {
+        if (lle_unicode_strings_equal(sval, "posix",
+                                      &LLE_UNICODE_COMPARE_DEFAULT)) {
             config.shell_mode = SHELL_MODE_POSIX;
-        } else if (lle_unicode_strings_equal(sval, "bash", &LLE_UNICODE_COMPARE_DEFAULT)) {
+        } else if (lle_unicode_strings_equal(sval, "bash",
+                                             &LLE_UNICODE_COMPARE_DEFAULT)) {
             config.shell_mode = SHELL_MODE_BASH;
-        } else if (lle_unicode_strings_equal(sval, "zsh", &LLE_UNICODE_COMPARE_DEFAULT)) {
+        } else if (lle_unicode_strings_equal(sval, "zsh",
+                                             &LLE_UNICODE_COMPARE_DEFAULT)) {
             config.shell_mode = SHELL_MODE_ZSH;
         } else {
             config.shell_mode = SHELL_MODE_LUSH;
@@ -738,18 +779,30 @@ static void shell_sync_from_runtime(void) {
     /* Map mode enum to string */
     const char *mode_str = "lush";
     switch (config.shell_mode) {
-    case SHELL_MODE_POSIX: mode_str = "posix"; break;
-    case SHELL_MODE_BASH: mode_str = "bash"; break;
-    case SHELL_MODE_ZSH: mode_str = "zsh"; break;
-    case SHELL_MODE_LUSH: mode_str = "lush"; break;
+    case SHELL_MODE_POSIX:
+        mode_str = "posix";
+        break;
+    case SHELL_MODE_BASH:
+        mode_str = "bash";
+        break;
+    case SHELL_MODE_ZSH:
+        mode_str = "zsh";
+        break;
+    case SHELL_MODE_LUSH:
+        mode_str = "lush";
+        break;
     }
     config_registry_set_string("shell.mode", mode_str);
 
     /* POSIX options - read from shell_opts via config_get_shell_option */
-    config_registry_set_boolean("shell.errexit", config_get_shell_option("errexit"));
-    config_registry_set_boolean("shell.nounset", config_get_shell_option("nounset"));
-    config_registry_set_boolean("shell.xtrace", config_get_shell_option("xtrace"));
-    config_registry_set_boolean("shell.pipefail", config_get_shell_option("pipefail"));
+    config_registry_set_boolean("shell.errexit",
+                                config_get_shell_option("errexit"));
+    config_registry_set_boolean("shell.nounset",
+                                config_get_shell_option("nounset"));
+    config_registry_set_boolean("shell.xtrace",
+                                config_get_shell_option("xtrace"));
+    config_registry_set_boolean("shell.pipefail",
+                                config_get_shell_option("pipefail"));
 }
 
 /**
@@ -759,19 +812,24 @@ static void display_sync_to_runtime(void) {
     bool bval;
     int64_t ival;
 
-    if (config_registry_get_boolean("display.syntax_highlighting", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("display.syntax_highlighting", &bval) ==
+        CREG_SUCCESS) {
         config.display_syntax_highlighting = bval;
     }
-    if (config_registry_get_boolean("display.autosuggestions", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("display.autosuggestions", &bval) ==
+        CREG_SUCCESS) {
         config.display_autosuggestions = bval;
     }
-    if (config_registry_get_boolean("display.transient_prompt", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("display.transient_prompt", &bval) ==
+        CREG_SUCCESS) {
         config.display_transient_prompt = bval;
     }
-    if (config_registry_get_boolean("display.theme_hot_reload", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("display.theme_hot_reload", &bval) ==
+        CREG_SUCCESS) {
         config.display_theme_hot_reload = bval;
     }
-    if (config_registry_get_integer("display.optimization_level", &ival) == CREG_SUCCESS) {
+    if (config_registry_get_integer("display.optimization_level", &ival) ==
+        CREG_SUCCESS) {
         config.display_optimization_level = (int)ival;
     }
 }
@@ -780,11 +838,16 @@ static void display_sync_to_runtime(void) {
  * @brief Sync display config from runtime to registry
  */
 static void display_sync_from_runtime(void) {
-    config_registry_set_boolean("display.syntax_highlighting", config.display_syntax_highlighting);
-    config_registry_set_boolean("display.autosuggestions", config.display_autosuggestions);
-    config_registry_set_boolean("display.transient_prompt", config.display_transient_prompt);
-    config_registry_set_boolean("display.theme_hot_reload", config.display_theme_hot_reload);
-    config_registry_set_integer("display.optimization_level", config.display_optimization_level);
+    config_registry_set_boolean("display.syntax_highlighting",
+                                config.display_syntax_highlighting);
+    config_registry_set_boolean("display.autosuggestions",
+                                config.display_autosuggestions);
+    config_registry_set_boolean("display.transient_prompt",
+                                config.display_transient_prompt);
+    config_registry_set_boolean("display.theme_hot_reload",
+                                config.display_theme_hot_reload);
+    config_registry_set_integer("display.optimization_level",
+                                config.display_optimization_level);
 }
 
 /**
@@ -793,13 +856,16 @@ static void display_sync_from_runtime(void) {
 static void completion_sync_to_runtime(void) {
     bool bval;
 
-    if (config_registry_get_boolean("completion.enabled", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("completion.enabled", &bval) ==
+        CREG_SUCCESS) {
         config.completion_enabled = bval;
     }
-    if (config_registry_get_boolean("completion.fuzzy", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("completion.fuzzy", &bval) ==
+        CREG_SUCCESS) {
         config.fuzzy_completion = bval;
     }
-    if (config_registry_get_boolean("completion.case_sensitive", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("completion.case_sensitive", &bval) ==
+        CREG_SUCCESS) {
         config.completion_case_sensitive = bval;
     }
 }
@@ -808,9 +874,11 @@ static void completion_sync_to_runtime(void) {
  * @brief Sync completion config from runtime to registry
  */
 static void completion_sync_from_runtime(void) {
-    config_registry_set_boolean("completion.enabled", config.completion_enabled);
+    config_registry_set_boolean("completion.enabled",
+                                config.completion_enabled);
     config_registry_set_boolean("completion.fuzzy", config.fuzzy_completion);
-    config_registry_set_boolean("completion.case_sensitive", config.completion_case_sensitive);
+    config_registry_set_boolean("completion.case_sensitive",
+                                config.completion_case_sensitive);
 }
 
 /**
@@ -819,13 +887,16 @@ static void completion_sync_from_runtime(void) {
 static void behavior_sync_to_runtime(void) {
     bool bval;
 
-    if (config_registry_get_boolean("behavior.auto_cd", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("behavior.auto_cd", &bval) ==
+        CREG_SUCCESS) {
         config.auto_cd = bval;
     }
-    if (config_registry_get_boolean("behavior.spell_correction", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("behavior.spell_correction", &bval) ==
+        CREG_SUCCESS) {
         config.spell_correction = bval;
     }
-    if (config_registry_get_boolean("behavior.confirm_exit", &bval) == CREG_SUCCESS) {
+    if (config_registry_get_boolean("behavior.confirm_exit", &bval) ==
+        CREG_SUCCESS) {
         config.confirm_exit = bval;
     }
 }
@@ -835,7 +906,8 @@ static void behavior_sync_to_runtime(void) {
  */
 static void behavior_sync_from_runtime(void) {
     config_registry_set_boolean("behavior.auto_cd", config.auto_cd);
-    config_registry_set_boolean("behavior.spell_correction", config.spell_correction);
+    config_registry_set_boolean("behavior.spell_correction",
+                                config.spell_correction);
     config_registry_set_boolean("behavior.confirm_exit", config.confirm_exit);
 }
 
@@ -1107,7 +1179,8 @@ bool config_get_shell_option(const char *option_name) {
     // Remove "shell." prefix to get the actual option name
     const char *opt_name = option_name + 6; // Skip "shell."
 
-    // Use existing shell option flags - same logic as builtin_set status display
+    // Use existing shell option flags - same logic as builtin_set status
+    // display
     if (strcmp(opt_name, "errexit") == 0) {
         return shell_opts.exit_on_error;
     } else if (strcmp(opt_name, "xtrace") == 0) {
@@ -1303,7 +1376,8 @@ int config_execute_script_file(const char *path) {
     }
 
     // Use the same approach as bin_source builtin - read complete multi-line
-    // constructs instead of line by line to handle if/then/fi, while/do/done, etc.
+    // constructs instead of line by line to handle if/then/fi, while/do/done,
+    // etc.
     FILE *file = fopen(path, "r");
     if (!file) {
         return -1;
@@ -1394,7 +1468,8 @@ int config_execute_script_file(const char *path) {
  * 2. /etc/profile (standard POSIX login config, if exists)
  * 3. /etc/profile.d/ shell scripts (*.sh files, alphabetically)
  *
- * This should be called BEFORE user profile scripts (~/.profile, ~/.lush_login).
+ * This should be called BEFORE user profile scripts (~/.profile,
+ * ~/.lush_login).
  *
  * @return 0 on success, -1 if any script fails (non-fatal, continues execution)
  */
@@ -1409,7 +1484,8 @@ int config_execute_system_profile(void) {
     // This runs in native lush mode since it's a lush-specific file
     if (config_script_exists("/etc/lushrc")) {
         if (config_execute_script_file("/etc/lushrc") != 0) {
-            // Log warning but continue - system config failure shouldn't block login
+            // Log warning but continue - system config failure shouldn't block
+            // login
             fprintf(stderr, "lush: warning: error sourcing /etc/lushrc\n");
             result = -1;
         }
@@ -1990,8 +2066,7 @@ int config_init(void) {
             fprintf(stderr,
                     "lush: Loading configuration from %s (legacy location)\n",
                     config_ctx.user_config_path);
-            fprintf(stderr,
-                    "lush: Run 'config save' to migrate to %s\n",
+            fprintf(stderr, "lush: Run 'config save' to migrate to %s\n",
                     xdg_path);
         }
     }
@@ -2128,8 +2203,8 @@ void config_set_defaults(void) {
     config.script_execution = true;
 
     // Shell mode defaults (Phase 0: Extended Language Support)
-    config.shell_mode = SHELL_MODE_LUSH;  // Curated best of Bash/Zsh
-    config.shell_mode_strict = false;        // Allow runtime mode changes
+    config.shell_mode = SHELL_MODE_LUSH; // Curated best of Bash/Zsh
+    config.shell_mode_strict = false;    // Allow runtime mode changes
 
     // Line editor - LLE is always enabled (sole line editor)
     // LLE is the only line editor - no config option needed
@@ -2137,7 +2212,8 @@ void config_set_defaults(void) {
 
 /* ============================================================================
  * XDG Path Resolution Helpers
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get the user's home directory
@@ -2243,7 +2319,7 @@ int config_get_xdg_config_path(char *buffer, size_t size) {
 
     int written = snprintf(buffer, size, "%s/%s", xdg_dir, CONFIG_XDG_FILE);
     if (written < 0 || (size_t)written >= size) {
-        return -1;  // Path truncated
+        return -1; // Path truncated
     }
     return 0;
 }
@@ -2295,9 +2371,7 @@ int config_get_script_config_path(char *buffer, size_t size) {
  *
  * @return true if legacy config exists and XDG config does not
  */
-bool config_needs_migration(void) {
-    return config_ctx.needs_migration;
-}
+bool config_needs_migration(void) { return config_ctx.needs_migration; }
 
 /**
  * @brief Ensure XDG config directory exists
@@ -2470,10 +2544,8 @@ int config_save_user(void) {
         if (result == 0) {
             /* Update context to point to new location */
             if (config_ctx.needs_migration) {
-                fprintf(stderr, "lush: Configuration saved to %s\n",
-                        xdg_path);
-                fprintf(stderr,
-                        "lush: You may remove the old %s file\n",
+                fprintf(stderr, "lush: Configuration saved to %s\n", xdg_path);
+                fprintf(stderr, "lush: You may remove the old %s file\n",
                         config_ctx.legacy_config_path
                             ? config_ctx.legacy_config_path
                             : "~/.lushrc");
@@ -3107,7 +3179,7 @@ bool config_validate_lle_dedup_strategy(const char *value) {
 bool config_validate_shell_mode(const char *value) {
     return (strcmp(value, "posix") == 0 || strcmp(value, "bash") == 0 ||
             strcmp(value, "zsh") == 0 || strcmp(value, "lush") == 0 ||
-            strcmp(value, "sh") == 0);  /* sh is alias for posix */
+            strcmp(value, "sh") == 0); /* sh is alias for posix */
 }
 
 /**
@@ -3154,7 +3226,8 @@ const char *config_get_last_error(void) { return last_error; }
 
 /* ============================================================================
  * Type-Safe Configuration Setters and Getters
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Set a boolean configuration value
@@ -3167,13 +3240,13 @@ int config_set_bool(const char *key, bool value) {
     for (int i = 0; i < num_config_options; i++) {
         if (strcmp(config_options[i].name, key) == 0) {
             if (config_options[i].type != CONFIG_TYPE_BOOL) {
-                return -1;  // Type mismatch
+                return -1; // Type mismatch
             }
             *(bool *)config_options[i].value_ptr = value;
             return 0;
         }
     }
-    return -1;  // Key not found
+    return -1; // Key not found
 }
 
 /**
@@ -3188,13 +3261,13 @@ int config_set_int(const char *key, int value) {
         if (strcmp(config_options[i].name, key) == 0) {
             if (config_options[i].type != CONFIG_TYPE_INT &&
                 config_options[i].type != CONFIG_TYPE_ENUM) {
-                return -1;  // Type mismatch
+                return -1; // Type mismatch
             }
             *(int *)config_options[i].value_ptr = value;
             return 0;
         }
     }
-    return -1;  // Key not found
+    return -1; // Key not found
 }
 
 /**
@@ -3209,7 +3282,7 @@ int config_set_string(const char *key, const char *value) {
         if (strcmp(config_options[i].name, key) == 0) {
             if (config_options[i].type != CONFIG_TYPE_STRING &&
                 config_options[i].type != CONFIG_TYPE_COLOR) {
-                return -1;  // Type mismatch
+                return -1; // Type mismatch
             }
             char **ptr = (char **)config_options[i].value_ptr;
             if (*ptr) {
@@ -3219,7 +3292,7 @@ int config_set_string(const char *key, const char *value) {
             return 0;
         }
     }
-    return -1;  // Key not found
+    return -1; // Key not found
 }
 
 /**
@@ -3300,7 +3373,8 @@ void builtin_config(int argc, char **argv) {
         printf("  get key            - Get configuration value\n");
         printf("  reload             - Reload configuration files\n");
         printf("  save               - Save current configuration\n");
-        printf("  migrate            - Migrate legacy ~/.lushrc to XDG location\n");
+        printf("  migrate            - Migrate legacy ~/.lushrc to XDG "
+               "location\n");
         printf("  path               - Show configuration file paths\n");
         printf("  reset-defaults     - Write default configuration\n");
         return;
@@ -3408,10 +3482,12 @@ void builtin_config(int argc, char **argv) {
             if (config_get_xdg_config_path(xdg_path, sizeof(xdg_path)) == 0) {
                 struct stat st;
                 if (stat(xdg_path, &st) == 0) {
-                    printf("Configuration already at XDG location: %s\n", xdg_path);
+                    printf("Configuration already at XDG location: %s\n",
+                           xdg_path);
                 } else {
                     printf("No legacy configuration to migrate.\n");
-                    printf("Use 'config save' to create a new configuration.\n");
+                    printf(
+                        "Use 'config save' to create a new configuration.\n");
                 }
             }
             return;
@@ -3439,10 +3515,12 @@ void builtin_config(int argc, char **argv) {
             printf("  Legacy config: %s\n", config_ctx.legacy_config_path);
         }
         printf("  Format: %s\n",
-               config_ctx.format == CONFIG_FORMAT_TOML ? "TOML" :
-               config_ctx.format == CONFIG_FORMAT_LEGACY ? "Legacy INI" : "Unknown");
+               config_ctx.format == CONFIG_FORMAT_TOML     ? "TOML"
+               : config_ctx.format == CONFIG_FORMAT_LEGACY ? "Legacy INI"
+                                                           : "Unknown");
         if (config_ctx.needs_migration) {
-            printf("  Status: Migration pending (run 'config migrate' or 'config save')\n");
+            printf("  Status: Migration pending (run 'config migrate' or "
+                   "'config save')\n");
         }
     } else {
         printf("Unknown config command: %s\n", argv[1]);
@@ -3459,15 +3537,15 @@ void builtin_config(int argc, char **argv) {
 void config_get_value(const char *key) {
     // Handle shell.feature.* keys dynamically (not in config_options array)
     if (strncmp(key, "shell.feature.", 14) == 0) {
-        const char *feature_name = key + 14;  // Skip "shell.feature."
+        const char *feature_name = key + 14; // Skip "shell.feature."
         shell_feature_t feature;
-        
+
         if (!shell_feature_parse(feature_name, &feature)) {
             printf("Unknown feature: %s\n", feature_name);
             printf("Use 'debug features' to see available features\n");
             return;
         }
-        
+
         printf("%s\n", shell_mode_allows(feature) ? "true" : "false");
         return;
     }
@@ -3489,7 +3567,8 @@ void config_get_value(const char *key) {
                 return;
             }
 
-            // Handle other shell options specially - they use integration functions
+            // Handle other shell options specially - they use integration
+            // functions
             if (strncmp(key, "shell.", 6) == 0) {
                 printf("%s\n", config_get_shell_option(key) ? "true" : "false");
                 return;
@@ -3554,15 +3633,15 @@ void config_get_value(const char *key) {
 void config_set_value(const char *key, const char *value) {
     // Handle shell.feature.* keys dynamically (not in config_options array)
     if (strncmp(key, "shell.feature.", 14) == 0) {
-        const char *feature_name = key + 14;  // Skip "shell.feature."
+        const char *feature_name = key + 14; // Skip "shell.feature."
         shell_feature_t feature;
-        
+
         if (!shell_feature_parse(feature_name, &feature)) {
             printf("Unknown feature: %s\n", feature_name);
             printf("Use 'debug features' to see available features\n");
             return;
         }
-        
+
         bool enable;
         if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
             strcmp(value, "on") == 0) {
@@ -3571,10 +3650,11 @@ void config_set_value(const char *key, const char *value) {
                    strcmp(value, "off") == 0) {
             enable = false;
         } else {
-            printf("Invalid boolean value: %s (use true/false/on/off)\n", value);
+            printf("Invalid boolean value: %s (use true/false/on/off)\n",
+                   value);
             return;
         }
-        
+
         if (enable) {
             shell_feature_enable(feature);
         } else {
@@ -3589,7 +3669,8 @@ void config_set_value(const char *key, const char *value) {
         config_option_t *opt = &config_options[i];
 
         if (strcmp(opt->name, key) == 0) {
-            // Handle shell.mode specially - it's an enum that also updates shell_mode system
+            // Handle shell.mode specially - it's an enum that also updates
+            // shell_mode system
             if (strcmp(key, "shell.mode") == 0) {
                 shell_mode_t new_mode;
                 if (strcmp(value, "posix") == 0 || strcmp(value, "sh") == 0) {
@@ -3601,7 +3682,8 @@ void config_set_value(const char *key, const char *value) {
                 } else if (strcmp(value, "lush") == 0) {
                     new_mode = SHELL_MODE_LUSH;
                 } else {
-                    printf("Invalid shell mode: %s (use posix/bash/zsh/lush)\n", value);
+                    printf("Invalid shell mode: %s (use posix/bash/zsh/lush)\n",
+                           value);
                     return;
                 }
                 if (!shell_mode_set(new_mode)) {
@@ -3624,7 +3706,9 @@ void config_set_value(const char *key, const char *value) {
                            strcmp(value, "off") == 0) {
                     strict = false;
                 } else {
-                    printf("Invalid boolean value: %s (use true/false/on/off)\n", value);
+                    printf(
+                        "Invalid boolean value: %s (use true/false/on/off)\n",
+                        value);
                     return;
                 }
                 shell_mode_set_strict(strict);
@@ -3633,7 +3717,8 @@ void config_set_value(const char *key, const char *value) {
                 return;
             }
 
-            // Handle other shell options specially - they use integration functions
+            // Handle other shell options specially - they use integration
+            // functions
             if (strncmp(key, "shell.", 6) == 0) {
                 if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
                     strcmp(value, "on") == 0) {

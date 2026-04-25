@@ -38,7 +38,8 @@ static bool is_function_definition(parser_t *parser);
 static node_t *parse_logical_expression(parser_t *parser);
 static node_t *parse_redirection(parser_t *parser);
 static bool is_redirection_token(token_type_t type);
-static bool parse_trailing_redirections(parser_t *parser, node_t *compound_node);
+static bool parse_trailing_redirections(parser_t *parser,
+                                        node_t *compound_node);
 
 // Forward declarations for extended language features (Phase 1)
 static node_t *parse_arithmetic_command(parser_t *parser);
@@ -99,8 +100,8 @@ parser_t *parser_new_with_source(const char *input, const char *source_name) {
 
     /* Initialize structured error collection */
     parser->source_name = source_name ? source_name : "<stdin>";
-    parser->error_collector = shell_error_collector_new(
-        input, strlen(input), parser->source_name, 0);
+    parser->error_collector =
+        shell_error_collector_new(input, strlen(input), parser->source_name, 0);
 
     /* Initialize parser context stack */
     parser->context_depth = 0;
@@ -119,7 +120,7 @@ void parser_set_source_name(parser_t *parser, const char *source_name) {
         return;
     }
     parser->source_name = source_name ? source_name : "<stdin>";
-    
+
     /* Update error collector's source_name too if it exists */
     if (parser->error_collector) {
         parser->error_collector->source_name = parser->source_name;
@@ -176,7 +177,8 @@ static void set_parser_error(parser_t *parser, const char *message) {
 
 /* ============================================================================
  * Structured Error Collection (Phase 2)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Convert a token to a source location
@@ -185,18 +187,17 @@ static void set_parser_error(parser_t *parser, const char *message) {
  * @param filename Source filename (or NULL for "<stdin>")
  * @return Source location structure
  */
-source_location_t token_to_source_location(token_t *token, const char *filename) {
+source_location_t token_to_source_location(token_t *token,
+                                           const char *filename) {
     if (!token) {
         return SOURCE_LOC_UNKNOWN;
     }
 
-    return (source_location_t){
-        .filename = filename ? filename : "<stdin>",
-        .line = token->line,
-        .column = token->column,
-        .offset = token->position,
-        .length = token->length
-    };
+    return (source_location_t){.filename = filename ? filename : "<stdin>",
+                               .line = token->line,
+                               .column = token->column,
+                               .offset = token->position,
+                               .length = token->length};
 }
 
 /**
@@ -215,13 +216,14 @@ void parser_error_add(parser_t *parser, shell_error_code_t code,
 
     /* Get current token for location */
     token_t *current = tokenizer_current(parser->tokenizer);
-    source_location_t loc = token_to_source_location(current, parser->source_name);
+    source_location_t loc =
+        token_to_source_location(current, parser->source_name);
 
     /* Create the error */
     va_list args;
     va_start(args, fmt);
-    shell_error_t *error = shell_error_createv(code, SHELL_SEVERITY_ERROR,
-                                                loc, fmt, args);
+    shell_error_t *error =
+        shell_error_createv(code, SHELL_SEVERITY_ERROR, loc, fmt, args);
     va_end(args);
 
     if (!error) {
@@ -232,12 +234,12 @@ void parser_error_add(parser_t *parser, shell_error_code_t code,
 
     /* Try to get source line for context display */
     if (parser->error_collector && loc.line > 0) {
-        char *source_line = shell_error_collector_get_line(
-            parser->error_collector, loc.line);
+        char *source_line =
+            shell_error_collector_get_line(parser->error_collector, loc.line);
         if (source_line) {
-            shell_error_set_source_line(error, source_line,
-                                        loc.column > 0 ? loc.column - 1 : 0,
-                                        loc.column > 0 ? loc.column - 1 + loc.length : loc.length);
+            shell_error_set_source_line(
+                error, source_line, loc.column > 0 ? loc.column - 1 : 0,
+                loc.column > 0 ? loc.column - 1 + loc.length : loc.length);
             free(source_line);
         }
     }
@@ -247,7 +249,8 @@ void parser_error_add(parser_t *parser, shell_error_code_t code,
         shell_error_collector_add(parser->error_collector, error);
     } else {
         /* Fallback: just set legacy error and free */
-        set_parser_error(parser, error->message ? error->message : "parse error");
+        set_parser_error(parser,
+                         error->message ? error->message : "parse error");
         shell_error_free(error);
     }
 
@@ -286,7 +289,8 @@ shell_error_collector_t *parser_get_error_collector(parser_t *parser) {
 
 /* ============================================================================
  * Parser Context Stack
- * ============================================================================ */
+ * ============================================================================
+ */
 
 void parser_push_context(parser_t *parser, const char *context) {
     if (!parser || !context) {
@@ -307,7 +311,8 @@ void parser_pop_context(parser_t *parser) {
 
 /* ============================================================================
  * Recursion Depth Tracking (Stack Overflow Protection)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Enter a recursive parsing operation
@@ -327,7 +332,8 @@ bool parser_enter_recursion(parser_t *parser) {
     parser->recursion_depth++;
 
     if (parser->recursion_depth > PARSER_MAX_RECURSION_DEPTH) {
-        parser_error_add_with_help(parser, SHELL_ERR_RESOURCE_LIMIT,
+        parser_error_add_with_help(
+            parser, SHELL_ERR_RESOURCE_LIMIT,
             "reduce nesting depth or simplify the script",
             "maximum parsing depth exceeded (%zu levels) - "
             "possible stack overflow attack or excessively nested code",
@@ -388,13 +394,14 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
 
     /* Get current token for location */
     token_t *current = tokenizer_current(parser->tokenizer);
-    source_location_t loc = token_to_source_location(current, parser->source_name);
+    source_location_t loc =
+        token_to_source_location(current, parser->source_name);
 
     /* Create the error */
     va_list args;
     va_start(args, fmt);
-    shell_error_t *error = shell_error_createv(code, SHELL_SEVERITY_ERROR,
-                                                loc, fmt, args);
+    shell_error_t *error =
+        shell_error_createv(code, SHELL_SEVERITY_ERROR, loc, fmt, args);
     va_end(args);
 
     if (!error) {
@@ -405,12 +412,12 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
 
     /* Try to get source line for context display */
     if (parser->error_collector && loc.line > 0) {
-        char *source_line = shell_error_collector_get_line(
-            parser->error_collector, loc.line);
+        char *source_line =
+            shell_error_collector_get_line(parser->error_collector, loc.line);
         if (source_line) {
-            shell_error_set_source_line(error, source_line,
-                                        loc.column > 0 ? loc.column - 1 : 0,
-                                        loc.column > 0 ? loc.column - 1 + loc.length : loc.length);
+            shell_error_set_source_line(
+                error, source_line, loc.column > 0 ? loc.column - 1 : 0,
+                loc.column > 0 ? loc.column - 1 + loc.length : loc.length);
             free(source_line);
         }
     }
@@ -430,7 +437,8 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
         shell_error_collector_add(parser->error_collector, error);
     } else {
         /* Fallback: just set legacy error and free */
-        set_parser_error(parser, error->message ? error->message : "parse error");
+        set_parser_error(parser,
+                         error->message ? error->message : "parse error");
         shell_error_free(error);
     }
 
@@ -451,8 +459,7 @@ static bool expect_token(parser_t *parser, token_type_t expected) {
     if (!tokenizer_match(parser->tokenizer, expected)) {
         token_t *current = tokenizer_current(parser->tokenizer);
         parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "expected '%s', got '%s'",
-                         token_type_name(expected),
+                         "expected '%s', got '%s'", token_type_name(expected),
                          current ? token_type_name(current->type) : "EOF");
         return false;
     }
@@ -474,10 +481,10 @@ static bool expect_token_with_help(parser_t *parser, token_type_t expected,
                                    const char *help) {
     if (!tokenizer_match(parser->tokenizer, expected)) {
         token_t *current = tokenizer_current(parser->tokenizer);
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN, help,
-                                   "expected '%s', got '%s'",
-                                   token_type_name(expected),
-                                   current ? token_type_name(current->type) : "EOF");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN, help, "expected '%s', got '%s'",
+            token_type_name(expected),
+            current ? token_type_name(current->type) : "EOF");
         return false;
     }
     tokenizer_advance(parser->tokenizer);
@@ -767,8 +774,8 @@ static node_t *parse_pipeline(parser_t *parser) {
     // Check for negation prefix (! pipeline)
     bool negate = false;
     token_t *current = tokenizer_current(parser->tokenizer);
-    if (current && current->type == TOK_WORD && 
-        current->length == 1 && current->text[0] == '!') {
+    if (current && current->type == TOK_WORD && current->length == 1 &&
+        current->text[0] == '!') {
         negate = true;
         tokenizer_advance(parser->tokenizer); // consume !
         // Skip whitespace after !
@@ -897,16 +904,16 @@ static node_t *parse_simple_command(parser_t *parser) {
                 size_t saved_pos = current->position;
                 size_t saved_line = parser->tokenizer->line;
                 size_t saved_col = parser->tokenizer->column;
-                
+
                 tokenizer_advance(parser->tokenizer); // consume (
                 tokenizer_advance(parser->tokenizer); // consume )
                 token_t *after_paren = tokenizer_current(parser->tokenizer);
-                
+
                 if (after_paren && after_paren->type == TOK_LBRACE) {
                     // This is an anonymous function () { body }
                     return parse_anonymous_function(parser);
                 }
-                
+
                 // Not anonymous function - restore tokenizer state
                 parser->tokenizer->position = saved_pos;
                 parser->tokenizer->line = saved_line;
@@ -946,7 +953,8 @@ static node_t *parse_simple_command(parser_t *parser) {
             return parse_coproc(parser);
         default:
             // Other keywords (like ESAC, FI, DONE, etc.) are handled by their
-            // parent constructs - returning NULL here lets the parent detect them
+            // parent constructs - returning NULL here lets the parent detect
+            // them
             return NULL;
         }
     }
@@ -1001,10 +1009,11 @@ static node_t *parse_simple_command(parser_t *parser) {
                 // Get value token - must copy before advancing
                 token_t *value_token = tokenizer_current(parser->tokenizer);
                 char *value_str = NULL;
-                if (value_token && (token_is_word_like(value_token->type) ||
-                                   value_token->type == TOK_VARIABLE ||
-                                   value_token->type == TOK_STRING ||
-                                   value_token->type == TOK_EXPANDABLE_STRING)) {
+                if (value_token &&
+                    (token_is_word_like(value_token->type) ||
+                     value_token->type == TOK_VARIABLE ||
+                     value_token->type == TOK_STRING ||
+                     value_token->type == TOK_EXPANDABLE_STRING)) {
                     value_str = strdup(value_token->text);
                     tokenizer_advance(parser->tokenizer); // consume value
                 }
@@ -1063,7 +1072,8 @@ static node_t *parse_simple_command(parser_t *parser) {
             }
         }
 
-        if (next && (next->type == TOK_ASSIGN || next->type == TOK_PLUS_ASSIGN)) {
+        if (next &&
+            (next->type == TOK_ASSIGN || next->type == TOK_PLUS_ASSIGN)) {
             bool is_append = (next->type == TOK_PLUS_ASSIGN);
 
             // Save variable name BEFORE advancing tokenizer
@@ -1086,7 +1096,8 @@ static node_t *parse_simple_command(parser_t *parser) {
                     return NULL;
                 }
                 // Create array assignment or append node
-                node_t *assign_node = new_node(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN);
+                node_t *assign_node =
+                    new_node(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN);
                 if (!assign_node) {
                     free(var_name);
                     free_node_tree(array_node);
@@ -1113,7 +1124,7 @@ static node_t *parse_simple_command(parser_t *parser) {
                  value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
                  value->type == TOK_COMMAND_SUB ||
                  value->type == TOK_BACKQUOTE)) {
-                
+
                 // Build complete value by concatenating adjacent tokens
                 size_t value_capacity = 256;
                 size_t value_len = 0;
@@ -1124,31 +1135,33 @@ static node_t *parse_simple_command(parser_t *parser) {
                     return NULL;
                 }
                 full_value[0] = '\0';
-                
-                while (value &&
-                       (token_is_word_like(value->type) ||
-                        value->type == TOK_VARIABLE || 
-                        value->type == TOK_ARITH_EXP ||
-                        value->type == TOK_COMMAND_SUB ||
-                        value->type == TOK_BACKQUOTE)) {
-                    
-                    // Check if this word is followed by = (making it a new assignment)
-                    // If so, stop - this word belongs to the next assignment
+
+                while (value && (token_is_word_like(value->type) ||
+                                 value->type == TOK_VARIABLE ||
+                                 value->type == TOK_ARITH_EXP ||
+                                 value->type == TOK_COMMAND_SUB ||
+                                 value->type == TOK_BACKQUOTE)) {
+
+                    // Check if this word is followed by = (making it a new
+                    // assignment) If so, stop - this word belongs to the next
+                    // assignment
                     if (token_is_word_like(value->type)) {
                         token_t *peek = tokenizer_peek(parser->tokenizer);
-                        if (peek && (peek->type == TOK_ASSIGN || 
+                        if (peek && (peek->type == TOK_ASSIGN ||
                                      peek->type == TOK_PLUS_ASSIGN)) {
                             break; // This word starts a new assignment
                         }
                     }
-                    
+
                     size_t token_len = strlen(value->text);
                     // For single-quoted strings, add 2 for surrounding quotes
                     size_t extra_len = (value->type == TOK_STRING) ? 2 : 0;
-                    
+
                     // Grow buffer if needed
-                    if (value_len + token_len + extra_len + 1 > value_capacity) {
-                        value_capacity = (value_len + token_len + extra_len + 1) * 2;
+                    if (value_len + token_len + extra_len + 1 >
+                        value_capacity) {
+                        value_capacity =
+                            (value_len + token_len + extra_len + 1) * 2;
                         char *new_value = realloc(full_value, value_capacity);
                         if (!new_value) {
                             free(full_value);
@@ -1158,10 +1171,11 @@ static node_t *parse_simple_command(parser_t *parser) {
                         }
                         full_value = new_value;
                     }
-                    
+
                     // Add token with appropriate quoting
-                    // Only single quotes need to be preserved to prevent expansion
-                    // Double quotes: expand variables but don't keep quotes
+                    // Only single quotes need to be preserved to prevent
+                    // expansion Double quotes: expand variables but don't keep
+                    // quotes
                     if (value->type == TOK_STRING) {
                         // Single-quoted: preserve quotes to prevent expansion
                         strcat(full_value, "'");
@@ -1173,14 +1187,15 @@ static node_t *parse_simple_command(parser_t *parser) {
                         strcat(full_value, value->text);
                         value_len += token_len;
                     }
-                    
+
                     tokenizer_advance(parser->tokenizer); // consume this token
                     value = tokenizer_current(parser->tokenizer);
                 }
-                
+
                 // Build final assignment string: var=value or var+=value
                 size_t var_len = strlen(var_name);
-                char *assignment = malloc(var_len + (is_append ? 2 : 1) + value_len + 1);
+                char *assignment =
+                    malloc(var_len + (is_append ? 2 : 1) + value_len + 1);
                 if (assignment) {
                     strcpy(assignment, var_name);
                     strcat(assignment, is_append ? "+=" : "=");
@@ -1212,29 +1227,34 @@ static node_t *parse_simple_command(parser_t *parser) {
         const char *text = current->text;
         if (text && text[0] == '$' && text[1] == '(') {
             if (text[2] == '(') {
-                parser_push_context(parser, "parsing arithmetic expansion $((..))");
-                parser_error_add_with_help(parser, SHELL_ERR_UNCLOSED_SUBST,
-                                 "arithmetic expansion requires closing '))'",
-                                 "unterminated arithmetic expansion $((");
+                parser_push_context(parser,
+                                    "parsing arithmetic expansion $((..))");
+                parser_error_add_with_help(
+                    parser, SHELL_ERR_UNCLOSED_SUBST,
+                    "arithmetic expansion requires closing '))'",
+                    "unterminated arithmetic expansion $((");
                 parser_pop_context(parser);
             } else {
-                parser_push_context(parser, "parsing command substitution $(...)");
-                parser_error_add_with_help(parser, SHELL_ERR_UNCLOSED_SUBST,
-                                 "command substitution requires closing ')'",
-                                 "unterminated command substitution $(");
+                parser_push_context(parser,
+                                    "parsing command substitution $(...)");
+                parser_error_add_with_help(
+                    parser, SHELL_ERR_UNCLOSED_SUBST,
+                    "command substitution requires closing ')'",
+                    "unterminated command substitution $(");
                 parser_pop_context(parser);
             }
         } else if (text && text[0] == '`') {
             parser_push_context(parser, "parsing backtick substitution `...`");
-            parser_error_add_with_help(parser, SHELL_ERR_UNCLOSED_SUBST,
-                             "backtick substitution requires closing '`'",
-                             "unterminated backtick command substitution");
+            parser_error_add_with_help(
+                parser, SHELL_ERR_UNCLOSED_SUBST,
+                "backtick substitution requires closing '`'",
+                "unterminated backtick command substitution");
             parser_pop_context(parser);
         } else {
             parser_push_context(parser, "parsing quoted string");
             parser_error_add_with_help(parser, SHELL_ERR_UNCLOSED_QUOTE,
-                             "strings must be properly closed",
-                             "unterminated quoted string");
+                                       "strings must be properly closed",
+                                       "unterminated quoted string");
             parser_pop_context(parser);
         }
         return NULL;
@@ -1243,12 +1263,14 @@ static node_t *parse_simple_command(parser_t *parser) {
     if (!token_is_word_like(current->type) && current->type != TOK_LBRACKET) {
         parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
                          "expected command name, got '%s'",
-                         current->text ? current->text : token_type_name(current->type));
+                         current->text ? current->text
+                                       : token_type_name(current->type));
         return NULL;
     }
 
     /* Create command node with source location from current token */
-    source_location_t cmd_loc = token_to_source_location(current, parser->source_name);
+    source_location_t cmd_loc =
+        token_to_source_location(current, parser->source_name);
     node_t *command = new_node_at(NODE_COMMAND, cmd_loc);
     if (!command) {
         return NULL;
@@ -1295,7 +1317,7 @@ static node_t *parse_simple_command(parser_t *parser) {
             }
 
             add_child_node(command, redir_node);
-            continue;  // Continue to check for more redirections/arguments
+            continue; // Continue to check for more redirections/arguments
         }
         // Handle process substitution <(cmd) and >(cmd)
         else if (arg_token->type == TOK_PROC_SUB_IN ||
@@ -1306,17 +1328,19 @@ static node_t *parse_simple_command(parser_t *parser) {
                 return NULL;
             }
             add_child_node(command, proc_sub_node);
-            continue;  // Continue to check for more arguments
+            continue; // Continue to check for more arguments
         }
         // Handle array literal arguments: name=(...) or name+=(...)
         // This allows declare -A map=([key]=value) to work
         else if (token_is_word_like(arg_token->type) &&
                  shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
-            // Peek ahead to see if this is word followed by = or += 
-            // Check if next token (lookahead) is = or +=, and the one after is (
+            // Peek ahead to see if this is word followed by = or +=
+            // Check if next token (lookahead) is = or +=, and the one after is
+            // (
             token_t *peek1 = tokenizer_peek(parser->tokenizer);
-            
-            if (peek1 && (peek1->type == TOK_ASSIGN || peek1->type == TOK_PLUS_ASSIGN)) {
+
+            if (peek1 &&
+                (peek1->type == TOK_ASSIGN || peek1->type == TOK_PLUS_ASSIGN)) {
                 // Check if = or += is immediately adjacent (no whitespace)
                 size_t word_end = arg_token->position + strlen(arg_token->text);
                 if (peek1->position == word_end) {
@@ -1326,13 +1350,15 @@ static node_t *parse_simple_command(parser_t *parser) {
                     // Peek at the input directly to see if ( follows
                     if (assign_end < parser->tokenizer->input_length &&
                         parser->tokenizer->input[assign_end] == '(') {
-                        // This is an array literal argument: name=(...) or name+=(...)
+                        // This is an array literal argument: name=(...) or
+                        // name+=(...)
                         char *var_name = strdup(arg_token->text);
                         bool is_append = (peek1->type == TOK_PLUS_ASSIGN);
-                        
-                        tokenizer_advance(parser->tokenizer); // consume var name
+
+                        tokenizer_advance(
+                            parser->tokenizer); // consume var name
                         tokenizer_advance(parser->tokenizer); // consume = or +=
-                        
+
                         // Now parse the array literal
                         node_t *array_node = parse_array_literal(parser);
                         if (!array_node) {
@@ -1340,20 +1366,23 @@ static node_t *parse_simple_command(parser_t *parser) {
                             free_node_tree(command);
                             return NULL;
                         }
-                        
-                        // Build a string representation for the argument: name=(...) 
-                        // The builtin will parse this
-                        size_t total_len = strlen(var_name) + (is_append ? 2 : 1) + 2; // name + = or += + ()
-                        
+
+                        // Build a string representation for the argument:
+                        // name=(...) The builtin will parse this
+                        size_t total_len = strlen(var_name) +
+                                           (is_append ? 2 : 1) +
+                                           2; // name + = or += + ()
+
                         // Count total length of elements
                         node_t *elem = array_node->first_child;
                         while (elem) {
                             if (elem->val.str) {
-                                total_len += strlen(elem->val.str) + 1; // element + space
+                                total_len += strlen(elem->val.str) +
+                                             1; // element + space
                             }
                             elem = elem->next_sibling;
                         }
-                        
+
                         char *arg_str = malloc(total_len + 1);
                         if (arg_str) {
                             strcpy(arg_str, var_name);
@@ -1362,16 +1391,18 @@ static node_t *parse_simple_command(parser_t *parser) {
                             bool first = true;
                             while (elem) {
                                 if (elem->val.str) {
-                                    if (!first) strcat(arg_str, " ");
+                                    if (!first)
+                                        strcat(arg_str, " ");
                                     strcat(arg_str, elem->val.str);
                                     first = false;
                                 }
                                 elem = elem->next_sibling;
                             }
                             strcat(arg_str, ")");
-                            
-                            // Use NODE_STRING_LITERAL to prevent glob/brace expansion
-                            // The array literal syntax [key]=value should be passed literally
+
+                            // Use NODE_STRING_LITERAL to prevent glob/brace
+                            // expansion The array literal syntax [key]=value
+                            // should be passed literally
                             node_t *arg_node = new_node(NODE_STRING_LITERAL);
                             if (arg_node) {
                                 arg_node->val.str = arg_str;
@@ -1381,7 +1412,7 @@ static node_t *parse_simple_command(parser_t *parser) {
                                 free(arg_str);
                             }
                         }
-                        
+
                         free(var_name);
                         free_node_tree(array_node);
                         continue; // Skip to next argument
@@ -1392,17 +1423,16 @@ static node_t *parse_simple_command(parser_t *parser) {
         }
         // Handle all argument tokens with unified concatenation logic
         if (arg_token->type == TOK_STRING ||
-                 arg_token->type == TOK_EXPANDABLE_STRING ||
-                 arg_token->type == TOK_ARITH_EXP ||
-                 arg_token->type == TOK_COMMAND_SUB ||
-                 arg_token->type == TOK_BACKQUOTE ||
-                 token_is_word_like(arg_token->type) ||
-                 token_is_keyword(arg_token->type) ||
-                 arg_token->type == TOK_VARIABLE ||
-                 arg_token->type == TOK_RBRACKET ||
-                 arg_token->type == TOK_ASSIGN || arg_token->type == TOK_GLOB ||
-                 arg_token->type == TOK_QUESTION ||
-                 arg_token->type == TOK_NOT_EQUAL) {
+            arg_token->type == TOK_EXPANDABLE_STRING ||
+            arg_token->type == TOK_ARITH_EXP ||
+            arg_token->type == TOK_COMMAND_SUB ||
+            arg_token->type == TOK_BACKQUOTE ||
+            token_is_word_like(arg_token->type) ||
+            token_is_keyword(arg_token->type) ||
+            arg_token->type == TOK_VARIABLE ||
+            arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+            arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
+            arg_token->type == TOK_NOT_EQUAL) {
 
             // Check for consecutive tokens that should be concatenated
             typedef struct {
@@ -1541,15 +1571,17 @@ static node_t *parse_brace_group(parser_t *parser) {
 
     token_t *current = tokenizer_current(parser->tokenizer);
     if (!current || current->type != TOK_LBRACE) {
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "brace groups execute commands in the current shell",
-                         "expected '{'");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "brace groups execute commands in the current shell",
+            "expected '{'");
         parser_exit_recursion(parser);
         return NULL;
     }
 
     /* Capture location for brace group */
-    source_location_t brace_loc = token_to_source_location(current, parser->source_name);
+    source_location_t brace_loc =
+        token_to_source_location(current, parser->source_name);
 
     /* Push context for better error messages */
     parser_push_context(parser, "parsing brace group");
@@ -1591,7 +1623,7 @@ static node_t *parse_brace_group(parser_t *parser) {
 
     // Expect '}'
     if (!expect_token_with_help(parser, TOK_RBRACE,
-            "brace group must end with '}'")) {
+                                "brace group must end with '}'")) {
         free_node_tree(group_node);
         parser_pop_context(parser);
         parser_exit_recursion(parser);
@@ -1627,15 +1659,16 @@ static node_t *parse_subshell(parser_t *parser) {
 
     token_t *current = tokenizer_current(parser->tokenizer);
     if (!current || current->type != TOK_LPAREN) {
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "subshells execute commands in a child process",
-                         "expected '('");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "subshells execute commands in a child process", "expected '('");
         parser_exit_recursion(parser);
         return NULL;
     }
 
     /* Capture location for subshell */
-    source_location_t subshell_loc = token_to_source_location(current, parser->source_name);
+    source_location_t subshell_loc =
+        token_to_source_location(current, parser->source_name);
 
     /* Push context for better error messages */
     parser_push_context(parser, "parsing subshell");
@@ -1677,7 +1710,7 @@ static node_t *parse_subshell(parser_t *parser) {
 
     // Expect ')'
     if (!expect_token_with_help(parser, TOK_RPAREN,
-            "subshell must end with ')'")) {
+                                "subshell must end with ')'")) {
         free_node_tree(subshell_node);
         parser_pop_context(parser);
         parser_exit_recursion(parser);
@@ -1704,20 +1737,13 @@ static node_t *parse_subshell(parser_t *parser) {
  * @return true if token is a redirection operator
  */
 static bool is_redirection_token(token_type_t type) {
-    return type == TOK_REDIRECT_OUT ||
-           type == TOK_REDIRECT_IN ||
-           type == TOK_APPEND ||
-           type == TOK_HEREDOC ||
-           type == TOK_HEREDOC_STRIP ||
-           type == TOK_HERESTRING ||
-           type == TOK_REDIRECT_ERR ||
-           type == TOK_REDIRECT_IN_FD ||
-           type == TOK_REDIRECT_BOTH ||
-           type == TOK_APPEND_ERR ||
-           type == TOK_REDIRECT_FD ||
-           type == TOK_REDIRECT_FD_ALLOC ||
-           type == TOK_REDIRECT_CLOBBER ||
-           type == TOK_APPEND_BOTH;
+    return type == TOK_REDIRECT_OUT || type == TOK_REDIRECT_IN ||
+           type == TOK_APPEND || type == TOK_HEREDOC ||
+           type == TOK_HEREDOC_STRIP || type == TOK_HERESTRING ||
+           type == TOK_REDIRECT_ERR || type == TOK_REDIRECT_IN_FD ||
+           type == TOK_REDIRECT_BOTH || type == TOK_APPEND_ERR ||
+           type == TOK_REDIRECT_FD || type == TOK_REDIRECT_FD_ALLOC ||
+           type == TOK_REDIRECT_CLOBBER || type == TOK_APPEND_BOTH;
 }
 
 /**
@@ -1731,22 +1757,23 @@ static bool is_redirection_token(token_type_t type) {
  * @param compound_node The compound command node to attach redirections to
  * @return true on success, false on error
  */
-static bool parse_trailing_redirections(parser_t *parser, node_t *compound_node) {
+static bool parse_trailing_redirections(parser_t *parser,
+                                        node_t *compound_node) {
     if (!parser || !compound_node) {
-        return true;  // Nothing to do
+        return true; // Nothing to do
     }
 
     token_t *current = tokenizer_current(parser->tokenizer);
-    
+
     while (current && is_redirection_token(current->type)) {
         node_t *redir_node = parse_redirection(parser);
         if (!redir_node) {
-            return false;  // Error parsing redirection
+            return false; // Error parsing redirection
         }
         add_child_node(compound_node, redir_node);
         current = tokenizer_current(parser->tokenizer);
     }
-    
+
     return true;
 }
 
@@ -1816,7 +1843,8 @@ static node_t *parse_redirection(parser_t *parser) {
     }
 
     /* Capture location for redirection */
-    source_location_t redir_loc = token_to_source_location(redir_token, parser->source_name);
+    source_location_t redir_loc =
+        token_to_source_location(redir_token, parser->source_name);
     node_t *redir_node = new_node_at(node_type, redir_loc);
     if (!redir_node) {
         return NULL;
@@ -1844,8 +1872,9 @@ static node_t *parse_redirection(parser_t *parser) {
         return redir_node;
     }
 
-    // For NODE_REDIR_FD_ALLOC, check if target is embedded (>&- or >&N patterns)
-    // or if we need a separate target file ({varname}> or {varname}>>)
+    // For NODE_REDIR_FD_ALLOC, check if target is embedded (>&- or >&N
+    // patterns) or if we need a separate target file ({varname}> or
+    // {varname}>>)
     if (node_type == NODE_REDIR_FD_ALLOC) {
         const char *redir_text = redir_node->val.str;
         size_t len = strlen(redir_text);
@@ -1861,8 +1890,9 @@ static node_t *parse_redirection(parser_t *parser) {
         // Otherwise fall through to parse target file
     }
 
-    // Check for process substitution as redirection target: < <(cmd) or > >(cmd)
-    // This is valid bash/zsh syntax for redirecting from/to process substitution
+    // Check for process substitution as redirection target: < <(cmd) or >
+    // >(cmd) This is valid bash/zsh syntax for redirecting from/to process
+    // substitution
     if (target_token && (target_token->type == TOK_PROC_SUB_IN ||
                          target_token->type == TOK_PROC_SUB_OUT)) {
         // Parse the process substitution and attach as child of redirection
@@ -2257,7 +2287,8 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 static node_t *parse_if_statement(parser_t *parser) {
     /* Capture location before consuming 'if' token */
     token_t *if_token = tokenizer_current(parser->tokenizer);
-    source_location_t if_loc = token_to_source_location(if_token, parser->source_name);
+    source_location_t if_loc =
+        token_to_source_location(if_token, parser->source_name);
 
     if (!expect_token(parser, TOK_IF)) {
         return NULL;
@@ -2285,8 +2316,8 @@ static node_t *parse_if_statement(parser_t *parser) {
     skip_separators(parser);
 
     // Now we should see 'then'
-    if (!expect_token_with_help(parser, TOK_THEN,
-            "'if' requires 'then' before the command body")) {
+    if (!expect_token_with_help(
+            parser, TOK_THEN, "'if' requires 'then' before the command body")) {
         free_node_tree(if_node);
         parser_pop_context(parser);
         return NULL;
@@ -2330,7 +2361,8 @@ static node_t *parse_if_statement(parser_t *parser) {
         skip_separators(parser);
 
         // Expect 'then' after elif condition
-        if (!expect_token_with_help(parser, TOK_THEN,
+        if (!expect_token_with_help(
+                parser, TOK_THEN,
                 "'elif' requires 'then' before the command body")) {
             free_node_tree(if_node);
             parser_pop_context(parser);
@@ -2380,7 +2412,7 @@ static node_t *parse_if_statement(parser_t *parser) {
     // No need for additional semicolon handling here since we handled it above
 
     if (!expect_token_with_help(parser, TOK_FI,
-            "'if' statement must end with 'fi'")) {
+                                "'if' statement must end with 'fi'")) {
         free_node_tree(if_node);
         parser_pop_context(parser);
         return NULL;
@@ -2408,7 +2440,8 @@ static node_t *parse_if_statement(parser_t *parser) {
 static node_t *parse_while_statement(parser_t *parser) {
     /* Capture location before consuming 'while' token */
     token_t *while_token = tokenizer_current(parser->tokenizer);
-    source_location_t while_loc = token_to_source_location(while_token, parser->source_name);
+    source_location_t while_loc =
+        token_to_source_location(while_token, parser->source_name);
 
     if (!expect_token(parser, TOK_WHILE)) {
         return NULL;
@@ -2432,8 +2465,8 @@ static node_t *parse_while_statement(parser_t *parser) {
     if (!condition) {
         free_node_tree(while_node);
         parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "'while' requires a condition command",
-                         "invalid while loop condition");
+                                   "'while' requires a condition command",
+                                   "invalid while loop condition");
         parser_pop_context(parser);
         return NULL;
     }
@@ -2444,7 +2477,7 @@ static node_t *parse_while_statement(parser_t *parser) {
 
     // Now we should see 'do'
     if (!expect_token_with_help(parser, TOK_DO,
-            "'while' requires 'do' before the loop body")) {
+                                "'while' requires 'do' before the loop body")) {
         free_node_tree(while_node);
         parser_pop_context(parser);
         return NULL;
@@ -2466,7 +2499,7 @@ static node_t *parse_while_statement(parser_t *parser) {
     skip_separators(parser);
 
     if (!expect_token_with_help(parser, TOK_DONE,
-            "'while' loop must end with 'done'")) {
+                                "'while' loop must end with 'done'")) {
         free_node_tree(while_node);
         parser_pop_context(parser);
         return NULL;
@@ -2513,8 +2546,8 @@ static node_t *parse_until_statement(parser_t *parser) {
     if (!condition) {
         free_node_tree(until_node);
         parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "'until' requires a condition command",
-                         "invalid until loop condition");
+                                   "'until' requires a condition command",
+                                   "invalid until loop condition");
         parser_pop_context(parser);
         return NULL;
     }
@@ -2525,7 +2558,7 @@ static node_t *parse_until_statement(parser_t *parser) {
 
     // Now we should see 'do'
     if (!expect_token_with_help(parser, TOK_DO,
-            "'until' requires 'do' before the loop body")) {
+                                "'until' requires 'do' before the loop body")) {
         free_node_tree(until_node);
         parser_pop_context(parser);
         return NULL;
@@ -2547,7 +2580,7 @@ static node_t *parse_until_statement(parser_t *parser) {
     skip_separators(parser);
 
     if (!expect_token_with_help(parser, TOK_DONE,
-            "'until' loop must end with 'done'")) {
+                                "'until' loop must end with 'done'")) {
         free_node_tree(until_node);
         parser_pop_context(parser);
         return NULL;
@@ -2575,7 +2608,8 @@ static node_t *parse_until_statement(parser_t *parser) {
 static node_t *parse_for_statement(parser_t *parser) {
     /* Capture location before consuming 'for' token */
     token_t *for_token = tokenizer_current(parser->tokenizer);
-    source_location_t for_loc = token_to_source_location(for_token, parser->source_name);
+    source_location_t for_loc =
+        token_to_source_location(for_token, parser->source_name);
 
     if (!expect_token(parser, TOK_FOR)) {
         return NULL;
@@ -2586,7 +2620,7 @@ static node_t *parse_for_statement(parser_t *parser) {
 
     // Check for C-style for loop: for ((init; test; update))
     if (tokenizer_match(parser->tokenizer, TOK_DOUBLE_LPAREN)) {
-        tokenizer_advance(parser->tokenizer); // consume (( 
+        tokenizer_advance(parser->tokenizer); // consume ((
 
         node_t *for_arith_node = new_node_at(NODE_FOR_ARITH, for_loc);
         if (!for_arith_node) {
@@ -2600,23 +2634,23 @@ static node_t *parse_for_statement(parser_t *parser) {
         //
         // We extract raw input text to preserve operators like <= that
         // the tokenizer splits into separate tokens (< and =).
-        
+
         const char *input = parser->tokenizer->input;
         char *init_expr = NULL;
         char *test_expr = NULL;
         char *update_expr = NULL;
-        
-        int paren_depth = 0;  // Track nested parentheses
-        
+
+        int paren_depth = 0; // Track nested parentheses
+
         // Get start position for init expression
         token_t *start_tok = tokenizer_current(parser->tokenizer);
         size_t expr_start = start_tok ? start_tok->position : 0;
         size_t expr_end = expr_start;
-        
+
         // Parse init expression - find the first ; at depth 0
         while (!tokenizer_match(parser->tokenizer, TOK_EOF)) {
             token_t *tok = tokenizer_current(parser->tokenizer);
-            
+
             // Track parentheses depth to handle nested (( )) in expressions
             if (tok->type == TOK_LPAREN || tok->type == TOK_DOUBLE_LPAREN) {
                 paren_depth++;
@@ -2626,7 +2660,8 @@ static node_t *parse_for_statement(parser_t *parser) {
                 if (paren_depth > 0) {
                     paren_depth -= 2;
                 } else {
-                    // End of for (( )) - but we haven't seen all three expressions
+                    // End of for (( )) - but we haven't seen all three
+                    // expressions
                     parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
                                      "expected ';' in C-style for loop");
                     free_node_tree(for_arith_node);
@@ -2634,16 +2669,16 @@ static node_t *parse_for_statement(parser_t *parser) {
                     return NULL;
                 }
             }
-            
+
             // Semicolon at depth 0 separates expressions
             if (tok->type == TOK_SEMICOLON && paren_depth == 0) {
                 expr_end = tok->position;
                 break;
             }
-            
+
             tokenizer_advance(parser->tokenizer);
         }
-        
+
         // Extract init expression from raw input
         if (expr_end > expr_start) {
             size_t len = expr_end - expr_start;
@@ -2653,35 +2688,39 @@ static node_t *parse_for_statement(parser_t *parser) {
                 init_expr[len] = '\0';
                 // Trim leading/trailing whitespace
                 char *p = init_expr;
-                while (*p && (*p == ' ' || *p == '\t')) p++;
-                if (p != init_expr) memmove(init_expr, p, strlen(p) + 1);
+                while (*p && (*p == ' ' || *p == '\t'))
+                    p++;
+                if (p != init_expr)
+                    memmove(init_expr, p, strlen(p) + 1);
                 size_t l = strlen(init_expr);
-                while (l > 0 && (init_expr[l-1] == ' ' || init_expr[l-1] == '\t')) {
+                while (l > 0 &&
+                       (init_expr[l - 1] == ' ' || init_expr[l - 1] == '\t')) {
                     init_expr[--l] = '\0';
                 }
             }
         } else {
             init_expr = strdup("");
         }
-        
+
         if (!tokenizer_consume(parser->tokenizer, TOK_SEMICOLON)) {
-            parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                             "expected ';' after init expression in C-style for loop");
+            parser_error_add(
+                parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                "expected ';' after init expression in C-style for loop");
             free(init_expr);
             free_node_tree(for_arith_node);
             parser_pop_context(parser);
             return NULL;
         }
-        
+
         // Parse test expression
         start_tok = tokenizer_current(parser->tokenizer);
         expr_start = start_tok ? start_tok->position : 0;
         expr_end = expr_start;
         paren_depth = 0;
-        
+
         while (!tokenizer_match(parser->tokenizer, TOK_EOF)) {
             token_t *tok = tokenizer_current(parser->tokenizer);
-            
+
             if (tok->type == TOK_LPAREN || tok->type == TOK_DOUBLE_LPAREN) {
                 paren_depth++;
             } else if (tok->type == TOK_RPAREN) {
@@ -2691,22 +2730,23 @@ static node_t *parse_for_statement(parser_t *parser) {
                     paren_depth -= 2;
                 } else {
                     parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                                     "expected ';' after test expression in C-style for loop");
+                                     "expected ';' after test expression in "
+                                     "C-style for loop");
                     free(init_expr);
                     free_node_tree(for_arith_node);
                     parser_pop_context(parser);
                     return NULL;
                 }
             }
-            
+
             if (tok->type == TOK_SEMICOLON && paren_depth == 0) {
                 expr_end = tok->position;
                 break;
             }
-            
+
             tokenizer_advance(parser->tokenizer);
         }
-        
+
         // Extract test expression from raw input
         if (expr_end > expr_start) {
             size_t len = expr_end - expr_start;
@@ -2716,36 +2756,40 @@ static node_t *parse_for_statement(parser_t *parser) {
                 test_expr[len] = '\0';
                 // Trim whitespace
                 char *p = test_expr;
-                while (*p && (*p == ' ' || *p == '\t')) p++;
-                if (p != test_expr) memmove(test_expr, p, strlen(p) + 1);
+                while (*p && (*p == ' ' || *p == '\t'))
+                    p++;
+                if (p != test_expr)
+                    memmove(test_expr, p, strlen(p) + 1);
                 size_t l = strlen(test_expr);
-                while (l > 0 && (test_expr[l-1] == ' ' || test_expr[l-1] == '\t')) {
+                while (l > 0 &&
+                       (test_expr[l - 1] == ' ' || test_expr[l - 1] == '\t')) {
                     test_expr[--l] = '\0';
                 }
             }
         } else {
             test_expr = strdup("");
         }
-        
+
         if (!tokenizer_consume(parser->tokenizer, TOK_SEMICOLON)) {
-            parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                             "expected ';' after test expression in C-style for loop");
+            parser_error_add(
+                parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                "expected ';' after test expression in C-style for loop");
             free(init_expr);
             free(test_expr);
             free_node_tree(for_arith_node);
             parser_pop_context(parser);
             return NULL;
         }
-        
+
         // Parse update expression (until )))
         start_tok = tokenizer_current(parser->tokenizer);
         expr_start = start_tok ? start_tok->position : 0;
         expr_end = expr_start;
         paren_depth = 0;
-        
+
         while (!tokenizer_match(parser->tokenizer, TOK_EOF)) {
             token_t *tok = tokenizer_current(parser->tokenizer);
-            
+
             if (tok->type == TOK_LPAREN || tok->type == TOK_DOUBLE_LPAREN) {
                 paren_depth++;
             } else if (tok->type == TOK_RPAREN) {
@@ -2763,10 +2807,10 @@ static node_t *parse_for_statement(parser_t *parser) {
                     break;
                 }
             }
-            
+
             tokenizer_advance(parser->tokenizer);
         }
-        
+
         // Extract update expression from raw input
         if (expr_end > expr_start) {
             size_t len = expr_end - expr_start;
@@ -2776,17 +2820,20 @@ static node_t *parse_for_statement(parser_t *parser) {
                 update_expr[len] = '\0';
                 // Trim whitespace
                 char *p = update_expr;
-                while (*p && (*p == ' ' || *p == '\t')) p++;
-                if (p != update_expr) memmove(update_expr, p, strlen(p) + 1);
+                while (*p && (*p == ' ' || *p == '\t'))
+                    p++;
+                if (p != update_expr)
+                    memmove(update_expr, p, strlen(p) + 1);
                 size_t l = strlen(update_expr);
-                while (l > 0 && (update_expr[l-1] == ' ' || update_expr[l-1] == '\t')) {
+                while (l > 0 && (update_expr[l - 1] == ' ' ||
+                                 update_expr[l - 1] == '\t')) {
                     update_expr[--l] = '\0';
                 }
             }
         } else {
             update_expr = strdup("");
         }
-        
+
         // Expect )) to close the arithmetic for
         if (!tokenizer_consume(parser->tokenizer, TOK_DOUBLE_RPAREN)) {
             parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
@@ -2798,7 +2845,7 @@ static node_t *parse_for_statement(parser_t *parser) {
             parser_pop_context(parser);
             return NULL;
         }
-        
+
         // Store expressions as child nodes
         // Child 0: init expression
         node_t *init_node = new_node(NODE_ARITH_EXP);
@@ -2809,7 +2856,7 @@ static node_t *parse_for_statement(parser_t *parser) {
         } else {
             free(init_expr);
         }
-        
+
         // Child 1: test expression
         node_t *test_node = new_node(NODE_ARITH_EXP);
         if (test_node) {
@@ -2819,7 +2866,7 @@ static node_t *parse_for_statement(parser_t *parser) {
         } else {
             free(test_expr);
         }
-        
+
         // Child 2: update expression
         node_t *update_node = new_node(NODE_ARITH_EXP);
         if (update_node) {
@@ -2829,21 +2876,22 @@ static node_t *parse_for_statement(parser_t *parser) {
         } else {
             free(update_expr);
         }
-        
+
         // Skip any separators (semicolons, newlines, whitespace)
         skip_separators(parser);
-        
+
         // Expect 'do'
-        if (!expect_token_with_help(parser, TOK_DO,
+        if (!expect_token_with_help(
+                parser, TOK_DO,
                 "'for ((...))' requires 'do' before the loop body")) {
             free_node_tree(for_arith_node);
             parser_pop_context(parser);
             return NULL;
         }
-        
+
         // Skip separators after 'do' before parsing body
         skip_separators(parser);
-        
+
         // Parse loop body
         node_t *body = parse_command_body(parser, TOK_DONE);
         if (!body) {
@@ -2851,26 +2899,26 @@ static node_t *parse_for_statement(parser_t *parser) {
             parser_pop_context(parser);
             return NULL;
         }
-        add_child_node(for_arith_node, body);  // Child 3: body
-        
+        add_child_node(for_arith_node, body); // Child 3: body
+
         // Skip separators before 'done'
         skip_separators(parser);
-        
-        if (!expect_token_with_help(parser, TOK_DONE,
-                "'for ((...))' loop must end with 'done'")) {
+
+        if (!expect_token_with_help(
+                parser, TOK_DONE, "'for ((...))' loop must end with 'done'")) {
             free_node_tree(for_arith_node);
             parser_pop_context(parser);
             return NULL;
         }
-        
+
         parser_pop_context(parser);
-        
+
         // Parse any trailing redirections
         if (!parse_trailing_redirections(parser, for_arith_node)) {
             free_node_tree(for_arith_node);
             return NULL;
         }
-        
+
         return for_arith_node;
     }
 
@@ -2883,9 +2931,11 @@ static node_t *parse_for_statement(parser_t *parser) {
     // Parse variable name (POSIX for-in loop)
     if (!tokenizer_match(parser->tokenizer, TOK_WORD)) {
         free_node_tree(for_node);
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "syntax: for NAME [in WORDS...]; do COMMANDS; done\n       for ((init; test; update)); do COMMANDS; done",
-                         "expected variable name or '((' after 'for'");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "syntax: for NAME [in WORDS...]; do COMMANDS; done\n       for "
+            "((init; test; update)); do COMMANDS; done",
+            "expected variable name or '((' after 'for'");
         parser_pop_context(parser);
         return NULL;
     }
@@ -2924,9 +2974,10 @@ static node_t *parse_for_statement(parser_t *parser) {
         // Unexpected token after variable name
         free_node_tree(for_node);
         free_node_tree(word_list);
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "syntax: for NAME [in WORDS...]; do COMMANDS; done",
-                         "expected 'in', ';', or 'do' after variable name in for loop");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "syntax: for NAME [in WORDS...]; do COMMANDS; done",
+            "expected 'in', ';', or 'do' after variable name in for loop");
         parser_pop_context(parser);
         return NULL;
     }
@@ -2941,8 +2992,8 @@ static node_t *parse_for_statement(parser_t *parser) {
 
         token_t *word_token = tokenizer_current(parser->tokenizer);
 
-        // In for-in word lists, '=' can be a standalone word (e.g., for i in = foo)
-        // Handle it specially before the normal word-like check
+        // In for-in word lists, '=' can be a standalone word (e.g., for i in =
+        // foo) Handle it specially before the normal word-like check
         if (word_token->type == TOK_ASSIGN) {
             node_t *word_node = new_node(NODE_VAR);
             if (!word_node) {
@@ -2984,7 +3035,8 @@ static node_t *parse_for_statement(parser_t *parser) {
                 return NULL;
             }
 
-            // Start building the word string - may need to combine with '=' and more
+            // Start building the word string - may need to combine with '=' and
+            // more
             char *combined = strdup(word_token->text);
             if (!combined) {
                 free_node_tree(word_node);
@@ -2996,19 +3048,21 @@ static node_t *parse_for_statement(parser_t *parser) {
             size_t current_end_pos = word_token->position + word_token->length;
             tokenizer_advance(parser->tokenizer);
 
-            // Check for WORD=VALUE pattern: if next token is '=' followed by word,
-            // combine them into a single word (POSIX: for i in a=b c=d; do ...)
-            // Handle chained equals like a=b=c as a single word
+            // Check for WORD=VALUE pattern: if next token is '=' followed by
+            // word, combine them into a single word (POSIX: for i in a=b c=d;
+            // do ...) Handle chained equals like a=b=c as a single word
             // IMPORTANT: Only combine if there's no whitespace between tokens
             while (tokenizer_match(parser->tokenizer, TOK_ASSIGN)) {
-                // Check if '=' is adjacent to the previous token (no whitespace)
+                // Check if '=' is adjacent to the previous token (no
+                // whitespace)
                 token_t *assign_token = tokenizer_current(parser->tokenizer);
                 if (assign_token->position != current_end_pos) {
                     // There's whitespace before '=', don't combine
                     break;
                 }
-                size_t assign_end_pos = assign_token->position + assign_token->length;
-                tokenizer_advance(parser->tokenizer);  // consume '='
+                size_t assign_end_pos =
+                    assign_token->position + assign_token->length;
+                tokenizer_advance(parser->tokenizer); // consume '='
 
                 // Append '=' to combined string
                 size_t len = strlen(combined);
@@ -3024,17 +3078,19 @@ static node_t *parse_for_statement(parser_t *parser) {
                 combined[len] = '=';
                 combined[len + 1] = '\0';
 
-                // Check if there's a value IMMEDIATELY after '=' (no whitespace)
+                // Check if there's a value IMMEDIATELY after '=' (no
+                // whitespace)
                 token_t *value_token = tokenizer_current(parser->tokenizer);
                 bool is_adjacent = (value_token->position == assign_end_pos);
 
-                if (is_adjacent &&
-                    (token_is_word_like(value_token->type) ||
-                     value_token->type == TOK_VARIABLE ||
-                     value_token->type == TOK_NUMBER)) {
-                    // Append the value (it's adjacent to '=', so part of same word)
+                if (is_adjacent && (token_is_word_like(value_token->type) ||
+                                    value_token->type == TOK_VARIABLE ||
+                                    value_token->type == TOK_NUMBER)) {
+                    // Append the value (it's adjacent to '=', so part of same
+                    // word)
                     size_t vlen = strlen(value_token->text);
-                    new_combined = realloc(combined, strlen(combined) + vlen + 1);
+                    new_combined =
+                        realloc(combined, strlen(combined) + vlen + 1);
                     if (!new_combined) {
                         free(combined);
                         free_node_tree(word_node);
@@ -3045,12 +3101,14 @@ static node_t *parse_for_statement(parser_t *parser) {
                     combined = new_combined;
                     strcat(combined, value_token->text);
                     // Update end position for next iteration's adjacency check
-                    current_end_pos = value_token->position + value_token->length;
+                    current_end_pos =
+                        value_token->position + value_token->length;
                     tokenizer_advance(parser->tokenizer);
                     // Continue loop to check for more '=' (handles a=b=c)
                 } else {
-                    // No adjacent value after '=' - word ends with '=' (e.g., empty=)
-                    // Or there's whitespace before next token (separate word)
+                    // No adjacent value after '=' - word ends with '=' (e.g.,
+                    // empty=) Or there's whitespace before next token (separate
+                    // word)
                     break;
                 }
             }
@@ -3071,7 +3129,7 @@ skip_word_parsing:
 
     // Now we should see 'do'
     if (!expect_token_with_help(parser, TOK_DO,
-            "'for' requires 'do' before the loop body")) {
+                                "'for' requires 'do' before the loop body")) {
         free_node_tree(for_node);
         parser_pop_context(parser);
         return NULL;
@@ -3093,7 +3151,7 @@ skip_word_parsing:
     skip_separators(parser);
 
     if (!expect_token_with_help(parser, TOK_DONE,
-            "'for' loop must end with 'done'")) {
+                                "'for' loop must end with 'done'")) {
         free_node_tree(for_node);
         parser_pop_context(parser);
         return NULL;
@@ -3136,9 +3194,10 @@ static node_t *parse_select_statement(parser_t *parser) {
     // Parse variable name
     if (!tokenizer_match(parser->tokenizer, TOK_WORD)) {
         free_node_tree(select_node);
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "syntax: select NAME [in WORDS...]; do COMMANDS; done",
-                         "expected variable name after 'select'");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "syntax: select NAME [in WORDS...]; do COMMANDS; done",
+            "expected variable name after 'select'");
         parser_pop_context(parser);
         return NULL;
     }
@@ -3215,8 +3274,8 @@ static node_t *parse_select_statement(parser_t *parser) {
     skip_separators(parser);
 
     // Now we should see 'do'
-    if (!expect_token_with_help(parser, TOK_DO,
-            "'select' requires 'do' before the command body")) {
+    if (!expect_token_with_help(
+            parser, TOK_DO, "'select' requires 'do' before the command body")) {
         free_node_tree(select_node);
         parser_pop_context(parser);
         return NULL;
@@ -3238,7 +3297,7 @@ static node_t *parse_select_statement(parser_t *parser) {
     skip_separators(parser);
 
     if (!expect_token_with_help(parser, TOK_DONE,
-            "'select' statement must end with 'done'")) {
+                                "'select' statement must end with 'done'")) {
         free_node_tree(select_node);
         parser_pop_context(parser);
         return NULL;
@@ -3330,8 +3389,8 @@ static node_t *parse_coproc(parser_t *parser) {
 
     // Skip any whitespace/newlines
     token_t *current = tokenizer_current(parser->tokenizer);
-    while (current && (current->type == TOK_NEWLINE || 
-                       current->type == TOK_WHITESPACE)) {
+    while (current &&
+           (current->type == TOK_NEWLINE || current->type == TOK_WHITESPACE)) {
         tokenizer_advance(parser->tokenizer);
         current = tokenizer_current(parser->tokenizer);
     }
@@ -3346,22 +3405,18 @@ static node_t *parse_coproc(parser_t *parser) {
     // Check if first word is a NAME (simple identifier followed by command)
     // NAME must be a valid identifier and not a compound command starter
     char *coproc_name = NULL;
-    
+
     if (token_is_word_like(current->type)) {
         // Peek ahead to see if this is a name or the start of a command
         token_t *next = tokenizer_peek(parser->tokenizer);
-        
+
         // If next token is also word-like or a compound command starter,
         // then current token is the NAME
-        if (next && (token_is_word_like(next->type) || 
-                     next->type == TOK_LBRACE ||
-                     next->type == TOK_LPAREN ||
-                     next->type == TOK_WHILE ||
-                     next->type == TOK_UNTIL ||
-                     next->type == TOK_FOR ||
-                     next->type == TOK_IF ||
-                     next->type == TOK_CASE ||
-                     next->type == TOK_SELECT)) {
+        if (next && (token_is_word_like(next->type) ||
+                     next->type == TOK_LBRACE || next->type == TOK_LPAREN ||
+                     next->type == TOK_WHILE || next->type == TOK_UNTIL ||
+                     next->type == TOK_FOR || next->type == TOK_IF ||
+                     next->type == TOK_CASE || next->type == TOK_SELECT)) {
             // Current is the NAME
             coproc_name = strdup(current->text);
             tokenizer_advance(parser->tokenizer);
@@ -3398,7 +3453,7 @@ static node_t *parse_coproc(parser_t *parser) {
  * @return Anonymous function AST node
  */
 static node_t *parse_anonymous_function(parser_t *parser) {
-    // Current token should be '{' - we've already consumed () 
+    // Current token should be '{' - we've already consumed ()
     node_t *anon_node = new_node(NODE_ANON_FUNCTION);
     if (!anon_node) {
         return NULL;
@@ -3451,7 +3506,8 @@ static node_t *parse_case_statement(parser_t *parser) {
 
         token_t *word_token = tokenizer_current(parser->tokenizer);
 
-        // Accept word-like tokens, variables, strings, and colons for case words
+        // Accept word-like tokens, variables, strings, and colons for case
+        // words
         if (token_is_word_like(word_token->type) ||
             word_token->type == TOK_VARIABLE ||
             word_token->type == TOK_STRING ||
@@ -3479,9 +3535,10 @@ static node_t *parse_case_statement(parser_t *parser) {
     if (!case_word || case_word_len == 0) {
         free(case_word);
         free_node_tree(case_node);
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "syntax: case WORD in [PATTERN) COMMANDS ;;]... esac",
-                         "expected word after 'case'");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "syntax: case WORD in [PATTERN) COMMANDS ;;]... esac",
+            "expected word after 'case'");
         parser_pop_context(parser);
         return NULL;
     }
@@ -3494,7 +3551,8 @@ static node_t *parse_case_statement(parser_t *parser) {
     skip_separators(parser);
 
     // Expect 'in' keyword
-    if (!expect_token_with_help(parser, TOK_IN,
+    if (!expect_token_with_help(
+            parser, TOK_IN,
             "'case' requires 'in' keyword after the test word")) {
         free_node_tree(case_node);
         parser_pop_context(parser);
@@ -3515,7 +3573,8 @@ static node_t *parse_case_statement(parser_t *parser) {
             return NULL;
         }
 
-        // Terminator will be stored in pattern string prefix (0=break, 1=fall, 2=cont)
+        // Terminator will be stored in pattern string prefix (0=break, 1=fall,
+        // 2=cont)
         case_terminator_t terminator = CASE_TERM_BREAK;
 
         // Build pattern string (can be multiple patterns separated by |)
@@ -3571,9 +3630,10 @@ static node_t *parse_case_statement(parser_t *parser) {
             if (!single_pattern) {
                 free_node_tree(case_item);
                 free_node_tree(case_node);
-                parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                                 "patterns can contain wildcards: *, ?, [...]",
-                                 "expected pattern in case statement");
+                parser_error_add_with_help(
+                    parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                    "patterns can contain wildcards: *, ?, [...]",
+                    "expected pattern in case statement");
                 parser_pop_context(parser);
                 return NULL;
             }
@@ -3616,8 +3676,8 @@ static node_t *parse_case_statement(parser_t *parser) {
             free_node_tree(case_item);
             free_node_tree(case_node);
             parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                             "case patterns must end with ')'",
-                             "expected ')' after case pattern");
+                                       "case patterns must end with ')'",
+                                       "expected ')' after case pattern");
             parser_pop_context(parser);
             return NULL;
         }
@@ -3730,7 +3790,7 @@ static node_t *parse_case_statement(parser_t *parser) {
 
     // Expect 'esac'
     if (!expect_token_with_help(parser, TOK_ESAC,
-            "'case' statement must end with 'esac'")) {
+                                "'case' statement must end with 'esac'")) {
         free_node_tree(case_node);
         parser_pop_context(parser);
         return NULL;
@@ -3830,9 +3890,10 @@ static node_t *parse_function_definition(parser_t *parser) {
     parser_push_context(parser, "parsing function definition");
 
     if (!current || !token_is_word_like(current->type)) {
-        parser_error_add_with_help(parser, SHELL_ERR_INVALID_FUNCTION,
-                         "syntax: name() { commands; } or function name { commands; }",
-                         "expected function name");
+        parser_error_add_with_help(
+            parser, SHELL_ERR_INVALID_FUNCTION,
+            "syntax: name() { commands; } or function name { commands; }",
+            "expected function name");
         parser_pop_context(parser);
         return NULL;
     }
@@ -3855,10 +3916,10 @@ static node_t *parse_function_definition(parser_t *parser) {
     // POSIX compliance: validate function name in posix mode
     if (is_posix_mode_enabled() &&
         !is_valid_posix_function_name(current->text)) {
-        parser_error_add_with_help(parser, SHELL_ERR_INVALID_FUNCTION,
-                         "POSIX function names must start with a letter or underscore",
-                         "invalid function name in POSIX mode: '%s'",
-                         current->text);
+        parser_error_add_with_help(
+            parser, SHELL_ERR_INVALID_FUNCTION,
+            "POSIX function names must start with a letter or underscore",
+            "invalid function name in POSIX mode: '%s'", current->text);
         free_node_tree(function_node);
         parser_pop_context(parser);
         return NULL;
@@ -3875,7 +3936,8 @@ static node_t *parse_function_definition(parser_t *parser) {
     }
 
     // Expect '('
-    if (!expect_token_with_help(parser, TOK_LPAREN,
+    if (!expect_token_with_help(
+            parser, TOK_LPAREN,
             "POSIX functions require '()' after the function name")) {
         free_node_tree(function_node);
         parser_pop_context(parser);
@@ -3893,9 +3955,10 @@ static node_t *parse_function_definition(parser_t *parser) {
     while (current && current->type != TOK_RPAREN && current->type != TOK_EOF) {
         // Expect parameter name (word token)
         if (!token_is_word_like(current->type)) {
-            parser_error_add_with_help(parser, SHELL_ERR_INVALID_FUNCTION,
-                             "function parameters must be valid identifiers",
-                             "expected parameter name");
+            parser_error_add_with_help(
+                parser, SHELL_ERR_INVALID_FUNCTION,
+                "function parameters must be valid identifiers",
+                "expected parameter name");
             free_function_params(params);
             free_node_tree(function_node);
             parser_pop_context(parser);
@@ -3921,9 +3984,10 @@ static node_t *parse_function_definition(parser_t *parser) {
             if (!current || (!token_is_word_like(current->type) &&
                              current->type != TOK_STRING &&
                              current->type != TOK_EXPANDABLE_STRING)) {
-                parser_error_add_with_help(parser, SHELL_ERR_INVALID_FUNCTION,
-                                 "use name=value syntax for default parameter values",
-                                 "expected default value after '='");
+                parser_error_add_with_help(
+                    parser, SHELL_ERR_INVALID_FUNCTION,
+                    "use name=value syntax for default parameter values",
+                    "expected default value after '='");
                 free(param_name);
                 free_function_params(params);
                 free_node_tree(function_node);
@@ -3977,8 +4041,8 @@ static node_t *parse_function_definition(parser_t *parser) {
             // Continue to next parameter
         } else {
             parser_error_add_with_help(parser, SHELL_ERR_INVALID_FUNCTION,
-                             "separate parameters with commas",
-                             "expected ',' or ')' after parameter");
+                                       "separate parameters with commas",
+                                       "expected ',' or ')' after parameter");
             free_function_params(params);
             free_node_tree(function_node);
             parser_pop_context(parser);
@@ -3988,7 +4052,7 @@ static node_t *parse_function_definition(parser_t *parser) {
 
     // Expect ')'
     if (!expect_token_with_help(parser, TOK_RPAREN,
-            "function parameter list must end with ')'")) {
+                                "function parameter list must end with ')'")) {
         free_function_params(params);
         free_node_tree(function_node);
         parser_pop_context(parser);
@@ -4048,41 +4112,42 @@ parse_function_body:
     if (body_start && body_start->type != TOK_LBRACE) {
         node_t *body = NULL;
         switch (body_start->type) {
-            case TOK_LPAREN:
-                body = parse_subshell(parser);
-                break;
-            case TOK_DOUBLE_LPAREN:
-                body = parse_arithmetic_command(parser);
-                break;
-            case TOK_DOUBLE_LBRACKET:
-                body = parse_extended_test(parser);
-                break;
-            case TOK_IF:
-                body = parse_if_statement(parser);
-                break;
-            case TOK_WHILE:
-                body = parse_while_statement(parser);
-                break;
-            case TOK_UNTIL:
-                body = parse_until_statement(parser);
-                break;
-            case TOK_FOR:
-                body = parse_for_statement(parser);
-                break;
-            case TOK_CASE:
-                body = parse_case_statement(parser);
-                break;
-            case TOK_SELECT:
-                body = parse_select_statement(parser);
-                break;
-            default:
-                parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                    "function body must be a compound command",
-                    "expected '{', '(', '((', '[[', if, while, until, for, "
-                    "case, or select");
-                free_node_tree(function_node);
-                parser_pop_context(parser);
-                return NULL;
+        case TOK_LPAREN:
+            body = parse_subshell(parser);
+            break;
+        case TOK_DOUBLE_LPAREN:
+            body = parse_arithmetic_command(parser);
+            break;
+        case TOK_DOUBLE_LBRACKET:
+            body = parse_extended_test(parser);
+            break;
+        case TOK_IF:
+            body = parse_if_statement(parser);
+            break;
+        case TOK_WHILE:
+            body = parse_while_statement(parser);
+            break;
+        case TOK_UNTIL:
+            body = parse_until_statement(parser);
+            break;
+        case TOK_FOR:
+            body = parse_for_statement(parser);
+            break;
+        case TOK_CASE:
+            body = parse_case_statement(parser);
+            break;
+        case TOK_SELECT:
+            body = parse_select_statement(parser);
+            break;
+        default:
+            parser_error_add_with_help(
+                parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                "function body must be a compound command",
+                "expected '{', '(', '((', '[[', if, while, until, for, "
+                "case, or select");
+            free_node_tree(function_node);
+            parser_pop_context(parser);
+            return NULL;
         }
         if (!body) {
             free_node_tree(function_node);
@@ -4105,8 +4170,8 @@ parse_function_body:
 
     // Brace-group body — consume '{' and parse until '}'
     if (!expect_token_with_help(parser, TOK_LBRACE,
-            "function body must be enclosed in braces { } "
-            "or be a compound command")) {
+                                "function body must be enclosed in braces { } "
+                                "or be a compound command")) {
         free_node_tree(function_node);
         parser_pop_context(parser);
         return NULL;
@@ -4147,7 +4212,7 @@ parse_function_body:
 
     // Expect '}'
     if (!expect_token_with_help(parser, TOK_RBRACE,
-            "function body must end with '}'")) {
+                                "function body must end with '}'")) {
         free_node_tree(function_node);
         parser_pop_context(parser);
         return NULL;
@@ -4185,7 +4250,8 @@ static node_t *parse_arithmetic_command(parser_t *parser) {
     }
 
     /* Capture location for arithmetic command */
-    source_location_t arith_loc = token_to_source_location(current, parser->source_name);
+    source_location_t arith_loc =
+        token_to_source_location(current, parser->source_name);
 
     // Consume ((
     tokenizer_advance(parser->tokenizer);
@@ -4246,7 +4312,8 @@ static node_t *parse_arithmetic_command(parser_t *parser) {
 
         // Add space between tokens for readability (except at start)
         // But don't add space before operator characters that might form
-        // multi-character operators (==, !=, <=, >=, &&, ||, +=, -=, *=, /=, %=, ++, --, etc.)
+        // multi-character operators (==, !=, <=, >=, &&, ||, +=, -=, *=, /=,
+        // %=, ++, --, etc.)
         bool is_operator_char =
             (current->text[0] == '=' || current->text[0] == '!' ||
              current->text[0] == '<' || current->text[0] == '>' ||
@@ -4322,7 +4389,8 @@ static node_t *parse_array_literal(parser_t *parser) {
     }
 
     /* Capture location for array literal */
-    source_location_t array_loc = token_to_source_location(current, parser->source_name);
+    source_location_t array_loc =
+        token_to_source_location(current, parser->source_name);
 
     // Consume (
     tokenizer_advance(parser->tokenizer);
@@ -4343,8 +4411,7 @@ static node_t *parse_array_literal(parser_t *parser) {
         }
 
         // Skip whitespace
-        if (current->type == TOK_WHITESPACE ||
-            current->type == TOK_NEWLINE) {
+        if (current->type == TOK_WHITESPACE || current->type == TOK_NEWLINE) {
             tokenizer_advance(parser->tokenizer);
             continue;
         }
@@ -4361,7 +4428,8 @@ static node_t *parse_array_literal(parser_t *parser) {
             while (!tokenizer_match(parser->tokenizer, TOK_RBRACKET) &&
                    !tokenizer_match(parser->tokenizer, TOK_EOF)) {
                 token_t *idx_token = tokenizer_current(parser->tokenizer);
-                if (!idx_token) break;
+                if (!idx_token)
+                    break;
 
                 size_t tlen = strlen(idx_token->text);
                 char *new_idx = realloc(index_str, index_len + tlen + 1);
@@ -4399,10 +4467,10 @@ static node_t *parse_array_literal(parser_t *parser) {
             // Get value
             current = tokenizer_current(parser->tokenizer);
             char *value_str = NULL;
-            if (current && (token_is_word_like(current->type) ||
-                           current->type == TOK_VARIABLE ||
-                           current->type == TOK_STRING ||
-                           current->type == TOK_EXPANDABLE_STRING)) {
+            if (current &&
+                (token_is_word_like(current->type) ||
+                 current->type == TOK_VARIABLE || current->type == TOK_STRING ||
+                 current->type == TOK_EXPANDABLE_STRING)) {
                 value_str = strdup(current->text);
                 tokenizer_advance(parser->tokenizer);
             } else {
@@ -4420,12 +4488,12 @@ static node_t *parse_array_literal(parser_t *parser) {
 
             // Store as "[index]=value" for later processing
             size_t total_len = 1 + (index_str ? strlen(index_str) : 0) + 2 +
-                              (value_str ? strlen(value_str) : 0) + 1;
+                               (value_str ? strlen(value_str) : 0) + 1;
             char *combined = malloc(total_len);
             if (combined) {
                 snprintf(combined, total_len, "[%s]=%s",
-                        index_str ? index_str : "0",
-                        value_str ? value_str : "");
+                         index_str ? index_str : "0",
+                         value_str ? value_str : "");
                 elem_node->val.str = combined;
                 elem_node->val_type = VAL_STR;
             }
@@ -4436,8 +4504,7 @@ static node_t *parse_array_literal(parser_t *parser) {
         }
         // Regular element (no explicit index)
         else if (token_is_word_like(current->type) ||
-                 current->type == TOK_VARIABLE ||
-                 current->type == TOK_STRING ||
+                 current->type == TOK_VARIABLE || current->type == TOK_STRING ||
                  current->type == TOK_EXPANDABLE_STRING ||
                  current->type == TOK_ARITH_EXP ||
                  current->type == TOK_COMMAND_SUB) {
@@ -4517,13 +4584,13 @@ static node_t *parse_array_literal(parser_t *parser) {
 static node_t *parse_extended_test(parser_t *parser) {
     token_t *current = tokenizer_current(parser->tokenizer);
     if (!current || current->type != TOK_DOUBLE_LBRACKET) {
-        parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
-                         "expected '[['");
+        parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN, "expected '[['");
         return NULL;
     }
 
     // Capture source location BEFORE advancing (advance frees current token)
-    source_location_t loc = token_to_source_location(current, parser->source_name);
+    source_location_t loc =
+        token_to_source_location(current, parser->source_name);
 
     // Consume [[
     tokenizer_advance(parser->tokenizer);
@@ -4542,7 +4609,7 @@ static node_t *parse_extended_test(parser_t *parser) {
     size_t expr_len = 0;
     size_t expr_capacity = 256;
     int paren_depth = 0;
-    bool in_regex = false;  // Track if we're parsing a regex pattern after =~
+    bool in_regex = false; // Track if we're parsing a regex pattern after =~
 
     expr = malloc(expr_capacity);
     if (!expr) {
@@ -4565,7 +4632,8 @@ static node_t *parse_extended_test(parser_t *parser) {
 
         // Check for logical operators that end regex context
         // && and || are expression separators in [[ ]]
-        if ((current->type == TOK_LOGICAL_AND || current->type == TOK_LOGICAL_OR) && 
+        if ((current->type == TOK_LOGICAL_AND ||
+             current->type == TOK_LOGICAL_OR) &&
             paren_depth == 0) {
             in_regex = false;
         }
@@ -4618,7 +4686,7 @@ static node_t *parse_extended_test(parser_t *parser) {
             // - Between consecutive operators
             skip_space = (current->type == TOK_RPAREN) ||
                          (expr_len > 0 && expr[expr_len - 1] == '(') ||
-                         (expr_len > 0 && expr[expr_len - 1] == ')' && 
+                         (expr_len > 0 && expr[expr_len - 1] == ')' &&
                           current->type == TOK_LPAREN) ||
                          (is_operator_char && prev_is_operator);
         }
@@ -4708,7 +4776,8 @@ static node_t *parse_process_substitution(parser_t *parser) {
     }
 
     // Create the process substitution node with source location
-    source_location_t loc = token_to_source_location(current, parser->source_name);
+    source_location_t loc =
+        token_to_source_location(current, parser->source_name);
     node_t *proc_sub_node = new_node_at(node_type, loc);
     if (!proc_sub_node) {
         parser_error_add(parser, SHELL_ERR_OUT_OF_MEMORY,

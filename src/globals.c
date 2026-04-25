@@ -45,17 +45,15 @@ posix_history_manager_t *global_posix_history = NULL;
 
 /**
  * @brief Weak definition of shell_opts for tests that don't link posix_opts.c
- * 
+ *
  * The real definition in posix_opts.c will override this.
  */
 __attribute__((weak)) shell_options_t shell_opts = {0};
 
 /**
  * @brief Stub for is_interactive_shell when init.c is not linked
- * 
+ *
  * This weak symbol allows tests that don't link init.c to still compile.
  * The real implementation in init.c will override this.
  */
-__attribute__((weak)) bool is_interactive_shell(void) {
-    return false;
-}
+__attribute__((weak)) bool is_interactive_shell(void) { return false; }

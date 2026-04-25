@@ -89,17 +89,14 @@
     } while (0)
 
 /* Helper to setup and teardown aliases for each test */
-static void setup_aliases(void) {
-    init_aliases();
-}
+static void setup_aliases(void) { init_aliases(); }
 
-static void teardown_aliases(void) {
-    free_aliases();
-}
+static void teardown_aliases(void) { free_aliases(); }
 
 /* ============================================================================
  * INITIALIZATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(init_aliases_basic) {
     init_aliases();
@@ -122,7 +119,8 @@ TEST(init_free_cycle) {
 
 /* ============================================================================
  * ALIAS NAME VALIDATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(valid_alias_name_simple) {
     ASSERT(valid_alias_name("ls"), "Simple name should be valid");
@@ -142,7 +140,8 @@ TEST(valid_alias_name_long) {
 }
 
 TEST(valid_alias_name_starts_with_number) {
-    ASSERT(!valid_alias_name("2ls"), "Name starting with number should be invalid");
+    ASSERT(!valid_alias_name("2ls"),
+           "Name starting with number should be invalid");
 }
 
 TEST(valid_alias_name_empty) {
@@ -157,10 +156,11 @@ TEST(valid_alias_name_with_dash) {
 }
 
 TEST(valid_alias_name_with_space) {
-    /* Note: valid_alias_name stops at whitespace and validates up to that point,
-     * so "my alias" is considered valid (as "my") by the implementation */
+    /* Note: valid_alias_name stops at whitespace and validates up to that
+     * point, so "my alias" is considered valid (as "my") by the implementation
+     */
     bool result = valid_alias_name("my alias");
-    (void)result;  /* Just ensure it doesn't crash */
+    (void)result; /* Just ensure it doesn't crash */
 }
 
 TEST(valid_alias_name_with_equals) {
@@ -175,7 +175,8 @@ TEST(valid_alias_name_special_chars) {
 
 /* ============================================================================
  * BASIC ALIAS OPERATIONS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(set_alias_basic) {
     setup_aliases();
@@ -242,14 +243,16 @@ TEST(set_multiple_aliases) {
 
     ASSERT_STR_EQ(lookup_alias("ll"), "ls -l", "ll should work");
     ASSERT_STR_EQ(lookup_alias("la"), "ls -a", "la should work");
-    ASSERT_STR_EQ(lookup_alias("grep"), "grep --color=auto", "grep should work");
+    ASSERT_STR_EQ(lookup_alias("grep"), "grep --color=auto",
+                  "grep should work");
 
     teardown_aliases();
 }
 
 /* ============================================================================
  * PRINT ALIASES TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(print_aliases_empty) {
     setup_aliases();
@@ -287,7 +290,8 @@ TEST(print_aliases_with_content) {
 
 /* ============================================================================
  * RECURSIVE EXPANSION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_aliases_recursive_simple) {
     setup_aliases();
@@ -296,7 +300,8 @@ TEST(expand_aliases_recursive_simple) {
     set_alias("mytest", "mycommand --option");
     char *expanded = expand_aliases_recursive("mytest", 10);
     ASSERT_NOT_NULL(expanded, "Expansion should succeed");
-    ASSERT_STR_EQ(expanded, "mycommand --option", "Simple expansion should work");
+    ASSERT_STR_EQ(expanded, "mycommand --option",
+                  "Simple expansion should work");
     free(expanded);
 
     teardown_aliases();
@@ -367,7 +372,8 @@ TEST(expand_aliases_recursive_circular) {
 
 /* ============================================================================
  * FIRST WORD EXPANSION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_first_word_alias_basic) {
     setup_aliases();
@@ -411,18 +417,22 @@ TEST(expand_first_word_alias_only_first) {
 
 /* ============================================================================
  * SHELL OPERATOR HANDLING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(contains_shell_operators_pipe) {
-    ASSERT(contains_shell_operators("ls | grep foo"), "Pipe should be detected");
+    ASSERT(contains_shell_operators("ls | grep foo"),
+           "Pipe should be detected");
 }
 
 TEST(contains_shell_operators_redirect_out) {
-    ASSERT(contains_shell_operators("ls > file"), "Redirect out should be detected");
+    ASSERT(contains_shell_operators("ls > file"),
+           "Redirect out should be detected");
 }
 
 TEST(contains_shell_operators_redirect_in) {
-    ASSERT(contains_shell_operators("cat < file"), "Redirect in should be detected");
+    ASSERT(contains_shell_operators("cat < file"),
+           "Redirect in should be detected");
 }
 
 TEST(contains_shell_operators_append) {
@@ -446,7 +456,8 @@ TEST(contains_shell_operators_or) {
 }
 
 TEST(contains_shell_operators_none) {
-    ASSERT(!contains_shell_operators("ls -la /home"), "Simple command should not detect operators");
+    ASSERT(!contains_shell_operators("ls -la /home"),
+           "Simple command should not detect operators");
 }
 
 /* Note: is_special_alias_char is actually an alias for valid_alias_name_char,
@@ -472,7 +483,8 @@ TEST(is_special_alias_char_invalid_chars) {
 
 /* ============================================================================
  * EXPAND WITH SHELL OPERATORS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_alias_with_shell_operators_simple) {
     setup_aliases();
@@ -510,7 +522,8 @@ TEST(expand_alias_with_shell_operators_in_value) {
 
 /* ============================================================================
  * USAGE FUNCTIONS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(alias_usage) {
     /* Should not crash */
@@ -538,14 +551,16 @@ TEST(unalias_usage) {
 
 /* ============================================================================
  * EDGE CASES AND STRESS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(alias_with_quotes) {
     setup_aliases();
 
     set_alias("say", "echo 'hello world'");
     char *value = lookup_alias("say");
-    ASSERT_STR_EQ(value, "echo 'hello world'", "Quoted value should be preserved");
+    ASSERT_STR_EQ(value, "echo 'hello world'",
+                  "Quoted value should be preserved");
 
     teardown_aliases();
 }
@@ -585,7 +600,8 @@ TEST(many_aliases) {
 
     /* Verify some */
     ASSERT_STR_EQ(lookup_alias("alias0"), "command0 --option", "First alias");
-    ASSERT_STR_EQ(lookup_alias("alias50"), "command50 --option", "Middle alias");
+    ASSERT_STR_EQ(lookup_alias("alias50"), "command50 --option",
+                  "Middle alias");
     ASSERT_STR_EQ(lookup_alias("alias99"), "command99 --option", "Last alias");
 
     teardown_aliases();
@@ -593,7 +609,8 @@ TEST(many_aliases) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running alias.c tests...\n\n");

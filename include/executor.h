@@ -56,7 +56,7 @@ typedef struct job {
     pid_t pgid;
     job_state_t state;
     bool foreground;
-    bool no_sighup;       /**< If true, job won't receive SIGHUP on shell exit */
+    bool no_sighup; /**< If true, job won't receive SIGHUP on shell exit */
     process_t *processes;
     char *command_line;
     struct job *next;
@@ -90,22 +90,22 @@ typedef struct executor {
     bool in_script_execution;  // True if executing from script file
 
     // Sourced script tracking (Phase 6: return from sourced scripts)
-    int source_depth;          // Depth of nested source commands (0 = not sourced)
-    bool source_return;        // True if return was called in sourced script
+    int source_depth;   // Depth of nested source commands (0 = not sourced)
+    bool source_return; // True if return was called in sourced script
 
     // Expansion error tracking
     bool expansion_error;      // True if error occurred during expansion
     int expansion_exit_status; // Exit status from expansion errors
 
     // Error context stack (Phase 3: context-aware error management)
-    char *context_stack[EXECUTOR_CONTEXT_STACK_MAX];  // "while executing X"
+    char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; // "while executing X"
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
-    size_t context_depth;      // Current depth of context stack
+    size_t context_depth; // Current depth of context stack
 
     // Process substitution fd tracking (for cleanup after command execution)
-    int procsub_fds[32];       // File descriptors from process substitutions
-    pid_t procsub_pids[32];    // Child PIDs from process substitutions
-    int procsub_fd_count;      // Number of tracked fds/pids
+    int procsub_fds[32];    // File descriptors from process substitutions
+    pid_t procsub_pids[32]; // Child PIDs from process substitutions
+    int procsub_fd_count;   // Number of tracked fds/pids
 
 } executor_t;
 
@@ -114,7 +114,8 @@ extern executor_t *current_executor;
 
 /* ============================================================================
  * Executor Lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a new executor with global symbol table
@@ -140,7 +141,8 @@ void executor_free(executor_t *executor);
 
 /* ============================================================================
  * Primary Execution
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Execute an AST node
@@ -162,7 +164,8 @@ int executor_execute_command_line(executor_t *executor, const char *input);
 
 /* ============================================================================
  * Configuration
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Enable or disable debug mode
@@ -190,7 +193,8 @@ void executor_set_symtable(executor_t *executor, symtable_manager_t *symtable);
 
 /* ============================================================================
  * Error Handling
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if executor has an error
@@ -210,7 +214,8 @@ const char *executor_error(executor_t *executor);
 
 /* ============================================================================
  * Error Context Stack (Phase 3)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Push a context frame onto the error context stack
@@ -256,7 +261,8 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
 
 /* ============================================================================
  * Variable Expansion
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Expand variables in text if needed
@@ -275,14 +281,16 @@ char *expand_if_needed(executor_t *executor, const char *text);
  * can be used as a filename for redirection.
  *
  * @param executor Executor context
- * @param proc_sub Process substitution node (NODE_PROC_SUB_IN or NODE_PROC_SUB_OUT)
+ * @param proc_sub Process substitution node (NODE_PROC_SUB_IN or
+ * NODE_PROC_SUB_OUT)
  * @return Path string like "/dev/fd/N" (caller must free) or NULL on error
  */
 char *expand_process_substitution(executor_t *executor, node_t *proc_sub);
 
 /* ============================================================================
  * Job Control
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Execute a command in the background
@@ -365,7 +373,8 @@ int executor_count_jobs(executor_t *executor);
 
 /* ============================================================================
  * Function Parameters
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a function parameter definition
@@ -386,7 +395,8 @@ void free_function_params(function_param_t *params);
 
 /* ============================================================================
  * Script Context (Debugging)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Set script execution context for debugging
@@ -423,7 +433,8 @@ int executor_get_current_script_line(executor_t *executor);
 
 /* ============================================================================
  * Security
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if redirection target is allowed in privileged mode
@@ -435,7 +446,8 @@ bool is_privileged_redirection_allowed(const char *target);
 
 /* ============================================================================
  * Hook Functions (Phase 7: Zsh-Specific)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Call a hook function if defined
@@ -488,7 +500,8 @@ bool executor_in_hook(void);
 
 /* ============================================================================
  * Structured Error Reporting (Phase 4)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Add a structured error to the executor's error state

@@ -90,7 +90,8 @@
 
 /* ============================================================================
  * STRING ALLOCATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(alloc_str_basic) {
     char *s = alloc_str(100, false);
@@ -143,7 +144,8 @@ TEST(get_alloced_str_basic) {
 
 /* ============================================================================
  * CASE CONVERSION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(strupper_basic) {
     char s[] = "hello";
@@ -196,7 +198,8 @@ TEST(strlower_empty) {
 
 /* ============================================================================
  * WHITESPACE HANDLING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(str_strip_whitespace_both) {
     char s[] = "  hello world  ";
@@ -220,7 +223,8 @@ TEST(str_strip_whitespace_trailing) {
 TEST(str_strip_whitespace_none) {
     char s[] = "hello";
     char *result = str_strip_whitespace(s);
-    ASSERT_STR_EQ(result, "hello", "String without whitespace should be unchanged");
+    ASSERT_STR_EQ(result, "hello",
+                  "String without whitespace should be unchanged");
 }
 
 TEST(str_strip_whitespace_empty) {
@@ -278,14 +282,16 @@ TEST(str_strip_trailing_whitespace_none) {
 
 /* ============================================================================
  * NEWLINE HANDLING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(null_replace_newline_basic) {
     /* Function only removes trailing newline, not newlines in middle */
     char s[] = "hello\nworld";
     null_replace_newline(s);
     /* No trailing newline, so string unchanged */
-    ASSERT_STR_EQ(s, "hello\nworld", "String without trailing newline should be unchanged");
+    ASSERT_STR_EQ(s, "hello\nworld",
+                  "String without trailing newline should be unchanged");
 }
 
 TEST(null_replace_newline_end) {
@@ -302,7 +308,8 @@ TEST(null_replace_newline_none) {
 
 /* ============================================================================
  * CHARACTER DELETION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(delete_char_at_start) {
     char s[] = "hello";
@@ -324,7 +331,8 @@ TEST(delete_char_at_end) {
 
 /* ============================================================================
  * STRING SEARCH TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(strchr_any_found) {
     char s[] = "hello world";
@@ -348,7 +356,8 @@ TEST(strchr_any_first_char) {
 
 /* ============================================================================
  * QUOTE HANDLING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(find_opening_quote_type_single) {
     char s[] = "'hello'";
@@ -395,7 +404,8 @@ TEST(find_last_quote_basic) {
 
 /* ============================================================================
  * BRACE HANDLING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(find_closing_brace_basic) {
     char s[] = "{hello}";
@@ -417,7 +427,8 @@ TEST(find_closing_brace_deeply_nested) {
 
 /* ============================================================================
  * QUOTING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(quote_val_simple) {
     char val[] = "hello";
@@ -447,7 +458,8 @@ TEST(quote_val_with_special_chars) {
 
 /* ============================================================================
  * ESCAPE PROCESSING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(process_token_escapes_newline) {
     const char *input = "hello\\nworld";
@@ -469,7 +481,8 @@ TEST(process_token_escapes_backslash) {
     const char *input = "hello\\\\world";
     char *result = process_token_escapes(input);
     ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "hello\\world", "Backslash escape should be processed");
+    ASSERT_STR_EQ(result, "hello\\world",
+                  "Backslash escape should be processed");
     free(result);
 }
 
@@ -477,7 +490,8 @@ TEST(process_token_escapes_multiple) {
     const char *input = "\\thello\\nworld\\t";
     char *result = process_token_escapes(input);
     ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "\thello\nworld\t", "Multiple escapes should be processed");
+    ASSERT_STR_EQ(result, "\thello\nworld\t",
+                  "Multiple escapes should be processed");
     free(result);
 }
 
@@ -485,13 +499,15 @@ TEST(process_token_escapes_no_escapes) {
     const char *input = "hello world";
     char *result = process_token_escapes(input);
     ASSERT_NOT_NULL(result, "process_token_escapes should return non-NULL");
-    ASSERT_STR_EQ(result, "hello world", "String without escapes should be unchanged");
+    ASSERT_STR_EQ(result, "hello world",
+                  "String without escapes should be unchanged");
     free(result);
 }
 
 /* ============================================================================
  * BUFFER BOUNDS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(check_buffer_bounds_needs_growth) {
     size_t count = 10;
@@ -522,7 +538,8 @@ TEST(check_buffer_bounds_no_growth) {
 
 /* ============================================================================
  * ARGV HANDLING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(free_argv_basic) {
     char **argv = malloc(3 * sizeof(char *));
@@ -543,7 +560,8 @@ TEST(free_argv_empty) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running strings.c tests...\n\n");

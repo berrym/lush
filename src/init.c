@@ -362,7 +362,8 @@ int init(int argc, char **argv, FILE **in) {
     // Parse command line options EARLY - needed for login/interactive detection
     size_t optind = parse_opts(argc, argv);
 
-    // POSIX-compliant shell type determination - must happen before config scripts
+    // POSIX-compliant shell type determination - must happen before config
+    // scripts
     // 1. Determine if this is a login shell
     IS_LOGIN_SHELL = (**argv == '-') || shell_opts.login_shell;
 
@@ -371,8 +372,9 @@ int init(int argc, char **argv, FILE **in) {
 
     // 3. Preliminary interactive detection for startup scripts
     // Full detection happens later after we know about script files
-    bool preliminary_interactive = shell_opts.interactive ||
-                                   (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO));
+    bool preliminary_interactive =
+        shell_opts.interactive ||
+        (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO));
 
     // Initialize configuration system
     config_init();
@@ -392,7 +394,8 @@ int init(int argc, char **argv, FILE **in) {
     }
 
     // Execute startup scripts for interactive shells (preliminary check)
-    // Note: This uses a preliminary check; full interactive detection happens below
+    // Note: This uses a preliminary check; full interactive detection happens
+    // below
     if (preliminary_interactive && !shell_opts.command_mode) {
         config_execute_startup_scripts();
     }
@@ -643,8 +646,7 @@ int init(int argc, char **argv, FILE **in) {
             // Always initialize display integration to support runtime display
             // enable
             if (!display_integration_init(&display_config)) {
-                if (display_config.debug_mode ||
-                    getenv("LUSH_DISPLAY_DEBUG")) {
+                if (display_config.debug_mode || getenv("LUSH_DISPLAY_DEBUG")) {
                     fprintf(stderr, "Warning: Failed to initialize display "
                                     "integration, using standard display\n");
                 }
@@ -721,7 +723,8 @@ int init(int argc, char **argv, FILE **in) {
                     posix_history_set_filename(global_posix_history, histfile);
                     posix_history_load(global_posix_history, histfile, false);
                 }
-                free(home);  /* symtable_get_global_default returns strdup'd value */
+                free(home); /* symtable_get_global_default returns strdup'd
+                               value */
 
                 // Enable duplicate detection by default
                 posix_history_set_no_duplicates(global_posix_history, true);
@@ -825,7 +828,8 @@ static int parse_opts(int argc, char **argv) {
                 // Enable strict compatibility mode - warnings become errors
                 compat_set_strict(true);
             } else if (strncmp(arg, "--target=", 9) == 0) {
-                // Set target shell for compatibility checking (stored as string)
+                // Set target shell for compatibility checking (stored as
+                // string)
                 const char *target_name = arg + 9;
                 compat_set_target(target_name);
             } else if (strncmp(arg, "--target", 8) == 0) {
@@ -998,13 +1002,19 @@ static void usage(int err) {
     printf("Options:\n");
     printf("      --help              Show this help message and exit\n");
     printf("  -V, --version           Show version information and exit\n");
-    printf("      --analyze[=FILE]    Full script analysis (info, warnings, errors)\n");
-    printf("      --lint[=FILE]       Lint for actionable issues (warnings, errors)\n");
-    printf("      --fix               Apply safe automatic fixes (implies --lint)\n");
-    printf("      --unsafe-fixes      Also apply unsafe fixes (implies --fix)\n");
+    printf("      --analyze[=FILE]    Full script analysis (info, warnings, "
+           "errors)\n");
+    printf("      --lint[=FILE]       Lint for actionable issues (warnings, "
+           "errors)\n");
+    printf("      --fix               Apply safe automatic fixes (implies "
+           "--lint)\n");
+    printf(
+        "      --unsafe-fixes      Also apply unsafe fixes (implies --fix)\n");
     printf("      --dry-run           Preview fixes without applying\n");
-    printf("      --format=FMT        Output format: text (default), json, gcc\n");
-    printf("      --strict            Treat compatibility warnings as errors\n");
+    printf(
+        "      --format=FMT        Output format: text (default), json, gcc\n");
+    printf(
+        "      --strict            Treat compatibility warnings as errors\n");
     printf("      --target=<shell>    Check compatibility against shell "
            "(posix, bash, zsh)\n");
     printf("  -c command       Execute command string and exit\n");

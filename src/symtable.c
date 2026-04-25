@@ -48,9 +48,9 @@ static symtable_manager_t *global_manager = NULL;
 static symtable_t dummy_symtable = {0, NULL, NULL};
 
 // Special variable tracking
-static time_t shell_start_time = 0;      // For $SECONDS
-static unsigned int random_seed = 0;     // For $RANDOM
-static int current_lineno = 0;           // For $LINENO
+static time_t shell_start_time = 0;  // For $SECONDS
+static unsigned int random_seed = 0; // For $RANDOM
+static int current_lineno = 0;       // For $LINENO
 
 // Constants
 #define DEFAULT_HT_FLAGS (HT_STR_NONE | HT_SEED_RANDOM)
@@ -652,21 +652,36 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
     if (strcmp(name, "-") == 0) {
         char flags[32];
         int pos = 0;
-        if (is_interactive_shell()) flags[pos++] = 'i';
-        if (shell_opts.job_control) flags[pos++] = 'm';
-        if (shell_opts.exit_on_error) flags[pos++] = 'e';
-        if (shell_opts.unset_error) flags[pos++] = 'u';
-        if (shell_opts.trace_execution) flags[pos++] = 'x';
-        if (shell_opts.verbose) flags[pos++] = 'v';
-        if (shell_opts.noclobber) flags[pos++] = 'C';
-        if (shell_opts.no_globbing) flags[pos++] = 'f';
-        if (shell_opts.syntax_check) flags[pos++] = 'n';
-        if (shell_opts.allexport) flags[pos++] = 'a';
-        if (shell_opts.notify) flags[pos++] = 'b';
-        if (shell_opts.physical_mode) flags[pos++] = 'P';
-        if (shell_opts.privileged_mode) flags[pos++] = 'p';
-        if (shell_opts.history_mode) flags[pos++] = 'H';
-        if (shell_opts.histexpand_mode) flags[pos++] = 'B';
+        if (is_interactive_shell())
+            flags[pos++] = 'i';
+        if (shell_opts.job_control)
+            flags[pos++] = 'm';
+        if (shell_opts.exit_on_error)
+            flags[pos++] = 'e';
+        if (shell_opts.unset_error)
+            flags[pos++] = 'u';
+        if (shell_opts.trace_execution)
+            flags[pos++] = 'x';
+        if (shell_opts.verbose)
+            flags[pos++] = 'v';
+        if (shell_opts.noclobber)
+            flags[pos++] = 'C';
+        if (shell_opts.no_globbing)
+            flags[pos++] = 'f';
+        if (shell_opts.syntax_check)
+            flags[pos++] = 'n';
+        if (shell_opts.allexport)
+            flags[pos++] = 'a';
+        if (shell_opts.notify)
+            flags[pos++] = 'b';
+        if (shell_opts.physical_mode)
+            flags[pos++] = 'P';
+        if (shell_opts.privileged_mode)
+            flags[pos++] = 'p';
+        if (shell_opts.history_mode)
+            flags[pos++] = 'H';
+        if (shell_opts.histexpand_mode)
+            flags[pos++] = 'B';
         flags[pos] = '\0';
         return strdup(flags);
     }
@@ -712,7 +727,8 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
 
 /* ============================================================================
  * NAMEREF SUPPORT (Phase 6: Function Enhancements)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a nameref variable
@@ -738,8 +754,7 @@ int symtable_set_nameref(symtable_manager_t *manager, const char *name,
     }
 
     // Set the variable with the target name as value and nameref flag
-    return symtable_set_var(manager, name, target,
-                            flags | SYMVAR_NAMEREF_FLAG);
+    return symtable_set_var(manager, name, target, flags | SYMVAR_NAMEREF_FLAG);
 }
 
 /**
@@ -786,8 +801,8 @@ const char *symtable_resolve_nameref(symtable_manager_t *manager,
     }
 
     // Recursively resolve (with depth limit)
-    const char *resolved = symtable_resolve_nameref(manager, target_copy,
-                                                    max_depth - 1);
+    const char *resolved =
+        symtable_resolve_nameref(manager, target_copy, max_depth - 1);
 
     // If resolution returns the copy, we need to keep it
     // Otherwise, free the copy
@@ -984,8 +999,8 @@ char **symtable_get_environ(symtable_manager_t *manager) {
             size_t value_len = var->value ? strlen(var->value) : 0;
             char *entry = malloc(name_len + 1 + value_len + 1); // name=value\0
             if (entry) {
-                snprintf(entry, name_len + 1 + value_len + 1, "%s=%s",
-                         name, var->value ? var->value : "");
+                snprintf(entry, name_len + 1 + value_len + 1, "%s=%s", name,
+                         var->value ? var->value : "");
 
                 // Grow array if needed
                 if (count + 1 >= capacity) {
@@ -1545,7 +1560,8 @@ size_t symtable_count_global_vars(void) {
  *
  * Returns a NULL-terminated array of "name=value" strings.
  *
- * @return Allocated environment array, must be freed with symtable_free_environment_array
+ * @return Allocated environment array, must be freed with
+ * symtable_free_environment_array
  */
 char **symtable_get_environment_array(void) {
     if (!global_manager) {
@@ -2047,27 +2063,21 @@ int symtable_opt_test(void) { return symtable_libht_test(); }
  *
  * @param lineno Current line number
  */
-void symtable_set_lineno(int lineno) {
-    current_lineno = lineno;
-}
+void symtable_set_lineno(int lineno) { current_lineno = lineno; }
 
 /**
  * @brief Get the current line number
  *
  * @return Current line number
  */
-int symtable_get_lineno(void) {
-    return current_lineno;
-}
+int symtable_get_lineno(void) { return current_lineno; }
 
 /**
  * @brief Reset SECONDS counter
  *
  * Resets the shell start time to now, making $SECONDS return 0.
  */
-void symtable_reset_seconds(void) {
-    shell_start_time = time(NULL);
-}
+void symtable_reset_seconds(void) { shell_start_time = time(NULL); }
 
 /**
  * @brief Seed the RANDOM generator
@@ -2167,13 +2177,14 @@ void symtable_array_free(array_value_t *array) {
  * @param found Output: true if index exists
  * @return Position in indices array
  */
-static size_t array_find_index_pos(array_value_t *array, int index, bool *found) {
+static size_t array_find_index_pos(array_value_t *array, int index,
+                                   bool *found) {
     *found = false;
-    
+
     // Binary search for the index
     size_t left = 0;
     size_t right = array->count;
-    
+
     while (left < right) {
         size_t mid = left + (right - left) / 2;
         if (array->indices[mid] == index) {
@@ -2185,8 +2196,8 @@ static size_t array_find_index_pos(array_value_t *array, int index, bool *found)
             right = mid;
         }
     }
-    
-    return left;  // Insertion point
+
+    return left; // Insertion point
 }
 
 /**
@@ -2198,49 +2209,51 @@ static int array_ensure_capacity(array_value_t *array) {
         if (new_capacity < ARRAY_INITIAL_CAPACITY) {
             new_capacity = ARRAY_INITIAL_CAPACITY;
         }
-        
-        char **new_elements = realloc(array->elements, 
-                                      new_capacity * sizeof(char *));
-        int *new_indices = realloc(array->indices,
-                                   new_capacity * sizeof(int));
-        
+
+        char **new_elements =
+            realloc(array->elements, new_capacity * sizeof(char *));
+        int *new_indices = realloc(array->indices, new_capacity * sizeof(int));
+
         if (!new_elements || !new_indices) {
             // Restore on partial failure
-            if (new_elements) array->elements = new_elements;
-            if (new_indices) array->indices = new_indices;
+            if (new_elements)
+                array->elements = new_elements;
+            if (new_indices)
+                array->indices = new_indices;
             return -1;
         }
-        
+
         array->elements = new_elements;
         array->indices = new_indices;
         array->capacity = new_capacity;
-        
+
         // Zero new memory
         for (size_t i = array->count; i < new_capacity; i++) {
             array->elements[i] = NULL;
             array->indices[i] = 0;
         }
     }
-    
+
     return 0;
 }
 
 /**
  * @brief Set an element in an indexed array
- * 
+ *
  * Supports negative indices: -1 is last element, -2 is second-to-last, etc.
  * Negative indices are converted relative to (max_index + 1).
  */
-int symtable_array_set_index(array_value_t *array, int index, const char *value) {
+int symtable_array_set_index(array_value_t *array, int index,
+                             const char *value) {
     if (!array || array->is_associative) {
         return -1;
     }
-    
+
     // Handle negative indices (Bash-style: -1 = last element)
     if (index < 0) {
         index = (int)(array->max_index + 1) + index;
         if (index < 0) {
-            return -1;  // Still negative = out of bounds
+            return -1; // Still negative = out of bounds
         }
     }
 
@@ -2256,13 +2269,13 @@ int symtable_array_set_index(array_value_t *array, int index, const char *value)
         if (array_ensure_capacity(array) < 0) {
             return -1;
         }
-        
+
         // Shift elements to make room
         for (size_t i = array->count; i > pos; i--) {
             array->elements[i] = array->elements[i - 1];
             array->indices[i] = array->indices[i - 1];
         }
-        
+
         array->elements[pos] = value ? strdup(value) : NULL;
         array->indices[pos] = index;
         array->count++;
@@ -2277,7 +2290,7 @@ int symtable_array_set_index(array_value_t *array, int index, const char *value)
 
 /**
  * @brief Get an element from an indexed array
- * 
+ *
  * Supports negative indices: -1 is last element, -2 is second-to-last, etc.
  * Negative indices are converted relative to (max_index + 1).
  */
@@ -2285,12 +2298,12 @@ const char *symtable_array_get_index(array_value_t *array, int index) {
     if (!array || array->is_associative) {
         return NULL;
     }
-    
+
     // Handle negative indices (Bash-style: -1 = last element)
     if (index < 0) {
         index = (int)(array->max_index + 1) + index;
         if (index < 0) {
-            return NULL;  // Still negative = out of bounds
+            return NULL; // Still negative = out of bounds
         }
     }
 
@@ -2365,7 +2378,7 @@ size_t symtable_array_length(array_value_t *array) {
 
 /**
  * @brief Unset an element in an indexed array
- * 
+ *
  * Supports negative indices: -1 is last element, -2 is second-to-last, etc.
  * Negative indices are converted relative to (max_index + 1).
  */
@@ -2373,12 +2386,12 @@ int symtable_array_unset_index(array_value_t *array, int index) {
     if (!array || array->is_associative) {
         return -1;
     }
-    
+
     // Handle negative indices (Bash-style: -1 = last element)
     if (index < 0) {
         index = (int)(array->max_index + 1) + index;
         if (index < 0) {
-            return -1;  // Still negative = out of bounds
+            return -1; // Still negative = out of bounds
         }
     }
 
@@ -2386,7 +2399,7 @@ int symtable_array_unset_index(array_value_t *array, int index) {
     size_t pos = array_find_index_pos(array, index, &found);
 
     if (!found) {
-        return 0;  // Not an error to unset nonexistent element
+        return 0; // Not an error to unset nonexistent element
     }
 
     // Free the element
@@ -2430,7 +2443,8 @@ int symtable_array_unset_assoc(array_value_t *array, const char *key) {
  */
 char **symtable_array_get_keys(array_value_t *array, size_t *count) {
     if (!array || !count) {
-        if (count) *count = 0;
+        if (count)
+            *count = 0;
         return NULL;
     }
 
@@ -2452,7 +2466,7 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
             size_t i = 0;
             const char *key;
             const char *val;
-            while (ht_strstr_enum_next(enumerator, &key, &val) && 
+            while (ht_strstr_enum_next(enumerator, &key, &val) &&
                    i < array->count) {
                 keys[i++] = strdup(key);
             }
@@ -2475,7 +2489,8 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
  */
 char **symtable_array_get_values(array_value_t *array, size_t *count) {
     if (!array || !count) {
-        if (count) *count = 0;
+        if (count)
+            *count = 0;
         return NULL;
     }
 
@@ -2497,7 +2512,7 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
             size_t i = 0;
             const char *key;
             const char *val;
-            while (ht_strstr_enum_next(enumerator, &key, &val) && 
+            while (ht_strstr_enum_next(enumerator, &key, &val) &&
                    i < array->count) {
                 values[i++] = val ? strdup(val) : strdup("");
             }
@@ -2506,8 +2521,8 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
     } else {
         // Copy indexed array values
         for (size_t i = 0; i < array->count; i++) {
-            values[i] = array->elements[i] ? strdup(array->elements[i]) 
-                                           : strdup("");
+            values[i] =
+                array->elements[i] ? strdup(array->elements[i]) : strdup("");
         }
     }
 
@@ -2630,7 +2645,7 @@ int symtable_set_array(const char *name, array_value_t *array) {
     // Store pointer as string (hacky but works with existing ht_strstr)
     char ptr_str[32];
     snprintf(ptr_str, sizeof(ptr_str), "%p", (void *)array);
-    
+
     ht_strstr_insert(array_storage, name, ptr_str);
     return 0;
 }
@@ -2700,18 +2715,19 @@ int symtable_set_array_element(const char *name, const char *subscript,
             // For now, treat as error for indexed array
             return -1;
         }
-        
+
         // Adjust for 1-indexed arrays (zsh mode)
-        // When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to internal 0
+        // When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
+        // internal 0
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
             if (index <= 0) {
-                return -1;  // In 1-indexed mode, index 0 and below are invalid
+                return -1; // In 1-indexed mode, index 0 and below are invalid
             }
-            index--;  // Convert 1-indexed to 0-indexed internally
+            index--; // Convert 1-indexed to 0-indexed internally
         } else if (index < 0) {
-            return -1;  // 0-indexed mode doesn't allow negative here
+            return -1; // 0-indexed mode doesn't allow negative here
         }
-        
+
         return symtable_array_set_index(array, (int)index, value);
     }
 }
@@ -2742,18 +2758,19 @@ char *symtable_get_array_element(const char *name, const char *subscript) {
         if (*endptr != '\0') {
             return NULL;
         }
-        
+
         // Adjust for 1-indexed arrays (zsh mode)
-        // When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to internal 0
+        // When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
+        // internal 0
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
             if (index <= 0) {
-                return NULL;  // In 1-indexed mode, index 0 and below are invalid
+                return NULL; // In 1-indexed mode, index 0 and below are invalid
             }
-            index--;  // Convert 1-indexed to 0-indexed internally
+            index--; // Convert 1-indexed to 0-indexed internally
         } else if (index < 0) {
-            return NULL;  // 0-indexed mode doesn't allow negative here
+            return NULL; // 0-indexed mode doesn't allow negative here
         }
-        
+
         result = symtable_array_get_index(array, (int)index);
     }
 

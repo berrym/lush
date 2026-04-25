@@ -573,7 +573,8 @@ int fuzzy_common_prefix_length(const char *s1, const char *s2,
  * @param pattern Pattern string to match
  * @param text Text string to search in
  * @param options Fuzzy match options (NULL for defaults)
- * @return Score from 0 to 100 based on how much of pattern matches as subsequence
+ * @return Score from 0 to 100 based on how much of pattern matches as
+ * subsequence
  */
 int fuzzy_subsequence_score(const char *pattern, const char *text,
                             const fuzzy_match_options_t *options) {

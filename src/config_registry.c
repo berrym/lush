@@ -35,8 +35,10 @@
  * @return true if strings are equal after Unicode normalization
  */
 static inline bool unicode_streq(const char *s1, const char *s2) {
-    if (s1 == s2) return true;
-    if (!s1 || !s2) return false;
+    if (s1 == s2)
+        return true;
+    if (!s1 || !s2)
+        return false;
     return lle_unicode_strings_equal(s1, s2, &LLE_UNICODE_COMPARE_DEFAULT);
 }
 
@@ -49,18 +51,18 @@ static inline bool unicode_streq(const char *s1, const char *s2) {
  * @brief Stored option value with metadata
  */
 typedef struct {
-    char key[CREG_KEY_MAX];           /**< Full key path */
-    creg_value_t value;               /**< Current value */
-    creg_value_t default_val;         /**< Default value */
-    const creg_option_t *option_def;  /**< Pointer to option definition */
-    bool persisted;                     /**< Should be saved to file */
+    char key[CREG_KEY_MAX];          /**< Full key path */
+    creg_value_t value;              /**< Current value */
+    creg_value_t default_val;        /**< Default value */
+    const creg_option_t *option_def; /**< Pointer to option definition */
+    bool persisted;                  /**< Should be saved to file */
 } stored_option_t;
 
 /**
  * @brief Registered section with its options
  */
 typedef struct {
-    creg_section_t section;                      /**< Section definition */
+    creg_section_t section; /**< Section definition */
     stored_option_t options[CREG_OPTIONS_PER_SECTION_MAX];
     size_t option_count;
 } registered_section_t;
@@ -147,8 +149,8 @@ static stored_option_t *find_option(const char *key) {
     char section_name[CREG_KEY_MAX];
     char option_name[CREG_KEY_MAX];
 
-    if (!parse_key(key, section_name, sizeof(section_name),
-                   option_name, sizeof(option_name))) {
+    if (!parse_key(key, section_name, sizeof(section_name), option_name,
+                   sizeof(option_name))) {
         return NULL;
     }
 
@@ -160,7 +162,8 @@ static stored_option_t *find_option(const char *key) {
     for (size_t i = 0; i < section->option_count; i++) {
         /* Compare just the option part of the stored key */
         const char *stored_dot = strchr(section->options[i].key, '.');
-        const char *stored_option = stored_dot ? stored_dot + 1 : section->options[i].key;
+        const char *stored_option =
+            stored_dot ? stored_dot + 1 : section->options[i].key;
         if (unicode_streq(stored_option, option_name)) {
             return &section->options[i];
         }
@@ -189,7 +192,7 @@ static bool pattern_matches(const char *pattern, const char *key) {
     if (plen >= 2 && pattern[plen - 1] == '*' && pattern[plen - 2] == '.') {
         /* Extract prefix without the trailing '*' (keep the dot) */
         /* e.g., "shell.*" -> match prefix "shell." against key */
-        size_t prefix_len = plen - 1;  /* Length without the '*' */
+        size_t prefix_len = plen - 1; /* Length without the '*' */
         return lle_unicode_is_prefix(pattern, prefix_len, key, strlen(key),
                                      &LLE_UNICODE_COMPARE_DEFAULT);
     }
@@ -241,9 +244,7 @@ void config_registry_cleanup(void) {
     memset(&g_registry, 0, sizeof(g_registry));
 }
 
-bool config_registry_is_initialized(void) {
-    return g_registry.initialized;
-}
+bool config_registry_is_initialized(void) { return g_registry.initialized; }
 
 /* ============================================================================
  * Section Registration
@@ -283,8 +284,8 @@ creg_result_t config_registry_register_section(const creg_section_t *section) {
         stored_option_t *stored = &reg->options[reg->option_count];
 
         /* Build full key path */
-        snprintf(stored->key, sizeof(stored->key), "%s.%s",
-                 section->name, opt->name);
+        snprintf(stored->key, sizeof(stored->key), "%s.%s", section->name,
+                 opt->name);
 
         stored->value = opt->default_val;
         stored->default_val = opt->default_val;
@@ -380,7 +381,8 @@ creg_result_t config_registry_set_string(const char *key, const char *value) {
     return config_registry_set(key, &v);
 }
 
-creg_result_t config_registry_get_string(const char *key, char *out, size_t out_len) {
+creg_result_t config_registry_get_string(const char *key, char *out,
+                                         size_t out_len) {
     if (!out || out_len == 0) {
         return CREG_ERROR_INVALID_PARAM;
     }
@@ -453,8 +455,8 @@ creg_result_t config_registry_get_boolean(const char *key, bool *out) {
  */
 
 creg_result_t config_registry_subscribe(const char *pattern,
-                                          creg_change_callback_t callback,
-                                          void *user_data) {
+                                        creg_change_callback_t callback,
+                                        void *user_data) {
     if (!pattern || !callback) {
         return CREG_ERROR_INVALID_PARAM;
     }
@@ -536,8 +538,8 @@ static toml_result_t load_callback(const char *section, const char *key,
     switch (value->type) {
     case TOML_VALUE_STRING:
         config_val.type = CREG_VALUE_STRING;
-        snprintf(config_val.data.string, sizeof(config_val.data.string),
-                 "%s", value->data.string);
+        snprintf(config_val.data.string, sizeof(config_val.data.string), "%s",
+                 value->data.string);
         break;
 
     case TOML_VALUE_INTEGER:
@@ -559,8 +561,8 @@ static toml_result_t load_callback(const char *section, const char *key,
     creg_result_t result = config_registry_set(full_key, &config_val);
     if (result != CREG_SUCCESS && result != CREG_ERROR_NOT_FOUND) {
         ctx->result = result;
-        snprintf(ctx->error_msg, sizeof(ctx->error_msg),
-                 "Error setting '%s'", full_key);
+        snprintf(ctx->error_msg, sizeof(ctx->error_msg), "Error setting '%s'",
+                 full_key);
     }
 
     return TOML_SUCCESS;
@@ -690,7 +692,8 @@ creg_result_t config_registry_save(const char *path) {
             /* Write value based on type */
             switch (opt->value.type) {
             case CREG_VALUE_STRING:
-                fprintf(file, "%s = \"%s\"\n", option_name, opt->value.data.string);
+                fprintf(file, "%s = \"%s\"\n", option_name,
+                        opt->value.data.string);
                 break;
             case CREG_VALUE_INTEGER:
                 fprintf(file, "%s = %lld\n", option_name,
@@ -701,7 +704,8 @@ creg_result_t config_registry_save(const char *path) {
                         opt->value.data.boolean ? "true" : "false");
                 break;
             case CREG_VALUE_FLOAT:
-                fprintf(file, "%s = %g\n", option_name, opt->value.data.floating);
+                fprintf(file, "%s = %g\n", option_name,
+                        opt->value.data.floating);
                 break;
             default:
                 break;
@@ -786,7 +790,8 @@ void config_registry_reset_all(void) {
     }
 }
 
-creg_result_t config_registry_get_default(const char *key, creg_value_t *value) {
+creg_result_t config_registry_get_default(const char *key,
+                                          creg_value_t *value) {
     if (!value) {
         return CREG_ERROR_INVALID_PARAM;
     }

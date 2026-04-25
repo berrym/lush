@@ -14,14 +14,15 @@
  * Build with AFL++ (GCC or Clang):
  *   CC=afl-clang-fast meson setup build -Denable_fuzzing=true -Dfuzzer=afl
  *   meson compile -C build fuzz_tokenizer_afl
- *   afl-fuzz -i tests/fuzz/corpus/tokenizer/ -o findings/ -- ./build/fuzz_tokenizer_afl
+ *   afl-fuzz -i tests/fuzz/corpus/tokenizer/ -o findings/ --
+ * ./build/fuzz_tokenizer_afl
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "tokenizer.h"
 #include "shell_mode.h"
+#include "tokenizer.h"
 
 #include <stdint.h>
 #include <stdlib.h>

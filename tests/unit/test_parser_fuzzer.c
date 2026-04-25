@@ -18,8 +18,8 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "parser.h"
 #include "node.h"
+#include "parser.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +87,8 @@ static int tests_failed = 0;
             parser_free(_p);                                                   \
             return;                                                            \
         }                                                                      \
-        if (_n) free_node_tree(_n);                                            \
+        if (_n)                                                                \
+            free_node_tree(_n);                                                \
         parser_free(_p);                                                       \
     } while (0)
 
@@ -457,7 +458,7 @@ TEST(quote_in_variable) {
 TEST(escaped_quotes) {
     /* Escaped quotes */
     ASSERT_PARSES("echo \"hello \\\"world\\\"\"");
-    ASSERT_PARSES("echo 'it'\\''s'");  /* Escaped single quote trick */
+    ASSERT_PARSES("echo 'it'\\''s'"); /* Escaped single quote trick */
 }
 
 TEST(nested_command_substitution_quotes) {

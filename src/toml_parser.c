@@ -31,8 +31,10 @@
  * equivalent Unicode sequences compare as equal.
  */
 static inline bool toml_streq(const char *s1, const char *s2) {
-    if (s1 == s2) return true;
-    if (!s1 || !s2) return false;
+    if (s1 == s2)
+        return true;
+    if (!s1 || !s2)
+        return false;
     return lle_unicode_strings_equal(s1, s2, &LLE_UNICODE_COMPARE_DEFAULT);
 }
 
@@ -454,8 +456,8 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
 
                 for (int i = 0; i < hex_digits; i++) {
                     if (PARSER_EOF(parser)) {
-                        return parser_set_error(parser,
-                            "Incomplete Unicode escape sequence");
+                        return parser_set_error(
+                            parser, "Incomplete Unicode escape sequence");
                     }
                     char h = PARSER_PEEK(parser);
                     PARSER_ADVANCE(parser);
@@ -468,8 +470,8 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
                     } else if (h >= 'A' && h <= 'F') {
                         digit = 10 + (h - 'A');
                     } else {
-                        return parser_set_error(parser,
-                            "Invalid hex digit in Unicode escape");
+                        return parser_set_error(
+                            parser, "Invalid hex digit in Unicode escape");
                     }
                     codepoint = (codepoint << 4) | (uint32_t)digit;
                 }
@@ -477,20 +479,20 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
                 /* Validate codepoint range */
                 if (codepoint > 0x10FFFF) {
                     return parser_set_error(parser,
-                        "Unicode codepoint out of range");
+                                            "Unicode codepoint out of range");
                 }
                 /* Reject surrogates (reserved for UTF-16) */
                 if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
                     return parser_set_error(parser,
-                        "Surrogate codepoints not allowed");
+                                            "Surrogate codepoints not allowed");
                 }
 
                 /* Encode to UTF-8 using LLE's Unicode support */
                 char utf8_buf[4];
                 int utf8_len = lle_utf8_encode_codepoint(codepoint, utf8_buf);
                 if (utf8_len <= 0) {
-                    return parser_set_error(parser,
-                        "Failed to encode Unicode codepoint");
+                    return parser_set_error(
+                        parser, "Failed to encode Unicode codepoint");
                 }
 
                 /* Add UTF-8 bytes to output */

@@ -3,7 +3,8 @@
  * @brief POSIX-compliant arithmetic expansion module
  *
  * Provides arithmetic expansion using the shunting yard algorithm.
- * Supports all POSIX arithmetic operators, variables, and proper error handling.
+ * Supports all POSIX arithmetic operators, variables, and proper error
+ * handling.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -34,20 +35,23 @@
  * - Variables and numeric literals
  * - Octal (0123) and hexadecimal (0x123) numbers
  *
- * @param orig_expr Arithmetic expression string (with or without $(( )) wrapper)
+ * @param orig_expr Arithmetic expression string (with or without $(( ))
+ * wrapper)
  * @return String representation of the result, or NULL on error
  */
 char *arithm_expand(const char *orig_expr);
 
 /**
- * @brief Evaluate arithmetic expression with executor context for scoped variables
+ * @brief Evaluate arithmetic expression with executor context for scoped
+ * variables
  *
  * This function is identical to arithm_expand but uses the executor's
  * symbol table for variable resolution, allowing access to function
  * parameters like $1, $2, etc.
  *
  * @param executor Executor context for scoped variable resolution
- * @param orig_expr Arithmetic expression string (with or without $(( )) wrapper)
+ * @param orig_expr Arithmetic expression string (with or without $(( ))
+ * wrapper)
  * @return String representation of the result, or NULL on error
  */
 typedef struct executor executor_t;

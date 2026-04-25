@@ -21,15 +21,14 @@ int strcasecmp(const char *s1, const char *s2);
 
 /* ============================================================================
  * Global State
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Global shell mode state instance */
-shell_mode_state_t g_shell_mode_state = {
-    .current_mode = SHELL_MODE_LUSH,
-    .feature_overrides = {false},
-    .feature_override_set = {false},
-    .strict_mode = false
-};
+shell_mode_state_t g_shell_mode_state = {.current_mode = SHELL_MODE_LUSH,
+                                         .feature_overrides = {false},
+                                         .feature_override_set = {false},
+                                         .strict_mode = false};
 
 /* ============================================================================
  * Feature Matrix
@@ -41,429 +40,447 @@ shell_mode_state_t g_shell_mode_state = {
 
 static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
     /* SHELL_MODE_POSIX - Strict POSIX sh compliance */
-    [SHELL_MODE_POSIX] = {
-        /* Arrays - not in POSIX */
-        [FEATURE_INDEXED_ARRAYS]      = false,
-        [FEATURE_ASSOCIATIVE_ARRAYS]  = false,
-        [FEATURE_ARRAY_ZERO_INDEXED]  = true,  /* N/A but default to sane value */
-        [FEATURE_ARRAY_APPEND]        = false,
+    [SHELL_MODE_POSIX] =
+        {
+            /* Arrays - not in POSIX */
+            [FEATURE_INDEXED_ARRAYS] = false,
+            [FEATURE_ASSOCIATIVE_ARRAYS] = false,
+            [FEATURE_ARRAY_ZERO_INDEXED] =
+                true, /* N/A but default to sane value */
+            [FEATURE_ARRAY_APPEND] = false,
 
-        /* Arithmetic */
-        [FEATURE_ARITH_COMMAND]       = false, /* (( )) not in POSIX */
-        [FEATURE_LET_BUILTIN]         = false,
+            /* Arithmetic */
+            [FEATURE_ARITH_COMMAND] = false, /* (( )) not in POSIX */
+            [FEATURE_LET_BUILTIN] = false,
 
-        /* Extended Tests */
-        [FEATURE_EXTENDED_TEST]       = false, /* [[ ]] not in POSIX */
-        [FEATURE_REGEX_MATCH]         = false,
-        [FEATURE_PATTERN_MATCH]       = false,
+            /* Extended Tests */
+            [FEATURE_EXTENDED_TEST] = false, /* [[ ]] not in POSIX */
+            [FEATURE_REGEX_MATCH] = false,
+            [FEATURE_PATTERN_MATCH] = false,
 
-        /* Process Substitution */
-        [FEATURE_PROCESS_SUBSTITUTION] = false,
-        [FEATURE_PIPE_STDERR]          = false,
-        [FEATURE_APPEND_BOTH]          = false,
-        [FEATURE_COPROC]               = false,
+            /* Process Substitution */
+            [FEATURE_PROCESS_SUBSTITUTION] = false,
+            [FEATURE_PIPE_STDERR] = false,
+            [FEATURE_APPEND_BOTH] = false,
+            [FEATURE_COPROC] = false,
 
-        /* Extended Parameter Expansion */
-        [FEATURE_CASE_MODIFICATION]    = false,
-        [FEATURE_SUBSTRING_EXPANSION]  = false,
-        [FEATURE_PATTERN_SUBSTITUTION] = false,
-        [FEATURE_INDIRECT_EXPANSION]   = false,
-        [FEATURE_PARAM_TRANSFORMATION] = false,
+            /* Extended Parameter Expansion */
+            [FEATURE_CASE_MODIFICATION] = false,
+            [FEATURE_SUBSTRING_EXPANSION] = false,
+            [FEATURE_PATTERN_SUBSTITUTION] = false,
+            [FEATURE_INDIRECT_EXPANSION] = false,
+            [FEATURE_PARAM_TRANSFORMATION] = false,
 
-        /* Extended Globbing */
-        [FEATURE_EXTENDED_GLOB]       = false,
-        [FEATURE_NULL_GLOB]           = false,
-        [FEATURE_DOT_GLOB]            = false,
-        [FEATURE_GLOBSTAR]            = false, /* POSIX doesn't have ** recursive glob */
+            /* Extended Globbing */
+            [FEATURE_EXTENDED_GLOB] = false,
+            [FEATURE_NULL_GLOB] = false,
+            [FEATURE_DOT_GLOB] = false,
+            [FEATURE_GLOBSTAR] =
+                false, /* POSIX doesn't have ** recursive glob */
 
-        /* Brace Expansion */
-        [FEATURE_BRACE_EXPANSION]     = false, /* POSIX doesn't have brace expansion */
+            /* Brace Expansion */
+            [FEATURE_BRACE_EXPANSION] =
+                false, /* POSIX doesn't have brace expansion */
 
-        /* Quoting Extensions */
-        [FEATURE_ANSI_QUOTING]        = false, /* POSIX doesn't have $'...' */
-        [FEATURE_LOCALE_QUOTING]      = false, /* POSIX doesn't have $"..." */
+            /* Quoting Extensions */
+            [FEATURE_ANSI_QUOTING] = false,   /* POSIX doesn't have $'...' */
+            [FEATURE_LOCALE_QUOTING] = false, /* POSIX doesn't have $"..." */
 
-        /* Control Flow Extensions */
-        [FEATURE_CASE_FALLTHROUGH]    = false,
-        [FEATURE_SELECT_LOOP]         = false,
-        [FEATURE_TIME_KEYWORD]        = false,
+            /* Control Flow Extensions */
+            [FEATURE_CASE_FALLTHROUGH] = false,
+            [FEATURE_SELECT_LOOP] = false,
+            [FEATURE_TIME_KEYWORD] = false,
 
-        /* Behavior Defaults */
-        [FEATURE_WORD_SPLIT_DEFAULT]  = true,  /* POSIX requires word splitting */
-        [FEATURE_AUTO_CD]             = false,
-        [FEATURE_AUTO_PUSHD]          = false,
-        [FEATURE_CDABLE_VARS]         = false,
+            /* Behavior Defaults */
+            [FEATURE_WORD_SPLIT_DEFAULT] =
+                true, /* POSIX requires word splitting */
+            [FEATURE_AUTO_CD] = false,
+            [FEATURE_AUTO_PUSHD] = false,
+            [FEATURE_CDABLE_VARS] = false,
 
-        /* History Behavior */
-        [FEATURE_HISTAPPEND]          = false,
-        [FEATURE_INC_APPEND_HISTORY]  = false,
-        [FEATURE_SHARE_HISTORY]       = false,
-        [FEATURE_HIST_VERIFY]         = false,
-        [FEATURE_CHECKJOBS]           = false,
+            /* History Behavior */
+            [FEATURE_HISTAPPEND] = false,
+            [FEATURE_INC_APPEND_HISTORY] = false,
+            [FEATURE_SHARE_HISTORY] = false,
+            [FEATURE_HIST_VERIFY] = false,
+            [FEATURE_CHECKJOBS] = false,
 
-        /* Function Enhancements */
-        [FEATURE_NAMEREF]             = false,
-        [FEATURE_ANONYMOUS_FUNCTIONS] = false,
-        [FEATURE_RETURN_ANYWHERE]     = false,
+            /* Function Enhancements */
+            [FEATURE_NAMEREF] = false,
+            [FEATURE_ANONYMOUS_FUNCTIONS] = false,
+            [FEATURE_RETURN_ANYWHERE] = false,
 
-        /* Zsh-Specific */
-        [FEATURE_GLOB_QUALIFIERS]     = false,
-        [FEATURE_HOOK_FUNCTIONS]      = false,
-        [FEATURE_SIMPLE_HOOK_ARRAYS]  = false,
-        [FEATURE_PROMPT_COMMAND]      = false, /* Not in POSIX */
-        [FEATURE_ZSH_PARAM_FLAGS]     = false,
-        [FEATURE_PLUGIN_SYSTEM]       = false,
-    },
+            /* Zsh-Specific */
+            [FEATURE_GLOB_QUALIFIERS] = false,
+            [FEATURE_HOOK_FUNCTIONS] = false,
+            [FEATURE_SIMPLE_HOOK_ARRAYS] = false,
+            [FEATURE_PROMPT_COMMAND] = false, /* Not in POSIX */
+            [FEATURE_ZSH_PARAM_FLAGS] = false,
+            [FEATURE_PLUGIN_SYSTEM] = false,
+        },
 
     /* SHELL_MODE_BASH - Bash 5.x compatibility */
-    [SHELL_MODE_BASH] = {
-        /* Arrays */
-        [FEATURE_INDEXED_ARRAYS]      = true,
-        [FEATURE_ASSOCIATIVE_ARRAYS]  = true,
-        [FEATURE_ARRAY_ZERO_INDEXED]  = true,  /* Bash arrays are 0-indexed */
-        [FEATURE_ARRAY_APPEND]        = true,
+    [SHELL_MODE_BASH] =
+        {
+            /* Arrays */
+            [FEATURE_INDEXED_ARRAYS] = true,
+            [FEATURE_ASSOCIATIVE_ARRAYS] = true,
+            [FEATURE_ARRAY_ZERO_INDEXED] = true, /* Bash arrays are 0-indexed */
+            [FEATURE_ARRAY_APPEND] = true,
 
-        /* Arithmetic */
-        [FEATURE_ARITH_COMMAND]       = true,
-        [FEATURE_LET_BUILTIN]         = true,
+            /* Arithmetic */
+            [FEATURE_ARITH_COMMAND] = true,
+            [FEATURE_LET_BUILTIN] = true,
 
-        /* Extended Tests */
-        [FEATURE_EXTENDED_TEST]       = true,
-        [FEATURE_REGEX_MATCH]         = true,
-        [FEATURE_PATTERN_MATCH]       = true,
+            /* Extended Tests */
+            [FEATURE_EXTENDED_TEST] = true,
+            [FEATURE_REGEX_MATCH] = true,
+            [FEATURE_PATTERN_MATCH] = true,
 
-        /* Process Substitution */
-        [FEATURE_PROCESS_SUBSTITUTION] = true,
-        [FEATURE_PIPE_STDERR]          = true,
-        [FEATURE_APPEND_BOTH]          = true,
-        [FEATURE_COPROC]               = true,
+            /* Process Substitution */
+            [FEATURE_PROCESS_SUBSTITUTION] = true,
+            [FEATURE_PIPE_STDERR] = true,
+            [FEATURE_APPEND_BOTH] = true,
+            [FEATURE_COPROC] = true,
 
-        /* Extended Parameter Expansion */
-        [FEATURE_CASE_MODIFICATION]    = true,
-        [FEATURE_SUBSTRING_EXPANSION]  = true,
-        [FEATURE_PATTERN_SUBSTITUTION] = true,
-        [FEATURE_INDIRECT_EXPANSION]   = true,
-        [FEATURE_PARAM_TRANSFORMATION] = true,
+            /* Extended Parameter Expansion */
+            [FEATURE_CASE_MODIFICATION] = true,
+            [FEATURE_SUBSTRING_EXPANSION] = true,
+            [FEATURE_PATTERN_SUBSTITUTION] = true,
+            [FEATURE_INDIRECT_EXPANSION] = true,
+            [FEATURE_PARAM_TRANSFORMATION] = true,
 
-        /* Extended Globbing - off by default in Bash, use shopt extglob */
-        [FEATURE_EXTENDED_GLOB]       = false,
-        [FEATURE_NULL_GLOB]           = false,
-        [FEATURE_DOT_GLOB]            = false,
-        [FEATURE_GLOBSTAR]            = false, /* shopt globstar, off by default */
+            /* Extended Globbing - off by default in Bash, use shopt extglob */
+            [FEATURE_EXTENDED_GLOB] = false,
+            [FEATURE_NULL_GLOB] = false,
+            [FEATURE_DOT_GLOB] = false,
+            [FEATURE_GLOBSTAR] = false, /* shopt globstar, off by default */
 
-        /* Brace Expansion */
-        [FEATURE_BRACE_EXPANSION]     = true, /* Bash has brace expansion on by default */
+            /* Brace Expansion */
+            [FEATURE_BRACE_EXPANSION] =
+                true, /* Bash has brace expansion on by default */
 
-        /* Quoting Extensions */
-        [FEATURE_ANSI_QUOTING]        = true, /* Bash supports $'...' */
-        [FEATURE_LOCALE_QUOTING]      = true, /* Bash supports $"..." */
+            /* Quoting Extensions */
+            [FEATURE_ANSI_QUOTING] = true,   /* Bash supports $'...' */
+            [FEATURE_LOCALE_QUOTING] = true, /* Bash supports $"..." */
 
-        /* Control Flow Extensions */
-        [FEATURE_CASE_FALLTHROUGH]    = true,
-        [FEATURE_SELECT_LOOP]         = true,
-        [FEATURE_TIME_KEYWORD]        = true,
+            /* Control Flow Extensions */
+            [FEATURE_CASE_FALLTHROUGH] = true,
+            [FEATURE_SELECT_LOOP] = true,
+            [FEATURE_TIME_KEYWORD] = true,
 
-        /* Behavior Defaults */
-        [FEATURE_WORD_SPLIT_DEFAULT]  = true,  /* Bash does word splitting by default */
-        [FEATURE_AUTO_CD]             = false, /* shopt autocd, off by default */
-        [FEATURE_AUTO_PUSHD]          = false,
-        [FEATURE_CDABLE_VARS]         = false,
+            /* Behavior Defaults */
+            [FEATURE_WORD_SPLIT_DEFAULT] =
+                true,                  /* Bash does word splitting by default */
+            [FEATURE_AUTO_CD] = false, /* shopt autocd, off by default */
+            [FEATURE_AUTO_PUSHD] = false,
+            [FEATURE_CDABLE_VARS] = false,
 
-        /* History Behavior */
-        [FEATURE_HISTAPPEND]          = true,  /* Bash default on */
-        [FEATURE_INC_APPEND_HISTORY]  = false, /* Bash: off by default */
-        [FEATURE_SHARE_HISTORY]       = false, /* Bash doesn't have this */
-        [FEATURE_HIST_VERIFY]         = false, /* shopt histverify, off */
-        [FEATURE_CHECKJOBS]           = false, /* shopt checkjobs, off */
+            /* History Behavior */
+            [FEATURE_HISTAPPEND] = true,          /* Bash default on */
+            [FEATURE_INC_APPEND_HISTORY] = false, /* Bash: off by default */
+            [FEATURE_SHARE_HISTORY] = false,      /* Bash doesn't have this */
+            [FEATURE_HIST_VERIFY] = false,        /* shopt histverify, off */
+            [FEATURE_CHECKJOBS] = false,          /* shopt checkjobs, off */
 
-        /* Function Enhancements */
-        [FEATURE_NAMEREF]             = true,
-        [FEATURE_ANONYMOUS_FUNCTIONS] = false, /* Bash doesn't have these */
-        [FEATURE_RETURN_ANYWHERE]     = true,
+            /* Function Enhancements */
+            [FEATURE_NAMEREF] = true,
+            [FEATURE_ANONYMOUS_FUNCTIONS] = false, /* Bash doesn't have these */
+            [FEATURE_RETURN_ANYWHERE] = true,
 
-        /* Zsh-Specific */
-        [FEATURE_GLOB_QUALIFIERS]     = false,
-        [FEATURE_HOOK_FUNCTIONS]      = false, /* Bash has PROMPT_COMMAND instead */
-        [FEATURE_SIMPLE_HOOK_ARRAYS]  = false, /* Bash uses PROMPT_COMMAND */
-        [FEATURE_PROMPT_COMMAND]      = true,  /* Bash 5.1+ supports string and array */
-        [FEATURE_ZSH_PARAM_FLAGS]     = false,
-        [FEATURE_PLUGIN_SYSTEM]       = false, /* Not a Bash feature */
-    },
+            /* Zsh-Specific */
+            [FEATURE_GLOB_QUALIFIERS] = false,
+            [FEATURE_HOOK_FUNCTIONS] =
+                false, /* Bash has PROMPT_COMMAND instead */
+            [FEATURE_SIMPLE_HOOK_ARRAYS] = false, /* Bash uses PROMPT_COMMAND */
+            [FEATURE_PROMPT_COMMAND] =
+                true, /* Bash 5.1+ supports string and array */
+            [FEATURE_ZSH_PARAM_FLAGS] = false,
+            [FEATURE_PLUGIN_SYSTEM] = false, /* Not a Bash feature */
+        },
 
     /* SHELL_MODE_ZSH - Zsh compatibility */
-    [SHELL_MODE_ZSH] = {
-        /* Arrays */
-        [FEATURE_INDEXED_ARRAYS]      = true,
-        [FEATURE_ASSOCIATIVE_ARRAYS]  = true,
-        [FEATURE_ARRAY_ZERO_INDEXED]  = false, /* Zsh arrays are 1-indexed */
-        [FEATURE_ARRAY_APPEND]        = true,
+    [SHELL_MODE_ZSH] =
+        {
+            /* Arrays */
+            [FEATURE_INDEXED_ARRAYS] = true,
+            [FEATURE_ASSOCIATIVE_ARRAYS] = true,
+            [FEATURE_ARRAY_ZERO_INDEXED] = false, /* Zsh arrays are 1-indexed */
+            [FEATURE_ARRAY_APPEND] = true,
 
-        /* Arithmetic */
-        [FEATURE_ARITH_COMMAND]       = true,
-        [FEATURE_LET_BUILTIN]         = true,
+            /* Arithmetic */
+            [FEATURE_ARITH_COMMAND] = true,
+            [FEATURE_LET_BUILTIN] = true,
 
-        /* Extended Tests */
-        [FEATURE_EXTENDED_TEST]       = true,
-        [FEATURE_REGEX_MATCH]         = true,
-        [FEATURE_PATTERN_MATCH]       = true,
+            /* Extended Tests */
+            [FEATURE_EXTENDED_TEST] = true,
+            [FEATURE_REGEX_MATCH] = true,
+            [FEATURE_PATTERN_MATCH] = true,
 
-        /* Process Substitution */
-        [FEATURE_PROCESS_SUBSTITUTION] = true,
-        [FEATURE_PIPE_STDERR]          = true,
-        [FEATURE_APPEND_BOTH]          = true,
-        [FEATURE_COPROC]               = true,
+            /* Process Substitution */
+            [FEATURE_PROCESS_SUBSTITUTION] = true,
+            [FEATURE_PIPE_STDERR] = true,
+            [FEATURE_APPEND_BOTH] = true,
+            [FEATURE_COPROC] = true,
 
-        /* Extended Parameter Expansion */
-        [FEATURE_CASE_MODIFICATION]    = true,
-        [FEATURE_SUBSTRING_EXPANSION]  = true,
-        [FEATURE_PATTERN_SUBSTITUTION] = true,
-        [FEATURE_INDIRECT_EXPANSION]   = true,
-        [FEATURE_PARAM_TRANSFORMATION] = true,
+            /* Extended Parameter Expansion */
+            [FEATURE_CASE_MODIFICATION] = true,
+            [FEATURE_SUBSTRING_EXPANSION] = true,
+            [FEATURE_PATTERN_SUBSTITUTION] = true,
+            [FEATURE_INDIRECT_EXPANSION] = true,
+            [FEATURE_PARAM_TRANSFORMATION] = true,
 
-        /* Extended Globbing - on by default in Zsh */
-        [FEATURE_EXTENDED_GLOB]       = true,
-        [FEATURE_NULL_GLOB]           = true,  /* CSH_NULL_GLOB behavior */
-        [FEATURE_DOT_GLOB]            = false, /* GLOB_DOTS off by default */
-        [FEATURE_GLOBSTAR]            = true,  /* ** recursive glob on by default */
+            /* Extended Globbing - on by default in Zsh */
+            [FEATURE_EXTENDED_GLOB] = true,
+            [FEATURE_NULL_GLOB] = true, /* CSH_NULL_GLOB behavior */
+            [FEATURE_DOT_GLOB] = false, /* GLOB_DOTS off by default */
+            [FEATURE_GLOBSTAR] = true,  /* ** recursive glob on by default */
 
-        /* Brace Expansion */
-        [FEATURE_BRACE_EXPANSION]     = true, /* Zsh has brace expansion on by default */
+            /* Brace Expansion */
+            [FEATURE_BRACE_EXPANSION] =
+                true, /* Zsh has brace expansion on by default */
 
-        /* Quoting Extensions */
-        [FEATURE_ANSI_QUOTING]        = true, /* Zsh supports $'...' */
-        [FEATURE_LOCALE_QUOTING]      = false, /* Zsh doesn't have $"..." */
+            /* Quoting Extensions */
+            [FEATURE_ANSI_QUOTING] = true,    /* Zsh supports $'...' */
+            [FEATURE_LOCALE_QUOTING] = false, /* Zsh doesn't have $"..." */
 
-        /* Control Flow Extensions */
-        [FEATURE_CASE_FALLTHROUGH]    = true,
-        [FEATURE_SELECT_LOOP]         = true,
-        [FEATURE_TIME_KEYWORD]        = true,
+            /* Control Flow Extensions */
+            [FEATURE_CASE_FALLTHROUGH] = true,
+            [FEATURE_SELECT_LOOP] = true,
+            [FEATURE_TIME_KEYWORD] = true,
 
-        /* Behavior Defaults */
-        [FEATURE_WORD_SPLIT_DEFAULT]  = false, /* Zsh doesn't word-split by default */
-        [FEATURE_AUTO_CD]             = false, /* AUTO_CD option, off by default */
-        [FEATURE_AUTO_PUSHD]          = false,
-        [FEATURE_CDABLE_VARS]         = false,
+            /* Behavior Defaults */
+            [FEATURE_WORD_SPLIT_DEFAULT] =
+                false,                 /* Zsh doesn't word-split by default */
+            [FEATURE_AUTO_CD] = false, /* AUTO_CD option, off by default */
+            [FEATURE_AUTO_PUSHD] = false,
+            [FEATURE_CDABLE_VARS] = false,
 
-        /* History Behavior */
-        [FEATURE_HISTAPPEND]          = true,  /* APPEND_HISTORY */
-        [FEATURE_INC_APPEND_HISTORY]  = true,  /* INC_APPEND_HISTORY on by default */
-        [FEATURE_SHARE_HISTORY]       = false, /* SHARE_HISTORY off by default */
-        [FEATURE_HIST_VERIFY]         = false, /* HIST_VERIFY off by default */
-        [FEATURE_CHECKJOBS]           = false, /* CHECK_JOBS off by default */
+            /* History Behavior */
+            [FEATURE_HISTAPPEND] = true, /* APPEND_HISTORY */
+            [FEATURE_INC_APPEND_HISTORY] =
+                true, /* INC_APPEND_HISTORY on by default */
+            [FEATURE_SHARE_HISTORY] = false, /* SHARE_HISTORY off by default */
+            [FEATURE_HIST_VERIFY] = false,   /* HIST_VERIFY off by default */
+            [FEATURE_CHECKJOBS] = false,     /* CHECK_JOBS off by default */
 
-        /* Function Enhancements */
-        [FEATURE_NAMEREF]             = true,
-        [FEATURE_ANONYMOUS_FUNCTIONS] = true,
-        [FEATURE_RETURN_ANYWHERE]     = true,
+            /* Function Enhancements */
+            [FEATURE_NAMEREF] = true,
+            [FEATURE_ANONYMOUS_FUNCTIONS] = true,
+            [FEATURE_RETURN_ANYWHERE] = true,
 
-        /* Zsh-Specific */
-        [FEATURE_GLOB_QUALIFIERS]     = true,
-        [FEATURE_HOOK_FUNCTIONS]      = true,
-        [FEATURE_SIMPLE_HOOK_ARRAYS]  = true,  /* Zsh supports precmd+=(fn) */
-        [FEATURE_PROMPT_COMMAND]      = false, /* Zsh uses precmd instead */
-        [FEATURE_ZSH_PARAM_FLAGS]     = true,
-        [FEATURE_PLUGIN_SYSTEM]       = false, /* Not a Zsh feature */
-    },
+            /* Zsh-Specific */
+            [FEATURE_GLOB_QUALIFIERS] = true,
+            [FEATURE_HOOK_FUNCTIONS] = true,
+            [FEATURE_SIMPLE_HOOK_ARRAYS] = true, /* Zsh supports precmd+=(fn) */
+            [FEATURE_PROMPT_COMMAND] = false,    /* Zsh uses precmd instead */
+            [FEATURE_ZSH_PARAM_FLAGS] = true,
+            [FEATURE_PLUGIN_SYSTEM] = false, /* Not a Zsh feature */
+        },
 
     /* SHELL_MODE_LUSH - Curated best of both (DEFAULT) */
-    [SHELL_MODE_LUSH] = {
-        /* Arrays - full support, 0-indexed like Bash (more intuitive) */
-        [FEATURE_INDEXED_ARRAYS]      = true,
-        [FEATURE_ASSOCIATIVE_ARRAYS]  = true,
-        [FEATURE_ARRAY_ZERO_INDEXED]  = true,  /* 0-indexed like Bash, C, Python */
-        [FEATURE_ARRAY_APPEND]        = true,
+    [SHELL_MODE_LUSH] =
+        {
+            /* Arrays - full support, 0-indexed like Bash (more intuitive) */
+            [FEATURE_INDEXED_ARRAYS] = true,
+            [FEATURE_ASSOCIATIVE_ARRAYS] = true,
+            [FEATURE_ARRAY_ZERO_INDEXED] =
+                true, /* 0-indexed like Bash, C, Python */
+            [FEATURE_ARRAY_APPEND] = true,
 
-        /* Arithmetic - full support */
-        [FEATURE_ARITH_COMMAND]       = true,
-        [FEATURE_LET_BUILTIN]         = true,
+            /* Arithmetic - full support */
+            [FEATURE_ARITH_COMMAND] = true,
+            [FEATURE_LET_BUILTIN] = true,
 
-        /* Extended Tests - full support */
-        [FEATURE_EXTENDED_TEST]       = true,
-        [FEATURE_REGEX_MATCH]         = true,
-        [FEATURE_PATTERN_MATCH]       = true,
+            /* Extended Tests - full support */
+            [FEATURE_EXTENDED_TEST] = true,
+            [FEATURE_REGEX_MATCH] = true,
+            [FEATURE_PATTERN_MATCH] = true,
 
-        /* Process Substitution - full support */
-        [FEATURE_PROCESS_SUBSTITUTION] = true,
-        [FEATURE_PIPE_STDERR]          = true,
-        [FEATURE_APPEND_BOTH]          = true,
-        [FEATURE_COPROC]               = true,
+            /* Process Substitution - full support */
+            [FEATURE_PROCESS_SUBSTITUTION] = true,
+            [FEATURE_PIPE_STDERR] = true,
+            [FEATURE_APPEND_BOTH] = true,
+            [FEATURE_COPROC] = true,
 
-        /* Extended Parameter Expansion - full support */
-        [FEATURE_CASE_MODIFICATION]    = true,
-        [FEATURE_SUBSTRING_EXPANSION]  = true,
-        [FEATURE_PATTERN_SUBSTITUTION] = true,
-        [FEATURE_INDIRECT_EXPANSION]   = true,
-        [FEATURE_PARAM_TRANSFORMATION] = true,
+            /* Extended Parameter Expansion - full support */
+            [FEATURE_CASE_MODIFICATION] = true,
+            [FEATURE_SUBSTRING_EXPANSION] = true,
+            [FEATURE_PATTERN_SUBSTITUTION] = true,
+            [FEATURE_INDIRECT_EXPANSION] = true,
+            [FEATURE_PARAM_TRANSFORMATION] = true,
 
-        /* Extended Globbing - on like Zsh (more powerful) */
-        [FEATURE_EXTENDED_GLOB]       = true,
-        [FEATURE_NULL_GLOB]           = true,  /* Safer: no literal *.foo */
-        [FEATURE_DOT_GLOB]            = false, /* Explicit is better */
-        [FEATURE_GLOBSTAR]            = true,  /* ** recursive glob - very useful */
+            /* Extended Globbing - on like Zsh (more powerful) */
+            [FEATURE_EXTENDED_GLOB] = true,
+            [FEATURE_NULL_GLOB] = true, /* Safer: no literal *.foo */
+            [FEATURE_DOT_GLOB] = false, /* Explicit is better */
+            [FEATURE_GLOBSTAR] = true,  /* ** recursive glob - very useful */
 
-        /* Brace Expansion */
-        [FEATURE_BRACE_EXPANSION]     = true, /* Essential shell feature */
+            /* Brace Expansion */
+            [FEATURE_BRACE_EXPANSION] = true, /* Essential shell feature */
 
-        /* Quoting Extensions */
-        [FEATURE_ANSI_QUOTING]        = true, /* Very useful, widely expected */
-        [FEATURE_LOCALE_QUOTING]      = false, /* Niche use, Bash-only */
+            /* Quoting Extensions */
+            [FEATURE_ANSI_QUOTING] = true,    /* Very useful, widely expected */
+            [FEATURE_LOCALE_QUOTING] = false, /* Niche use, Bash-only */
 
-        /* Control Flow Extensions - full support */
-        [FEATURE_CASE_FALLTHROUGH]    = true,
-        [FEATURE_SELECT_LOOP]         = true,
-        [FEATURE_TIME_KEYWORD]        = true,
+            /* Control Flow Extensions - full support */
+            [FEATURE_CASE_FALLTHROUGH] = true,
+            [FEATURE_SELECT_LOOP] = true,
+            [FEATURE_TIME_KEYWORD] = true,
 
-        /* Behavior Defaults - Zsh's safer defaults */
-        [FEATURE_WORD_SPLIT_DEFAULT]  = false, /* Zsh behavior: safer */
-        [FEATURE_AUTO_CD]             = true,  /* Convenience feature */
-        [FEATURE_AUTO_PUSHD]          = false, /* Optional */
-        [FEATURE_CDABLE_VARS]         = false, /* Optional */
+            /* Behavior Defaults - Zsh's safer defaults */
+            [FEATURE_WORD_SPLIT_DEFAULT] = false, /* Zsh behavior: safer */
+            [FEATURE_AUTO_CD] = true,             /* Convenience feature */
+            [FEATURE_AUTO_PUSHD] = false,         /* Optional */
+            [FEATURE_CDABLE_VARS] = false,        /* Optional */
 
-        /* History Behavior - better defaults */
-        [FEATURE_HISTAPPEND]          = true,  /* Preserve history */
-        [FEATURE_INC_APPEND_HISTORY]  = true,  /* Better crash recovery */
-        [FEATURE_SHARE_HISTORY]       = false, /* Can be confusing, opt-in */
-        [FEATURE_HIST_VERIFY]         = false, /* Slows workflow, opt-in */
-        [FEATURE_CHECKJOBS]           = true,  /* Prevents accidental job loss */
+            /* History Behavior - better defaults */
+            [FEATURE_HISTAPPEND] = true,         /* Preserve history */
+            [FEATURE_INC_APPEND_HISTORY] = true, /* Better crash recovery */
+            [FEATURE_SHARE_HISTORY] = false,     /* Can be confusing, opt-in */
+            [FEATURE_HIST_VERIFY] = false,       /* Slows workflow, opt-in */
+            [FEATURE_CHECKJOBS] = true, /* Prevents accidental job loss */
 
-        /* Function Enhancements - full support */
-        [FEATURE_NAMEREF]             = true,
-        [FEATURE_ANONYMOUS_FUNCTIONS] = true,  /* From Zsh: powerful */
-        [FEATURE_RETURN_ANYWHERE]     = true,
+            /* Function Enhancements - full support */
+            [FEATURE_NAMEREF] = true,
+            [FEATURE_ANONYMOUS_FUNCTIONS] = true, /* From Zsh: powerful */
+            [FEATURE_RETURN_ANYWHERE] = true,
 
-        /* Zsh-Specific - selective adoption */
-        [FEATURE_GLOB_QUALIFIERS]     = true,  /* Powerful feature */
-        [FEATURE_HOOK_FUNCTIONS]      = true,  /* Essential for prompts */
-        [FEATURE_SIMPLE_HOOK_ARRAYS]  = true,  /* precmd+=(fn) works intuitively */
-        [FEATURE_PROMPT_COMMAND]      = true,  /* Bash compat: string and array */
-        [FEATURE_ZSH_PARAM_FLAGS]     = true,  /* Now implemented: ${(U)var} etc */
-        [FEATURE_PLUGIN_SYSTEM]       = true,  /* Lush extension */
-    },
+            /* Zsh-Specific - selective adoption */
+            [FEATURE_GLOB_QUALIFIERS] = true, /* Powerful feature */
+            [FEATURE_HOOK_FUNCTIONS] = true,  /* Essential for prompts */
+            [FEATURE_SIMPLE_HOOK_ARRAYS] =
+                true, /* precmd+=(fn) works intuitively */
+            [FEATURE_PROMPT_COMMAND] = true, /* Bash compat: string and array */
+            [FEATURE_ZSH_PARAM_FLAGS] =
+                true,                       /* Now implemented: ${(U)var} etc */
+            [FEATURE_PLUGIN_SYSTEM] = true, /* Lush extension */
+        },
 };
 
 /* ============================================================================
  * Mode Name Table
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static const char *mode_names[SHELL_MODE_COUNT] = {
-    [SHELL_MODE_POSIX]  = "posix",
-    [SHELL_MODE_BASH]   = "bash",
-    [SHELL_MODE_ZSH]    = "zsh",
+    [SHELL_MODE_POSIX] = "posix",
+    [SHELL_MODE_BASH] = "bash",
+    [SHELL_MODE_ZSH] = "zsh",
     [SHELL_MODE_LUSH] = "lush",
 };
 
 /* ============================================================================
  * Feature Name Table
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static const char *feature_names[FEATURE_COUNT] = {
     /* Arrays */
-    [FEATURE_INDEXED_ARRAYS]       = "indexed_arrays",
-    [FEATURE_ASSOCIATIVE_ARRAYS]   = "associative_arrays",
-    [FEATURE_ARRAY_ZERO_INDEXED]   = "array_zero_indexed",
-    [FEATURE_ARRAY_APPEND]         = "array_append",
+    [FEATURE_INDEXED_ARRAYS] = "indexed_arrays",
+    [FEATURE_ASSOCIATIVE_ARRAYS] = "associative_arrays",
+    [FEATURE_ARRAY_ZERO_INDEXED] = "array_zero_indexed",
+    [FEATURE_ARRAY_APPEND] = "array_append",
 
     /* Arithmetic */
-    [FEATURE_ARITH_COMMAND]        = "arith_command",
-    [FEATURE_LET_BUILTIN]          = "let_builtin",
+    [FEATURE_ARITH_COMMAND] = "arith_command",
+    [FEATURE_LET_BUILTIN] = "let_builtin",
 
     /* Extended Tests */
-    [FEATURE_EXTENDED_TEST]        = "extended_test",
-    [FEATURE_REGEX_MATCH]          = "regex_match",
-    [FEATURE_PATTERN_MATCH]        = "pattern_match",
+    [FEATURE_EXTENDED_TEST] = "extended_test",
+    [FEATURE_REGEX_MATCH] = "regex_match",
+    [FEATURE_PATTERN_MATCH] = "pattern_match",
 
     /* Process Substitution */
     [FEATURE_PROCESS_SUBSTITUTION] = "process_substitution",
-    [FEATURE_PIPE_STDERR]          = "pipe_stderr",
-    [FEATURE_APPEND_BOTH]          = "append_both",
-    [FEATURE_COPROC]               = "coproc",
+    [FEATURE_PIPE_STDERR] = "pipe_stderr",
+    [FEATURE_APPEND_BOTH] = "append_both",
+    [FEATURE_COPROC] = "coproc",
 
     /* Extended Parameter Expansion */
-    [FEATURE_CASE_MODIFICATION]    = "case_modification",
-    [FEATURE_SUBSTRING_EXPANSION]  = "substring_expansion",
+    [FEATURE_CASE_MODIFICATION] = "case_modification",
+    [FEATURE_SUBSTRING_EXPANSION] = "substring_expansion",
     [FEATURE_PATTERN_SUBSTITUTION] = "pattern_substitution",
-    [FEATURE_INDIRECT_EXPANSION]   = "indirect_expansion",
+    [FEATURE_INDIRECT_EXPANSION] = "indirect_expansion",
     [FEATURE_PARAM_TRANSFORMATION] = "param_transformation",
 
     /* Extended Globbing */
-    [FEATURE_EXTENDED_GLOB]        = "extended_glob",
-    [FEATURE_NULL_GLOB]            = "null_glob",
-    [FEATURE_DOT_GLOB]             = "dot_glob",
-    [FEATURE_GLOBSTAR]             = "globstar",
+    [FEATURE_EXTENDED_GLOB] = "extended_glob",
+    [FEATURE_NULL_GLOB] = "null_glob",
+    [FEATURE_DOT_GLOB] = "dot_glob",
+    [FEATURE_GLOBSTAR] = "globstar",
 
     /* Brace Expansion */
-    [FEATURE_BRACE_EXPANSION]      = "brace_expansion",
+    [FEATURE_BRACE_EXPANSION] = "brace_expansion",
 
     /* Quoting Extensions */
-    [FEATURE_ANSI_QUOTING]         = "ansi_quoting",
-    [FEATURE_LOCALE_QUOTING]       = "locale_quoting",
+    [FEATURE_ANSI_QUOTING] = "ansi_quoting",
+    [FEATURE_LOCALE_QUOTING] = "locale_quoting",
 
     /* Control Flow Extensions */
-    [FEATURE_CASE_FALLTHROUGH]     = "case_fallthrough",
-    [FEATURE_SELECT_LOOP]          = "select_loop",
-    [FEATURE_TIME_KEYWORD]         = "time_keyword",
+    [FEATURE_CASE_FALLTHROUGH] = "case_fallthrough",
+    [FEATURE_SELECT_LOOP] = "select_loop",
+    [FEATURE_TIME_KEYWORD] = "time_keyword",
 
     /* Behavior Defaults */
-    [FEATURE_WORD_SPLIT_DEFAULT]   = "word_split",
-    [FEATURE_AUTO_CD]              = "auto_cd",
-    [FEATURE_AUTO_PUSHD]           = "auto_pushd",
-    [FEATURE_CDABLE_VARS]          = "cdable_vars",
+    [FEATURE_WORD_SPLIT_DEFAULT] = "word_split",
+    [FEATURE_AUTO_CD] = "auto_cd",
+    [FEATURE_AUTO_PUSHD] = "auto_pushd",
+    [FEATURE_CDABLE_VARS] = "cdable_vars",
 
     /* History Behavior */
-    [FEATURE_HISTAPPEND]           = "histappend",
-    [FEATURE_INC_APPEND_HISTORY]   = "inc_append_history",
-    [FEATURE_SHARE_HISTORY]        = "share_history",
-    [FEATURE_HIST_VERIFY]          = "hist_verify",
-    [FEATURE_CHECKJOBS]            = "checkjobs",
+    [FEATURE_HISTAPPEND] = "histappend",
+    [FEATURE_INC_APPEND_HISTORY] = "inc_append_history",
+    [FEATURE_SHARE_HISTORY] = "share_history",
+    [FEATURE_HIST_VERIFY] = "hist_verify",
+    [FEATURE_CHECKJOBS] = "checkjobs",
 
     /* Function Enhancements */
-    [FEATURE_NAMEREF]              = "nameref",
-    [FEATURE_ANONYMOUS_FUNCTIONS]  = "anonymous_functions",
-    [FEATURE_RETURN_ANYWHERE]      = "return_anywhere",
+    [FEATURE_NAMEREF] = "nameref",
+    [FEATURE_ANONYMOUS_FUNCTIONS] = "anonymous_functions",
+    [FEATURE_RETURN_ANYWHERE] = "return_anywhere",
 
     /* Zsh-Specific */
-    [FEATURE_GLOB_QUALIFIERS]      = "glob_qualifiers",
-    [FEATURE_HOOK_FUNCTIONS]       = "hook_functions",
-    [FEATURE_SIMPLE_HOOK_ARRAYS]   = "simple_hook_arrays",
-    [FEATURE_PROMPT_COMMAND]       = "prompt_command",
-    [FEATURE_ZSH_PARAM_FLAGS]      = "zsh_param_flags",
-    [FEATURE_PLUGIN_SYSTEM]        = "plugin_system",
+    [FEATURE_GLOB_QUALIFIERS] = "glob_qualifiers",
+    [FEATURE_HOOK_FUNCTIONS] = "hook_functions",
+    [FEATURE_SIMPLE_HOOK_ARRAYS] = "simple_hook_arrays",
+    [FEATURE_PROMPT_COMMAND] = "prompt_command",
+    [FEATURE_ZSH_PARAM_FLAGS] = "zsh_param_flags",
+    [FEATURE_PLUGIN_SYSTEM] = "plugin_system",
 };
 
 /* Feature short names for common features (for config convenience) */
 static const struct {
     const char *short_name;
     shell_feature_t feature;
-} feature_aliases[] = {
-    {"arrays",      FEATURE_INDEXED_ARRAYS},
-    {"assoc",       FEATURE_ASSOCIATIVE_ARRAYS},
-    {"exttest",     FEATURE_EXTENDED_TEST},
-    {"regex",       FEATURE_REGEX_MATCH},
-    {"procsub",     FEATURE_PROCESS_SUBSTITUTION},
-    {"extglob",     FEATURE_EXTENDED_GLOB},
-    {"nullglob",    FEATURE_NULL_GLOB},
-    {"dotglob",     FEATURE_DOT_GLOB},
-    {"globstar",    FEATURE_GLOBSTAR},
-    {"braceexp",    FEATURE_BRACE_EXPANSION},
-    {"ansiquoting", FEATURE_ANSI_QUOTING},
-    {"dollarquote", FEATURE_ANSI_QUOTING},
-    {"autocd",      FEATURE_AUTO_CD},
-    {"wordsplit",   FEATURE_WORD_SPLIT_DEFAULT},
-    {"histappend",  FEATURE_HISTAPPEND},
-    {"incappendhistory", FEATURE_INC_APPEND_HISTORY},
-    {"sharehistory", FEATURE_SHARE_HISTORY},
-    {"histverify",  FEATURE_HIST_VERIFY},
-    {"checkjobs",   FEATURE_CHECKJOBS},
-    {"plugins",     FEATURE_PLUGIN_SYSTEM},
-    {NULL, 0}
-};
+} feature_aliases[] = {{"arrays", FEATURE_INDEXED_ARRAYS},
+                       {"assoc", FEATURE_ASSOCIATIVE_ARRAYS},
+                       {"exttest", FEATURE_EXTENDED_TEST},
+                       {"regex", FEATURE_REGEX_MATCH},
+                       {"procsub", FEATURE_PROCESS_SUBSTITUTION},
+                       {"extglob", FEATURE_EXTENDED_GLOB},
+                       {"nullglob", FEATURE_NULL_GLOB},
+                       {"dotglob", FEATURE_DOT_GLOB},
+                       {"globstar", FEATURE_GLOBSTAR},
+                       {"braceexp", FEATURE_BRACE_EXPANSION},
+                       {"ansiquoting", FEATURE_ANSI_QUOTING},
+                       {"dollarquote", FEATURE_ANSI_QUOTING},
+                       {"autocd", FEATURE_AUTO_CD},
+                       {"wordsplit", FEATURE_WORD_SPLIT_DEFAULT},
+                       {"histappend", FEATURE_HISTAPPEND},
+                       {"incappendhistory", FEATURE_INC_APPEND_HISTORY},
+                       {"sharehistory", FEATURE_SHARE_HISTORY},
+                       {"histverify", FEATURE_HIST_VERIFY},
+                       {"checkjobs", FEATURE_CHECKJOBS},
+                       {"plugins", FEATURE_PLUGIN_SYSTEM},
+                       {NULL, 0}};
 
 /* ============================================================================
  * Mode Query Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
-bool shell_mode_allows(shell_feature_t feature)
-{
+bool shell_mode_allows(shell_feature_t feature) {
     if (feature >= FEATURE_COUNT) {
         return false;
     }
@@ -477,18 +494,13 @@ bool shell_mode_allows(shell_feature_t feature)
     return feature_matrix[g_shell_mode_state.current_mode][feature];
 }
 
-bool shell_mode_is(shell_mode_t mode)
-{
+bool shell_mode_is(shell_mode_t mode) {
     return g_shell_mode_state.current_mode == mode;
 }
 
-shell_mode_t shell_mode_get(void)
-{
-    return g_shell_mode_state.current_mode;
-}
+shell_mode_t shell_mode_get(void) { return g_shell_mode_state.current_mode; }
 
-bool shell_mode_set(shell_mode_t mode)
-{
+bool shell_mode_set(shell_mode_t mode) {
     if (mode >= SHELL_MODE_COUNT) {
         return false;
     }
@@ -503,10 +515,10 @@ bool shell_mode_set(shell_mode_t mode)
 
 /* ============================================================================
  * Feature Override Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
-void shell_feature_enable(shell_feature_t feature)
-{
+void shell_feature_enable(shell_feature_t feature) {
     if (feature >= FEATURE_COUNT) {
         return;
     }
@@ -515,8 +527,7 @@ void shell_feature_enable(shell_feature_t feature)
     g_shell_mode_state.feature_override_set[feature] = true;
 }
 
-void shell_feature_disable(shell_feature_t feature)
-{
+void shell_feature_disable(shell_feature_t feature) {
     if (feature >= FEATURE_COUNT) {
         return;
     }
@@ -525,8 +536,7 @@ void shell_feature_disable(shell_feature_t feature)
     g_shell_mode_state.feature_override_set[feature] = true;
 }
 
-void shell_feature_reset(shell_feature_t feature)
-{
+void shell_feature_reset(shell_feature_t feature) {
     if (feature >= FEATURE_COUNT) {
         return;
     }
@@ -534,15 +544,13 @@ void shell_feature_reset(shell_feature_t feature)
     g_shell_mode_state.feature_override_set[feature] = false;
 }
 
-void shell_feature_reset_all(void)
-{
+void shell_feature_reset_all(void) {
     for (int i = 0; i < FEATURE_COUNT; i++) {
         g_shell_mode_state.feature_override_set[i] = false;
     }
 }
 
-bool shell_feature_is_overridden(shell_feature_t feature)
-{
+bool shell_feature_is_overridden(shell_feature_t feature) {
     if (feature >= FEATURE_COUNT) {
         return false;
     }
@@ -552,10 +560,10 @@ bool shell_feature_is_overridden(shell_feature_t feature)
 
 /* ============================================================================
  * Mode Information Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
-const char *shell_mode_name(shell_mode_t mode)
-{
+const char *shell_mode_name(shell_mode_t mode) {
     if (mode >= SHELL_MODE_COUNT) {
         return "unknown";
     }
@@ -563,8 +571,7 @@ const char *shell_mode_name(shell_mode_t mode)
     return mode_names[mode];
 }
 
-const char *shell_feature_name(shell_feature_t feature)
-{
+const char *shell_feature_name(shell_feature_t feature) {
     if (feature >= FEATURE_COUNT) {
         return "unknown";
     }
@@ -572,8 +579,7 @@ const char *shell_feature_name(shell_feature_t feature)
     return feature_names[feature];
 }
 
-bool shell_mode_feature_default(shell_mode_t mode, shell_feature_t feature)
-{
+bool shell_mode_feature_default(shell_mode_t mode, shell_feature_t feature) {
     if (mode >= SHELL_MODE_COUNT || feature >= FEATURE_COUNT) {
         return false;
     }
@@ -581,8 +587,7 @@ bool shell_mode_feature_default(shell_mode_t mode, shell_feature_t feature)
     return feature_matrix[mode][feature];
 }
 
-bool shell_mode_parse(const char *name, shell_mode_t *mode)
-{
+bool shell_mode_parse(const char *name, shell_mode_t *mode) {
     if (!name || !mode) {
         return false;
     }
@@ -603,8 +608,7 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode)
     return false;
 }
 
-bool shell_feature_parse(const char *name, shell_feature_t *feature)
-{
+bool shell_feature_parse(const char *name, shell_feature_t *feature) {
     if (!name || !feature) {
         return false;
     }
@@ -630,10 +634,10 @@ bool shell_feature_parse(const char *name, shell_feature_t *feature)
 
 /* ============================================================================
  * Initialization and Lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
-void shell_mode_init(void)
-{
+void shell_mode_init(void) {
     g_shell_mode_state.current_mode = SHELL_MODE_LUSH;
     g_shell_mode_state.strict_mode = false;
 
@@ -643,27 +647,22 @@ void shell_mode_init(void)
     }
 }
 
-void shell_mode_cleanup(void)
-{
+void shell_mode_cleanup(void) {
     /* Currently nothing to clean up - all state is static */
 }
 
-void shell_mode_set_strict(bool strict)
-{
+void shell_mode_set_strict(bool strict) {
     g_shell_mode_state.strict_mode = strict;
 }
 
-bool shell_mode_is_strict(void)
-{
-    return g_shell_mode_state.strict_mode;
-}
+bool shell_mode_is_strict(void) { return g_shell_mode_state.strict_mode; }
 
 /* ============================================================================
  * Shebang Detection
- * ============================================================================ */
+ * ============================================================================
+ */
 
-bool shell_mode_detect_from_shebang(const char *shebang, shell_mode_t *mode)
-{
+bool shell_mode_detect_from_shebang(const char *shebang, shell_mode_t *mode) {
     if (!shebang || !mode) {
         return false;
     }
@@ -707,7 +706,7 @@ bool shell_mode_detect_from_shebang(const char *shebang, shell_mode_t *mode)
     }
 
     if (strncmp(interpreter, "sh", 2) == 0 &&
-        (interpreter[2] == '\0' || interpreter[2] == ' ' || 
+        (interpreter[2] == '\0' || interpreter[2] == ' ' ||
          interpreter[2] == '\t' || interpreter[2] == '\n')) {
         *mode = SHELL_MODE_POSIX;
         return true;
@@ -730,13 +729,15 @@ bool shell_mode_detect_from_shebang(const char *shebang, shell_mode_t *mode)
 
 /* ============================================================================
  * Debugging and Introspection
- * ============================================================================ */
+ * ============================================================================
+ */
 
-void shell_mode_debug_print(void)
-{
+void shell_mode_debug_print(void) {
     fprintf(stderr, "=== Shell Mode State ===\n");
-    fprintf(stderr, "Current mode: %s\n", shell_mode_name(g_shell_mode_state.current_mode));
-    fprintf(stderr, "Strict mode: %s\n", g_shell_mode_state.strict_mode ? "yes" : "no");
+    fprintf(stderr, "Current mode: %s\n",
+            shell_mode_name(g_shell_mode_state.current_mode));
+    fprintf(stderr, "Strict mode: %s\n",
+            g_shell_mode_state.strict_mode ? "yes" : "no");
     fprintf(stderr, "\nFeature states:\n");
 
     for (int i = 0; i < FEATURE_COUNT; i++) {
@@ -744,34 +745,34 @@ void shell_mode_debug_print(void)
         bool overridden = g_shell_mode_state.feature_override_set[i];
         bool mode_default = feature_matrix[g_shell_mode_state.current_mode][i];
 
-        fprintf(stderr, "  %-25s: %s", feature_names[i], enabled ? "ON " : "OFF");
+        fprintf(stderr, "  %-25s: %s", feature_names[i],
+                enabled ? "ON " : "OFF");
 
         if (overridden) {
-            fprintf(stderr, " (override, mode default: %s)", mode_default ? "on" : "off");
+            fprintf(stderr, " (override, mode default: %s)",
+                    mode_default ? "on" : "off");
         }
 
         fprintf(stderr, "\n");
     }
 }
 
-int shell_feature_describe(shell_feature_t feature, char *buffer, size_t size)
-{
+int shell_feature_describe(shell_feature_t feature, char *buffer, size_t size) {
     if (feature >= FEATURE_COUNT || !buffer || size == 0) {
         return 0;
     }
 
     bool enabled = shell_mode_allows(feature);
     bool overridden = g_shell_mode_state.feature_override_set[feature];
-    bool mode_default = feature_matrix[g_shell_mode_state.current_mode][feature];
+    bool mode_default =
+        feature_matrix[g_shell_mode_state.current_mode][feature];
 
     if (overridden) {
         return snprintf(buffer, size, "%s: %s (override, mode default: %s)",
-                        feature_names[feature],
-                        enabled ? "on" : "off",
+                        feature_names[feature], enabled ? "on" : "off",
                         mode_default ? "on" : "off");
     } else {
-        return snprintf(buffer, size, "%s: %s",
-                        feature_names[feature],
+        return snprintf(buffer, size, "%s: %s", feature_names[feature],
                         enabled ? "on" : "off");
     }
 }

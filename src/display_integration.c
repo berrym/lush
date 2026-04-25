@@ -96,7 +96,8 @@ void lush_clear_screen(void);
  * Creates the shell prompt using the LLE prompt composer if available.
  * Falls back to a simple "$ " or "# " prompt based on user ID.
  *
- * @return Pool-allocated prompt string that caller must free with lush_pool_free()
+ * @return Pool-allocated prompt string that caller must free with
+ * lush_pool_free()
  */
 static char *display_generate_prompt(void) {
     if (g_lle_integration && g_lle_integration->prompt_composer) {
@@ -119,7 +120,8 @@ static char *display_generate_prompt(void) {
  * Public wrapper for display_generate_prompt() that creates the shell
  * prompt using the LLE prompt composer.
  *
- * @return Pool-allocated prompt string that caller must free with lush_pool_free()
+ * @return Pool-allocated prompt string that caller must free with
+ * lush_pool_free()
  */
 char *lush_generate_prompt(void) { return display_generate_prompt(); }
 
@@ -2024,7 +2026,7 @@ bool display_integration_establish_baseline(void) {
  * Check if enhanced performance targets are being met.
  */
 bool display_integration_perf_monitor_check_targets(bool *cache_target_met,
-                                                bool *timing_target_met) {
+                                                    bool *timing_target_met) {
     if (!cache_target_met || !timing_target_met ||
         !enhanced_perf_monitoring_initialized) {
         return false;

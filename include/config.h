@@ -43,9 +43,9 @@
  * @brief Configuration file format types
  */
 typedef enum {
-    CONFIG_FORMAT_UNKNOWN,  /**< Unknown or invalid format */
-    CONFIG_FORMAT_LEGACY,   /**< Legacy INI-like format (.lushrc) */
-    CONFIG_FORMAT_TOML      /**< TOML format (lushrc.toml) */
+    CONFIG_FORMAT_UNKNOWN, /**< Unknown or invalid format */
+    CONFIG_FORMAT_LEGACY,  /**< Legacy INI-like format (.lushrc) */
+    CONFIG_FORMAT_TOML     /**< TOML format (lushrc.toml) */
 } config_format_t;
 
 /**
@@ -73,8 +73,9 @@ typedef enum {
  * Controls how arrow keys behave in multiline editing contexts.
  */
 typedef enum {
-    LLE_ARROW_MODE_CONTEXT_AWARE,  /**< Smart: multiline navigation when in multiline */
-    LLE_ARROW_MODE_CLASSIC,        /**< GNU Readline: always history navigation */
+    LLE_ARROW_MODE_CONTEXT_AWARE, /**< Smart: multiline navigation when in
+                                     multiline */
+    LLE_ARROW_MODE_CLASSIC, /**< GNU Readline: always history navigation */
     LLE_ARROW_MODE_ALWAYS_HISTORY, /**< Always history, use Ctrl-P/N only */
     LLE_ARROW_MODE_MULTILINE_FIRST /**< Prioritize multiline navigation */
 } lle_arrow_key_mode_t;
@@ -110,10 +111,12 @@ typedef enum {
  */
 typedef enum {
     LLE_DEDUP_STRATEGY_IGNORE,        /**< Reject new duplicates, keep old */
-    LLE_DEDUP_STRATEGY_KEEP_RECENT,   /**< Keep newest, mark old as deleted (default) */
-    LLE_DEDUP_STRATEGY_KEEP_FREQUENT, /**< Keep entry with highest usage count */
-    LLE_DEDUP_STRATEGY_MERGE,         /**< Merge forensic metadata, keep existing */
-    LLE_DEDUP_STRATEGY_KEEP_ALL       /**< No dedup (track frequency only) */
+    LLE_DEDUP_STRATEGY_KEEP_RECENT,   /**< Keep newest, mark old as deleted
+                                         (default) */
+    LLE_DEDUP_STRATEGY_KEEP_FREQUENT, /**< Keep entry with highest usage count
+                                       */
+    LLE_DEDUP_STRATEGY_MERGE,   /**< Merge forensic metadata, keep existing */
+    LLE_DEDUP_STRATEGY_KEEP_ALL /**< No dedup (track frequency only) */
 } lle_dedup_strategy_t;
 
 /**
@@ -141,37 +144,37 @@ typedef struct {
  */
 typedef struct {
     /* History settings */
-    bool history_enabled;      /**< Enable command history */
-    int history_size;          /**< Maximum history entries */
-    bool history_no_dups;      /**< Ignore duplicate entries */
-    bool history_timestamps;   /**< Record timestamps */
-    char *history_file;        /**< History file path */
+    bool history_enabled;    /**< Enable command history */
+    int history_size;        /**< Maximum history entries */
+    bool history_no_dups;    /**< Ignore duplicate entries */
+    bool history_timestamps; /**< Record timestamps */
+    char *history_file;      /**< History file path */
 
     /* LLE History Configuration */
-    lle_arrow_key_mode_t lle_arrow_key_mode;     /**< Arrow key behavior mode */
-    bool lle_enable_multiline_navigation;        /**< Enable multiline navigation */
-    bool lle_wrap_history_navigation;            /**< Wrap at history ends */
-    bool lle_save_line_on_history_nav;           /**< Save line when navigating */
-    bool lle_preserve_multiline_structure;       /**< Preserve multiline structure */
-    bool lle_enable_multiline_editing;           /**< Enable multiline editing */
-    bool lle_show_multiline_indicators;          /**< Show multiline indicators */
-    bool lle_enable_interactive_search;          /**< Enable interactive search */
-    bool lle_search_fuzzy_matching;              /**< Enable fuzzy search matching */
-    bool lle_search_case_sensitive;              /**< Case-sensitive search */
+    lle_arrow_key_mode_t lle_arrow_key_mode; /**< Arrow key behavior mode */
+    bool lle_enable_multiline_navigation;    /**< Enable multiline navigation */
+    bool lle_wrap_history_navigation;        /**< Wrap at history ends */
+    bool lle_save_line_on_history_nav;       /**< Save line when navigating */
+    bool lle_preserve_multiline_structure; /**< Preserve multiline structure */
+    bool lle_enable_multiline_editing;     /**< Enable multiline editing */
+    bool lle_show_multiline_indicators;    /**< Show multiline indicators */
+    bool lle_enable_interactive_search;    /**< Enable interactive search */
+    bool lle_search_fuzzy_matching;        /**< Enable fuzzy search matching */
+    bool lle_search_case_sensitive;        /**< Case-sensitive search */
     lle_history_storage_mode_t lle_storage_mode; /**< History storage mode */
     char *lle_history_file;                      /**< LLE history file path */
-    bool lle_sync_with_readline;                 /**< Sync with readline history */
-    bool lle_export_to_bash_history;             /**< Export to bash history */
-    bool lle_enable_forensic_tracking;           /**< Enable forensic tracking */
-    bool lle_enable_deduplication;               /**< Enable deduplication */
-    lle_dedup_scope_t lle_dedup_scope;           /**< Deduplication scope */
-    lle_dedup_strategy_t lle_dedup_strategy;     /**< Deduplication strategy */
-    bool lle_dedup_navigation;                   /**< Skip duplicates during navigation */
-    bool lle_dedup_navigation_unique;            /**< Show only unique entries */
-    bool lle_dedup_unicode_normalize;            /**< Use Unicode NFC normalization */
-    bool lle_enable_history_cache;               /**< Enable history cache */
-    int lle_cache_size;                          /**< Cache size */
-    bool lle_readline_compatible_mode;           /**< Readline compatibility mode */
+    bool lle_sync_with_readline;             /**< Sync with readline history */
+    bool lle_export_to_bash_history;         /**< Export to bash history */
+    bool lle_enable_forensic_tracking;       /**< Enable forensic tracking */
+    bool lle_enable_deduplication;           /**< Enable deduplication */
+    lle_dedup_scope_t lle_dedup_scope;       /**< Deduplication scope */
+    lle_dedup_strategy_t lle_dedup_strategy; /**< Deduplication strategy */
+    bool lle_dedup_navigation;         /**< Skip duplicates during navigation */
+    bool lle_dedup_navigation_unique;  /**< Show only unique entries */
+    bool lle_dedup_unicode_normalize;  /**< Use Unicode NFC normalization */
+    bool lle_enable_history_cache;     /**< Enable history cache */
+    int lle_cache_size;                /**< Cache size */
+    bool lle_readline_compatible_mode; /**< Readline compatibility mode */
 
     /* Completion settings */
     bool completion_enabled;        /**< Enable tab completion */
@@ -204,39 +207,39 @@ typedef struct {
     int theme_color_support_override;  /**< Override detected color support */
 
     /* Behavior settings */
-    bool auto_cd;         /**< Auto-cd to directories */
+    bool auto_cd;          /**< Auto-cd to directories */
     bool spell_correction; /**< Enable spell correction */
-    bool confirm_exit;    /**< Confirm before exit */
-    int tab_width;        /**< Tab display width */
-    bool no_word_expand;  /**< Disable word expansion */
-    bool multiline_mode;  /**< Enable multiline editing */
+    bool confirm_exit;     /**< Confirm before exit */
+    int tab_width;         /**< Tab display width */
+    bool no_word_expand;   /**< Disable word expansion */
+    bool multiline_mode;   /**< Enable multiline editing */
 
     /* Auto-correction settings */
-    int autocorrect_max_suggestions;  /**< Maximum suggestions */
-    int autocorrect_threshold;        /**< Minimum similarity threshold */
-    bool autocorrect_interactive;     /**< Interactive prompts */
-    bool autocorrect_learn_history;   /**< Learn from history */
-    bool autocorrect_builtins;        /**< Correct builtin names */
-    bool autocorrect_external;        /**< Correct external commands */
-    bool autocorrect_case_sensitive;  /**< Case-sensitive matching */
+    int autocorrect_max_suggestions; /**< Maximum suggestions */
+    int autocorrect_threshold;       /**< Minimum similarity threshold */
+    bool autocorrect_interactive;    /**< Interactive prompts */
+    bool autocorrect_learn_history;  /**< Learn from history */
+    bool autocorrect_builtins;       /**< Correct builtin names */
+    bool autocorrect_external;       /**< Correct external commands */
+    bool autocorrect_case_sensitive; /**< Case-sensitive matching */
 
     /* Color settings */
-    char *color_scheme;   /**< Active color scheme name */
-    bool colors_enabled;  /**< Enable colored output */
+    char *color_scheme;  /**< Active color scheme name */
+    bool colors_enabled; /**< Enable colored output */
 
     /* Advanced settings */
     bool verbose_errors; /**< Verbose error messages */
     bool debug_mode;     /**< Enable debug mode */
 
     /* Display system settings */
-    bool display_syntax_highlighting;    /**< Enable syntax highlighting */
-    bool display_autosuggestions;        /**< Enable autosuggestions */
-    bool display_transient_prompt;       /**< Enable transient prompts */
-    bool display_theme_hot_reload;       /**< Auto-reload theme on file change */
-    bool display_newline_before_prompt;  /**< Print newline before prompt */
+    bool display_syntax_highlighting;   /**< Enable syntax highlighting */
+    bool display_autosuggestions;       /**< Enable autosuggestions */
+    bool display_transient_prompt;      /**< Enable transient prompts */
+    bool display_theme_hot_reload;      /**< Auto-reload theme on file change */
+    bool display_newline_before_prompt; /**< Print newline before prompt */
     bool display_performance_monitoring; /**< Enable performance monitoring */
     int display_optimization_level;      /**< Optimization level (0-4) */
-    bool enhanced_display_mode;          /**< Legacy display setting (deprecated) */
+    bool enhanced_display_mode; /**< Legacy display setting (deprecated) */
 
     /* Network settings */
     bool ssh_completion_enabled;  /**< Enable SSH host completion */
@@ -251,8 +254,8 @@ typedef struct {
     bool script_execution; /**< Enable script execution */
 
     /* Shell mode settings (Phase 0: Extended Language Support) */
-    int shell_mode;            /**< Shell mode: 0=posix, 1=bash, 2=zsh, 3=lush */
-    bool shell_mode_strict;    /**< Disallow runtime mode changes */
+    int shell_mode;         /**< Shell mode: 0=posix, 1=bash, 2=zsh, 3=lush */
+    bool shell_mode_strict; /**< Disallow runtime mode changes */
 } config_values_t;
 
 /** @brief Global configuration instance */
@@ -263,7 +266,8 @@ extern config_context_t config_ctx;
 
 /* ============================================================================
  * Core Configuration Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize the configuration system
@@ -316,7 +320,8 @@ void config_cleanup(void);
 
 /* ============================================================================
  * Configuration Parsing Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Parse a single configuration line
@@ -347,7 +352,8 @@ int config_parse_option(const char *key, const char *value);
 
 /* ============================================================================
  * Shell Option Integration Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Validate a shell option value
@@ -382,7 +388,8 @@ config_section_t config_get_current_section(void);
 
 /* ============================================================================
  * Configuration Validation Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Validate a boolean configuration value
@@ -498,7 +505,8 @@ bool config_validate_shell_mode(const char *value);
 
 /* ============================================================================
  * Configuration Value Setters and Getters
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Set a boolean configuration value
@@ -556,7 +564,8 @@ const char *config_get_string(const char *key, const char *default_value);
 
 /* ============================================================================
  * Configuration Utility Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Set all configuration values to defaults
@@ -658,7 +667,8 @@ int config_get_script_config_path(char *buffer, size_t size);
 
 /* ============================================================================
  * Script Execution Support
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Execute startup scripts
@@ -725,7 +735,8 @@ void config_set_script_execution(bool enabled);
 
 /* ============================================================================
  * Traditional Shell Script File Detection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get path to profile script
@@ -765,7 +776,8 @@ bool config_script_exists(const char *path);
 
 /* ============================================================================
  * Configuration Error Handling
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Report a configuration error
@@ -796,7 +808,8 @@ const char *config_get_last_error(void);
 
 /* ============================================================================
  * Configuration Display Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Display all configuration settings
@@ -840,7 +853,8 @@ void config_set_value(const char *key, const char *value);
 
 /* ============================================================================
  * Configuration Save Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Save configuration to a specific file
@@ -852,7 +866,8 @@ int config_save_file(const char *path);
 
 /* ============================================================================
  * Built-in Command Integration
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Configuration builtin command handler

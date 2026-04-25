@@ -17,10 +17,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alias.h"
 #include "autocorrect.h"
 #include "executor.h"
 #include "symtable.h"
-#include "alias.h"
 
 /* Test framework macros */
 #define TEST(name) static void test_##name(void)
@@ -103,7 +103,8 @@ TEST(autocorrect_default_config) {
     ASSERT_TRUE(config.enabled, "Default should be enabled");
     ASSERT(config.max_suggestions >= 1 && config.max_suggestions <= 5,
            "Max suggestions should be 1-5");
-    ASSERT(config.similarity_threshold >= 0 && config.similarity_threshold <= 100,
+    ASSERT(config.similarity_threshold >= 0 &&
+               config.similarity_threshold <= 100,
            "Threshold should be 0-100");
 }
 
@@ -142,7 +143,8 @@ TEST(autocorrect_load_config) {
 
     int result = autocorrect_load_config(&config);
     ASSERT_EQ(result, 0, "Loading config should succeed");
-    ASSERT_FALSE(autocorrect_is_enabled(), "Should be disabled after config load");
+    ASSERT_FALSE(autocorrect_is_enabled(),
+                 "Should be disabled after config load");
 
     autocorrect_cleanup();
 }
@@ -214,7 +216,8 @@ TEST(jaro_winkler_identical) {
 
 TEST(jaro_winkler_similar) {
     int score = autocorrect_jaro_winkler_score("hello", "hallo");
-    ASSERT(score >= 70 && score <= 95, "Similar strings should have high score");
+    ASSERT(score >= 70 && score <= 95,
+           "Similar strings should have high score");
 }
 
 TEST(jaro_winkler_different) {
@@ -291,7 +294,8 @@ TEST(suggest_builtins_basic) {
     /* Should find 'echo' as a suggestion */
     bool found_echo = false;
     for (int i = 0; i < count; i++) {
-        if (suggestions[i].command && strcmp(suggestions[i].command, "echo") == 0) {
+        if (suggestions[i].command &&
+            strcmp(suggestions[i].command, "echo") == 0) {
             found_echo = true;
             free(suggestions[i].command);
         } else if (suggestions[i].command) {

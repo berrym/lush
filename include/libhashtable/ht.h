@@ -55,9 +55,9 @@ typedef struct ht_strstr ht_strstr_t;
  * @brief Hash table configuration flags
  */
 typedef enum {
-    HT_STR_NONE = 0,      /**< No special flags */
-    HT_STR_CASECMP,       /**< Use case-insensitive string comparison */
-    HT_SEED_RANDOM,       /**< Use random seed for hashing */
+    HT_STR_NONE = 0, /**< No special flags */
+    HT_STR_CASECMP,  /**< Use case-insensitive string comparison */
+    HT_SEED_RANDOM,  /**< Use random seed for hashing */
 } ht_flags_enum_t;
 
 /**
@@ -108,14 +108,14 @@ typedef void (*ht_vfree)(const void *);
  * Contains function pointers for copying and freeing keys and values.
  */
 typedef struct {
-    ht_kcopy key_copy;  /**< Function to copy keys */
-    ht_kfree key_free;  /**< Function to free keys */
-    ht_vcopy val_copy;  /**< Function to copy values */
-    ht_vfree val_free;  /**< Function to free values */
+    ht_kcopy key_copy; /**< Function to copy keys */
+    ht_kfree key_free; /**< Function to free keys */
+    ht_vcopy val_copy; /**< Function to copy values */
+    ht_vfree val_free; /**< Function to free values */
 } ht_callbacks_t;
 
 /** @brief FNV-1a hash prime constant (64-bit) */
-#define FNV1A_PRIME (0x00000100000001B3)  // 1099511628211 (64 bit)
+#define FNV1A_PRIME (0x00000100000001B3) // 1099511628211 (64 bit)
 
 /** @brief FNV-1a hash offset basis (64-bit) */
 #define FNV1A_OFFSET (0xCBF29CE484222325) // 14695981039346656037 (64 bit)

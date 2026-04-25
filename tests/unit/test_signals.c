@@ -61,7 +61,8 @@
 
 /* ============================================================================
  * SIGNAL NUMBER CONVERSION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(get_signal_number_int) {
     int sig = get_signal_number("INT");
@@ -105,7 +106,8 @@ TEST(get_signal_number_usr2) {
     ASSERT_EQ(sig, SIGUSR2, "USR2 should map to SIGUSR2");
 }
 
-/* Note: PIPE, ALRM, CHLD, CONT, STOP, TSTP signals not implemented in get_signal_number */
+/* Note: PIPE, ALRM, CHLD, CONT, STOP, TSTP signals not implemented in
+ * get_signal_number */
 
 TEST(get_signal_number_invalid) {
     int sig = get_signal_number("NOTASIGNAL");
@@ -133,7 +135,8 @@ TEST(get_signal_number_numeric) {
 
 /* ============================================================================
  * TRAP MANAGEMENT TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(set_trap_basic) {
     int result = set_trap(SIGUSR1, "echo trapped");
@@ -159,7 +162,8 @@ TEST(remove_trap_nonexistent) {
     /* Removing a trap that doesn't exist */
     int result = remove_trap(SIGUSR2);
     /* Should either succeed (no-op) or return appropriate error */
-    ASSERT(result == 0 || result == -1, "Remove nonexistent should handle gracefully");
+    ASSERT(result == 0 || result == -1,
+           "Remove nonexistent should handle gracefully");
 }
 
 TEST(set_trap_overwrite) {
@@ -201,7 +205,8 @@ TEST(list_traps) {
 
 /* ============================================================================
  * CHILD PROCESS TRACKING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(set_clear_child_pid) {
     pid_t test_pid = 12345;
@@ -220,7 +225,8 @@ TEST(clear_child_pid_without_set) {
 
 /* ============================================================================
  * LLE READLINE COORDINATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(set_lle_readline_active) {
     set_lle_readline_active(1);
@@ -242,7 +248,8 @@ TEST(check_and_clear_sigint_flag) {
 
 /* ============================================================================
  * SIGNAL HANDLER TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static volatile int test_handler_called = 0;
 
@@ -284,18 +291,21 @@ TEST(set_signal_handler_default) {
 
 /* ============================================================================
  * INIT SIGNAL HANDLERS TEST
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(init_signal_handlers) {
     /* Should not crash */
     init_signal_handlers();
 }
 
-/* Note: set_sigint_handler test removed - function declared but not implemented */
+/* Note: set_sigint_handler test removed - function declared but not implemented
+ */
 
 /* ============================================================================
  * SIGHUP TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(sighup_was_received_initial) {
     bool received = sighup_was_received();
@@ -311,7 +321,8 @@ TEST(send_sighup_to_jobs) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running signals.c tests...\n\n");

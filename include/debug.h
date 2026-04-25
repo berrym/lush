@@ -64,11 +64,11 @@ typedef struct breakpoint {
  * @brief Debug stack frame for tracking execution context
  */
 typedef struct debug_frame {
-    char *function_name;       /**< Name of current function */
-    char *file_path;           /**< Path to source file */
-    int line_number;           /**< Current line number */
-    node_t *current_node;      /**< Current AST node */
-    symtable_t *local_vars;    /**< Local variables in this frame */
+    char *function_name;        /**< Name of current function */
+    char *file_path;            /**< Path to source file */
+    int line_number;            /**< Current line number */
+    node_t *current_node;       /**< Current AST node */
+    symtable_t *local_vars;     /**< Local variables in this frame */
     struct debug_frame *parent; /**< Parent frame */
     struct timespec start_time; /**< Frame start time */
     struct timespec end_time;   /**< Frame end time */
@@ -78,25 +78,25 @@ typedef struct debug_frame {
  * @brief Performance profiling data
  */
 typedef struct profile_data {
-    char *function_name;        /**< Function name */
-    char *file_path;            /**< Source file path */
-    long total_time_ns;         /**< Total time in nanoseconds */
-    int call_count;             /**< Number of calls */
-    long min_time_ns;           /**< Minimum call time */
-    long max_time_ns;           /**< Maximum call time */
-    struct profile_data *next;  /**< Next profile entry */
+    char *function_name;       /**< Function name */
+    char *file_path;           /**< Source file path */
+    long total_time_ns;        /**< Total time in nanoseconds */
+    int call_count;            /**< Number of calls */
+    long min_time_ns;          /**< Minimum call time */
+    long max_time_ns;          /**< Maximum call time */
+    struct profile_data *next; /**< Next profile entry */
 } profile_data_t;
 
 /**
  * @brief Script analysis issue
  */
 typedef struct analysis_issue {
-    char *file_path;            /**< File with issue */
-    int line_number;            /**< Line number of issue */
-    char *severity;             /**< "error", "warning", "info" */
-    char *category;             /**< "syntax", "performance", "security", "style" */
-    char *message;              /**< Issue description */
-    char *suggestion;           /**< Suggested fix */
+    char *file_path;  /**< File with issue */
+    int line_number;  /**< Line number of issue */
+    char *severity;   /**< "error", "warning", "info" */
+    char *category;   /**< "syntax", "performance", "security", "style" */
+    char *message;    /**< Issue description */
+    char *suggestion; /**< Suggested fix */
     struct analysis_issue *next; /**< Next issue */
 } analysis_issue_t;
 
@@ -106,13 +106,13 @@ typedef struct analysis_issue {
  * Contains all debugging state and configuration.
  */
 typedef struct debug_context {
-    debug_level_t level;       /**< Current debug level */
-    debug_mode_t mode;         /**< Current execution mode */
-    bool enabled;              /**< Debug mode enabled */
-    bool step_mode;            /**< Single-step mode active */
-    bool trace_execution;      /**< Trace execution enabled */
-    bool profile_enabled;      /**< Profiling enabled */
-    bool analysis_enabled;     /**< Script analysis enabled */
+    debug_level_t level;   /**< Current debug level */
+    debug_mode_t mode;     /**< Current execution mode */
+    bool enabled;          /**< Debug mode enabled */
+    bool step_mode;        /**< Single-step mode active */
+    bool trace_execution;  /**< Trace execution enabled */
+    bool profile_enabled;  /**< Profiling enabled */
+    bool analysis_enabled; /**< Script analysis enabled */
 
     /* Execution state */
     debug_frame_t *current_frame; /**< Current stack frame */
@@ -129,8 +129,8 @@ typedef struct debug_context {
     } execution_context;           /**< Execution context for loop debugging */
 
     /* Breakpoints */
-    breakpoint_t *breakpoints;  /**< List of breakpoints */
-    int next_breakpoint_id;     /**< Next breakpoint ID to assign */
+    breakpoint_t *breakpoints; /**< List of breakpoints */
+    int next_breakpoint_id;    /**< Next breakpoint ID to assign */
 
     /* Profiling */
     profile_data_t *profile_data; /**< Profiling data */
@@ -146,15 +146,15 @@ typedef struct debug_context {
     FILE *analysis_output; /**< Analysis output stream */
 
     /* Configuration */
-    bool show_variables;    /**< Show variable values */
-    bool show_stack_trace;  /**< Show stack traces */
-    bool show_timing;       /**< Show timing information */
-    bool highlight_syntax;  /**< Syntax highlighting in output */
-    int max_stack_depth;    /**< Maximum stack depth to display */
+    bool show_variables;   /**< Show variable values */
+    bool show_stack_trace; /**< Show stack traces */
+    bool show_timing;      /**< Show timing information */
+    bool highlight_syntax; /**< Syntax highlighting in output */
+    int max_stack_depth;   /**< Maximum stack depth to display */
 
     /* Statistics */
-    long total_commands;        /**< Total commands executed */
-    long total_time_ns;         /**< Total execution time */
+    long total_commands;           /**< Total commands executed */
+    long total_time_ns;            /**< Total execution time */
     struct timespec session_start; /**< Session start time */
 } debug_context_t;
 
@@ -163,7 +163,8 @@ extern debug_context_t *g_debug_context;
 
 /* ============================================================================
  * Core Debug System Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize the debug system
@@ -209,7 +210,8 @@ void debug_enable(debug_context_t *ctx, bool enable);
 
 /* ============================================================================
  * Execution Tracing
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Trace an AST node execution
@@ -257,7 +259,8 @@ void debug_trace_function_call(debug_context_t *ctx, const char *function,
 
 /* ============================================================================
  * Stack Frame Management
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Push a new stack frame
@@ -295,7 +298,8 @@ void debug_show_stack(debug_context_t *ctx);
 
 /* ============================================================================
  * Breakpoint Management
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Add a breakpoint
@@ -354,7 +358,8 @@ void debug_clear_breakpoints(debug_context_t *ctx);
 
 /* ============================================================================
  * Variable Inspection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Inspect a single variable
@@ -388,7 +393,8 @@ void debug_show_variable_changes(debug_context_t *ctx);
 
 /* ============================================================================
  * Step Execution
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Step into the next instruction
@@ -420,7 +426,8 @@ void debug_continue(debug_context_t *ctx);
 
 /* ============================================================================
  * Performance Profiling
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Start profiling
@@ -468,7 +475,8 @@ void debug_profile_reset(debug_context_t *ctx);
 
 /* ============================================================================
  * Script Analysis
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Analysis mode for script checking
@@ -477,7 +485,8 @@ void debug_profile_reset(debug_context_t *ctx);
  */
 typedef enum {
     ANALYSIS_MODE_FULL, /**< Full analysis: info + warnings + errors */
-    ANALYSIS_MODE_LINT, /**< Lint mode: warnings + errors only, supports fixes */
+    ANALYSIS_MODE_LINT, /**< Lint mode: warnings + errors only, supports fixes
+                         */
 } analysis_mode_t;
 
 /**
@@ -504,8 +513,8 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path);
  * @param dry_run Preview fixes without applying
  * @return Number of unfixed issues remaining
  */
-int debug_lint_script(debug_context_t *ctx, const char *script_path,
-                      bool fix, bool unsafe_fixes, bool dry_run);
+int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
+                      bool unsafe_fixes, bool dry_run);
 
 /**
  * @brief Add an analysis issue
@@ -536,7 +545,7 @@ void debug_show_analysis_report(debug_context_t *ctx);
  * @param mode Analysis mode (FULL shows all, LINT filters info items)
  */
 void debug_show_analysis_report_filtered(debug_context_t *ctx,
-                                          analysis_mode_t mode);
+                                         analysis_mode_t mode);
 
 /**
  * @brief Clear all analysis issues
@@ -547,7 +556,8 @@ void debug_clear_analysis_issues(debug_context_t *ctx);
 
 /* ============================================================================
  * Function Introspection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief List all defined functions
@@ -566,7 +576,8 @@ void debug_show_function(debug_context_t *ctx, const char *function_name);
 
 /* ============================================================================
  * Utility Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Print an AST node with indentation
@@ -611,7 +622,8 @@ void debug_format_time(long ns, char *buffer, size_t size);
 
 /* ============================================================================
  * Output Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Print formatted debug output
@@ -639,7 +651,8 @@ void debug_print_header(debug_context_t *ctx, const char *title);
 
 /* ============================================================================
  * Configuration
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Set debug output file
@@ -667,7 +680,8 @@ void debug_set_analysis_output_file(debug_context_t *ctx, const char *filename);
 
 /* ============================================================================
  * Integration Macros
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Trace AST node execution if debugging enabled */
 #define DEBUG_TRACE_NODE(node, file, line)                                     \
@@ -701,7 +715,8 @@ void debug_set_analysis_output_file(debug_context_t *ctx, const char *filename);
 
 /* ============================================================================
  * User Interaction Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Handle user debug command input
@@ -782,7 +797,8 @@ bool debug_evaluate_condition(debug_context_t *ctx, const char *condition);
 
 /* ============================================================================
  * Execution Context Preservation (Loop Debugging Fix)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Save execution context for loop debugging
@@ -813,7 +829,8 @@ void debug_cleanup_execution_context(debug_context_t *ctx);
 
 /* ============================================================================
  * Loop Context Tracking (Architectural Fix)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Enter a loop context
@@ -846,7 +863,8 @@ void debug_exit_loop(debug_context_t *ctx);
 /**
  * @brief Check breakpoint with context preservation
  *
- * Enhanced breakpoint check that preserves execution context for loop debugging.
+ * Enhanced breakpoint check that preserves execution context for loop
+ * debugging.
  *
  * @param ctx Debug context
  * @param file Source file

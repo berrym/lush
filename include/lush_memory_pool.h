@@ -43,11 +43,11 @@ typedef enum {
 
 // Pool block structure for memory management
 typedef struct lush_pool_block {
-    void *memory;                   // Allocated memory block
-    size_t size;                    // Block size
-    bool in_use;                    // Allocation status
-    uint64_t allocation_time_us;    // Allocation timestamp for debugging
-    uint32_t allocation_id;         // Unique allocation ID for tracking
+    void *memory;                 // Allocated memory block
+    size_t size;                  // Block size
+    bool in_use;                  // Allocation status
+    uint64_t allocation_time_us;  // Allocation timestamp for debugging
+    uint32_t allocation_id;       // Unique allocation ID for tracking
     struct lush_pool_block *next; // Next block in free list
     struct lush_pool_block *prev; // Previous block for efficient removal
 } lush_pool_block_t;
@@ -68,26 +68,26 @@ typedef struct {
 
 // Individual pool configuration and state
 typedef struct {
-    size_t block_size;               // Size of each block in this pool
-    size_t initial_blocks;           // Initial number of blocks to pre-allocate
-    size_t max_blocks;               // Maximum blocks allowed (0 = unlimited)
-    size_t current_blocks;           // Current number of allocated blocks
-    size_t free_blocks;              // Number of available blocks
+    size_t block_size;             // Size of each block in this pool
+    size_t initial_blocks;         // Initial number of blocks to pre-allocate
+    size_t max_blocks;             // Maximum blocks allowed (0 = unlimited)
+    size_t current_blocks;         // Current number of allocated blocks
+    size_t free_blocks;            // Number of available blocks
     lush_pool_block_t *free_list;  // Linked list of free blocks
     lush_pool_block_t *all_blocks; // Array of all blocks for cleanup
-    uint64_t pool_allocations;       // Allocations from this specific pool
-    uint64_t pool_deallocations;     // Deallocations to this specific pool
+    uint64_t pool_allocations;     // Allocations from this specific pool
+    uint64_t pool_deallocations;   // Deallocations to this specific pool
 } lush_pool_t;
 
 // Main memory pool system
 typedef struct {
     lush_pool_t pools[LUSH_POOL_COUNT]; // Individual size pools
-    lush_pool_stats_t stats;              // Performance statistics
-    bool initialized;                       // Initialization status
-    bool enable_statistics;                 // Statistics collection toggle
-    bool enable_malloc_fallback;            // Automatic malloc fallback
-    uint32_t next_allocation_id;            // Unique ID counter
-    struct timespec init_time;              // Pool system initialization time
+    lush_pool_stats_t stats;            // Performance statistics
+    bool initialized;                   // Initialization status
+    bool enable_statistics;             // Statistics collection toggle
+    bool enable_malloc_fallback;        // Automatic malloc fallback
+    uint32_t next_allocation_id;        // Unique ID counter
+    struct timespec init_time;          // Pool system initialization time
 } lush_memory_pool_system_t;
 
 // Error codes for memory pool operations
@@ -225,7 +225,7 @@ bool lush_pool_is_pool_pointer(const void *ptr);
  * @return LUSH_POOL_SUCCESS on success, error code on failure
  */
 lush_pool_error_t lush_pool_preallocate(lush_pool_size_t pool_type,
-                                            size_t count);
+                                        size_t count);
 
 /**
  * @brief Get detailed information about specific pool
@@ -235,7 +235,7 @@ lush_pool_error_t lush_pool_preallocate(lush_pool_size_t pool_type,
  * @param total_blocks Pointer to store total block count (may be NULL)
  */
 void lush_pool_get_pool_info(lush_pool_size_t pool_type, size_t *block_size,
-                               size_t *free_blocks, size_t *total_blocks);
+                             size_t *free_blocks, size_t *total_blocks);
 
 /**
  * @brief Validate pool integrity (debug/testing)
@@ -255,11 +255,13 @@ void lush_pool_print_status_report(void);
 /**
  * @brief Get pool memory usage for display performance reporting
  * @param pool_bytes Pointer to store current pool usage in bytes (may be NULL)
- * @param malloc_bytes Pointer to store malloc fallback usage in bytes (may be NULL)
- * @param pool_efficiency Pointer to store pool hit rate percentage (may be NULL)
+ * @param malloc_bytes Pointer to store malloc fallback usage in bytes (may be
+ * NULL)
+ * @param pool_efficiency Pointer to store pool hit rate percentage (may be
+ * NULL)
  */
 void lush_pool_get_memory_usage(uint64_t *pool_bytes, uint64_t *malloc_bytes,
-                                  double *pool_efficiency);
+                                double *pool_efficiency);
 
 /**
  * @brief Check if pool system is meeting performance targets

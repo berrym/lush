@@ -7,10 +7,10 @@
  * debugging user input handling.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <unistd.h>
 
 #include "debug.h"
@@ -21,49 +21,56 @@
 static int tests_run = 0;
 static int tests_passed = 0;
 
-#define ASSERT(cond) do { \
-    if (!(cond)) { \
-        printf("  FAIL: %s (line %d)\n", #cond, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if ((a) != (b)) { \
-        printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_EQ(a, b)                                                        \
+    do {                                                                       \
+        if ((a) != (b)) {                                                      \
+            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_STR_EQ(a, b) do { \
-    if (strcmp((a), (b)) != 0) { \
-        printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b), __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_STR_EQ(a, b)                                                    \
+    do {                                                                       \
+        if (strcmp((a), (b)) != 0) {                                           \
+            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
+                   __LINE__);                                                  \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NOT_NULL(ptr) do { \
-    if ((ptr) == NULL) { \
-        printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NOT_NULL(ptr)                                                   \
+    do {                                                                       \
+        if ((ptr) == NULL) {                                                   \
+            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NULL(ptr) do { \
-    if ((ptr) != NULL) { \
-        printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NULL(ptr)                                                       \
+    do {                                                                       \
+        if ((ptr) != NULL) {                                                   \
+            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define RUN_TEST(test) do { \
-    printf("  Running %s...\n", #test); \
-    tests_run++; \
-    if (test()) { \
-        tests_passed++; \
-        printf("  PASS: %s\n", #test); \
-    } \
-} while(0)
+#define RUN_TEST(test)                                                         \
+    do {                                                                       \
+        printf("  Running %s...\n", #test);                                    \
+        tests_run++;                                                           \
+        if (test()) {                                                          \
+            tests_passed++;                                                    \
+            printf("  PASS: %s\n", #test);                                     \
+        }                                                                      \
+    } while (0)
 
 /* Helper to create a debug context for testing */
 static debug_context_t *create_test_context(void) {
@@ -1195,17 +1202,16 @@ static int test_show_current_location_with_frame(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    debug_frame_t frame = {
-        .function_name = "test_func",
-        .file_path = "test.sh",
-        .line_number = 42,
-        .parent = NULL
-    };
+    debug_frame_t frame = {.function_name = "test_func",
+                           .file_path = "test.sh",
+                           .line_number = 42,
+                           .parent = NULL};
     ctx->current_frame = &frame;
 
     debug_show_current_location(ctx);
 
-    ctx->current_frame = NULL; /* Don't let free_test_context touch stack frame */
+    ctx->current_frame =
+        NULL; /* Don't let free_test_context touch stack frame */
     free_test_context(ctx);
     return 1;
 }
@@ -1768,7 +1774,8 @@ static int test_multiple_breakpoints_workflow(void) {
     int disabled_count = 0;
     while (bp) {
         count++;
-        if (!bp->enabled) disabled_count++;
+        if (!bp->enabled)
+            disabled_count++;
         bp = bp->next;
     }
     ASSERT_EQ(count, 3);

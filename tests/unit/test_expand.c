@@ -48,7 +48,8 @@
 
 /* ============================================================================
  * CONTEXT INITIALIZATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_ctx_init_normal) {
     expand_ctx_t ctx;
@@ -106,8 +107,8 @@ TEST(expand_ctx_init_combined) {
 
 TEST(expand_ctx_init_all_flags) {
     expand_ctx_t ctx;
-    int mode = EXPAND_ALIAS | EXPAND_NOQUOTE | EXPAND_NOVAR |
-               EXPAND_NOCMD | EXPAND_NOGLOB;
+    int mode = EXPAND_ALIAS | EXPAND_NOQUOTE | EXPAND_NOVAR | EXPAND_NOCMD |
+               EXPAND_NOGLOB;
     expand_ctx_init(&ctx, mode);
 
     ASSERT_EQ(ctx.mode, mode, "Mode should have all flags");
@@ -115,17 +116,23 @@ TEST(expand_ctx_init_all_flags) {
 
 /* ============================================================================
  * MODE FLAG CHECKING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_ctx_check_normal_has_nothing) {
     expand_ctx_t ctx;
     expand_ctx_init(&ctx, EXPAND_NORMAL);
 
-    ASSERT(!expand_ctx_check(&ctx, EXPAND_ALIAS), "NORMAL should not have ALIAS");
-    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOQUOTE), "NORMAL should not have NOQUOTE");
-    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOVAR), "NORMAL should not have NOVAR");
-    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOCMD), "NORMAL should not have NOCMD");
-    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOGLOB), "NORMAL should not have NOGLOB");
+    ASSERT(!expand_ctx_check(&ctx, EXPAND_ALIAS),
+           "NORMAL should not have ALIAS");
+    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOQUOTE),
+           "NORMAL should not have NOQUOTE");
+    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOVAR),
+           "NORMAL should not have NOVAR");
+    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOCMD),
+           "NORMAL should not have NOCMD");
+    ASSERT(!expand_ctx_check(&ctx, EXPAND_NOGLOB),
+           "NORMAL should not have NOGLOB");
 }
 
 TEST(expand_ctx_check_alias) {
@@ -179,8 +186,8 @@ TEST(expand_ctx_check_combined) {
 
 TEST(expand_ctx_check_all_flags) {
     expand_ctx_t ctx;
-    int mode = EXPAND_ALIAS | EXPAND_NOQUOTE | EXPAND_NOVAR |
-               EXPAND_NOCMD | EXPAND_NOGLOB;
+    int mode = EXPAND_ALIAS | EXPAND_NOQUOTE | EXPAND_NOVAR | EXPAND_NOCMD |
+               EXPAND_NOGLOB;
     expand_ctx_init(&ctx, mode);
 
     ASSERT(expand_ctx_check(&ctx, EXPAND_ALIAS), "Should have ALIAS");
@@ -192,7 +199,8 @@ TEST(expand_ctx_check_all_flags) {
 
 /* ============================================================================
  * QUOTE STATE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_ctx_quotes_initial) {
     expand_ctx_t ctx;
@@ -220,7 +228,8 @@ TEST(expand_ctx_quotes_clear) {
 
 /* ============================================================================
  * BACKTICK STATE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_ctx_backticks_initial) {
     expand_ctx_t ctx;
@@ -248,7 +257,8 @@ TEST(expand_ctx_backticks_clear) {
 
 /* ============================================================================
  * COMBINED STATE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_ctx_quotes_and_backticks) {
     expand_ctx_t ctx;
@@ -273,7 +283,8 @@ TEST(expand_ctx_mode_with_quotes) {
 
 /* ============================================================================
  * FLAG CONSTANT TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_flag_values) {
     /* Verify flags are distinct powers of 2 */
@@ -287,15 +298,20 @@ TEST(expand_flag_values) {
 
 TEST(expand_flags_orthogonal) {
     /* Verify flags don't overlap */
-    ASSERT((EXPAND_ALIAS & EXPAND_NOQUOTE) == 0, "ALIAS and NOQUOTE should be orthogonal");
-    ASSERT((EXPAND_NOQUOTE & EXPAND_NOVAR) == 0, "NOQUOTE and NOVAR should be orthogonal");
-    ASSERT((EXPAND_NOVAR & EXPAND_NOCMD) == 0, "NOVAR and NOCMD should be orthogonal");
-    ASSERT((EXPAND_NOCMD & EXPAND_NOGLOB) == 0, "NOCMD and NOGLOB should be orthogonal");
+    ASSERT((EXPAND_ALIAS & EXPAND_NOQUOTE) == 0,
+           "ALIAS and NOQUOTE should be orthogonal");
+    ASSERT((EXPAND_NOQUOTE & EXPAND_NOVAR) == 0,
+           "NOQUOTE and NOVAR should be orthogonal");
+    ASSERT((EXPAND_NOVAR & EXPAND_NOCMD) == 0,
+           "NOVAR and NOCMD should be orthogonal");
+    ASSERT((EXPAND_NOCMD & EXPAND_NOGLOB) == 0,
+           "NOCMD and NOGLOB should be orthogonal");
 }
 
 /* ============================================================================
  * EDGE CASES
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expand_ctx_reinit) {
     expand_ctx_t ctx;
@@ -332,14 +348,16 @@ TEST(expand_ctx_multiple_contexts) {
 
     /* Contexts should be independent */
     ASSERT(expand_ctx_check(&ctx1, EXPAND_ALIAS), "ctx1 should have ALIAS");
-    ASSERT(!expand_ctx_check(&ctx2, EXPAND_ALIAS), "ctx2 should not have ALIAS");
+    ASSERT(!expand_ctx_check(&ctx2, EXPAND_ALIAS),
+           "ctx2 should not have ALIAS");
     ASSERT(ctx1.in_quotes, "ctx1 should be in quotes");
     ASSERT(!ctx2.in_quotes, "ctx2 should not be in quotes");
 }
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running expand.c tests...\n\n");

@@ -480,8 +480,7 @@ char *debug_get_node_description(node_t *node) {
                  node->val.str ? node->val.str : "");
         break;
     case NODE_ARRAY_LITERAL:
-        snprintf(desc, 256, "ARRAY_LITERAL (%zu elements)",
-                 node->children);
+        snprintf(desc, 256, "ARRAY_LITERAL (%zu elements)", node->children);
         break;
     case NODE_ARRAY_ACCESS:
         snprintf(desc, 256, "ARRAY_ACCESS: %s",
@@ -504,8 +503,7 @@ char *debug_get_node_description(node_t *node) {
                  node->val.str ? node->val.str : "");
         break;
     case NODE_COPROC:
-        snprintf(desc, 256, "COPROC: %s",
-                 node->val.str ? node->val.str : "");
+        snprintf(desc, 256, "COPROC: %s", node->val.str ? node->val.str : "");
         break;
     case NODE_CASE_ITEM: {
         const char *term_str = ";;";
@@ -523,12 +521,12 @@ char *debug_get_node_description(node_t *node) {
         break;
     }
     case NODE_SELECT:
-        snprintf(desc, 256, "SELECT: %s",
-                 node->val.str ? node->val.str : "");
+        snprintf(desc, 256, "SELECT: %s", node->val.str ? node->val.str : "");
         break;
     case NODE_TIME:
         snprintf(desc, 256, "TIME%s",
-                 (node->val_type == VAL_SINT && node->val.sint == 1) ? " -p" : "");
+                 (node->val_type == VAL_SINT && node->val.sint == 1) ? " -p"
+                                                                     : "");
         break;
     case NODE_ANON_FUNCTION:
         snprintf(desc, 256, "ANON_FUNCTION () { ... }");

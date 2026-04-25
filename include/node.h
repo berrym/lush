@@ -13,11 +13,11 @@
 #ifndef NODE_H
 #define NODE_H
 
+#include "shell_error.h" /* For source_location_t */
+
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
-
-#include "shell_error.h"  /* For source_location_t */
 
 typedef enum {
     NODE_COMMAND,
@@ -71,25 +71,26 @@ typedef enum {
     NODE_EXTENDED_TEST, // [[ expr ]] - extended test command
 
     // Extended language features (Phase 3: Process Substitution)
-    NODE_PROC_SUB_IN,   // <(cmd) - process substitution input
-    NODE_PROC_SUB_OUT,  // >(cmd) - process substitution output
-    NODE_COPROC,        // coproc name cmd - coprocess
+    NODE_PROC_SUB_IN,  // <(cmd) - process substitution input
+    NODE_PROC_SUB_OUT, // >(cmd) - process substitution output
+    NODE_COPROC,       // coproc name cmd - coprocess
 
     // Extended language features (Phase 5: Control Flow)
-    NODE_CASE_ITEM,     // Case item with terminator type
-    NODE_SELECT,        // select var in list; do body; done
-    NODE_TIME,          // time [-p] pipeline
-    NODE_NEGATE,        // ! pipeline - negate exit status
+    NODE_CASE_ITEM, // Case item with terminator type
+    NODE_SELECT,    // select var in list; do body; done
+    NODE_TIME,      // time [-p] pipeline
+    NODE_NEGATE,    // ! pipeline - negate exit status
 
     // Extended language features (Phase 7: Zsh-Specific)
-    NODE_ANON_FUNCTION, // () { body } - anonymous function (immediately executed)
+    NODE_ANON_FUNCTION, // () { body } - anonymous function (immediately
+                        // executed)
 } node_type_t;
 
 // Case item terminator types for fall-through behavior
 typedef enum {
-    CASE_TERM_BREAK,        // ;; - stop processing (default)
-    CASE_TERM_FALLTHROUGH,  // ;& - execute next item without pattern test
-    CASE_TERM_CONTINUE,     // ;;& - continue testing next patterns
+    CASE_TERM_BREAK,       // ;; - stop processing (default)
+    CASE_TERM_FALLTHROUGH, // ;& - execute next item without pattern test
+    CASE_TERM_CONTINUE,    // ;;& - continue testing next patterns
 } case_terminator_t;
 
 typedef enum {

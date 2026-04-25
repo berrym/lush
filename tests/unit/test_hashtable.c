@@ -91,7 +91,8 @@
 
 /* ============================================================================
  * STRING-TO-STRING HASH TABLE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(strstr_create_destroy) {
     ht_strstr_t *ht = ht_strstr_create(HT_STR_NONE);
@@ -171,7 +172,8 @@ TEST(strstr_case_insensitive) {
 
 /* ============================================================================
  * STRING-TO-INT HASH TABLE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(strint_create_destroy) {
     ht_strint_t *ht = ht_strint_create(HT_STR_NONE);
@@ -221,7 +223,8 @@ TEST(strint_zero_value) {
 
 /* ============================================================================
  * STRING-TO-FLOAT HASH TABLE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(strfloat_create_destroy) {
     ht_strfloat_t *ht = ht_strfloat_create(HT_STR_NONE);
@@ -238,7 +241,8 @@ TEST(strfloat_insert_get) {
 
     float *result = ht_strfloat_get(ht, "pi");
     ASSERT_NOT_NULL(result, "Value should not be NULL");
-    ASSERT(*result > 3.14f && *result < 3.15f, "Value should be approximately pi");
+    ASSERT(*result > 3.14f && *result < 3.15f,
+           "Value should be approximately pi");
 
     ht_strfloat_destroy(ht);
 }
@@ -251,7 +255,8 @@ TEST(strfloat_negative) {
 
     float *result = ht_strfloat_get(ht, "neg");
     ASSERT_NOT_NULL(result, "Value should not be NULL");
-    ASSERT(*result < -2.4f && *result > -2.6f, "Negative value should be correct");
+    ASSERT(*result < -2.4f && *result > -2.6f,
+           "Negative value should be correct");
 
     ht_strfloat_destroy(ht);
 }
@@ -271,7 +276,8 @@ TEST(strfloat_zero) {
 
 /* ============================================================================
  * STRING-TO-DOUBLE HASH TABLE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(strdouble_create_destroy) {
     ht_strdouble_t *ht = ht_strdouble_create(HT_STR_NONE);
@@ -288,7 +294,8 @@ TEST(strdouble_insert_get) {
 
     double *result = ht_strdouble_get(ht, "pi");
     ASSERT_NOT_NULL(result, "Value should not be NULL");
-    ASSERT(*result > 3.14159 && *result < 3.14160, "Value should be approximately pi");
+    ASSERT(*result > 3.14159 && *result < 3.14160,
+           "Value should be approximately pi");
 
     ht_strdouble_destroy(ht);
 }
@@ -310,7 +317,8 @@ TEST(strdouble_precision) {
 
 /* ============================================================================
  * EDGE CASES
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(collision_handling) {
     ht_strstr_t *ht = ht_strstr_create(HT_STR_NONE);
@@ -378,7 +386,8 @@ TEST(special_chars_in_key) {
 
 /* ============================================================================
  * ENUMERATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(strstr_enumeration) {
     ht_strstr_t *ht = ht_strstr_create(HT_STR_NONE);
@@ -432,7 +441,8 @@ TEST(strint_enumeration) {
 
 /* ============================================================================
  * HASH FUNCTION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(fnv1a_hash_basic) {
     /* Test that hash produces consistent results */
@@ -455,7 +465,8 @@ TEST(fnv1a_hash_case_insensitive) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running hash table library tests...\n\n");

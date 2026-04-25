@@ -487,7 +487,8 @@ TEST(analysis_add_issue) {
     ASSERT_EQ(ctx->issue_count, 0, "No issues initially");
 
     debug_add_analysis_issue(ctx, "test.sh", 10, "warning", "style",
-                             "Line too long", "Consider breaking into multiple lines");
+                             "Line too long",
+                             "Consider breaking into multiple lines");
 
     ASSERT_EQ(ctx->issue_count, 1, "Should have 1 issue");
     ASSERT_NOT_NULL(ctx->analysis_issues, "Issue list should not be empty");
@@ -569,10 +570,9 @@ TEST(utility_get_node_description) {
 }
 
 TEST(utility_node_description_various_types) {
-    node_type_t types[] = {
-        NODE_COMMAND, NODE_PIPELINE, NODE_IF, NODE_FOR, NODE_WHILE,
-        NODE_CASE, NODE_FUNCTION, NODE_VAR, NODE_SUBSHELL
-    };
+    node_type_t types[] = {NODE_COMMAND,  NODE_PIPELINE, NODE_IF,
+                           NODE_FOR,      NODE_WHILE,    NODE_CASE,
+                           NODE_FUNCTION, NODE_VAR,      NODE_SUBSHELL};
     int num_types = 9;
 
     for (int i = 0; i < num_types; i++) {
@@ -595,13 +595,14 @@ TEST(utility_node_description_various_types) {
 TEST(loop_context_enter_exit) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true);  /* Enable debug mode for loop tracking */
+    debug_enable(ctx, true); /* Enable debug mode for loop tracking */
 
     ASSERT_FALSE(ctx->execution_context.in_loop, "Not in loop initially");
 
     debug_enter_loop(ctx, "for", "i", "1");
     ASSERT_TRUE(ctx->execution_context.in_loop, "Should be in loop");
-    ASSERT_EQ(ctx->execution_context.loop_iteration, 0, "Iteration should be 0");
+    ASSERT_EQ(ctx->execution_context.loop_iteration, 0,
+              "Iteration should be 0");
 
     debug_exit_loop(ctx);
     ASSERT_FALSE(ctx->execution_context.in_loop, "Should not be in loop");
@@ -612,7 +613,7 @@ TEST(loop_context_enter_exit) {
 TEST(loop_context_update_variable) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true);  /* Enable debug mode for loop tracking */
+    debug_enable(ctx, true); /* Enable debug mode for loop tracking */
 
     debug_enter_loop(ctx, "for", "i", "1");
 
@@ -643,7 +644,7 @@ TEST(output_null_context_safe) {
 TEST(step_mode_transitions) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true);  /* Enable debug mode for step operations */
+    debug_enable(ctx, true); /* Enable debug mode for step operations */
 
     debug_step_into(ctx);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP, "Should be in step mode");
@@ -665,7 +666,7 @@ TEST(step_mode_transitions) {
 TEST(execution_context_cleanup) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true);  /* Enable debug mode for execution context */
+    debug_enable(ctx, true); /* Enable debug mode for execution context */
 
     debug_enter_loop(ctx, "for", "i", "1");
     ASSERT_TRUE(ctx->execution_context.in_loop, "Should be in loop");

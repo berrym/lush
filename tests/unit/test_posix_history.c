@@ -127,7 +127,8 @@ TEST(add_empty_command_rejected) {
 
     ASSERT_EQ(posix_history_add(mgr, ""), -1, "Empty command should fail");
     ASSERT_EQ(posix_history_add(mgr, "   "), -1, "Whitespace-only should fail");
-    ASSERT_EQ(posix_history_add(mgr, "\t\n"), -1, "Whitespace-only should fail");
+    ASSERT_EQ(posix_history_add(mgr, "\t\n"), -1,
+              "Whitespace-only should fail");
     ASSERT_EQ(mgr->count, 0, "Count should still be 0");
 
     posix_history_destroy(mgr);
@@ -162,7 +163,8 @@ TEST(add_no_duplicates_enabled) {
 }
 
 TEST(add_overflow_removes_oldest) {
-    posix_history_manager_t *mgr = posix_history_create(POSIX_HISTORY_MIN_ENTRIES);
+    posix_history_manager_t *mgr =
+        posix_history_create(POSIX_HISTORY_MIN_ENTRIES);
     ASSERT_NOT_NULL(mgr, "Manager creation");
 
     // Fill to capacity
@@ -299,7 +301,8 @@ TEST(delete_nonexistent) {
 
     ASSERT_FALSE(posix_history_delete(mgr, 999), "Delete non-existent fails");
     ASSERT_FALSE(posix_history_delete(mgr, 0), "Delete number 0 fails");
-    ASSERT_FALSE(posix_history_delete(NULL, 1), "Delete with null manager fails");
+    ASSERT_FALSE(posix_history_delete(NULL, 1),
+                 "Delete with null manager fails");
 
     posix_history_destroy(mgr);
 }
@@ -438,8 +441,7 @@ TEST(parse_range_invalid) {
                  "Invalid first");
     ASSERT_FALSE(posix_history_parse_range(NULL, "1", NULL, &range),
                  "Null manager");
-    ASSERT_FALSE(posix_history_parse_range(mgr, "1", NULL, NULL),
-                 "Null range");
+    ASSERT_FALSE(posix_history_parse_range(mgr, "1", NULL, NULL), "Null range");
 
     posix_history_destroy(mgr);
 }
@@ -537,8 +539,9 @@ TEST(get_stats_invalid) {
     size_t total;
     int current_num, wraparound;
 
-    ASSERT_FALSE(posix_history_get_stats(NULL, &total, &current_num, &wraparound),
-                 "Null manager");
+    ASSERT_FALSE(
+        posix_history_get_stats(NULL, &total, &current_num, &wraparound),
+        "Null manager");
 
     posix_history_manager_t *mgr = posix_history_create(0);
     ASSERT_NOT_NULL(mgr, "Manager creation");
@@ -620,7 +623,8 @@ TEST(load_nonexistent_file) {
     posix_history_manager_t *mgr = posix_history_create(0);
     ASSERT_NOT_NULL(mgr, "Manager creation");
 
-    int loaded = posix_history_load(mgr, "/tmp/nonexistent_history_file_12345", false);
+    int loaded =
+        posix_history_load(mgr, "/tmp/nonexistent_history_file_12345", false);
     ASSERT_EQ(loaded, 0, "Non-existent file returns 0 (not error)");
 
     posix_history_destroy(mgr);

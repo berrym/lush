@@ -89,8 +89,10 @@ static size_t get_history_count(lle_history_core_t *history) {
  * the form "old=new" where old is replaced with new in the command.
  *
  * @param pattern The substitution pattern string
- * @param old Output pointer for the old string (newly allocated, caller must free)
- * @param new_str Output pointer for the new string (newly allocated, caller must free)
+ * @param old Output pointer for the old string (newly allocated, caller must
+ * free)
+ * @param new_str Output pointer for the new string (newly allocated, caller
+ * must free)
  * @return true on success, false on allocation failure
  */
 static bool parse_substitution_pattern(const char *pattern, char **old,

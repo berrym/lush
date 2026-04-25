@@ -411,8 +411,8 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
  * @brief Structure for passing callback data during variable enumeration
  */
 typedef struct {
-    debug_context_t *ctx;  /**< Debug context for output */
-    bool found_any;        /**< Flag indicating if any variables were found */
+    debug_context_t *ctx; /**< Debug context for output */
+    bool found_any;       /**< Flag indicating if any variables were found */
 } debug_var_callback_data_t;
 
 /**

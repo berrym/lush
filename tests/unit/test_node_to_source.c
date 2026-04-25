@@ -11,8 +11,8 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "node_to_source.h"
 #include "node.h"
+#include "node_to_source.h"
 #include "parser.h"
 #include <assert.h>
 #include <stdio.h>
@@ -90,12 +90,14 @@
 
 /* ============================================================================
  * NODE TO SOURCE BASIC TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(node_to_source_null) {
     char *source = node_to_source(NULL);
     /* Implementation returns empty string for NULL, not NULL */
-    ASSERT_NOT_NULL(source, "node_to_source should return empty string for NULL");
+    ASSERT_NOT_NULL(source,
+                    "node_to_source should return empty string for NULL");
     ASSERT_STR_EQ(source, "", "NULL node should produce empty string");
     free(source);
 }
@@ -160,7 +162,8 @@ TEST(node_to_source_pipe) {
 
 /* ============================================================================
  * NODE EQUALS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(node_equals_null) {
     ASSERT_EQ(node_equals(NULL, NULL), 1, "NULL equals NULL");
@@ -240,7 +243,8 @@ TEST(node_equals_different_children_count) {
     add_child_node(b, child2);
     add_child_node(b, child3);
 
-    ASSERT_EQ(node_equals(a, b), 0, "Different child count should not be equal");
+    ASSERT_EQ(node_equals(a, b), 0,
+              "Different child count should not be equal");
 
     free_node_tree(a);
     free_node_tree(b);
@@ -248,7 +252,8 @@ TEST(node_equals_different_children_count) {
 
 /* ============================================================================
  * ROUND-TRIP TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(round_trip_simple_command) {
     const char *input = "echo hello";
@@ -383,7 +388,8 @@ TEST(round_trip_while_loop) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running node_to_source.c tests...\n\n");

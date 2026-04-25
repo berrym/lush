@@ -13,11 +13,10 @@
 #ifndef REDIRECTION_H
 #define REDIRECTION_H
 
+#include "executor.h"
 #include "node.h"
 
 #include <stdbool.h>
-#include "executor.h"
-#include "node.h"
 
 /**
  * @brief Set up all redirections for a command

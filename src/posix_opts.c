@@ -43,11 +43,20 @@ static void sync_shell_mode_to_config(shell_mode_t mode) {
     if (config_registry_is_initialized()) {
         const char *mode_str = "lush";
         switch (mode) {
-        case SHELL_MODE_POSIX: mode_str = "posix"; break;
-        case SHELL_MODE_BASH: mode_str = "bash"; break;
-        case SHELL_MODE_ZSH: mode_str = "zsh"; break;
-        case SHELL_MODE_LUSH: mode_str = "lush"; break;
-        case SHELL_MODE_COUNT: break; /* Not a real mode */
+        case SHELL_MODE_POSIX:
+            mode_str = "posix";
+            break;
+        case SHELL_MODE_BASH:
+            mode_str = "bash";
+            break;
+        case SHELL_MODE_ZSH:
+            mode_str = "zsh";
+            break;
+        case SHELL_MODE_LUSH:
+            mode_str = "lush";
+            break;
+        case SHELL_MODE_COUNT:
+            break; /* Not a real mode */
         }
         config_registry_set_string("shell.mode", mode_str);
     }
@@ -236,9 +245,9 @@ void print_command_trace(const char *command) {
  * Maps long option names to their flag pointers and short option characters.
  */
 typedef struct option_mapping {
-    const char *name;  /**< Long option name (e.g., "errexit") */
-    bool *flag;        /**< Pointer to the option flag */
-    char short_opt;    /**< Short option character (e.g., 'e'), 0 if none */
+    const char *name; /**< Long option name (e.g., "errexit") */
+    bool *flag;       /**< Pointer to the option flag */
+    char short_opt;   /**< Short option character (e.g., 'e'), 0 if none */
 } option_mapping_t;
 
 /** @brief Map of option names to flags */
@@ -416,28 +425,32 @@ int builtin_set(char **args) {
                 // Check for shell mode options first (mutually exclusive modes)
                 if (strcmp(args[i], "posix") == 0) {
                     if (!shell_mode_set(SHELL_MODE_POSIX)) {
-                        error_message("set: cannot change shell mode (strict mode enabled)");
+                        error_message("set: cannot change shell mode (strict "
+                                      "mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_POSIX);
                     shell_opts.posix_mode = true;
                 } else if (strcmp(args[i], "bash") == 0) {
                     if (!shell_mode_set(SHELL_MODE_BASH)) {
-                        error_message("set: cannot change shell mode (strict mode enabled)");
+                        error_message("set: cannot change shell mode (strict "
+                                      "mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_BASH);
                     shell_opts.posix_mode = false;
                 } else if (strcmp(args[i], "zsh") == 0) {
                     if (!shell_mode_set(SHELL_MODE_ZSH)) {
-                        error_message("set: cannot change shell mode (strict mode enabled)");
+                        error_message("set: cannot change shell mode (strict "
+                                      "mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_ZSH);
                     shell_opts.posix_mode = false;
                 } else if (strcmp(args[i], "lush") == 0) {
                     if (!shell_mode_set(SHELL_MODE_LUSH)) {
-                        error_message("set: cannot change shell mode (strict mode enabled)");
+                        error_message("set: cannot change shell mode (strict "
+                                      "mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_LUSH);
@@ -472,7 +485,8 @@ int builtin_set(char **args) {
                            option_map[j].name);
                 }
                 // Also show current shell mode
-                printf("set -o %s  (shell mode)\n", shell_mode_name(shell_mode_get()));
+                printf("set -o %s  (shell mode)\n",
+                       shell_mode_name(shell_mode_get()));
                 return 0;
             }
         } else if (strcmp(arg, "+o") == 0) {
@@ -485,7 +499,8 @@ int builtin_set(char **args) {
                     strcmp(args[i], "bash") == 0 ||
                     strcmp(args[i], "zsh") == 0) {
                     if (!shell_mode_set(SHELL_MODE_LUSH)) {
-                        error_message("set: cannot change shell mode (strict mode enabled)");
+                        error_message("set: cannot change shell mode (strict "
+                                      "mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_LUSH);
@@ -524,7 +539,8 @@ int builtin_set(char **args) {
                            option_map[j].name);
                 }
                 // Also show current shell mode
-                printf("set -o %s  (shell mode)\n", shell_mode_name(shell_mode_get()));
+                printf("set -o %s  (shell mode)\n",
+                       shell_mode_name(shell_mode_get()));
                 return 0;
             }
         } else if (strcmp(arg, "--") == 0) {

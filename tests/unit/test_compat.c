@@ -91,7 +91,8 @@
 
 /* ============================================================================
  * DATABASE INITIALIZATION TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_init_basic) {
     int result = compat_init(NULL);
@@ -122,7 +123,8 @@ TEST(compat_reload) {
 
 /* ============================================================================
  * CATEGORY NAME TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_category_name_builtin) {
     const char *name = compat_category_name(COMPAT_CATEGORY_BUILTIN);
@@ -162,7 +164,8 @@ TEST(compat_category_parse_invalid) {
 
 /* ============================================================================
  * SEVERITY NAME TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_severity_name_info) {
     const char *name = compat_severity_name(COMPAT_SEVERITY_INFO);
@@ -204,7 +207,8 @@ TEST(compat_severity_parse_invalid) {
 
 /* ============================================================================
  * FIX TYPE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_fix_type_name_none) {
     const char *name = compat_fix_type_name(FIX_TYPE_NONE);
@@ -259,7 +263,8 @@ TEST(compat_fix_type_parse_invalid) {
 
 /* ============================================================================
  * TARGET SHELL TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_set_get_target) {
     compat_init(NULL);
@@ -288,7 +293,8 @@ TEST(compat_get_target_default) {
 
 /* ============================================================================
  * STRICT MODE TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_set_strict) {
     compat_init(NULL);
@@ -313,7 +319,8 @@ TEST(compat_is_strict_default) {
 
 /* ============================================================================
  * ENTRY QUERY TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_get_entry_count) {
     compat_init(NULL);
@@ -369,7 +376,8 @@ TEST(compat_get_first_by_feature) {
 
 /* ============================================================================
  * FOREACH ENTRY TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static int foreach_count;
 
@@ -393,7 +401,8 @@ TEST(compat_foreach_entry) {
 
 /* ============================================================================
  * PORTABILITY CHECKING TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_is_portable_simple) {
     compat_init(NULL);
@@ -401,7 +410,7 @@ TEST(compat_is_portable_simple) {
     compat_result_t result;
     bool portable = compat_is_portable("echo hello", SHELL_MODE_POSIX, &result);
     /* Basic echo should be portable */
-    (void)portable;  /* May vary by database content */
+    (void)portable; /* May vary by database content */
 
     compat_cleanup();
 }
@@ -420,8 +429,8 @@ TEST(compat_check_line) {
     compat_init(NULL);
 
     compat_result_t results[10];
-    size_t count = compat_check_line("echo -e 'hello\\n'", SHELL_MODE_POSIX,
-                                     results, 10);
+    size_t count =
+        compat_check_line("echo -e 'hello\\n'", SHELL_MODE_POSIX, results, 10);
     /* May find issues or not depending on database */
     ASSERT(count <= 10, "Should not exceed max results");
 
@@ -441,7 +450,8 @@ TEST(compat_check_script) {
 
 /* ============================================================================
  * EFFECTIVE SEVERITY TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_effective_severity_normal) {
     compat_init(NULL);
@@ -465,7 +475,8 @@ TEST(compat_effective_severity_strict) {
     compat_set_strict(true);
     compat_severity_t sev = compat_effective_severity(&entry);
     /* In strict mode, warnings may be elevated to errors */
-    ASSERT(sev >= COMPAT_SEVERITY_WARNING, "Severity should be at least warning");
+    ASSERT(sev >= COMPAT_SEVERITY_WARNING,
+           "Severity should be at least warning");
 
     compat_set_strict(false);
     compat_cleanup();
@@ -473,15 +484,14 @@ TEST(compat_effective_severity_strict) {
 
 /* ============================================================================
  * FIX TYPE FOR TARGET TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_get_fix_type_for_target) {
-    compat_fix_class_t fix_class = {
-        .posix = FIX_TYPE_SAFE,
-        .bash = FIX_TYPE_UNSAFE,
-        .zsh = FIX_TYPE_MANUAL,
-        .lush = FIX_TYPE_NONE
-    };
+    compat_fix_class_t fix_class = {.posix = FIX_TYPE_SAFE,
+                                    .bash = FIX_TYPE_UNSAFE,
+                                    .zsh = FIX_TYPE_MANUAL,
+                                    .lush = FIX_TYPE_NONE};
 
     fix_type_t type;
 
@@ -500,18 +510,17 @@ TEST(compat_get_fix_type_for_target) {
 
 /* ============================================================================
  * FORMAT RESULT TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_format_result) {
     compat_init(NULL);
 
-    compat_result_t result = {
-        .is_portable = false,
-        .entry = NULL,
-        .target = SHELL_MODE_POSIX,
-        .line = 5,
-        .column = 10
-    };
+    compat_result_t result = {.is_portable = false,
+                              .entry = NULL,
+                              .target = SHELL_MODE_POSIX,
+                              .line = 5,
+                              .column = 10};
 
     char buffer[256];
     int len = compat_format_result(&result, buffer, sizeof(buffer));
@@ -523,7 +532,8 @@ TEST(compat_format_result) {
 
 /* ============================================================================
  * DEBUG FUNCTIONS TESTS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(compat_debug_print_stats) {
     compat_init(NULL);
@@ -544,12 +554,10 @@ TEST(compat_debug_print_stats) {
 TEST(compat_debug_print_entry) {
     compat_init(NULL);
 
-    compat_entry_t entry = {
-        .id = "test_entry",
-        .category = COMPAT_CATEGORY_BUILTIN,
-        .feature = "test",
-        .description = "Test entry"
-    };
+    compat_entry_t entry = {.id = "test_entry",
+                            .category = COMPAT_CATEGORY_BUILTIN,
+                            .feature = "test",
+                            .description = "Test entry"};
 
     FILE *old_stderr = stderr;
     FILE *null_err = fopen("/dev/null", "w");
@@ -565,7 +573,8 @@ TEST(compat_debug_print_entry) {
 
 /* ============================================================================
  * MAIN
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("Running compat.c tests...\n\n");

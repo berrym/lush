@@ -132,17 +132,18 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     results->original_command = strdup(command);
 
     // Temporary array to collect all suggestions from all sources
-    // Each source can contribute up to MAX_CORRECTIONS, then we sort and take best
-    correction_t
-        temp_suggestions[MAX_CORRECTIONS * 4]; // Space for all sources
+    // Each source can contribute up to MAX_CORRECTIONS, then we sort and take
+    // best
+    correction_t temp_suggestions[MAX_CORRECTIONS * 4]; // Space for all sources
     int temp_count = 0;
     int max_per_source = MAX_CORRECTIONS;
 
     // Find builtin suggestions
-    if (autocorrect_config.correct_builtins && temp_count < MAX_CORRECTIONS * 4) {
+    if (autocorrect_config.correct_builtins &&
+        temp_count < MAX_CORRECTIONS * 4) {
         int builtin_count = autocorrect_suggest_builtins(
-            command, &temp_suggestions[temp_count],
-            max_per_source, autocorrect_config.case_sensitive);
+            command, &temp_suggestions[temp_count], max_per_source,
+            autocorrect_config.case_sensitive);
         temp_count += builtin_count;
 
         if (debug_enabled && builtin_count > 0) {
@@ -154,8 +155,8 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     // Find function suggestions
     if (executor && temp_count < MAX_CORRECTIONS * 4) {
         int function_count = autocorrect_suggest_functions(
-            executor, command, &temp_suggestions[temp_count],
-            max_per_source, autocorrect_config.case_sensitive);
+            executor, command, &temp_suggestions[temp_count], max_per_source,
+            autocorrect_config.case_sensitive);
         temp_count += function_count;
 
         if (debug_enabled && function_count > 0) {
@@ -165,10 +166,11 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     }
 
     // Find PATH command suggestions
-    if (autocorrect_config.correct_external && temp_count < MAX_CORRECTIONS * 4) {
+    if (autocorrect_config.correct_external &&
+        temp_count < MAX_CORRECTIONS * 4) {
         int path_count = autocorrect_suggest_path_commands(
-            command, &temp_suggestions[temp_count],
-            max_per_source, autocorrect_config.case_sensitive);
+            command, &temp_suggestions[temp_count], max_per_source,
+            autocorrect_config.case_sensitive);
         temp_count += path_count;
 
         if (debug_enabled && path_count > 0) {
@@ -178,10 +180,11 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     }
 
     // Find history suggestions
-    if (autocorrect_config.learn_from_history && temp_count < MAX_CORRECTIONS * 4) {
+    if (autocorrect_config.learn_from_history &&
+        temp_count < MAX_CORRECTIONS * 4) {
         int history_count = autocorrect_suggest_from_history(
-            command, &temp_suggestions[temp_count],
-            max_per_source, autocorrect_config.case_sensitive);
+            command, &temp_suggestions[temp_count], max_per_source,
+            autocorrect_config.case_sensitive);
         temp_count += history_count;
 
         if (debug_enabled && history_count > 0) {
@@ -193,7 +196,8 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     // Sort suggestions by score (highest first)
     sort_corrections_by_score(temp_suggestions, temp_count);
 
-    // Copy top suggestions to results, filtering by threshold, max count, and duplicates
+    // Copy top suggestions to results, filtering by threshold, max count, and
+    // duplicates
     int max_to_copy = (autocorrect_config.max_suggestions < MAX_CORRECTIONS)
                           ? autocorrect_config.max_suggestions
                           : MAX_CORRECTIONS;
@@ -204,8 +208,8 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
             // Check for duplicates (same command from different sources)
             bool is_duplicate = false;
             for (int j = 0; j < results->count; j++) {
-                if (strcmp(results->suggestions[j].command, 
-                          temp_suggestions[i].command) == 0) {
+                if (strcmp(results->suggestions[j].command,
+                           temp_suggestions[i].command) == 0) {
                     is_duplicate = true;
                     break;
                 }
@@ -549,7 +553,7 @@ int autocorrect_suggest_functions(executor_t *executor, const char *command,
  * which counts transpositions (like gti->git) as 1 edit, not 2.
  *
  * @param s1 First string
- * @param s2 Second string  
+ * @param s2 Second string
  * @param max_dist Maximum distance to consider (returns max_dist+1 if exceeded)
  * @return Edit distance, or max_dist+1 if too different
  */
@@ -558,53 +562,67 @@ static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
     size_t len2 = strlen(s2);
 
     /* Quick length check */
-    if (len1 > 32 || len2 > 32) return max_dist + 1;
+    if (len1 > 32 || len2 > 32)
+        return max_dist + 1;
     int len_diff = (int)len1 - (int)len2;
-    if (len_diff < 0) len_diff = -len_diff;
-    if (len_diff > max_dist) return max_dist + 1;
+    if (len_diff < 0)
+        len_diff = -len_diff;
+    if (len_diff > max_dist)
+        return max_dist + 1;
 
-    /* Full matrix for Damerau-Levenshtein (need prev-prev row for transpositions) */
+    /* Full matrix for Damerau-Levenshtein (need prev-prev row for
+     * transpositions) */
     int matrix[34][34];
-    
-    for (size_t i = 0; i <= len1; i++) matrix[i][0] = (int)i;
-    for (size_t j = 0; j <= len2; j++) matrix[0][j] = (int)j;
+
+    for (size_t i = 0; i <= len1; i++)
+        matrix[i][0] = (int)i;
+    for (size_t j = 0; j <= len2; j++)
+        matrix[0][j] = (int)j;
 
     for (size_t i = 1; i <= len1; i++) {
         int row_min = (int)i;
 
         for (size_t j = 1; j <= len2; j++) {
             /* Case-insensitive comparison */
-            char c1 = s1[i-1];
-            char c2 = s2[j-1];
-            if (c1 >= 'A' && c1 <= 'Z') c1 += 32;
-            if (c2 >= 'A' && c2 <= 'Z') c2 += 32;
+            char c1 = s1[i - 1];
+            char c2 = s2[j - 1];
+            if (c1 >= 'A' && c1 <= 'Z')
+                c1 += 32;
+            if (c2 >= 'A' && c2 <= 'Z')
+                c2 += 32;
 
             int cost = (c1 == c2) ? 0 : 1;
-            int del = matrix[i-1][j] + 1;
-            int ins = matrix[i][j-1] + 1;
-            int sub = matrix[i-1][j-1] + cost;
+            int del = matrix[i - 1][j] + 1;
+            int ins = matrix[i][j - 1] + 1;
+            int sub = matrix[i - 1][j - 1] + cost;
 
-            int min_val = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
+            int min_val =
+                del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
 
             /* Check for transposition (Damerau extension) */
             if (i > 1 && j > 1) {
-                char prev_c1 = s1[i-2];
-                char prev_c2 = s2[j-2];
-                if (prev_c1 >= 'A' && prev_c1 <= 'Z') prev_c1 += 32;
-                if (prev_c2 >= 'A' && prev_c2 <= 'Z') prev_c2 += 32;
+                char prev_c1 = s1[i - 2];
+                char prev_c2 = s2[j - 2];
+                if (prev_c1 >= 'A' && prev_c1 <= 'Z')
+                    prev_c1 += 32;
+                if (prev_c2 >= 'A' && prev_c2 <= 'Z')
+                    prev_c2 += 32;
 
                 if (c1 == prev_c2 && c2 == prev_c1) {
-                    int trans = matrix[i-2][j-2] + 1;
-                    if (trans < min_val) min_val = trans;
+                    int trans = matrix[i - 2][j - 2] + 1;
+                    if (trans < min_val)
+                        min_val = trans;
                 }
             }
 
             matrix[i][j] = min_val;
-            if (min_val < row_min) row_min = min_val;
+            if (min_val < row_min)
+                row_min = min_val;
         }
 
         /* Early termination if entire row exceeds threshold */
-        if (row_min > max_dist) return max_dist + 1;
+        if (row_min > max_dist)
+            return max_dist + 1;
     }
 
     return matrix[len1][len2];
@@ -627,7 +645,7 @@ int autocorrect_suggest_path_commands(const char *command,
 
     /* Pre-filter threshold: commands within 3 edits are candidates */
     const int prefilter_max_dist = 3;
-    
+
     /* Collect more candidates than requested, then sort and take best.
      * Use local array to avoid overflowing caller's buffer. */
     const int max_candidates = 50;
@@ -649,8 +667,8 @@ int autocorrect_suggest_path_commands(const char *command,
             }
 
             /* Fast pre-filter: skip if edit distance > threshold */
-            int edit_dist = fast_edit_distance(command, entry->d_name, 
-                                               prefilter_max_dist);
+            int edit_dist =
+                fast_edit_distance(command, entry->d_name, prefilter_max_dist);
             if (edit_dist > prefilter_max_dist) {
                 continue;
             }
@@ -659,7 +677,8 @@ int autocorrect_suggest_path_commands(const char *command,
             snprintf(full_path, sizeof(full_path), "%s/%s", dir, entry->d_name);
 
             if (is_executable_file(full_path)) {
-                /* Full Unicode-aware scoring for candidates that passed pre-filter */
+                /* Full Unicode-aware scoring for candidates that passed
+                 * pre-filter */
                 int score = autocorrect_similarity_score(command, entry->d_name,
                                                          case_sensitive);
 
@@ -682,7 +701,8 @@ int autocorrect_suggest_path_commands(const char *command,
     sort_corrections_by_score(candidates, candidate_count);
 
     /* Copy top results to caller's buffer */
-    int result_count = candidate_count < max_suggestions ? candidate_count : max_suggestions;
+    int result_count =
+        candidate_count < max_suggestions ? candidate_count : max_suggestions;
     for (int i = 0; i < result_count; i++) {
         suggestions[i] = candidates[i];
     }
@@ -800,7 +820,8 @@ void autocorrect_set_debug(bool enabled) { debug_enabled = enabled; }
 
 /* ============================================================================
  * Internal Helper Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Sort correction suggestions by score in descending order.

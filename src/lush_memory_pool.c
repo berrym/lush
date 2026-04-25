@@ -50,41 +50,49 @@ static size_t malloc_fallback_capacity = 0;
  * @return true on success, false on failure
  */
 static bool track_malloc_fallback(void *ptr) {
-    if (!ptr) return false;
-    
+    if (!ptr)
+        return false;
+
     // Initialize array on first use
     if (!malloc_fallback_ptrs) {
-        malloc_fallback_ptrs = malloc(INITIAL_FALLBACK_CAPACITY * sizeof(void *));
-        if (!malloc_fallback_ptrs) return false;
+        malloc_fallback_ptrs =
+            malloc(INITIAL_FALLBACK_CAPACITY * sizeof(void *));
+        if (!malloc_fallback_ptrs)
+            return false;
         malloc_fallback_capacity = INITIAL_FALLBACK_CAPACITY;
         malloc_fallback_count = 0;
     }
-    
+
     // Grow array if needed
     if (malloc_fallback_count >= malloc_fallback_capacity) {
         size_t new_capacity = malloc_fallback_capacity * 2;
-        void **new_ptrs = realloc(malloc_fallback_ptrs, new_capacity * sizeof(void *));
-        if (!new_ptrs) return false;
+        void **new_ptrs =
+            realloc(malloc_fallback_ptrs, new_capacity * sizeof(void *));
+        if (!new_ptrs)
+            return false;
         malloc_fallback_ptrs = new_ptrs;
         malloc_fallback_capacity = new_capacity;
     }
-    
+
     malloc_fallback_ptrs[malloc_fallback_count++] = ptr;
     return true;
 }
 
 /**
- * @brief Untrack a malloc fallback allocation (called when freed before shutdown)
+ * @brief Untrack a malloc fallback allocation (called when freed before
+ * shutdown)
  * @param ptr Pointer to untrack
  * @return true if found and removed, false if not found
  */
 static bool untrack_malloc_fallback(void *ptr) {
-    if (!ptr || !malloc_fallback_ptrs) return false;
-    
+    if (!ptr || !malloc_fallback_ptrs)
+        return false;
+
     for (size_t i = 0; i < malloc_fallback_count; i++) {
         if (malloc_fallback_ptrs[i] == ptr) {
             // Move last element to this position (order doesn't matter)
-            malloc_fallback_ptrs[i] = malloc_fallback_ptrs[--malloc_fallback_count];
+            malloc_fallback_ptrs[i] =
+                malloc_fallback_ptrs[--malloc_fallback_count];
             return true;
         }
     }
@@ -95,14 +103,15 @@ static bool untrack_malloc_fallback(void *ptr) {
  * @brief Free all tracked malloc fallback allocations during shutdown
  */
 static void free_all_malloc_fallbacks(void) {
-    if (!malloc_fallback_ptrs) return;
-    
+    if (!malloc_fallback_ptrs)
+        return;
+
     for (size_t i = 0; i < malloc_fallback_count; i++) {
         if (malloc_fallback_ptrs[i]) {
             free(malloc_fallback_ptrs[i]);
         }
     }
-    
+
     free(malloc_fallback_ptrs);
     malloc_fallback_ptrs = NULL;
     malloc_fallback_count = 0;
@@ -181,9 +190,8 @@ static void set_last_error(lush_pool_error_t error) {
  * @param initial_blocks Number of blocks to pre-allocate
  * @return LUSH_POOL_SUCCESS on success, error code on failure
  */
-static lush_pool_error_t init_single_pool(lush_pool_t *pool,
-                                            size_t block_size,
-                                            size_t initial_blocks) {
+static lush_pool_error_t init_single_pool(lush_pool_t *pool, size_t block_size,
+                                          size_t initial_blocks) {
     if (!pool || block_size == 0 || initial_blocks == 0) {
         return LUSH_POOL_ERROR_INVALID_SIZE;
     }
@@ -271,7 +279,8 @@ static void cleanup_single_pool(lush_pool_t *pool) {
 /**
  * @brief Find the appropriate pool for a given size
  * @param size The allocation size to find a pool for
- * @return Pool type that can accommodate the size, or LUSH_POOL_COUNT if too large
+ * @return Pool type that can accommodate the size, or LUSH_POOL_COUNT if too
+ * large
  */
 static lush_pool_size_t find_pool_for_size(size_t size) {
     for (int i = 0; i < LUSH_POOL_COUNT; i++) {
@@ -364,7 +373,8 @@ static bool return_to_pool(lush_pool_t *pool, void *ptr) {
 
 /**
  * @brief Update global statistics after an allocation
- * @param pool_hit Whether the allocation came from a pool (true) or malloc (false)
+ * @param pool_hit Whether the allocation came from a pool (true) or malloc
+ * (false)
  * @param size Size of the allocation in bytes
  * @param allocation_time_ns Time taken for the allocation in nanoseconds
  */
@@ -568,7 +578,7 @@ void *lush_pool_alloc(size_t size) {
         if (fallback_count < 100) {
             fallback_sizes[fallback_count++] = size;
         }
-        
+
         // Track pointer for cleanup during shutdown
         if (result) {
             track_malloc_fallback(result);
@@ -585,8 +595,7 @@ void *lush_pool_alloc(size_t size) {
 
     pthread_mutex_unlock(&pool_mutex);
 
-    set_last_error(result ? LUSH_POOL_SUCCESS
-                          : LUSH_POOL_ERROR_MALLOC_FAILED);
+    set_last_error(result ? LUSH_POOL_SUCCESS : LUSH_POOL_ERROR_MALLOC_FAILED);
     return result;
 }
 
@@ -646,7 +655,7 @@ void lush_pool_free(void *ptr) {
         pthread_mutex_lock(&pool_mutex);
         untrack_malloc_fallback(ptr);
         pthread_mutex_unlock(&pool_mutex);
-        
+
         uintptr_t ptr_addr =
             (uintptr_t)ptr; // Save address as integer before free
         free(ptr);
@@ -1003,11 +1012,13 @@ lush_pool_error_t lush_pool_get_last_error(void) { return last_error; }
 /**
  * @brief Get pool memory usage for display performance reporting
  * @param pool_bytes Pointer to store current pool usage in bytes (may be NULL)
- * @param malloc_bytes Pointer to store malloc fallback usage in bytes (may be NULL)
- * @param pool_efficiency Pointer to store pool hit rate percentage (may be NULL)
+ * @param malloc_bytes Pointer to store malloc fallback usage in bytes (may be
+ * NULL)
+ * @param pool_efficiency Pointer to store pool hit rate percentage (may be
+ * NULL)
  */
 void lush_pool_get_memory_usage(uint64_t *pool_bytes, uint64_t *malloc_bytes,
-                                  double *pool_efficiency) {
+                                double *pool_efficiency) {
     if (!global_memory_pool) {
         if (pool_bytes)
             *pool_bytes = 0;

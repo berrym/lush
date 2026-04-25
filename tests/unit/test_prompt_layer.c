@@ -10,13 +10,13 @@
  * any prompt structure without requiring parsing or modification.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
-#include "display/prompt_layer.h"
 #include "display/layer_events.h"
+#include "display/prompt_layer.h"
 
 /* Helper to create an initialized event system for tests */
 static layer_event_system_t *create_test_event_system(void) {
@@ -31,49 +31,57 @@ static layer_event_system_t *create_test_event_system(void) {
 static int tests_run = 0;
 static int tests_passed = 0;
 
-#define ASSERT(cond) do { \
-    if (!(cond)) { \
-        printf("  FAIL: %s (line %d)\n", #cond, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if ((a) != (b)) { \
-        printf("  FAIL: %s != %s (%d != %d) (line %d)\n", #a, #b, (int)(a), (int)(b), __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_EQ(a, b)                                                        \
+    do {                                                                       \
+        if ((a) != (b)) {                                                      \
+            printf("  FAIL: %s != %s (%d != %d) (line %d)\n", #a, #b,          \
+                   (int)(a), (int)(b), __LINE__);                              \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NOT_NULL(ptr) do { \
-    if ((ptr) == NULL) { \
-        printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NOT_NULL(ptr)                                                   \
+    do {                                                                       \
+        if ((ptr) == NULL) {                                                   \
+            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NULL(ptr) do { \
-    if ((ptr) != NULL) { \
-        printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NULL(ptr)                                                       \
+    do {                                                                       \
+        if ((ptr) != NULL) {                                                   \
+            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_STR_EQ(a, b) do { \
-    if (strcmp((a), (b)) != 0) { \
-        printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b), __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_STR_EQ(a, b)                                                    \
+    do {                                                                       \
+        if (strcmp((a), (b)) != 0) {                                           \
+            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
+                   __LINE__);                                                  \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define RUN_TEST(test) do { \
-    printf("  Running %s...\n", #test); \
-    tests_run++; \
-    if (test()) { \
-        tests_passed++; \
-        printf("  PASS: %s\n", #test); \
-    } \
-} while(0)
+#define RUN_TEST(test)                                                         \
+    do {                                                                       \
+        printf("  Running %s...\n", #test);                                    \
+        tests_run++;                                                           \
+        if (test()) {                                                          \
+            tests_passed++;                                                    \
+            printf("  PASS: %s\n", #test);                                     \
+        }                                                                      \
+    } while (0)
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -87,70 +95,80 @@ static int test_error_string_success(void) {
 }
 
 static int test_error_string_invalid_param(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_INVALID_PARAM);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_INVALID_PARAM);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_null_pointer(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_NULL_POINTER);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_NULL_POINTER);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_memory_allocation(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_MEMORY_ALLOCATION);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_MEMORY_ALLOCATION);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_buffer_too_small(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_BUFFER_TOO_SMALL);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_BUFFER_TOO_SMALL);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_content_too_large(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_CONTENT_TOO_LARGE);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_CONTENT_TOO_LARGE);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_theme_not_available(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_THEME_NOT_AVAILABLE);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_THEME_NOT_AVAILABLE);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_event_system_failure(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_EVENT_SYSTEM_FAILURE);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_EVENT_SYSTEM_FAILURE);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_rendering_failure(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_RENDERING_FAILURE);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_RENDERING_FAILURE);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_invalid_state(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_INVALID_STATE);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_INVALID_STATE);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
 }
 
 static int test_error_string_performance_timeout(void) {
-    const char *msg = prompt_layer_error_string(PROMPT_LAYER_ERROR_PERFORMANCE_TIMEOUT);
+    const char *msg =
+        prompt_layer_error_string(PROMPT_LAYER_ERROR_PERFORMANCE_TIMEOUT);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     return 1;
@@ -224,11 +242,11 @@ static int test_create_returns_valid_layer(void) {
 static int test_create_initializes_disabled(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     /* Layer should start disabled until initialized */
     ASSERT_EQ(layer->initialized, false);
     ASSERT_EQ(layer->enabled, false);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -236,11 +254,11 @@ static int test_create_initializes_disabled(void) {
 static int test_create_initializes_content_null(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     /* Content pointers should be NULL initially */
     ASSERT_NULL(layer->raw_content);
     ASSERT_NULL(layer->rendered_content);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -254,7 +272,7 @@ static int test_destroy_null_layer(void) {
 static int test_destroy_twice(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     prompt_layer_destroy(layer);
     /* Second call with same pointer would be undefined, but we test
        that the first destroy doesn't crash */
@@ -274,12 +292,12 @@ static int test_init_null_layer(void) {
 static int test_init_null_events(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     /* Init with NULL events returns INVALID_PARAM - events are required */
     prompt_layer_error_t result = prompt_layer_init(layer, NULL);
     ASSERT_EQ(result, PROMPT_LAYER_ERROR_INVALID_PARAM);
     ASSERT_EQ(layer->initialized, false);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -287,14 +305,14 @@ static int test_init_null_events(void) {
 static int test_init_with_events(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_error_t result = prompt_layer_init(layer, events);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT_EQ(layer->initialized, true);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -303,16 +321,16 @@ static int test_init_with_events(void) {
 static int test_init_sets_initialized_flag(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     ASSERT_EQ(layer->initialized, false);
-    
+
     prompt_layer_init(layer, events);
-    
+
     ASSERT_EQ(layer->initialized, true);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -321,16 +339,16 @@ static int test_init_sets_initialized_flag(void) {
 static int test_init_enables_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     ASSERT_EQ(layer->enabled, false);
-    
+
     prompt_layer_init(layer, events);
-    
+
     ASSERT_EQ(layer->enabled, true);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -349,11 +367,11 @@ static int test_cleanup_null_layer(void) {
 static int test_cleanup_uninitialized_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     /* Cleanup should work even if not initialized */
     prompt_layer_error_t result = prompt_layer_cleanup(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -361,13 +379,13 @@ static int test_cleanup_uninitialized_layer(void) {
 static int test_cleanup_twice(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     prompt_layer_cleanup(layer);
-    
+
     /* Second cleanup should also be safe */
     prompt_layer_error_t result = prompt_layer_cleanup(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -375,17 +393,17 @@ static int test_cleanup_twice(void) {
 static int test_cleanup_initialized_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
     ASSERT_EQ(layer->initialized, true);
-    
+
     prompt_layer_error_t result = prompt_layer_cleanup(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT_EQ(layer->initialized, false);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -404,15 +422,15 @@ static int test_set_content_null_layer(void) {
 static int test_set_content_null_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_error_t result = prompt_layer_set_content(layer, NULL);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -421,11 +439,11 @@ static int test_set_content_null_content(void) {
 static int test_set_content_uninitialized_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     /* Uninitialized layer should return INVALID_STATE */
     prompt_layer_error_t result = prompt_layer_set_content(layer, "$ ");
     ASSERT_EQ(result, PROMPT_LAYER_ERROR_INVALID_STATE);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -433,16 +451,16 @@ static int test_set_content_uninitialized_layer(void) {
 static int test_set_content_empty_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     /* Empty content should be allowed */
     prompt_layer_error_t result = prompt_layer_set_content(layer, "");
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -451,19 +469,19 @@ static int test_set_content_empty_content(void) {
 static int test_set_content_simple_prompt(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_error_t result = prompt_layer_set_content(layer, "$ ");
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     /* Content should be stored */
     ASSERT_NOT_NULL(layer->raw_content);
     ASSERT_STR_EQ(layer->raw_content, "$ ");
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -472,19 +490,20 @@ static int test_set_content_simple_prompt(void) {
 static int test_set_content_complex_prompt(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     const char *complex_prompt = "[user@host ~/path]$ ";
-    prompt_layer_error_t result = prompt_layer_set_content(layer, complex_prompt);
+    prompt_layer_error_t result =
+        prompt_layer_set_content(layer, complex_prompt);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     ASSERT_NOT_NULL(layer->raw_content);
     ASSERT_STR_EQ(layer->raw_content, complex_prompt);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -493,19 +512,20 @@ static int test_set_content_complex_prompt(void) {
 static int test_set_content_multiline_prompt(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     const char *multiline_prompt = "line1\nline2\n$ ";
-    prompt_layer_error_t result = prompt_layer_set_content(layer, multiline_prompt);
+    prompt_layer_error_t result =
+        prompt_layer_set_content(layer, multiline_prompt);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     ASSERT_NOT_NULL(layer->raw_content);
     ASSERT_STR_EQ(layer->raw_content, multiline_prompt);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -514,19 +534,19 @@ static int test_set_content_multiline_prompt(void) {
 static int test_set_content_with_ansi(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     const char *ansi_prompt = "\033[32muser\033[0m@\033[34mhost\033[0m $ ";
     prompt_layer_error_t result = prompt_layer_set_content(layer, ansi_prompt);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     ASSERT_NOT_NULL(layer->raw_content);
     ASSERT_STR_EQ(layer->raw_content, ansi_prompt);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -535,18 +555,18 @@ static int test_set_content_with_ansi(void) {
 static int test_set_content_marks_dirty(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     layer->content_dirty = false;
-    
+
     prompt_layer_set_content(layer, "$ ");
-    
+
     ASSERT_EQ(layer->content_dirty, true);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -555,17 +575,17 @@ static int test_set_content_marks_dirty(void) {
 static int test_set_content_replaces_existing(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "old$ ");
     prompt_layer_set_content(layer, "new$ ");
-    
+
     ASSERT_STR_EQ(layer->raw_content, "new$ ");
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -574,19 +594,19 @@ static int test_set_content_replaces_existing(void) {
 static int test_set_content_ascii_art_prompt(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     const char *ascii_art = "┌─[user@host]─[~/path]\n└─$ ";
     prompt_layer_error_t result = prompt_layer_set_content(layer, ascii_art);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     ASSERT_NOT_NULL(layer->raw_content);
     ASSERT_STR_EQ(layer->raw_content, ascii_art);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -595,19 +615,20 @@ static int test_set_content_ascii_art_prompt(void) {
 static int test_set_content_unicode_prompt(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     const char *unicode_prompt = "λ ~/code » ";
-    prompt_layer_error_t result = prompt_layer_set_content(layer, unicode_prompt);
+    prompt_layer_error_t result =
+        prompt_layer_set_content(layer, unicode_prompt);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     ASSERT_NOT_NULL(layer->raw_content);
     ASSERT_STR_EQ(layer->raw_content, unicode_prompt);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -619,8 +640,8 @@ static int test_set_content_unicode_prompt(void) {
 
 static int test_get_rendered_content_null_layer(void) {
     char output[256];
-    prompt_layer_error_t result = prompt_layer_get_rendered_content(
-        NULL, output, sizeof(output));
+    prompt_layer_error_t result =
+        prompt_layer_get_rendered_content(NULL, output, sizeof(output));
     ASSERT(result != PROMPT_LAYER_SUCCESS);
     return 1;
 }
@@ -628,16 +649,16 @@ static int test_get_rendered_content_null_layer(void) {
 static int test_get_rendered_content_null_output(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
-    prompt_layer_error_t result = prompt_layer_get_rendered_content(
-        layer, NULL, 256);
+
+    prompt_layer_error_t result =
+        prompt_layer_get_rendered_content(layer, NULL, 256);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -646,17 +667,17 @@ static int test_get_rendered_content_null_output(void) {
 static int test_get_rendered_content_zero_size(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     char output[256];
-    prompt_layer_error_t result = prompt_layer_get_rendered_content(
-        layer, output, 0);
+    prompt_layer_error_t result =
+        prompt_layer_get_rendered_content(layer, output, 0);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -665,18 +686,18 @@ static int test_get_rendered_content_zero_size(void) {
 static int test_get_rendered_content_no_content_set(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     char output[256];
-    prompt_layer_error_t result = prompt_layer_get_rendered_content(
-        layer, output, sizeof(output));
+    prompt_layer_error_t result =
+        prompt_layer_get_rendered_content(layer, output, sizeof(output));
     /* May return empty string or error - implementation dependent */
     (void)result;
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -685,21 +706,21 @@ static int test_get_rendered_content_no_content_set(void) {
 static int test_get_rendered_content_basic(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "$ ");
-    
+
     char output[256];
-    prompt_layer_error_t result = prompt_layer_get_rendered_content(
-        layer, output, sizeof(output));
-    
+    prompt_layer_error_t result =
+        prompt_layer_get_rendered_content(layer, output, sizeof(output));
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT(strlen(output) > 0);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -708,23 +729,24 @@ static int test_get_rendered_content_basic(void) {
 static int test_get_rendered_content_preserves_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     const char *prompt = "[test]$ ";
     prompt_layer_set_content(layer, prompt);
-    
+
     char output[256];
-    prompt_layer_error_t result = prompt_layer_get_rendered_content(
-        layer, output, sizeof(output));
-    
+    prompt_layer_error_t result =
+        prompt_layer_get_rendered_content(layer, output, sizeof(output));
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    /* Output should contain the original content (possibly with theme colors) */
+    /* Output should contain the original content (possibly with theme colors)
+     */
     ASSERT(strstr(output, "test") != NULL || strstr(output, "$") != NULL);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -733,20 +755,20 @@ static int test_get_rendered_content_preserves_content(void) {
 static int test_get_rendered_content_buffer_too_small(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "this is a long prompt $ ");
-    
-    char output[5];  /* Too small */
-    prompt_layer_error_t result = prompt_layer_get_rendered_content(
-        layer, output, sizeof(output));
-    
+
+    char output[5]; /* Too small */
+    prompt_layer_error_t result =
+        prompt_layer_get_rendered_content(layer, output, sizeof(output));
+
     ASSERT_EQ(result, PROMPT_LAYER_ERROR_BUFFER_TOO_SMALL);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -766,15 +788,15 @@ static int test_get_metrics_null_layer(void) {
 static int test_get_metrics_null_metrics(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, NULL);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -783,17 +805,17 @@ static int test_get_metrics_null_metrics(void) {
 static int test_get_metrics_no_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_metrics_t metrics;
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
     /* Should succeed with zeroed metrics or return error */
     (void)result;
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -802,22 +824,22 @@ static int test_get_metrics_no_content(void) {
 static int test_get_metrics_simple_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "$ ");
-    
+
     prompt_metrics_t metrics;
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
-    
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT_EQ(metrics.line_count, 1);
     ASSERT(metrics.max_line_width >= 2);
     ASSERT_EQ(metrics.is_multiline, false);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -826,21 +848,21 @@ static int test_get_metrics_simple_content(void) {
 static int test_get_metrics_multiline_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "line1\nline2\n$ ");
-    
+
     prompt_metrics_t metrics;
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
-    
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT(metrics.line_count >= 2);
     ASSERT_EQ(metrics.is_multiline, true);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -849,20 +871,20 @@ static int test_get_metrics_multiline_content(void) {
 static int test_get_metrics_detects_ansi(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "\033[32mgreen\033[0m$ ");
-    
+
     prompt_metrics_t metrics;
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
-    
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT_EQ(metrics.has_ansi_sequences, true);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -871,20 +893,20 @@ static int test_get_metrics_detects_ansi(void) {
 static int test_get_metrics_no_ansi(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "plain$ ");
-    
+
     prompt_metrics_t metrics;
     prompt_layer_error_t result = prompt_layer_get_metrics(layer, &metrics);
-    
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT_EQ(metrics.has_ansi_sequences, false);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -903,11 +925,11 @@ static int test_update_theme_null_layer(void) {
 static int test_update_theme_uninitialized(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     /* Should return error for uninitialized layer */
     prompt_layer_error_t result = prompt_layer_update_theme(layer);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -915,15 +937,15 @@ static int test_update_theme_uninitialized(void) {
 static int test_update_theme_initialized(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_error_t result = prompt_layer_update_theme(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -942,11 +964,11 @@ static int test_force_render_null_layer(void) {
 static int test_force_render_uninitialized(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     /* Force render on uninitialized layer should fail */
     prompt_layer_error_t result = prompt_layer_force_render(layer);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -954,17 +976,17 @@ static int test_force_render_uninitialized(void) {
 static int test_force_render_no_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     /* Force render with no content */
     prompt_layer_error_t result = prompt_layer_force_render(layer);
     /* May succeed with empty render or return error */
     (void)result;
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -973,17 +995,17 @@ static int test_force_render_no_content(void) {
 static int test_force_render_with_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "$ ");
-    
+
     prompt_layer_error_t result = prompt_layer_force_render(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -992,19 +1014,19 @@ static int test_force_render_with_content(void) {
 static int test_force_render_clears_dirty_flag(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "$ ");
     ASSERT_EQ(layer->content_dirty, true);
-    
+
     prompt_layer_force_render(layer);
-    
+
     ASSERT_EQ(layer->content_dirty, false);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1024,15 +1046,15 @@ static int test_get_performance_null_layer(void) {
 static int test_get_performance_null_performance(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_error_t result = prompt_layer_get_performance(layer, NULL);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1041,19 +1063,19 @@ static int test_get_performance_null_performance(void) {
 static int test_get_performance_new_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_performance_t perf;
     prompt_layer_error_t result = prompt_layer_get_performance(layer, &perf);
-    
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     /* New layer should have zero render count */
     ASSERT_EQ(perf.render_count, 0);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1062,23 +1084,23 @@ static int test_get_performance_new_layer(void) {
 static int test_get_performance_after_render(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "$ ");
-    
+
     char output[256];
     prompt_layer_get_rendered_content(layer, output, sizeof(output));
-    
+
     prompt_performance_t perf;
     prompt_layer_error_t result = prompt_layer_get_performance(layer, &perf);
-    
+
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
     ASSERT(perf.render_count >= 1);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1097,27 +1119,27 @@ static int test_reset_performance_null_layer(void) {
 static int test_reset_performance_valid(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     /* Do some renders to accumulate stats */
     prompt_layer_set_content(layer, "$ ");
     char output[256];
     prompt_layer_get_rendered_content(layer, output, sizeof(output));
-    
+
     prompt_layer_error_t result = prompt_layer_reset_performance(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     /* Verify counters are zero */
     prompt_performance_t perf;
     prompt_layer_get_performance(layer, &perf);
     ASSERT_EQ(perf.render_count, 0);
     ASSERT_EQ(perf.cache_hits, 0);
     ASSERT_EQ(perf.cache_misses, 0);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1136,15 +1158,15 @@ static int test_optimize_null_layer(void) {
 static int test_optimize_valid(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_error_t result = prompt_layer_optimize(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1153,17 +1175,17 @@ static int test_optimize_valid(void) {
 static int test_optimize_with_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "$ ");
-    
+
     prompt_layer_error_t result = prompt_layer_optimize(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1182,16 +1204,16 @@ static int test_process_events_null_layer(void) {
 static int test_process_events_with_events(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     /* Process events with valid event system */
     prompt_layer_error_t result = prompt_layer_process_events(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1210,10 +1232,10 @@ static int test_validate_null_layer(void) {
 static int test_validate_new_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     prompt_layer_error_t result = prompt_layer_validate(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -1221,15 +1243,15 @@ static int test_validate_new_layer(void) {
 static int test_validate_initialized_layer(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_error_t result = prompt_layer_validate(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1238,17 +1260,17 @@ static int test_validate_initialized_layer(void) {
 static int test_validate_with_content(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     layer_event_system_t *events = create_test_event_system();
     ASSERT_NOT_NULL(events);
-    
+
     prompt_layer_init(layer, events);
-    
+
     prompt_layer_set_content(layer, "$ ");
-    
+
     prompt_layer_error_t result = prompt_layer_validate(layer);
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     layer_events_destroy(events);
     return 1;
@@ -1267,10 +1289,10 @@ static int test_generate_from_lush_null_layer(void) {
 static int test_generate_from_lush_uninitialized(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     prompt_layer_error_t result = prompt_layer_generate_from_lush(layer);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }
@@ -1288,10 +1310,10 @@ static int test_run_tests_null_layer(void) {
 static int test_run_tests_uninitialized(void) {
     prompt_layer_t *layer = prompt_layer_create();
     ASSERT_NOT_NULL(layer);
-    
+
     prompt_layer_error_t result = prompt_layer_run_tests(layer);
     ASSERT(result != PROMPT_LAYER_SUCCESS);
-    
+
     prompt_layer_destroy(layer);
     return 1;
 }

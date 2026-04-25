@@ -26,16 +26,17 @@ typedef struct symvar symvar_t;
 
 // Variable types
 typedef enum {
-    SYMVAR_STRING,  // Regular string variable
-    SYMVAR_INTEGER, // Integer variable (for arithmetic)
-    SYMVAR_ARRAY,   // Array variable (bash extension)
+    SYMVAR_STRING,   // Regular string variable
+    SYMVAR_INTEGER,  // Integer variable (for arithmetic)
+    SYMVAR_ARRAY,    // Array variable (bash extension)
     SYMVAR_FUNCTION, // Function definition
-    SYMVAR_NAMEREF  // Nameref variable (reference to another variable)
+    SYMVAR_NAMEREF   // Nameref variable (reference to another variable)
 } symvar_type_t;
 
 /* ============================================================================
  * ARRAY VALUE STORAGE (Phase 1: Extended Language Support)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Array value storage structure
@@ -45,27 +46,27 @@ typedef enum {
  * Associative arrays use a hash table for key-value storage.
  */
 typedef struct array_value {
-    char **elements;        /**< Sparse array of element values (indexed) */
-    int *indices;           /**< Parallel array of actual indices (for sparse) */
-    size_t count;           /**< Number of elements currently stored */
-    size_t capacity;        /**< Allocated capacity for elements/indices */
-    size_t max_index;       /**< Highest index used (for ${#arr[@]}) */
-    bool is_associative;    /**< True if associative array (declare -A) */
+    char **elements;     /**< Sparse array of element values (indexed) */
+    int *indices;        /**< Parallel array of actual indices (for sparse) */
+    size_t count;        /**< Number of elements currently stored */
+    size_t capacity;     /**< Allocated capacity for elements/indices */
+    size_t max_index;    /**< Highest index used (for ${#arr[@]}) */
+    bool is_associative; /**< True if associative array (declare -A) */
     ht_strstr_t *assoc_map; /**< Hash table for associative arrays */
 } array_value_t;
 
 // Variable flags
 typedef enum {
     SYMVAR_NONE = 0,
-    SYMVAR_EXPORTED = (1 << 0),    // Variable is exported to environment
-    SYMVAR_READONLY = (1 << 1),    // Variable is read-only
-    SYMVAR_LOCAL = (1 << 2),       // Variable is local to current scope
-    SYMVAR_SPECIAL_VAR = (1 << 3), // Special system variable
-    SYMVAR_UNSET = (1 << 4),       // Variable is explicitly unset
+    SYMVAR_EXPORTED = (1 << 0),     // Variable is exported to environment
+    SYMVAR_READONLY = (1 << 1),     // Variable is read-only
+    SYMVAR_LOCAL = (1 << 2),        // Variable is local to current scope
+    SYMVAR_SPECIAL_VAR = (1 << 3),  // Special system variable
+    SYMVAR_UNSET = (1 << 4),        // Variable is explicitly unset
     SYMVAR_NAMEREF_FLAG = (1 << 5), // Variable is a nameref (local -n)
-    SYMVAR_LOWERCASE = (1 << 6),   // Convert value to lowercase (declare -l)
-    SYMVAR_UPPERCASE = (1 << 7),   // Convert value to uppercase (declare -u)
-    SYMVAR_TRACE = (1 << 8)        // Trace attribute (declare -t)
+    SYMVAR_LOWERCASE = (1 << 6),    // Convert value to lowercase (declare -l)
+    SYMVAR_UPPERCASE = (1 << 7),    // Convert value to uppercase (declare -u)
+    SYMVAR_TRACE = (1 << 8)         // Trace attribute (declare -t)
 } symvar_flags_t;
 
 // Scope types for different contexts
@@ -128,7 +129,8 @@ typedef struct {
 
 /* ============================================================================
  * CORE MODERN API
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /* Manager Lifecycle */
 
@@ -283,7 +285,8 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name);
 
 /* ============================================================================
  * NAMEREF SUPPORT (Phase 6: Function Enhancements)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a nameref variable
@@ -330,7 +333,8 @@ bool symtable_is_nameref(symtable_manager_t *manager, const char *name);
  * @param name Variable name
  * @return Variable flags or SYMVAR_NONE if not found
  */
-symvar_flags_t symtable_get_flags(symtable_manager_t *manager, const char *name);
+symvar_flags_t symtable_get_flags(symtable_manager_t *manager,
+                                  const char *name);
 
 /**
  * @brief Set variable flags
@@ -397,7 +401,8 @@ void symtable_dump_all_scopes(symtable_manager_t *manager);
 
 /* ============================================================================
  * CONVENIENCE API (High-level functions for common operations)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get the global symbol table manager
@@ -598,7 +603,8 @@ void symtable_free_environment_array(char **env);
 
 /* ============================================================================
  * CONVENIENCE MACROS
- * ============================================================================ */
+ * ============================================================================
+ */
 
 #define symtable_set(mgr, name, value)                                         \
     symtable_set_var(mgr, name, value, SYMVAR_NONE)
@@ -623,7 +629,8 @@ void symtable_free_environment_array(char **env);
 
 /* ============================================================================
  * SYSTEM INTERFACE (Essential functions for shell operation)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Initialize the global symbol table */
 void init_symtable(void);
@@ -654,7 +661,8 @@ void free_environ_array(char **env);
 
 /* ============================================================================
  * LEGACY COMPATIBILITY (For string management and other subsystems)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /* Legacy flag definitions */
 #define FLAG_EXPORT (1 << 0)
@@ -684,7 +692,8 @@ void symtable_entry_setval(symtable_entry_t *entry, char *val);
 
 /* ============================================================================
  * ENHANCED SYMBOL TABLE (libhashtable implementation)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /* Feature detection */
 bool symtable_libht_available(void);
@@ -710,7 +719,8 @@ int symtable_libht_test(void);
 
 /* ============================================================================
  * OPTIMIZED SYMBOL TABLE (libhashtable v2 implementation)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /* Feature detection */
 bool symtable_opt_available(void);
@@ -736,7 +746,8 @@ int symtable_opt_test(void);
 
 /* ============================================================================
  * SPECIAL VARIABLE API
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Set the current line number for $LINENO
@@ -766,7 +777,8 @@ void symtable_seed_random(unsigned int seed);
 
 /* ============================================================================
  * ARRAY VARIABLE API (Phase 1: Extended Language Support)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a new array value
@@ -791,7 +803,8 @@ void symtable_array_free(array_value_t *array);
  * @param value Element value (will be copied)
  * @return 0 on success, -1 on error
  */
-int symtable_array_set_index(array_value_t *array, int index, const char *value);
+int symtable_array_set_index(array_value_t *array, int index,
+                             const char *value);
 
 /**
  * @brief Get an element from an indexed array

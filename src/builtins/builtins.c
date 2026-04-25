@@ -15,16 +15,13 @@
 #include "alias.h"
 #include "arithmetic.h"
 #include "compat.h"
-#include "lush_fork.h"
-#include "dirstack.h"
 #include "config.h"
 #include "config_registry.h"
 #include "debug.h"
-#include "shell_error.h"
-#include "shell_mode.h"
-#include "display_integration.h"
+#include "dirstack.h"
 #include "display/command_layer.h"
 #include "display/composition_engine.h"
+#include "display_integration.h"
 #include "errors.h"
 #include "executor.h"
 #include "fixer.h"
@@ -45,8 +42,11 @@
 #include "lle/prompt/theme.h"
 #include "lle/prompt/theme_loader.h"
 #include "lush.h"
+#include "lush_fork.h"
 #include "lush_memory_pool.h"
 #include "posix_history.h"
+#include "shell_error.h"
+#include "shell_mode.h"
 #include "signals.h"
 #include "symtable.h"
 
@@ -114,13 +114,13 @@ static void builtin_error(const char *builtin_name, shell_error_code_t code,
     va_list args;
     va_start(args, fmt);
     shell_error_t *error = shell_error_createv(code, SHELL_SEVERITY_ERROR,
-                                                SOURCE_LOC_UNKNOWN, fmt, args);
+                                               SOURCE_LOC_UNKNOWN, fmt, args);
     va_end(args);
 
     if (error) {
         /* Add builtin context */
         shell_error_push_context(error, "in builtin '%s'", builtin_name);
-        
+
         /* Display the error */
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
@@ -165,7 +165,8 @@ builtin builtins[] = {
     {"jobs", "list active jobs", bin_jobs},
     {"fg", "bring job to foreground", bin_fg},
     {"bg", "send job to background", bin_bg},
-    {"disown", "remove jobs from shell or mark to not receive SIGHUP", bin_disown},
+    {"disown", "remove jobs from shell or mark to not receive SIGHUP",
+     bin_disown},
     {"shift", "shift positional parameters", bin_shift},
     {"break", "break out of loops", bin_break},
     {"continue", "continue to next loop iteration", bin_continue},
@@ -200,7 +201,8 @@ builtin builtins[] = {
     {"readarray", "read lines from stdin into array", bin_mapfile},
     {"env", "run command with modified environment", bin_env},
     {"printenv", "print environment variables", bin_env},
-    {"analyze", "full script analysis with info, warnings, and errors", bin_analyze},
+    {"analyze", "full script analysis with info, warnings, and errors",
+     bin_analyze},
     {"lint", "lint scripts and optionally apply automatic fixes", bin_lint},
 };
 
@@ -278,7 +280,8 @@ int bin_help(int argc __attribute__((unused)),
  * maintaining the logical path as entered by the user.
  *
  * @param path The path to canonicalize
- * @return Newly allocated canonicalized path, or NULL on error (caller must free)
+ * @return Newly allocated canonicalized path, or NULL on error (caller must
+ * free)
  */
 static char *canonicalize_logical_path(const char *path) {
     if (!path)
@@ -376,7 +379,7 @@ int bin_cd(int argc __attribute__((unused)),
     // Parse arguments - handle -- as option terminator
     int arg_index = 1;
     if (argc > 1 && strcmp(argv[1], "--") == 0) {
-        arg_index = 2;  // Skip past --
+        arg_index = 2; // Skip past --
     }
 
     if (arg_index >= argc) {
@@ -391,7 +394,8 @@ int bin_cd(int argc __attribute__((unused)),
         if (strcmp(argv[arg_index], "-") == 0) {
             // cd - : go to previous directory
             if (!previous_dir) {
-                builtin_error("cd", SHELL_ERR_UNBOUND_VARIABLE, "OLDPWD not set");
+                builtin_error("cd", SHELL_ERR_UNBOUND_VARIABLE,
+                              "OLDPWD not set");
                 free(current_dir);
                 return 1;
             }
@@ -402,15 +406,17 @@ int bin_cd(int argc __attribute__((unused)),
             target_dir = argv[arg_index];
         }
     } else {
-        builtin_error("cd", SHELL_ERR_TOO_MANY_ARGUMENTS, "usage: cd [pathname | -]");
+        builtin_error("cd", SHELL_ERR_TOO_MANY_ARGUMENTS,
+                      "usage: cd [pathname | -]");
         free(current_dir);
         return 1;
     }
 
     // Attempt to change directory
     if (chdir(target_dir) < 0) {
-        // If chdir failed and cdable_vars is enabled, try treating target as variable name
-        if (shell_mode_allows(FEATURE_CDABLE_VARS) && target_dir[0] != '/' && 
+        // If chdir failed and cdable_vars is enabled, try treating target as
+        // variable name
+        if (shell_mode_allows(FEATURE_CDABLE_VARS) && target_dir[0] != '/' &&
             target_dir[0] != '.' && target_dir[0] != '~') {
             const char *var_value = symtable_get_global(target_dir);
             if (var_value && var_value[0] == '/') {
@@ -752,8 +758,9 @@ int bin_unset(int argc, char **argv) {
     // Unset each variable specified
     for (int i = 1; i < argc; i++) {
         const char *var_name = argv[i];
-        
-        // Resolve nameref if applicable - unset the target, not the nameref itself
+
+        // Resolve nameref if applicable - unset the target, not the nameref
+        // itself
         symtable_manager_t *mgr = symtable_get_global_manager();
         if (mgr && symtable_is_nameref(mgr, var_name)) {
             const char *target = symtable_resolve_nameref(mgr, var_name, 10);
@@ -1380,7 +1387,8 @@ int bin_printf(int argc, char **argv) {
             }
         }
 
-        // If no format specifiers consumed arguments, stop to avoid infinite loop
+        // If no format specifiers consumed arguments, stop to avoid infinite
+        // loop
         if (args_used_this_pass == 0) {
             break;
         }
@@ -1577,7 +1585,7 @@ int bin_source(int argc, char **argv) {
 
         // Parse and execute the complete construct
         int construct_result = parse_and_execute(complete_input);
-        
+
         // Check for return from sourced script (exit code 200+)
         if (construct_result >= 200 && construct_result <= 455) {
             result = construct_result - 200;
@@ -1585,7 +1593,7 @@ int bin_source(int argc, char **argv) {
             free(complete_input);
             break;
         }
-        
+
         if (construct_result != 0) {
             result = construct_result;
         }
@@ -1767,7 +1775,8 @@ static int evaluate_single_test(char **argv, int start, int end) {
             struct stat st;
             return (stat(argv[start + 1], &st) == 0 && st.st_size > 0) ? 0 : 1;
         } else if (strcmp(argv[start], "-t") == 0) {
-            // test -t FD - true if file descriptor is open and refers to a terminal
+            // test -t FD - true if file descriptor is open and refers to a
+            // terminal
             int fd = atoi(argv[start + 1]);
             return isatty(fd) ? 0 : 1;
         }
@@ -2111,24 +2120,24 @@ int bin_read(int argc, char **argv) {
 int bin_mapfile(int argc, char **argv) {
     // Default options
     char delim = '\n';
-    int max_count = 0;  // 0 means read all
+    int max_count = 0; // 0 means read all
     int origin = 0;
     int skip_count = 0;
     bool trim_delim = false;
     int fd = STDIN_FILENO;
     char *callback = NULL;
     int callback_quantum = 5000;
-    
+
     // Default array name
     char *array_name = "MAPFILE";
-    
+
     int opt_index = 1;
-    
+
     // Parse options
-    while (opt_index < argc && argv[opt_index][0] == '-' && 
+    while (opt_index < argc && argv[opt_index][0] == '-' &&
            argv[opt_index][1] != '\0') {
         char *arg = argv[opt_index];
-        
+
         if (strcmp(arg, "-d") == 0) {
             // -d delim: Use delim as delimiter
             if (opt_index + 1 >= argc) {
@@ -2139,7 +2148,7 @@ int bin_mapfile(int argc, char **argv) {
             if (argv[opt_index][0] != '\0') {
                 delim = argv[opt_index][0];
             } else {
-                delim = '\0';  // NUL delimiter
+                delim = '\0'; // NUL delimiter
             }
         } else if (strcmp(arg, "-n") == 0) {
             // -n count: Read at most count lines
@@ -2215,7 +2224,7 @@ int bin_mapfile(int argc, char **argv) {
         }
         opt_index++;
     }
-    
+
     // Get array name if provided
     if (opt_index < argc) {
         array_name = argv[opt_index];
@@ -2224,33 +2233,33 @@ int bin_mapfile(int argc, char **argv) {
             return 1;
         }
     }
-    
+
     // Clear existing array (unless using -O with non-zero origin)
     if (origin == 0) {
         symtable_unset_global(array_name);
     }
-    
+
     // Read lines
     FILE *input = (fd == STDIN_FILENO) ? stdin : fdopen(fd, "r");
     if (!input) {
         error_message("mapfile: cannot open file descriptor %d", fd);
         return 1;
     }
-    
+
     char *line = NULL;
     size_t line_cap = 0;
     ssize_t line_len;
     int lines_read = 0;
     int lines_skipped = 0;
     int array_index = origin;
-    
+
     while ((line_len = getdelim(&line, &line_cap, delim, input)) != -1) {
         // Skip lines if requested
         if (lines_skipped < skip_count) {
             lines_skipped++;
             continue;
         }
-        
+
         // Check max count - but continue reading to consume input
         if (max_count > 0 && lines_read >= max_count) {
             // Consume remaining input to prevent it from being executed
@@ -2259,21 +2268,21 @@ int bin_mapfile(int argc, char **argv) {
             }
             break;
         }
-        
+
         // Trim delimiter if requested
         char *value = line;
         if (trim_delim && line_len > 0 && line[line_len - 1] == delim) {
             line[line_len - 1] = '\0';
         }
-        
+
         // Set array element - convert index to string
         char index_str[32];
         snprintf(index_str, sizeof(index_str), "%d", array_index);
         symtable_set_array_element(array_name, index_str, value);
-        
+
         array_index++;
         lines_read++;
-        
+
         // Execute callback if specified
         if (callback && (lines_read % callback_quantum) == 0) {
             // Execute callback with index and line
@@ -2283,18 +2292,18 @@ int bin_mapfile(int argc, char **argv) {
             // executor_execute_command_line(executor, cmd);
         }
     }
-    
+
     free(line);
-    
+
     // Close fd if we opened it (not stdin)
     if (fd != STDIN_FILENO && input != stdin) {
         fclose(input);
     }
-    
+
     // Suppress unused variable warning
     (void)callback;
     (void)callback_quantum;
-    
+
     return 0;
 }
 
@@ -2395,7 +2404,8 @@ int bin_false(int argc, char **argv) {
  */
 static source_location_t builtin_get_source_location(void) {
     if (current_executor && current_executor->context_depth > 0) {
-        return current_executor->context_locations[current_executor->context_depth - 1];
+        return current_executor
+            ->context_locations[current_executor->context_depth - 1];
     }
     return SOURCE_LOC_UNKNOWN;
 }
@@ -2421,22 +2431,24 @@ static source_location_t builtin_get_source_location(void) {
 int bin_let(int argc, char **argv) {
     if (argc < 2) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
-            loc, "missing arithmetic expression");
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "missing arithmetic expression");
         if (error) {
             /* Add executor context stack if available */
             if (current_executor) {
                 for (size_t i = 0; i < current_executor->context_depth; i++) {
                     if (current_executor->context_stack[i]) {
-                        shell_error_push_context(error, "%s",
-                            current_executor->context_stack[i]);
+                        shell_error_push_context(
+                            error, "%s", current_executor->context_stack[i]);
                     }
                 }
             }
             shell_error_push_context(error, "in builtin 'let'");
-            shell_error_set_detail(error, "let requires at least one expression to evaluate");
-            shell_error_set_suggestion(error,
+            shell_error_set_detail(
+                error, "let requires at least one expression to evaluate");
+            shell_error_set_suggestion(
+                error,
                 "usage: let expr [expr ...]\n"
                 "   examples: let x=5+3    let \"x++\"    let a=1 b=2 c=a+b");
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
@@ -2456,27 +2468,31 @@ int bin_let(int argc, char **argv) {
             const char *err_msg = arithm_get_last_error();
             source_location_t loc = builtin_get_source_location();
             shell_error_t *error = shell_error_create(
-                SHELL_ERR_ARITHMETIC_SYNTAX, SHELL_SEVERITY_ERROR,
-                loc, "invalid expression '%s'", argv[i]);
+                SHELL_ERR_ARITHMETIC_SYNTAX, SHELL_SEVERITY_ERROR, loc,
+                "invalid expression '%s'", argv[i]);
             if (error) {
                 /* Add executor context stack if available */
                 if (current_executor) {
-                    for (size_t i = 0; i < current_executor->context_depth; i++) {
+                    for (size_t i = 0; i < current_executor->context_depth;
+                         i++) {
                         if (current_executor->context_stack[i]) {
-                            shell_error_push_context(error, "%s",
+                            shell_error_push_context(
+                                error, "%s",
                                 current_executor->context_stack[i]);
                         }
                     }
                 }
                 shell_error_push_context(error, "in builtin 'let'");
-                shell_error_push_context(error, "evaluating argument %d of %d", i, argc - 1);
+                shell_error_push_context(error, "evaluating argument %d of %d",
+                                         i, argc - 1);
                 if (err_msg) {
                     shell_error_set_detail(error, err_msg);
                 }
-                shell_error_set_suggestion(error,
-                    "supported operators: + - * / %% ** ++ -- = += -= *= /= %%=\n"
-                    "   comparisons: == != < > <= >= && || !\n"
-                    "   note: variables don't need $: let x=5 y=x+1");
+                shell_error_set_suggestion(
+                    error, "supported operators: + - * / %% ** ++ -- = += -= "
+                           "*= /= %%=\n"
+                           "   comparisons: == != < > <= >= && || !\n"
+                           "   note: variables don't need $: let x=5 y=x+1");
                 shell_error_display(error, stderr, isatty(STDERR_FILENO));
                 shell_error_free(error);
             }
@@ -2585,9 +2601,9 @@ int bin_disown(int argc, char **argv) {
         return 1;
     }
 
-    bool flag_h = false;  // Mark no_sighup instead of removing
-    bool flag_a = false;  // Apply to all jobs
-    bool flag_r = false;  // Apply to running jobs only
+    bool flag_h = false; // Mark no_sighup instead of removing
+    bool flag_a = false; // Apply to all jobs
+    bool flag_r = false; // Apply to running jobs only
 
     // Parse options
     int optind_local = 1;
@@ -2607,7 +2623,8 @@ int bin_disown(int argc, char **argv) {
                 break;
             default:
                 fprintf(stderr, "disown: -%c: invalid option\n", opt[i]);
-                fprintf(stderr, "disown: usage: disown [-h] [-a | -r] [jobspec ...]\n");
+                fprintf(stderr,
+                        "disown: usage: disown [-h] [-a | -r] [jobspec ...]\n");
                 return 1;
             }
         }
@@ -2676,7 +2693,8 @@ int bin_disown(int argc, char **argv) {
             }
 
             if (job_id <= 0) {
-                fprintf(stderr, "disown: %s: invalid job specification\n", jobspec);
+                fprintf(stderr, "disown: %s: invalid job specification\n",
+                        jobspec);
                 result = 1;
                 continue;
             }
@@ -2997,7 +3015,9 @@ int bin_return(int argc, char **argv) {
     bool in_source = executor && executor->source_depth > 0;
 
     if (!in_function && !in_source) {
-        fprintf(stderr, "return: can only `return' from a function or sourced script\n");
+        fprintf(
+            stderr,
+            "return: can only `return' from a function or sourced script\n");
         return 1;
     }
 
@@ -3019,7 +3039,8 @@ int bin_return(int argc, char **argv) {
     // Return a special exit code that the executor can recognize as "function
     // return" We'll use a specific value that doesn't conflict with normal exit
     // codes
-    return 200 + (return_code & 0xFF); // 200-455 range for function/source returns
+    return 200 +
+           (return_code & 0xFF); // 200-455 range for function/source returns
 }
 
 /**
@@ -4132,7 +4153,8 @@ int bin_local(int argc, char **argv) {
             }
 
             if (opt_nameref) {
-                error_message("local: -n requires assignment (local -n ref=target)");
+                error_message(
+                    "local: -n requires assignment (local -n ref=target)");
                 return 1;
             }
 
@@ -4151,11 +4173,14 @@ int bin_local(int argc, char **argv) {
 static void declare_print_var_callback(const char *key, const char *value,
                                        void *userdata) {
     (void)userdata;
-    if (!key) return;
+    if (!key)
+        return;
     /* Skip internal variables starting with __ */
-    if (key[0] == '_' && key[1] == '_') return;
+    if (key[0] == '_' && key[1] == '_')
+        return;
     /* Skip if this is actually an array (handled separately) */
-    if (symtable_is_array(key)) return;
+    if (symtable_is_array(key))
+        return;
     printf("declare -- %s=\"%s\"\n", key, value ? value : "");
 }
 
@@ -4163,7 +4188,8 @@ static void declare_print_var_callback(const char *key, const char *value,
 static void declare_print_array_callback(const char *name, array_value_t *array,
                                          void *userdata) {
     (void)userdata;
-    if (!name || !array) return;
+    if (!name || !array)
+        return;
     if (array->is_associative) {
         printf("declare -A %s=(", name);
         /* Print associative array elements */
@@ -4187,7 +4213,8 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
         for (size_t i = 0; i < array->count; i++) {
             if (array->elements[i]) {
                 int idx = array->indices ? array->indices[i] : (int)i;
-                printf("%s[%d]=\"%s\"", first ? "" : " ", idx, array->elements[i]);
+                printf("%s[%d]=\"%s\"", first ? "" : " ", idx,
+                       array->elements[i]);
                 first = false;
             }
         }
@@ -4344,7 +4371,8 @@ int bin_declare(int argc, char **argv) {
         }
         for (size_t j = 1; name[j]; j++) {
             if (!isalnum(name[j]) && name[j] != '_') {
-                fprintf(stderr, "declare: `%s': not a valid identifier\n", name);
+                fprintf(stderr, "declare: `%s': not a valid identifier\n",
+                        name);
                 free(name);
                 return 1;
             }
@@ -4392,8 +4420,10 @@ int bin_declare(int argc, char **argv) {
 
                 while (*p && *p != ')') {
                     // Skip whitespace
-                    while (*p && isspace(*p)) p++;
-                    if (*p == ')' || !*p) break;
+                    while (*p && isspace(*p))
+                        p++;
+                    if (*p == ')' || !*p)
+                        break;
 
                     // Find end of element
                     const char *elem_start = p;
@@ -4426,10 +4456,12 @@ int bin_declare(int argc, char **argv) {
                                     const char *elem_val = bracket_end + 2;
 
                                     if (opt_assoc_array) {
-                                        symtable_array_set_assoc(arr, idx_str, elem_val);
+                                        symtable_array_set_assoc(arr, idx_str,
+                                                                 elem_val);
                                     } else {
                                         int parsed_idx = atoi(idx_str);
-                                        symtable_array_set_index(arr, parsed_idx, elem_val);
+                                        symtable_array_set_index(
+                                            arr, parsed_idx, elem_val);
                                     }
                                 }
                             } else {
@@ -4846,13 +4878,12 @@ int bin_unsetopt(int argc, char **argv) {
  * @param argv Argument vector
  * @return 0 on success, 1 on error, 2 if -q and option is off
  */
-int bin_shopt(int argc, char **argv)
-{
-    bool set_mode = false;      /* -s: enable options */
-    bool unset_mode = false;    /* -u: disable options */
-    bool query_mode = false;    /* -q: query silently */
-    bool print_mode = false;    /* -p: print format */
-    bool set_o_mode = false;    /* -o: use set -o options */
+int bin_shopt(int argc, char **argv) {
+    bool set_mode = false;   /* -s: enable options */
+    bool unset_mode = false; /* -u: disable options */
+    bool query_mode = false; /* -q: query silently */
+    bool print_mode = false; /* -p: print format */
+    bool set_o_mode = false; /* -o: use set -o options */
     int opt_end = 1;
 
     /* Parse flags */
@@ -5114,7 +5145,8 @@ int bin_hash(int argc, char **argv) {
         int ret = 0;
         for (int i = 2; i < argc; i++) {
             const char *utility = argv[i];
-            const char *path = command_hash ? ht_strstr_get(command_hash, utility) : NULL;
+            const char *path =
+                command_hash ? ht_strstr_get(command_hash, utility) : NULL;
             if (path) {
                 printf("%s\n", path);
             } else {
@@ -5820,7 +5852,7 @@ int bin_display(int argc, char **argv) {
         } else if (strcmp(perf_cmd, "targets") == 0) {
             bool cache_met, timing_met;
             if (display_integration_perf_monitor_check_targets(&cache_met,
-                                                           &timing_met)) {
+                                                               &timing_met)) {
                 printf("Performance Target Status:\n");
                 printf("  Cache Hit Rate: %s\n",
                        cache_met ? "OK MET" : "X NOT MET");
@@ -5936,8 +5968,7 @@ int bin_display(int argc, char **argv) {
                    "autosuggestions\n");
             printf("  syntax on|off           - Control syntax highlighting\n");
             printf("  transient on|off        - Control transient prompts\n");
-            printf(
-                "  hot-reload on|off       - Control theme hot-reload\n");
+            printf("  hot-reload on|off       - Control theme hot-reload\n");
             printf(
                 "  newline-before on|off   - Control newline before prompt\n");
             printf("  multiline on|off        - Control multiline editing\n");
@@ -6146,7 +6177,8 @@ int bin_display(int argc, char **argv) {
                     } else if (strcmp(scope_val, "global") == 0) {
                         config.lle_dedup_scope = LLE_DEDUP_SCOPE_GLOBAL;
 
-                        /* When switching to global scope, run full dedup scan */
+                        /* When switching to global scope, run full dedup scan
+                         */
                         lle_editor_t *editor = lle_get_global_editor();
                         if (editor && editor->history_system &&
                             editor->history_system->dedup_engine) {
@@ -6272,7 +6304,8 @@ int bin_display(int argc, char **argv) {
                 /* Navigation-time duplicate skipping */
                 if (argc < 5) {
                     printf("Navigation duplicate skipping: %s\n",
-                           config.lle_dedup_navigation ? "enabled" : "disabled");
+                           config.lle_dedup_navigation ? "enabled"
+                                                       : "disabled");
                     printf("Usage: display lle history nav-dedup on|off\n");
                     return 0;
                 }
@@ -6487,8 +6520,7 @@ int bin_display(int argc, char **argv) {
                         "  reload   - Reload keybindings from config file\n");
                     printf("  actions  - List all available action names\n");
                     printf("  help     - Show this help message\n");
-                    printf(
-                        "\nConfig file: ~/.config/lush/keybindings.toml\n");
+                    printf("\nConfig file: ~/.config/lush/keybindings.toml\n");
                     printf("\nExample config:\n");
                     printf("  [bindings]\n");
                     printf("  \"C-a\" = \"end-of-line\"\n");
@@ -6608,14 +6640,16 @@ int bin_display(int argc, char **argv) {
             if (strcmp(state, "on") == 0) {
                 config.display_autosuggestions = true;
                 if (config_registry_is_initialized()) {
-                    config_registry_set_boolean("display.autosuggestions", true);
+                    config_registry_set_boolean("display.autosuggestions",
+                                                true);
                 }
                 printf("Autosuggestions enabled\n");
                 return 0;
             } else if (strcmp(state, "off") == 0) {
                 config.display_autosuggestions = false;
                 if (config_registry_is_initialized()) {
-                    config_registry_set_boolean("display.autosuggestions", false);
+                    config_registry_set_boolean("display.autosuggestions",
+                                                false);
                 }
                 printf("Autosuggestions disabled\n");
                 return 0;
@@ -6641,24 +6675,28 @@ int bin_display(int argc, char **argv) {
             if (strcmp(state, "on") == 0) {
                 config.display_syntax_highlighting = true;
                 if (config_registry_is_initialized()) {
-                    config_registry_set_boolean("display.syntax_highlighting", true);
+                    config_registry_set_boolean("display.syntax_highlighting",
+                                                true);
                 }
                 /* Apply to runtime: update the command layer */
                 display_controller_t *dc = display_integration_get_controller();
                 if (dc && dc->compositor && dc->compositor->command_layer) {
-                    command_layer_set_syntax_enabled(dc->compositor->command_layer, true);
+                    command_layer_set_syntax_enabled(
+                        dc->compositor->command_layer, true);
                 }
                 printf("Syntax highlighting enabled\n");
                 return 0;
             } else if (strcmp(state, "off") == 0) {
                 config.display_syntax_highlighting = false;
                 if (config_registry_is_initialized()) {
-                    config_registry_set_boolean("display.syntax_highlighting", false);
+                    config_registry_set_boolean("display.syntax_highlighting",
+                                                false);
                 }
                 /* Apply to runtime: update the command layer */
                 display_controller_t *dc = display_integration_get_controller();
                 if (dc && dc->compositor && dc->compositor->command_layer) {
-                    command_layer_set_syntax_enabled(dc->compositor->command_layer, false);
+                    command_layer_set_syntax_enabled(
+                        dc->compositor->command_layer, false);
                 }
                 printf("Syntax highlighting disabled\n");
                 return 0;
@@ -6688,7 +6726,8 @@ int bin_display(int argc, char **argv) {
             if (strcmp(state, "on") == 0) {
                 config.display_transient_prompt = true;
                 if (config_registry_is_initialized()) {
-                    config_registry_set_boolean("display.transient_prompt", true);
+                    config_registry_set_boolean("display.transient_prompt",
+                                                true);
                 }
                 /* Also update composer config if available */
                 if (g_lle_integration && g_lle_integration->prompt_composer) {
@@ -6700,7 +6739,8 @@ int bin_display(int argc, char **argv) {
             } else if (strcmp(state, "off") == 0) {
                 config.display_transient_prompt = false;
                 if (config_registry_is_initialized()) {
-                    config_registry_set_boolean("display.transient_prompt", false);
+                    config_registry_set_boolean("display.transient_prompt",
+                                                false);
                 }
                 /* Also update composer config if available */
                 if (g_lle_integration && g_lle_integration->prompt_composer) {
@@ -6720,9 +6760,9 @@ int bin_display(int argc, char **argv) {
         } else if (strcmp(lle_cmd, "hot-reload") == 0) {
             /* Control theme hot-reload (auto-reload on file change) */
             if (argc < 4) {
-                printf("Theme hot-reload: %s\n",
-                       config.display_theme_hot_reload ? "enabled"
-                                                       : "disabled");
+                printf("Theme hot-reload: %s\n", config.display_theme_hot_reload
+                                                     ? "enabled"
+                                                     : "disabled");
                 printf("Usage: display lle hot-reload on|off\n");
                 printf("\nAutomatically reloads the active theme when its\n");
                 printf("TOML file is modified on disk.\n");
@@ -6841,10 +6881,9 @@ int bin_display(int argc, char **argv) {
                        editor->buffer ? "OK" : "OK (session-scoped)");
                 printf("  History: %s\n",
                        editor->history_system ? "OK" : "MISSING");
-                printf("  Keybindings: %s\n",
-                       editor->keybinding_manager
-                           ? "OK"
-                           : "OK (session-scoped)");
+                printf("  Keybindings: %s\n", editor->keybinding_manager
+                                                  ? "OK"
+                                                  : "OK (session-scoped)");
                 printf("  Kill ring: %s\n",
                        editor->kill_ring ? "OK" : "MISSING");
                 printf("  Change tracker: %s\n",
@@ -7083,8 +7122,8 @@ int bin_display(int argc, char **argv) {
                             }
                         }
                         if (strlen(new_theme->layout.ps2_format) > 0) {
-                            symtable_set_global(
-                                "PS2", new_theme->layout.ps2_format);
+                            symtable_set_global("PS2",
+                                                new_theme->layout.ps2_format);
                         }
                     }
                     printf("LLE theme set to '%s'\n", theme_name);
@@ -7316,8 +7355,7 @@ int bin_display(int argc, char **argv) {
         printf("  display help             - Show this help message\n");
         printf("\nConfiguration:\n");
         printf("  Environment variables can be used to control behavior:\n");
-        printf(
-            "  - LUSH_LAYERED_DISPLAY=1|0     Enable/disable at startup\n");
+        printf("  - LUSH_LAYERED_DISPLAY=1|0     Enable/disable at startup\n");
         printf("  - LUSH_DISPLAY_DEBUG=1|0       Enable debug output\n");
         printf("  - LUSH_DISPLAY_OPTIMIZATION=0-4 Set optimization level\n");
         printf("\nOptimization Levels:\n");
@@ -7353,9 +7391,9 @@ int bin_display(int argc, char **argv) {
  * @return Command exit status, or 127 if command not found
  */
 int bin_command(int argc, char **argv) {
-    bool opt_v = false;      /* -v: print path only */
-    bool opt_V = false;      /* -V: verbose description */
-    bool opt_p = false;      /* -p: use default PATH */
+    bool opt_v = false; /* -v: print path only */
+    bool opt_V = false; /* -V: verbose description */
+    bool opt_p = false; /* -p: use default PATH */
     int cmd_start = 1;
 
     /* Parse options */
@@ -7369,13 +7407,11 @@ int bin_command(int argc, char **argv) {
         } else if (strcmp(argv[i], "-p") == 0) {
             opt_p = true;
             cmd_start = i + 1;
-        } else if (strcmp(argv[i], "-pv") == 0 ||
-                   strcmp(argv[i], "-vp") == 0) {
+        } else if (strcmp(argv[i], "-pv") == 0 || strcmp(argv[i], "-vp") == 0) {
             opt_p = true;
             opt_v = true;
             cmd_start = i + 1;
-        } else if (strcmp(argv[i], "-pV") == 0 ||
-                   strcmp(argv[i], "-Vp") == 0) {
+        } else if (strcmp(argv[i], "-pV") == 0 || strcmp(argv[i], "-Vp") == 0) {
             opt_p = true;
             opt_V = true;
             cmd_start = i + 1;
@@ -7547,7 +7583,8 @@ int bin_command(int argc, char **argv) {
 
 /* ============================================================================
  * Directory Stack Builtins
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Push directory onto stack and change to it
@@ -7576,18 +7613,18 @@ int bin_pushd(int argc, char **argv) {
             free(cwd);
             return 1;
         }
-        
+
         const char *top = dirstack_peek(0);
         if (!top) {
             fprintf(stderr, "pushd: directory stack empty\n");
             free(cwd);
             return 1;
         }
-        
+
         // Save current directory, pop top, push current, cd to old top
         char *old_top = dirstack_pop();
         dirstack_push(cwd);
-        
+
         if (chdir(old_top) < 0) {
             error_return("pushd");
             // Restore stack state
@@ -7597,7 +7634,7 @@ int bin_pushd(int argc, char **argv) {
             free(cwd);
             return 1;
         }
-        
+
         // Update PWD
         symtable_set_global("OLDPWD", cwd);
         char *new_cwd = getcwd(NULL, 0);
@@ -7605,7 +7642,7 @@ int bin_pushd(int argc, char **argv) {
             symtable_set_global("PWD", new_cwd);
             free(new_cwd);
         }
-        
+
         free(old_top);
         free(cwd);
         dirstack_print(false, false);
@@ -7613,14 +7650,14 @@ int bin_pushd(int argc, char **argv) {
     }
 
     char *arg = argv[1];
-    
+
     // Check for +N or -N rotation
     if (arg[0] == '+' || arg[0] == '-') {
         char *endptr;
         long n = strtol(arg + 1, &endptr, 10);
         if (*endptr == '\0' && n >= 0) {
             int idx = (arg[0] == '+') ? (int)n : -(int)n - 1;
-            
+
             // Need to account for cwd being index 0
             if (idx == 0) {
                 // +0 means current dir, nothing to do
@@ -7628,60 +7665,61 @@ int bin_pushd(int argc, char **argv) {
                 dirstack_print(false, false);
                 return 0;
             }
-            
+
             // Adjust for the fact that cwd is position 0
             int stack_idx = idx - 1;
-            
+
             const char *target = dirstack_peek(stack_idx);
             if (!target) {
-                fprintf(stderr, "pushd: %s: directory stack index out of range\n", arg);
+                fprintf(stderr,
+                        "pushd: %s: directory stack index out of range\n", arg);
                 free(cwd);
                 return 1;
             }
-            
+
             // Rotate stack and cd
             if (dirstack_rotate(stack_idx) < 0) {
                 fprintf(stderr, "pushd: %s: rotation failed\n", arg);
                 free(cwd);
                 return 1;
             }
-            
+
             target = dirstack_peek(0);
             if (chdir(target) < 0) {
                 error_return("pushd");
                 free(cwd);
                 return 1;
             }
-            
+
             symtable_set_global("OLDPWD", cwd);
             char *new_cwd = getcwd(NULL, 0);
             if (new_cwd) {
                 symtable_set_global("PWD", new_cwd);
                 free(new_cwd);
             }
-            
+
             free(cwd);
             dirstack_print(false, false);
             return 0;
         }
     }
-    
+
     // Push current directory and cd to new one
     if (chdir(arg) < 0) {
         error_return("pushd");
         free(cwd);
         return 1;
     }
-    
+
     dirstack_push(cwd);
-    
+
     symtable_set_global("OLDPWD", cwd);
     char *new_cwd = getcwd(NULL, 0);
     if (new_cwd) {
         symtable_set_global("PWD", new_cwd);
         free(new_cwd);
     }
-    
+
     free(cwd);
     dirstack_print(false, false);
     return 0;
@@ -7712,9 +7750,9 @@ int bin_popd(int argc, char **argv) {
             fprintf(stderr, "popd: directory stack empty\n");
             return 1;
         }
-        
+
         char *cwd = getcwd(NULL, 0);
-        
+
         if (chdir(dir) < 0) {
             error_return("popd");
             // Put it back
@@ -7723,25 +7761,25 @@ int bin_popd(int argc, char **argv) {
             free(cwd);
             return 1;
         }
-        
+
         if (cwd) {
             symtable_set_global("OLDPWD", cwd);
             free(cwd);
         }
-        
+
         char *new_cwd = getcwd(NULL, 0);
         if (new_cwd) {
             symtable_set_global("PWD", new_cwd);
             free(new_cwd);
         }
-        
+
         free(dir);
         dirstack_print(false, false);
         return 0;
     }
 
     char *arg = argv[1];
-    
+
     // Check for +N or -N removal
     if (arg[0] == '+' || arg[0] == '-') {
         char *endptr;
@@ -7753,26 +7791,27 @@ int bin_popd(int argc, char **argv) {
             } else {
                 idx = dirstack_size() - (int)n;
             }
-            
+
             // +0 means current directory, can't remove that
             if (idx == 0) {
                 fprintf(stderr, "popd: can't remove current directory\n");
                 return 1;
             }
-            
+
             // Adjust for cwd being position 0
             int stack_idx = idx - 1;
-            
+
             if (dirstack_remove(stack_idx) < 0) {
-                fprintf(stderr, "popd: %s: directory stack index out of range\n", arg);
+                fprintf(stderr,
+                        "popd: %s: directory stack index out of range\n", arg);
                 return 1;
             }
-            
+
             dirstack_print(false, false);
             return 0;
         }
     }
-    
+
     fprintf(stderr, "popd: %s: invalid argument\n", arg);
     return 1;
 }
@@ -7795,7 +7834,7 @@ int bin_dirs(int argc, char **argv) {
     bool one_per_line = false;
     bool show_index = false;
     bool clear_stack = false;
-    
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-p") == 0) {
             one_per_line = true;
@@ -7811,19 +7850,20 @@ int bin_dirs(int argc, char **argv) {
             return 1;
         }
     }
-    
+
     if (clear_stack) {
         dirstack_clear();
         return 0;
     }
-    
+
     dirstack_print(one_per_line, show_index);
     return 0;
 }
 
 /* ============================================================================
  * Environment Builtin
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Run command with modified environment
@@ -7846,12 +7886,12 @@ int bin_env(int argc, char **argv) {
     char **unset_vars = NULL;     /* -u: variables to unset */
     int unset_count = 0;
     int unset_capacity = 0;
-    
+
     /* Check if invoked as printenv */
     bool is_printenv = (strcmp(argv[0], "printenv") == 0);
-    
+
     int i = 1;
-    
+
     /* Parse options */
     while (i < argc && argv[i][0] == '-' && argv[i][1] != '\0') {
         if (strcmp(argv[i], "--") == 0) {
@@ -7872,8 +7912,8 @@ int bin_env(int argc, char **argv) {
             /* Add to unset list */
             if (unset_count >= unset_capacity) {
                 unset_capacity = unset_capacity ? unset_capacity * 2 : 4;
-                char **new_unset = realloc(unset_vars, 
-                                           unset_capacity * sizeof(char *));
+                char **new_unset =
+                    realloc(unset_vars, unset_capacity * sizeof(char *));
                 if (!new_unset) {
                     free(unset_vars);
                     return 1;
@@ -7883,7 +7923,8 @@ int bin_env(int argc, char **argv) {
             unset_vars[unset_count++] = argv[i + 1];
             i += 2;
         } else if (strcmp(argv[i], "--help") == 0) {
-            printf("Usage: env [OPTION]... [NAME=VALUE]... [COMMAND [ARG]...]\n");
+            printf(
+                "Usage: env [OPTION]... [NAME=VALUE]... [COMMAND [ARG]...]\n");
             printf("Run COMMAND with modified environment.\n\n");
             printf("Options:\n");
             printf("  -i          Start with empty environment\n");
@@ -7899,17 +7940,17 @@ int bin_env(int argc, char **argv) {
             return 125;
         }
     }
-    
+
     /* Collect NAME=VALUE assignments */
     char **env_assignments = NULL;
     int env_count = 0;
     int env_capacity = 0;
-    
+
     while (i < argc && strchr(argv[i], '=') != NULL) {
         if (env_count >= env_capacity) {
             env_capacity = env_capacity ? env_capacity * 2 : 8;
-            char **new_env = realloc(env_assignments, 
-                                     env_capacity * sizeof(char *));
+            char **new_env =
+                realloc(env_assignments, env_capacity * sizeof(char *));
             if (!new_env) {
                 free(unset_vars);
                 free(env_assignments);
@@ -7920,7 +7961,7 @@ int bin_env(int argc, char **argv) {
         env_assignments[env_count++] = argv[i];
         i++;
     }
-    
+
     /* printenv: just print variable values */
     if (is_printenv) {
         char delim = null_terminator ? '\0' : '\n';
@@ -7938,7 +7979,7 @@ int bin_env(int argc, char **argv) {
                 if (val) {
                     printf("%s%c", val, delim);
                 } else {
-                    result = 1;  /* Variable not found */
+                    result = 1; /* Variable not found */
                 }
             }
             free(unset_vars);
@@ -7949,7 +7990,7 @@ int bin_env(int argc, char **argv) {
         free(env_assignments);
         return 0;
     }
-    
+
     /* No command: print environment */
     if (i >= argc) {
         char delim = null_terminator ? '\0' : '\n';
@@ -7966,7 +8007,7 @@ int bin_env(int argc, char **argv) {
                 bool skip = false;
                 for (int u = 0; u < unset_count; u++) {
                     size_t ulen = strlen(unset_vars[u]);
-                    if (strncmp(*env, unset_vars[u], ulen) == 0 && 
+                    if (strncmp(*env, unset_vars[u], ulen) == 0 &&
                         (*env)[ulen] == '=') {
                         skip = true;
                         break;
@@ -7995,7 +8036,7 @@ int bin_env(int argc, char **argv) {
         free(env_assignments);
         return 0;
     }
-    
+
     /* Run command with modified environment */
     pid_t pid = lush_fork();
     if (pid < 0) {
@@ -8009,17 +8050,17 @@ int bin_env(int argc, char **argv) {
         free(env_assignments);
         return 126;
     }
-    
+
     if (pid == 0) {
         /* Child process */
-        
+
         if (ignore_env) {
             /* Clear entire environment - use portable approach
              * clearenv() is a GNU extension not available on macOS/BSD
              * Setting environ to NULL or empty array is POSIX portable
              */
             extern char **environ;
-            static char *empty_env[] = { NULL };
+            static char *empty_env[] = {NULL};
             environ = empty_env;
         } else {
             /* Unset specified variables */
@@ -8027,30 +8068,30 @@ int bin_env(int argc, char **argv) {
                 unsetenv(unset_vars[u]);
             }
         }
-        
+
         /* Apply assignments */
         for (int j = 0; j < env_count; j++) {
             char *eq = strchr(env_assignments[j], '=');
             if (eq) {
                 *eq = '\0';
                 setenv(env_assignments[j], eq + 1, 1);
-                *eq = '=';  /* Restore for potential re-use */
+                *eq = '='; /* Restore for potential re-use */
             }
         }
-        
+
         /* Execute command */
         execvp(argv[i], &argv[i]);
-        
+
         /* exec failed */
         int exit_code = (errno == ENOENT) ? 127 : 126;
         fprintf(stderr, "env: %s: %s\n", argv[i], strerror(errno));
         _exit(exit_code);
     }
-    
+
     /* Parent: wait for child */
     free(unset_vars);
     free(env_assignments);
-    
+
     int status;
     if (waitpid(pid, &status, 0) < 0) {
         int saved_errno = errno;
@@ -8061,13 +8102,13 @@ int bin_env(int argc, char **argv) {
         shell_error_free(error);
         return 126;
     }
-    
+
     if (WIFEXITED(status)) {
         return WEXITSTATUS(status);
     } else if (WIFSIGNALED(status)) {
         return 128 + WTERMSIG(status);
     }
-    
+
     return 126;
 }
 
@@ -8093,7 +8134,7 @@ int bin_analyze(int argc, char **argv) {
     bool strict_mode = false;
     const char *target_shell = NULL;
     const char *script_file = NULL;
-    
+
     /* Parse arguments */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
@@ -8114,7 +8155,8 @@ int bin_analyze(int argc, char **argv) {
             printf("  1  Warnings found\n");
             printf("  2  Errors found\n");
             return 0;
-        } else if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--strict") == 0) {
+        } else if (strcmp(argv[i], "-s") == 0 ||
+                   strcmp(argv[i], "--strict") == 0) {
             strict_mode = true;
         } else if (strcmp(argv[i], "-t") == 0) {
             if (i + 1 < argc) {
@@ -8132,36 +8174,36 @@ int bin_analyze(int argc, char **argv) {
             script_file = argv[i];
         }
     }
-    
+
     if (!script_file) {
         fprintf(stderr, "%s: missing script file argument\n", argv[0]);
         fprintf(stderr, "Usage: %s [OPTIONS] <script>\n", argv[0]);
         return 1;
     }
-    
+
     /* Set target shell if specified (stored as string for flexibility) */
     if (target_shell) {
         compat_set_target(target_shell);
     }
-    
+
     /* Set strict mode if requested */
     if (strict_mode) {
         compat_set_strict(true);
     }
-    
+
     /* Initialize debug context for analysis */
     debug_context_t *ctx = debug_init();
     if (!ctx) {
         fprintf(stderr, "%s: failed to initialize analysis context\n", argv[0]);
         return 1;
     }
-    
+
     /* Enable context so debug_printf works for output */
     debug_enable(ctx, true);
-    
+
     /* Run analysis (includes report output) */
     debug_analyze_script(ctx, script_file);
-    
+
     /* Determine exit code based on issues found */
     int exit_status = 0;
     if (ctx->issue_count > 0) {
@@ -8170,26 +8212,27 @@ int bin_analyze(int argc, char **argv) {
             if (strcmp(issue->severity, "error") == 0) {
                 exit_status = 2;
                 break;
-            } else if (strcmp(issue->severity, "warning") == 0 && exit_status < 1) {
+            } else if (strcmp(issue->severity, "warning") == 0 &&
+                       exit_status < 1) {
                 exit_status = 1;
             }
             issue = issue->next;
         }
-        
+
         /* In strict mode, warnings become errors */
         if (strict_mode && exit_status == 1) {
             exit_status = 2;
         }
     }
-    
+
     /* Cleanup */
     debug_cleanup(ctx);
-    
+
     /* Reset strict mode */
     if (strict_mode) {
         compat_set_strict(false);
     }
-    
+
     return exit_status;
 }
 
@@ -8213,7 +8256,7 @@ int bin_lint(int argc, char **argv) {
     bool create_backup = true;
     const char *target_shell = NULL;
     const char *script_file = NULL;
-    
+
     /* Parse arguments */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
@@ -8224,10 +8267,12 @@ int bin_lint(int argc, char **argv) {
             printf("  -s, --strict        Treat warnings as errors\n");
             printf("  --fix               Apply safe automatic fixes\n");
             printf("  --fix-interactive   Interactively approve each fix\n");
-            printf("  --unsafe-fixes      Also apply unsafe fixes (implies --fix)\n");
+            printf("  --unsafe-fixes      Also apply unsafe fixes (implies "
+                   "--fix)\n");
             printf("  --dry-run           Preview fixes without applying\n");
             printf("  --diff              Show unified diff of changes\n");
-            printf("  --no-backup         Don't create .bak backup when fixing\n");
+            printf(
+                "  --no-backup         Don't create .bak backup when fixing\n");
             printf("  -h, --help          Show this help message\n");
             printf("\nFix safety levels:\n");
             printf("  safe   - Applied with --fix (e.g., source -> .)\n");
@@ -8239,7 +8284,8 @@ int bin_lint(int argc, char **argv) {
             printf("  2  Unfixed errors remain\n");
             printf("  3  Fix application failed\n");
             return 0;
-        } else if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--strict") == 0) {
+        } else if (strcmp(argv[i], "-s") == 0 ||
+                   strcmp(argv[i], "--strict") == 0) {
             strict_mode = true;
         } else if (strcmp(argv[i], "--fix") == 0) {
             fix_mode = true;
@@ -8272,33 +8318,33 @@ int bin_lint(int argc, char **argv) {
             script_file = argv[i];
         }
     }
-    
+
     if (!script_file) {
         fprintf(stderr, "%s: missing script file argument\n", argv[0]);
         fprintf(stderr, "Usage: %s [OPTIONS] <script>\n", argv[0]);
         return 1;
     }
-    
+
     /* Set target shell if specified (stored as string for flexibility) */
     if (target_shell) {
         compat_set_target(target_shell);
     }
-    
+
     /* Set strict mode if requested */
     if (strict_mode) {
         compat_set_strict(true);
     }
-    
+
     /* Initialize debug context for analysis */
     debug_context_t *ctx = debug_init();
     if (!ctx) {
         fprintf(stderr, "%s: failed to initialize lint context\n", argv[0]);
         return 1;
     }
-    
+
     /* Enable context so debug_printf works for output */
     debug_enable(ctx, true);
-    
+
     /* Suppress unused variable warnings */
     (void)show_diff;
 
@@ -8321,7 +8367,8 @@ int bin_lint(int argc, char **argv) {
                     }
 
                     /* Collect fixes */
-                    size_t fixes_found = fixer_collect_fixes(&fixer_ctx, target);
+                    size_t fixes_found =
+                        fixer_collect_fixes(&fixer_ctx, target);
 
                     if (fixes_found > 0) {
                         fixer_options_t opts = {
@@ -8333,10 +8380,11 @@ int bin_lint(int argc, char **argv) {
                         };
 
                         int applied = fixer_run_interactive(&fixer_ctx, &opts,
-                                                             script_file);
+                                                            script_file);
                         if (applied > 0) {
                             remaining -= applied;
-                            if (remaining < 0) remaining = 0;
+                            if (remaining < 0)
+                                remaining = 0;
                         }
                     } else {
                         printf("No automatic fixes available.\n");
@@ -8347,14 +8395,14 @@ int bin_lint(int argc, char **argv) {
         }
     } else {
         /* Standard fix mode (automatic or none) */
-        remaining = debug_lint_script(ctx, script_file, fix_mode,
-                                       unsafe_fixes, dry_run);
+        remaining = debug_lint_script(ctx, script_file, fix_mode, unsafe_fixes,
+                                      dry_run);
     }
-    
+
     /* Determine exit code */
     int exit_status = 0;
     if (remaining < 0) {
-        exit_status = 3;  /* Fix application error */
+        exit_status = 3; /* Fix application error */
     } else if (remaining > 0) {
         /* Check if we have errors or just warnings */
         analysis_issue_t *issue = ctx->analysis_issues;
@@ -8362,25 +8410,26 @@ int bin_lint(int argc, char **argv) {
             if (strcmp(issue->severity, "error") == 0) {
                 exit_status = 2;
                 break;
-            } else if (strcmp(issue->severity, "warning") == 0 && exit_status < 1) {
+            } else if (strcmp(issue->severity, "warning") == 0 &&
+                       exit_status < 1) {
                 exit_status = 1;
             }
             issue = issue->next;
         }
-        
+
         /* In strict mode, warnings become errors */
         if (strict_mode && exit_status == 1) {
             exit_status = 2;
         }
     }
-    
+
     /* Cleanup */
     debug_cleanup(ctx);
-    
+
     /* Reset strict mode */
     if (strict_mode) {
         compat_set_strict(false);
     }
-    
+
     return exit_status;
 }

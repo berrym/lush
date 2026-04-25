@@ -99,10 +99,10 @@ typedef struct expansion_context {
  * @brief Expansion result codes
  */
 typedef enum {
-    EXP_OK,          /**< Expansion succeeded */
-    EXP_ERROR,       /**< Expansion failed */
+    EXP_OK,           /**< Expansion succeeded */
+    EXP_ERROR,        /**< Expansion failed */
     EXP_NO_EXPANSION, /**< No expansion needed */
-    EXP_INVALID_VAR  /**< Invalid variable reference */
+    EXP_INVALID_VAR   /**< Invalid variable reference */
 } exp_result_t;
 
 /**
@@ -127,7 +127,8 @@ typedef struct string_builder {
 
 /* ============================================================================
  * Parser Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Parse and execute a command string
@@ -139,7 +140,8 @@ int parse_and_execute(const char *command);
 
 /* ============================================================================
  * Executor Access Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Forward declaration for executor */
 struct executor;
@@ -153,7 +155,8 @@ struct executor *get_global_executor(void);
 
 /* ============================================================================
  * Symbol Table Variable Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get a shell variable as a string pointer
@@ -200,7 +203,8 @@ void set_shell_vari(char *name, int val);
 
 /* ============================================================================
  * Shell Options
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief POSIX shell options structure
@@ -243,8 +247,9 @@ typedef struct shell_options {
     bool pipefail_mode;   /**< pipefail: pipeline fails if any command fails */
     bool histexpand_mode; /**< histexpand: enable history expansion */
     bool history_mode;    /**< history: enable command history recording */
-    bool interactive_comments_mode; /**< interactive-comments: enable # comments */
-    bool physical_mode;   /**< physical: resolve symlinks in paths */
+    bool interactive_comments_mode; /**< interactive-comments: enable # comments
+                                     */
+    bool physical_mode;             /**< physical: resolve symlinks in paths */
     bool privileged_mode; /**< privileged: restricted shell security mode */
 } shell_options_t;
 
@@ -272,7 +277,8 @@ bool get_no_word_expand(void);
 
 /* ============================================================================
  * POSIX Option Management Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize POSIX options
@@ -360,7 +366,8 @@ int builtin_set(char **args);
 
 /* ============================================================================
  * Word Expansion Types and Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Word structure for expansion results
@@ -418,7 +425,8 @@ char *wordlist_to_str(word_t *word);
 
 /* ============================================================================
  * Core Expansion Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Perform tilde expansion
@@ -458,7 +466,8 @@ expansion_t arithm_expand_exp(const char *str, const exp_ctx_t *ctx);
 
 /* ============================================================================
  * Main Word Expansion Pipeline
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Perform full word expansion
@@ -501,7 +510,8 @@ void remove_quotes(word_t *wordlist);
 
 /* ============================================================================
  * Context Management
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a new expansion context
@@ -526,7 +536,8 @@ void reset_expansion_context(exp_ctx_t *ctx);
 
 /* ============================================================================
  * String Builder Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Create a new string builder
@@ -598,7 +609,8 @@ char *arithm_expand(const char *orig_expr);
 
 /* ============================================================================
  * Command Execution Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Search PATH for an executable

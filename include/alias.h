@@ -12,10 +12,10 @@
 #ifndef ALIAS_H
 #define ALIAS_H
 
+#include "libhashtable/ht.h"
+
 #include <stdbool.h>
 #include <stddef.h>
-
-#include "libhashtable/ht.h"
 
 /**
  * @brief Global alias hash table

@@ -10,14 +10,14 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "debug.h"
 #include "compat.h"
+#include "debug.h"
 #include "errors.h"
 #include "fixer.h"
+#include "lle/unicode_compare.h"
 #include "node.h"
 #include "parser.h"
 #include "tokenizer.h"
-#include "lle/unicode_compare.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -28,7 +28,7 @@
 
 // Forward declarations for static functions
 static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
-                                     const char *content);
+                                    const char *content);
 static void debug_analyze_style(debug_context_t *ctx, const char *file,
                                 const char *content);
 static void debug_analyze_performance(debug_context_t *ctx, const char *file,
@@ -143,7 +143,7 @@ void debug_add_analysis_issue(debug_context_t *ctx, const char *file, int line,
  * @return Parsed AST on success, NULL on syntax error (caller must free)
  */
 static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
-                                     const char *content) {
+                                    const char *content) {
     if (!ctx || !file || !content) {
         return NULL;
     }
@@ -169,7 +169,7 @@ static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
     }
 
     parser_free(parser);
-    return ast;  // Caller is responsible for freeing
+    return ast; // Caller is responsible for freeing
 }
 
 /**
@@ -376,15 +376,16 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
 
     // Get target shell for portability checking (before potential init reset)
     const char *target_str = compat_get_target();
-    
+
     // Initialize compat system if not already done
     if (compat_get_entry_count() == 0) {
         compat_init(NULL);
         // Restore target that was set before init
         compat_set_target(target_str);
     }
-    
-    // Convert string target to enum for API functions that still use shell_mode_t
+
+    // Convert string target to enum for API functions that still use
+    // shell_mode_t
     shell_mode_t target = SHELL_MODE_POSIX;
     if (target_str) {
         shell_mode_parse(target_str, &target);
@@ -397,10 +398,9 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
         size_t ast_found = compat_check_ast_issues(ast, target, ast_issues, 64);
 
         for (size_t i = 0; i < ast_found; i++) {
-            debug_add_analysis_issue(ctx, file, ast_issues[i].line,
-                                     ast_issues[i].severity, "portability",
-                                     ast_issues[i].message,
-                                     ast_issues[i].suggestion);
+            debug_add_analysis_issue(
+                ctx, file, ast_issues[i].line, ast_issues[i].severity,
+                "portability", ast_issues[i].message, ast_issues[i].suggestion);
         }
     }
 
@@ -411,30 +411,29 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
 
     for (size_t i = 0; i < found; i++) {
         const compat_entry_t *entry = results[i].entry;
-        if (!entry) continue;
+        if (!entry)
+            continue;
 
-        // Skip entries that are covered by AST-based checking to avoid duplicates
-        // AST covers: extended_test, arithmetic_command, arithmetic_for,
-        // process_substitution, arrays, here_string, redirect_both,
-        // redirect_append_both, redirect_fd, coproc, select_loop,
-        // time_keyword, anonymous_function
+        // Skip entries that are covered by AST-based checking to avoid
+        // duplicates AST covers: extended_test, arithmetic_command,
+        // arithmetic_for, process_substitution, arrays, here_string,
+        // redirect_both, redirect_append_both, redirect_fd, coproc,
+        // select_loop, time_keyword, anonymous_function
         if (entry->feature) {
-            static const char *ast_covered_features[] = {
-                "extended_test",
-                "arithmetic_command",
-                "arithmetic_for",
-                "process_substitution",
-                "arrays",
-                "here_string",
-                "redirect_both",
-                "redirect_append_both",
-                "redirect_fd",
-                "coproc",
-                "select_loop",
-                "time_keyword",
-                "anonymous_function",
-                NULL
-            };
+            static const char *ast_covered_features[] = {"extended_test",
+                                                         "arithmetic_command",
+                                                         "arithmetic_for",
+                                                         "process_substitution",
+                                                         "arrays",
+                                                         "here_string",
+                                                         "redirect_both",
+                                                         "redirect_append_both",
+                                                         "redirect_fd",
+                                                         "coproc",
+                                                         "select_loop",
+                                                         "time_keyword",
+                                                         "anonymous_function",
+                                                         NULL};
 
             bool skip = false;
             for (const char **feat = ast_covered_features; *feat; feat++) {
@@ -445,18 +444,17 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
                 }
             }
             if (skip) {
-                continue;  // Already handled by AST analysis
+                continue; // Already handled by AST analysis
             }
         }
 
-        const char *severity = compat_severity_name(
-            compat_effective_severity(entry));
+        const char *severity =
+            compat_severity_name(compat_effective_severity(entry));
 
-        debug_add_analysis_issue(ctx, file, results[i].line,
-                                 severity, "portability",
-                                 entry->lint.message ? entry->lint.message
-                                                     : entry->description,
-                                 entry->lint.suggestion);
+        debug_add_analysis_issue(
+            ctx, file, results[i].line, severity, "portability",
+            entry->lint.message ? entry->lint.message : entry->description,
+            entry->lint.suggestion);
     }
 
     // === Level 3: Legacy pattern-based checks ===
@@ -473,16 +471,17 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
 
             // Check for bash-specific function syntax (not yet in AST)
             if (strncmp(pos, "function ", 9) == 0) {
-                debug_add_analysis_issue(
-                    ctx, file, line_number, "info", "portability",
-                    "Bash-specific function syntax", "Use POSIX function syntax");
+                debug_add_analysis_issue(ctx, file, line_number, "info",
+                                         "portability",
+                                         "Bash-specific function syntax",
+                                         "Use POSIX function syntax");
             }
 
             // Check for non-portable commands
             if (strncmp(pos, "echo -e ", 8) == 0) {
-                debug_add_analysis_issue(ctx, file, line_number, "warning",
-                                         "portability", "Non-portable echo option",
-                                         "Use printf instead");
+                debug_add_analysis_issue(
+                    ctx, file, line_number, "warning", "portability",
+                    "Non-portable echo option", "Use printf instead");
             }
 
             if (strncmp(pos, "source ", 7) == 0) {
@@ -610,14 +609,13 @@ void debug_show_analysis_report(debug_context_t *ctx) {
  * @param mode Analysis mode (FULL or LINT)
  */
 void debug_show_analysis_report_filtered(debug_context_t *ctx,
-                                          analysis_mode_t mode) {
+                                         analysis_mode_t mode) {
     if (!ctx) {
         return;
     }
 
-    const char *header = (mode == ANALYSIS_MODE_LINT) 
-                         ? "Lint Report" 
-                         : "Script Analysis Report";
+    const char *header =
+        (mode == ANALYSIS_MODE_LINT) ? "Lint Report" : "Script Analysis Report";
     debug_print_header(ctx, header);
 
     // Count issues by severity (respecting mode filter)
@@ -648,9 +646,9 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
             debug_printf(ctx, "No issues found - script looks good!\n");
             return;
         }
-        debug_printf(ctx,
-                     "Issues found: %d total (%d errors, %d warnings, %d info)\n\n",
-                     ctx->issue_count, error_count, warning_count, info_count);
+        debug_printf(
+            ctx, "Issues found: %d total (%d errors, %d warnings, %d info)\n\n",
+            ctx->issue_count, error_count, warning_count, info_count);
     }
 
     // Show issues by category
@@ -720,7 +718,8 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
     } else {
         debug_printf(ctx, "Summary:\n");
         if (error_count > 0) {
-            debug_printf(ctx,
+            debug_printf(
+                ctx,
                 "  WARNING: %d syntax or critical errors need to be fixed\n",
                 error_count);
         }
@@ -730,21 +729,21 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
         }
         if (info_count > 0) {
             debug_printf(ctx,
-                "  INFO: %d informational items for improvement\n",
-                info_count);
+                         "  INFO: %d informational items for improvement\n",
+                         info_count);
         }
 
         debug_printf(ctx, "\nRecommendations:\n");
         debug_printf(ctx,
-            "  - Fix all syntax errors before running the script\n");
-        debug_printf(ctx,
-            "  - Address security warnings to prevent vulnerabilities\n");
-        debug_printf(ctx,
+                     "  - Fix all syntax errors before running the script\n");
+        debug_printf(
+            ctx, "  - Address security warnings to prevent vulnerabilities\n");
+        debug_printf(
+            ctx,
             "  - Consider performance suggestions for better efficiency\n");
-        debug_printf(ctx,
-            "  - Follow style guidelines for maintainability\n");
-        debug_printf(ctx,
-            "  - Address portability issues for cross-platform compatibility\n");
+        debug_printf(ctx, "  - Follow style guidelines for maintainability\n");
+        debug_printf(ctx, "  - Address portability issues for cross-platform "
+                          "compatibility\n");
     }
 }
 
@@ -763,8 +762,8 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
  * @param dry_run Preview fixes without applying
  * @return Number of unfixed issues remaining (0 = success)
  */
-int debug_lint_script(debug_context_t *ctx, const char *script_path,
-                      bool fix, bool unsafe_fixes, bool dry_run) {
+int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
+                      bool unsafe_fixes, bool dry_run) {
     if (!ctx || !script_path) {
         return -1;
     }
@@ -828,7 +827,8 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path,
     if (fix && actionable_count > 0) {
         fixer_context_t fixer_ctx;
         if (fixer_init(&fixer_ctx) == FIXER_OK) {
-            if (fixer_load_string(&fixer_ctx, script_content, script_path) == FIXER_OK) {
+            if (fixer_load_string(&fixer_ctx, script_content, script_path) ==
+                FIXER_OK) {
                 // Convert string target to enum for fixer API
                 shell_mode_t target = SHELL_MODE_POSIX;
                 const char *target_str = compat_get_target();
@@ -854,29 +854,31 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path,
                         size_t applied = 0;
 
                         if (fixer_apply_fixes_alloc(&fixer_ctx, &opts,
-                                                     &fixed_content,
-                                                     &applied) == FIXER_OK) {
+                                                    &fixed_content,
+                                                    &applied) == FIXER_OK) {
                             if (applied > 0) {
                                 // Verify syntax before writing
-                                if (fixer_verify_syntax(fixed_content, target)) {
+                                if (fixer_verify_syntax(fixed_content,
+                                                        target)) {
                                     if (fixer_write_file(script_path,
-                                                          fixed_content,
-                                                          true) == FIXER_OK) {
-                                        debug_printf(ctx,
+                                                         fixed_content,
+                                                         true) == FIXER_OK) {
+                                        debug_printf(
+                                            ctx,
                                             "\nApplied %zu fix(es) to %s\n",
                                             applied, script_path);
                                         debug_printf(ctx,
-                                            "Backup saved to %s.bak\n",
-                                            script_path);
+                                                     "Backup saved to %s.bak\n",
+                                                     script_path);
                                         actionable_count -= (int)applied;
                                     } else {
-                                        debug_printf(ctx,
-                                            "ERROR: Failed to write fixed file\n");
+                                        debug_printf(ctx, "ERROR: Failed to "
+                                                          "write fixed file\n");
                                     }
                                 } else {
-                                    debug_printf(ctx,
-                                        "ERROR: Fixed script has syntax errors, "
-                                        "not applying\n");
+                                    debug_printf(ctx, "ERROR: Fixed script has "
+                                                      "syntax errors, "
+                                                      "not applying\n");
                                 }
                             }
                             free(fixed_content);

@@ -133,9 +133,7 @@ static void sighup_handler(int signo) {
  *
  * @return true if SIGHUP was received, false otherwise
  */
-bool sighup_was_received(void) {
-    return sighup_received != 0;
-}
+bool sighup_was_received(void) { return sighup_received != 0; }
 
 /**
  * @brief Send SIGHUP to all background jobs

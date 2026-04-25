@@ -12,16 +12,16 @@
 #ifndef BUILTINS_H
 #define BUILTINS_H
 
+#include "libhashtable/ht.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "libhashtable/ht.h"
-
 /** Builtin command entry */
 typedef struct builtin_s {
-    const char *name;  /**< Command name */
-    const char *doc;   /**< Help documentation */
-    int (*func)(int argc, char **argv);  /**< Handler function */
+    const char *name;                   /**< Command name */
+    const char *doc;                    /**< Help documentation */
+    int (*func)(int argc, char **argv); /**< Handler function */
 } builtin;
 
 /** Array of all builtin commands */
@@ -32,7 +32,8 @@ extern const size_t builtins_count;
 
 /* ============================================================================
  * Builtin Command Handlers
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Exit the shell
@@ -413,7 +414,8 @@ int bin_dirs(int argc, char **argv);
 
 /* ============================================================================
  * Command Hash Table
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Initialize the command hash table */
 void init_command_hash(void);

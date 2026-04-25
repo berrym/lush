@@ -77,34 +77,39 @@
  */
 
 /* Create a fully initialized command layer with event system */
-static command_layer_t *create_initialized_layer(layer_event_system_t **events_out) {
+static command_layer_t *
+create_initialized_layer(layer_event_system_t **events_out) {
     layer_event_system_t *events = layer_events_create(NULL);
-    if (!events) return NULL;
-    
+    if (!events)
+        return NULL;
+
     layer_events_init(events);
-    
+
     command_layer_t *layer = command_layer_create();
     if (!layer) {
         layer_events_destroy(events);
         return NULL;
     }
-    
+
     command_layer_error_t err = command_layer_init(layer, events);
     if (err != COMMAND_LAYER_SUCCESS) {
         command_layer_destroy(layer);
         layer_events_destroy(events);
         return NULL;
     }
-    
+
     if (events_out) {
         *events_out = events;
     }
     return layer;
 }
 
-static void destroy_initialized_layer(command_layer_t *layer, layer_event_system_t *events) {
-    if (layer) command_layer_destroy(layer);
-    if (events) layer_events_destroy(events);
+static void destroy_initialized_layer(command_layer_t *layer,
+                                      layer_event_system_t *events) {
+    if (layer)
+        command_layer_destroy(layer);
+    if (events)
+        layer_events_destroy(events);
 }
 
 /* ============================================================================
@@ -130,7 +135,8 @@ TEST(command_layer_set_command_simple) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    command_layer_error_t err = command_layer_set_command(layer, "echo hello", 0);
+    command_layer_error_t err =
+        command_layer_set_command(layer, "echo hello", 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "set_command should succeed");
 
     destroy_initialized_layer(layer, events);
@@ -178,8 +184,10 @@ TEST(command_layer_cursor_position) {
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
     /* Set command with cursor at position 5 */
-    command_layer_error_t err = command_layer_set_command(layer, "echo hello", 5);
-    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "set_command with cursor should succeed");
+    command_layer_error_t err =
+        command_layer_set_command(layer, "echo hello", 5);
+    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS,
+              "set_command with cursor should succeed");
 
     /* Update cursor position */
     err = command_layer_set_cursor_position(layer, 8);
@@ -199,7 +207,8 @@ TEST(command_layer_get_highlighted_text) {
     char buffer[1024];
     command_layer_error_t err =
         command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
-    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "get_highlighted_text should succeed");
+    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS,
+              "get_highlighted_text should succeed");
 
     destroy_initialized_layer(layer, events);
 }
@@ -444,7 +453,8 @@ TEST(layer_events_publish_content_changed) {
 
     layer_events_error_t err = layer_events_publish_content_changed(
         events, LAYER_ID_COMMAND_LAYER, "test content", 12, false);
-    ASSERT_EQ(err, LAYER_EVENTS_SUCCESS, "publish_content_changed should succeed");
+    ASSERT_EQ(err, LAYER_EVENTS_SUCCESS,
+              "publish_content_changed should succeed");
 
     layer_events_destroy(events);
 }
@@ -536,8 +546,8 @@ TEST(layer_events_process_priority) {
                                 LAYER_EVENT_PRIORITY_HIGH);
 
     /* Process only high priority */
-    int processed = layer_events_process_priority(events,
-                                                  LAYER_EVENT_PRIORITY_HIGH, 10);
+    int processed =
+        layer_events_process_priority(events, LAYER_EVENT_PRIORITY_HIGH, 10);
     ASSERT(processed >= 0, "process_priority should not return negative");
 
     layer_events_destroy(events);
@@ -617,12 +627,13 @@ TEST(command_layer_completion_menu_set) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    command_layer_error_t err = command_layer_set_completion_menu(
-        layer, "item1\nitem2\nitem3", 3, 0);
+    command_layer_error_t err =
+        command_layer_set_completion_menu(layer, "item1\nitem2\nitem3", 3, 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "set_completion_menu should succeed");
 
     ASSERT_TRUE(command_layer_is_menu_visible(layer), "Menu should be visible");
-    ASSERT_EQ(command_layer_get_menu_lines(layer), 3, "Menu should have 3 lines");
+    ASSERT_EQ(command_layer_get_menu_lines(layer), 3,
+              "Menu should have 3 lines");
 
     destroy_initialized_layer(layer, events);
 }
@@ -636,9 +647,11 @@ TEST(command_layer_completion_menu_clear) {
     ASSERT_TRUE(command_layer_is_menu_visible(layer), "Menu should be visible");
 
     command_layer_error_t err = command_layer_clear_completion_menu(layer);
-    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "clear_completion_menu should succeed");
+    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS,
+              "clear_completion_menu should succeed");
 
-    ASSERT_FALSE(command_layer_is_menu_visible(layer), "Menu should not be visible");
+    ASSERT_FALSE(command_layer_is_menu_visible(layer),
+                 "Menu should not be visible");
 
     destroy_initialized_layer(layer, events);
 }
@@ -682,13 +695,15 @@ TEST(command_layer_multiline) {
 
     const char *multiline = "if true\nthen\n  echo hello\nfi";
     command_layer_error_t err = command_layer_set_command(layer, multiline, 0);
-    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "Multiline set_command should succeed");
+    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS,
+              "Multiline set_command should succeed");
 
     command_layer_update(layer);
 
     char buffer[2048];
     err = command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
-    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "Multiline get_highlighted should succeed");
+    ASSERT_EQ(err, COMMAND_LAYER_SUCCESS,
+              "Multiline get_highlighted should succeed");
 
     destroy_initialized_layer(layer, events);
 }
@@ -698,7 +713,8 @@ TEST(command_layer_continuation) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Test simple continuation line (without trailing backslash that may trigger input) */
+    /* Test simple continuation line (without trailing backslash that may
+     * trigger input) */
     const char *multiline = "echo hello world";
     command_layer_error_t err = command_layer_set_command(layer, multiline, 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "Simple command should succeed");
@@ -738,7 +754,8 @@ TEST(command_layer_unicode) {
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
     /* Unicode in command */
-    command_layer_error_t err = command_layer_set_command(layer, "echo 日本語", 0);
+    command_layer_error_t err =
+        command_layer_set_command(layer, "echo 日本語", 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "Unicode should be handled");
 
     destroy_initialized_layer(layer, events);
@@ -778,7 +795,8 @@ TEST(command_layer_performance_target) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     for (int i = 0; i < 100; i++) {
-        command_layer_set_command(layer, "echo hello | grep h > /dev/null", i % 30);
+        command_layer_set_command(layer, "echo hello | grep h > /dev/null",
+                                  i % 30);
         command_layer_update(layer);
     }
 

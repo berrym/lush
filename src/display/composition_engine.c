@@ -1480,7 +1480,8 @@ composition_engine_calculate_hash(const composition_engine_t *engine,
 // ============================================================================
 
 /**
- * @brief Calculate visual width of a text string, stripping ANSI escape sequences
+ * @brief Calculate visual width of a text string, stripping ANSI escape
+ * sequences
  *
  * Strips ANSI escape sequences and GNU Readline markers (\001 and \002).
  * This is needed to calculate the prompt width correctly.
@@ -1741,7 +1742,8 @@ static size_t split_command_lines(const char *command_text,
  *
  * @param engine Composition engine instance
  * @param primary_prompt Primary prompt (for first line)
- * @param command_text Full command text (unused, for display_controller callback)
+ * @param command_text Full command text (unused, for display_controller
+ * callback)
  * @param lines Array of line info (unused, for display_controller callback)
  * @param line_count Number of lines to build prompts for
  * @param prompts Output array for prompts (must have line_count entries)
@@ -1844,7 +1846,8 @@ static composition_engine_error_t coordinate_screen_buffer_rendering(
  * @param prompts Array of prompts for each line
  * @param terminal_width Terminal width in columns
  * @param out_line Output: cursor line number (0-based)
- * @param out_column Output: cursor column number (0-based, includes prompt width)
+ * @param out_column Output: cursor column number (0-based, includes prompt
+ * width)
  * @return COMPOSITION_ENGINE_SUCCESS on success, error code otherwise
  */
 MAYBE_UNUSED

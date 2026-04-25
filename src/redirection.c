@@ -70,7 +70,8 @@ int setup_redirections(executor_t *executor, node_t *command) {
     // POSIX compliant: Process redirections left-to-right in order they appear
     node_t *child = command->first_child;
     while (child) {
-        if (child->type >= NODE_REDIR_IN && child->type <= NODE_REDIR_FD_ALLOC) {
+        if (child->type >= NODE_REDIR_IN &&
+            child->type <= NODE_REDIR_FD_ALLOC) {
             int result = handle_redirection_node(executor, child);
             if (result != 0) {
                 return result;
@@ -151,25 +152,28 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
     }
 
     // Check if target is a process substitution node (< <(cmd) or > >(cmd))
-    // This is valid bash/zsh syntax for redirecting from/to process substitution
+    // This is valid bash/zsh syntax for redirecting from/to process
+    // substitution
     if (target_node->type == NODE_PROC_SUB_IN ||
         target_node->type == NODE_PROC_SUB_OUT) {
         // Expand the process substitution to get /dev/fd/N path
-        char *proc_sub_path = expand_process_substitution(executor, target_node);
+        char *proc_sub_path =
+            expand_process_substitution(executor, target_node);
         if (!proc_sub_path) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_PROCESS_SUBST, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "process substitution expansion failed");
             // Copy executor's context stack to error
-            for (size_t i = 0; i < executor->context_depth &&
-                              i < SHELL_ERROR_CONTEXT_MAX; i++) {
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
                 if (executor->context_stack[i]) {
                     shell_error_push_context(error, "%s",
                                              executor->context_stack[i]);
                 }
             }
-            shell_error_set_suggestion(error,
-                "ensure the command inside <(...) or >(...) is valid");
+            shell_error_set_suggestion(
+                error, "ensure the command inside <(...) or >(...) is valid");
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             return 1;
@@ -187,8 +191,9 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                 shell_error_t *error = shell_error_create(
                     SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
                     redir_node->loc, "%s: %s", proc_sub_path, strerror(errno));
-                for (size_t i = 0; i < executor->context_depth &&
-                                  i < SHELL_ERROR_CONTEXT_MAX; i++) {
+                for (size_t i = 0;
+                     i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
                     if (executor->context_stack[i]) {
                         shell_error_push_context(error, "%s",
                                                  executor->context_stack[i]);
@@ -217,8 +222,9 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                 shell_error_t *error = shell_error_create(
                     SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
                     redir_node->loc, "%s: %s", proc_sub_path, strerror(errno));
-                for (size_t i = 0; i < executor->context_depth &&
-                                  i < SHELL_ERROR_CONTEXT_MAX; i++) {
+                for (size_t i = 0;
+                     i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
                     if (executor->context_stack[i]) {
                         shell_error_push_context(error, "%s",
                                                  executor->context_stack[i]);
@@ -247,9 +253,9 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                     SHELL_ERR_INVALID_REDIRECT, SHELL_SEVERITY_ERROR,
                     redir_node->loc,
                     "unsupported redirection type with process substitution");
-                shell_error_set_suggestion(error,
-                    "use '< <(cmd)' to read from a command or "
-                    "'> >(cmd)' to write to one");
+                shell_error_set_suggestion(
+                    error, "use '< <(cmd)' to read from a command or "
+                           "'> >(cmd)' to write to one");
                 shell_error_display(error, stderr, isatty(STDERR_FILENO));
                 shell_error_free(error);
                 result = 1;
@@ -274,10 +280,9 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
 
     // Privileged mode security check for redirection target
     if (!is_privileged_redirection_allowed(target)) {
-        fprintf(
-            stderr,
-            "lush: %s: restricted redirection target in privileged mode\n",
-            target);
+        fprintf(stderr,
+                "lush: %s: restricted redirection target in privileged mode\n",
+                target);
         free(target);
         return 1;
     }
@@ -587,9 +592,9 @@ static int setup_here_document(const char *delimiter, bool strip_tabs) {
     // Create a temporary pipe for the here document content
     int pipefd[2];
     if (pipe(pipefd) == -1) {
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_PIPE_FAILED, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "pipe: %s", strerror(errno));
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_PIPE_FAILED, SHELL_SEVERITY_ERROR,
+                               SOURCE_LOC_UNKNOWN, "pipe: %s", strerror(errno));
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
         return 1;
@@ -597,9 +602,9 @@ static int setup_here_document(const char *delimiter, bool strip_tabs) {
 
     pid_t pid = lush_fork();
     if (pid == -1) {
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_FORK_FAILED, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "fork: %s", strerror(errno));
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_FORK_FAILED, SHELL_SEVERITY_ERROR,
+                               SOURCE_LOC_UNKNOWN, "fork: %s", strerror(errno));
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
         close(pipefd[0]);
@@ -687,9 +692,9 @@ static int setup_here_document_with_content(const char *content) {
     // Create a temporary pipe for the here document content
     int pipefd[2];
     if (pipe(pipefd) == -1) {
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_PIPE_FAILED, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "pipe: %s", strerror(errno));
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_PIPE_FAILED, SHELL_SEVERITY_ERROR,
+                               SOURCE_LOC_UNKNOWN, "pipe: %s", strerror(errno));
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
         return 1;
@@ -697,9 +702,9 @@ static int setup_here_document_with_content(const char *content) {
 
     pid_t pid = lush_fork();
     if (pid == -1) {
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_FORK_FAILED, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "fork: %s", strerror(errno));
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_FORK_FAILED, SHELL_SEVERITY_ERROR,
+                               SOURCE_LOC_UNKNOWN, "fork: %s", strerror(errno));
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
         close(pipefd[0]);
@@ -874,9 +879,9 @@ static int setup_here_string(executor_t *executor, const char *content) {
 
     int pipefd[2];
     if (pipe(pipefd) == -1) {
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_PIPE_FAILED, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "pipe: %s", strerror(errno));
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_PIPE_FAILED, SHELL_SEVERITY_ERROR,
+                               SOURCE_LOC_UNKNOWN, "pipe: %s", strerror(errno));
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
         return 1;
@@ -912,9 +917,9 @@ static int setup_here_string(executor_t *executor, const char *content) {
 
     // Redirect stdin to read from the pipe
     if (dup2(pipefd[0], STDIN_FILENO) == -1) {
-        shell_error_t *error = shell_error_create(
-            SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "dup2: %s", strerror(errno));
+        shell_error_t *error =
+            shell_error_create(SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR,
+                               SOURCE_LOC_UNKNOWN, "dup2: %s", strerror(errno));
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
         close(pipefd[0]);
@@ -992,10 +997,12 @@ static int setup_fd_redirection(executor_t *executor, const char *redir_text) {
 
     // Determine direction: < or >
     if (*p == '<') {
-        if (source_fd == -1) source_fd = STDIN_FILENO;
+        if (source_fd == -1)
+            source_fd = STDIN_FILENO;
         p++;
     } else if (*p == '>') {
-        if (source_fd == -1) source_fd = STDOUT_FILENO;
+        if (source_fd == -1)
+            source_fd = STDOUT_FILENO;
         p++;
     } else {
         return 1; // Unknown pattern
@@ -1076,8 +1083,9 @@ static int setup_fd_redirection(executor_t *executor, const char *redir_text) {
         return 1;
     }
 
-    // For output redirections (source_fd is stdout-like), verify target is writable
-    // For input redirections (source_fd is stdin-like), verify target is readable
+    // For output redirections (source_fd is stdout-like), verify target is
+    // writable For input redirections (source_fd is stdin-like), verify target
+    // is readable
     int access_mode = fd_flags & O_ACCMODE;
     bool is_output_redir = (source_fd != STDIN_FILENO);
     bool is_input_redir = (source_fd == STDIN_FILENO);
@@ -1252,7 +1260,7 @@ static int find_available_fd(int min_fd) {
             return fd;
         }
     }
-    return -1;  // No available fd found
+    return -1; // No available fd found
 }
 
 /**
@@ -1269,7 +1277,8 @@ static int find_available_fd(int min_fd) {
  * @param redir_node Redirection node containing pattern and optional target
  * @return 0 on success, non-zero on error
  */
-static int setup_fd_alloc_redirection(executor_t *executor, node_t *redir_node) {
+static int setup_fd_alloc_redirection(executor_t *executor,
+                                      node_t *redir_node) {
     if (!redir_node || !redir_node->val.str) {
         return 1;
     }
@@ -1305,7 +1314,7 @@ static int setup_fd_alloc_redirection(executor_t *executor, node_t *redir_node) 
     bool is_append = false;
     int dup_target = -1;
 
-    op++;  // Skip < or >
+    op++; // Skip < or >
 
     // Check for >> (append)
     if (*op == '>') {
@@ -1370,8 +1379,9 @@ static int setup_fd_alloc_redirection(executor_t *executor, node_t *redir_node) 
         int allocated_fd = find_available_fd(10);
         if (allocated_fd < 0) {
             shell_error_t *error = shell_error_create(
-                SHELL_ERR_FD_UNAVAILABLE, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-                "cannot allocate file descriptor for %s", var_name);
+                SHELL_ERR_FD_UNAVAILABLE, SHELL_SEVERITY_ERROR,
+                SOURCE_LOC_UNKNOWN, "cannot allocate file descriptor for %s",
+                var_name);
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             free(var_name);
@@ -1399,8 +1409,8 @@ static int setup_fd_alloc_redirection(executor_t *executor, node_t *redir_node) 
     node_t *target_node = redir_node->first_child;
     if (!target_node || !target_node->val.str) {
         shell_error_t *error = shell_error_create(
-            SHELL_ERR_INVALID_REDIRECT, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "missing redirection target");
+            SHELL_ERR_INVALID_REDIRECT, SHELL_SEVERITY_ERROR,
+            SOURCE_LOC_UNKNOWN, "missing redirection target");
         shell_error_display(error, stderr, isatty(STDERR_FILENO));
         shell_error_free(error);
         free(var_name);

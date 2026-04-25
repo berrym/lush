@@ -16,13 +16,15 @@
 #ifndef FIXER_H
 #define FIXER_H
 
+#include "compat.h"
+
 #include <stdbool.h>
 #include <stddef.h>
-#include "compat.h"
 
 /* ============================================================================
  * Fixer Types
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief A single fix to be applied
@@ -31,14 +33,14 @@
  * Fixes are applied from end to start to preserve line/column positions.
  */
 typedef struct {
-    int line;               /**< Line number (1-based) */
-    int column;             /**< Column number (1-based) */
-    size_t match_start;     /**< Byte offset of match start */
-    size_t match_length;    /**< Length of matched text */
-    const char *original;   /**< Original matched text (not owned) */
-    const char *replacement;/**< Replacement text (not owned) */
-    fix_type_t type;        /**< Fix type (safe/unsafe/manual) */
-    const char *message;    /**< Description of the fix (not owned) */
+    int line;                    /**< Line number (1-based) */
+    int column;                  /**< Column number (1-based) */
+    size_t match_start;          /**< Byte offset of match start */
+    size_t match_length;         /**< Length of matched text */
+    const char *original;        /**< Original matched text (not owned) */
+    const char *replacement;     /**< Replacement text (not owned) */
+    fix_type_t type;             /**< Fix type (safe/unsafe/manual) */
+    const char *message;         /**< Description of the fix (not owned) */
     const compat_entry_t *entry; /**< Source compat entry (not owned) */
 } fixer_fix_t;
 
@@ -46,40 +48,41 @@ typedef struct {
  * @brief Collection of fixes for a script
  */
 typedef struct {
-    fixer_fix_t *fixes;     /**< Array of fixes */
-    size_t count;           /**< Number of fixes */
-    size_t capacity;        /**< Allocated capacity */
-    char *script_path;      /**< Path to script being fixed */
-    char *content;          /**< Original content (owned) */
-    size_t content_len;     /**< Content length */
+    fixer_fix_t *fixes; /**< Array of fixes */
+    size_t count;       /**< Number of fixes */
+    size_t capacity;    /**< Allocated capacity */
+    char *script_path;  /**< Path to script being fixed */
+    char *content;      /**< Original content (owned) */
+    size_t content_len; /**< Content length */
 } fixer_context_t;
 
 /**
  * @brief Result of a fix operation
  */
 typedef enum {
-    FIXER_OK,               /**< Success */
-    FIXER_ERR_IO,           /**< I/O error reading/writing file */
-    FIXER_ERR_PARSE,        /**< Failed to parse fixed script */
-    FIXER_ERR_NOMEM,        /**< Memory allocation failed */
-    FIXER_ERR_NOFIX,        /**< No fixes to apply */
-    FIXER_ERR_VERIFY,       /**< Fixed script failed verification */
+    FIXER_OK,         /**< Success */
+    FIXER_ERR_IO,     /**< I/O error reading/writing file */
+    FIXER_ERR_PARSE,  /**< Failed to parse fixed script */
+    FIXER_ERR_NOMEM,  /**< Memory allocation failed */
+    FIXER_ERR_NOFIX,  /**< No fixes to apply */
+    FIXER_ERR_VERIFY, /**< Fixed script failed verification */
 } fixer_result_t;
 
 /**
  * @brief Options for fix application
  */
 typedef struct {
-    bool include_unsafe;    /**< Include unsafe fixes */
-    bool dry_run;           /**< Preview only, don't modify files */
-    bool create_backup;     /**< Create .bak backup before modifying */
-    bool verify_syntax;     /**< Parse fixed script to verify correctness */
-    shell_mode_t target;    /**< Target shell mode for verification */
+    bool include_unsafe; /**< Include unsafe fixes */
+    bool dry_run;        /**< Preview only, don't modify files */
+    bool create_backup;  /**< Create .bak backup before modifying */
+    bool verify_syntax;  /**< Parse fixed script to verify correctness */
+    shell_mode_t target; /**< Target shell mode for verification */
 } fixer_options_t;
 
 /* ============================================================================
  * Context Management
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize a fixer context
@@ -118,11 +121,12 @@ fixer_result_t fixer_load_file(fixer_context_t *ctx, const char *path);
  * @return FIXER_OK on success, error code on failure
  */
 fixer_result_t fixer_load_string(fixer_context_t *ctx, const char *content,
-                                  const char *path);
+                                 const char *path);
 
 /* ============================================================================
  * Fix Collection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Collect all fixable issues from the loaded script
@@ -171,7 +175,8 @@ size_t fixer_count_manual(const fixer_context_t *ctx);
 
 /* ============================================================================
  * Fix Application
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Apply collected fixes to the script content
@@ -187,9 +192,8 @@ size_t fixer_count_manual(const fixer_context_t *ctx);
  * @return FIXER_OK on success, error code on failure
  */
 fixer_result_t fixer_apply_fixes(fixer_context_t *ctx,
-                                  const fixer_options_t *options,
-                                  char *output, size_t output_size,
-                                  size_t *fixes_applied);
+                                 const fixer_options_t *options, char *output,
+                                 size_t output_size, size_t *fixes_applied);
 
 /**
  * @brief Apply fixes and return newly allocated string
@@ -201,9 +205,8 @@ fixer_result_t fixer_apply_fixes(fixer_context_t *ctx,
  * @return FIXER_OK on success, error code on failure
  */
 fixer_result_t fixer_apply_fixes_alloc(fixer_context_t *ctx,
-                                        const fixer_options_t *options,
-                                        char **output,
-                                        size_t *fixes_applied);
+                                       const fixer_options_t *options,
+                                       char **output, size_t *fixes_applied);
 
 /**
  * @brief Verify that fixed content parses correctly
@@ -227,11 +230,12 @@ bool fixer_verify_syntax(const char *content, shell_mode_t target);
  * @return FIXER_OK on success, error code on failure
  */
 fixer_result_t fixer_write_file(const char *path, const char *content,
-                                 bool create_backup);
+                                bool create_backup);
 
 /* ============================================================================
  * Diff Generation
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Generate unified diff of changes
@@ -257,7 +261,8 @@ void fixer_print_diff(fixer_context_t *ctx, const fixer_options_t *options);
 
 /* ============================================================================
  * Reporting
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Print summary of collected fixes
@@ -290,30 +295,31 @@ const char *fixer_result_string(fixer_result_t result);
 
 /* ============================================================================
  * Interactive Fix Mode
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief User response for interactive fix mode
  */
 typedef enum {
-    FIXER_RESPONSE_YES,      /**< Apply this fix */
-    FIXER_RESPONSE_NO,       /**< Skip this fix */
-    FIXER_RESPONSE_ALL,      /**< Apply all remaining fixes */
-    FIXER_RESPONSE_QUIT,     /**< Stop and apply accepted fixes */
-    FIXER_RESPONSE_DIFF,     /**< Show diff for this fix */
-    FIXER_RESPONSE_HELP,     /**< Show help */
+    FIXER_RESPONSE_YES,  /**< Apply this fix */
+    FIXER_RESPONSE_NO,   /**< Skip this fix */
+    FIXER_RESPONSE_ALL,  /**< Apply all remaining fixes */
+    FIXER_RESPONSE_QUIT, /**< Stop and apply accepted fixes */
+    FIXER_RESPONSE_DIFF, /**< Show diff for this fix */
+    FIXER_RESPONSE_HELP, /**< Show help */
 } fixer_response_t;
 
 /**
  * @brief Interactive fix session state
  */
 typedef struct {
-    fixer_context_t *ctx;       /**< Fixer context */
-    fixer_options_t options;    /**< Fix options */
-    bool *accepted;             /**< Array of accepted fix flags */
-    size_t current;             /**< Current fix index */
-    bool apply_all;             /**< Apply all remaining without prompting */
-    bool aborted;               /**< Session was aborted */
+    fixer_context_t *ctx;    /**< Fixer context */
+    fixer_options_t options; /**< Fix options */
+    bool *accepted;          /**< Array of accepted fix flags */
+    size_t current;          /**< Current fix index */
+    bool apply_all;          /**< Apply all remaining without prompting */
+    bool aborted;            /**< Session was aborted */
 } fixer_interactive_t;
 
 /**
@@ -325,8 +331,8 @@ typedef struct {
  * @return FIXER_OK on success, error code on failure
  */
 fixer_result_t fixer_interactive_init(fixer_interactive_t *session,
-                                       fixer_context_t *ctx,
-                                       const fixer_options_t *options);
+                                      fixer_context_t *ctx,
+                                      const fixer_options_t *options);
 
 /**
  * @brief Clean up interactive session
@@ -363,8 +369,7 @@ void fixer_interactive_respond(fixer_interactive_t *session,
  * @return FIXER_OK on success, error code on failure
  */
 fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
-                                        char **output,
-                                        size_t *fixes_applied);
+                                       char **output, size_t *fixes_applied);
 
 /**
  * @brief Print a single fix with context for interactive review
@@ -378,8 +383,8 @@ fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
  * @param total Total number of fixes
  */
 void fixer_print_fix_interactive(const fixer_context_t *ctx,
-                                 const fixer_fix_t *fix,
-                                 size_t index, size_t total);
+                                 const fixer_fix_t *fix, size_t index,
+                                 size_t total);
 
 /**
  * @brief Print interactive mode help
@@ -406,8 +411,7 @@ fixer_response_t fixer_read_response(void);
  * @param script_path Path to script (for writing)
  * @return Number of fixes applied, or -1 on error
  */
-int fixer_run_interactive(fixer_context_t *ctx,
-                          const fixer_options_t *options,
+int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
                           const char *script_path);
 
 #endif /* FIXER_H */

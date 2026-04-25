@@ -3,7 +3,8 @@
  * @brief Display controller - High-level display management system
  *
  * Provides high-level coordination of all display layers, system-wide
- * performance monitoring, and intelligent caching for optimal shell integration.
+ * performance monitoring, and intelligent caching for optimal shell
+ * integration.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -280,8 +281,8 @@ typedef struct {
     // Notification integration (transient hints below command line)
     // We store a COPY of the notification, not a pointer, because the source
     // may be on the stack and get overwritten by intermediate function calls
-    lle_notification_state_t notification_copy;  // Copy of notification data
-    bool notification_visible;   // Notification visibility state
+    lle_notification_state_t notification_copy; // Copy of notification data
+    bool notification_visible;                  // Notification visibility state
     bool notification_state_changed; // Flag: notification changed, needs redraw
 } display_controller_t;
 
@@ -649,7 +650,8 @@ display_controller_clear_notification(display_controller_t *controller);
  * @param controller The display controller
  * @return true if notification is visible, false otherwise
  */
-bool display_controller_has_notification(const display_controller_t *controller);
+bool display_controller_has_notification(
+    const display_controller_t *controller);
 
 /**
  * Check if notification state changed and clear the flag.

@@ -179,7 +179,8 @@ int main(int argc, char **argv) {
         // Initialize debug context for analysis
         debug_context_t *ctx = debug_init();
         if (!ctx) {
-            fprintf(stderr, "%s: failed to initialize analysis context\n", argv[0]);
+            fprintf(stderr, "%s: failed to initialize analysis context\n",
+                    argv[0]);
             exit(EXIT_FAILURE);
         }
 
@@ -196,10 +197,11 @@ int main(int argc, char **argv) {
             analysis_issue_t *issue = ctx->analysis_issues;
             while (issue) {
                 if (strcmp(issue->severity, "error") == 0) {
-                    exit_status = 2;  // Errors found
+                    exit_status = 2; // Errors found
                     break;
-                } else if (strcmp(issue->severity, "warning") == 0 && exit_status < 1) {
-                    exit_status = 1;  // Warnings found
+                } else if (strcmp(issue->severity, "warning") == 0 &&
+                           exit_status < 1) {
+                    exit_status = 1; // Warnings found
                 }
                 issue = issue->next;
             }
@@ -247,24 +249,24 @@ int main(int argc, char **argv) {
         debug_enable(ctx, true);
 
         // Run lint analysis with optional fix
-        int remaining = debug_lint_script(ctx, file_to_lint,
-                                          shell_opts.fix_mode,
-                                          shell_opts.unsafe_fixes,
-                                          shell_opts.dry_run);
+        int remaining =
+            debug_lint_script(ctx, file_to_lint, shell_opts.fix_mode,
+                              shell_opts.unsafe_fixes, shell_opts.dry_run);
 
         // Determine exit code
         int exit_status = 0;
         if (remaining < 0) {
-            exit_status = 3;  // Fix application error
+            exit_status = 3; // Fix application error
         } else if (remaining > 0) {
             // Check severity levels of remaining issues
             analysis_issue_t *issue = ctx->analysis_issues;
             while (issue) {
                 if (strcmp(issue->severity, "error") == 0) {
-                    exit_status = 2;  // Errors found
+                    exit_status = 2; // Errors found
                     break;
-                } else if (strcmp(issue->severity, "warning") == 0 && exit_status < 1) {
-                    exit_status = 1;  // Warnings found
+                } else if (strcmp(issue->severity, "warning") == 0 &&
+                           exit_status < 1) {
+                    exit_status = 1; // Warnings found
                 }
                 issue = issue->next;
             }
@@ -375,7 +377,8 @@ int main(int argc, char **argv) {
         fclose(in);
     }
 
-    // For login shells: send SIGHUP to background jobs and execute logout scripts
+    // For login shells: send SIGHUP to background jobs and execute logout
+    // scripts
     if (is_login_shell()) {
         // Send SIGHUP to all background jobs (standard login shell behavior)
         // This must happen before logout scripts so jobs can be cleaned up
@@ -408,7 +411,8 @@ int main(int argc, char **argv) {
  * across multiple command invocations.
  *
  * @param command The command string to parse and execute
- * @return Exit status of the executed command (0 for success, non-zero for failure)
+ * @return Exit status of the executed command (0 for success, non-zero for
+ * failure)
  */
 int parse_and_execute(const char *command) {
     // Use global persistent executor for all commands to maintain function
@@ -418,7 +422,7 @@ int parse_and_execute(const char *command) {
         if (!global_executor) {
             return 1;
         }
-        
+
         // Set script context if running a script (not interactive)
         // $0 contains the script name when running a script
         if (!is_interactive_shell()) {
@@ -438,8 +442,10 @@ int parse_and_execute(const char *command) {
     fflush(stderr);
 
     // Print error messages to stderr if there were any errors
-    // (Skip if error_message is NULL - means it was already displayed via structured system)
-    if (executor_has_error(global_executor) && executor_error(global_executor)) {
+    // (Skip if error_message is NULL - means it was already displayed via
+    // structured system)
+    if (executor_has_error(global_executor) &&
+        executor_error(global_executor)) {
         fprintf(stderr, "lush: %s\n", executor_error(global_executor));
         fflush(stderr);
     }

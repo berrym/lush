@@ -10,10 +10,10 @@
  * error handling, strategy strings, and creation/destruction.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 
 #include "display/composition_engine.h"
 
@@ -21,56 +21,64 @@
 static int tests_run = 0;
 static int tests_passed = 0;
 
-#define ASSERT(cond) do { \
-    if (!(cond)) { \
-        printf("  FAIL: %s (line %d)\n", #cond, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if ((a) != (b)) { \
-        printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_EQ(a, b)                                                        \
+    do {                                                                       \
+        if ((a) != (b)) {                                                      \
+            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NOT_NULL(ptr) do { \
-    if ((ptr) == NULL) { \
-        printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NOT_NULL(ptr)                                                   \
+    do {                                                                       \
+        if ((ptr) == NULL) {                                                   \
+            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_NULL(ptr) do { \
-    if ((ptr) != NULL) { \
-        printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_NULL(ptr)                                                       \
+    do {                                                                       \
+        if ((ptr) != NULL) {                                                   \
+            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define ASSERT_STR_EQ(a, b) do { \
-    if (strcmp((a), (b)) != 0) { \
-        printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b), __LINE__); \
-        return 0; \
-    } \
-} while(0)
+#define ASSERT_STR_EQ(a, b)                                                    \
+    do {                                                                       \
+        if (strcmp((a), (b)) != 0) {                                           \
+            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
+                   __LINE__);                                                  \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
 
-#define RUN_TEST(test) do { \
-    printf("  Running %s...\n", #test); \
-    tests_run++; \
-    if (test()) { \
-        tests_passed++; \
-        printf("  PASS: %s\n", #test); \
-    } \
-} while(0)
+#define RUN_TEST(test)                                                         \
+    do {                                                                       \
+        printf("  Running %s...\n", #test);                                    \
+        tests_run++;                                                           \
+        if (test()) {                                                          \
+            tests_passed++;                                                    \
+            printf("  PASS: %s\n", #test);                                     \
+        }                                                                      \
+    } while (0)
 
 /* ============================================================
  * ERROR STRING TESTS
  * ============================================================ */
 
 static int test_error_string_success(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_SUCCESS);
+    const char *msg =
+        composition_engine_error_string(COMPOSITION_ENGINE_SUCCESS);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Success");
@@ -78,7 +86,8 @@ static int test_error_string_success(void) {
 }
 
 static int test_error_string_invalid_param(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
+    const char *msg =
+        composition_engine_error_string(COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Invalid parameter");
@@ -86,7 +95,8 @@ static int test_error_string_invalid_param(void) {
 }
 
 static int test_error_string_null_pointer(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_NULL_POINTER);
+    const char *msg =
+        composition_engine_error_string(COMPOSITION_ENGINE_ERROR_NULL_POINTER);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "NULL pointer");
@@ -94,7 +104,8 @@ static int test_error_string_null_pointer(void) {
 }
 
 static int test_error_string_memory_allocation(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_MEMORY_ALLOCATION);
+    const char *msg = composition_engine_error_string(
+        COMPOSITION_ENGINE_ERROR_MEMORY_ALLOCATION);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Memory allocation failed");
@@ -102,7 +113,8 @@ static int test_error_string_memory_allocation(void) {
 }
 
 static int test_error_string_buffer_too_small(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL);
+    const char *msg = composition_engine_error_string(
+        COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Buffer too small");
@@ -110,7 +122,8 @@ static int test_error_string_buffer_too_small(void) {
 }
 
 static int test_error_string_content_too_large(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_CONTENT_TOO_LARGE);
+    const char *msg = composition_engine_error_string(
+        COMPOSITION_ENGINE_ERROR_CONTENT_TOO_LARGE);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Content too large");
@@ -118,7 +131,8 @@ static int test_error_string_content_too_large(void) {
 }
 
 static int test_error_string_layer_not_ready(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY);
+    const char *msg = composition_engine_error_string(
+        COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Layer not ready");
@@ -126,7 +140,8 @@ static int test_error_string_layer_not_ready(void) {
 }
 
 static int test_error_string_analysis_failed(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_ANALYSIS_FAILED);
+    const char *msg = composition_engine_error_string(
+        COMPOSITION_ENGINE_ERROR_ANALYSIS_FAILED);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Analysis failed");
@@ -134,7 +149,8 @@ static int test_error_string_analysis_failed(void) {
 }
 
 static int test_error_string_composition_failed(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_COMPOSITION_FAILED);
+    const char *msg = composition_engine_error_string(
+        COMPOSITION_ENGINE_ERROR_COMPOSITION_FAILED);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Composition failed");
@@ -142,7 +158,8 @@ static int test_error_string_composition_failed(void) {
 }
 
 static int test_error_string_cache_invalid(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_CACHE_INVALID);
+    const char *msg =
+        composition_engine_error_string(COMPOSITION_ENGINE_ERROR_CACHE_INVALID);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Cache invalid");
@@ -150,7 +167,8 @@ static int test_error_string_cache_invalid(void) {
 }
 
 static int test_error_string_event_failed(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_EVENT_FAILED);
+    const char *msg =
+        composition_engine_error_string(COMPOSITION_ENGINE_ERROR_EVENT_FAILED);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Event handling failed");
@@ -158,7 +176,8 @@ static int test_error_string_event_failed(void) {
 }
 
 static int test_error_string_not_initialized(void) {
-    const char *msg = composition_engine_error_string(COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
+    const char *msg = composition_engine_error_string(
+        COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Engine not initialized");
@@ -166,7 +185,8 @@ static int test_error_string_not_initialized(void) {
 }
 
 static int test_error_string_unknown(void) {
-    const char *msg = composition_engine_error_string((composition_engine_error_t)999);
+    const char *msg =
+        composition_engine_error_string((composition_engine_error_t)999);
     ASSERT_NOT_NULL(msg);
     ASSERT(strlen(msg) > 0);
     ASSERT_STR_EQ(msg, "Unknown error");
@@ -178,42 +198,48 @@ static int test_error_string_unknown(void) {
  * ============================================================ */
 
 static int test_strategy_string_simple(void) {
-    const char *msg = composition_engine_strategy_string(COMPOSITION_STRATEGY_SIMPLE);
+    const char *msg =
+        composition_engine_strategy_string(COMPOSITION_STRATEGY_SIMPLE);
     ASSERT_NOT_NULL(msg);
     ASSERT_STR_EQ(msg, "Simple");
     return 1;
 }
 
 static int test_strategy_string_multiline(void) {
-    const char *msg = composition_engine_strategy_string(COMPOSITION_STRATEGY_MULTILINE);
+    const char *msg =
+        composition_engine_strategy_string(COMPOSITION_STRATEGY_MULTILINE);
     ASSERT_NOT_NULL(msg);
     ASSERT_STR_EQ(msg, "Multiline");
     return 1;
 }
 
 static int test_strategy_string_complex(void) {
-    const char *msg = composition_engine_strategy_string(COMPOSITION_STRATEGY_COMPLEX);
+    const char *msg =
+        composition_engine_strategy_string(COMPOSITION_STRATEGY_COMPLEX);
     ASSERT_NOT_NULL(msg);
     ASSERT_STR_EQ(msg, "Complex");
     return 1;
 }
 
 static int test_strategy_string_ascii_art(void) {
-    const char *msg = composition_engine_strategy_string(COMPOSITION_STRATEGY_ASCII_ART);
+    const char *msg =
+        composition_engine_strategy_string(COMPOSITION_STRATEGY_ASCII_ART);
     ASSERT_NOT_NULL(msg);
     ASSERT_STR_EQ(msg, "ASCII Art");
     return 1;
 }
 
 static int test_strategy_string_adaptive(void) {
-    const char *msg = composition_engine_strategy_string(COMPOSITION_STRATEGY_ADAPTIVE);
+    const char *msg =
+        composition_engine_strategy_string(COMPOSITION_STRATEGY_ADAPTIVE);
     ASSERT_NOT_NULL(msg);
     ASSERT_STR_EQ(msg, "Adaptive");
     return 1;
 }
 
 static int test_strategy_string_unknown(void) {
-    const char *msg = composition_engine_strategy_string((composition_strategy_t)999);
+    const char *msg =
+        composition_engine_strategy_string((composition_strategy_t)999);
     ASSERT_NOT_NULL(msg);
     ASSERT_STR_EQ(msg, "Unknown");
     return 1;
@@ -233,16 +259,16 @@ static int test_create_returns_valid_engine(void) {
 static int test_create_initializes_defaults(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     /* Check default configuration */
     ASSERT_EQ(engine->intelligent_positioning, true);
     ASSERT_EQ(engine->adaptive_strategy, true);
     ASSERT_EQ(engine->performance_monitoring, true);
     ASSERT_EQ(engine->current_strategy, COMPOSITION_STRATEGY_ADAPTIVE);
-    
+
     /* Not initialized until composition_engine_init() called */
     ASSERT_EQ(engine->initialized, false);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -250,10 +276,10 @@ static int test_create_initializes_defaults(void) {
 static int test_create_initializes_version_string(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     /* Version string should be set */
     ASSERT(strlen(engine->version_string) > 0);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -267,7 +293,7 @@ static int test_destroy_null_engine(void) {
 static int test_destroy_cleans_up_resources(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     /* Destroy should clean up */
     composition_engine_destroy(engine);
     /* If we get here without crash, success */
@@ -279,8 +305,8 @@ static int test_destroy_cleans_up_resources(void) {
  * ============================================================ */
 
 static int test_init_null_engine(void) {
-    composition_engine_error_t result = composition_engine_init(
-        NULL, NULL, NULL, NULL);
+    composition_engine_error_t result =
+        composition_engine_init(NULL, NULL, NULL, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -288,11 +314,11 @@ static int test_init_null_engine(void) {
 static int test_init_null_prompt_layer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_engine_error_t result = composition_engine_init(
         engine, NULL, (command_layer_t *)0x1, (layer_event_system_t *)0x1);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -300,11 +326,11 @@ static int test_init_null_prompt_layer(void) {
 static int test_init_null_command_layer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_engine_error_t result = composition_engine_init(
         engine, (prompt_layer_t *)0x1, NULL, (layer_event_system_t *)0x1);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -312,11 +338,11 @@ static int test_init_null_command_layer(void) {
 static int test_init_null_event_system(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_engine_error_t result = composition_engine_init(
         engine, (prompt_layer_t *)0x1, (command_layer_t *)0x1, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -334,10 +360,10 @@ static int test_is_initialized_null_engine(void) {
 static int test_is_initialized_uninitialized_engine(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     bool result = composition_engine_is_initialized(engine);
     ASSERT_EQ(result, false);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -355,11 +381,11 @@ static int test_cleanup_null_engine(void) {
 static int test_cleanup_uninitialized_engine(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     /* Should not crash even if not initialized */
     composition_engine_error_t result = composition_engine_cleanup(engine);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -370,8 +396,8 @@ static int test_cleanup_uninitialized_engine(void) {
 
 static int test_get_output_null_engine(void) {
     char output[256];
-    composition_engine_error_t result = composition_engine_get_output(
-        NULL, output, sizeof(output));
+    composition_engine_error_t result =
+        composition_engine_get_output(NULL, output, sizeof(output));
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -379,11 +405,11 @@ static int test_get_output_null_engine(void) {
 static int test_get_output_null_buffer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_get_output(
-        engine, NULL, 256);
+
+    composition_engine_error_t result =
+        composition_engine_get_output(engine, NULL, 256);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -391,12 +417,12 @@ static int test_get_output_null_buffer(void) {
 static int test_get_output_zero_size(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     char output[256];
-    composition_engine_error_t result = composition_engine_get_output(
-        engine, output, 0);
+    composition_engine_error_t result =
+        composition_engine_get_output(engine, output, 0);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -404,12 +430,12 @@ static int test_get_output_zero_size(void) {
 static int test_get_output_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     char output[256];
-    composition_engine_error_t result = composition_engine_get_output(
-        engine, output, sizeof(output));
+    composition_engine_error_t result =
+        composition_engine_get_output(engine, output, sizeof(output));
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -420,8 +446,8 @@ static int test_get_output_not_initialized(void) {
 
 static int test_get_analysis_null_engine(void) {
     composition_analysis_t analysis;
-    composition_engine_error_t result = composition_engine_get_analysis(
-        NULL, &analysis);
+    composition_engine_error_t result =
+        composition_engine_get_analysis(NULL, &analysis);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -429,11 +455,11 @@ static int test_get_analysis_null_engine(void) {
 static int test_get_analysis_null_analysis(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_get_analysis(
-        engine, NULL);
+
+    composition_engine_error_t result =
+        composition_engine_get_analysis(engine, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -441,12 +467,12 @@ static int test_get_analysis_null_analysis(void) {
 static int test_get_analysis_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_analysis_t analysis;
-    composition_engine_error_t result = composition_engine_get_analysis(
-        engine, &analysis);
+    composition_engine_error_t result =
+        composition_engine_get_analysis(engine, &analysis);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -457,8 +483,8 @@ static int test_get_analysis_not_initialized(void) {
 
 static int test_get_positioning_null_engine(void) {
     composition_positioning_t positioning;
-    composition_engine_error_t result = composition_engine_get_positioning(
-        NULL, &positioning);
+    composition_engine_error_t result =
+        composition_engine_get_positioning(NULL, &positioning);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -466,11 +492,11 @@ static int test_get_positioning_null_engine(void) {
 static int test_get_positioning_null_positioning(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_get_positioning(
-        engine, NULL);
+
+    composition_engine_error_t result =
+        composition_engine_get_positioning(engine, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -478,12 +504,12 @@ static int test_get_positioning_null_positioning(void) {
 static int test_get_positioning_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_positioning_t positioning;
-    composition_engine_error_t result = composition_engine_get_positioning(
-        engine, &positioning);
+    composition_engine_error_t result =
+        composition_engine_get_positioning(engine, &positioning);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -494,8 +520,8 @@ static int test_get_positioning_not_initialized(void) {
 
 static int test_get_performance_null_engine(void) {
     composition_performance_t performance;
-    composition_engine_error_t result = composition_engine_get_performance(
-        NULL, &performance);
+    composition_engine_error_t result =
+        composition_engine_get_performance(NULL, &performance);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -503,11 +529,11 @@ static int test_get_performance_null_engine(void) {
 static int test_get_performance_null_performance(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_get_performance(
-        engine, NULL);
+
+    composition_engine_error_t result =
+        composition_engine_get_performance(engine, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -515,12 +541,12 @@ static int test_get_performance_null_performance(void) {
 static int test_get_performance_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_performance_t performance;
-    composition_engine_error_t result = composition_engine_get_performance(
-        engine, &performance);
+    composition_engine_error_t result =
+        composition_engine_get_performance(engine, &performance);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -530,8 +556,8 @@ static int test_get_performance_not_initialized(void) {
  * ============================================================ */
 
 static int test_set_strategy_null_engine(void) {
-    composition_engine_error_t result = composition_engine_set_strategy(
-        NULL, COMPOSITION_STRATEGY_SIMPLE);
+    composition_engine_error_t result =
+        composition_engine_set_strategy(NULL, COMPOSITION_STRATEGY_SIMPLE);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -539,11 +565,11 @@ static int test_set_strategy_null_engine(void) {
 static int test_set_strategy_invalid_strategy(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_strategy(
-        engine, (composition_strategy_t)999);
+
+    composition_engine_error_t result =
+        composition_engine_set_strategy(engine, (composition_strategy_t)999);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -551,12 +577,12 @@ static int test_set_strategy_invalid_strategy(void) {
 static int test_set_strategy_valid_strategy(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_strategy(
-        engine, COMPOSITION_STRATEGY_MULTILINE);
+
+    composition_engine_error_t result =
+        composition_engine_set_strategy(engine, COMPOSITION_STRATEGY_MULTILINE);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->current_strategy, COMPOSITION_STRATEGY_MULTILINE);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -564,13 +590,13 @@ static int test_set_strategy_valid_strategy(void) {
 static int test_set_strategy_invalidates_cache(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     engine->composition_cache_valid = true;
-    
+
     composition_engine_set_strategy(engine, COMPOSITION_STRATEGY_SIMPLE);
-    
+
     ASSERT_EQ(engine->composition_cache_valid, false);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -580,8 +606,8 @@ static int test_set_strategy_invalidates_cache(void) {
  * ============================================================ */
 
 static int test_set_intelligent_positioning_null_engine(void) {
-    composition_engine_error_t result = composition_engine_set_intelligent_positioning(
-        NULL, true);
+    composition_engine_error_t result =
+        composition_engine_set_intelligent_positioning(NULL, true);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -589,12 +615,12 @@ static int test_set_intelligent_positioning_null_engine(void) {
 static int test_set_intelligent_positioning_enable(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_intelligent_positioning(
-        engine, true);
+
+    composition_engine_error_t result =
+        composition_engine_set_intelligent_positioning(engine, true);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->intelligent_positioning, true);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -602,12 +628,12 @@ static int test_set_intelligent_positioning_enable(void) {
 static int test_set_intelligent_positioning_disable(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_intelligent_positioning(
-        engine, false);
+
+    composition_engine_error_t result =
+        composition_engine_set_intelligent_positioning(engine, false);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->intelligent_positioning, false);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -617,8 +643,8 @@ static int test_set_intelligent_positioning_disable(void) {
  * ============================================================ */
 
 static int test_set_performance_monitoring_null_engine(void) {
-    composition_engine_error_t result = composition_engine_set_performance_monitoring(
-        NULL, true);
+    composition_engine_error_t result =
+        composition_engine_set_performance_monitoring(NULL, true);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -626,12 +652,12 @@ static int test_set_performance_monitoring_null_engine(void) {
 static int test_set_performance_monitoring_enable(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_performance_monitoring(
-        engine, true);
+
+    composition_engine_error_t result =
+        composition_engine_set_performance_monitoring(engine, true);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->performance_monitoring, true);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -639,12 +665,12 @@ static int test_set_performance_monitoring_enable(void) {
 static int test_set_performance_monitoring_disable(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_performance_monitoring(
-        engine, false);
+
+    composition_engine_error_t result =
+        composition_engine_set_performance_monitoring(engine, false);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->performance_monitoring, false);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -654,8 +680,8 @@ static int test_set_performance_monitoring_disable(void) {
  * ============================================================ */
 
 static int test_set_cache_max_age_null_engine(void) {
-    composition_engine_error_t result = composition_engine_set_cache_max_age(
-        NULL, 100);
+    composition_engine_error_t result =
+        composition_engine_set_cache_max_age(NULL, 100);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -663,12 +689,12 @@ static int test_set_cache_max_age_null_engine(void) {
 static int test_set_cache_max_age_valid(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_cache_max_age(
-        engine, 1000);
+
+    composition_engine_error_t result =
+        composition_engine_set_cache_max_age(engine, 1000);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->max_cache_age_ms, 1000);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -686,13 +712,13 @@ static int test_clear_cache_null_engine(void) {
 static int test_clear_cache_valid(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     engine->composition_cache_valid = true;
-    
+
     composition_engine_error_t result = composition_engine_clear_cache(engine);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->composition_cache_valid, false);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -703,8 +729,8 @@ static int test_clear_cache_valid(void) {
 
 static int test_set_screen_buffer_null_engine(void) {
     screen_buffer_t buffer;
-    composition_engine_error_t result = composition_engine_set_screen_buffer(
-        NULL, &buffer);
+    composition_engine_error_t result =
+        composition_engine_set_screen_buffer(NULL, &buffer);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -712,15 +738,15 @@ static int test_set_screen_buffer_null_engine(void) {
 static int test_set_screen_buffer_valid(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
-    
-    composition_engine_error_t result = composition_engine_set_screen_buffer(
-        engine, &buffer);
+
+    composition_engine_error_t result =
+        composition_engine_set_screen_buffer(engine, &buffer);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(engine->screen_buffer, &buffer);
-    
+
     screen_buffer_cleanup(&buffer);
     composition_engine_destroy(engine);
     return 1;
@@ -729,12 +755,12 @@ static int test_set_screen_buffer_valid(void) {
 static int test_set_screen_buffer_null_buffer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_set_screen_buffer(
-        engine, NULL);
+
+    composition_engine_error_t result =
+        composition_engine_set_screen_buffer(engine, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_NULL(engine->screen_buffer);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -745,8 +771,8 @@ static int test_set_screen_buffer_null_buffer(void) {
 
 static int test_get_version_null_engine(void) {
     char version[32];
-    composition_engine_error_t result = composition_engine_get_version(
-        NULL, version, sizeof(version));
+    composition_engine_error_t result =
+        composition_engine_get_version(NULL, version, sizeof(version));
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -754,11 +780,11 @@ static int test_get_version_null_engine(void) {
 static int test_get_version_null_buffer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_get_version(
-        engine, NULL, 32);
+
+    composition_engine_error_t result =
+        composition_engine_get_version(engine, NULL, 32);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -766,12 +792,12 @@ static int test_get_version_null_buffer(void) {
 static int test_get_version_zero_size(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     char version[32];
-    composition_engine_error_t result = composition_engine_get_version(
-        engine, version, 0);
+    composition_engine_error_t result =
+        composition_engine_get_version(engine, version, 0);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -779,16 +805,16 @@ static int test_get_version_zero_size(void) {
 static int test_get_version_valid(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     char version[32];
-    composition_engine_error_t result = composition_engine_get_version(
-        engine, version, sizeof(version));
+    composition_engine_error_t result =
+        composition_engine_get_version(engine, version, sizeof(version));
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
-    
+
     /* Version should be in format x.y.z */
     ASSERT(strlen(version) > 0);
     ASSERT(strchr(version, '.') != NULL);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -799,8 +825,8 @@ static int test_get_version_valid(void) {
 
 static int test_validate_cache_null_engine(void) {
     size_t valid = 0, expired = 0;
-    composition_engine_error_t result = composition_engine_validate_cache(
-        NULL, &valid, &expired);
+    composition_engine_error_t result =
+        composition_engine_validate_cache(NULL, &valid, &expired);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -808,12 +834,12 @@ static int test_validate_cache_null_engine(void) {
 static int test_validate_cache_null_outputs(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     /* NULL outputs should be allowed */
-    composition_engine_error_t result = composition_engine_validate_cache(
-        engine, NULL, NULL);
+    composition_engine_error_t result =
+        composition_engine_validate_cache(engine, NULL, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -821,14 +847,14 @@ static int test_validate_cache_null_outputs(void) {
 static int test_validate_cache_empty(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     size_t valid = 999, expired = 999;
-    composition_engine_error_t result = composition_engine_validate_cache(
-        engine, &valid, &expired);
+    composition_engine_error_t result =
+        composition_engine_validate_cache(engine, &valid, &expired);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
     ASSERT_EQ(valid, 0);
     ASSERT_EQ(expired, 0);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -846,10 +872,10 @@ static int test_compose_null_engine(void) {
 static int test_compose_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_engine_error_t result = composition_engine_compose(engine);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -860,8 +886,8 @@ static int test_compose_not_initialized(void) {
 
 static int test_compose_with_cursor_null_engine(void) {
     composition_with_cursor_t result_buf;
-    composition_engine_error_t result = composition_engine_compose_with_cursor(
-        NULL, 0, 80, &result_buf);
+    composition_engine_error_t result =
+        composition_engine_compose_with_cursor(NULL, 0, 80, &result_buf);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -869,11 +895,11 @@ static int test_compose_with_cursor_null_engine(void) {
 static int test_compose_with_cursor_null_result(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_compose_with_cursor(
-        engine, 0, 80, NULL);
+
+    composition_engine_error_t result =
+        composition_engine_compose_with_cursor(engine, 0, 80, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -881,12 +907,12 @@ static int test_compose_with_cursor_null_result(void) {
 static int test_compose_with_cursor_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_with_cursor_t result_buf;
-    composition_engine_error_t result = composition_engine_compose_with_cursor(
-        engine, 0, 80, &result_buf);
+    composition_engine_error_t result =
+        composition_engine_compose_with_cursor(engine, 0, 80, &result_buf);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -894,14 +920,14 @@ static int test_compose_with_cursor_not_initialized(void) {
 static int test_compose_with_cursor_invalid_width(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     /* Invalid width should use fallback of 80 */
     composition_with_cursor_t result_buf;
-    composition_engine_error_t result = composition_engine_compose_with_cursor(
-        engine, 0, -1, &result_buf);
+    composition_engine_error_t result =
+        composition_engine_compose_with_cursor(engine, 0, -1, &result_buf);
     /* Should return NOT_INITIALIZED since engine not initialized */
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -912,8 +938,8 @@ static int test_compose_with_cursor_invalid_width(void) {
 
 static int test_analyze_prompt_null_engine(void) {
     composition_analysis_t analysis;
-    composition_engine_error_t result = composition_engine_analyze_prompt(
-        NULL, &analysis);
+    composition_engine_error_t result =
+        composition_engine_analyze_prompt(NULL, &analysis);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -921,11 +947,11 @@ static int test_analyze_prompt_null_engine(void) {
 static int test_analyze_prompt_null_analysis(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_analyze_prompt(
-        engine, NULL);
+
+    composition_engine_error_t result =
+        composition_engine_analyze_prompt(engine, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -933,12 +959,12 @@ static int test_analyze_prompt_null_analysis(void) {
 static int test_analyze_prompt_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_analysis_t analysis;
-    composition_engine_error_t result = composition_engine_analyze_prompt(
-        engine, &analysis);
+    composition_engine_error_t result =
+        composition_engine_analyze_prompt(engine, &analysis);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -950,8 +976,8 @@ static int test_analyze_prompt_not_initialized(void) {
 static int test_calculate_positioning_null_engine(void) {
     composition_analysis_t analysis = {0};
     composition_positioning_t positioning;
-    composition_engine_error_t result = composition_engine_calculate_positioning(
-        NULL, &analysis, &positioning);
+    composition_engine_error_t result =
+        composition_engine_calculate_positioning(NULL, &analysis, &positioning);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -959,12 +985,12 @@ static int test_calculate_positioning_null_engine(void) {
 static int test_calculate_positioning_null_analysis(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_positioning_t positioning;
-    composition_engine_error_t result = composition_engine_calculate_positioning(
-        engine, NULL, &positioning);
+    composition_engine_error_t result =
+        composition_engine_calculate_positioning(engine, NULL, &positioning);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -972,12 +998,12 @@ static int test_calculate_positioning_null_analysis(void) {
 static int test_calculate_positioning_null_positioning(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_analysis_t analysis = {0};
-    composition_engine_error_t result = composition_engine_calculate_positioning(
-        engine, &analysis, NULL);
+    composition_engine_error_t result =
+        composition_engine_calculate_positioning(engine, &analysis, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -985,13 +1011,14 @@ static int test_calculate_positioning_null_positioning(void) {
 static int test_calculate_positioning_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     composition_analysis_t analysis = {0};
     composition_positioning_t positioning;
-    composition_engine_error_t result = composition_engine_calculate_positioning(
-        engine, &analysis, &positioning);
+    composition_engine_error_t result =
+        composition_engine_calculate_positioning(engine, &analysis,
+                                                 &positioning);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -1002,8 +1029,8 @@ static int test_calculate_positioning_not_initialized(void) {
 
 static int test_calculate_hash_null_engine(void) {
     char hash[32];
-    composition_engine_error_t result = composition_engine_calculate_hash(
-        NULL, hash, sizeof(hash));
+    composition_engine_error_t result =
+        composition_engine_calculate_hash(NULL, hash, sizeof(hash));
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
     return 1;
 }
@@ -1011,11 +1038,11 @@ static int test_calculate_hash_null_engine(void) {
 static int test_calculate_hash_null_buffer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    composition_engine_error_t result = composition_engine_calculate_hash(
-        engine, NULL, 32);
+
+    composition_engine_error_t result =
+        composition_engine_calculate_hash(engine, NULL, 32);
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -1023,12 +1050,12 @@ static int test_calculate_hash_null_buffer(void) {
 static int test_calculate_hash_small_buffer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
-    char hash[8];  /* Too small */
-    composition_engine_error_t result = composition_engine_calculate_hash(
-        engine, hash, sizeof(hash));
+
+    char hash[8]; /* Too small */
+    composition_engine_error_t result =
+        composition_engine_calculate_hash(engine, hash, sizeof(hash));
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }
@@ -1036,12 +1063,12 @@ static int test_calculate_hash_small_buffer(void) {
 static int test_calculate_hash_not_initialized(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
-    
+
     char hash[32];
-    composition_engine_error_t result = composition_engine_calculate_hash(
-        engine, hash, sizeof(hash));
+    composition_engine_error_t result =
+        composition_engine_calculate_hash(engine, hash, sizeof(hash));
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
-    
+
     composition_engine_destroy(engine);
     return 1;
 }

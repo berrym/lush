@@ -107,7 +107,7 @@ static bool dc_write_all(int fd, const void *buf, size_t len) {
 #if 1 // DC_DEBUG enabled temporarily for debugging
 #define DC_DEBUG(fmt, ...)                                                     \
     do {                                                                       \
-        FILE *_dbg = fopen("/tmp/lush_dc_debug.log", "a");                   \
+        FILE *_dbg = fopen("/tmp/lush_dc_debug.log", "a");                     \
         if (_dbg) {                                                            \
             fprintf(_dbg, "[DC_DEBUG] %s:%d: " fmt "\n", __func__, __LINE__,   \
                     ##__VA_ARGS__);                                            \
@@ -246,7 +246,8 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
         return false;
     }
 
-    /* Block SIGWINCH during terminal output to prevent mid-sequence corruption */
+    /* Block SIGWINCH during terminal output to prevent mid-sequence corruption
+     */
     sigset_t block_set, old_set;
     sigemptyset(&block_set);
     sigaddset(&block_set, SIGWINCH);
@@ -317,7 +318,7 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
                 if (highlight_result == COMMAND_LAYER_SUCCESS &&
                     highlighted_buffer[0] != '\0') {
                     dc_write_all(STDOUT_FILENO, highlighted_buffer,
-                          strlen(highlighted_buffer));
+                                 strlen(highlighted_buffer));
                     wrote_highlighted = true;
                 }
             }
@@ -589,13 +590,15 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                  menu_start_row, menu_rows_added, desired_screen.num_rows);
     }
 
-    /* Get notification text if visible and add to screen_buffer for proper tracking
-     * Following the same pattern as menu to ensure correct cursor positioning */
+    /* Get notification text if visible and add to screen_buffer for proper
+     * tracking Following the same pattern as menu to ensure correct cursor
+     * positioning */
     char notification_buffer[LLE_NOTIFICATION_MAX_STYLED];
     const char *notification_text = NULL;
     int notification_rows_added = 0;
 
-    if (controller->notification_visible && controller->notification_copy.visible) {
+    if (controller->notification_visible &&
+        controller->notification_copy.visible) {
         notification_text = lle_notification_get_styled_text(
             &controller->notification_copy, notification_buffer,
             sizeof(notification_buffer));
@@ -606,9 +609,11 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             notification_rows_added = screen_buffer_add_text_rows(
                 &desired_screen, notif_start_row, notification_text);
 
-            DC_DEBUG("Added notification to screen_buffer: start_row=%d, rows_added=%d, "
+            DC_DEBUG("Added notification to screen_buffer: start_row=%d, "
+                     "rows_added=%d, "
                      "new_num_rows=%d",
-                     notif_start_row, notification_rows_added, desired_screen.num_rows);
+                     notif_start_row, notification_rows_added,
+                     desired_screen.num_rows);
         }
     }
 
@@ -705,7 +710,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
      * so we must redraw it every cycle.
      *
      * Sequence: move to rprompt_col, write RPROMPT, move back to command_start.
-     * Only on single-line prompts where command hasn't grown into RPROMPT space.
+     * Only on single-line prompts where command hasn't grown into RPROMPT
+     * space.
      */
     if (desired_screen.rprompt_fits && desired_screen.rprompt_text[0]) {
         char rprompt_col_seq[16];
@@ -713,17 +719,17 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             snprintf(rprompt_col_seq, sizeof(rprompt_col_seq), "\033[%dG",
                      desired_screen.rprompt_col + 1);
         if (rprompt_col_len > 0) {
-            dc_write_all(STDOUT_FILENO, rprompt_col_seq, (size_t)rprompt_col_len);
+            dc_write_all(STDOUT_FILENO, rprompt_col_seq,
+                         (size_t)rprompt_col_len);
         }
         dc_write_all(STDOUT_FILENO, desired_screen.rprompt_text,
-                      strlen(desired_screen.rprompt_text));
+                     strlen(desired_screen.rprompt_text));
         /* Reset attributes after RPROMPT (it may contain colors) */
         dc_write_all(STDOUT_FILENO, "\033[0m", 4);
         /* Move back to command start column */
         char back_col_seq[16];
-        int back_col_len =
-            snprintf(back_col_seq, sizeof(back_col_seq), "\033[%dG",
-                     command_start_col + 1);
+        int back_col_len = snprintf(back_col_seq, sizeof(back_col_seq),
+                                    "\033[%dG", command_start_col + 1);
         if (back_col_len > 0) {
             dc_write_all(STDOUT_FILENO, back_col_seq, (size_t)back_col_len);
         }
@@ -771,7 +777,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     }
                     /* Write the ANSI sequence */
                     dc_write_all(STDOUT_FILENO, command_buffer + seq_start,
-                          i - seq_start);
+                                 i - seq_start);
                     continue;
                 }
 
@@ -788,7 +794,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                         /* Reset ANSI state before writing continuation prompt
                          */
                         dc_write_all(STDOUT_FILENO, "\033[0m", 4);
-                        dc_write_all(STDOUT_FILENO, cont_prompt, strlen(cont_prompt));
+                        dc_write_all(STDOUT_FILENO, cont_prompt,
+                                     strlen(cont_prompt));
                         visual_col =
                             (int)screen_buffer_get_line_prefix_visual_width(
                                 &desired_screen, visual_row);
@@ -862,9 +869,10 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         if (suggestion && *suggestion) {
             /* Write ghost text in BRIGHT_BLACK (dimmed gray) */
             dc_write_all(STDOUT_FILENO, "\033[90m",
-                  5); /* Set bright black foreground */
+                         5); /* Set bright black foreground */
             dc_write_all(STDOUT_FILENO, suggestion, strlen(suggestion));
-            dc_write_all(STDOUT_FILENO, "\033[0m", 4); /* Reset all attributes */
+            dc_write_all(STDOUT_FILENO, "\033[0m",
+                         4); /* Reset all attributes */
         }
     }
 
@@ -878,7 +886,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
      * Notification is now tracked in screen_buffer like menu */
     if (notification_text && *notification_text) {
         dc_write_all(STDOUT_FILENO, "\n", 1);
-        dc_write_all(STDOUT_FILENO, notification_text, strlen(notification_text));
+        dc_write_all(STDOUT_FILENO, notification_text,
+                     strlen(notification_text));
     }
 
     /* Step 5: Position cursor at the correct location
@@ -980,7 +989,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
      * removed stdout is line-buffered by default and terminal I/O doesn't need
      * fsync */
 
-    /* Restore original signal mask - any pending SIGWINCH will be delivered now */
+    /* Restore original signal mask - any pending SIGWINCH will be delivered now
+     */
     sigprocmask(SIG_SETMASK, &old_set, NULL);
 
     return LAYER_EVENTS_SUCCESS;
@@ -2891,7 +2901,8 @@ display_controller_error_t display_controller_set_notification(
     memcpy(&controller->notification_copy, notification, sizeof(*notification));
     controller->notification_visible = true;
 
-    DC_DEBUG("Notification set (visible: %d)", controller->notification_visible);
+    DC_DEBUG("Notification set (visible: %d)",
+             controller->notification_visible);
 
     // Notification state changed - mark that we need redraw
     controller->notification_state_changed = true;
@@ -2940,7 +2951,8 @@ bool display_controller_check_and_clear_notification_changed(
     }
 
     bool changed = controller->notification_state_changed;
-    controller->notification_state_changed = false; // Clear the flag after checking
+    controller->notification_state_changed =
+        false; // Clear the flag after checking
     return changed;
 }
 

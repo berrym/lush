@@ -17,13 +17,15 @@
 #ifndef COMPAT_H
 #define COMPAT_H
 
+#include "shell_mode.h"
+
 #include <stdbool.h>
 #include <stddef.h>
-#include "shell_mode.h"
 
 /* ============================================================================
  * Compatibility Entry Types
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Compatibility entry categories
@@ -86,10 +88,10 @@ typedef struct {
  * (since the behavior differs slightly).
  */
 typedef struct {
-    fix_type_t posix;  /**< Fix safety when targeting POSIX */
-    fix_type_t bash;   /**< Fix safety when targeting Bash */
-    fix_type_t zsh;    /**< Fix safety when targeting Zsh */
-    fix_type_t lush;   /**< Fix safety when targeting Lush */
+    fix_type_t posix; /**< Fix safety when targeting POSIX */
+    fix_type_t bash;  /**< Fix safety when targeting Bash */
+    fix_type_t zsh;   /**< Fix safety when targeting Zsh */
+    fix_type_t lush;  /**< Fix safety when targeting Lush */
 } compat_fix_class_t;
 
 /**
@@ -114,12 +116,12 @@ typedef struct {
  * difference between shells.
  */
 typedef struct {
-    const char *id;              /**< Unique identifier */
-    compat_category_t category;  /**< Category of this entry */
-    const char *feature;         /**< Feature name (e.g., "echo", "arrays") */
-    const char *description;     /**< Human-readable description */
-    compat_behavior_t behavior;  /**< Per-shell behavior descriptions */
-    compat_lint_t lint;          /**< Lint configuration */
+    const char *id;             /**< Unique identifier */
+    compat_category_t category; /**< Category of this entry */
+    const char *feature;        /**< Feature name (e.g., "echo", "arrays") */
+    const char *description;    /**< Human-readable description */
+    compat_behavior_t behavior; /**< Per-shell behavior descriptions */
+    compat_lint_t lint;         /**< Lint configuration */
 } compat_entry_t;
 
 /**
@@ -128,16 +130,17 @@ typedef struct {
  * Result of checking a construct for compatibility with a target shell.
  */
 typedef struct {
-    bool is_portable;             /**< True if construct is portable to target */
-    const compat_entry_t *entry;  /**< Entry that matched (if not portable) */
-    shell_mode_t target;          /**< Target shell that was checked against */
-    int line;                     /**< Line number where issue was found */
-    int column;                   /**< Column number where issue was found */
+    bool is_portable;            /**< True if construct is portable to target */
+    const compat_entry_t *entry; /**< Entry that matched (if not portable) */
+    shell_mode_t target;         /**< Target shell that was checked against */
+    int line;                    /**< Line number where issue was found */
+    int column;                  /**< Column number where issue was found */
 } compat_result_t;
 
 /* ============================================================================
  * Database Management
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Initialize the compatibility database
@@ -169,7 +172,8 @@ int compat_reload(void);
 
 /* ============================================================================
  * Entry Query Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get a compatibility entry by ID
@@ -235,7 +239,8 @@ void compat_foreach_entry(void (*callback)(const compat_entry_t *entry,
 
 /* ============================================================================
  * Portability Checking
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Check if a construct is portable to a target shell
@@ -293,10 +298,10 @@ struct node;
 typedef struct {
     int line;
     int column;
-    const char *severity;      /* Static string, not owned */
-    const char *message;       /* Static string from TOML, not owned */
-    const char *suggestion;    /* Static string from TOML, not owned */
-    const char *feature;       /* Static string, not owned */
+    const char *severity;   /* Static string, not owned */
+    const char *message;    /* Static string from TOML, not owned */
+    const char *suggestion; /* Static string from TOML, not owned */
+    const char *feature;    /* Static string, not owned */
 } compat_ast_issue_t;
 
 /**
@@ -338,7 +343,8 @@ size_t compat_check_ast_issues(struct node *ast, shell_mode_t target,
 
 /* ============================================================================
  * Strict Mode Support
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Enable strict compatibility mode
@@ -369,7 +375,8 @@ compat_severity_t compat_effective_severity(const compat_entry_t *entry);
 
 /* ============================================================================
  * Target Shell Support
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Set the target shell for compatibility checking
@@ -391,7 +398,8 @@ const char *compat_get_target(void);
 
 /* ============================================================================
  * Utility Functions
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Get category name as string
@@ -455,7 +463,7 @@ bool compat_fix_type_parse(const char *name, fix_type_t *type);
  * @return Fix type for the specified target
  */
 fix_type_t compat_get_fix_type_for_target(const compat_fix_class_t *fix_class,
-                                           const char *target);
+                                          const char *target);
 
 /**
  * @brief Format a compatibility result as a message
@@ -473,7 +481,8 @@ int compat_format_result(const compat_result_t *result, char *buffer,
 
 /* ============================================================================
  * Debugging
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /**
  * @brief Print database statistics

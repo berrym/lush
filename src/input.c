@@ -85,7 +85,7 @@ typedef struct {
     bool in_command_substitution;
     bool in_arithmetic;
     bool in_function_definition;
-    bool saw_posix_func_parens;   /* Saw name() pattern, waiting for { */
+    bool saw_posix_func_parens; /* Saw name() pattern, waiting for { */
     bool in_case_statement;
     bool in_if_statement;
     bool in_while_loop;
@@ -1014,7 +1014,8 @@ char *get_input_complete(FILE *in) {
                 return NULL;
             }
             accumulated = new_accumulated;
-            // Only add newline if previous line didn't have backslash continuation
+            // Only add newline if previous line didn't have backslash
+            // continuation
             if (!had_backslash_continuation) {
                 strcat(accumulated, "\n");
                 accumulated_len++;

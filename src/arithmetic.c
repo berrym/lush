@@ -300,7 +300,7 @@ static ssize_t eval_ternary_question(stack_item_t *a1, stack_item_t *a2) {
 
 /**
  * @brief Get variable value using executor context if available
- * 
+ *
  * Uses the executor's symbol table for scoped variable resolution,
  * falling back to global symbol table if no executor context.
  *
@@ -311,7 +311,7 @@ static ssize_t get_var_value_scoped(stack_item_t *item) {
     if (!item || !item->var_name) {
         return 0;
     }
-    
+
     // Use executor context if available for scoped variable resolution
     if (item->executor_context) {
         executor_t *exec = (executor_t *)item->executor_context;
@@ -324,7 +324,7 @@ static ssize_t get_var_value_scoped(stack_item_t *item) {
             }
         }
     }
-    
+
     // Fallback to global
     char *value = symtable_get_global(item->var_name);
     if (value) {
@@ -335,7 +335,7 @@ static ssize_t get_var_value_scoped(stack_item_t *item) {
 
 /**
  * @brief Set variable value using executor context if available
- * 
+ *
  * Uses the executor's symbol table for scoped variable assignment,
  * falling back to global symbol table if no executor context.
  *
@@ -346,19 +346,20 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
     if (!item || !item->var_name) {
         return;
     }
-    
+
     char value_str[32];
     snprintf(value_str, sizeof(value_str), "%zd", value);
-    
+
     // Use executor context if available for scoped variable assignment
     if (item->executor_context) {
         executor_t *exec = (executor_t *)item->executor_context;
         if (exec && exec->symtable) {
-            symtable_set_var(exec->symtable, item->var_name, value_str, SYMVAR_NONE);
+            symtable_set_var(exec->symtable, item->var_name, value_str,
+                             SYMVAR_NONE);
             return;
         }
     }
-    
+
     // Fallback to global
     symtable_set_global(item->var_name, value_str);
 }
@@ -563,44 +564,45 @@ static ssize_t eval_exp(stack_item_t *a1, stack_item_t *a2) {
 #define CH_MULEQ 0x11
 #define CH_DIVEQ 0x12
 #define CH_MODEQ 0x13
-#define CH_TERNARY_Q 0x14  // ? part of ternary
-#define CH_TERNARY_C 0x15  // : part of ternary
-#define CH_COMMA 0x16      // comma operator
+#define CH_TERNARY_Q 0x14 // ? part of ternary
+#define CH_TERNARY_C 0x15 // : part of ternary
+#define CH_COMMA 0x16     // comma operator
 
 // Operator definitions (only binary operators in main table)
-static op_t operators[] = {{'(', 0, ASSOC_NONE, 0, 1, NULL},
-                           {')', 0, ASSOC_NONE, 0, 1, NULL},
-                           {'!', 2, ASSOC_RIGHT, 1, 1, eval_lognot},
-                           {'~', 2, ASSOC_RIGHT, 1, 1, eval_bitnot},
-                           {CH_EXP, 3, ASSOC_RIGHT, 0, 2, eval_exp},
-                           {'*', 4, ASSOC_LEFT, 0, 1, eval_mul},
-                           {'/', 4, ASSOC_LEFT, 0, 1, eval_div},
-                           {'%', 4, ASSOC_LEFT, 0, 1, eval_mod},
-                           {'+', 5, ASSOC_LEFT, 0, 1, eval_add},
-                           {'-', 5, ASSOC_LEFT, 0, 1, eval_sub},
-                           {CH_LSH, 6, ASSOC_LEFT, 0, 2, eval_lsh},
-                           {CH_RSH, 6, ASSOC_LEFT, 0, 2, eval_rsh},
-                           {CH_LT, 7, ASSOC_LEFT, 0, 1, eval_lt},
-                           {CH_LE, 7, ASSOC_LEFT, 0, 2, eval_le},
-                           {CH_GT, 7, ASSOC_LEFT, 0, 1, eval_gt},
-                           {CH_GE, 7, ASSOC_LEFT, 0, 2, eval_ge},
-                           {CH_EQ, 8, ASSOC_LEFT, 0, 2, eval_eq},
-                           {CH_NE, 8, ASSOC_LEFT, 0, 2, eval_ne},
-                           {'&', 9, ASSOC_LEFT, 0, 1, eval_bitand},
-                           {'^', 10, ASSOC_LEFT, 0, 1, eval_bitxor},
-                           {'|', 11, ASSOC_LEFT, 0, 1, eval_bitor},
-                           {CH_AND, 12, ASSOC_LEFT, 0, 2, eval_logand},
-                           {CH_OR, 13, ASSOC_LEFT, 0, 2, eval_logor},
-                           {CH_TERNARY_Q, 14, ASSOC_RIGHT, 0, 1, eval_ternary_question},
-                           {CH_TERNARY_C, 14, ASSOC_RIGHT, 0, 1, eval_ternary_colon},
-                           {'=', 15, ASSOC_RIGHT, 0, 1, eval_assign},
-                           {CH_ADDEQ, 15, ASSOC_RIGHT, 0, 2, eval_addeq},
-                           {CH_SUBEQ, 15, ASSOC_RIGHT, 0, 2, eval_subeq},
-                           {CH_MULEQ, 15, ASSOC_RIGHT, 0, 2, eval_muleq},
-                           {CH_DIVEQ, 15, ASSOC_RIGHT, 0, 2, eval_diveq},
-                           {CH_MODEQ, 15, ASSOC_RIGHT, 0, 2, eval_modeq},
-                           {CH_COMMA, 16, ASSOC_LEFT, 0, 1, eval_comma},
-                           {0, 0, 0, 0, 0, NULL}};
+static op_t operators[] = {
+    {'(', 0, ASSOC_NONE, 0, 1, NULL},
+    {')', 0, ASSOC_NONE, 0, 1, NULL},
+    {'!', 2, ASSOC_RIGHT, 1, 1, eval_lognot},
+    {'~', 2, ASSOC_RIGHT, 1, 1, eval_bitnot},
+    {CH_EXP, 3, ASSOC_RIGHT, 0, 2, eval_exp},
+    {'*', 4, ASSOC_LEFT, 0, 1, eval_mul},
+    {'/', 4, ASSOC_LEFT, 0, 1, eval_div},
+    {'%', 4, ASSOC_LEFT, 0, 1, eval_mod},
+    {'+', 5, ASSOC_LEFT, 0, 1, eval_add},
+    {'-', 5, ASSOC_LEFT, 0, 1, eval_sub},
+    {CH_LSH, 6, ASSOC_LEFT, 0, 2, eval_lsh},
+    {CH_RSH, 6, ASSOC_LEFT, 0, 2, eval_rsh},
+    {CH_LT, 7, ASSOC_LEFT, 0, 1, eval_lt},
+    {CH_LE, 7, ASSOC_LEFT, 0, 2, eval_le},
+    {CH_GT, 7, ASSOC_LEFT, 0, 1, eval_gt},
+    {CH_GE, 7, ASSOC_LEFT, 0, 2, eval_ge},
+    {CH_EQ, 8, ASSOC_LEFT, 0, 2, eval_eq},
+    {CH_NE, 8, ASSOC_LEFT, 0, 2, eval_ne},
+    {'&', 9, ASSOC_LEFT, 0, 1, eval_bitand},
+    {'^', 10, ASSOC_LEFT, 0, 1, eval_bitxor},
+    {'|', 11, ASSOC_LEFT, 0, 1, eval_bitor},
+    {CH_AND, 12, ASSOC_LEFT, 0, 2, eval_logand},
+    {CH_OR, 13, ASSOC_LEFT, 0, 2, eval_logor},
+    {CH_TERNARY_Q, 14, ASSOC_RIGHT, 0, 1, eval_ternary_question},
+    {CH_TERNARY_C, 14, ASSOC_RIGHT, 0, 1, eval_ternary_colon},
+    {'=', 15, ASSOC_RIGHT, 0, 1, eval_assign},
+    {CH_ADDEQ, 15, ASSOC_RIGHT, 0, 2, eval_addeq},
+    {CH_SUBEQ, 15, ASSOC_RIGHT, 0, 2, eval_subeq},
+    {CH_MULEQ, 15, ASSOC_RIGHT, 0, 2, eval_muleq},
+    {CH_DIVEQ, 15, ASSOC_RIGHT, 0, 2, eval_diveq},
+    {CH_MODEQ, 15, ASSOC_RIGHT, 0, 2, eval_modeq},
+    {CH_COMMA, 16, ASSOC_LEFT, 0, 1, eval_comma},
+    {0, 0, 0, 0, 0, NULL}};
 
 // Unary operator definitions (separate from main table)
 static op_t op_uminus = {'-', 2, ASSOC_RIGHT, 1, 1, eval_uminus};
@@ -991,11 +993,12 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 if (ctx->errflag) {
                     return;
                 }
-                
+
                 // Next operator should be '?'
-                if (ctx->nopstack > 0 && ctx->opstack[ctx->nopstack - 1]->op == CH_TERNARY_Q) {
+                if (ctx->nopstack > 0 &&
+                    ctx->opstack[ctx->nopstack - 1]->op == CH_TERNARY_Q) {
                     pop_opstack(ctx); // Remove the '?'
-                    
+
                     // Get true value and condition
                     stack_item_t true_val = pop_numstack(ctx);
                     if (ctx->errflag) {
@@ -1008,11 +1011,13 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                         stack_item_cleanup(&true_val);
                         return;
                     }
-                    
+
                     // Evaluate: condition ? true_val : false_val
-                    ssize_t result = long_value(&condition) ? long_value(&true_val) : long_value(&false_val);
+                    ssize_t result = long_value(&condition)
+                                         ? long_value(&true_val)
+                                         : long_value(&false_val);
                     push_numstackl(ctx, result);
-                    
+
                     stack_item_cleanup(&condition);
                     stack_item_cleanup(&true_val);
                     stack_item_cleanup(&false_val);
@@ -1083,11 +1088,12 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 if (ctx->errflag) {
                     return;
                 }
-                
+
                 // Next operator should be '?'
-                if (ctx->nopstack > 0 && ctx->opstack[ctx->nopstack - 1]->op == CH_TERNARY_Q) {
+                if (ctx->nopstack > 0 &&
+                    ctx->opstack[ctx->nopstack - 1]->op == CH_TERNARY_Q) {
                     pop_opstack(ctx); // Remove the '?'
-                    
+
                     // Get true value and condition
                     stack_item_t true_val = pop_numstack(ctx);
                     if (ctx->errflag) {
@@ -1100,11 +1106,13 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                         stack_item_cleanup(&true_val);
                         return;
                     }
-                    
+
                     // Evaluate: condition ? true_val : false_val
-                    ssize_t result = long_value(&condition) ? long_value(&true_val) : long_value(&false_val);
+                    ssize_t result = long_value(&condition)
+                                         ? long_value(&true_val)
+                                         : long_value(&false_val);
                     push_numstackl(ctx, result);
-                    
+
                     stack_item_cleanup(&condition);
                     stack_item_cleanup(&true_val);
                     stack_item_cleanup(&false_val);
@@ -1358,17 +1366,18 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             // Handle ${variable} syntax in arithmetic expressions
             const char *start = current + 2; // Skip ${
             const char *end = strchr(start, '}');
-            
+
             if (end) {
                 // Extract variable name (handle simple ${var} for now)
                 // More complex forms like ${var:-default} would need executor
-                
+
                 // Find the end of the variable name (before any operator)
                 const char *name_end = start;
-                while (name_end < end && (isalnum(*name_end) || *name_end == '_')) {
+                while (name_end < end &&
+                       (isalnum(*name_end) || *name_end == '_')) {
                     name_end++;
                 }
-                
+
                 if (name_end > start) {
                     size_t var_len = name_end - start;
                     char *var_name = malloc(var_len + 1);
@@ -1383,13 +1392,13 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                 } else {
                     push_numstackl(&ctx, 0);
                 }
-                
+
                 current = end + 1; // Skip past }
             } else {
                 arithm_set_error("unmatched ${ in arithmetic expression");
                 break;
             }
-            
+
             if (ctx.errflag) {
                 break;
             }
@@ -1445,11 +1454,12 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             if (ctx.errflag) {
                 break;
             }
-            
+
             // Next operator should be '?'
-            if (ctx.nopstack > 0 && ctx.opstack[ctx.nopstack - 1]->op == CH_TERNARY_Q) {
+            if (ctx.nopstack > 0 &&
+                ctx.opstack[ctx.nopstack - 1]->op == CH_TERNARY_Q) {
                 pop_opstack(&ctx); // Remove the '?'
-                
+
                 // Get true value and condition
                 stack_item_t true_val = pop_numstack(&ctx);
                 if (ctx.errflag) {
@@ -1462,11 +1472,13 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                     stack_item_cleanup(&true_val);
                     break;
                 }
-                
+
                 // Evaluate: condition ? true_val : false_val
-                ssize_t result = long_value(&condition) ? long_value(&true_val) : long_value(&false_val);
+                ssize_t result = long_value(&condition)
+                                     ? long_value(&true_val)
+                                     : long_value(&false_val);
                 push_numstackl(&ctx, result);
-                
+
                 stack_item_cleanup(&condition);
                 stack_item_cleanup(&true_val);
                 stack_item_cleanup(&false_val);
@@ -1478,7 +1490,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             }
             continue;
         }
-        
+
         // Skip '?' - it's handled with ':'
         if (op->op == CH_TERNARY_Q) {
             arithm_set_error("mismatched ternary operator");

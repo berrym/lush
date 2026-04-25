@@ -339,9 +339,9 @@ TEST(dirstack_clear_empty) {
 
 TEST(dirstack_rotate_positive) {
     dirstack_init();
-    dirstack_push("/first");  /* bottom */
+    dirstack_push("/first"); /* bottom */
     dirstack_push("/second");
-    dirstack_push("/third");  /* top */
+    dirstack_push("/third"); /* top */
 
     int result = dirstack_rotate(2);
     ASSERT_EQ(result, 0, "Rotate should succeed");

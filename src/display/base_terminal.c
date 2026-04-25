@@ -357,7 +357,8 @@ base_terminal_error_t base_terminal_get_size(base_terminal_t *terminal,
 /**
  * @brief Check if data is available for reading
  * @param terminal Pointer to base_terminal_t instance
- * @param timeout_ms Timeout in milliseconds (0 for non-blocking, negative for infinite)
+ * @param timeout_ms Timeout in milliseconds (0 for non-blocking, negative for
+ * infinite)
  * @return 1 if data available, 0 if no data, -1 on error
  */
 int base_terminal_data_available(base_terminal_t *terminal, int timeout_ms) {
