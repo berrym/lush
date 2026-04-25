@@ -13,6 +13,8 @@
 
 #include "lle/git_command.h"
 
+#include "lush_fork.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -124,7 +126,7 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
         return result;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid < 0) {
         /* Fork failed */
         close(pipefd[0]);

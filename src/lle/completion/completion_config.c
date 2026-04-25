@@ -20,6 +20,7 @@
 #include "lle/completion/custom_source.h"
 #include "lle/error_handling.h"
 #include "lle/prompt/theme_parser.h"
+#include "lush_fork.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -243,7 +244,7 @@ static lle_result_t execute_command(const char *command, char ***out_lines,
         return LLE_ERROR_IO_ERROR;
     }
 
-    pid_t pid = fork();
+    pid_t pid = lush_fork();
     if (pid == -1) {
         close(pipefd[0]);
         close(pipefd[1]);
