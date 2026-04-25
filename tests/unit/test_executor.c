@@ -666,6 +666,141 @@ TEST(local_while_loop_counter) {
 }
 
 /* ============================================================================
+ * REGRESSION TESTS — Issue #48
+ * Trailing redirections attached to a function definition must be applied
+ * when the function is called. The parser side landed in #43 and these
+ * inputs now produce a correct AST; the executor needs to honor it.
+ *
+ * Each test redirects to /tmp/lush_test_48, then reads back via
+ * `RESULT=$(cat /tmp/lush_test_48)` and compares against the expected
+ * file contents. Tests clean up their tmp file before and after to
+ * avoid cross-contamination.
+ * ============================================================================ */
+
+TEST(function_redir_out_applied_at_call) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec,
+        "f() { echo HELLO; } > /tmp/lush_test_48");
+    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec,
+        "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "HELLO",
+        "function trailing > redirect must write body output to the file");
+    free(result);
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_free(exec);
+}
+
+TEST(function_redir_stderr_applied_at_call) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec,
+        "f() { echo OOPS 1>&2; } 2> /tmp/lush_test_48");
+    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec,
+        "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "OOPS",
+        "function trailing 2> redirect must write body stderr to the file");
+    free(result);
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_free(exec);
+}
+
+TEST(function_redir_append_accumulates_across_calls) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec,
+        "f() { echo line; } >> /tmp/lush_test_48");
+    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec,
+        "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "line\nline\nline",
+        "function trailing >> redirect must append on every call");
+    free(result);
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_free(exec);
+}
+
+TEST(function_redir_keyword_form_applied_at_call) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec,
+        "function f { echo from-keyword; } > /tmp/lush_test_48");
+    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec,
+        "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "from-keyword",
+        "function-keyword form trailing > redirect must apply at call");
+    free(result);
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_free(exec);
+}
+
+TEST(function_redir_input_applied_at_call) {
+    /* Verifies the function's stdin is the redirected file. The captured
+     * value is stored in a global so the test does not need command
+     * substitution to read it back. */
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in");
+    executor_execute_command_line(exec, "echo hello-input > /tmp/lush_test_48_in");
+    executor_execute_command_line(exec,
+        "f() { read line; CAPTURED=\"got: $line\"; } < /tmp/lush_test_48_in");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "CAPTURED");
+    ASSERT_STR_EQ(result, "got: hello-input",
+        "function trailing < redirect must feed body stdin from the file");
+    free(result);
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in");
+    executor_free(exec);
+}
+
+TEST(function_redir_does_not_break_normal_call) {
+    /* Sanity: calling a function with a trailing redirect must not leak
+     * the redirection across to subsequent unrelated commands. */
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec,
+        "f() { echo from-f; } > /tmp/lush_test_48");
+    executor_execute_command_line(exec, "f");
+    /* This echo must NOT also be captured by f's redirect — its output
+     * should be discarded as normal (we don't capture stdout here). */
+    executor_execute_command_line(exec, "echo from-second-call");
+    executor_execute_command_line(exec,
+        "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "from-f",
+        "function trailing redirect must not leak to subsequent commands");
+    free(result);
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_free(exec);
+}
+
+/* ============================================================================
  * ARITHMETIC TESTS
  * ============================================================================ */
 
@@ -1593,6 +1728,14 @@ int main(void) {
     RUN_TEST(local_for_loop_variable);
     RUN_TEST(local_plus_equals_append);
     RUN_TEST(local_while_loop_counter);
+
+    printf("\nRegression tests — Issue #48 (function trailing redirections at call):\n");
+    RUN_TEST(function_redir_out_applied_at_call);
+    RUN_TEST(function_redir_stderr_applied_at_call);
+    RUN_TEST(function_redir_append_accumulates_across_calls);
+    RUN_TEST(function_redir_keyword_form_applied_at_call);
+    RUN_TEST(function_redir_input_applied_at_call);
+    RUN_TEST(function_redir_does_not_break_normal_call);
     
     printf("\nArithmetic tests:\n");
     RUN_TEST(arithmetic_basic);

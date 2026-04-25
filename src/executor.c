@@ -6827,16 +6827,48 @@ static int execute_function_call(executor_t *executor,
     source_location_t func_loc = func->body ? func->body->loc : SOURCE_LOC_UNKNOWN;
     executor_push_context(executor, func_loc, "in function '%s'", function_name);
 
-    // Execute function body (handle multiple commands)
+    // Apply trailing redirections attached to the function definition (issue
+    // #48). The redirection nodes were appended as siblings of the body by
+    // parse_function_definition + parse_trailing_redirections (issue #43);
+    // copy_ast_chain pulled them along into func->body. Use a synthetic
+    // parent so setup_redirections can walk them via first_child like every
+    // other compound command. Save/restore fds so the redirection only
+    // applies for the duration of this call.
+    node_t synthetic_parent = {0};
+    synthetic_parent.first_child = func->body;
+    bool has_redirections = count_redirections(&synthetic_parent) > 0;
+    redirection_state_t redir_state;
+    if (has_redirections) {
+        save_file_descriptors(&redir_state);
+        int redir_result = setup_redirections(executor, &synthetic_parent);
+        if (redir_result != 0) {
+            restore_file_descriptors(&redir_state);
+            executor_pop_context(executor);
+            symtable_pop_scope(executor->symtable);
+            return redir_result;
+        }
+    }
+
+    // Execute function body (handle multiple commands; skip redirection
+    // siblings, which were already applied above)
     int result = 0;
     node_t *command = func->body;
     while (command) {
+        if (is_redirection_node(command)) {
+            command = command->next_sibling;
+            continue;
+        }
+
         result = execute_node(executor, command);
 
         // Check if this is a function return (special code 200-255)
         if (result >= 200 && result <= 255) {
             // Extract the actual return value from the special code
             int actual_return = result - 200;
+
+            if (has_redirections) {
+                restore_file_descriptors(&redir_state);
+            }
 
             /* Pop function context before returning */
             executor_pop_context(executor);
@@ -6851,6 +6883,10 @@ static int execute_function_call(executor_t *executor,
             break; // Stop on first error
         }
         command = command->next_sibling;
+    }
+
+    if (has_redirections) {
+        restore_file_descriptors(&redir_state);
     }
 
     /* Pop function context */
