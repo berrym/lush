@@ -584,10 +584,11 @@ if lle_sources.length() > 0
        timeout: 30)
 
   # Render cache unit tests
-  test_render_cache = executable('test_render_cache',
-                                 'tests/lle/unit/test_render_cache.c',
-                                 include_directories: inc,
-                                 dependencies: [lle_dep])
+  test_render_cache = executable(
+    'test_render_cache',
+    'tests/lle/unit/test_render_cache.c',
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep])
 
   test('LLE Render Cache', test_render_cache,
        suite: 'lle-unit',
