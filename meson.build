@@ -931,6 +931,20 @@ endif
          timeout: 30)
   endif
 
+  # Theme Parser Unit Tests
+  # Tests the TOML-subset parser (init/parse/reset/error reporting),
+  # value helpers, and the color-spec parser.
+  if fs.exists('tests/lle/unit/test_theme_parser.c')
+    test_theme_parser = executable(
+      'test_theme_parser',
+      'tests/lle/unit/test_theme_parser.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE Theme Parser', test_theme_parser,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # ============================================================================
   # SPEC 25: DEFAULT KEYBINDINGS TESTS
   # ============================================================================
