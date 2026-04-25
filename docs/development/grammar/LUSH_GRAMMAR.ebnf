@@ -1,0 +1,373 @@
+(* ============================================================================
+   LUSH GRAMMAR (descriptive)
+   ============================================================================
+
+   This grammar describes what `src/parser.c` actually accepts as of the
+   current branch. It is descriptive, not generative: the parser is hand-
+   written recursive descent, and this document was written by mapping every
+   parser function to a production. See PARSER_NOTES.md for everything pure
+   EBNF cannot express — lexer modes, context-sensitivity, the heredoc dance,
+   parser asymmetries, and open questions.
+
+   Notation:
+     =        production definition
+     |        choice
+     [ ... ]  optional
+     { ... }  zero or more
+     ( ... )  grouping
+     "..."    literal token text (when unambiguous)
+     UPPER    token name from token_type_t (e.g., TOK_WORD, TOK_LBRACE)
+     §N       cross-reference to a numbered section
+
+   Feature gates are noted inline as (* feat: FEATURE_X *). When the relevant
+   feature is disabled, the production is rejected at parse time.
+
+   Source-of-truth functions are noted in (* parser.c:NNN *).
+   ============================================================================ *)
+
+
+(* ----------------------------------------------------------------------------
+   §1  Program entry, command lists, pipelines, logical expressions
+   ---------------------------------------------------------------------------- *)
+
+program            = { wsp | comment | newline } [ command_list ] .
+                     (* parser.c:496 parser_parse *)
+
+command_list       = logical_expression { separator logical_expression } [ separator ] .
+                     (* parser.c:706; does NOT consume control-structure terminators *)
+
+separator          = ( ";" | newline ) { ";" | newline | wsp | comment } .
+
+logical_expression = pipeline { ( "&&" | "||" ) separator pipeline } .
+                     (* parser.c:650; left-associative; && and || share precedence *)
+
+pipeline           = [ negate ] simple_or_compound { pipe_op [ newline ] simple_or_compound } [ "&" ] .
+                     (* parser.c:761 *)
+
+negate             = "!" .
+                     (* tokenized as TOK_WORD, text=="!", length==1; no TOK_NOT *)
+
+pipe_op            = "|" | "|&" .
+                     (* TOK_PIPE | TOK_PIPE_STDERR; |& requires FEATURE_PROCESS_SUBSTITUTION *)
+
+simple_or_compound = simple_command          (* §2 *)
+                   | brace_group             (* §3 *)
+                   | subshell                (* §3 *)
+                   | if_statement            (* §3 *)
+                   | while_statement         (* §3 *)
+                   | until_statement         (* §3 *)
+                   | for_statement           (* §4 *)
+                   | select_statement        (* §4 *)
+                   | time_command            (* §4 *)
+                   | coproc                  (* §4 *)
+                   | anonymous_function      (* §4 *)
+                   | case_statement          (* §5 *)
+                   | function_definition     (* §6 *)
+                   | arithmetic_command      (* §7 *)
+                   | extended_test           (* §7 *) .
+
+(* Body framings used by §3-§5 *)
+
+command_body       = { separator } [ logical_expression { separator logical_expression } { separator } ] .
+                     (* parser.c:553; parameterized by terminator; stops without consuming it *)
+
+if_body            = { separator } [ logical_expression { separator logical_expression } { separator } ] .
+                     (* parser.c:599; commands wrapped in NODE_COMMAND_LIST; stops at TOK_ELSE/TOK_ELIF/TOK_FI *)
+
+
+(* ----------------------------------------------------------------------------
+   §2  Simple commands — assignments, command name, arguments, redirections
+   ---------------------------------------------------------------------------- *)
+
+simple_command     = { assignment } [ command_name { argument_or_redirection } ]
+                   | assignment { assignment } .
+                     (* parser.c:867; assignment-only forms are valid *)
+
+assignment         = NAME "=" assignment_value
+                   | NAME "+=" assignment_value                       (* feat: FEATURE_INDEXED_ARRAYS *)
+                   | NAME "[" subscript "]" ( "=" | "+=" ) value      (* feat: FEATURE_INDEXED_ARRAYS *)
+                   | NAME "=" array_literal                           (* feat: FEATURE_INDEXED_ARRAYS; §7 *)
+                   | NAME "+=" array_literal                          (* feat: FEATURE_INDEXED_ARRAYS; §7 *) .
+
+assignment_value   = (* empty *)
+                   | concatenated_word .
+
+subscript          = { TOKEN } .
+                     (* collected as raw text between [ and ]; not parsed *)
+
+command_name       = word_like_token | KEYWORD | TOK_LBRACKET .
+                     (* TOK_LBRACKET allowed as the [ builtin *)
+
+argument_or_redirection
+                   = redirection                                       (* §8 *)
+                   | argument .
+
+argument           = concatenated_word
+                   | process_substitution                              (* §7 *)
+                   | array_literal_arg .                               (* feat: FEATURE_INDEXED_ARRAYS *)
+
+concatenated_word  = single_word { adjacent single_word } .
+                     (* "adjacent" = next token starts at end position of previous; no whitespace gap *)
+
+single_word        = TOK_WORD | TOK_STRING | TOK_EXPANDABLE_STRING | TOK_VARIABLE
+                   | TOK_ARITH_EXP | TOK_COMMAND_SUB | TOK_BACKQUOTE
+                   | TOK_NUMBER | TOK_RBRACKET | TOK_ASSIGN | TOK_GLOB | TOK_QUESTION
+                   | TOK_NOT_EQUAL | KEYWORD .
+                     (* keywords accepted as argument tokens; they only trigger
+                        compound-command parsing in command position *)
+
+word_like_token    = TOK_WORD | TOK_STRING | TOK_EXPANDABLE_STRING
+                   | TOK_NUMBER | TOK_VARIABLE .
+                     (* token_is_word_like(); tokenizer.c:385 *)
+
+array_literal_arg  = NAME ( "=" | "+=" ) array_literal .
+                     (* declare -A map=([k]=v) — adjacent NAME=( pattern in argument context *)
+
+
+(* ----------------------------------------------------------------------------
+   §3  Brace groups, subshells, if/while/until
+   ---------------------------------------------------------------------------- *)
+
+brace_group        = "{" command_body "}" trailing_redirections .
+                     (* parser.c:1536 *)
+
+subshell           = "(" command_body ")" trailing_redirections .
+                     (* parser.c:1622 *)
+
+if_statement       = "if" logical_expression separator "then" if_body
+                     { elif_clause } [ else_clause ]
+                     "fi" trailing_redirections .
+                     (* parser.c:2237; elif chains are FLAT — all conds and bodies
+                        are direct children of one NODE_IF, not nested *)
+
+elif_clause        = "elif" logical_expression separator "then" if_body .
+
+else_clause        = "else" if_body .
+
+while_statement    = "while" condition separator "do" command_body "done"
+                     trailing_redirections .
+                     (* parser.c:2388 *)
+
+until_statement    = "until" condition separator "do" command_body "done"
+                     trailing_redirections .
+                     (* parser.c:2481 *)
+
+condition          = simple_command | pipeline .
+                     (* lush-specific: NOT a full logical_expression. `while a && b` does
+                        NOT parse as expected — `a` is the condition, `&& b; do ...` follows *)
+
+
+(* ----------------------------------------------------------------------------
+   §4  for, select, time, coproc, anonymous functions
+   ---------------------------------------------------------------------------- *)
+
+for_statement      = "for" ( for_arith | for_posix ) .
+                     (* parser.c:2569; lookahead on TOK_DOUBLE_LPAREN *)
+
+for_arith          = "((" arith_expr ";" arith_expr ";" arith_expr "))"
+                     separator "do" command_body "done"
+                     trailing_redirections .
+
+for_posix          = NAME [ "in" word_list ]
+                     separator "do" command_body "done"
+                     trailing_redirections .
+                     (* if `in` omitted and next token is ;/newline/do, defaults to "$@" *)
+
+arith_expr         = { TOKEN } .
+                     (* extracted from RAW INPUT (not tokens) to preserve `<=`,
+                        `>=`, etc. that the tokenizer splits *)
+
+word_list          = word { word } .
+                     (* tokens reassembled across `=` adjacency; see §2 concatenated_word *)
+
+select_statement   = "select" NAME [ "in" word_list ]
+                     separator "do" command_body "done"
+                     trailing_redirections .
+                     (* parser.c:3116; NO implicit "$@" if `in` omitted *)
+
+time_command       = "time" [ "-p" ] pipeline .
+                     (* parser.c:3261 *)
+
+coproc             = "coproc" [ NAME ] pipeline .
+                     (* parser.c:3308; feat: FEATURE_COPROC; NAME detected by lookahead *)
+
+anonymous_function = "(" ")" "{" command_body "}" .
+                     (* parser.c:3394; feat: FEATURE_ANONYMOUS_FUNCTIONS;
+                        disambiguated from subshell by 3-token lookahead `(` `)` `{` *)
+
+
+(* ----------------------------------------------------------------------------
+   §5  Case statements
+   ---------------------------------------------------------------------------- *)
+
+case_statement     = "case" word "in" { case_item } "esac" trailing_redirections .
+                     (* parser.c:3423; NO optional leading `(` before patterns *)
+
+case_item          = pattern_list ")" command_body case_terminator .
+
+case_terminator    = ";;"                  (* CASE_TERM_BREAK, default if missing before esac *)
+                   | ";&"                  (* CASE_TERM_FALLTHROUGH; bash 4.0+ *)
+                   | ";;&" .               (* CASE_TERM_CONTINUE; bash 4.0+ *)
+
+pattern_list       = pattern { "|" pattern } .
+                     (* stored as a single string in val.str with `|` preserved,
+                        prefixed by single-byte terminator code '0'/'1'/'2' *)
+
+pattern            = { TOK_WORD | TOK_VARIABLE | TOK_STRING | TOK_EXPANDABLE_STRING
+                     | TOK_MULTIPLY | TOK_QUESTION | TOK_GLOB
+                     | TOK_LBRACKET | TOK_RBRACKET | TOK_ASSIGN } .
+
+
+(* ----------------------------------------------------------------------------
+   §6  Function definitions
+   ---------------------------------------------------------------------------- *)
+
+function_definition
+                   = posix_function_form
+                   | keyword_function_form .
+                     (* parser.c:3812; body MUST be a brace group, not arbitrary compound *)
+
+posix_function_form
+                   = NAME "(" [ parameters ] ")" brace_group_body .
+                     (* detected by 2-token lookahead in §2: word_like_token + TOK_LPAREN *)
+
+keyword_function_form
+                   = "function" NAME [ "(" [ parameters ] ")" ] brace_group_body .
+                     (* parens optional iff next token is "{" *)
+
+parameters         = parameter { "," parameter } .
+                     (* lush extension; not POSIX, not bash *)
+
+parameter          = NAME [ "=" parameter_default ] .
+
+parameter_default  = TOK_WORD | TOK_STRING | TOK_EXPANDABLE_STRING .
+                     (* arithmetic / command sub NOT accepted as defaults *)
+
+brace_group_body   = "{" command_body "}" .
+                     (* mandatory braces; subshell, if, etc. as bodies are NOT accepted *)
+
+NAME               = TOK_WORD .
+                     (* in POSIX mode: validated as [A-Za-z_][A-Za-z0-9_]* by
+                        is_valid_posix_function_name; outside POSIX mode, ANY
+                        word_like_token is accepted *)
+
+
+(* ----------------------------------------------------------------------------
+   §7  Extended features
+   ---------------------------------------------------------------------------- *)
+
+arithmetic_command = "((" arith_token_seq "))" .
+                     (* parser.c:4101; feat: FEATURE_ARITH_COMMAND;
+                        inner content collected verbatim, reconstructed as
+                        a string in NODE_ARITH_CMD.val.str; deferred to
+                        runtime arithmetic evaluator *)
+
+arith_token_seq    = { TOKEN } .
+                     (* until matching TOK_DOUBLE_RPAREN at paren_depth 0 *)
+
+array_literal      = "(" { array_element } ")" .
+                     (* parser.c:4238; feat: FEATURE_INDEXED_ARRAYS;
+                        only entered after `=` or `+=` in assignment context;
+                        TOK_LPAREN at command position is always a subshell *)
+
+array_element      = "[" subscript "]" "=" array_value     (* indexed *)
+                   | array_value .                          (* positional *)
+
+array_value        = TOK_WORD | TOK_STRING | TOK_EXPANDABLE_STRING
+                   | TOK_VARIABLE | TOK_ARITH_EXP | TOK_COMMAND_SUB .
+                     (* nested `(` is NOT recognized — `arr=(a (b c) d)` does
+                        NOT produce a nested array *)
+
+extended_test      = "[[" test_token_seq "]]" .
+                     (* parser.c:4438; feat: FEATURE_EXTENDED_TEST;
+                        inner content reconstructed as a string with regex-mode
+                        spacing rules; deferred to runtime test evaluator *)
+
+test_token_seq     = { TOKEN } .
+                     (* until matching TOK_DOUBLE_RBRACKET at paren_depth 0;
+                        regex-mode flag set after =~, cleared at && / || at
+                        depth 0; controls whether spaces are inserted between
+                        tokens during reconstruction *)
+
+process_substitution
+                   = TOK_PROC_SUB_IN command_list ")"     (* <(...) *)
+                   | TOK_PROC_SUB_OUT command_list ")" .  (* >(...) *)
+                     (* parser.c:4603; feat: FEATURE_PROCESS_SUBSTITUTION;
+                        recognized at the LEXER, not reconstructed from tokens;
+                        inner body is a full command_list (§1); valid as a
+                        word in simple commands AND as a redirection target *)
+
+
+(* ----------------------------------------------------------------------------
+   §8  Redirections and heredocs
+   ---------------------------------------------------------------------------- *)
+
+trailing_redirections
+                   = { redirection } .
+                     (* attached to brace_group, subshell, if, while, until, for,
+                        for_arith, case, select, time per parser.c §3-§5;
+                        function_definition support is uncertain — see notes *)
+
+redirection        = file_redirection
+                   | fd_redirection
+                   | fd_alloc_redirection
+                   | heredoc_redirection
+                   | herestring_redirection .
+                     (* parser.c:1762 *)
+
+file_redirection   = file_redir_op redirection_target .
+
+file_redir_op      = "<" | ">" | ">>" | ">|" | "&>" | "&>>"
+                   | NUMBER "<" | NUMBER ">" | NUMBER ">>" .
+                     (* fd-prefixed operators are SINGLE tokens (e.g., `2>` is
+                        TOK_REDIRECT_ERR, not TOK_NUMBER + TOK_REDIRECT_OUT) *)
+
+fd_redirection     = fd_dup_op .
+                     (* fully embedded in token text; no separate target child *)
+
+fd_dup_op          = NUMBER "<&" fd_target
+                   | NUMBER ">&" fd_target
+                   | "<&" fd_target
+                   | ">&" fd_target .
+
+fd_target          = NUMBER | "-" | TOK_VARIABLE .   (* "-" closes the fd *)
+
+fd_alloc_redirection
+                   = "{" NAME "}" fd_alloc_op [ redirection_target ] .
+                     (* bash 4.1+ / zsh; entire `{name}>` etc. is a single
+                        TOK_REDIRECT_FD_ALLOC token from the lexer *)
+
+fd_alloc_op        = "<" | ">" | ">>" | ">&" fd_target | "<&" fd_target .
+
+heredoc_redirection
+                   = ( "<<" | "<<-" ) heredoc_delimiter .
+                     (* body is collected by collect_heredoc_content (parser.c:2030)
+                        directly from raw input, OUTSIDE the token stream; see notes *)
+
+heredoc_delimiter  = TOK_WORD                      (* unquoted; body expanded *)
+                   | TOK_STRING                    (* single-quoted; body literal *)
+                   | TOK_EXPANDABLE_STRING .       (* double-quoted; body literal *)
+
+herestring_redirection
+                   = "<<<" concatenated_word .
+
+redirection_target = concatenated_word
+                   | process_substitution .
+
+
+(* ----------------------------------------------------------------------------
+   §9  Tokenizer-level constructs (informative)
+   ---------------------------------------------------------------------------- *)
+
+(* The tokenizer recognizes brace expansion `{a,b,c}` / `{1..10}` (feat:
+   FEATURE_BRACE_EXPANSION), extended-glob patterns `@(...)` etc. (feat:
+   FEATURE_EXTENDED_GLOB), array literal syntax `var=(...)` (feat:
+   FEATURE_INDEXED_ARRAYS), and glob qualifiers `*(.)` (feat:
+   FEATURE_GLOB_QUALIFIERS) as parts of single TOK_WORD tokens. These do not
+   appear as separate productions because the parser sees them only as words.
+
+   Adjacent quoted strings are concatenated at the lexer (`'a''b'` is one
+   token, content `ab`). UTF-8 codepoints U+0080+ are valid word characters. *)
+
+
+(* End of grammar. See PARSER_NOTES.md for everything EBNF cannot say. *)
