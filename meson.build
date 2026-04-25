@@ -484,11 +484,12 @@ if lle_sources.length() > 0
        timeout: 30)
 
   # Render pipeline unit tests
-  test_render_pipeline = executable('test_render_pipeline',
-                                    ['tests/lle/unit/test_render_pipeline.c',
-                                     'tests/lle/functional/display_test_stubs.c'],
-                                    include_directories: inc,
-                                    dependencies: [lle_dep, display_dep])
+  test_render_pipeline = executable(
+    'test_render_pipeline',
+    ['tests/lle/unit/test_render_pipeline.c',
+     'tests/lle/functional/display_test_stubs.c'],
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep, display_dep])
 
   test('LLE Render Pipeline', test_render_pipeline,
        suite: 'lle-unit',
@@ -506,10 +507,11 @@ if lle_sources.length() > 0
 
   # Async Worker Unit Tests (Spec 25 Section 7)
   # Tests async worker thread pool for non-blocking git status
-  test_async_worker = executable('test_async_worker',
-                                 'tests/lle/unit/test_async_worker.c',
-                                 include_directories: inc,
-                                 dependencies: [lle_dep])
+  test_async_worker = executable(
+    'test_async_worker',
+    'tests/lle/unit/test_async_worker.c',
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep])
 
   test('LLE Async Worker', test_async_worker,
        suite: 'lle-unit',

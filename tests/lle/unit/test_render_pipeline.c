@@ -15,46 +15,11 @@
 #include "lle/display_integration.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
-#include <assert.h>
+#include "test_framework.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* ========================================================================== */
-/*                         TEST FRAMEWORK                                     */
-/* ========================================================================== */
-
-/* Test tracking */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name)                                                             \
-    static void test_##name(void);                                             \
-    __attribute__((unused)) static void run_test_##name(void) {                \
-        printf("Running test: %s\n", #name);                                   \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-        tests_passed++;                                                        \
-    }                                                                          \
-    static void test_##name(void)
-
-#define ASSERT_TRUE(cond, msg)                                                 \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_FALSE(cond, msg) ASSERT_TRUE(!(cond), msg)
-#define ASSERT_NULL(ptr, msg) ASSERT_TRUE((ptr) == NULL, msg)
-#define ASSERT_NOT_NULL(ptr, msg) ASSERT_TRUE((ptr) != NULL, msg)
-#define ASSERT_EQ(a, b, msg) ASSERT_TRUE((a) == (b), msg)
-#define ASSERT_NEQ(a, b, msg) ASSERT_TRUE((a) != (b), msg)
-#define ASSERT_GT(a, b, msg) ASSERT_TRUE((a) > (b), msg)
 
 /* ========================================================================== */
 /*                         MOCK OBJECTS                                       */
@@ -367,49 +332,33 @@ TEST(pipeline_handles_unicode) {
 /* ========================================================================== */
 
 int main(void) {
-    printf(
-        "=================================================================\n");
-    printf("  LLE Render Pipeline Unit Tests\n");
-    printf("================================================================="
-           "\n\n");
+    printf("=== LLE Render Pipeline Unit Tests ===\n\n");
 
-    /* Initialization tests */
-    run_test_pipeline_init_success();
-    run_test_pipeline_init_null_output();
-    run_test_pipeline_init_null_pool();
-    run_test_pipeline_reinit_after_cleanup();
+    printf("--- Initialization ---\n");
+    RUN_TEST(pipeline_init_success);
+    RUN_TEST(pipeline_init_null_output);
+    RUN_TEST(pipeline_init_null_pool);
+    RUN_TEST(pipeline_reinit_after_cleanup);
 
-    /* Cleanup tests */
-    run_test_pipeline_cleanup_null();
-    run_test_pipeline_cleanup_success();
+    printf("\n--- Cleanup ---\n");
+    RUN_TEST(pipeline_cleanup_null);
+    RUN_TEST(pipeline_cleanup_success);
 
-    /* Execution tests */
-    run_test_pipeline_execute_null_pipeline();
-    run_test_pipeline_execute_null_context();
-    run_test_pipeline_execute_null_output();
-    run_test_pipeline_execute_empty_buffer();
-    run_test_pipeline_execute_simple_content();
-    run_test_pipeline_execute_multiline_content();
+    printf("\n--- Execution ---\n");
+    RUN_TEST(pipeline_execute_null_pipeline);
+    RUN_TEST(pipeline_execute_null_context);
+    RUN_TEST(pipeline_execute_null_output);
+    RUN_TEST(pipeline_execute_empty_buffer);
+    RUN_TEST(pipeline_execute_simple_content);
+    RUN_TEST(pipeline_execute_multiline_content);
 
-    /* Behavior tests */
-    run_test_pipeline_multiple_executions();
-    run_test_pipeline_different_content_sizes();
+    printf("\n--- Behavior ---\n");
+    RUN_TEST(pipeline_multiple_executions);
+    RUN_TEST(pipeline_different_content_sizes);
 
-    /* Special content tests */
-    run_test_pipeline_handles_special_characters();
-    run_test_pipeline_handles_unicode();
+    printf("\n--- Special content ---\n");
+    RUN_TEST(pipeline_handles_special_characters);
+    RUN_TEST(pipeline_handles_unicode);
 
-    /* Print summary */
-    printf("\n================================================================="
-           "\n");
-    printf("  Test Summary\n");
-    printf(
-        "=================================================================\n");
-    printf("  Tests run:    %d\n", tests_run);
-    printf("  Tests passed: %d\n", tests_passed);
-    printf("  Tests failed: %d\n", tests_failed);
-    printf(
-        "=================================================================\n");
-
-    return (tests_failed == 0) ? 0 : 1;
+    return TEST_RESULT();
 }
