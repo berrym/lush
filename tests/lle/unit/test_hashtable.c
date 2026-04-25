@@ -18,48 +18,16 @@
 
 #include "lle/error_handling.h"
 #include "lle/hashtable.h"
-#include <assert.h>
+#include "test_framework.h"
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-/* ========================================================================== */
-/*                         TEST FRAMEWORK                                     */
-/* ========================================================================== */
-
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name)                                                             \
-    static void test_##name(void);                                             \
-    __attribute__((unused)) static void run_test_##name(void) {                \
-        printf("Running test: %s\n", #name);                                   \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-        tests_passed++;                                                        \
-    }                                                                          \
-    static void test_##name(void)
-
-#define ASSERT_TRUE(cond, msg)                                                 \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  ✗ ASSERTION FAILED: %s\n", msg);                         \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_FALSE(cond, msg) ASSERT_TRUE(!(cond), msg)
-#define ASSERT_NULL(ptr, msg) ASSERT_TRUE((ptr) == NULL, msg)
-#define ASSERT_NOT_NULL(ptr, msg) ASSERT_TRUE((ptr) != NULL, msg)
-#define ASSERT_EQ(a, b, msg) ASSERT_TRUE((a) == (b), msg)
-#define ASSERT_NEQ(a, b, msg) ASSERT_TRUE((a) != (b), msg)
-#define ASSERT_GT(a, b, msg) ASSERT_TRUE((a) > (b), msg)
-#define ASSERT_STR_EQ(a, b, msg) ASSERT_TRUE(strcmp((a), (b)) == 0, msg)
+/* ASSERT_NEQ kept as a local alias since the shared framework names it ASSERT_NE */
+#define ASSERT_NEQ(a, b, msg) ASSERT_NE(a, b, msg)
 
 /* ========================================================================== */
 /*                         MOCK OBJECTS                                       */
@@ -709,64 +677,48 @@ TEST(invalid_params_lookup) {
 /* ========================================================================== */
 
 int main(void) {
-    printf("========================================\n");
-    printf("LLE Hashtable Wrapper Functional Tests\n");
-    printf("Spec 05: libhashtable Integration\n");
-    printf("========================================\n\n");
+    printf("=== LLE Hashtable Wrapper Functional Tests ===\n\n");
 
-    printf("=== PHASE 1: Configuration Tests ===\n");
-    run_test_config_init_default();
-    run_test_config_create_pooled();
-    run_test_config_invalid_params();
+    printf("--- Phase 1: Configuration ---\n");
+    RUN_TEST(config_init_default);
+    RUN_TEST(config_create_pooled);
+    RUN_TEST(config_invalid_params);
 
-    printf("\n=== PHASE 1: Registry Tests ===\n");
-    run_test_registry_init_destroy();
-    run_test_registry_add_remove();
-    run_test_registry_invalid_params();
+    printf("\n--- Phase 1: Registry ---\n");
+    RUN_TEST(registry_init_destroy);
+    RUN_TEST(registry_add_remove);
+    RUN_TEST(registry_invalid_params);
 
-    printf("\n=== PHASE 1: Factory Tests ===\n");
-    run_test_factory_init_destroy();
-    run_test_factory_memory_pool_integration();
-    run_test_factory_create_strstr_basic();
-    run_test_factory_create_strstr_with_config();
+    printf("\n--- Phase 1: Factory ---\n");
+    RUN_TEST(factory_init_destroy);
+    RUN_TEST(factory_memory_pool_integration);
+    RUN_TEST(factory_create_strstr_basic);
+    RUN_TEST(factory_create_strstr_with_config);
 
-    printf("\n=== PHASE 1: Basic Operations ===\n");
-    run_test_strstr_insert_lookup();
-    run_test_strstr_multiple_inserts();
-    run_test_strstr_update_value();
-    run_test_strstr_delete();
-    run_test_strstr_contains();
-    run_test_strstr_size();
-    run_test_strstr_clear();
+    printf("\n--- Phase 1: Basic Operations ---\n");
+    RUN_TEST(strstr_insert_lookup);
+    RUN_TEST(strstr_multiple_inserts);
+    RUN_TEST(strstr_update_value);
+    RUN_TEST(strstr_delete);
+    RUN_TEST(strstr_contains);
+    RUN_TEST(strstr_size);
+    RUN_TEST(strstr_clear);
 
-    printf("\n=== PHASE 1: Performance Monitoring ===\n");
-    run_test_performance_metrics_tracking();
-    run_test_performance_metrics_reset();
+    printf("\n--- Phase 1: Performance Monitoring ---\n");
+    RUN_TEST(performance_metrics_tracking);
+    RUN_TEST(performance_metrics_reset);
 
-    printf("\n=== PHASE 2: Thread Safety ===\n");
-    run_test_thread_safe_concurrent_inserts();
-    run_test_thread_safe_concurrent_reads();
+    printf("\n--- Phase 2: Thread Safety ---\n");
+    RUN_TEST(thread_safe_concurrent_inserts);
+    RUN_TEST(thread_safe_concurrent_reads);
 
-    printf("\n=== PHASE 3: System Initialization ===\n");
-    run_test_system_init_destroy();
-    run_test_system_with_memory_pool();
+    printf("\n--- Phase 3: System Initialization ---\n");
+    RUN_TEST(system_init_destroy);
+    RUN_TEST(system_with_memory_pool);
 
-    printf("\n=== Invalid Parameters ===\n");
-    run_test_invalid_params_insert();
-    run_test_invalid_params_lookup();
+    printf("\n--- Invalid Parameters ---\n");
+    RUN_TEST(invalid_params_insert);
+    RUN_TEST(invalid_params_lookup);
 
-    printf("\n========================================\n");
-    printf("Test Results:\n");
-    printf("  Tests Run:    %d\n", tests_run);
-    printf("  Tests Passed: %d\n", tests_passed);
-    printf("  Tests Failed: %d\n", tests_failed);
-    printf("========================================\n");
-
-    if (tests_failed > 0) {
-        printf("FAILED: Some tests did not pass\n");
-        return 1;
-    }
-
-    printf("SUCCESS: All tests passed\n");
-    return 0;
+    return TEST_RESULT();
 }

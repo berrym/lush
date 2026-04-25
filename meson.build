@@ -386,11 +386,12 @@ if lle_sources.length() > 0
 
   # Event System Unit Tests (Spec 04 Phase 1)
   # Tests core event system infrastructure: lifecycle, events, queues, handlers
-  test_event_system = executable('test_event_system',
-                                 ['tests/lle/unit/test_event_system.c',
-                                  'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: inc,
-                                 dependencies: [lle_dep])
+  test_event_system = executable(
+    'test_event_system',
+    ['tests/lle/unit/test_event_system.c',
+     'tests/lle/functional/test_memory_mock.c'],
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep])
 
   test('LLE Event System', test_event_system,
        suite: 'lle-unit',
@@ -496,10 +497,11 @@ if lle_sources.length() > 0
        timeout: 30)
 
   # Hashtable wrapper unit tests (Spec 05)
-  test_hashtable = executable('test_hashtable',
-                              'tests/lle/unit/test_hashtable.c',
-                              include_directories: inc,
-                              dependencies: [lle_dep])
+  test_hashtable = executable(
+    'test_hashtable',
+    'tests/lle/unit/test_hashtable.c',
+    include_directories: [inc, include_directories('tests')],
+    dependencies: [lle_dep])
 
   test('LLE Hashtable Wrapper', test_hashtable,
        suite: 'lle-unit',
