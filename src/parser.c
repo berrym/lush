@@ -4016,12 +4016,68 @@ static node_t *parse_function_definition(parser_t *parser) {
     }
 
 parse_function_body:
-    // Skip separators before '{'
+    // Skip separators before the body
     skip_separators(parser);
 
-    // Expect '{'
+    // The function body may be any compound command (POSIX function_body
+    // is `compound_command`; bash/zsh extend this to (( )), [[ ]], select).
+    // Brace-group bodies use the inline sibling-chain parsing below for AST
+    // compactness. All other compound bodies are parsed by their respective
+    // compound-command parsers and attached as a single child node.
+    token_t *body_start = tokenizer_current(parser->tokenizer);
+    if (body_start && body_start->type != TOK_LBRACE) {
+        node_t *body = NULL;
+        switch (body_start->type) {
+            case TOK_LPAREN:
+                body = parse_subshell(parser);
+                break;
+            case TOK_DOUBLE_LPAREN:
+                body = parse_arithmetic_command(parser);
+                break;
+            case TOK_DOUBLE_LBRACKET:
+                body = parse_extended_test(parser);
+                break;
+            case TOK_IF:
+                body = parse_if_statement(parser);
+                break;
+            case TOK_WHILE:
+                body = parse_while_statement(parser);
+                break;
+            case TOK_UNTIL:
+                body = parse_until_statement(parser);
+                break;
+            case TOK_FOR:
+                body = parse_for_statement(parser);
+                break;
+            case TOK_CASE:
+                body = parse_case_statement(parser);
+                break;
+            case TOK_SELECT:
+                body = parse_select_statement(parser);
+                break;
+            default:
+                parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                    "function body must be a compound command",
+                    "expected '{', '(', '((', '[[', if, while, until, for, "
+                    "case, or select");
+                free_node_tree(function_node);
+                parser_pop_context(parser);
+                return NULL;
+        }
+        if (!body) {
+            free_node_tree(function_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        add_child_node(function_node, body);
+        parser_pop_context(parser);
+        return function_node;
+    }
+
+    // Brace-group body — consume '{' and parse until '}'
     if (!expect_token_with_help(parser, TOK_LBRACE,
-            "function body must be enclosed in braces { }")) {
+            "function body must be enclosed in braces { } "
+            "or be a compound command")) {
         free_node_tree(function_node);
         parser_pop_context(parser);
         return NULL;

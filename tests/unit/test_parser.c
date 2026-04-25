@@ -549,11 +549,98 @@ TEST(parse_function_keyword) {
 TEST(parse_function_posix) {
     parser_t *parser = parser_new("foo() { echo bar; }");
     ASSERT_NOT_NULL(parser, "parser_new failed");
-    
+
     node_t *ast = parser_parse(parser);
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
-    
+
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+/* ============================================================================
+ * REGRESSION TESTS — Issue #46
+ * Function bodies must accept any compound command, not only brace groups.
+ * Bash and zsh both accept subshell, if, while, for, case, arithmetic,
+ * and extended-test bodies. Until the fix lands, every test below fails
+ * with `expected 'LBRACE', got '...'`.
+ * ============================================================================
+ */
+
+TEST(parse_function_body_subshell) {
+    parser_t *parser = parser_new("f() ( echo subshell-body )");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with subshell body must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with subshell body must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_body_if) {
+    parser_t *parser = parser_new("f() if true; then echo yes; fi");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with if body must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with if body must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_body_while) {
+    parser_t *parser = parser_new("f() while false; do echo never; done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with while body must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with while body must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_body_for) {
+    parser_t *parser = parser_new("f() for i in a b; do echo $i; done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with for body must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with for body must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_body_case) {
+    parser_t *parser = parser_new("f() case x in x) echo match;; esac");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with case body must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with case body must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_body_arith) {
+    parser_t *parser = parser_new("f() (( 1 + 1 ))");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "function with arithmetic body must parse");
+    ASSERT(!parser_has_error(parser),
+           "function with arithmetic body must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_function_body_keyword_form_subshell) {
+    parser_t *parser = parser_new("function f() ( echo body )");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast,
+        "'function name() ( body )' (keyword form, subshell body) must parse");
+    ASSERT(!parser_has_error(parser),
+        "keyword form with subshell body must not produce parse error");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -890,6 +977,15 @@ int main(void) {
     printf("\nFunction tests:\n");
     RUN_TEST(parse_function_keyword);
     RUN_TEST(parse_function_posix);
+
+    printf("\nRegression tests — Issue #46 (function compound bodies):\n");
+    RUN_TEST(parse_function_body_subshell);
+    RUN_TEST(parse_function_body_if);
+    RUN_TEST(parse_function_body_while);
+    RUN_TEST(parse_function_body_for);
+    RUN_TEST(parse_function_body_case);
+    RUN_TEST(parse_function_body_arith);
+    RUN_TEST(parse_function_body_keyword_form_subshell);
     
     printf("\nGrouping tests:\n");
     RUN_TEST(parse_subshell);
