@@ -888,6 +888,20 @@ endif
          timeout: 30)
   endif
 
+  # Char Width Unit Tests
+  # Tests lle_codepoint_width() and lle_is_wide_character() across the
+  # Unicode East Asian Width ranges the implementation distinguishes.
+  if fs.exists('tests/lle/unit/test_char_width.c')
+    test_char_width = executable(
+      'test_char_width',
+      'tests/lle/unit/test_char_width.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE Char Width', test_char_width,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # ============================================================================
   # SPEC 25: DEFAULT KEYBINDINGS TESTS
   # ============================================================================

@@ -121,9 +121,13 @@ int lle_codepoint_width(uint32_t cp) {
     if (cp >= 0xFE00 && cp <= 0xFE0F)
         return 0; /* Variation Selectors (zero-width) */
 
-    /* Skin tone modifiers (Emoji modifiers) */
-    if (cp >= 0x1F3FB && cp <= 0x1F3FF)
-        return 0; /* Emoji modifiers (zero-width when combined) */
+    /* NOTE: Skin tone modifiers (U+1F3FB..U+1F3FF) are not handled
+     * specially here — Unicode TR11 assigns them East Asian Width = W,
+     * so they are width 2 as standalone codepoints (and the broader
+     * emoji-block check above already returns 2 for them). Their
+     * "no extra columns when combined" behavior is a grapheme-cluster
+     * property, handled by the grapheme detector / unicode_grapheme
+     * modules, not by per-codepoint width. */
 
     /* Regional Indicators (flags) */
     if (cp >= 0x1F1E6 && cp <= 0x1F1FF)
