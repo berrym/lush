@@ -626,6 +626,18 @@ TEST(powerline_color_downgrade) {
 /* ========================================================================== */
 
 int main(void) {
+    /* Force a color-capable terminal environment for the duration of this
+     * test process. The composer caches color capabilities on first use via
+     * setupterm(); CI environments where TERM is unset or "dumb" cause
+     * setupterm to fail and the renderer to correctly downgrade to
+     * no-color, which would mask the very behavior these tests verify.
+     * Setting TERM=xterm-256color + COLORTERM=truecolor before any
+     * composer call makes the detection deterministic across local
+     * developer terminals, GitHub Actions runners, and any other harness
+     * that does not present a color-capable tty. */
+    setenv("TERM", "xterm-256color", 1);
+    setenv("COLORTERM", "truecolor", 1);
+
     printf("=== LLE Powerline Renderer Tests ===\n\n");
 
     /* Direct renderer tests */
