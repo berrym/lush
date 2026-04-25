@@ -902,6 +902,20 @@ endif
          timeout: 30)
   endif
 
+  # Grapheme Detector Unit Tests
+  # Tests the UAX #29 grapheme break property classification and the
+  # boundary rules between codepoint pairs.
+  if fs.exists('tests/lle/unit/test_grapheme_detector.c')
+    test_grapheme_detector = executable(
+      'test_grapheme_detector',
+      'tests/lle/unit/test_grapheme_detector.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE Grapheme Detector', test_grapheme_detector,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # ============================================================================
   # SPEC 25: DEFAULT KEYBINDINGS TESTS
   # ============================================================================
