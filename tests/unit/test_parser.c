@@ -414,11 +414,91 @@ TEST(parse_while_loop) {
 TEST(parse_until_loop) {
     parser_t *parser = parser_new("until false; do echo loop; done");
     ASSERT_NOT_NULL(parser, "parser_new failed");
-    
+
     node_t *ast = parser_parse(parser);
     ASSERT_NOT_NULL(ast, "parser_parse should return AST");
     ASSERT(!parser_has_error(parser), "Should not have parse error");
-    
+
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+/* ============================================================================
+ * REGRESSION TESTS — Issue #45
+ * `while` and `until` must accept logical-expression conditions
+ * (&& and ||) as bash and zsh do. Until the fix lands, every test
+ * below fails with `expected 'DO', got 'LOGICAL_AND'/'LOGICAL_OR'`.
+ * ============================================================================
+ */
+
+TEST(parse_while_logical_and_simple) {
+    parser_t *parser = parser_new(
+        "i=0; while [ $i -lt 2 ] && true; do echo $i; i=$((i+1)); done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "while + && condition must parse");
+    ASSERT(!parser_has_error(parser),
+           "while + && condition must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_while_logical_or_simple) {
+    parser_t *parser = parser_new(
+        "i=0; while [ $i -lt 2 ] || false; do echo $i; i=$((i+1)); done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "while + || condition must parse");
+    ASSERT(!parser_has_error(parser),
+           "while + || condition must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_until_logical_and_simple) {
+    parser_t *parser = parser_new(
+        "i=2; until [ $i -le 0 ] && false; do echo $i; i=$((i-1)); done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "until + && condition must parse");
+    ASSERT(!parser_has_error(parser),
+           "until + && condition must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_until_logical_or_simple) {
+    parser_t *parser = parser_new(
+        "i=2; until [ $i -le 0 ] || false; do echo $i; i=$((i-1)); done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "until + || condition must parse");
+    ASSERT(!parser_has_error(parser),
+           "until + || condition must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_while_logical_arith_compound) {
+    parser_t *parser = parser_new(
+        "i=0; while ((i < 2)) && ((i >= 0)); do echo $i; ((i++)); done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "while + (( )) && (( )) condition must parse");
+    ASSERT(!parser_has_error(parser),
+           "while + (( )) && (( )) condition must not produce parse error");
+    free_node_tree(ast);
+    parser_free(parser);
+}
+
+TEST(parse_while_logical_brace_group) {
+    parser_t *parser = parser_new(
+        "i=0; while { [ $i -lt 2 ]; } && true; do echo $i; i=$((i+1)); done");
+    ASSERT_NOT_NULL(parser, "parser_new failed");
+    node_t *ast = parser_parse(parser);
+    ASSERT_NOT_NULL(ast, "while + brace-group + && condition must parse");
+    ASSERT(!parser_has_error(parser),
+           "while + brace-group + && condition must not produce parse error");
     free_node_tree(ast);
     parser_free(parser);
 }
@@ -795,6 +875,15 @@ int main(void) {
     RUN_TEST(parse_for_loop_no_in);
     RUN_TEST(parse_while_loop);
     RUN_TEST(parse_until_loop);
+
+    printf("\nRegression tests — Issue #45 (while/until logical conditions):\n");
+    RUN_TEST(parse_while_logical_and_simple);
+    RUN_TEST(parse_while_logical_or_simple);
+    RUN_TEST(parse_until_logical_and_simple);
+    RUN_TEST(parse_until_logical_or_simple);
+    RUN_TEST(parse_while_logical_arith_compound);
+    RUN_TEST(parse_while_logical_brace_group);
+
     RUN_TEST(parse_case);
     RUN_TEST(parse_case_with_patterns);
     

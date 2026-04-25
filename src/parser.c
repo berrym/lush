@@ -2403,18 +2403,11 @@ static node_t *parse_while_statement(parser_t *parser) {
         return NULL;
     }
 
-    // Parse condition - this is the key fix!
-    // We parse until we hit 'do', not until we hit ';'
-    node_t *condition = NULL;
-
-    // Parse condition as a simple command or pipeline
-    if (tokenizer_match(parser->tokenizer, TOK_LBRACKET)) {
-        // Special handling for [ ... ] test commands
-        condition = parse_simple_command(parser);
-    } else {
-        // Regular command condition
-        condition = parse_pipeline(parser);
-    }
+    // Parse condition as a full logical expression so that &&/|| chains
+    // (e.g. `while [ $i -lt N ] && true; do ...`) parse like in if/elif.
+    // The `do` terminator is unambiguous, so logical operators in the
+    // condition introduce no parser ambiguity.
+    node_t *condition = parse_logical_expression(parser);
 
     if (!condition) {
         free_node_tree(while_node);
@@ -2492,17 +2485,10 @@ static node_t *parse_until_statement(parser_t *parser) {
         return NULL;
     }
 
-    // Parse condition - same logic as while
-    node_t *condition = NULL;
-
-    // Parse condition as a simple command or pipeline
-    if (tokenizer_match(parser->tokenizer, TOK_LBRACKET)) {
-        // Special handling for [ ... ] test commands
-        condition = parse_simple_command(parser);
-    } else {
-        // Regular command condition
-        condition = parse_pipeline(parser);
-    }
+    // Parse condition as a full logical expression — same rationale as
+    // parse_while_statement: &&/|| in conditions are unambiguous because
+    // `do` is the terminator.
+    node_t *condition = parse_logical_expression(parser);
 
     if (!condition) {
         free_node_tree(until_node);
