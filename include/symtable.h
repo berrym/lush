@@ -239,6 +239,31 @@ int symtable_set_global_var(symtable_manager_t *manager, const char *name,
                             const char *value);
 
 /**
+ * @brief Assign a value using POSIX scope-chain semantics
+ *
+ * The correct write path for unprefixed `name=value` assignments. Walks
+ * the scope chain from current scope upward; if the variable already
+ * exists in any reachable scope, updates that scope (preserving its
+ * locality and existing flags). If not found anywhere, creates the
+ * variable in the global scope (POSIX default for unprefixed
+ * assignments).
+ *
+ * Use this instead of symtable_set_global_var when implementing the
+ * runtime semantics of `name=value`, `name+=value`, `for var in ...`,
+ * and similar implicit-assignment forms. symtable_set_global_var
+ * unconditionally creates or updates a global, ignoring any local of
+ * the same name — which leaves the local unchanged and produces silent
+ * semantic shifts (issue #47).
+ *
+ * @param manager Manager instance
+ * @param name Variable name
+ * @param value Variable value
+ * @return 0 on success, -1 on error
+ */
+int symtable_assign_var(symtable_manager_t *manager, const char *name,
+                        const char *value);
+
+/**
  * @brief Get a variable value with scope lookup
  *
  * @param manager Manager instance

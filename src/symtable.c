@@ -563,6 +563,45 @@ int symtable_set_global_var(symtable_manager_t *manager, const char *name,
     return result;
 }
 
+int symtable_assign_var(symtable_manager_t *manager, const char *name,
+                        const char *value) {
+    if (!manager || !name) {
+        return -1;
+    }
+
+    // Walk scope chain from current scope upward looking for the variable.
+    // If found, update that scope (preserves locality). If not, fall through
+    // to global write (POSIX default for unprefixed assignments).
+    symtable_scope_t *scope = manager->current_scope;
+    while (scope) {
+        const char *serialized = ht_strstr_get(scope->vars_ht, name);
+        if (serialized) {
+            // Preserve the existing flags so locality and other attributes
+            // (export, readonly bookkeeping, etc.) survive the assignment.
+            // Mask out the unset sentinel since we are setting a value.
+            symvar_flags_t flags = SYMVAR_NONE;
+            symvar_t *existing = deserialize_variable(name, serialized);
+            if (existing) {
+                flags = existing->flags & ~SYMVAR_UNSET;
+                free_symvar(existing);
+            }
+
+            // Temporarily switch current_scope so symtable_set_var writes
+            // to the scope where the variable actually lives. Restore on
+            // the way out.
+            symtable_scope_t *old_scope = manager->current_scope;
+            manager->current_scope = scope;
+            int result = symtable_set_var(manager, name, value, flags);
+            manager->current_scope = old_scope;
+            return result;
+        }
+        scope = scope->parent;
+    }
+
+    // Variable does not exist in any scope — create it globally per POSIX.
+    return symtable_set_global_var(manager, name, value);
+}
+
 /**
  * @brief Get a variable's value from the scope chain
  *

@@ -2213,9 +2213,12 @@ static int execute_for(executor_t *executor, node_t *for_node) {
     // Iterate over expanded words
     for (int i = 0; i < word_count; i++) {
         if (expanded_words[i]) {
-            // Set loop variable in global scope (POSIX compliance)
-            if (symtable_set_global_var(executor->symtable, var_name,
-                                        expanded_words[i]) != 0) {
+            // Update loop variable using POSIX scope-chain semantics: if
+            // a local of this name already exists (e.g. `local i` in the
+            // enclosing function), update that local instead of creating
+            // a parallel global. See issue #47.
+            if (symtable_assign_var(executor->symtable, var_name,
+                                    expanded_words[i]) != 0) {
                 set_executor_error(executor, "Failed to set loop variable");
                 // Cleanup expanded words
                 for (int j = 0; j < word_count; j++) {
@@ -2611,15 +2614,15 @@ static int execute_select(executor_t *executor, node_t *select_node) {
         char *endptr;
         long selection = strtol(input_buf, &endptr, 10);
 
-        // Set loop variable
+        // Set loop variable using POSIX scope-chain semantics (issue #47)
         if (*input_buf != '\0' && *endptr == '\0' && selection >= 1 &&
             selection <= item_count) {
             // Valid selection
-            symtable_set_global_var(executor->symtable, var_name,
-                                    menu_items[selection - 1]);
+            symtable_assign_var(executor->symtable, var_name,
+                                menu_items[selection - 1]);
         } else {
             // Invalid or empty input - set variable to empty
-            symtable_set_global_var(executor->symtable, var_name, "");
+            symtable_assign_var(executor->symtable, var_name, "");
         }
 
         // Execute body
@@ -6421,20 +6424,20 @@ static int execute_assignment(executor_t *executor, const char *assignment) {
                     if (value) {
                         strcat(combined, value);
                     }
-                    result = symtable_set_global_var(executor->symtable, target_name, combined);
+                    result = symtable_assign_var(executor->symtable, target_name, combined);
                     free(combined);
                 } else {
                     result = -1;
                 }
             } else {
                 // No existing value, just set the new value
-                result = symtable_set_global_var(executor->symtable, target_name,
-                                                 value ? value : "");
+                result = symtable_assign_var(executor->symtable, target_name,
+                                             value ? value : "");
             }
         }
     } else {
-        result = symtable_set_global_var(executor->symtable, target_name,
-                                         value ? value : "");
+        result = symtable_assign_var(executor->symtable, target_name,
+                                     value ? value : "");
     }
     
     // Free resolved nameref if it was allocated

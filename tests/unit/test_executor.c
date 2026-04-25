@@ -469,11 +469,199 @@ TEST(function_with_args) {
 TEST(function_return) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
-    
+
     executor_execute_command_line(exec, "retfunc() { return 42; }");
     int status = executor_execute_command_line(exec, "retfunc");
     ASSERT_EQ(status, 42, "Function should return 42");
-    
+
+    executor_free(exec);
+}
+
+/* ============================================================================
+ * REGRESSION TESTS — Issue #47
+ * Variables declared with local/declare/typeset must honor subsequent
+ * assignments using POSIX scope-chain semantics: an unprefixed `name=value`
+ * in a function should update the existing local, not silently create or
+ * update a global. The same applies to += append, for-loop variables, and
+ * other implicit-assignment forms — they all share the same root cause
+ * (unconditional global write at the executor level).
+ *
+ * Each test below stores the post-assignment value in a global RESULT
+ * variable so the test can inspect it after the function returns. Until
+ * the fix lands, RESULT reflects the *initial* local value rather than
+ * the value the assignment specified.
+ * ============================================================================ */
+
+TEST(local_plain_string_reassignment) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local x=initial; x=updated; RESULT=$x; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "updated",
+        "local then plain reassignment must update the local");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(local_integer_reassignment) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local x=0; x=42; RESULT=$x; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "42",
+        "local then integer literal reassignment must update the local");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(local_arith_substitution) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local x=0; x=$((1+1)); RESULT=$x; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "2",
+        "local then arithmetic substitution assignment must update the local");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(local_command_substitution) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local x=initial; x=$(echo updated); RESULT=$x; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "updated",
+        "local then command substitution assignment must update the local");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(declare_reassignment) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { declare x=0; x=42; RESULT=$x; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "42",
+        "declare then reassignment must update the declared variable");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(typeset_reassignment) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { typeset x=0; x=42; RESULT=$x; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "42",
+        "typeset then reassignment must update the typeset variable");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(local_two_step_no_initial) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local x; x=hello; RESULT=$x; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "hello",
+        "local without initial value then assign must produce the new value");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(local_does_not_leak_to_global) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec, "X_LEAK=outside-initial");
+    executor_execute_command_line(exec,
+        "f() { local X_LEAK=inside-local; X_LEAK=inside-updated; }");
+    executor_execute_command_line(exec, "f");
+
+    char *outside = symtable_get_var(exec->symtable, "X_LEAK");
+    ASSERT_STR_EQ(outside, "outside-initial",
+        "global with same name as local must not be touched by reassignment "
+        "to the local");
+    free(outside);
+    executor_free(exec);
+}
+
+TEST(local_for_loop_variable) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local i=startval; for i in 1 2 3; do :; done; RESULT=$i; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "3",
+        "for loop variable must update the local, not silently write to global");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(local_plus_equals_append) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local s=hello; s+=\" world\"; RESULT=$s; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "hello world",
+        "local += append must concatenate to the local, not silently "
+        "write to global");
+    free(result);
+    executor_free(exec);
+}
+
+TEST(local_while_loop_counter) {
+    /* The original symptomatic case from issue #47 — a while-loop counter
+     * with `local` infinite-looped before the fix. The test framework
+     * exits on first failure, so earlier simpler tests stop the run before
+     * this one ever executes in the broken state. After the fix, this
+     * confirms the loop terminates correctly. */
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    executor_execute_command_line(exec,
+        "f() { local i=0; while [ $i -lt 3 ]; do i=$((i+1)); done; RESULT=$i; }");
+    executor_execute_command_line(exec, "f");
+
+    char *result = symtable_get_var(exec->symtable, "RESULT");
+    ASSERT_STR_EQ(result, "3",
+        "while-loop counter using local must terminate correctly");
+    free(result);
     executor_free(exec);
 }
 
@@ -1392,6 +1580,19 @@ int main(void) {
     RUN_TEST(function_definition_ksh);
     RUN_TEST(function_with_args);
     RUN_TEST(function_return);
+
+    printf("\nRegression tests — Issue #47 (local/declare/typeset assignment):\n");
+    RUN_TEST(local_plain_string_reassignment);
+    RUN_TEST(local_integer_reassignment);
+    RUN_TEST(local_arith_substitution);
+    RUN_TEST(local_command_substitution);
+    RUN_TEST(declare_reassignment);
+    RUN_TEST(typeset_reassignment);
+    RUN_TEST(local_two_step_no_initial);
+    RUN_TEST(local_does_not_leak_to_global);
+    RUN_TEST(local_for_loop_variable);
+    RUN_TEST(local_plus_equals_append);
+    RUN_TEST(local_while_loop_counter);
     
     printf("\nArithmetic tests:\n");
     RUN_TEST(arithmetic_basic);
