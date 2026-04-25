@@ -916,6 +916,21 @@ endif
          timeout: 30)
   endif
 
+  # UTF-8 Index Unit Tests
+  # Tests the bidirectional position-mapping index (byte/codepoint/
+  # grapheme/display column conversions, init/rebuild/invalidate state
+  # machine, and error paths).
+  if fs.exists('tests/lle/unit/test_utf8_index.c')
+    test_utf8_index = executable(
+      'test_utf8_index',
+      'tests/lle/unit/test_utf8_index.c',
+      include_directories: [inc, include_directories('tests')],
+      dependencies: [lle_dep])
+    test('LLE UTF-8 Index', test_utf8_index,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # ============================================================================
   # SPEC 25: DEFAULT KEYBINDINGS TESTS
   # ============================================================================
