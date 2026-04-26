@@ -10,7 +10,7 @@
 
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/error_handling.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +33,7 @@ static int tests_passed = 0;
 /**
  * Test fallback hierarchy logic
  */
-static void test_fallback_hierarchy(void) {
+TEST(fallback_hierarchy) {
     printf("\nFallback Hierarchy Tests:\n");
 
     /* Get a valid detection result */
@@ -112,7 +112,7 @@ static void test_fallback_hierarchy(void) {
 /**
  * Test multiple fallback levels
  */
-static void test_multiple_fallbacks(void) {
+TEST(multiple_fallbacks) {
     printf("\nMultiple Fallback Tests:\n");
 
     /* Create a detection result for testing */
@@ -167,7 +167,7 @@ static void test_multiple_fallbacks(void) {
 /**
  * Test fallback error handling
  */
-static void test_fallback_errors(void) {
+TEST(fallback_errors) {
     printf("\nFallback Error Handling Tests:\n");
 
     /* Test NULL context */
@@ -190,7 +190,7 @@ static void test_fallback_errors(void) {
 /**
  * Test graceful degradation chain
  */
-static void test_degradation_chain(void) {
+TEST(degradation_chain) {
     printf("\nGraceful Degradation Chain Tests:\n");
 
     /* Verify expected fallback paths */
@@ -213,26 +213,10 @@ static void test_degradation_chain(void) {
  * Main test runner
  */
 int main(void) {
-    printf("\n");
-    printf("==================================================================="
-           "=============\n");
-    printf("Adaptive Terminal Fallback Tests (Spec 26 Phase 3)\n");
-    printf("==================================================================="
-           "=============\n");
-
-    test_fallback_hierarchy();
-    test_multiple_fallbacks();
-    test_fallback_errors();
-    test_degradation_chain();
-
-    printf("\n");
-    printf("==================================================================="
-           "=============\n");
-    printf("Test Results: %d/%d passed (%.1f%%)\n", tests_passed, tests_run,
-           tests_run > 0 ? (100.0 * tests_passed / tests_run) : 0.0);
-    printf("==================================================================="
-           "=============\n");
-    printf("\n");
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    printf("=== Adaptive Terminal Fallback Tests (Spec 26 Phase 3) ===\n");
+    RUN_TEST(fallback_hierarchy);
+    RUN_TEST(multiple_fallbacks);
+    RUN_TEST(fallback_errors);
+    RUN_TEST(degradation_chain);
+    return TEST_RESULT();
 }

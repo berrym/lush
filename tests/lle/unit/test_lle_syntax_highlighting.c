@@ -8,26 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test framework macros */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
+#include "test_framework.h"
 
-#define TEST_START(name)                                                       \
-    do {                                                                       \
-        printf("Test: %s... ", name);                                          \
-        tests_run++;                                                           \
-    } while (0)
-#define TEST_PASS()                                                            \
-    do {                                                                       \
-        tests_passed++;                                                        \
-        printf("PASS\n");                                                      \
-    } while (0)
-#define TEST_FAIL(msg)                                                         \
-    do {                                                                       \
-        tests_failed++;                                                        \
-        printf("FAIL: %s\n", msg);                                             \
-    } while (0)
+#define TEST_START(name) ((void)0)
+#define TEST_PASS() ((void)0)
+#define TEST_FAIL(msg) TEST_FAIL_MSG(msg)
 
 /* Stubs for lush core functions */
 bool is_builtin(const char *name) {
@@ -103,7 +88,7 @@ get_first_command_type(lle_syntax_highlighter_t *h, const char *input) {
 }
 
 /* Test: Highlighter creation */
-static void test_highlighter_create(void) {
+TEST(highlighter_create) {
     TEST_START("highlighter_create");
     lle_syntax_highlighter_t *h = NULL;
     int rc = lle_syntax_highlighter_create(&h);
@@ -116,7 +101,7 @@ static void test_highlighter_create(void) {
 }
 
 /* Test: Builtin detection */
-static void test_builtins(void) {
+TEST(builtins) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
@@ -162,7 +147,7 @@ static void test_builtins(void) {
 }
 
 /* Test: External commands */
-static void test_external_commands(void) {
+TEST(external_commands) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
@@ -188,7 +173,7 @@ static void test_external_commands(void) {
 }
 
 /* Test: Invalid commands */
-static void test_invalid_commands(void) {
+TEST(invalid_commands) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
@@ -205,7 +190,7 @@ static void test_invalid_commands(void) {
 }
 
 /* Test: Keywords */
-static void test_keywords(void) {
+TEST(keywords) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
@@ -231,7 +216,7 @@ static void test_keywords(void) {
 }
 
 /* Test: Pipes and operators */
-static void test_operators(void) {
+TEST(operators) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
@@ -253,7 +238,7 @@ static void test_operators(void) {
 }
 
 /* Test: Variables */
-static void test_variables(void) {
+TEST(variables) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
@@ -288,7 +273,7 @@ static void test_variables(void) {
 }
 
 /* Test: ANSI rendering */
-static void test_ansi_render(void) {
+TEST(ansi_render) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
@@ -309,19 +294,13 @@ static void test_ansi_render(void) {
 int main(void) {
     printf("=== LLE Syntax Highlighting Unit Tests ===\n\n");
 
-    test_highlighter_create();
-    test_builtins();
-    test_external_commands();
-    test_invalid_commands();
-    test_keywords();
-    test_operators();
-    test_variables();
-    test_ansi_render();
-
-    printf("\n========================================\n");
-    printf("Results: %d passed, %d failed (of %d)\n", tests_passed,
-           tests_failed, tests_run);
-    printf("========================================\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    RUN_TEST(highlighter_create);
+    RUN_TEST(builtins);
+    RUN_TEST(external_commands);
+    RUN_TEST(invalid_commands);
+    RUN_TEST(keywords);
+    RUN_TEST(operators);
+    RUN_TEST(variables);
+    RUN_TEST(ansi_render);
+    return TEST_RESULT();
 }

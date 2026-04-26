@@ -377,7 +377,7 @@ if lle_sources.length() > 0
   test_display_bridge = executable('test_display_bridge',
                                    ['tests/lle/unit/test_display_bridge.c',
                                     'tests/lle/functional/display_test_stubs.c'],
-                                   include_directories: inc,
+                                   include_directories: [inc, include_directories('tests')],
                                    dependencies: [lle_dep, display_dep])
 
   test('LLE Display Bridge', test_display_bridge,
@@ -465,7 +465,7 @@ if lle_sources.length() > 0
   test_render_controller = executable('test_render_controller',
                                       ['tests/lle/unit/test_render_controller.c',
                                        'tests/lle/functional/display_test_stubs.c'],
-                                      include_directories: inc,
+                                      include_directories: [inc, include_directories('tests')],
                                       dependencies: [lle_dep, display_dep])
 
   test('LLE Render Controller', test_render_controller,
@@ -477,7 +477,7 @@ if lle_sources.length() > 0
   # Syntax highlighting unit tests (Spec 11)
   test_lle_syntax_highlighting = executable('test_lle_syntax_highlighting',
                                             'tests/lle/unit/test_lle_syntax_highlighting.c',
-                                            include_directories: inc,
+                                            include_directories: [inc, include_directories('tests')],
                                             dependencies: [lle_dep])
 
   test('LLE Syntax Highlighting', test_lle_syntax_highlighting,
@@ -1042,7 +1042,7 @@ endif
   if fs.exists('tests/lle/unit/test_adaptive_detection.c')
     test_adaptive_detection = executable('test_adaptive_detection',
                                          'tests/lle/unit/test_adaptive_detection.c',
-                                         include_directories: inc,
+                                         include_directories: [inc, include_directories('tests')],
                                          dependencies: [lle_dep])
     test('LLE Adaptive Detection', test_adaptive_detection,
          suite: 'lle-unit',
@@ -1054,7 +1054,7 @@ endif
   if fs.exists('tests/lle/unit/test_adaptive_controllers.c')
     test_adaptive_controllers = executable('test_adaptive_controllers',
                                           'tests/lle/unit/test_adaptive_controllers.c',
-                                          include_directories: inc,
+                                          include_directories: [inc, include_directories('tests')],
                                           dependencies: [lle_dep])
     test('LLE Adaptive Controllers', test_adaptive_controllers,
          suite: 'lle-unit',
@@ -1066,7 +1066,7 @@ endif
   if fs.exists('tests/lle/unit/test_adaptive_fallback.c')
     test_adaptive_fallback = executable('test_adaptive_fallback',
                                        'tests/lle/unit/test_adaptive_fallback.c',
-                                       include_directories: inc,
+                                       include_directories: [inc, include_directories('tests')],
                                        dependencies: [lle_dep])
     test('LLE Adaptive Fallback', test_adaptive_fallback,
          suite: 'lle-unit',

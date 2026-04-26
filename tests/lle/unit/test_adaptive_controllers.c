@@ -15,6 +15,7 @@
 
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/error_handling.h"
+#include "test_framework.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +42,7 @@ static int tests_passed = 0;
  * ============================================================================
  */
 
-static void test_context_initialization(void) {
+TEST(context_initialization) {
     printf("\nContext Initialization Tests:\n");
 
     /* Check if we have a TTY - some tests require interactive terminal */
@@ -96,7 +97,7 @@ static void test_context_initialization(void) {
  * ============================================================================
  */
 
-static void test_interface_creation(void) {
+TEST(interface_creation) {
     printf("\nInterface Creation Tests:\n");
 
     /* Check if we have a TTY - interface creation requires interactive terminal
@@ -144,7 +145,7 @@ static void test_interface_creation(void) {
  * ============================================================================
  */
 
-static void test_mode_utilities(void) {
+TEST(mode_utilities) {
     printf("\nMode Utility Tests:\n");
 
     const char *mode_str;
@@ -197,7 +198,7 @@ static void test_mode_utilities(void) {
  * ============================================================================
  */
 
-static void test_config_recommendations(void) {
+TEST(config_recommendations) {
     printf("\nConfiguration Recommendation Tests:\n");
 
     lle_adaptive_config_recommendation_t config;
@@ -235,7 +236,7 @@ static void test_config_recommendations(void) {
  * ============================================================================
  */
 
-static void test_shell_integration(void) {
+TEST(shell_integration) {
     printf("\nShell Integration Tests:\n");
 
     /* Test 1: Script file should never be interactive */
@@ -262,7 +263,7 @@ static void test_shell_integration(void) {
  * ============================================================================
  */
 
-static void test_health_monitoring(void) {
+TEST(health_monitoring) {
     printf("\nHealth Monitoring Tests:\n");
 
     /* Check if we have a TTY */
@@ -314,7 +315,7 @@ static void test_health_monitoring(void) {
  * ============================================================================
  */
 
-static void test_controller_operations(void) {
+TEST(controller_operations) {
     printf("\nController Operation Tests:\n");
 
     /* Check if we have a TTY */
@@ -357,7 +358,7 @@ static void test_controller_operations(void) {
  * ============================================================================
  */
 
-static void test_error_handling(void) {
+TEST(error_handling) {
     printf("\nError Handling Tests:\n");
 
     lle_result_t res;
@@ -389,30 +390,14 @@ static void test_error_handling(void) {
  */
 
 int main(void) {
-    printf("\n");
-    printf("==================================================================="
-           "=============\n");
-    printf("Adaptive Terminal Controller Tests (Spec 26 Phase 2)\n");
-    printf("==================================================================="
-           "=============\n");
-
-    test_context_initialization();
-    test_interface_creation();
-    test_mode_utilities();
-    test_config_recommendations();
-    test_shell_integration();
-    test_health_monitoring();
-    test_controller_operations();
-    test_error_handling();
-
-    printf("\n");
-    printf("==================================================================="
-           "=============\n");
-    printf("Test Results: %d/%d passed (%.1f%%)\n", tests_passed, tests_run,
-           tests_run > 0 ? (100.0 * tests_passed / tests_run) : 0.0);
-    printf("==================================================================="
-           "=============\n");
-    printf("\n");
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    printf("=== Adaptive Terminal Controllers Tests (Spec 26 Phase 2) ===\n");
+    RUN_TEST(context_initialization);
+    RUN_TEST(interface_creation);
+    RUN_TEST(mode_utilities);
+    RUN_TEST(config_recommendations);
+    RUN_TEST(shell_integration);
+    RUN_TEST(health_monitoring);
+    RUN_TEST(controller_operations);
+    RUN_TEST(error_handling);
+    return TEST_RESULT();
 }
