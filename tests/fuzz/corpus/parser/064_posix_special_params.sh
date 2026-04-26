@@ -1,0 +1,8 @@
+echo "PID: $$"
+echo "args: $#"
+echo "all: $*"
+echo "all-quoted: $@"
+echo "exit: $?"
+echo "shell: $0"
+echo "first: $1"
+shift 2
