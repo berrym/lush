@@ -13,10 +13,10 @@
  */
 
 #include "lush.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "test_framework.h"
 
 /* External declarations for posix_opts functions */
 extern shell_options_t shell_opts;
@@ -42,9 +42,6 @@ extern bool is_interactive_comments_enabled(void);
 extern void print_command_trace(const char *command);
 
 /* Test framework macros */
-
-
-
 
 /* ============================================================================
  * INITIALIZATION TESTS

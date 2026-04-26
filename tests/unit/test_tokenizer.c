@@ -12,11 +12,11 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "test_framework.h"
 #include "tokenizer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "test_framework.h"
 
 /* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
  * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
@@ -25,10 +25,6 @@
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* Test framework macros */
-
-
-
-
 
 /* ============================================================================
  * LIFECYCLE TESTS

@@ -12,10 +12,10 @@
 #include "node.h"
 #include "node_to_source.h"
 #include "parser.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "test_framework.h"
 
 /* This file's pre-existing PASS()/FAIL(msg) helpers are stubbed: PASS
  * is a no-op (RUN_TEST already prints PASS) and FAIL routes through
@@ -24,8 +24,6 @@
 #define FAIL(msg) TEST_FAIL_MSG(msg)
 
 /* Test counters */
-
-
 
 /**
  * @brief Perform round-trip test on shell input

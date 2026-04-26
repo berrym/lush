@@ -28,7 +28,12 @@
 #undef ASSERT_STR_EQ
 #undef ASSERT_NULL
 #undef ASSERT_NOT_NULL
-#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            TEST_FAIL_MSG(#cond);                                              \
+        }                                                                      \
+    } while (0)
 #define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
 #define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
 #define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
@@ -44,12 +49,6 @@ static layer_event_system_t *create_test_event_system(void) {
 }
 
 /* Test framework macros */
-
-
-
-
-
-
 
 /* ============================================================
  * ERROR STRING TESTS

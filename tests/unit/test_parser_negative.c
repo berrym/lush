@@ -32,10 +32,10 @@
 
 #include "node.h"
 #include "parser.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "test_framework.h"
 
 /* Test counters */
 
@@ -53,7 +53,6 @@ static void print_category_summary(const char *name) {
 }
 
 /* Test framework macros */
-
 
 /**
  * Assert that parsing the given input produces an error.
@@ -545,7 +544,8 @@ TEST(recursion_depth_limit) {
         free_node_tree(ast);
         parser_free(parser);
         free(input);
-        TEST_FAIL_FMT("expected recursion depth error for %d-deep nesting", depth);
+        TEST_FAIL_FMT("expected recursion depth error for %d-deep nesting",
+                      depth);
     }
 
     /* Success - parser correctly rejected deeply nested input */
