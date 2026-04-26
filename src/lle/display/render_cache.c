@@ -11,7 +11,9 @@
  * docs/lle_specification/05_libhashtable_integration_complete.md
  *
  * COMPLIANCE:
- * - Uses libhashtable (ht_strstr_t) as exclusive hashtable solution
+ * - Uses libhashtable (ht_strblob_t) as exclusive hashtable solution.
+ *   Switched from ht_strstr_t for binary safety (issue #49) so cached
+ *   entries containing embedded NUL bytes round-trip intact.
  * - Thread-safe operations with pthread_rwlock
  * - Full memory pool integration
  * - Comprehensive error handling
@@ -44,15 +46,21 @@
 /* ========================================================================== */
 
 /**
- * @brief Serialize cache entry to string for storage in libhashtable
+ * @brief Serialize cache entry into a length-prefixed binary blob
  *
- * Format: "data_size:timestamp:last_access:access_count:valid|<data>"
+ * Format: ASCII header "data_size:timestamp:last_access:access_count:valid|"
+ * followed by the raw data bytes. The header has no internal NUL so it can
+ * still be parsed with sscanf when the buffer is treated as a C string up
+ * to the '|' separator. The data section may contain arbitrary bytes
+ * (including NULs) — total length is tracked separately.
  *
  * @param entry Cache entry to serialize
- * @return Serialized string (caller must free)
+ * @param out_size Receives the total serialized length on success
+ * @return Pointer to serialized buffer (caller must free), or NULL on failure
  */
-static char *serialize_cache_entry(const lle_cached_entry_t *entry) {
-    if (!entry || !entry->data) {
+static void *serialize_cache_entry(const lle_cached_entry_t *entry,
+                                   size_t *out_size) {
+    if (!entry || !entry->data || !out_size) {
         return NULL;
     }
 
@@ -76,45 +84,57 @@ static char *serialize_cache_entry(const lle_cached_entry_t *entry) {
         return NULL;
     }
 
-    /* Append data */
+    /* Append data verbatim — may contain embedded NULs */
     memcpy(serialized + header_len, entry->data, entry->data_size);
 
+    *out_size = (size_t)header_len + entry->data_size;
     return serialized;
 }
 
 /**
- * @brief Deserialize cache entry from string stored in libhashtable
+ * @brief Deserialize cache entry from length-prefixed binary blob
  *
- * @param serialized Serialized string
+ * @param serialized Serialized blob (NUL-terminated header section, then raw
+ *                   data bytes which may include NULs)
+ * @param serialized_size Total length of @p serialized in bytes
  * @param entry Output entry structure (caller must allocate)
  * @return LLE_SUCCESS or error code
  */
-static lle_result_t deserialize_cache_entry(const char *serialized,
+static lle_result_t deserialize_cache_entry(const void *serialized,
+                                            size_t serialized_size,
                                             lle_cached_entry_t *entry) {
-    if (!serialized || !entry) {
+    if (!serialized || !entry || serialized_size == 0) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Parse metadata header */
+    const char *bytes = serialized;
+
+    /* Parse metadata header (header section ends at '|' and contains no NULs)
+     */
     uint64_t timestamp, last_access;
     unsigned int access_count;
     int valid;
     size_t data_size;
 
-    int fields =
-        sscanf(serialized, "%zu:%" SCNu64 ":%" SCNu64 ":%u:%d|", &data_size,
-               &timestamp, &last_access, &access_count, &valid);
+    int fields = sscanf(bytes, "%zu:%" SCNu64 ":%" SCNu64 ":%u:%d|", &data_size,
+                        &timestamp, &last_access, &access_count, &valid);
 
     if (fields != 5) {
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    /* Find data start (after '|') */
-    const char *data_start = strchr(serialized, '|');
-    if (!data_start) {
+    /* Find data start (after '|') — bounded scan limited to header size */
+    const char *separator = memchr(bytes, '|', serialized_size);
+    if (!separator) {
         return LLE_ERROR_INVALID_FORMAT;
     }
-    data_start++; /* Skip '|' */
+    const char *data_start = separator + 1;
+    size_t header_len = (size_t)(data_start - bytes);
+
+    /* Reject blobs whose payload length disagrees with the header */
+    if (header_len + data_size != serialized_size) {
+        return LLE_ERROR_INVALID_FORMAT;
+    }
 
     /* Allocate and copy data */
     entry->data = lle_pool_alloc(data_size);
@@ -330,39 +350,23 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     /* Step 3: Store memory pool reference (cast from LLE to Lush type) */
     c->memory_pool = (lush_memory_pool_t *)memory_pool;
 
-    /* Step 4: Create LLE hashtable wrapper with memory pool integration (Spec
-     * 05) */
-    lle_hashtable_config_t config;
-    lle_hashtable_config_init_default(&config);
-    config.use_memory_pool = true;
-    config.memory_pool = (lush_memory_pool_t *)memory_pool;
-    config.random_seed = true;
-    config.thread_safe = false; /* render_cache has its own rwlock */
-    config.performance_monitoring = true;
-    config.hashtable_name = "render_cache";
-
-    /* Use factory pattern to create hashtable */
-    lle_hashtable_factory_t *factory = NULL;
-    lle_result_t factory_result =
-        lle_hashtable_factory_init(&factory, (lush_memory_pool_t *)memory_pool);
-    if (factory_result != LLE_SUCCESS) {
+    /* Step 4: Create binary-safe libhashtable for cache storage. The cache
+     * stores serialized entries that contain arbitrary data bytes (issue
+     * #49 — embedded NULs were silently truncated under the previous
+     * string-only hashtable wrapper). render_cache provides its own
+     * rwlock and metrics so the bare libhashtable type is sufficient
+     * here; an lle_strblob wrapper can be added later if a second
+     * consumer needs memory-context or metrics integration. */
+    c->cache_table = ht_strblob_create(HT_SEED_RANDOM);
+    if (!c->cache_table) {
         lle_pool_free(c);
-        return factory_result;
-    }
-
-    factory_result =
-        lle_hashtable_factory_create_strstr(factory, &config, &c->cache_table);
-    lle_hashtable_factory_destroy(factory);
-
-    if (factory_result != LLE_SUCCESS) {
-        lle_pool_free(c);
-        return factory_result;
+        return LLE_ERROR_OUT_OF_MEMORY;
     }
 
     /* Step 5: Allocate cache metrics */
     c->metrics = lle_pool_alloc(sizeof(lle_cache_metrics_t));
     if (!c->metrics) {
-        lle_strstr_hashtable_destroy(c->cache_table);
+        ht_strblob_destroy(c->cache_table);
         lle_pool_free(c);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
@@ -373,7 +377,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
         &c->policy, LLE_CACHE_DEFAULT_MAX_ENTRIES, memory_pool);
     if (result != LLE_SUCCESS) {
         lle_pool_free(c->metrics);
-        lle_strstr_hashtable_destroy(c->cache_table);
+        ht_strblob_destroy(c->cache_table);
         lle_pool_free(c);
         return result;
     }
@@ -382,7 +386,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     if (pthread_rwlock_init(&c->cache_lock, NULL) != 0) {
         lle_cache_policy_cleanup(c->policy);
         lle_pool_free(c->metrics);
-        lle_strstr_hashtable_destroy(c->cache_table);
+        ht_strblob_destroy(c->cache_table);
         lle_pool_free(c);
         return LLE_ERROR_INITIALIZATION_FAILED;
     }
@@ -403,9 +407,9 @@ lle_result_t lle_display_cache_cleanup(lle_display_cache_t *cache) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Destroy LLE hashtable wrapper (frees all entries) */
+    /* Destroy libhashtable (frees all entries) */
     if (cache->cache_table) {
-        lle_strstr_hashtable_destroy(cache->cache_table);
+        ht_strblob_destroy(cache->cache_table);
     }
 
     /* Destroy lock */
@@ -464,8 +468,9 @@ lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
     entry.access_count = 0;
     entry.valid = true;
 
-    /* Step 4: Serialize entry */
-    char *serialized = serialize_cache_entry(&entry);
+    /* Step 4: Serialize entry into a length-prefixed binary blob */
+    size_t serialized_size = 0;
+    void *serialized = serialize_cache_entry(&entry, &serialized_size);
     if (!serialized) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
@@ -473,13 +478,13 @@ lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
     /* Step 5: Acquire write lock */
     pthread_rwlock_wrlock(&cache->cache_lock);
 
-    /* Step 6: Insert into libhashtable */
-    lle_strstr_hashtable_insert(cache->cache_table, key_str, serialized);
+    /* Step 6: Insert into libhashtable (deep copies the blob) */
+    ht_strblob_insert(cache->cache_table, key_str, serialized, serialized_size);
 
     /* Step 7: Release lock */
     pthread_rwlock_unlock(&cache->cache_lock);
 
-    /* Free serialized string (libhashtable makes a copy) */
+    /* Free serialized buffer (libhashtable made its own copy) */
     lle_pool_free(serialized);
 
     return LLE_SUCCESS;
@@ -511,8 +516,9 @@ lle_result_t lle_display_cache_lookup(lle_display_cache_t *cache, uint64_t key,
     pthread_rwlock_rdlock(&cache->cache_lock);
 
     /* Step 4: Lookup in libhashtable */
-    const char *serialized =
-        lle_strstr_hashtable_lookup(cache->cache_table, key_str);
+    size_t serialized_size = 0;
+    const void *serialized =
+        ht_strblob_get(cache->cache_table, key_str, &serialized_size);
 
     if (!serialized) {
         /* Cache miss */
@@ -524,7 +530,8 @@ lle_result_t lle_display_cache_lookup(lle_display_cache_t *cache, uint64_t key,
 
     /* Step 5: Deserialize entry */
     lle_cached_entry_t entry;
-    lle_result_t result = deserialize_cache_entry(serialized, &entry);
+    lle_result_t result =
+        deserialize_cache_entry(serialized, serialized_size, &entry);
 
     if (result != LLE_SUCCESS) {
         cache->metrics->cache_misses++;
@@ -569,7 +576,7 @@ lle_result_t lle_display_cache_invalidate(lle_display_cache_t *cache,
     pthread_rwlock_wrlock(&cache->cache_lock);
 
     /* Remove from libhashtable */
-    lle_strstr_hashtable_delete(cache->cache_table, key_str);
+    ht_strblob_remove(cache->cache_table, key_str);
 
     /* Update metrics */
     cache->metrics->evictions++;
@@ -598,26 +605,10 @@ lle_result_t lle_display_cache_invalidate_all(lle_display_cache_t *cache) {
 
     /* Destroy and recreate libhashtable to clear all entries */
     if (cache->cache_table) {
-        lle_strstr_hashtable_destroy(cache->cache_table);
+        ht_strblob_destroy(cache->cache_table);
     }
 
-    /* Recreate hashtable using LLE wrapper */
-    lle_hashtable_config_t config;
-    lle_hashtable_config_init_default(&config);
-    config.use_memory_pool = true;
-    config.memory_pool = cache->memory_pool;
-    config.random_seed = true;
-    config.thread_safe = false;
-    config.performance_monitoring = true;
-    config.hashtable_name = "render_cache";
-
-    lle_hashtable_factory_t *factory = NULL;
-    if (lle_hashtable_factory_init(&factory, cache->memory_pool) ==
-        LLE_SUCCESS) {
-        lle_hashtable_factory_create_strstr(factory, &config,
-                                            &cache->cache_table);
-        lle_hashtable_factory_destroy(factory);
-    }
+    cache->cache_table = ht_strblob_create(HT_SEED_RANDOM);
     if (!cache->cache_table) {
         pthread_rwlock_unlock(&cache->cache_lock);
         return LLE_ERROR_OUT_OF_MEMORY;

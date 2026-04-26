@@ -455,8 +455,10 @@ typedef struct {
  * Main display caching system with LRU policy using libhashtable.
  */
 struct lle_display_cache_t {
-    lle_strstr_hashtable_t
-        *cache_table; /**< LLE hashtable wrapper for cache storage (Spec 05) */
+    ht_strblob_t *cache_table; /**< Binary-safe libhashtable for cache storage.
+                                  Stores length-prefixed blobs so cached entries
+                                  containing embedded NUL bytes (ANSI sequences,
+                                  terminal control bytes) round-trip intact. */
     lle_display_cache_policy_t *policy; /**< Cache policy (LRU) */
     lle_cache_metrics_t *metrics;       /**< Cache metrics */
     pthread_rwlock_t cache_lock;        /**< Thread safety lock */

@@ -421,12 +421,7 @@ int main(void) {
     RUN_TEST(display_cache_lookup_rejects_null_size_out);
     RUN_TEST(display_cache_lookup_miss_returns_cache_miss);
     RUN_TEST(display_cache_store_then_lookup_returns_exact_data);
-    /* Disabled until issue #49 is fixed: the cache cannot round-trip
-     * binary data with embedded NUL bytes because the underlying
-     * lle_strstr_hashtable storage uses C-string semantics. The TEST
-     * function itself is preserved above so it can be re-enabled by
-     * uncommenting this one line once the cache is binary-safe. */
-    /* RUN_TEST(display_cache_store_then_lookup_with_binary_data); */
+    RUN_TEST(display_cache_store_then_lookup_with_binary_data);
     RUN_TEST(display_cache_overwrite_same_key_returns_new_value);
     RUN_TEST(display_cache_independent_keys_round_trip_independently);
 

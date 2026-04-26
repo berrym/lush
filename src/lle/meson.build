@@ -35,6 +35,7 @@ lle_sources += files(
   libhashtable_root + '/ht_fnv1a.c',
   libhashtable_root + '/ht_strdouble.c',
   libhashtable_root + '/ht_strfloat.c',
+  libhashtable_root + '/ht_strblob.c',
   libhashtable_root + '/ht_strint.c',
   libhashtable_root + '/ht_strstr.c',
 )
