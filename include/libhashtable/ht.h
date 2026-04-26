@@ -15,6 +15,7 @@
 #define __HT_H__
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -50,6 +51,15 @@ typedef struct ht_strint ht_strint_t;
  * @brief Opaque string-to-string hash table type
  */
 typedef struct ht_strstr ht_strstr_t;
+
+/**
+ * @brief Opaque string-to-blob hash table type
+ *
+ * Maps a string key to an arbitrary length-prefixed binary value. Use
+ * this in place of ht_strstr_t when the value can contain bytes that
+ * are not safe under C-string semantics (e.g., embedded NULs).
+ */
+typedef struct ht_strblob ht_strblob_t;
 
 /**
  * @brief Hash table configuration flags
@@ -225,6 +235,24 @@ ht_strstr_t *ht_strstr_create(unsigned int);
  */
 void ht_strstr_destroy(ht_strstr_t *);
 
+/**
+ * @brief Create a string-to-blob hash table
+ *
+ * Maps string keys to arbitrary length-prefixed binary values. The
+ * table makes a deep copy of every value on insert, including bytes
+ * after any embedded NUL.
+ *
+ * @param flags Configuration flags
+ * @return Pointer to new hash table, or NULL on failure
+ */
+ht_strblob_t *ht_strblob_create(unsigned int);
+
+/**
+ * @brief Destroy a string-to-blob hash table
+ * @param ht Pointer to hash table to destroy
+ */
+void ht_strblob_destroy(ht_strblob_t *);
+
 /*
  * Insertion and removal
  */
@@ -304,6 +332,26 @@ void ht_strstr_insert(ht_strstr_t *, const char *, const char *);
  */
 void ht_strstr_remove(ht_strstr_t *, const char *);
 
+/**
+ * @brief Insert a key/blob pair into a string-to-blob hash table
+ *
+ * The hash table makes a deep copy of both the key and the blob bytes.
+ * Caller retains ownership of the input data buffer.
+ *
+ * @param ht Pointer to hash table
+ * @param key Null-terminated string key
+ * @param data Pointer to blob bytes (may contain embedded NULs)
+ * @param size Number of bytes at @p data; may be 0
+ */
+void ht_strblob_insert(ht_strblob_t *, const char *, const void *, size_t);
+
+/**
+ * @brief Remove a key from a string-to-blob hash table
+ * @param ht Pointer to hash table
+ * @param key Null-terminated string key to remove
+ */
+void ht_strblob_remove(ht_strblob_t *, const char *);
+
 /*
  * Getting
  */
@@ -347,6 +395,21 @@ void *ht_strint_get(ht_strint_t *, const char *);
  * @return Pointer to string value, or NULL if not found
  */
 const char *ht_strstr_get(ht_strstr_t *, const char *);
+
+/**
+ * @brief Look up the blob stored under a key in a string-to-blob table
+ *
+ * The returned pointer aliases the hash table's internal storage and
+ * remains valid until the entry is removed or the table is destroyed.
+ * The caller must not free it.
+ *
+ * @param ht Pointer to hash table
+ * @param key Null-terminated string key to look up
+ * @param out_size If non-NULL, receives the blob length on success or
+ *                 0 if the key is absent
+ * @return Pointer to the stored blob bytes, or NULL if @p key is absent
+ */
+const void *ht_strblob_get(ht_strblob_t *, const char *, size_t *);
 
 /*
  * Enumeration
@@ -461,6 +524,34 @@ bool ht_strstr_enum_next(ht_enum_t *, const char **, const char **);
  * @param e Pointer to enumerator to destroy
  */
 void ht_strstr_enum_destroy(ht_enum_t *);
+
+/**
+ * @brief Create an enumerator for a string-to-blob hash table
+ * @param ht Pointer to hash table to enumerate
+ * @return Pointer to enumerator, or NULL on failure
+ */
+ht_enum_t *ht_strblob_enum_create(ht_strblob_t *);
+
+/**
+ * @brief Get the next key/blob triple from a string-to-blob enumerator
+ *
+ * Pointers written through @p key, @p data, and @p size alias the hash
+ * table's storage and must not be freed by the caller. Pass NULL for
+ * any output parameter that is not needed.
+ *
+ * @param e Pointer to enumerator
+ * @param key Out-pointer for the current key, or NULL
+ * @param data Out-pointer for the current blob bytes, or NULL
+ * @param size Out-pointer for the current blob length, or NULL
+ * @return true if a triple was retrieved, false if enumeration complete
+ */
+bool ht_strblob_enum_next(ht_enum_t *, const char **, const void **, size_t *);
+
+/**
+ * @brief Destroy a string-to-blob hash table enumerator
+ * @param e Pointer to enumerator to destroy
+ */
+void ht_strblob_enum_destroy(ht_enum_t *);
 
 #ifdef __cplusplus
 }
