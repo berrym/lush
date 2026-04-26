@@ -117,3 +117,7 @@ leak-*
 timeout-*
 oom-*
 tests/fuzz/findings/
+
+
+# Local tool state
+.claude/
