@@ -402,7 +402,7 @@ if lle_sources.length() > 0
   test_event_phase2 = executable('test_event_phase2',
                                  ['tests/lle/unit/test_event_phase2.c',
                                   'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: inc,
+                                 include_directories: [inc, include_directories('tests')],
                                  dependencies: [lle_dep])
 
   test('LLE Event System Phase 2', test_event_phase2,
@@ -412,7 +412,7 @@ if lle_sources.length() > 0
   # Terminal Capabilities Unit Tests (Spec 02 Phase 1)
   test_terminal_capabilities = executable('test_terminal_capabilities',
                                           'tests/lle/unit/test_terminal_capabilities.c',
-                                          include_directories: inc,
+                                          include_directories: [inc, include_directories('tests')],
                                           dependencies: [lle_dep])
 
   test('LLE Terminal Capabilities', test_terminal_capabilities,
@@ -422,7 +422,7 @@ if lle_sources.length() > 0
   # Terminal State Management Unit Tests (Spec 02 Phase 2)
   test_terminal_state = executable('test_terminal_state',
                                    'tests/lle/unit/test_terminal_state.c',
-                                   include_directories: inc,
+                                   include_directories: [inc, include_directories('tests')],
                                    dependencies: [lle_dep])
 
   test('LLE Terminal State', test_terminal_state,
@@ -432,7 +432,7 @@ if lle_sources.length() > 0
   # Terminal Event Reading Unit Tests (Spec 02 Phase 3)
   test_terminal_event_reading = executable('test_terminal_event_reading',
                                           'tests/lle/unit/test_terminal_event_reading.c',
-                                          include_directories: inc,
+                                          include_directories: [inc, include_directories('tests')],
                                           dependencies: [lle_dep])
 
   test('LLE Terminal Event Reading', test_terminal_event_reading,
@@ -1013,7 +1013,7 @@ endif
   if fs.exists('tests/lle/unit/test_completion_types.c')
     test_completion_types = executable('test_completion_types',
                                        'tests/lle/unit/test_completion_types.c',
-                                       include_directories: inc,
+                                       include_directories: [inc, include_directories('tests')],
                                        link_with: lle_lib,
                                        dependencies: [ncurses_link_dep])
     test('LLE Completion Types', test_completion_types,
