@@ -1,7 +1,0 @@
-if [ -f filÿÿÿÿÿÿÿÿÿÿÿÿÿe ]; then  
-  for i in $(cat file); do
-     ÿÿÿ[  case "$i" then  
-  for i in $(cat file); do
-     ÿÿÿ[  casin
-                   esac
-    ÿ filefi

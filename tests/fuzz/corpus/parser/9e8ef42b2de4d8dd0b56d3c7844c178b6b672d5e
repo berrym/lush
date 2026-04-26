@@ -1,5 +1,0 @@
-if [ -f file ]; then
-    echo existl
-elif [ -d di2 ] -f file ]; then
-    for i in $(cat file); do
-        c ];sl. thee2nf

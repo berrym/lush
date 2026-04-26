@@ -1,4 +1,0 @@
-arr=(one two three)
-echo$? $! $# $@ rr[1]hen $$ $? ÿÿÿ"$!in#@ $* echo "$linerr=(one two three)
-echo$? $! $# $@ rr[1]hen $$ $? ÿÿÿ"$!in#@ $* echo "$line""
-done

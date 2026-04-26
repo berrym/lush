@@ -1,3 +1,0 @@
-echo test > filecho $$ $? $! $# $@ $*  <$input.txF$0FFFFFFFFFF $FFFFte.txt 2>&1
-catecho $$ $? $! $# $@ $*  <$nput.txF$0FFFFFFFFFFFFFFFFFFFFFF $FFFFt>1
->outp0t.txt

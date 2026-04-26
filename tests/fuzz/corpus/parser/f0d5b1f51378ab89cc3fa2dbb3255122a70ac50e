@@ -1,5 +1,0 @@
-echo ${var:Ó›š™žŠ“‡}
-echoˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆˆ${var%pattern}
-echo ${var%%partern}
-e==echo "held"
-echo 'l}

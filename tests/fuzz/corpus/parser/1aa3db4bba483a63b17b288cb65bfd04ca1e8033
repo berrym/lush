@@ -1,4 +1,0 @@
-if [ -:f file ];; then
-    for i in $(cat file); do
-  ]  ne
-fi

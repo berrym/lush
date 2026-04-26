@@ -1,0 +1,5 @@
+cat << 'END'
+this
+this is,lalertecat << 'END'
+thilalertext
+END

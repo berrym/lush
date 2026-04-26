@@ -1,3 +1,0 @@
-etho test > file.txt 3>&1
-cat < inole.txt 2>&1
-cat <  test > filt 2>>> output.ecßput.txtì

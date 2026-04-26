@@ -1,0 +1,3 @@
+if [ -f File ]; then
+ ry
+else'eitherJfi

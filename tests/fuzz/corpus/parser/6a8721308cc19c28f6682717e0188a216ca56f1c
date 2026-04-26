@@ -1,0 +1,5 @@
+if [ -f esacfile ]; then
+    echo exists
+el=if [ -d dir ]; then
+    echo directory
+eldir ]; then'eith

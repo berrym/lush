@@ -1,0 +1,3 @@
+ar=(onewte
+echo ${arr[0]}
+arr[1]

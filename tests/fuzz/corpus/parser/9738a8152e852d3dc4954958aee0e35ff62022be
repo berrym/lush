@@ -1,2 +1,0 @@
-etho test > file.txt 3>&1
-cat < input.txtªªªªª >> outßput.txt

@@ -1,0 +1,13 @@
+case "$1" in
+    start)
+        echo starting
+        ;;
+    stop)
+        echo stopping
+  case "$x" in
+    a) ;;
+    b) echo b ;;echo $$ $$
+fsac
+;;
+e? $$¾
+sac

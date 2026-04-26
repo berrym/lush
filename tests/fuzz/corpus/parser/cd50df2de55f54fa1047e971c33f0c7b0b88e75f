@@ -1,4 +1,0 @@
-diff<(ÿcÿ ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿecho ${var:-default}
-echo ${var:=assign}
-echo ${vo ${var%pattnr}
-eecho ${var%%patÿÿÿÿÿÿÿÿÿÿÿÿÿÿterÿÿÿÿn

@@ -1,5 +1,0 @@
-if [ -f file ]; then
-    echo exists
-elif [ -d dir ]; thef [ -f file ]; then
-    for i in $(cat file); do
-        c ];sle theenf

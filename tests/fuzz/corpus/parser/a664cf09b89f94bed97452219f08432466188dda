@@ -1,6 +1,0 @@
-ech {vo$ar:-datfl}eu
-echoecho ${var:=aho ${var:+alternatedatfl}eu
-echo ${var:=aho $cho ${var:=aho ${var:+alternatealternate}
-echo ${var:?ar}
-echo ${6%pattern}
-echo ${var%%pat0e

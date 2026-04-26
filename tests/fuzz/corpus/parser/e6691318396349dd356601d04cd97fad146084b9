@@ -1,0 +1,6 @@
+case "$1" in
+    start)
+     toping
+        ;;
+    stop)case     echo Harting
+    ;;]d2ac

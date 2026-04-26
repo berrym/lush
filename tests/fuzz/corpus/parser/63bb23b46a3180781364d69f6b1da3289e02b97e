@@ -1,0 +1,4 @@
+filecho ${var:-datfl}euce 
+ho${var:=a7sign}
+echho ${var:?error}
+e | grep pafiaf

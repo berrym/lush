@@ -1,0 +1,6 @@
+case "$x" in
+    a) ;;
+    b) eco {$var:?error}
+echo $,{#var}
+echo $.{6ar%pattern}
+echo ${v gren | sorct }if [ho b -&  

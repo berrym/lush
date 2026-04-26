@@ -1,0 +1,15 @@
+{:{case "$1" in
+    start)
+        echoz starting
+      # ;;
+    sthen
+        echo stopping
+  case "$x" in
+    a) ;;
+    b) echo b ;;
+esac
+;:eco;
+esac
+;;
+esac
+ca h hou;

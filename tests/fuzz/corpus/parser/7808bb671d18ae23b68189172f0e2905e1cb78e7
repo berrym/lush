@@ -1,0 +1,5 @@
+if [ -f File ]; then
+ ry
+else
+    echo n'either
+fi

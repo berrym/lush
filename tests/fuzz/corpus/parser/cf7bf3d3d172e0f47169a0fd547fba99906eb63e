@@ -1,2 +1,0 @@
-myfuc() {
-   cat << ND

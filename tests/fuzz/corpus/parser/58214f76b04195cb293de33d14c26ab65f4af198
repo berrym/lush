@@ -1,0 +1,5 @@
+echo test $? $!echo $$ $? $! $# $@ $*  $# @$ * $<$input.>&1
+cati *n$<put.t.tx
+21&>t catecho $$ $t 1>&1
+capldcho $$ $? $!echo $$ $? $! $# $@ $*  $# @$$*  $# @$ * $<txt 2>&1
+catec

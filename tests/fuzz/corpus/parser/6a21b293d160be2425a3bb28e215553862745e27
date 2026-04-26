@@ -1,3 +1,0 @@
-exec 3>&1
-echo test 4&3
-e 3>&-
