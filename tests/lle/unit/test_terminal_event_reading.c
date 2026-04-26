@@ -22,7 +22,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-
 /* Helper to create a pipe with data */
 static int create_pipe_with_data(const void *data, size_t len, int *write_fd) {
     int pipefd[2];

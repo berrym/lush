@@ -24,11 +24,11 @@
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lush_memory_pool.h"
+#include "test_framework.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "test_framework.h"
 
 /* Mock memory pool instance - just a non-NULL pointer for validation */
 /* The test_memory_mock.c provides lle_pool_alloc/free that don't actually use

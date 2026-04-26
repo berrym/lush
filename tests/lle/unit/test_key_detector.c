@@ -15,9 +15,9 @@
 
 #include "../../../include/lle/error_handling.h"
 #include "../../../include/lle/input_parsing.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
-#include "test_framework.h"
 
 #undef TEST
 #define TEST(name_str) ((void)0)
@@ -31,7 +31,6 @@ static int mock_pool_dummy = 43;
 static lle_terminal_capabilities_t *mock_terminal =
     (lle_terminal_capabilities_t *)&mock_terminal_dummy;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
-
 
 /*
  * Test: Initialize and destroy key detector
@@ -495,7 +494,6 @@ void test_unknown_sequence(void) {
  */
 int main(void) {
     printf("\n=== LLE Key Detector Unit Tests ===\n\n");
-
 
     RUN_TEST(init_destroy);
     RUN_TEST(init_invalid_params);

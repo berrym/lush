@@ -26,7 +26,6 @@ static lle_terminal_system_t *mock_terminal =
     (lle_terminal_system_t *)&mock_terminal_dummy;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-
 /* ============================================================================
  * Test: Initialization and Destruction
  * ============================================================================

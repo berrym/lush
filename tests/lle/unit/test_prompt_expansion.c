@@ -23,10 +23,15 @@
 #undef ASSERT
 #undef ASSERT_EQ
 #undef ASSERT_STR_EQ
-#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            TEST_FAIL_MSG(#cond);                                              \
+        }                                                                      \
+    } while (0)
 #define ASSERT_EQ(a, b) ASSERT((a) == (b))
 #define ASSERT_STR_EQ(a, b) ASSERT(strcmp((a), (b)) == 0)
-#define ASSERT_STR_CONTAINS(haystack, needle) \
+#define ASSERT_STR_CONTAINS(haystack, needle)                                  \
     ASSERT(strstr((haystack), (needle)) != NULL)
 #define PASS() ((void)0)
 

@@ -26,7 +26,8 @@
 #include <string.h>
 #include <unistd.h>
 
-/* ASSERT_NEQ kept as a local alias since the shared framework names it ASSERT_NE */
+/* ASSERT_NEQ kept as a local alias since the shared framework names it
+ * ASSERT_NE */
 #define ASSERT_NEQ(a, b, msg) ASSERT_NE(a, b, msg)
 
 /* ========================================================================== */

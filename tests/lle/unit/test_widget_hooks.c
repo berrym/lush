@@ -75,7 +75,6 @@ TEST(hooks_manager_init) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Invalid parameter checks for init */
@@ -105,7 +104,6 @@ TEST(hooks_manager_init_invalid_params) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Register hook */
@@ -141,7 +139,6 @@ TEST(hook_register) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Register multiple hooks */
@@ -191,7 +188,6 @@ TEST(hook_register_multiple) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Register duplicate hook */
@@ -230,7 +226,6 @@ TEST(hook_register_duplicate) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Trigger hook */
@@ -275,7 +270,6 @@ TEST(hook_trigger) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Trigger multiple hooks */
@@ -329,7 +323,6 @@ TEST(hook_trigger_multiple) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Trigger hook with error widget (should continue) */
@@ -387,7 +380,6 @@ TEST(hook_trigger_with_error) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Unregister hook */
@@ -427,7 +419,6 @@ TEST(hook_unregister) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Enable/disable hooks globally */
@@ -493,7 +484,6 @@ TEST(hook_enable_disable) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Test: Hook count */
@@ -531,7 +521,6 @@ TEST(hook_count) {
 
     /* Cleanup */
     lle_pool_destroy(pool);
-
 }
 
 /* Main test runner */

@@ -29,7 +29,12 @@
 #undef ASSERT_NOT_NULL
 #undef ASSERT_TRUE
 #undef ASSERT_FALSE
-#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT(cond)                                                           \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            TEST_FAIL_MSG(#cond);                                              \
+        }                                                                      \
+    } while (0)
 #define ASSERT_EQ(a, b) ASSERT((a) == (b))
 #define ASSERT_NE(a, b) ASSERT((a) != (b))
 #define ASSERT_STR_EQ(a, b) ASSERT(strcmp((a), (b)) == 0)

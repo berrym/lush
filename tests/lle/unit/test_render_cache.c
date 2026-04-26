@@ -33,7 +33,8 @@
  * The cache calls into LLE pool helpers which in turn defer to lush_pool_*.
  * These stubs route allocation to libc so the cache works against a
  * pointer-only "pool" that exists purely to satisfy the API contract.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
@@ -55,7 +56,8 @@ lush_pool_error_t lush_pool_init(const lush_pool_config_t *config) {
 
 /* ============================================================================
  * lle_display_cache: lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(display_cache_init_success) {
     lle_display_cache_t *cache = NULL;
@@ -72,8 +74,8 @@ TEST(display_cache_init_rejects_null_out) {
 
 TEST(display_cache_init_rejects_null_pool) {
     lle_display_cache_t *cache = NULL;
-    ASSERT_EQ(lle_display_cache_init(&cache, NULL),
-              LLE_ERROR_INVALID_PARAMETER, "NULL pool -> INVALID_PARAMETER");
+    ASSERT_EQ(lle_display_cache_init(&cache, NULL), LLE_ERROR_INVALID_PARAMETER,
+              "NULL pool -> INVALID_PARAMETER");
     ASSERT_NULL(cache, "cache stays NULL after rejected init");
 }
 
@@ -91,7 +93,8 @@ TEST(display_cache_cleanup_succeeds) {
 
 /* ============================================================================
  * lle_display_cache: store
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(display_cache_store_rejects_null_cache) {
     const char *data = "x";
@@ -131,7 +134,8 @@ TEST(display_cache_store_succeeds) {
  * The original tests only asserted data != NULL and size > 0 for hits.
  * That proves the lookup returned something but does not prove it
  * returned the right thing. Real tests must verify the bytes.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(display_cache_lookup_rejects_null_cache) {
     void *data = NULL;
@@ -250,8 +254,9 @@ TEST(display_cache_independent_keys_round_trip_independently) {
     for (uint64_t i = 0; i < 5; i++) {
         void *retrieved = NULL;
         size_t retrieved_len = 0;
-        ASSERT_EQ(lle_display_cache_lookup(cache, i, &retrieved, &retrieved_len),
-                  LLE_SUCCESS, "each key looks up");
+        ASSERT_EQ(
+            lle_display_cache_lookup(cache, i, &retrieved, &retrieved_len),
+            LLE_SUCCESS, "each key looks up");
         ASSERT_EQ(retrieved_len, strlen(vals[i]), "each size matches");
         ASSERT_EQ(memcmp(retrieved, vals[i], strlen(vals[i])), 0,
                   "each value matches its key");
@@ -261,7 +266,8 @@ TEST(display_cache_independent_keys_round_trip_independently) {
 
 /* ============================================================================
  * lle_display_cache: invalidate / invalidate_all
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(display_cache_invalidate_rejects_null) {
     ASSERT_EQ(lle_display_cache_invalidate(NULL, 1),
@@ -279,8 +285,7 @@ TEST(display_cache_invalidate_removes_entry) {
     void *out = NULL;
     size_t size = 0;
     ASSERT_EQ(lle_display_cache_lookup(cache, 50, &out, &size),
-              LLE_ERROR_CACHE_MISS,
-              "lookup after invalidate -> CACHE_MISS");
+              LLE_ERROR_CACHE_MISS, "lookup after invalidate -> CACHE_MISS");
     lle_display_cache_cleanup(cache);
 }
 
@@ -367,7 +372,8 @@ TEST(display_cache_invalidate_all_on_empty_is_safe) {
  * for the render cache's higher-level API are out of scope here because
  * its semantics depend on render-state types which are themselves not
  * covered by this file's stubs.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(render_cache_init_success) {
     lle_render_cache_t *cache = NULL;
@@ -389,7 +395,8 @@ TEST(render_cache_cleanup_rejects_null) {
 
 /* ============================================================================
  * Main runner
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("=== LLE Render Cache Tests ===\n\n");
@@ -407,7 +414,8 @@ int main(void) {
     RUN_TEST(display_cache_store_rejects_zero_size);
     RUN_TEST(display_cache_store_succeeds);
 
-    printf("\n--- display_cache lookup (with data round-trip verification) ---\n");
+    printf(
+        "\n--- display_cache lookup (with data round-trip verification) ---\n");
     RUN_TEST(display_cache_lookup_rejects_null_cache);
     RUN_TEST(display_cache_lookup_rejects_null_data_out);
     RUN_TEST(display_cache_lookup_rejects_null_size_out);
