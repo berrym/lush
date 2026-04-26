@@ -1795,15 +1795,22 @@ static token_t *tokenize_next(tokenizer_t *tokenizer) {
                             strchr("_.-/~:@*?+%!", sc) != NULL) {
                             scan_pos++;
                         } else if ((unsigned char)sc >= 0x80) {
-                            // UTF-8 continuation - skip entire sequence
-                            int seq_len = 1;
-                            if ((sc & 0xE0) == 0xC0)
-                                seq_len = 2;
-                            else if ((sc & 0xF0) == 0xE0)
-                                seq_len = 3;
-                            else if ((sc & 0xF8) == 0xF0)
-                                seq_len = 4;
-                            scan_pos += seq_len;
+                            /* Skip the rest of this UTF-8 sequence. Use the
+                             * shared LLE primitive so the byte-pattern logic
+                             * lives in exactly one place (issue #50). The
+                             * primitive reports what the lead byte CLAIMS;
+                             * the caller is responsible for clamping against
+                             * the input length so a partial sequence at the
+                             * end of the buffer cannot walk past it. */
+                            int seq_len =
+                                lle_utf8_sequence_length((unsigned char)sc);
+                            if (seq_len <= 0) {
+                                seq_len = 1;
+                            }
+                            scan_pos += (size_t)seq_len;
+                            if (scan_pos > tokenizer->input_length) {
+                                scan_pos = tokenizer->input_length;
+                            }
                         } else if (sc == '{') {
                             // Another brace pattern - scan for its closing }
                             // to support Cartesian products like {1..2}{a..b}

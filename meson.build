@@ -1735,6 +1735,13 @@ if fuzzing_enabled
     'src/libhashtable/ht.c',
     'src/libhashtable/ht_fnv1a.c',
     'src/libhashtable/ht_strstr.c',
+    # Tokenizer uses lle_utf8_sequence_length for UTF-8 byte-length
+    # decoding (issue #50). The fuzz binaries do not link liblle.a,
+    # so the LLE sources providing this symbol are compiled in directly.
+    # utf8_support.c calls lle_is_grapheme_boundary so unicode_grapheme.c
+    # comes along for the ride; both are hermetic.
+    'src/lle/unicode/utf8_support.c',
+    'src/lle/unicode/unicode_grapheme.c',
     'tests/fuzz/fuzz_stubs.c',
   ]
 

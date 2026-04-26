@@ -739,6 +739,36 @@ TEST(tokenize_line_position_tracking) {
 }
 
 /* ============================================================================
+ * REGRESSION — issue #50
+ * Brace-expansion suffix scanner used to advance scan_pos by the claimed
+ * UTF-8 sequence length without bounds-checking against input_length, so
+ * a partial sequence at end-of-input caused token_new's memcpy to read
+ * past the buffer (heap-buffer-overflow under ASan). The minimal trigger
+ * is "{x}" + a 4-byte UTF-8 lead byte (0xF0) with zero continuations.
+ * Behavioural assertion: parses successfully without crashing.
+ * ============================================================================
+ */
+
+TEST(utf8_partial_sequence_at_eof_brace_expansion) {
+    /* 4 bytes total: '{', 'x', '}', 0xF0. The lead byte claims a 4-byte
+     * UTF-8 sequence; no continuation bytes follow. */
+    const char input[] = {'{', 'x', '}', (char)0xF0, '\0'};
+    tokenizer_t *t = tokenizer_new(input);
+    ASSERT_NOT_NULL(t, "tokenizer_new failed");
+    /* Drain all tokens. The previous defect crashed inside token_new during
+     * the first WORD emission; reaching TOK_EOF here proves the bound holds. */
+    token_t *tok = NULL;
+    do {
+        tok = tokenizer_current(t);
+        ASSERT_NOT_NULL(tok, "tokenizer_current returned NULL");
+        if (tok->type != TOK_EOF) {
+            tokenizer_advance(t);
+        }
+    } while (tok->type != TOK_EOF);
+    tokenizer_free(t);
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -815,6 +845,9 @@ int main(void) {
     RUN_TEST(tokenize_arithmetic_expansion);
     RUN_TEST(tokenize_special_chars_in_word);
     RUN_TEST(tokenize_line_position_tracking);
+
+    printf("\nRegression tests:\n");
+    RUN_TEST(utf8_partial_sequence_at_eof_brace_expansion);
 
     printf("\n========================================\n");
     printf("All tokenizer tests PASSED!\n");
