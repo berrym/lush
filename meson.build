@@ -559,7 +559,7 @@ if lle_sources.length() > 0
   # Tests theme registry, theme creation, inheritance, and built-in themes
   test_theme_registry = executable('test_theme_registry',
                                    'tests/lle/unit/test_theme_registry.c',
-                                   include_directories: inc,
+                                   include_directories: [inc, include_directories('tests')],
                                    dependencies: [lle_dep])
 
   test('LLE Theme Registry', test_theme_registry,
@@ -571,7 +571,7 @@ if lle_sources.length() > 0
   test_prompt_composer = executable('test_prompt_composer',
                                     ['tests/lle/unit/test_prompt_composer.c',
                                      'tests/lle/functional/display_test_stubs.c'],
-                                    include_directories: inc,
+                                    include_directories: [inc, include_directories('tests')],
                                     dependencies: [lle_dep, display_dep])
 
   test('LLE Prompt Composer', test_prompt_composer,
@@ -583,7 +583,7 @@ if lle_sources.length() > 0
   test_powerline_renderer = executable('test_powerline_renderer',
                                        ['tests/lle/unit/test_powerline_renderer.c',
                                         'tests/lle/functional/display_test_stubs.c'],
-                                       include_directories: inc,
+                                       include_directories: [inc, include_directories('tests')],
                                        dependencies: [lle_dep, display_dep])
 
   test('LLE Powerline Renderer', test_powerline_renderer,
@@ -962,7 +962,7 @@ endif
   if fs.exists('tests/lle/unit/test_kill_ring.c')
     test_kill_ring = executable('test_kill_ring',
                                 'tests/lle/unit/test_kill_ring.c',
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep])
     test('LLE Kill Ring', test_kill_ring,
          suite: 'lle-unit',
@@ -975,7 +975,7 @@ endif
     test_keybinding = executable('test_keybinding',
                                  ['tests/lle/unit/test_keybinding.c',
                                   'tests/lle/functional/display_test_stubs.c'],
-                                 include_directories: inc,
+                                 include_directories: [inc, include_directories('tests')],
                                  dependencies: [lle_dep, display_dep])
     test('LLE Keybinding Engine', test_keybinding,
          suite: 'lle-unit',
@@ -988,7 +988,7 @@ endif
     test_widget_system = executable('test_widget_system',
                                     ['tests/lle/unit/test_widget_system.c',
                                      'tests/lle/functional/test_memory_mock.c'],
-                                    include_directories: inc,
+                                    include_directories: [inc, include_directories('tests')],
                                     dependencies: [lle_dep])
     test('LLE Widget System', test_widget_system,
          suite: 'lle-unit',
@@ -1001,7 +1001,7 @@ endif
     test_widget_hooks = executable('test_widget_hooks',
                                    ['tests/lle/unit/test_widget_hooks.c',
                                     'tests/lle/functional/test_memory_mock.c'],
-                                   include_directories: inc,
+                                   include_directories: [inc, include_directories('tests')],
                                    dependencies: [lle_dep])
     test('LLE Widget Hooks Manager', test_widget_hooks,
          suite: 'lle-unit',

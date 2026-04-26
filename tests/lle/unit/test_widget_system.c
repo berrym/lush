@@ -11,7 +11,7 @@
 #include "lle/error_handling.h"
 #include "lle/lle_editor.h"
 #include "lle/widget_system.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -84,19 +84,19 @@ static void free_test_editor(lle_editor_t *editor) {
 /**
  * Test widget registry initialization
  */
-static void test_widget_registry_init(void) {
+TEST(widget_registry_init) {
     printf("  test_widget_registry_init...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
     lle_result_t result = lle_widget_registry_init(&registry, pool);
-    assert(result == LLE_SUCCESS);
-    assert(registry != NULL);
-    assert(registry->registry_active == true);
-    assert(registry->widget_count == 0);
-    assert(registry->widget_list == NULL);
-    assert(registry->widgets != NULL);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(registry != NULL);
+    ASSERT(registry->registry_active == true);
+    ASSERT(registry->widget_count == 0);
+    ASSERT(registry->widget_list == NULL);
+    ASSERT(registry->widgets != NULL);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -107,7 +107,7 @@ static void test_widget_registry_init(void) {
 /**
  * Test widget registry init with NULL parameters
  */
-static void test_widget_registry_init_null_params(void) {
+TEST(widget_registry_init_null_params) {
     printf("  test_widget_registry_init_null_params...");
 
     lle_widget_registry_t *registry = NULL;
@@ -115,12 +115,12 @@ static void test_widget_registry_init_null_params(void) {
 
     /* NULL registry pointer */
     lle_result_t result = lle_widget_registry_init(NULL, pool);
-    assert(result == LLE_ERROR_INVALID_PARAMETER);
+    ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
     /* NULL memory pool */
     result = lle_widget_registry_init(&registry, NULL);
-    assert(result == LLE_ERROR_INVALID_PARAMETER);
-    assert(registry == NULL);
+    ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
+    ASSERT(registry == NULL);
 
     lle_pool_destroy(pool);
 
@@ -130,20 +130,20 @@ static void test_widget_registry_init_null_params(void) {
 /**
  * Test widget registration
  */
-static void test_widget_register(void) {
+TEST(widget_register) {
     printf("  test_widget_register...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
 
     /* Register a widget */
     lle_result_t result = lle_widget_register(
         registry, "test-widget", test_widget_callback, LLE_WIDGET_USER, NULL);
-    assert(result == LLE_SUCCESS);
-    assert(registry->widget_count == 1);
-    assert(registry->widget_list != NULL);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(registry->widget_count == 1);
+    ASSERT(registry->widget_list != NULL);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -154,23 +154,23 @@ static void test_widget_register(void) {
 /**
  * Test widget registration with duplicate name
  */
-static void test_widget_register_duplicate(void) {
+TEST(widget_register_duplicate) {
     printf("  test_widget_register_duplicate...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
 
     /* Register first widget */
-    assert(lle_widget_register(registry, "test-widget", test_widget_callback,
+    ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
 
     /* Try to register with same name */
     lle_result_t result = lle_widget_register(
         registry, "test-widget", test_widget_callback, LLE_WIDGET_USER, NULL);
-    assert(result == LLE_ERROR_ALREADY_EXISTS);
-    assert(registry->widget_count == 1);
+    ASSERT(result == LLE_ERROR_ALREADY_EXISTS);
+    ASSERT(registry->widget_count == 1);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -181,27 +181,27 @@ static void test_widget_register_duplicate(void) {
 /**
  * Test widget lookup
  */
-static void test_widget_lookup(void) {
+TEST(widget_lookup) {
     printf("  test_widget_lookup...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
-    assert(lle_widget_register(registry, "test-widget", test_widget_callback,
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
 
     /* Lookup existing widget */
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
-    assert(widget != NULL);
-    assert(strcmp(widget->name, "test-widget") == 0);
-    assert(widget->callback == test_widget_callback);
-    assert(widget->type == LLE_WIDGET_USER);
-    assert(widget->enabled == true);
+    ASSERT(widget != NULL);
+    ASSERT(strcmp(widget->name, "test-widget") == 0);
+    ASSERT(widget->callback == test_widget_callback);
+    ASSERT(widget->type == LLE_WIDGET_USER);
+    ASSERT(widget->enabled == true);
 
     /* Lookup non-existent widget */
     widget = lle_widget_lookup(registry, "nonexistent");
-    assert(widget == NULL);
+    ASSERT(widget == NULL);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -212,7 +212,7 @@ static void test_widget_lookup(void) {
 /**
  * Test widget execution
  */
-static void test_widget_execute(void) {
+TEST(widget_execute) {
     printf("  test_widget_execute...");
 
     reset_test_globals();
@@ -222,21 +222,21 @@ static void test_widget_execute(void) {
     lle_editor_t *editor = create_test_editor();
     int user_data = 42;
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
-    assert(lle_widget_register(registry, "test-widget", test_widget_callback,
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, &user_data) == LLE_SUCCESS);
 
     /* Execute widget */
     lle_result_t result = lle_widget_execute(registry, "test-widget", editor);
-    assert(result == LLE_SUCCESS);
-    assert(g_test_widget_called == 1);
-    assert(g_test_widget_call_count == 1);
-    assert(g_test_editor_arg == editor);
-    assert(g_test_user_data_arg == &user_data);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(g_test_widget_called == 1);
+    ASSERT(g_test_widget_call_count == 1);
+    ASSERT(g_test_editor_arg == editor);
+    ASSERT(g_test_user_data_arg == &user_data);
 
     /* Verify execution count updated */
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
-    assert(widget->execution_count == 1);
+    ASSERT(widget->execution_count == 1);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -248,25 +248,25 @@ static void test_widget_execute(void) {
 /**
  * Test widget execution with error
  */
-static void test_widget_execute_error(void) {
+TEST(widget_execute_error) {
     printf("  test_widget_execute_error...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
     lle_editor_t *editor = create_test_editor();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
-    assert(lle_widget_register(registry, "error-widget",
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_register(registry, "error-widget",
                                test_widget_error_callback, LLE_WIDGET_USER,
                                NULL) == LLE_SUCCESS);
 
     /* Execute widget that returns error */
     lle_result_t result = lle_widget_execute(registry, "error-widget", editor);
-    assert(result == LLE_ERROR_INVALID_STATE);
+    ASSERT(result == LLE_ERROR_INVALID_STATE);
 
     /* Verify execution count still updated */
     lle_widget_t *widget = lle_widget_lookup(registry, "error-widget");
-    assert(widget->execution_count == 1);
+    ASSERT(widget->execution_count == 1);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -278,25 +278,25 @@ static void test_widget_execute_error(void) {
 /**
  * Test widget unregistration
  */
-static void test_widget_unregister(void) {
+TEST(widget_unregister) {
     printf("  test_widget_unregister...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
-    assert(lle_widget_register(registry, "test-widget", test_widget_callback,
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
-    assert(registry->widget_count == 1);
+    ASSERT(registry->widget_count == 1);
 
     /* Unregister widget */
     lle_result_t result = lle_widget_unregister(registry, "test-widget");
-    assert(result == LLE_SUCCESS);
-    assert(registry->widget_count == 0);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(registry->widget_count == 0);
 
     /* Verify widget no longer exists */
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
-    assert(widget == NULL);
+    ASSERT(widget == NULL);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -307,39 +307,39 @@ static void test_widget_unregister(void) {
 /**
  * Test widget enable/disable
  */
-static void test_widget_enable_disable(void) {
+TEST(widget_enable_disable) {
     printf("  test_widget_enable_disable...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
     lle_editor_t *editor = create_test_editor();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
-    assert(lle_widget_register(registry, "test-widget", test_widget_callback,
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
 
     /* Widget starts enabled */
     lle_widget_t *widget = lle_widget_lookup(registry, "test-widget");
-    assert(widget->enabled == true);
+    ASSERT(widget->enabled == true);
 
     /* Disable widget */
-    assert(lle_widget_disable(registry, "test-widget") == LLE_SUCCESS);
-    assert(widget->enabled == false);
+    ASSERT(lle_widget_disable(registry, "test-widget") == LLE_SUCCESS);
+    ASSERT(widget->enabled == false);
 
     /* Try to execute disabled widget */
     reset_test_globals();
     lle_result_t result = lle_widget_execute(registry, "test-widget", editor);
-    assert(result == LLE_ERROR_DISABLED);
-    assert(g_test_widget_called == 0);
+    ASSERT(result == LLE_ERROR_DISABLED);
+    ASSERT(g_test_widget_called == 0);
 
     /* Re-enable widget */
-    assert(lle_widget_enable(registry, "test-widget") == LLE_SUCCESS);
-    assert(widget->enabled == true);
+    ASSERT(lle_widget_enable(registry, "test-widget") == LLE_SUCCESS);
+    ASSERT(widget->enabled == true);
 
     /* Execute now works */
     result = lle_widget_execute(registry, "test-widget", editor);
-    assert(result == LLE_SUCCESS);
-    assert(g_test_widget_called == 1);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(g_test_widget_called == 1);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -351,29 +351,29 @@ static void test_widget_enable_disable(void) {
 /**
  * Test multiple widget types
  */
-static void test_multiple_widget_types(void) {
+TEST(multiple_widget_types) {
     printf("  test_multiple_widget_types...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
 
     /* Register widgets of different types */
-    assert(lle_widget_register(registry, "builtin-widget", test_widget_callback,
+    ASSERT(lle_widget_register(registry, "builtin-widget", test_widget_callback,
                                LLE_WIDGET_BUILTIN, NULL) == LLE_SUCCESS);
-    assert(lle_widget_register(registry, "user-widget", test_widget_callback,
+    ASSERT(lle_widget_register(registry, "user-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
-    assert(lle_widget_register(registry, "plugin-widget", test_widget_callback,
+    ASSERT(lle_widget_register(registry, "plugin-widget", test_widget_callback,
                                LLE_WIDGET_PLUGIN, NULL) == LLE_SUCCESS);
 
-    assert(registry->widget_count == 3);
+    ASSERT(registry->widget_count == 3);
 
     /* Verify types */
-    assert(lle_widget_lookup(registry, "builtin-widget")->type ==
+    ASSERT(lle_widget_lookup(registry, "builtin-widget")->type ==
            LLE_WIDGET_BUILTIN);
-    assert(lle_widget_lookup(registry, "user-widget")->type == LLE_WIDGET_USER);
-    assert(lle_widget_lookup(registry, "plugin-widget")->type ==
+    ASSERT(lle_widget_lookup(registry, "user-widget")->type == LLE_WIDGET_USER);
+    ASSERT(lle_widget_lookup(registry, "plugin-widget")->type ==
            LLE_WIDGET_PLUGIN);
 
     lle_widget_registry_destroy(registry);
@@ -385,21 +385,21 @@ static void test_multiple_widget_types(void) {
 /**
  * Test widget exists
  */
-static void test_widget_exists(void) {
+TEST(widget_exists) {
     printf("  test_widget_exists...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
 
-    assert(lle_widget_exists(registry, "test-widget") == false);
+    ASSERT(lle_widget_exists(registry, "test-widget") == false);
 
-    assert(lle_widget_register(registry, "test-widget", test_widget_callback,
+    ASSERT(lle_widget_register(registry, "test-widget", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
 
-    assert(lle_widget_exists(registry, "test-widget") == true);
-    assert(lle_widget_exists(registry, "nonexistent") == false);
+    ASSERT(lle_widget_exists(registry, "test-widget") == true);
+    ASSERT(lle_widget_exists(registry, "nonexistent") == false);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -410,25 +410,25 @@ static void test_widget_exists(void) {
 /**
  * Test widget count
  */
-static void test_widget_count(void) {
+TEST(widget_count) {
     printf("  test_widget_count...");
 
     lle_widget_registry_t *registry = NULL;
     lle_memory_pool_t *pool = lle_pool_create();
 
-    assert(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
-    assert(lle_widget_registry_get_count(registry) == 0);
+    ASSERT(lle_widget_registry_init(&registry, pool) == LLE_SUCCESS);
+    ASSERT(lle_widget_registry_get_count(registry) == 0);
 
-    assert(lle_widget_register(registry, "widget1", test_widget_callback,
+    ASSERT(lle_widget_register(registry, "widget1", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
-    assert(lle_widget_registry_get_count(registry) == 1);
+    ASSERT(lle_widget_registry_get_count(registry) == 1);
 
-    assert(lle_widget_register(registry, "widget2", test_widget_callback,
+    ASSERT(lle_widget_register(registry, "widget2", test_widget_callback,
                                LLE_WIDGET_USER, NULL) == LLE_SUCCESS);
-    assert(lle_widget_registry_get_count(registry) == 2);
+    ASSERT(lle_widget_registry_get_count(registry) == 2);
 
-    assert(lle_widget_unregister(registry, "widget1") == LLE_SUCCESS);
-    assert(lle_widget_registry_get_count(registry) == 1);
+    ASSERT(lle_widget_unregister(registry, "widget1") == LLE_SUCCESS);
+    ASSERT(lle_widget_registry_get_count(registry) == 1);
 
     lle_widget_registry_destroy(registry);
     lle_pool_destroy(pool);
@@ -445,19 +445,18 @@ int main(void) {
     printf("Running Widget System Tests:\n");
     printf("========================================\n");
 
-    test_widget_registry_init();
-    test_widget_registry_init_null_params();
-    test_widget_register();
-    test_widget_register_duplicate();
-    test_widget_lookup();
-    test_widget_execute();
-    test_widget_execute_error();
-    test_widget_unregister();
-    test_widget_enable_disable();
-    test_multiple_widget_types();
-    test_widget_exists();
-    test_widget_count();
-
+    RUN_TEST(widget_registry_init);
+    RUN_TEST(widget_registry_init_null_params);
+    RUN_TEST(widget_register);
+    RUN_TEST(widget_register_duplicate);
+    RUN_TEST(widget_lookup);
+    RUN_TEST(widget_execute);
+    RUN_TEST(widget_execute_error);
+    RUN_TEST(widget_unregister);
+    RUN_TEST(widget_enable_disable);
+    RUN_TEST(multiple_widget_types);
+    RUN_TEST(widget_exists);
+    RUN_TEST(widget_count);
     printf("========================================\n");
     printf("All Widget System tests PASSED!\n");
 

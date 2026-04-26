@@ -18,33 +18,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ========================================================================== */
-/* Test Infrastructure                                                        */
-/* ========================================================================== */
+#include "test_framework.h"
 
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) static void test_##name(void)
-
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        printf("  [%d] %s... ", tests_run, #name);                             \
-        test_##name();                                                         \
-        tests_passed++;                                                        \
-        printf("PASS\n");                                                      \
-    } while (0)
-
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("FAIL\n    Assertion failed: %s\n    at %s:%d\n", #cond,    \
-                   __FILE__, __LINE__);                                        \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
+/* Local 1-arg ASSERT family (cond only — no message) wrapping the
+ * framework's failure mechanism, replacing the historical exit(1)
+ * pattern with longjmp-based isolation per RUN_TEST. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_NE
+#undef ASSERT_STR_EQ
+#undef ASSERT_NULL
+#undef ASSERT_NOT_NULL
+#undef ASSERT_TRUE
+#undef ASSERT_FALSE
+#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
 #define ASSERT_EQ(a, b) ASSERT((a) == (b))
 #define ASSERT_NE(a, b) ASSERT((a) != (b))
 #define ASSERT_STR_EQ(a, b) ASSERT(strcmp((a), (b)) == 0)
@@ -670,7 +657,5 @@ int main(void) {
     RUN_TEST(powerline_fg_and_bg_ansi_generation);
     RUN_TEST(powerline_color_downgrade);
 
-    printf("\n=== Results: %d/%d tests passed ===\n", tests_passed, tests_run);
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

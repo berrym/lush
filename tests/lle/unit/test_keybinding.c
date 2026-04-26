@@ -7,39 +7,13 @@
  */
 
 #include "lle/keybinding.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Test framework macros */
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Running: %s...\n", #name);                                   \
-        test_##name();                                                         \
-        printf("    ✓ PASSED\n");                                              \
-    } while (0)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("    ✗ FAILED: %s\n", message);                             \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    do {                                                                       \
-        if ((actual) != (expected)) {                                          \
-            printf("    ✗ FAILED: %s\n", message);                             \
-            printf("      Expected: %zu, Got: %zu\n", (size_t)(expected),      \
-                   (size_t)(actual));                                          \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* Mock editor structure for testing */
 struct lle_editor {
@@ -492,8 +466,5 @@ int main(void) {
     printf("\nPerformance Tests:\n");
     RUN_TEST(performance_tracking);
 
-    printf("\n=============================\n");
-    printf("All tests passed!\n");
-
-    return 0;
+    return TEST_RESULT();
 }
