@@ -17,6 +17,22 @@
 
 #include "display/layer_events.h"
 #include "display/prompt_layer.h"
+#include "test_framework.h"
+
+/* Local 1-arg / 2-arg ASSERT_* helpers (no message) bridge to the
+ * framework's variants by synthesizing a stringified-expression
+ * message. Replaces the historical exit(1) failure path with
+ * longjmp-based isolation per RUN_TEST. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
+#undef ASSERT_NULL
+#undef ASSERT_NOT_NULL
+#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+#define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
+#define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
 /* Helper to create an initialized event system for tests */
 static layer_event_system_t *create_test_event_system(void) {
@@ -28,60 +44,12 @@ static layer_event_system_t *create_test_event_system(void) {
 }
 
 /* Test framework macros */
-static int tests_run = 0;
-static int tests_passed = 0;
 
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAIL: %s != %s (%d != %d) (line %d)\n", #a, #b,          \
-                   (int)(a), (int)(b), __LINE__);                              \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NOT_NULL(ptr)                                                   \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NULL(ptr)                                                       \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
-                   __LINE__);                                                  \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        printf("  Running %s...\n", #test);                                    \
-        tests_run++;                                                           \
-        if (test()) {                                                          \
-            tests_passed++;                                                    \
-            printf("  PASS: %s\n", #test);                                     \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -1326,124 +1294,124 @@ int main(void) {
     printf("=== Prompt Layer Unit Tests ===\n\n");
 
     printf("=== Error String Tests ===\n");
-    RUN_TEST(test_error_string_success);
-    RUN_TEST(test_error_string_invalid_param);
-    RUN_TEST(test_error_string_null_pointer);
-    RUN_TEST(test_error_string_memory_allocation);
-    RUN_TEST(test_error_string_buffer_too_small);
-    RUN_TEST(test_error_string_content_too_large);
-    RUN_TEST(test_error_string_theme_not_available);
-    RUN_TEST(test_error_string_event_system_failure);
-    RUN_TEST(test_error_string_rendering_failure);
-    RUN_TEST(test_error_string_invalid_state);
-    RUN_TEST(test_error_string_performance_timeout);
-    RUN_TEST(test_error_string_unknown);
-    RUN_TEST(test_error_string_invalid_code);
+    RUN_TEST(error_string_success);
+    RUN_TEST(error_string_invalid_param);
+    RUN_TEST(error_string_null_pointer);
+    RUN_TEST(error_string_memory_allocation);
+    RUN_TEST(error_string_buffer_too_small);
+    RUN_TEST(error_string_content_too_large);
+    RUN_TEST(error_string_theme_not_available);
+    RUN_TEST(error_string_event_system_failure);
+    RUN_TEST(error_string_rendering_failure);
+    RUN_TEST(error_string_invalid_state);
+    RUN_TEST(error_string_performance_timeout);
+    RUN_TEST(error_string_unknown);
+    RUN_TEST(error_string_invalid_code);
 
     printf("\n=== Version Tests ===\n");
-    RUN_TEST(test_get_version_all_null);
-    RUN_TEST(test_get_version_major_only);
-    RUN_TEST(test_get_version_minor_only);
-    RUN_TEST(test_get_version_patch_only);
-    RUN_TEST(test_get_version_all);
+    RUN_TEST(get_version_all_null);
+    RUN_TEST(get_version_major_only);
+    RUN_TEST(get_version_minor_only);
+    RUN_TEST(get_version_patch_only);
+    RUN_TEST(get_version_all);
 
     printf("\n=== Create/Destroy Tests ===\n");
-    RUN_TEST(test_create_returns_valid_layer);
-    RUN_TEST(test_create_initializes_disabled);
-    RUN_TEST(test_create_initializes_content_null);
-    RUN_TEST(test_destroy_null_layer);
-    RUN_TEST(test_destroy_twice);
+    RUN_TEST(create_returns_valid_layer);
+    RUN_TEST(create_initializes_disabled);
+    RUN_TEST(create_initializes_content_null);
+    RUN_TEST(destroy_null_layer);
+    RUN_TEST(destroy_twice);
 
     printf("\n=== Init Tests ===\n");
-    RUN_TEST(test_init_null_layer);
-    RUN_TEST(test_init_null_events);
-    RUN_TEST(test_init_with_events);
-    RUN_TEST(test_init_sets_initialized_flag);
-    RUN_TEST(test_init_enables_layer);
+    RUN_TEST(init_null_layer);
+    RUN_TEST(init_null_events);
+    RUN_TEST(init_with_events);
+    RUN_TEST(init_sets_initialized_flag);
+    RUN_TEST(init_enables_layer);
 
     printf("\n=== Cleanup Tests ===\n");
-    RUN_TEST(test_cleanup_null_layer);
-    RUN_TEST(test_cleanup_uninitialized_layer);
-    RUN_TEST(test_cleanup_twice);
-    RUN_TEST(test_cleanup_initialized_layer);
+    RUN_TEST(cleanup_null_layer);
+    RUN_TEST(cleanup_uninitialized_layer);
+    RUN_TEST(cleanup_twice);
+    RUN_TEST(cleanup_initialized_layer);
 
     printf("\n=== Set Content Tests ===\n");
-    RUN_TEST(test_set_content_null_layer);
-    RUN_TEST(test_set_content_null_content);
-    RUN_TEST(test_set_content_uninitialized_layer);
-    RUN_TEST(test_set_content_empty_content);
-    RUN_TEST(test_set_content_simple_prompt);
-    RUN_TEST(test_set_content_complex_prompt);
-    RUN_TEST(test_set_content_multiline_prompt);
-    RUN_TEST(test_set_content_with_ansi);
-    RUN_TEST(test_set_content_marks_dirty);
-    RUN_TEST(test_set_content_replaces_existing);
-    RUN_TEST(test_set_content_ascii_art_prompt);
-    RUN_TEST(test_set_content_unicode_prompt);
+    RUN_TEST(set_content_null_layer);
+    RUN_TEST(set_content_null_content);
+    RUN_TEST(set_content_uninitialized_layer);
+    RUN_TEST(set_content_empty_content);
+    RUN_TEST(set_content_simple_prompt);
+    RUN_TEST(set_content_complex_prompt);
+    RUN_TEST(set_content_multiline_prompt);
+    RUN_TEST(set_content_with_ansi);
+    RUN_TEST(set_content_marks_dirty);
+    RUN_TEST(set_content_replaces_existing);
+    RUN_TEST(set_content_ascii_art_prompt);
+    RUN_TEST(set_content_unicode_prompt);
 
     printf("\n=== Get Rendered Content Tests ===\n");
-    RUN_TEST(test_get_rendered_content_null_layer);
-    RUN_TEST(test_get_rendered_content_null_output);
-    RUN_TEST(test_get_rendered_content_zero_size);
-    RUN_TEST(test_get_rendered_content_no_content_set);
-    RUN_TEST(test_get_rendered_content_basic);
-    RUN_TEST(test_get_rendered_content_preserves_content);
-    RUN_TEST(test_get_rendered_content_buffer_too_small);
+    RUN_TEST(get_rendered_content_null_layer);
+    RUN_TEST(get_rendered_content_null_output);
+    RUN_TEST(get_rendered_content_zero_size);
+    RUN_TEST(get_rendered_content_no_content_set);
+    RUN_TEST(get_rendered_content_basic);
+    RUN_TEST(get_rendered_content_preserves_content);
+    RUN_TEST(get_rendered_content_buffer_too_small);
 
     printf("\n=== Get Metrics Tests ===\n");
-    RUN_TEST(test_get_metrics_null_layer);
-    RUN_TEST(test_get_metrics_null_metrics);
-    RUN_TEST(test_get_metrics_no_content);
-    RUN_TEST(test_get_metrics_simple_content);
-    RUN_TEST(test_get_metrics_multiline_content);
-    RUN_TEST(test_get_metrics_detects_ansi);
-    RUN_TEST(test_get_metrics_no_ansi);
+    RUN_TEST(get_metrics_null_layer);
+    RUN_TEST(get_metrics_null_metrics);
+    RUN_TEST(get_metrics_no_content);
+    RUN_TEST(get_metrics_simple_content);
+    RUN_TEST(get_metrics_multiline_content);
+    RUN_TEST(get_metrics_detects_ansi);
+    RUN_TEST(get_metrics_no_ansi);
 
     printf("\n=== Update Theme Tests ===\n");
-    RUN_TEST(test_update_theme_null_layer);
-    RUN_TEST(test_update_theme_uninitialized);
-    RUN_TEST(test_update_theme_initialized);
+    RUN_TEST(update_theme_null_layer);
+    RUN_TEST(update_theme_uninitialized);
+    RUN_TEST(update_theme_initialized);
 
     printf("\n=== Force Render Tests ===\n");
-    RUN_TEST(test_force_render_null_layer);
-    RUN_TEST(test_force_render_uninitialized);
-    RUN_TEST(test_force_render_no_content);
-    RUN_TEST(test_force_render_with_content);
-    RUN_TEST(test_force_render_clears_dirty_flag);
+    RUN_TEST(force_render_null_layer);
+    RUN_TEST(force_render_uninitialized);
+    RUN_TEST(force_render_no_content);
+    RUN_TEST(force_render_with_content);
+    RUN_TEST(force_render_clears_dirty_flag);
 
     printf("\n=== Get Performance Tests ===\n");
-    RUN_TEST(test_get_performance_null_layer);
-    RUN_TEST(test_get_performance_null_performance);
-    RUN_TEST(test_get_performance_new_layer);
-    RUN_TEST(test_get_performance_after_render);
+    RUN_TEST(get_performance_null_layer);
+    RUN_TEST(get_performance_null_performance);
+    RUN_TEST(get_performance_new_layer);
+    RUN_TEST(get_performance_after_render);
 
     printf("\n=== Reset Performance Tests ===\n");
-    RUN_TEST(test_reset_performance_null_layer);
-    RUN_TEST(test_reset_performance_valid);
+    RUN_TEST(reset_performance_null_layer);
+    RUN_TEST(reset_performance_valid);
 
     printf("\n=== Optimize Tests ===\n");
-    RUN_TEST(test_optimize_null_layer);
-    RUN_TEST(test_optimize_valid);
-    RUN_TEST(test_optimize_with_content);
+    RUN_TEST(optimize_null_layer);
+    RUN_TEST(optimize_valid);
+    RUN_TEST(optimize_with_content);
 
     printf("\n=== Process Events Tests ===\n");
-    RUN_TEST(test_process_events_null_layer);
-    RUN_TEST(test_process_events_with_events);
+    RUN_TEST(process_events_null_layer);
+    RUN_TEST(process_events_with_events);
 
     printf("\n=== Validate Tests ===\n");
-    RUN_TEST(test_validate_null_layer);
-    RUN_TEST(test_validate_new_layer);
-    RUN_TEST(test_validate_initialized_layer);
-    RUN_TEST(test_validate_with_content);
+    RUN_TEST(validate_null_layer);
+    RUN_TEST(validate_new_layer);
+    RUN_TEST(validate_initialized_layer);
+    RUN_TEST(validate_with_content);
 
     printf("\n=== Generate From Lush Tests ===\n");
-    RUN_TEST(test_generate_from_lush_null_layer);
-    RUN_TEST(test_generate_from_lush_uninitialized);
+    RUN_TEST(generate_from_lush_null_layer);
+    RUN_TEST(generate_from_lush_uninitialized);
 
     printf("\n=== Run Tests Function Tests ===\n");
-    RUN_TEST(test_run_tests_null_layer);
-    RUN_TEST(test_run_tests_uninitialized);
+    RUN_TEST(run_tests_null_layer);
+    RUN_TEST(run_tests_uninitialized);
 
     printf("\n=== Summary ===\n");
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

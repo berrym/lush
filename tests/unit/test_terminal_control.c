@@ -18,52 +18,29 @@
 
 #include "display/base_terminal.h"
 #include "display/terminal_control.h"
+#include "test_framework.h"
+
+/* Local 1-arg / 2-arg ASSERT_* helpers (no message) bridge to the
+ * framework's variants by synthesizing a stringified-expression
+ * message. Replaces the historical exit(1) failure path with
+ * longjmp-based isolation per RUN_TEST. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
+#undef ASSERT_NULL
+#undef ASSERT_NOT_NULL
+#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+#define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
+#define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
 /* Test framework macros */
-static int tests_run = 0;
-static int tests_passed = 0;
 
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NOT_NULL(ptr)                                                   \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NULL(ptr)                                                       \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        printf("  Running %s...\n", #test);                                    \
-        tests_run++;                                                           \
-        if (test()) {                                                          \
-            tests_passed++;                                                    \
-            printf("  PASS: %s\n", #test);                                     \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -790,124 +767,124 @@ int main(void) {
     printf("Running terminal control tests...\n\n");
 
     printf("=== Error String Tests ===\n");
-    RUN_TEST(test_error_string_success);
-    RUN_TEST(test_error_string_invalid_param);
-    RUN_TEST(test_error_string_memory_allocation);
-    RUN_TEST(test_error_string_capability_detection);
-    RUN_TEST(test_error_string_sequence_too_long);
-    RUN_TEST(test_error_string_unsupported_operation);
-    RUN_TEST(test_error_string_color_out_of_range);
-    RUN_TEST(test_error_string_position_out_of_range);
-    RUN_TEST(test_error_string_terminal_not_ready);
-    RUN_TEST(test_error_string_unknown);
-    RUN_TEST(test_error_strings_are_different);
+    RUN_TEST(error_string_success);
+    RUN_TEST(error_string_invalid_param);
+    RUN_TEST(error_string_memory_allocation);
+    RUN_TEST(error_string_capability_detection);
+    RUN_TEST(error_string_sequence_too_long);
+    RUN_TEST(error_string_unsupported_operation);
+    RUN_TEST(error_string_color_out_of_range);
+    RUN_TEST(error_string_position_out_of_range);
+    RUN_TEST(error_string_terminal_not_ready);
+    RUN_TEST(error_string_unknown);
+    RUN_TEST(error_strings_are_different);
 
     printf("\n=== Color Utility Tests ===\n");
-    RUN_TEST(test_color_default);
-    RUN_TEST(test_color_from_basic_black);
-    RUN_TEST(test_color_from_basic_red);
-    RUN_TEST(test_color_from_basic_green);
-    RUN_TEST(test_color_from_basic_yellow);
-    RUN_TEST(test_color_from_basic_blue);
-    RUN_TEST(test_color_from_basic_magenta);
-    RUN_TEST(test_color_from_basic_cyan);
-    RUN_TEST(test_color_from_basic_white);
-    RUN_TEST(test_color_from_basic_bright_black);
-    RUN_TEST(test_color_from_basic_bright_white);
-    RUN_TEST(test_color_from_basic_max_value);
+    RUN_TEST(color_default);
+    RUN_TEST(color_from_basic_black);
+    RUN_TEST(color_from_basic_red);
+    RUN_TEST(color_from_basic_green);
+    RUN_TEST(color_from_basic_yellow);
+    RUN_TEST(color_from_basic_blue);
+    RUN_TEST(color_from_basic_magenta);
+    RUN_TEST(color_from_basic_cyan);
+    RUN_TEST(color_from_basic_white);
+    RUN_TEST(color_from_basic_bright_black);
+    RUN_TEST(color_from_basic_bright_white);
+    RUN_TEST(color_from_basic_max_value);
 
     printf("\n=== Create/Destroy Null Tests ===\n");
-    RUN_TEST(test_create_null_base_terminal);
-    RUN_TEST(test_destroy_null_safe);
+    RUN_TEST(create_null_base_terminal);
+    RUN_TEST(destroy_null_safe);
 
     printf("\n=== Init Null/Invalid Tests ===\n");
-    RUN_TEST(test_init_null_control);
+    RUN_TEST(init_null_control);
 
     printf("\n=== Cleanup Null/Invalid Tests ===\n");
-    RUN_TEST(test_cleanup_null_control);
+    RUN_TEST(cleanup_null_control);
 
     printf("\n=== Capability Detection Null Tests ===\n");
-    RUN_TEST(test_detect_capabilities_null_control);
-    RUN_TEST(test_get_capabilities_null_control);
-    RUN_TEST(test_has_capability_null_control);
-    RUN_TEST(test_update_size_null_control);
+    RUN_TEST(detect_capabilities_null_control);
+    RUN_TEST(get_capabilities_null_control);
+    RUN_TEST(has_capability_null_control);
+    RUN_TEST(update_size_null_control);
 
     printf("\n=== Cursor Control Null Tests ===\n");
-    RUN_TEST(test_move_cursor_null_control);
-    RUN_TEST(test_move_cursor_relative_null_control);
-    RUN_TEST(test_get_cursor_position_null_control);
-    RUN_TEST(test_set_cursor_visible_null_control);
-    RUN_TEST(test_save_cursor_null_control);
-    RUN_TEST(test_restore_cursor_null_control);
+    RUN_TEST(move_cursor_null_control);
+    RUN_TEST(move_cursor_relative_null_control);
+    RUN_TEST(get_cursor_position_null_control);
+    RUN_TEST(set_cursor_visible_null_control);
+    RUN_TEST(save_cursor_null_control);
+    RUN_TEST(restore_cursor_null_control);
 
     printf("\n=== Screen Control Null Tests ===\n");
-    RUN_TEST(test_clear_screen_null_control);
-    RUN_TEST(test_clear_to_end_of_line_null_control);
-    RUN_TEST(test_clear_to_beginning_of_line_null_control);
-    RUN_TEST(test_clear_line_null_control);
-    RUN_TEST(test_clear_to_end_of_screen_null_control);
+    RUN_TEST(clear_screen_null_control);
+    RUN_TEST(clear_to_end_of_line_null_control);
+    RUN_TEST(clear_to_beginning_of_line_null_control);
+    RUN_TEST(clear_line_null_control);
+    RUN_TEST(clear_to_end_of_screen_null_control);
 
     printf("\n=== Color and Style Null Tests ===\n");
-    RUN_TEST(test_set_foreground_color_null_control);
-    RUN_TEST(test_set_background_color_null_control);
-    RUN_TEST(test_set_style_null_control);
-    RUN_TEST(test_reset_formatting_null_control);
+    RUN_TEST(set_foreground_color_null_control);
+    RUN_TEST(set_background_color_null_control);
+    RUN_TEST(set_style_null_control);
+    RUN_TEST(reset_formatting_null_control);
 
     printf("\n=== Sequence Generation Null Tests ===\n");
-    RUN_TEST(test_generate_cursor_sequence_null_control);
-    RUN_TEST(test_generate_cursor_sequence_null_buffer);
-    RUN_TEST(test_generate_color_sequence_null_control);
-    RUN_TEST(test_generate_style_sequence_null_control);
+    RUN_TEST(generate_cursor_sequence_null_control);
+    RUN_TEST(generate_cursor_sequence_null_buffer);
+    RUN_TEST(generate_color_sequence_null_control);
+    RUN_TEST(generate_style_sequence_null_control);
 
     printf("\n=== Color Validation Null Tests ===\n");
-    RUN_TEST(test_validate_color_null_control);
-    RUN_TEST(test_color_from_rgb_null_control);
+    RUN_TEST(validate_color_null_control);
+    RUN_TEST(color_from_rgb_null_control);
 
     printf("\n=== Performance/Metrics Null Tests ===\n");
-    RUN_TEST(test_get_performance_metrics_null_control);
-    RUN_TEST(test_clear_metrics_null_control);
-    RUN_TEST(test_set_caching_enabled_null_control);
+    RUN_TEST(get_performance_metrics_null_control);
+    RUN_TEST(clear_metrics_null_control);
+    RUN_TEST(set_caching_enabled_null_control);
 
     printf("\n=== Last Error Null Test ===\n");
-    RUN_TEST(test_get_last_error_null_control);
+    RUN_TEST(get_last_error_null_control);
 
     printf("\n=== Version Tests ===\n");
-    RUN_TEST(test_get_version_not_null);
-    RUN_TEST(test_get_version_null_params);
-    RUN_TEST(test_get_version_partial_null_params);
+    RUN_TEST(get_version_not_null);
+    RUN_TEST(get_version_null_params);
+    RUN_TEST(get_version_partial_null_params);
 
     printf("\n=== Capability Flag Tests ===\n");
-    RUN_TEST(test_capability_flags_distinct);
-    RUN_TEST(test_capability_flags_are_powers_of_two);
+    RUN_TEST(capability_flags_distinct);
+    RUN_TEST(capability_flags_are_powers_of_two);
 
     printf("\n=== Style Flag Tests ===\n");
-    RUN_TEST(test_style_flags_distinct);
-    RUN_TEST(test_style_flags_combinable);
+    RUN_TEST(style_flags_distinct);
+    RUN_TEST(style_flags_combinable);
 
     printf("\n=== Color Type Tests ===\n");
-    RUN_TEST(test_color_type_default_is_zero);
-    RUN_TEST(test_color_types_distinct);
+    RUN_TEST(color_type_default_is_zero);
+    RUN_TEST(color_types_distinct);
 
     printf("\n=== Color Constant Tests ===\n");
-    RUN_TEST(test_basic_color_constants);
-    RUN_TEST(test_bright_color_constants);
+    RUN_TEST(basic_color_constants);
+    RUN_TEST(bright_color_constants);
 
     printf("\n=== Constant Definition Tests ===\n");
-    RUN_TEST(test_version_constants_positive);
-    RUN_TEST(test_max_sequence_length_reasonable);
-    RUN_TEST(test_max_terminal_name_length_reasonable);
-    RUN_TEST(test_cache_size_reasonable);
+    RUN_TEST(version_constants_positive);
+    RUN_TEST(max_sequence_length_reasonable);
+    RUN_TEST(max_terminal_name_length_reasonable);
+    RUN_TEST(cache_size_reasonable);
 
     printf("\n=== Error Code Tests ===\n");
-    RUN_TEST(test_error_codes_distinct);
+    RUN_TEST(error_codes_distinct);
 
     printf("\n=== Structure Size Tests ===\n");
-    RUN_TEST(test_terminal_color_struct_size);
-    RUN_TEST(test_terminal_position_struct_size);
-    RUN_TEST(test_terminal_capabilities_has_required_fields);
+    RUN_TEST(terminal_color_struct_size);
+    RUN_TEST(terminal_position_struct_size);
+    RUN_TEST(terminal_capabilities_has_required_fields);
 
     printf("\n========================================\n");
     printf("========================================\n");
 
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

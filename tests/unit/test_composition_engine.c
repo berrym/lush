@@ -16,61 +16,30 @@
 #include <string.h>
 
 #include "display/composition_engine.h"
+#include "test_framework.h"
+
+/* Local 1-arg / 2-arg ASSERT_* helpers (no message) bridge to the
+ * framework's variants by synthesizing a stringified-expression
+ * message. Replaces the historical exit(1) failure path with
+ * longjmp-based isolation per RUN_TEST. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
+#undef ASSERT_NULL
+#undef ASSERT_NOT_NULL
+#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+#define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
+#define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
 /* Test framework macros */
-static int tests_run = 0;
-static int tests_passed = 0;
 
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NOT_NULL(ptr)                                                   \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NULL(ptr)                                                       \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
-                   __LINE__);                                                  \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        printf("  Running %s...\n", #test);                                    \
-        tests_run++;                                                           \
-        if (test()) {                                                          \
-            tests_passed++;                                                    \
-            printf("  PASS: %s\n", #test);                                     \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -1081,137 +1050,137 @@ int main(void) {
     printf("=== Composition Engine Unit Tests ===\n\n");
 
     printf("=== Error String Tests ===\n");
-    RUN_TEST(test_error_string_success);
-    RUN_TEST(test_error_string_invalid_param);
-    RUN_TEST(test_error_string_null_pointer);
-    RUN_TEST(test_error_string_memory_allocation);
-    RUN_TEST(test_error_string_buffer_too_small);
-    RUN_TEST(test_error_string_content_too_large);
-    RUN_TEST(test_error_string_layer_not_ready);
-    RUN_TEST(test_error_string_analysis_failed);
-    RUN_TEST(test_error_string_composition_failed);
-    RUN_TEST(test_error_string_cache_invalid);
-    RUN_TEST(test_error_string_event_failed);
-    RUN_TEST(test_error_string_not_initialized);
-    RUN_TEST(test_error_string_unknown);
+    RUN_TEST(error_string_success);
+    RUN_TEST(error_string_invalid_param);
+    RUN_TEST(error_string_null_pointer);
+    RUN_TEST(error_string_memory_allocation);
+    RUN_TEST(error_string_buffer_too_small);
+    RUN_TEST(error_string_content_too_large);
+    RUN_TEST(error_string_layer_not_ready);
+    RUN_TEST(error_string_analysis_failed);
+    RUN_TEST(error_string_composition_failed);
+    RUN_TEST(error_string_cache_invalid);
+    RUN_TEST(error_string_event_failed);
+    RUN_TEST(error_string_not_initialized);
+    RUN_TEST(error_string_unknown);
 
     printf("\n=== Strategy String Tests ===\n");
-    RUN_TEST(test_strategy_string_simple);
-    RUN_TEST(test_strategy_string_multiline);
-    RUN_TEST(test_strategy_string_complex);
-    RUN_TEST(test_strategy_string_ascii_art);
-    RUN_TEST(test_strategy_string_adaptive);
-    RUN_TEST(test_strategy_string_unknown);
+    RUN_TEST(strategy_string_simple);
+    RUN_TEST(strategy_string_multiline);
+    RUN_TEST(strategy_string_complex);
+    RUN_TEST(strategy_string_ascii_art);
+    RUN_TEST(strategy_string_adaptive);
+    RUN_TEST(strategy_string_unknown);
 
     printf("\n=== Create/Destroy Tests ===\n");
-    RUN_TEST(test_create_returns_valid_engine);
-    RUN_TEST(test_create_initializes_defaults);
-    RUN_TEST(test_create_initializes_version_string);
-    RUN_TEST(test_destroy_null_engine);
-    RUN_TEST(test_destroy_cleans_up_resources);
+    RUN_TEST(create_returns_valid_engine);
+    RUN_TEST(create_initializes_defaults);
+    RUN_TEST(create_initializes_version_string);
+    RUN_TEST(destroy_null_engine);
+    RUN_TEST(destroy_cleans_up_resources);
 
     printf("\n=== Initialization Tests ===\n");
-    RUN_TEST(test_init_null_engine);
-    RUN_TEST(test_init_null_prompt_layer);
-    RUN_TEST(test_init_null_command_layer);
-    RUN_TEST(test_init_null_event_system);
+    RUN_TEST(init_null_engine);
+    RUN_TEST(init_null_prompt_layer);
+    RUN_TEST(init_null_command_layer);
+    RUN_TEST(init_null_event_system);
 
     printf("\n=== Is Initialized Tests ===\n");
-    RUN_TEST(test_is_initialized_null_engine);
-    RUN_TEST(test_is_initialized_uninitialized_engine);
+    RUN_TEST(is_initialized_null_engine);
+    RUN_TEST(is_initialized_uninitialized_engine);
 
     printf("\n=== Cleanup Tests ===\n");
-    RUN_TEST(test_cleanup_null_engine);
-    RUN_TEST(test_cleanup_uninitialized_engine);
+    RUN_TEST(cleanup_null_engine);
+    RUN_TEST(cleanup_uninitialized_engine);
 
     printf("\n=== Get Output Tests ===\n");
-    RUN_TEST(test_get_output_null_engine);
-    RUN_TEST(test_get_output_null_buffer);
-    RUN_TEST(test_get_output_zero_size);
-    RUN_TEST(test_get_output_not_initialized);
+    RUN_TEST(get_output_null_engine);
+    RUN_TEST(get_output_null_buffer);
+    RUN_TEST(get_output_zero_size);
+    RUN_TEST(get_output_not_initialized);
 
     printf("\n=== Get Analysis Tests ===\n");
-    RUN_TEST(test_get_analysis_null_engine);
-    RUN_TEST(test_get_analysis_null_analysis);
-    RUN_TEST(test_get_analysis_not_initialized);
+    RUN_TEST(get_analysis_null_engine);
+    RUN_TEST(get_analysis_null_analysis);
+    RUN_TEST(get_analysis_not_initialized);
 
     printf("\n=== Get Positioning Tests ===\n");
-    RUN_TEST(test_get_positioning_null_engine);
-    RUN_TEST(test_get_positioning_null_positioning);
-    RUN_TEST(test_get_positioning_not_initialized);
+    RUN_TEST(get_positioning_null_engine);
+    RUN_TEST(get_positioning_null_positioning);
+    RUN_TEST(get_positioning_not_initialized);
 
     printf("\n=== Get Performance Tests ===\n");
-    RUN_TEST(test_get_performance_null_engine);
-    RUN_TEST(test_get_performance_null_performance);
-    RUN_TEST(test_get_performance_not_initialized);
+    RUN_TEST(get_performance_null_engine);
+    RUN_TEST(get_performance_null_performance);
+    RUN_TEST(get_performance_not_initialized);
 
     printf("\n=== Set Strategy Tests ===\n");
-    RUN_TEST(test_set_strategy_null_engine);
-    RUN_TEST(test_set_strategy_invalid_strategy);
-    RUN_TEST(test_set_strategy_valid_strategy);
-    RUN_TEST(test_set_strategy_invalidates_cache);
+    RUN_TEST(set_strategy_null_engine);
+    RUN_TEST(set_strategy_invalid_strategy);
+    RUN_TEST(set_strategy_valid_strategy);
+    RUN_TEST(set_strategy_invalidates_cache);
 
     printf("\n=== Set Intelligent Positioning Tests ===\n");
-    RUN_TEST(test_set_intelligent_positioning_null_engine);
-    RUN_TEST(test_set_intelligent_positioning_enable);
-    RUN_TEST(test_set_intelligent_positioning_disable);
+    RUN_TEST(set_intelligent_positioning_null_engine);
+    RUN_TEST(set_intelligent_positioning_enable);
+    RUN_TEST(set_intelligent_positioning_disable);
 
     printf("\n=== Set Performance Monitoring Tests ===\n");
-    RUN_TEST(test_set_performance_monitoring_null_engine);
-    RUN_TEST(test_set_performance_monitoring_enable);
-    RUN_TEST(test_set_performance_monitoring_disable);
+    RUN_TEST(set_performance_monitoring_null_engine);
+    RUN_TEST(set_performance_monitoring_enable);
+    RUN_TEST(set_performance_monitoring_disable);
 
     printf("\n=== Set Cache Max Age Tests ===\n");
-    RUN_TEST(test_set_cache_max_age_null_engine);
-    RUN_TEST(test_set_cache_max_age_valid);
+    RUN_TEST(set_cache_max_age_null_engine);
+    RUN_TEST(set_cache_max_age_valid);
 
     printf("\n=== Clear Cache Tests ===\n");
-    RUN_TEST(test_clear_cache_null_engine);
-    RUN_TEST(test_clear_cache_valid);
+    RUN_TEST(clear_cache_null_engine);
+    RUN_TEST(clear_cache_valid);
 
     printf("\n=== Set Screen Buffer Tests ===\n");
-    RUN_TEST(test_set_screen_buffer_null_engine);
-    RUN_TEST(test_set_screen_buffer_valid);
-    RUN_TEST(test_set_screen_buffer_null_buffer);
+    RUN_TEST(set_screen_buffer_null_engine);
+    RUN_TEST(set_screen_buffer_valid);
+    RUN_TEST(set_screen_buffer_null_buffer);
 
     printf("\n=== Get Version Tests ===\n");
-    RUN_TEST(test_get_version_null_engine);
-    RUN_TEST(test_get_version_null_buffer);
-    RUN_TEST(test_get_version_zero_size);
-    RUN_TEST(test_get_version_valid);
+    RUN_TEST(get_version_null_engine);
+    RUN_TEST(get_version_null_buffer);
+    RUN_TEST(get_version_zero_size);
+    RUN_TEST(get_version_valid);
 
     printf("\n=== Validate Cache Tests ===\n");
-    RUN_TEST(test_validate_cache_null_engine);
-    RUN_TEST(test_validate_cache_null_outputs);
-    RUN_TEST(test_validate_cache_empty);
+    RUN_TEST(validate_cache_null_engine);
+    RUN_TEST(validate_cache_null_outputs);
+    RUN_TEST(validate_cache_empty);
 
     printf("\n=== Compose Tests ===\n");
-    RUN_TEST(test_compose_null_engine);
-    RUN_TEST(test_compose_not_initialized);
+    RUN_TEST(compose_null_engine);
+    RUN_TEST(compose_not_initialized);
 
     printf("\n=== Compose with Cursor Tests ===\n");
-    RUN_TEST(test_compose_with_cursor_null_engine);
-    RUN_TEST(test_compose_with_cursor_null_result);
-    RUN_TEST(test_compose_with_cursor_not_initialized);
-    RUN_TEST(test_compose_with_cursor_invalid_width);
+    RUN_TEST(compose_with_cursor_null_engine);
+    RUN_TEST(compose_with_cursor_null_result);
+    RUN_TEST(compose_with_cursor_not_initialized);
+    RUN_TEST(compose_with_cursor_invalid_width);
 
     printf("\n=== Analyze Prompt Tests ===\n");
-    RUN_TEST(test_analyze_prompt_null_engine);
-    RUN_TEST(test_analyze_prompt_null_analysis);
-    RUN_TEST(test_analyze_prompt_not_initialized);
+    RUN_TEST(analyze_prompt_null_engine);
+    RUN_TEST(analyze_prompt_null_analysis);
+    RUN_TEST(analyze_prompt_not_initialized);
 
     printf("\n=== Calculate Positioning Tests ===\n");
-    RUN_TEST(test_calculate_positioning_null_engine);
-    RUN_TEST(test_calculate_positioning_null_analysis);
-    RUN_TEST(test_calculate_positioning_null_positioning);
-    RUN_TEST(test_calculate_positioning_not_initialized);
+    RUN_TEST(calculate_positioning_null_engine);
+    RUN_TEST(calculate_positioning_null_analysis);
+    RUN_TEST(calculate_positioning_null_positioning);
+    RUN_TEST(calculate_positioning_not_initialized);
 
     printf("\n=== Calculate Hash Tests ===\n");
-    RUN_TEST(test_calculate_hash_null_engine);
-    RUN_TEST(test_calculate_hash_null_buffer);
-    RUN_TEST(test_calculate_hash_small_buffer);
-    RUN_TEST(test_calculate_hash_not_initialized);
+    RUN_TEST(calculate_hash_null_engine);
+    RUN_TEST(calculate_hash_null_buffer);
+    RUN_TEST(calculate_hash_small_buffer);
+    RUN_TEST(calculate_hash_not_initialized);
 
     printf("\n=== Summary ===\n");
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

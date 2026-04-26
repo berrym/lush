@@ -16,61 +16,30 @@
 #include "debug.h"
 #include "executor.h"
 #include "node.h"
+#include "test_framework.h"
+
+/* Local 1-arg / 2-arg ASSERT_* helpers (no message) bridge to the
+ * framework's variants by synthesizing a stringified-expression
+ * message. Replaces the historical exit(1) failure path with
+ * longjmp-based isolation per RUN_TEST. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
+#undef ASSERT_NULL
+#undef ASSERT_NOT_NULL
+#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+#define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
+#define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
 /* Test framework macros */
-static int tests_run = 0;
-static int tests_passed = 0;
 
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
-                   __LINE__);                                                  \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NOT_NULL(ptr)                                                   \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NULL(ptr)                                                       \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        printf("  Running %s...\n", #test);                                    \
-        tests_run++;                                                           \
-        if (test()) {                                                          \
-            tests_passed++;                                                    \
-            printf("  PASS: %s\n", #test);                                     \
-        }                                                                      \
-    } while (0)
 
 /* Helper to create a debug context for testing */
 static debug_context_t *create_test_context(void) {
@@ -1843,175 +1812,175 @@ int main(void) {
     printf("Running debug breakpoints tests...\n\n");
 
     printf("=== Breakpoint Add Tests ===\n");
-    RUN_TEST(test_add_breakpoint_null_context);
-    RUN_TEST(test_add_breakpoint_null_file);
-    RUN_TEST(test_add_breakpoint_invalid_line_zero);
-    RUN_TEST(test_add_breakpoint_invalid_line_negative);
-    RUN_TEST(test_add_breakpoint_simple);
-    RUN_TEST(test_add_breakpoint_with_condition);
-    RUN_TEST(test_add_multiple_breakpoints);
-    RUN_TEST(test_add_breakpoint_increments_id);
+    RUN_TEST(add_breakpoint_null_context);
+    RUN_TEST(add_breakpoint_null_file);
+    RUN_TEST(add_breakpoint_invalid_line_zero);
+    RUN_TEST(add_breakpoint_invalid_line_negative);
+    RUN_TEST(add_breakpoint_simple);
+    RUN_TEST(add_breakpoint_with_condition);
+    RUN_TEST(add_multiple_breakpoints);
+    RUN_TEST(add_breakpoint_increments_id);
 
     printf("\n=== Breakpoint Remove Tests ===\n");
-    RUN_TEST(test_remove_breakpoint_null_context);
-    RUN_TEST(test_remove_breakpoint_invalid_id_zero);
-    RUN_TEST(test_remove_breakpoint_invalid_id_negative);
-    RUN_TEST(test_remove_breakpoint_not_found);
-    RUN_TEST(test_remove_breakpoint_single);
-    RUN_TEST(test_remove_breakpoint_from_middle);
-    RUN_TEST(test_remove_breakpoint_from_head);
-    RUN_TEST(test_remove_breakpoint_from_tail);
-    RUN_TEST(test_remove_breakpoint_with_condition_frees_memory);
+    RUN_TEST(remove_breakpoint_null_context);
+    RUN_TEST(remove_breakpoint_invalid_id_zero);
+    RUN_TEST(remove_breakpoint_invalid_id_negative);
+    RUN_TEST(remove_breakpoint_not_found);
+    RUN_TEST(remove_breakpoint_single);
+    RUN_TEST(remove_breakpoint_from_middle);
+    RUN_TEST(remove_breakpoint_from_head);
+    RUN_TEST(remove_breakpoint_from_tail);
+    RUN_TEST(remove_breakpoint_with_condition_frees_memory);
 
     printf("\n=== Breakpoint Enable/Disable Tests ===\n");
-    RUN_TEST(test_enable_breakpoint_null_context);
-    RUN_TEST(test_enable_breakpoint_invalid_id);
-    RUN_TEST(test_enable_breakpoint_not_found);
-    RUN_TEST(test_disable_breakpoint);
-    RUN_TEST(test_enable_breakpoint_already_enabled);
-    RUN_TEST(test_reenable_breakpoint);
-    RUN_TEST(test_enable_specific_breakpoint_in_list);
+    RUN_TEST(enable_breakpoint_null_context);
+    RUN_TEST(enable_breakpoint_invalid_id);
+    RUN_TEST(enable_breakpoint_not_found);
+    RUN_TEST(disable_breakpoint);
+    RUN_TEST(enable_breakpoint_already_enabled);
+    RUN_TEST(reenable_breakpoint);
+    RUN_TEST(enable_specific_breakpoint_in_list);
 
     printf("\n=== Breakpoint List Tests ===\n");
-    RUN_TEST(test_list_breakpoints_null_context);
-    RUN_TEST(test_list_breakpoints_disabled_context);
-    RUN_TEST(test_list_breakpoints_empty);
-    RUN_TEST(test_list_breakpoints_with_entries);
+    RUN_TEST(list_breakpoints_null_context);
+    RUN_TEST(list_breakpoints_disabled_context);
+    RUN_TEST(list_breakpoints_empty);
+    RUN_TEST(list_breakpoints_with_entries);
 
     printf("\n=== Breakpoint Clear Tests ===\n");
-    RUN_TEST(test_clear_breakpoints_null_context);
-    RUN_TEST(test_clear_breakpoints_empty);
-    RUN_TEST(test_clear_breakpoints_single);
-    RUN_TEST(test_clear_breakpoints_multiple);
-    RUN_TEST(test_clear_breakpoints_resets_id_counter);
+    RUN_TEST(clear_breakpoints_null_context);
+    RUN_TEST(clear_breakpoints_empty);
+    RUN_TEST(clear_breakpoints_single);
+    RUN_TEST(clear_breakpoints_multiple);
+    RUN_TEST(clear_breakpoints_resets_id_counter);
 
     printf("\n=== Check Breakpoint Tests ===\n");
-    RUN_TEST(test_check_breakpoint_null_context);
-    RUN_TEST(test_check_breakpoint_disabled_context);
-    RUN_TEST(test_check_breakpoint_null_file);
-    RUN_TEST(test_check_breakpoint_invalid_line);
-    RUN_TEST(test_check_breakpoint_no_match);
-    RUN_TEST(test_check_breakpoint_disabled_breakpoint);
+    RUN_TEST(check_breakpoint_null_context);
+    RUN_TEST(check_breakpoint_disabled_context);
+    RUN_TEST(check_breakpoint_null_file);
+    RUN_TEST(check_breakpoint_invalid_line);
+    RUN_TEST(check_breakpoint_no_match);
+    RUN_TEST(check_breakpoint_disabled_breakpoint);
 
     printf("\n=== Step Execution Tests ===\n");
-    RUN_TEST(test_step_into_null_context);
-    RUN_TEST(test_step_into_disabled_context);
-    RUN_TEST(test_step_into_sets_mode);
-    RUN_TEST(test_step_over_null_context);
-    RUN_TEST(test_step_over_disabled_context);
-    RUN_TEST(test_step_over_sets_mode);
-    RUN_TEST(test_step_out_null_context);
-    RUN_TEST(test_step_out_disabled_context);
-    RUN_TEST(test_step_out_sets_mode);
-    RUN_TEST(test_continue_null_context);
-    RUN_TEST(test_continue_disabled_context);
-    RUN_TEST(test_continue_clears_step_mode);
+    RUN_TEST(step_into_null_context);
+    RUN_TEST(step_into_disabled_context);
+    RUN_TEST(step_into_sets_mode);
+    RUN_TEST(step_over_null_context);
+    RUN_TEST(step_over_disabled_context);
+    RUN_TEST(step_over_sets_mode);
+    RUN_TEST(step_out_null_context);
+    RUN_TEST(step_out_disabled_context);
+    RUN_TEST(step_out_sets_mode);
+    RUN_TEST(continue_null_context);
+    RUN_TEST(continue_disabled_context);
+    RUN_TEST(continue_clears_step_mode);
 
     printf("\n=== User Input Handling Tests ===\n");
-    RUN_TEST(test_handle_user_input_null_context);
-    RUN_TEST(test_handle_user_input_null_input);
-    RUN_TEST(test_handle_user_input_empty);
-    RUN_TEST(test_handle_user_input_whitespace_only);
-    RUN_TEST(test_handle_user_input_continue_short);
-    RUN_TEST(test_handle_user_input_continue_long);
-    RUN_TEST(test_handle_user_input_step_short);
-    RUN_TEST(test_handle_user_input_step_long);
-    RUN_TEST(test_handle_user_input_next_short);
-    RUN_TEST(test_handle_user_input_next_long);
-    RUN_TEST(test_handle_user_input_finish_short);
-    RUN_TEST(test_handle_user_input_finish_long);
-    RUN_TEST(test_handle_user_input_quit_short);
-    RUN_TEST(test_handle_user_input_quit_long);
-    RUN_TEST(test_handle_user_input_unknown_command);
-    RUN_TEST(test_handle_user_input_with_leading_whitespace);
-    RUN_TEST(test_handle_user_input_backtrace);
-    RUN_TEST(test_handle_user_input_list);
-    RUN_TEST(test_handle_user_input_help);
-    RUN_TEST(test_handle_user_input_vars);
-    RUN_TEST(test_handle_user_input_where);
-    RUN_TEST(test_handle_user_input_print_variable);
-    RUN_TEST(test_handle_user_input_watch);
-    RUN_TEST(test_handle_user_input_set);
-    RUN_TEST(test_handle_user_input_eval);
-    RUN_TEST(test_handle_user_input_mode);
-    RUN_TEST(test_handle_user_input_features);
+    RUN_TEST(handle_user_input_null_context);
+    RUN_TEST(handle_user_input_null_input);
+    RUN_TEST(handle_user_input_empty);
+    RUN_TEST(handle_user_input_whitespace_only);
+    RUN_TEST(handle_user_input_continue_short);
+    RUN_TEST(handle_user_input_continue_long);
+    RUN_TEST(handle_user_input_step_short);
+    RUN_TEST(handle_user_input_step_long);
+    RUN_TEST(handle_user_input_next_short);
+    RUN_TEST(handle_user_input_next_long);
+    RUN_TEST(handle_user_input_finish_short);
+    RUN_TEST(handle_user_input_finish_long);
+    RUN_TEST(handle_user_input_quit_short);
+    RUN_TEST(handle_user_input_quit_long);
+    RUN_TEST(handle_user_input_unknown_command);
+    RUN_TEST(handle_user_input_with_leading_whitespace);
+    RUN_TEST(handle_user_input_backtrace);
+    RUN_TEST(handle_user_input_list);
+    RUN_TEST(handle_user_input_help);
+    RUN_TEST(handle_user_input_vars);
+    RUN_TEST(handle_user_input_where);
+    RUN_TEST(handle_user_input_print_variable);
+    RUN_TEST(handle_user_input_watch);
+    RUN_TEST(handle_user_input_set);
+    RUN_TEST(handle_user_input_eval);
+    RUN_TEST(handle_user_input_mode);
+    RUN_TEST(handle_user_input_features);
 
     printf("\n=== Stack Navigation Tests ===\n");
-    RUN_TEST(test_stack_up_null_context);
-    RUN_TEST(test_stack_up_with_context);
-    RUN_TEST(test_stack_down_null_context);
-    RUN_TEST(test_stack_down_with_context);
+    RUN_TEST(stack_up_null_context);
+    RUN_TEST(stack_up_with_context);
+    RUN_TEST(stack_down_null_context);
+    RUN_TEST(stack_down_with_context);
 
     printf("\n=== Show Current Location Tests ===\n");
-    RUN_TEST(test_show_current_location_null_context);
-    RUN_TEST(test_show_current_location_no_frame);
-    RUN_TEST(test_show_current_location_with_frame);
+    RUN_TEST(show_current_location_null_context);
+    RUN_TEST(show_current_location_no_frame);
+    RUN_TEST(show_current_location_with_frame);
 
     printf("\n=== Set Variable Tests ===\n");
-    RUN_TEST(test_set_variable_null_context);
-    RUN_TEST(test_set_variable_null_assignment);
-    RUN_TEST(test_set_variable_with_assignment);
+    RUN_TEST(set_variable_null_context);
+    RUN_TEST(set_variable_null_assignment);
+    RUN_TEST(set_variable_with_assignment);
 
     printf("\n=== Evaluate Expression Tests ===\n");
-    RUN_TEST(test_evaluate_expression_null_context);
-    RUN_TEST(test_evaluate_expression_null_expression);
-    RUN_TEST(test_evaluate_expression_with_expression);
+    RUN_TEST(evaluate_expression_null_context);
+    RUN_TEST(evaluate_expression_null_expression);
+    RUN_TEST(evaluate_expression_with_expression);
 
     printf("\n=== Condition Evaluation Tests ===\n");
-    RUN_TEST(test_evaluate_condition_null_context);
-    RUN_TEST(test_evaluate_condition_null_condition);
-    RUN_TEST(test_evaluate_condition_with_comparison);
-    RUN_TEST(test_evaluate_condition_with_variable_check);
+    RUN_TEST(evaluate_condition_null_context);
+    RUN_TEST(evaluate_condition_null_condition);
+    RUN_TEST(evaluate_condition_with_comparison);
+    RUN_TEST(evaluate_condition_with_variable_check);
 
     printf("\n=== Show Context Tests ===\n");
-    RUN_TEST(test_show_context_null_context);
-    RUN_TEST(test_show_context_null_file);
-    RUN_TEST(test_show_context_nonexistent_file);
+    RUN_TEST(show_context_null_context);
+    RUN_TEST(show_context_null_file);
+    RUN_TEST(show_context_nonexistent_file);
 
     printf("\n=== Print Help Tests ===\n");
-    RUN_TEST(test_print_help_null_context);
-    RUN_TEST(test_print_help_disabled_context);
-    RUN_TEST(test_print_help_enabled_context);
+    RUN_TEST(print_help_null_context);
+    RUN_TEST(print_help_disabled_context);
+    RUN_TEST(print_help_enabled_context);
 
     printf("\n=== Loop Context Tests ===\n");
-    RUN_TEST(test_enter_loop_null_context);
-    RUN_TEST(test_enter_loop_disabled_context);
-    RUN_TEST(test_enter_loop_for);
-    RUN_TEST(test_enter_loop_while);
-    RUN_TEST(test_enter_loop_null_values);
-    RUN_TEST(test_update_loop_variable_null_context);
-    RUN_TEST(test_update_loop_variable_disabled_context);
-    RUN_TEST(test_update_loop_variable_not_in_loop);
-    RUN_TEST(test_update_loop_variable);
-    RUN_TEST(test_update_loop_variable_null_value);
-    RUN_TEST(test_exit_loop_null_context);
-    RUN_TEST(test_exit_loop_disabled_context);
-    RUN_TEST(test_exit_loop_not_in_loop);
-    RUN_TEST(test_exit_loop_clears_context);
-    RUN_TEST(test_loop_lifecycle);
+    RUN_TEST(enter_loop_null_context);
+    RUN_TEST(enter_loop_disabled_context);
+    RUN_TEST(enter_loop_for);
+    RUN_TEST(enter_loop_while);
+    RUN_TEST(enter_loop_null_values);
+    RUN_TEST(update_loop_variable_null_context);
+    RUN_TEST(update_loop_variable_disabled_context);
+    RUN_TEST(update_loop_variable_not_in_loop);
+    RUN_TEST(update_loop_variable);
+    RUN_TEST(update_loop_variable_null_value);
+    RUN_TEST(exit_loop_null_context);
+    RUN_TEST(exit_loop_disabled_context);
+    RUN_TEST(exit_loop_not_in_loop);
+    RUN_TEST(exit_loop_clears_context);
+    RUN_TEST(loop_lifecycle);
 
     printf("\n=== Execution Context Tests ===\n");
-    RUN_TEST(test_save_execution_context_null_params);
-    RUN_TEST(test_save_execution_context_for_loop);
-    RUN_TEST(test_save_execution_context_while_loop);
-    RUN_TEST(test_save_execution_context_until_loop);
-    RUN_TEST(test_save_execution_context_non_loop);
-    RUN_TEST(test_restore_execution_context_null_context);
-    RUN_TEST(test_restore_execution_context_not_in_loop);
-    RUN_TEST(test_restore_execution_context_in_loop);
-    RUN_TEST(test_cleanup_execution_context_null);
-    RUN_TEST(test_cleanup_execution_context_not_in_loop);
-    RUN_TEST(test_cleanup_execution_context_in_loop);
+    RUN_TEST(save_execution_context_null_params);
+    RUN_TEST(save_execution_context_for_loop);
+    RUN_TEST(save_execution_context_while_loop);
+    RUN_TEST(save_execution_context_until_loop);
+    RUN_TEST(save_execution_context_non_loop);
+    RUN_TEST(restore_execution_context_null_context);
+    RUN_TEST(restore_execution_context_not_in_loop);
+    RUN_TEST(restore_execution_context_in_loop);
+    RUN_TEST(cleanup_execution_context_null);
+    RUN_TEST(cleanup_execution_context_not_in_loop);
+    RUN_TEST(cleanup_execution_context_in_loop);
 
     printf("\n=== Hit Count Tests ===\n");
-    RUN_TEST(test_breakpoint_hit_count_initialized_zero);
+    RUN_TEST(breakpoint_hit_count_initialized_zero);
 
     printf("\n=== Integration Tests ===\n");
-    RUN_TEST(test_multiple_breakpoints_workflow);
-    RUN_TEST(test_step_mode_transitions);
+    RUN_TEST(multiple_breakpoints_workflow);
+    RUN_TEST(step_mode_transitions);
 
     printf("\n========================================\n");
     printf("========================================\n");
 
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

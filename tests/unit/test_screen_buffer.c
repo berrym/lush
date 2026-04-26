@@ -16,62 +16,30 @@
 #include <string.h>
 
 #include "display/screen_buffer.h"
+#include "test_framework.h"
+
+/* Local 1-arg / 2-arg ASSERT_* helpers (no message) bridge to the
+ * framework's variants by synthesizing a stringified-expression
+ * message. Replaces the historical exit(1) failure path with
+ * longjmp-based isolation per RUN_TEST. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
+#undef ASSERT_NULL
+#undef ASSERT_NOT_NULL
+#define ASSERT(cond) do { if (!(cond)) { TEST_FAIL_MSG(#cond); } } while (0)
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+#define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
+#define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
 /* Test framework macros */
-static int tests_run = 0;
-static int tests_passed = 0;
 
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAIL: %s != %s (%d != %d) (line %d)\n", #a, #b,          \
-                   (int)(a), (int)(b), __LINE__);                              \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NOT_NULL(ptr)                                                   \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NULL(ptr)                                                       \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
-                   __LINE__);                                                  \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        printf("  Running %s...\n", #test);                                    \
-        tests_run++;                                                           \
-        if (test()) {                                                          \
-            tests_passed++;                                                    \
-            printf("  PASS: %s\n", #test);                                     \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================
  * INITIALIZATION TESTS
@@ -1178,131 +1146,131 @@ int main(void) {
     printf("=== Screen Buffer Unit Tests ===\n\n");
 
     printf("=== Initialization Tests ===\n");
-    RUN_TEST(test_init_null_buffer);
-    RUN_TEST(test_init_default_width);
-    RUN_TEST(test_init_zero_width);
-    RUN_TEST(test_init_negative_width);
-    RUN_TEST(test_init_large_width);
-    RUN_TEST(test_init_menu_tracking_fields);
-    RUN_TEST(test_init_prefix_pointers_null);
+    RUN_TEST(init_null_buffer);
+    RUN_TEST(init_default_width);
+    RUN_TEST(init_zero_width);
+    RUN_TEST(init_negative_width);
+    RUN_TEST(init_large_width);
+    RUN_TEST(init_menu_tracking_fields);
+    RUN_TEST(init_prefix_pointers_null);
 
     printf("\n=== Clear Tests ===\n");
-    RUN_TEST(test_clear_null_buffer);
-    RUN_TEST(test_clear_resets_state);
-    RUN_TEST(test_clear_preserves_terminal_width);
+    RUN_TEST(clear_null_buffer);
+    RUN_TEST(clear_resets_state);
+    RUN_TEST(clear_preserves_terminal_width);
 
     printf("\n=== Cleanup Tests ===\n");
-    RUN_TEST(test_cleanup_null_buffer);
-    RUN_TEST(test_cleanup_frees_prefixes);
+    RUN_TEST(cleanup_null_buffer);
+    RUN_TEST(cleanup_frees_prefixes);
 
     printf("\n=== Copy Tests ===\n");
-    RUN_TEST(test_copy_null_dest);
-    RUN_TEST(test_copy_null_src);
-    RUN_TEST(test_copy_basic);
+    RUN_TEST(copy_null_dest);
+    RUN_TEST(copy_null_src);
+    RUN_TEST(copy_basic);
 
     printf("\n=== Visual Width Tests ===\n");
-    RUN_TEST(test_visual_width_null_text);
-    RUN_TEST(test_visual_width_empty_string);
-    RUN_TEST(test_visual_width_ascii);
-    RUN_TEST(test_visual_width_with_ansi_color);
-    RUN_TEST(test_visual_width_with_bold_ansi);
-    RUN_TEST(test_visual_width_multiple_ansi);
-    RUN_TEST(test_visual_width_readline_markers);
-    RUN_TEST(test_visual_width_utf8_2byte);
+    RUN_TEST(visual_width_null_text);
+    RUN_TEST(visual_width_empty_string);
+    RUN_TEST(visual_width_ascii);
+    RUN_TEST(visual_width_with_ansi_color);
+    RUN_TEST(visual_width_with_bold_ansi);
+    RUN_TEST(visual_width_multiple_ansi);
+    RUN_TEST(visual_width_readline_markers);
+    RUN_TEST(visual_width_utf8_2byte);
 
     printf("\n=== Calculate Visual Width Tests ===\n");
-    RUN_TEST(test_calculate_visual_width_null);
-    RUN_TEST(test_calculate_visual_width_empty);
-    RUN_TEST(test_calculate_visual_width_ascii);
-    RUN_TEST(test_calculate_visual_width_ansi);
+    RUN_TEST(calculate_visual_width_null);
+    RUN_TEST(calculate_visual_width_empty);
+    RUN_TEST(calculate_visual_width_ascii);
+    RUN_TEST(calculate_visual_width_ansi);
 
     printf("\n=== Render Tests ===\n");
-    RUN_TEST(test_render_null_buffer);
-    RUN_TEST(test_render_null_prompt);
-    RUN_TEST(test_render_null_command);
-    RUN_TEST(test_render_simple_command);
-    RUN_TEST(test_render_cursor_at_start);
-    RUN_TEST(test_render_cursor_in_middle);
-    RUN_TEST(test_render_empty_command);
-    RUN_TEST(test_render_prompt_with_newline);
-    RUN_TEST(test_render_command_with_newline);
-    RUN_TEST(test_render_tracks_command_end);
+    RUN_TEST(render_null_buffer);
+    RUN_TEST(render_null_prompt);
+    RUN_TEST(render_null_command);
+    RUN_TEST(render_simple_command);
+    RUN_TEST(render_cursor_at_start);
+    RUN_TEST(render_cursor_in_middle);
+    RUN_TEST(render_empty_command);
+    RUN_TEST(render_prompt_with_newline);
+    RUN_TEST(render_command_with_newline);
+    RUN_TEST(render_tracks_command_end);
 
     printf("\n=== Set Prefix Tests ===\n");
-    RUN_TEST(test_set_prefix_null_buffer);
-    RUN_TEST(test_set_prefix_negative_line);
-    RUN_TEST(test_set_prefix_line_too_large);
-    RUN_TEST(test_set_prefix_null_text_clears);
-    RUN_TEST(test_set_prefix_basic);
-    RUN_TEST(test_set_prefix_with_ansi);
-    RUN_TEST(test_set_prefix_replaces_existing);
+    RUN_TEST(set_prefix_null_buffer);
+    RUN_TEST(set_prefix_negative_line);
+    RUN_TEST(set_prefix_line_too_large);
+    RUN_TEST(set_prefix_null_text_clears);
+    RUN_TEST(set_prefix_basic);
+    RUN_TEST(set_prefix_with_ansi);
+    RUN_TEST(set_prefix_replaces_existing);
 
     printf("\n=== Get Prefix Tests ===\n");
-    RUN_TEST(test_get_prefix_null_buffer);
-    RUN_TEST(test_get_prefix_negative_line);
-    RUN_TEST(test_get_prefix_no_prefix_set);
-    RUN_TEST(test_get_prefix_returns_text);
+    RUN_TEST(get_prefix_null_buffer);
+    RUN_TEST(get_prefix_negative_line);
+    RUN_TEST(get_prefix_no_prefix_set);
+    RUN_TEST(get_prefix_returns_text);
 
     printf("\n=== Clear Prefix Tests ===\n");
-    RUN_TEST(test_clear_prefix_null_buffer);
-    RUN_TEST(test_clear_prefix_negative_line);
-    RUN_TEST(test_clear_prefix_no_prefix);
-    RUN_TEST(test_clear_prefix_removes_prefix);
+    RUN_TEST(clear_prefix_null_buffer);
+    RUN_TEST(clear_prefix_negative_line);
+    RUN_TEST(clear_prefix_no_prefix);
+    RUN_TEST(clear_prefix_removes_prefix);
 
     printf("\n=== Prefix Visual Width Tests ===\n");
-    RUN_TEST(test_prefix_visual_width_null_buffer);
-    RUN_TEST(test_prefix_visual_width_negative_line);
-    RUN_TEST(test_prefix_visual_width_no_prefix);
-    RUN_TEST(test_prefix_visual_width_basic);
-    RUN_TEST(test_prefix_visual_width_with_ansi);
+    RUN_TEST(prefix_visual_width_null_buffer);
+    RUN_TEST(prefix_visual_width_negative_line);
+    RUN_TEST(prefix_visual_width_no_prefix);
+    RUN_TEST(prefix_visual_width_basic);
+    RUN_TEST(prefix_visual_width_with_ansi);
 
     printf("\n=== Prefix Dirty Flag Tests ===\n");
-    RUN_TEST(test_prefix_dirty_null_buffer);
-    RUN_TEST(test_prefix_dirty_initially_false);
-    RUN_TEST(test_prefix_dirty_after_set);
-    RUN_TEST(test_clear_prefix_dirty_null_buffer);
-    RUN_TEST(test_clear_prefix_dirty_clears_flag);
+    RUN_TEST(prefix_dirty_null_buffer);
+    RUN_TEST(prefix_dirty_initially_false);
+    RUN_TEST(prefix_dirty_after_set);
+    RUN_TEST(clear_prefix_dirty_null_buffer);
+    RUN_TEST(clear_prefix_dirty_clears_flag);
 
     printf("\n=== Column Translation Tests ===\n");
-    RUN_TEST(test_buffer_to_display_col_null_buffer);
-    RUN_TEST(test_buffer_to_display_col_negative_line);
-    RUN_TEST(test_buffer_to_display_col_negative_col);
-    RUN_TEST(test_buffer_to_display_col_no_prefix);
-    RUN_TEST(test_buffer_to_display_col_with_prefix);
-    RUN_TEST(test_display_to_buffer_col_null_buffer);
-    RUN_TEST(test_display_to_buffer_col_negative_line);
-    RUN_TEST(test_display_to_buffer_col_negative_col);
-    RUN_TEST(test_display_to_buffer_col_no_prefix);
-    RUN_TEST(test_display_to_buffer_col_with_prefix);
-    RUN_TEST(test_display_to_buffer_col_within_prefix);
+    RUN_TEST(buffer_to_display_col_null_buffer);
+    RUN_TEST(buffer_to_display_col_negative_line);
+    RUN_TEST(buffer_to_display_col_negative_col);
+    RUN_TEST(buffer_to_display_col_no_prefix);
+    RUN_TEST(buffer_to_display_col_with_prefix);
+    RUN_TEST(display_to_buffer_col_null_buffer);
+    RUN_TEST(display_to_buffer_col_negative_line);
+    RUN_TEST(display_to_buffer_col_negative_col);
+    RUN_TEST(display_to_buffer_col_no_prefix);
+    RUN_TEST(display_to_buffer_col_with_prefix);
+    RUN_TEST(display_to_buffer_col_within_prefix);
 
     printf("\n=== Render Line with Prefix Tests ===\n");
-    RUN_TEST(test_render_line_with_prefix_null_buffer);
-    RUN_TEST(test_render_line_with_prefix_null_output);
-    RUN_TEST(test_render_line_with_prefix_negative_line);
-    RUN_TEST(test_render_line_with_prefix_no_prefix);
+    RUN_TEST(render_line_with_prefix_null_buffer);
+    RUN_TEST(render_line_with_prefix_null_output);
+    RUN_TEST(render_line_with_prefix_negative_line);
+    RUN_TEST(render_line_with_prefix_no_prefix);
 
     printf("\n=== Render Multiline with Prefixes Tests ===\n");
-    RUN_TEST(test_render_multiline_null_buffer);
-    RUN_TEST(test_render_multiline_null_output);
-    RUN_TEST(test_render_multiline_negative_start);
-    RUN_TEST(test_render_multiline_zero_lines);
-    RUN_TEST(test_render_multiline_range_too_large);
+    RUN_TEST(render_multiline_null_buffer);
+    RUN_TEST(render_multiline_null_output);
+    RUN_TEST(render_multiline_negative_start);
+    RUN_TEST(render_multiline_zero_lines);
+    RUN_TEST(render_multiline_range_too_large);
 
     printf("\n=== Menu Rendering Tests ===\n");
-    RUN_TEST(test_add_text_rows_null_buffer);
-    RUN_TEST(test_add_text_rows_null_text);
-    RUN_TEST(test_get_total_display_rows_null_buffer);
-    RUN_TEST(test_get_total_display_rows_basic);
-    RUN_TEST(test_get_rows_below_cursor_null_buffer);
-    RUN_TEST(test_get_rows_below_cursor_single_row);
+    RUN_TEST(add_text_rows_null_buffer);
+    RUN_TEST(add_text_rows_null_text);
+    RUN_TEST(get_total_display_rows_null_buffer);
+    RUN_TEST(get_total_display_rows_basic);
+    RUN_TEST(get_rows_below_cursor_null_buffer);
+    RUN_TEST(get_rows_below_cursor_single_row);
 
     printf("\n=== Render with Continuation Tests ===\n");
-    RUN_TEST(test_render_with_continuation_null_buffer);
-    RUN_TEST(test_render_with_continuation_null_callback);
-    RUN_TEST(test_render_with_continuation_adds_prefix);
-    RUN_TEST(test_render_with_continuation_single_line);
+    RUN_TEST(render_with_continuation_null_buffer);
+    RUN_TEST(render_with_continuation_null_callback);
+    RUN_TEST(render_with_continuation_adds_prefix);
+    RUN_TEST(render_with_continuation_single_line);
 
     printf("\n=== Summary ===\n");
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }
