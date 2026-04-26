@@ -62,7 +62,8 @@ static node_t *parse_anonymous_function(parser_t *parser);
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
 static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
-                                     bool strip_tabs, bool expand_variables);
+                                     bool strip_tabs, bool expand_variables,
+                                     size_t op_position);
 static void set_parser_error(parser_t *parser, const char *message);
 static bool expect_token(parser_t *parser, token_type_t expected);
 
@@ -1792,6 +1793,14 @@ static node_t *parse_redirection(parser_t *parser) {
         return NULL;
     }
 
+    /* Capture the operator's absolute source position before any
+     * tokenizer_advance — that call frees the current token, so
+     * dereferencing redir_token->position later would be use-after-free.
+     * Used by collect_heredoc_content (issue #51) to anchor the body
+     * search at THIS operator instead of scanning the whole input from
+     * byte 0 (which finds the wrong `<<` when delimiters repeat). */
+    size_t op_position = redir_token->position;
+
     node_type_t node_type;
     switch (redir_token->type) {
     case TOK_REDIRECT_OUT:
@@ -1950,7 +1959,7 @@ static node_t *parse_redirection(parser_t *parser) {
         // Collect the here document content (this will advance the tokenizer
         // further)
         char *content = collect_heredoc_content(parser, delimiter, strip_tabs,
-                                                expand_variables);
+                                                expand_variables, op_position);
         if (!content) {
             free(delimiter);
             free_node_tree(redir_node);
@@ -2058,7 +2067,8 @@ static node_t *parse_redirection(parser_t *parser) {
  * @return Collected content string (caller must free)
  */
 static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
-                                     bool strip_tabs, bool expand_variables) {
+                                     bool strip_tabs, bool expand_variables,
+                                     size_t op_position) {
     (void)expand_variables; /* Expansion handled during execution phase */
     if (!parser || !delimiter) {
         return NULL;
@@ -2088,7 +2098,16 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 
     (void)strlen(match_delimiter); /* Delimiter matching uses strcmp */
 
-    for (size_t i = 0; i < tokenizer->input_length - 1; i++) {
+    /* Anchor the search at THIS operator's source position (issue #51).
+     * Previously this was `for (size_t i = 0; ...)`, which always found
+     * the FIRST `<<` in the input that matched the delimiter. When two
+     * heredocs in the same input shared a delimiter, the search for the
+     * second always re-found the first, then reset tokenizer->position
+     * backwards — causing the parser to re-parse the second heredoc
+     * forever. The op_position is captured by the parser before its
+     * tokenizer_advance frees the operator token (UAF would otherwise
+     * occur). */
+    for (size_t i = op_position; i < tokenizer->input_length - 1; i++) {
         if (tokenizer->input[i] == '<' && tokenizer->input[i + 1] == '<') {
             // Found <<, now check if delimiter follows
             size_t delimiter_pos = i + 2;

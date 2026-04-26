@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* Test counters */
 
@@ -568,6 +569,40 @@ TEST(control_chars_in_input) {
 TEST(coproc_no_command) { ASSERT_PARSE_FAILS("coproc"); }
 
 /* ============================================================================
+ * REGRESSION
+ * ============================================================================
+ */
+
+/* Issue #51: two heredocs in the same input sharing a delimiter caused
+ * collect_heredoc_content's input scan-from-zero to always re-find the
+ * FIRST `<<` operator and reset tokenizer->position backwards, making
+ * the parser re-parse the second heredoc forever. The fix anchors the
+ * search at the operator's own source position (op_position).
+ *
+ * Pre-fix wall-clock on the 29-byte trigger: ~8 seconds at 99% CPU.
+ * Post-fix: well under 100ms; this assertion budgets 1 second to
+ * tolerate slow CI machines. If the loop regression returns this
+ * test will time out at the meson default and fail loudly.
+ *
+ * The behavioural assertion is that the parse fails with an
+ * unterminated-heredoc error (the second `c << 'END'` has no body or
+ * terminator after it). */
+TEST(heredoc_repeated_delimiter_no_loop) {
+    const char *input = "cat << 'END'\ntu\nEND\nc<< 'END'";
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    ASSERT_PARSE_FAILS(input);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long elapsed_ms = (end.tv_sec - start.tv_sec) * 1000 +
+                      (end.tv_nsec - start.tv_nsec) / 1000000;
+    if (elapsed_ms > 1000) {
+        TEST_FAIL_FMT("parse took %ld ms (budget 1000 ms); the issue #51 "
+                      "infinite-loop regression has returned",
+                      elapsed_ms);
+    }
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -774,6 +809,11 @@ int main(void) {
     reset_category();
     RUN_TEST(coproc_no_command);
     print_category_summary("Coproc");
+
+    printf("Regression:\n");
+    reset_category();
+    RUN_TEST(heredoc_repeated_delimiter_no_loop);
+    print_category_summary("Regression");
 
     return TEST_RESULT();
 }
