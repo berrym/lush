@@ -15,23 +15,15 @@
 
 #include "../../../include/lle/error_handling.h"
 #include "../../../include/lle/input_parsing.h"
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "test_framework.h"
 
-/* Test framework macros */
-#define TEST(name)                                                             \
-    printf("  Testing: %s...", name);                                          \
-    fflush(stdout)
-#define TEST_END printf(" PASS\n")
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("\n    FAILED: %s\n", message);                             \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
+#undef TEST
+#define TEST(name_str) ((void)0)
+#define TEST_END ((void)0)
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* Mock terminal capabilities and memory pool */
 static int mock_terminal_dummy = 42;
@@ -40,9 +32,6 @@ static lle_terminal_capabilities_t *mock_terminal =
     (lle_terminal_capabilities_t *)&mock_terminal_dummy;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
 
 /*
  * Test: Initialize and destroy key detector
@@ -61,7 +50,6 @@ void test_init_destroy(void) {
     ASSERT(result == LLE_SUCCESS, "Destroy should succeed");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -86,7 +74,6 @@ void test_init_invalid_params(void) {
            "Init with NULL pool should fail");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -119,7 +106,6 @@ void test_detect_f1_key(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -151,7 +137,6 @@ void test_detect_cursor_up(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -184,7 +169,6 @@ void test_detect_ctrl_c(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -217,7 +201,6 @@ void test_detect_shift_up(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -250,7 +233,6 @@ void test_detect_ctrl_right(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -281,7 +263,6 @@ void test_detect_home_key(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -314,7 +295,6 @@ void test_detect_delete_key(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -345,7 +325,6 @@ void test_detect_tab_key(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -374,7 +353,6 @@ void test_partial_sequence(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -410,7 +388,6 @@ void test_complete_partial_sequence(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -444,7 +421,6 @@ void test_reset_detector(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -488,7 +464,6 @@ void test_get_statistics(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -513,7 +488,6 @@ void test_unknown_sequence(void) {
     lle_key_detector_destroy(detector);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -522,41 +496,22 @@ void test_unknown_sequence(void) {
 int main(void) {
     printf("\n=== LLE Key Detector Unit Tests ===\n\n");
 
-    tests_run = 0;
-    tests_passed = 0;
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        test();                                                                \
-    } while (0)
+    RUN_TEST(init_destroy);
+    RUN_TEST(init_invalid_params);
+    RUN_TEST(detect_f1_key);
+    RUN_TEST(detect_cursor_up);
+    RUN_TEST(detect_ctrl_c);
+    RUN_TEST(detect_shift_up);
+    RUN_TEST(detect_ctrl_right);
+    RUN_TEST(detect_home_key);
+    RUN_TEST(detect_delete_key);
+    RUN_TEST(detect_tab_key);
+    RUN_TEST(partial_sequence);
+    RUN_TEST(complete_partial_sequence);
+    RUN_TEST(reset_detector);
+    RUN_TEST(get_statistics);
+    RUN_TEST(unknown_sequence);
 
-    RUN_TEST(test_init_destroy);
-    RUN_TEST(test_init_invalid_params);
-    RUN_TEST(test_detect_f1_key);
-    RUN_TEST(test_detect_cursor_up);
-    RUN_TEST(test_detect_ctrl_c);
-    RUN_TEST(test_detect_shift_up);
-    RUN_TEST(test_detect_ctrl_right);
-    RUN_TEST(test_detect_home_key);
-    RUN_TEST(test_detect_delete_key);
-    RUN_TEST(test_detect_tab_key);
-    RUN_TEST(test_partial_sequence);
-    RUN_TEST(test_complete_partial_sequence);
-    RUN_TEST(test_reset_detector);
-    RUN_TEST(test_get_statistics);
-    RUN_TEST(test_unknown_sequence);
-
-    printf("\n=== Test Summary ===\n");
-    printf("Tests run:    %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_run - tests_passed);
-
-    if (tests_passed == tests_run) {
-        printf("\n✓ All tests passed!\n\n");
-        return 0;
-    } else {
-        printf("\n✗ Some tests failed!\n\n");
-        return 1;
-    }
+    return TEST_RESULT();
 }

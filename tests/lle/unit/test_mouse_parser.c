@@ -16,7 +16,7 @@
 
 #include "../../../include/lle/error_handling.h"
 #include "../../../include/lle/input_parsing.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,25 +25,8 @@
 extern void *lle_pool_alloc(size_t size);
 extern void lle_pool_free(void *ptr);
 
-/* Test counter */
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-/* Test result macros */
-#define TEST_ASSERT(condition, message)                                        \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            fprintf(stderr, "FAIL: %s\n", message);                            \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define TEST_PASS(name)                                                        \
-    do {                                                                       \
-        printf("PASS: %s\n", name);                                            \
-        tests_passed++;                                                        \
-    } while (0)
+#define TEST_ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+#define TEST_PASS(name) ((void)0)
 
 /*
  * Test: Initialize and destroy mouse parser
@@ -567,27 +550,21 @@ int main(void) {
     printf("=== LLE Mouse Parser Unit Tests ===\n\n");
 
     /* Run tests */
-    test_mouse_parser_init_destroy();
-    test_x10_button_press();
-    test_x10_button_release();
-    test_x10_middle_button();
-    test_x10_right_button();
-    test_x10_coordinates();
-    test_x10_wheel_up();
-    test_x10_wheel_down();
-    test_sgr_button_press();
-    test_sgr_button_release();
-    test_sgr_modifiers();
-    test_mouse_drag();
-    test_statistics();
-    test_reset();
-    test_get_state();
-    test_invalid_sequence();
-
-    /* Print results */
-    printf("\n=== Test Results ===\n");
-    printf("Passed: %d\n", tests_passed);
-    printf("Failed: %d\n", tests_failed);
-
-    return (tests_failed == 0) ? 0 : 1;
+    RUN_TEST(mouse_parser_init_destroy);
+    RUN_TEST(x10_button_press);
+    RUN_TEST(x10_button_release);
+    RUN_TEST(x10_middle_button);
+    RUN_TEST(x10_right_button);
+    RUN_TEST(x10_coordinates);
+    RUN_TEST(x10_wheel_up);
+    RUN_TEST(x10_wheel_down);
+    RUN_TEST(sgr_button_press);
+    RUN_TEST(sgr_button_release);
+    RUN_TEST(sgr_modifiers);
+    RUN_TEST(mouse_drag);
+    RUN_TEST(statistics);
+    RUN_TEST(reset);
+    RUN_TEST(get_state);
+    RUN_TEST(invalid_sequence);
+    return TEST_RESULT();
 }

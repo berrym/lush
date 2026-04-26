@@ -14,23 +14,15 @@
 
 #include "../../../include/lle/error_handling.h"
 #include "../../../include/lle/input_parsing.h"
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "test_framework.h"
 
-/* Test framework macros */
-#define TEST(name)                                                             \
-    printf("  Testing: %s...", name);                                          \
-    fflush(stdout)
-#define TEST_END printf(" PASS\n")
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("\n    FAILED: %s\n", message);                             \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
+#undef TEST
+#define TEST(name_str) ((void)0)
+#define TEST_END ((void)0)
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* Mock terminal capabilities and memory pool */
 static int mock_terminal_dummy = 42;
@@ -39,9 +31,6 @@ static lle_terminal_capabilities_t *mock_terminal =
     (lle_terminal_capabilities_t *)&mock_terminal_dummy;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
 
 /*
  * Test: Initialize and destroy sequence parser
@@ -60,7 +49,6 @@ void test_init_destroy(void) {
     ASSERT(result == LLE_SUCCESS, "Destroy should succeed");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -85,7 +73,6 @@ void test_init_invalid_params(void) {
            "Init with NULL pool should fail");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -115,7 +102,6 @@ void test_control_character(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -153,7 +139,6 @@ void test_csi_simple(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -188,7 +173,6 @@ void test_csi_with_parameters(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -217,7 +201,6 @@ void test_csi_multiple_parameters(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -248,7 +231,6 @@ void test_osc_sequence(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -277,7 +259,6 @@ void test_osc_st_terminator(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -306,7 +287,6 @@ void test_dcs_sequence(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -336,7 +316,6 @@ void test_ss3_sequence(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -372,7 +351,6 @@ void test_reset_state(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -404,7 +382,6 @@ void test_get_buffer(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -429,7 +406,6 @@ void test_get_statistics(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -460,7 +436,6 @@ void test_multiple_sequences(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -489,7 +464,6 @@ void test_incomplete_sequence(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -524,7 +498,6 @@ void test_complete_incomplete_sequence(void) {
     lle_sequence_parser_destroy(parser);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -533,42 +506,23 @@ void test_complete_incomplete_sequence(void) {
 int main(void) {
     printf("\n=== LLE Sequence Parser Unit Tests ===\n\n");
 
-    tests_run = 0;
-    tests_passed = 0;
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        test();                                                                \
-    } while (0)
+    RUN_TEST(init_destroy);
+    RUN_TEST(init_invalid_params);
+    RUN_TEST(control_character);
+    RUN_TEST(csi_simple);
+    RUN_TEST(csi_with_parameters);
+    RUN_TEST(csi_multiple_parameters);
+    RUN_TEST(osc_sequence);
+    RUN_TEST(osc_st_terminator);
+    RUN_TEST(dcs_sequence);
+    RUN_TEST(ss3_sequence);
+    RUN_TEST(reset_state);
+    RUN_TEST(get_buffer);
+    RUN_TEST(get_statistics);
+    RUN_TEST(multiple_sequences);
+    RUN_TEST(incomplete_sequence);
+    RUN_TEST(complete_incomplete_sequence);
 
-    RUN_TEST(test_init_destroy);
-    RUN_TEST(test_init_invalid_params);
-    RUN_TEST(test_control_character);
-    RUN_TEST(test_csi_simple);
-    RUN_TEST(test_csi_with_parameters);
-    RUN_TEST(test_csi_multiple_parameters);
-    RUN_TEST(test_osc_sequence);
-    RUN_TEST(test_osc_st_terminator);
-    RUN_TEST(test_dcs_sequence);
-    RUN_TEST(test_ss3_sequence);
-    RUN_TEST(test_reset_state);
-    RUN_TEST(test_get_buffer);
-    RUN_TEST(test_get_statistics);
-    RUN_TEST(test_multiple_sequences);
-    RUN_TEST(test_incomplete_sequence);
-    RUN_TEST(test_complete_incomplete_sequence);
-
-    printf("\n=== Test Summary ===\n");
-    printf("Tests run:    %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_run - tests_passed);
-
-    if (tests_passed == tests_run) {
-        printf("\n✓ All tests passed!\n\n");
-        return 0;
-    } else {
-        printf("\n✗ Some tests failed!\n\n");
-        return 1;
-    }
+    return TEST_RESULT();
 }

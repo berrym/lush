@@ -607,7 +607,7 @@ if lle_sources.length() > 0
   test_input_stream = executable('test_input_stream',
                                  ['tests/lle/unit/test_input_stream.c',
                                   'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: inc,
+                                 include_directories: [inc, include_directories('tests')],
                                  dependencies: [lle_dep])
 
   test('LLE Input Stream', test_input_stream,
@@ -620,7 +620,7 @@ if lle_sources.length() > 0
   test_input_utf8_processor = executable('test_input_utf8_processor',
                                          ['tests/lle/unit/test_input_utf8_processor.c',
                                           'tests/lle/functional/test_memory_mock.c'],
-                                         include_directories: inc,
+                                         include_directories: [inc, include_directories('tests')],
                                          dependencies: [lle_dep])
 
   test('LLE Input UTF-8 Processor', test_input_utf8_processor,
@@ -633,7 +633,7 @@ if lle_sources.length() > 0
   test_sequence_parser = executable('test_sequence_parser',
                                     ['tests/lle/unit/test_sequence_parser.c',
                                      'tests/lle/functional/test_memory_mock.c'],
-                                    include_directories: inc,
+                                    include_directories: [inc, include_directories('tests')],
                                     dependencies: [lle_dep])
 
   test('LLE Sequence Parser', test_sequence_parser,
@@ -646,7 +646,7 @@ if lle_sources.length() > 0
   test_key_detector = executable('test_key_detector',
                                  ['tests/lle/unit/test_key_detector.c',
                                   'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: inc,
+                                 include_directories: [inc, include_directories('tests')],
                                  dependencies: [lle_dep])
 
   test('LLE Key Detector', test_key_detector,
@@ -659,7 +659,7 @@ if fs.exists('tests/lle/unit/test_mouse_parser.c')
   test_mouse_parser = executable('test_mouse_parser',
                                  ['tests/lle/unit/test_mouse_parser.c',
                                   'tests/lle/functional/test_memory_mock.c'],
-                                 include_directories: inc,
+                                 include_directories: [inc, include_directories('tests')],
                                  dependencies: [lle_dep])
   test('LLE Mouse Parser', test_mouse_parser,
        suite: 'lle-unit',
@@ -671,7 +671,7 @@ if fs.exists('tests/lle/unit/test_parser_state_machine.c')
   test_parser_state_machine = executable('test_parser_state_machine',
                                          ['tests/lle/unit/test_parser_state_machine.c',
                                           'tests/lle/functional/test_memory_mock.c'],
-                                         include_directories: inc,
+                                         include_directories: [inc, include_directories('tests')],
                                          dependencies: [lle_dep])
   test('LLE Parser State Machine', test_parser_state_machine,
        suite: 'lle-unit',
