@@ -13,10 +13,10 @@
  */
 
 #include "lush.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "test_framework.h"
 
 /* External declarations for posix_opts functions */
 extern shell_options_t shell_opts;
@@ -42,36 +42,9 @@ extern bool is_interactive_comments_enabled(void);
 extern void print_command_trace(const char *command);
 
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Running: %s...\n", #name);                                   \
-        test_##name();                                                         \
-        printf("    PASSED\n");                                                \
-    } while (0)
 
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_TRUE(condition, message) ASSERT((condition), message)
-#define ASSERT_FALSE(condition, message) ASSERT(!(condition), message)
 
-#define ASSERT_EQ(actual, expected, message)                                   \
-    do {                                                                       \
-        if ((actual) != (expected)) {                                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: %ld, Got: %ld\n", (long)(expected),        \
-                   (long)(actual));                                            \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -609,6 +582,5 @@ int main(void) {
     RUN_TEST(is_posix_option_set_b);
     RUN_TEST(is_posix_option_set_invalid);
 
-    printf("\n=== All POSIX Options tests passed! ===\n");
-    return 0;
+    return TEST_RESULT();
 }

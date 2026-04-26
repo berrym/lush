@@ -32,15 +32,12 @@
 
 #include "node.h"
 #include "parser.h"
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "test_framework.h"
 
 /* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
 
 /* Category counters for summary */
 static int category_tests = 0;
@@ -56,22 +53,7 @@ static void print_category_summary(const char *name) {
 }
 
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
 
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        category_tests++;                                                      \
-        int _prev_failed = tests_failed;                                       \
-        printf("  %s...", #name);                                              \
-        fflush(stdout);                                                        \
-        test_##name();                                                         \
-        if (tests_failed == _prev_failed) {                                    \
-            printf(" PASSED\n");                                               \
-            tests_passed++;                                                    \
-            category_passed++;                                                 \
-        }                                                                      \
-    } while (0)
 
 /**
  * Assert that parsing the given input produces an error.
@@ -89,13 +71,9 @@ static void print_category_summary(const char *name) {
         node_t *_n = parser_parse(_p);                                         \
         int _has_error = parser_has_error(_p);                                 \
         if (!_has_error && _n != NULL) {                                       \
-            printf(" FAILED\n");                                               \
-            printf("      Expected parse error for: %s\n", input);             \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            tests_failed++;                                                    \
             free_node_tree(_n);                                                \
             parser_free(_p);                                                   \
-            return;                                                            \
+            TEST_FAIL_FMT("expected parse error for: %s", input);              \
         }                                                                      \
         if (_n)                                                                \
             free_node_tree(_n);                                                \
@@ -564,14 +542,10 @@ TEST(recursion_depth_limit) {
     int has_error = parser_has_error(parser);
 
     if (!has_error && ast != NULL) {
-        printf(" FAILED\n");
-        printf("      Expected recursion depth error for %d-deep nesting\n",
-               depth);
-        tests_failed++;
         free_node_tree(ast);
         parser_free(parser);
         free(input);
-        return;
+        TEST_FAIL_FMT("expected recursion depth error for %d-deep nesting", depth);
     }
 
     /* Success - parser correctly rejected deeply nested input */
@@ -801,21 +775,5 @@ int main(void) {
     RUN_TEST(coproc_no_command);
     print_category_summary("Coproc");
 
-    printf("\n========================================\n");
-    printf("NEGATIVE TEST RESULTS\n");
-    printf("========================================\n");
-    printf("Tests run:    %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_failed);
-    printf("========================================\n");
-
-    if (tests_failed > 0) {
-        printf("\nWARNING: %d test(s) failed!\n", tests_failed);
-        printf("The parser may be accepting invalid syntax.\n");
-    } else {
-        printf("\nAll negative tests passed!\n");
-        printf("Parser correctly rejects invalid syntax.\n");
-    }
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

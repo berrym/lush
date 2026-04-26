@@ -18,64 +18,49 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "test_framework.h"
+
+/* This file's pre-existing helpers used 2-arg variants of ASSERT_EQ
+ * and ASSERT_STR_EQ (no message). Bridge them to the framework's
+ * 3-arg versions by synthesizing a message. The bare 1-arg ASSERT
+ * already matches the framework's signature exactly. */
+#undef ASSERT_EQ
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#undef ASSERT_STR_EQ
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+
+/* These tests assume a fresh registry per test. The pre-existing local
+ * RUN_TEST wrapped every call with cleanup+init; preserve that here by
+ * overriding RUN_TEST and deferring to the framework's internal state
+ * for accounting and failure isolation. */
+#undef RUN_TEST
+#define RUN_TEST(name)                                                         \
+    do {                                                                       \
+        test_framework_run++;                                                  \
+        test_framework_current_name = #name;                                   \
+        printf("  %s ... ", #name);                                            \
+        fflush(stdout);                                                        \
+        config_registry_cleanup();                                             \
+        config_registry_init();                                                \
+        if (setjmp(test_framework_jmpbuf) == 0) {                              \
+            test_##name();                                                     \
+            test_framework_passed++;                                           \
+            printf("PASS\n");                                                  \
+        } else {                                                               \
+            test_framework_failed++;                                           \
+        }                                                                      \
+        config_registry_cleanup();                                             \
+    } while (0)
 
 /* ============================================================================
  * Test Framework
  * ============================================================================
  */
 
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
 
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Testing: %s ... ", #name);                                   \
-        fflush(stdout);                                                        \
-        tests_run++;                                                           \
-        config_registry_cleanup();                                             \
-        config_registry_init();                                                \
-        test_##name();                                                         \
-        config_registry_cleanup();                                             \
-        printf("PASSED\n");                                                    \
-        tests_passed++;                                                        \
-    } while (0)
 
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("FAILED\n");                                                \
-            printf("    Assertion failed: %s\n", #cond);                       \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("FAILED\n");                                                \
-            printf("    Expected: %s == %s\n", #a, #b);                        \
-            printf("    Got: %lld vs %lld\n", (long long)(a), (long long)(b)); \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("FAILED\n");                                                \
-            printf("    Expected: \"%s\"\n", (b));                             \
-            printf("    Got: \"%s\"\n", (a));                                  \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * Test Section Definitions
@@ -747,10 +732,5 @@ int main(void) {
     RUN_TEST(on_load_hook);
     RUN_TEST(sync_hooks);
 
-    printf("\n=== Results ===\n");
-    printf("Tests run: %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_failed);
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

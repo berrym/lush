@@ -1213,9 +1213,5 @@ int main(void) {
     RUN_TEST(test_calculate_hash_not_initialized);
 
     printf("\n=== Summary ===\n");
-    printf("Tests run: %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_run - tests_passed);
-
     return (tests_passed == tests_run) ? 0 : 1;
 }

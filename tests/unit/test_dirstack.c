@@ -18,75 +18,14 @@
 #include <string.h>
 
 #include "dirstack.h"
+#include "test_framework.h"
 
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Running: %s...\n", #name);                                   \
-        test_##name();                                                         \
-        printf("    PASSED\n");                                                \
-    } while (0)
 
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(actual, expected, message)                                   \
-    do {                                                                       \
-        if ((actual) != (expected)) {                                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: %d, Got: %d\n", (int)(expected),           \
-                   (int)(actual));                                             \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_STR_EQ(actual, expected, message)                               \
-    do {                                                                       \
-        const char *_actual = (actual);                                        \
-        const char *_expected = (expected);                                    \
-        if (_actual == NULL || _expected == NULL) {                            \
-            if (_actual != _expected) {                                        \
-                printf("    FAILED: %s\n", message);                           \
-                printf("      Expected: %s, Got: %s\n",                        \
-                       _expected ? _expected : "NULL",                         \
-                       _actual ? _actual : "NULL");                            \
-                printf("      at %s:%d\n", __FILE__, __LINE__);                \
-                exit(1);                                                       \
-            }                                                                  \
-        } else if (strcmp(_actual, _expected) != 0) {                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: \"%s\", Got: \"%s\"\n", _expected,         \
-                   _actual);                                                   \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NOT_NULL(ptr, message)                                          \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("    FAILED: %s (got NULL)\n", message);                    \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NULL(ptr, message)                                              \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("    FAILED: %s (expected NULL)\n", message);               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -561,6 +500,5 @@ int main(void) {
     printf("\nStress Tests:\n");
     RUN_TEST(dirstack_many_entries);
 
-    printf("\n=== All %d Directory Stack Tests Passed ===\n\n", 27);
-    return 0;
+    return TEST_RESULT();
 }

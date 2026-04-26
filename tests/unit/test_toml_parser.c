@@ -14,61 +14,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "test_framework.h"
+
+#undef ASSERT_EQ
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#undef ASSERT_STR_EQ
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
 
 /* ============================================================================
  * Test Framework
  * ============================================================================
  */
 
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
 
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Testing: %s ... ", #name);                                   \
-        fflush(stdout);                                                        \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-        printf("PASSED\n");                                                    \
-        tests_passed++;                                                        \
-    } while (0)
 
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("FAILED\n");                                                \
-            printf("    Assertion failed: %s\n", #cond);                       \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("FAILED\n");                                                \
-            printf("    Expected: %s == %s\n", #a, #b);                        \
-            printf("    Got: %lld vs %lld\n", (long long)(a), (long long)(b)); \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("FAILED\n");                                                \
-            printf("    Expected: \"%s\"\n", (b));                             \
-            printf("    Got: \"%s\"\n", (a));                                  \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * Test Callback Context
@@ -1155,10 +1116,5 @@ int main(void) {
     RUN_TEST(parse_key_with_hyphen);
     RUN_TEST(parse_trailing_comma_array);
 
-    printf("\n=== Results ===\n");
-    printf("Tests run: %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_failed);
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

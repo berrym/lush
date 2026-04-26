@@ -1101,7 +1101,7 @@ endif
 if fs.exists('tests/unit/test_completion_menu_renderer.c')
   test_completion_menu_renderer = executable('test_completion_menu_renderer',
                                              'tests/unit/test_completion_menu_renderer.c',
-                                             include_directories: inc,
+                                             include_directories: [inc, include_directories('tests')],
                                              link_with: lle_lib)
   test('LLE Completion Menu Renderer', test_completion_menu_renderer,
        suite: 'unit',
@@ -1115,7 +1115,7 @@ if fs.exists('tests/unit/test_shell_mode.c')
   test_shell_mode = executable('test_shell_mode',
                                'tests/unit/test_shell_mode.c',
                                'src/shell_mode.c',
-                               include_directories: inc)
+                               include_directories: [inc, include_directories('tests')])
   test('Shell Mode System', test_shell_mode,
        suite: 'unit',
        timeout: 30)
@@ -1127,7 +1127,7 @@ endif
 if fs.exists('tests/unit/test_toml_parser.c')
   test_toml_parser = executable('test_toml_parser',
                                 'tests/unit/test_toml_parser.c',
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep])
   test('TOML Parser', test_toml_parser,
        suite: 'unit',
@@ -1141,7 +1141,7 @@ if fs.exists('tests/unit/test_config_registry.c')
   test_config_registry = executable('test_config_registry',
                                     'tests/unit/test_config_registry.c',
                                     'src/config_registry.c',
-                                    include_directories: inc,
+                                    include_directories: [inc, include_directories('tests')],
                                     dependencies: [lle_dep])
   test('Config Registry', test_config_registry,
        suite: 'unit',
@@ -1156,7 +1156,7 @@ if fs.exists('tests/unit/test_tokenizer.c')
                               'tests/unit/test_tokenizer.c',
                               'src/tokenizer.c',
                               'src/shell_mode.c',
-                              include_directories: inc,
+                              include_directories: [inc, include_directories('tests')],
                               dependencies: [lle_dep])
   test('Tokenizer', test_tokenizer,
        suite: 'unit',
@@ -1180,7 +1180,7 @@ if fs.exists('tests/unit/test_parser.c')
                            'src/libhashtable/ht_fnv1a.c',
                            'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
-                           include_directories: inc,
+                           include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
   test('Parser', test_parser,
        suite: 'unit',
@@ -1202,7 +1202,7 @@ if fs.exists('tests/unit/test_parser_fuzzer.c')
                            'src/libhashtable/ht_fnv1a.c',
                            'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
-                           include_directories: inc,
+                           include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
   test('Parser Fuzzer', test_parser_fuzzer,
        suite: 'unit',
@@ -1224,7 +1224,7 @@ if fs.exists('tests/unit/test_parser_negative.c')
                            'src/libhashtable/ht_fnv1a.c',
                            'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
-                           include_directories: inc,
+                           include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
   test('Parser Negative', test_parser_negative,
        suite: 'unit',
@@ -1247,7 +1247,7 @@ if fs.exists('tests/unit/test_ast_roundtrip.c')
                            'src/libhashtable/ht_fnv1a.c',
                            'src/libhashtable/ht_strstr.c',
                            'tests/unit/test_parser_stubs.c',
-                           include_directories: inc,
+                           include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep])
   test('AST Round-Trip', test_ast_roundtrip,
        suite: 'unit',
@@ -1265,7 +1265,7 @@ if fs.exists('tests/unit/test_symtable.c')
                              'src/libhashtable/ht_fnv1a.c',
                              'src/libhashtable/ht_strstr.c',
                              'tests/unit/test_symtable_stubs.c',
-                             include_directories: inc)
+                             include_directories: [inc, include_directories('tests')])
   test('Symbol Table', test_symtable,
        suite: 'unit',
        timeout: 30)
@@ -1279,7 +1279,7 @@ if fs.exists('tests/unit/test_node.c')
                          'tests/unit/test_node.c',
                          'src/node.c',
                          'tests/unit/test_node_stubs.c',
-                         include_directories: inc)
+                         include_directories: [inc, include_directories('tests')])
   test('AST Node', test_node,
        suite: 'unit',
        timeout: 30)
@@ -1301,7 +1301,7 @@ if fs.exists('tests/unit/test_executor.c')
                              'tests/unit/test_executor.c',
                              'tests/unit/test_executor_stubs.c',
                              test_executor_sources + lle_shell_sources,
-                             include_directories: inc,
+                             include_directories: [inc, include_directories('tests')],
                              dependencies: [lle_dep, libm])
   test('Executor', test_executor,
        suite: 'unit',
@@ -1323,7 +1323,7 @@ if fs.exists('tests/unit/test_builtins.c')
                              'tests/unit/test_builtins.c',
                              'tests/unit/test_executor_stubs.c',
                              test_builtins_sources + lle_shell_sources,
-                             include_directories: inc,
+                             include_directories: [inc, include_directories('tests')],
                              dependencies: [lle_dep, libm])
   test('Builtins', test_builtins,
        suite: 'unit',
@@ -1345,7 +1345,7 @@ if fs.exists('tests/unit/test_expansion.c')
                               'tests/unit/test_expansion.c',
                               'tests/unit/test_executor_stubs.c',
                               test_expansion_sources + lle_shell_sources,
-                              include_directories: inc,
+                              include_directories: [inc, include_directories('tests')],
                               dependencies: [lle_dep, libm])
   test('Expansion', test_expansion,
        suite: 'unit',
@@ -1366,7 +1366,7 @@ if fs.exists('tests/unit/test_fuzzy_match.c')
                                 'tests/unit/test_fuzzy_match.c',
                                 'tests/unit/test_executor_stubs.c',
                                 test_fuzzy_sources + lle_shell_sources,
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Fuzzy Match', test_fuzzy_match,
        suite: 'unit',
@@ -1387,7 +1387,7 @@ if fs.exists('tests/unit/test_debug.c')
                           'tests/unit/test_debug.c',
                           'tests/unit/test_executor_stubs.c',
                           test_debug_sources + lle_shell_sources,
-                          include_directories: inc,
+                          include_directories: [inc, include_directories('tests')],
                           dependencies: [lle_dep, libm])
   test('Debug', test_debug,
        suite: 'unit',
@@ -1408,7 +1408,7 @@ if fs.exists('tests/unit/test_fc.c')
                        'tests/unit/test_fc.c',
                        'tests/unit/test_executor_stubs.c',
                        test_fc_sources + lle_shell_sources,
-                       include_directories: inc,
+                       include_directories: [inc, include_directories('tests')],
                        dependencies: [lle_dep, libm])
   test('FC Builtin', test_fc,
        suite: 'unit',
@@ -1429,7 +1429,7 @@ if fs.exists('tests/unit/test_display.c')
                             'tests/unit/test_display.c',
                             'tests/unit/test_executor_stubs.c',
                             test_display_sources + lle_shell_sources,
-                            include_directories: inc,
+                            include_directories: [inc, include_directories('tests')],
                             dependencies: [lle_dep, libm])
   test('Display', test_display,
        suite: 'unit',
@@ -1450,7 +1450,7 @@ if fs.exists('tests/unit/test_autocorrect.c')
                                 'tests/unit/test_autocorrect.c',
                                 'tests/unit/test_executor_stubs.c',
                                 test_autocorrect_sources + lle_shell_sources,
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Autocorrect', test_autocorrect,
        suite: 'unit',
@@ -1471,7 +1471,7 @@ if fs.exists('tests/unit/test_dirstack.c')
                              'tests/unit/test_dirstack.c',
                              'tests/unit/test_executor_stubs.c',
                              test_dirstack_sources + lle_shell_sources,
-                             include_directories: inc,
+                             include_directories: [inc, include_directories('tests')],
                              dependencies: [lle_dep, libm])
   test('Dirstack', test_dirstack,
        suite: 'unit',
@@ -1492,7 +1492,7 @@ if fs.exists('tests/unit/test_posix_history.c')
                                   'tests/unit/test_posix_history.c',
                                   'tests/unit/test_executor_stubs.c',
                                   test_posix_history_sources + lle_shell_sources,
-                                  include_directories: inc,
+                                  include_directories: [inc, include_directories('tests')],
                                   dependencies: [lle_dep, libm])
   test('POSIX History', test_posix_history,
        suite: 'unit',
@@ -1513,7 +1513,7 @@ if fs.exists('tests/unit/test_debug_analysis.c')
                                    'tests/unit/test_debug_analysis.c',
                                    'tests/unit/test_executor_stubs.c',
                                    test_debug_analysis_sources + lle_shell_sources,
-                                   include_directories: inc,
+                                   include_directories: [inc, include_directories('tests')],
                                    dependencies: [lle_dep, libm])
   test('Debug Analysis', test_debug_analysis,
        suite: 'unit',
@@ -1534,7 +1534,7 @@ if fs.exists('tests/unit/test_debug_trace.c')
                                 'tests/unit/test_debug_trace.c',
                                 'tests/unit/test_executor_stubs.c',
                                 test_debug_trace_sources + lle_shell_sources,
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Debug Trace', test_debug_trace,
        suite: 'unit',
@@ -1555,7 +1555,7 @@ if fs.exists('tests/unit/test_debug_breakpoints.c')
                                       'tests/unit/test_debug_breakpoints.c',
                                       'tests/unit/test_executor_stubs.c',
                                       test_debug_breakpoints_sources + lle_shell_sources,
-                                      include_directories: inc,
+                                      include_directories: [inc, include_directories('tests')],
                                       dependencies: [lle_dep, libm])
   test('Debug Breakpoints', test_debug_breakpoints,
        suite: 'unit',
@@ -1576,7 +1576,7 @@ if fs.exists('tests/unit/test_display_controller.c')
                                        'tests/unit/test_display_controller.c',
                                        'tests/unit/test_executor_stubs.c',
                                        test_display_controller_sources + lle_shell_sources,
-                                       include_directories: inc,
+                                       include_directories: [inc, include_directories('tests')],
                                        dependencies: [lle_dep, libm])
   test('Display Controller', test_display_controller,
        suite: 'unit',
@@ -1597,7 +1597,7 @@ if fs.exists('tests/unit/test_terminal_control.c')
                                      'tests/unit/test_terminal_control.c',
                                      'tests/unit/test_executor_stubs.c',
                                      test_terminal_control_sources + lle_shell_sources,
-                                     include_directories: inc,
+                                     include_directories: [inc, include_directories('tests')],
                                      dependencies: [lle_dep, libm])
   test('Terminal Control', test_terminal_control,
        suite: 'unit',
@@ -1617,7 +1617,7 @@ if fs.exists('tests/unit/test_screen_buffer.c')
                                   'tests/unit/test_screen_buffer.c',
                                   'tests/unit/test_executor_stubs.c',
                                   test_screen_buffer_sources + lle_shell_sources,
-                                  include_directories: inc,
+                                  include_directories: [inc, include_directories('tests')],
                                   dependencies: [lle_dep, libm])
   test('Screen Buffer', test_screen_buffer,
        suite: 'unit',
@@ -1637,7 +1637,7 @@ if fs.exists('tests/unit/test_composition_engine.c')
                                        'tests/unit/test_composition_engine.c',
                                        'tests/unit/test_executor_stubs.c',
                                        test_composition_engine_sources + lle_shell_sources,
-                                       include_directories: inc,
+                                       include_directories: [inc, include_directories('tests')],
                                        dependencies: [lle_dep, libm])
   test('Composition Engine', test_composition_engine,
        suite: 'unit',
@@ -1657,7 +1657,7 @@ if fs.exists('tests/unit/test_prompt_layer.c')
                                  'tests/unit/test_prompt_layer.c',
                                  'tests/unit/test_executor_stubs.c',
                                  test_prompt_layer_sources + lle_shell_sources,
-                                 include_directories: inc,
+                                 include_directories: [inc, include_directories('tests')],
                                  dependencies: [lle_dep, libm])
   test('Prompt Layer', test_prompt_layer,
        suite: 'unit',
@@ -1678,7 +1678,7 @@ if fs.exists('tests/unit/test_fixer.c')
                           'tests/unit/test_fixer.c',
                           'tests/unit/test_executor_stubs.c',
                           test_fixer_sources + lle_shell_sources,
-                          include_directories: inc,
+                          include_directories: [inc, include_directories('tests')],
                           dependencies: [lle_dep, libm])
   test('Fixer Module', test_fixer,
        suite: 'unit',
@@ -1893,7 +1893,7 @@ if fs.exists('tests/unit/test_strings.c')
                             'tests/unit/test_strings.c',
                             'tests/unit/test_executor_stubs.c',
                             test_strings_sources + lle_shell_sources,
-                            include_directories: inc,
+                            include_directories: [inc, include_directories('tests')],
                             dependencies: [lle_dep, libm])
   test('String Utilities', test_strings,
        suite: 'unit',
@@ -1912,7 +1912,7 @@ if fs.exists('tests/unit/test_shell_error.c')
                                 'tests/unit/test_shell_error.c',
                                 'tests/unit/test_executor_stubs.c',
                                 test_shell_error_sources + lle_shell_sources,
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Shell Error System', test_shell_error,
        suite: 'unit',
@@ -1931,7 +1931,7 @@ if fs.exists('tests/unit/test_memory_pool.c')
                                 'tests/unit/test_memory_pool.c',
                                 'tests/unit/test_executor_stubs.c',
                                 test_memory_pool_sources + lle_shell_sources,
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Memory Pool', test_memory_pool,
        suite: 'unit',
@@ -1950,7 +1950,7 @@ if fs.exists('tests/unit/test_signals.c')
                             'tests/unit/test_signals.c',
                             'tests/unit/test_executor_stubs.c',
                             test_signals_sources + lle_shell_sources,
-                            include_directories: inc,
+                            include_directories: [inc, include_directories('tests')],
                             dependencies: [lle_dep, libm])
   test('Signal Handling', test_signals,
        suite: 'unit',
@@ -1969,7 +1969,7 @@ if fs.exists('tests/unit/test_alias.c')
                           'tests/unit/test_alias.c',
                           'tests/unit/test_executor_stubs.c',
                           test_alias_sources + lle_shell_sources,
-                          include_directories: inc,
+                          include_directories: [inc, include_directories('tests')],
                           dependencies: [lle_dep, libm])
   test('Alias System', test_alias,
        suite: 'unit',
@@ -1988,7 +1988,7 @@ if fs.exists('tests/unit/test_redirection.c')
                                 'tests/unit/test_redirection.c',
                                 'tests/unit/test_executor_stubs.c',
                                 test_redirection_sources + lle_shell_sources,
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Redirection', test_redirection,
        suite: 'unit',
@@ -2007,7 +2007,7 @@ if fs.exists('tests/unit/test_compat.c')
                            'tests/unit/test_compat.c',
                            'tests/unit/test_executor_stubs.c',
                            test_compat_sources + lle_shell_sources,
-                           include_directories: inc,
+                           include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep, libm])
   test('Compatibility Database', test_compat,
        suite: 'unit',
@@ -2026,7 +2026,7 @@ if fs.exists('tests/unit/test_expand.c')
                            'tests/unit/test_expand.c',
                            'tests/unit/test_executor_stubs.c',
                            test_expand_sources + lle_shell_sources,
-                           include_directories: inc,
+                           include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep, libm])
   test('Expand Module', test_expand,
        suite: 'unit',
@@ -2043,7 +2043,7 @@ if fs.exists('tests/unit/test_hashtable.c')
                               'src/libhashtable/ht_strint.c',
                               'src/libhashtable/ht_strfloat.c',
                               'src/libhashtable/ht_strdouble.c',
-                              include_directories: inc,
+                              include_directories: [inc, include_directories('tests')],
                               dependencies: [libm])
   test('Hash Table Library', test_hashtable,
        suite: 'unit',
@@ -2062,7 +2062,7 @@ if fs.exists('tests/unit/test_debug_core.c')
                                'tests/unit/test_debug_core.c',
                                'tests/unit/test_executor_stubs.c',
                                test_debug_core_sources + lle_shell_sources,
-                               include_directories: inc,
+                               include_directories: [inc, include_directories('tests')],
                                dependencies: [lle_dep, libm])
   test('Debug Core', test_debug_core,
        suite: 'unit',
@@ -2085,7 +2085,7 @@ if fs.exists('tests/unit/test_node_to_source.c')
                                    'src/libhashtable/ht_fnv1a.c',
                                    'src/libhashtable/ht_strstr.c',
                                    'tests/unit/test_parser_stubs.c',
-                                   include_directories: inc,
+                                   include_directories: [inc, include_directories('tests')],
                                    dependencies: [lle_dep])
   test('Node to Source', test_node_to_source,
        suite: 'unit',
@@ -2104,7 +2104,7 @@ if fs.exists('tests/unit/test_config.c')
                            'tests/unit/test_config.c',
                            'tests/unit/test_executor_stubs.c',
                            test_config_sources + lle_shell_sources,
-                           include_directories: inc,
+                           include_directories: [inc, include_directories('tests')],
                            dependencies: [lle_dep, libm])
   test('Configuration System', test_config,
        suite: 'unit',
@@ -2123,7 +2123,7 @@ if fs.exists('tests/unit/test_posix_opts.c')
                                'tests/unit/test_posix_opts.c',
                                'tests/unit/test_executor_stubs.c',
                                test_posix_opts_sources + lle_shell_sources,
-                               include_directories: inc,
+                               include_directories: [inc, include_directories('tests')],
                                dependencies: [lle_dep, libm])
   test('POSIX Options', test_posix_opts,
        suite: 'unit',
@@ -2142,7 +2142,7 @@ if fs.exists('tests/unit/test_lush_plugin.c')
                                 'tests/unit/test_lush_plugin.c',
                                 'tests/unit/test_executor_stubs.c',
                                 test_plugin_sources + lle_shell_sources,
-                                include_directories: inc,
+                                include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Plugin System', test_lush_plugin,
        suite: 'unit',
@@ -2161,7 +2161,7 @@ if fs.exists('tests/unit/test_input_continuation.c')
                                        'tests/unit/test_input_continuation.c',
                                        'tests/unit/test_executor_stubs.c',
                                        test_input_cont_sources + lle_shell_sources,
-                                       include_directories: inc,
+                                       include_directories: [inc, include_directories('tests')],
                                        dependencies: [lle_dep, libm])
   test('Input Continuation', test_input_continuation,
        suite: 'unit',

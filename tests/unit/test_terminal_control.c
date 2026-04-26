@@ -907,7 +907,6 @@ int main(void) {
     RUN_TEST(test_terminal_capabilities_has_required_fields);
 
     printf("\n========================================\n");
-    printf("Tests passed: %d/%d\n", tests_passed, tests_run);
     printf("========================================\n");
 
     return (tests_passed == tests_run) ? 0 : 1;

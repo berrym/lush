@@ -20,47 +20,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "test_framework.h"
 
 /* ============================================================================
  * Test Framework
  * ============================================================================
  */
 
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
 
-#define TEST(name) static void test_##name(void)
 
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        int _prev_failed = tests_failed;                                       \
-        printf("  Running %s...", #name);                                      \
-        fflush(stdout);                                                        \
-        test_##name();                                                         \
-        if (tests_failed == _prev_failed) {                                    \
-            printf(" PASSED\n");                                               \
-            tests_passed++;                                                    \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT(cond, msg)                                                      \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf(" FAILED: %s\n", msg);                                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
-#define ASSERT_NOT_NULL(ptr, msg) ASSERT((ptr) != NULL, msg)
-#define ASSERT_NULL(ptr, msg) ASSERT((ptr) == NULL, msg)
-#define ASSERT_TRUE(val, msg) ASSERT((val) == true, msg)
-#define ASSERT_FALSE(val, msg) ASSERT((val) == false, msg)
-#define ASSERT_EQ(a, b, msg) ASSERT((a) == (b), msg)
-#define ASSERT_NE(a, b, msg) ASSERT((a) != (b), msg)
-#define ASSERT_STR_EQ(a, b, msg) ASSERT(strcmp((a), (b)) == 0, msg)
 
 /* ============================================================================
  * Test Helpers
@@ -990,9 +960,7 @@ int main(void) {
     RUN_TEST(fixer_result_string_all);
 
     printf("\n========================================\n");
-    printf("Tests run: %d, Passed: %d, Failed: %d\n", tests_run, tests_passed,
-           tests_failed);
     printf("========================================\n");
 
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }
