@@ -23,6 +23,7 @@
 #ifndef LUSH_FORK_H
 #define LUSH_FORK_H
 
+#include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -34,11 +35,25 @@
  * child PID in the parent. The flush is the only added behavior.
  *
  * @return Same as fork()
+ *
+ * Sandbox mode: when compiled with -DLUSH_FUZZ_SANDBOX, lush_fork()
+ * always returns -1 with errno=ENOSYS. This is used by the executor
+ * fuzz target to prevent the fuzzer from actually spawning external
+ * processes while fuzzing arbitrary attacker-controlled shell input.
+ * Every caller of lush_fork() in the codebase has POSIX-required
+ * fork-failure handling, so each automatically takes its error path
+ * when the stub is active. Production builds (no LUSH_FUZZ_SANDBOX
+ * defined) get the unmodified fork() wrapper.
  */
 static inline pid_t lush_fork(void) {
+#ifdef LUSH_FUZZ_SANDBOX
+    errno = ENOSYS;
+    return -1;
+#else
     fflush(stdout);
     fflush(stderr);
     return fork();
+#endif
 }
 
 #endif /* LUSH_FORK_H */

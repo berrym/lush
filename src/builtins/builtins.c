@@ -3153,6 +3153,16 @@ int bin_exec(int argc, char **argv) {
         return 0;
     }
 
+#ifdef LUSH_FUZZ_SANDBOX
+    /* Under fuzzing sandbox, exec must not call execvp() (which would
+     * replace the fuzzer process) or exit() on execvp failure (which
+     * would terminate it). Short-circuit any exec-with-args invocation
+     * to a no-op returning 127 — the same status the fall-through
+     * exit() would convey to a parent. */
+    (void)argv;
+    return 127;
+#endif
+
     // Check for redirection-only exec (exec < file, exec > file, etc.)
     bool has_redirections = false;
     bool has_command = false;

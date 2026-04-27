@@ -1850,7 +1850,34 @@ if fuzzing_enabled
                                 build_rpath: fuzz_rpath,
                                 build_by_default: false)
 
-    message('libFuzzer targets: fuzz_parser, fuzz_tokenizer')
+    # Executor fuzzer (libFuzzer). Unlike fuzz_parser/fuzz_tokenizer
+    # this needs the FULL core src minus lush.c (which has main()),
+    # because the executor pulls in builtins, expansion, redirection,
+    # debug, autocorrect, and the rest of the shell. fuzz_stubs.c is
+    # NOT included here — for the executor target we want the real
+    # implementations of every function the parser fuzzers stubbed.
+    # LUSH_FUZZ_SANDBOX in c_args makes lush_fork() always return -1
+    # (see include/lush_fork.h), preventing any actual external
+    # process spawning while fuzzing arbitrary attacker-controlled
+    # shell input.
+    fuzz_executor_sources = []
+    foreach s : src
+      if not s.endswith('lush.c')
+        fuzz_executor_sources += s
+      endif
+    endforeach
+
+    fuzz_executor = executable('fuzz_executor',
+                               'tests/fuzz/fuzz_executor.c',
+                               fuzz_executor_sources + lle_shell_sources,
+                               include_directories: inc,
+                               c_args: fuzz_args + ['-DLUSH_FUZZ_SANDBOX'],
+                               link_args: fuzz_link_args,
+                               build_rpath: fuzz_rpath,
+                               dependencies: [lle_dep, libm],
+                               build_by_default: false)
+
+    message('libFuzzer targets: fuzz_parser, fuzz_tokenizer, fuzz_executor')
 
   elif fuzzer_type == 'afl'
     # ========================================================================
