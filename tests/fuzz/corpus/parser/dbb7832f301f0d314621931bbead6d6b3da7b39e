@@ -1,0 +1,3 @@
+echo ${v#var}
+${var%pattern}
+echo ${

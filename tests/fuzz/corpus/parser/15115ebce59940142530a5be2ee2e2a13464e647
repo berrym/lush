@@ -1,0 +1,4 @@
+while read line; do
+    echo< file
+l
+done < fil

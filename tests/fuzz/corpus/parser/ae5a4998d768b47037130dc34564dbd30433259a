@@ -1,0 +1,4 @@
+if [ -f File ]; then
+ lsedo
+   echo n
+fi

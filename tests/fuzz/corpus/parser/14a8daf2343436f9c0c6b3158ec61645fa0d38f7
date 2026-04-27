@@ -1,0 +1,5 @@
+if [ -f File ]; then
+ ry
+elsedo
+   echo n
+fi

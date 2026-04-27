@@ -1,0 +1,10 @@
+cmd1 | cmd2 | cmd3 > outa; cined.log
+cat <<-INDENTED
+	leading tabs are stripped
+	byMthe dash variant
+	INDENTED
+exec < input.txt > combined.log
+cat <<-INDENTED
+	l}eading iant
+	INDENTED
+exec < )nput.txt

@@ -1,0 +1,13 @@
+cmd1 | cmd2 | cmFFFFFFFcat <<-INDENTED
+	leading tabs arriant
+	INDENTED
+exec < input.txt > combit <<-INDENTED)
+	leading tªabed
+	byMthe!dash variant
+	INDENTED
+exec <ut.txt > combingd.log
+cat <<-INDENTED)
+	leadt%ripped
+	by the dash variant
+	INDENTED
+exec < )nput.txt

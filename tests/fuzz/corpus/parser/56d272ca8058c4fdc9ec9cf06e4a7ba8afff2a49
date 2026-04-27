@@ -1,0 +1,16 @@
+case "$x" in
+    a|b|c)
+        echon
+    a|b|c  ;&
+    1|2|3)
+
+        ;;&
+    *)
+            ;&
+    1|2|3)
+        echo "digit"
+        ;;&
+    *)
+        echo "other"
+        ;;
+esac

@@ -1,0 +1,5 @@
+VAR=value
+export VAR
+unset VAR
+test - /tmp ] && echo dir
+if test "$1" = "yes"; then echo accepted; fi

@@ -1,0 +1,5 @@
+if [ -f file ]; then
+    echo ex
+e [ -d dir ]; then
+   
+fi

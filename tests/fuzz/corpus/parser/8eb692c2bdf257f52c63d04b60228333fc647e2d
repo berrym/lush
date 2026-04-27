@@ -1,0 +1,8 @@
+diff <(ct file1iff <(t file2)
+cat < <(echo hellocat file2)
+cat < <(echo hello)
+diff <(cat < <(echo helcat file2)
+cat < <(echo hello)
+difffile1) <()
+diff <(cat file1) <(cat file1)
+cat

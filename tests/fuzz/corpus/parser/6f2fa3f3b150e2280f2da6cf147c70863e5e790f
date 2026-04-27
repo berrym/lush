@@ -1,0 +1,5 @@
+er: ${var:=aho ${cho ${var:?error}
+echo ${#var}\teE
+echo ${6r%pattern}
+echo ${vaar:=aho ${vardo:+alt{var#pattern}
+echo ${var##pattern|

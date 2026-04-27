@@ -1,0 +1,4 @@
+var="hello world"
+for word in $var; do echo "]"; done
+lis=("one two" "three four")
+for item in "${arr[@]}"; do echo "[$item]"; done

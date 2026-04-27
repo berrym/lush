@@ -1,0 +1,6 @@
+myfunc() {
+    local x=$1
+    $x
+w
+ ecx
+$yth

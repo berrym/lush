@@ -1,0 +1,11 @@
+case "$0" in
+    start)
+       ;;
+    stop)
+;;
+    stop)
+        echo stopping
+  case "$x" in
+    a) ;;
+    b) &echo b;;
+esac

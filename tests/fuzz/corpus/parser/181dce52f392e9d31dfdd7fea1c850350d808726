@@ -1,0 +1,13 @@
+case "$x" in
+    a|3)
+
+        ;;&
+    *)
+      "digit"
+        ;;&
+    *)
+    	    echo "oth   *)
+    	    echo "other"
+er"
+        ;;
+esac

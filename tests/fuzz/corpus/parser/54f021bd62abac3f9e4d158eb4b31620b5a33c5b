@@ -1,0 +1,6 @@
+for ((i = 0; i < 5; i++)); do
+    ec $i
+done
+for ((;;)); do
+    break
+done

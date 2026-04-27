@@ -1,0 +1,7 @@
+if [ -f f; then
+    echo exists
+elif [ -d dir ]; then
+  JJJJJJho directory
+else
+  neither
+fi

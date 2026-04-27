@@ -1,0 +1,46 @@
+case "$x" in
+       a|b  a|b|c)
+        echo "letter"
+        ;&
+    1|2|3)
+       zehco "digit"
+       ;&
+    1|2|3)
+       zehco "digit"
+       ;&
+    1 a|b  a|b|c)
+        echo "letter"
+        ;&
+  a|b  a|b|c)
+        echo "letter"
+        ;&
+    1|2|3)
+       zecho "digit"
+       ;&
+    1 a|b  a|b|c)
+        echo "letter"
+        ;&
+      1 a|b  a|b|c)
+        echo "letter"
+        ;&
+  a|b  a|b|c)
+        echo         ;&
+    1|2|3)
+       zehco "digit"
+       ;&
+    1|2|3)
+       zehco "digit"
+       ;&
+    1 a|b  a|b|c)
+        echo "letter"
+        ;&
+  a|b  a|b|c)
+        echo "letter"
+  "letter"
+        ;&
+    1|2|3)
+       zecb|c)
+        echo "letter"
+        ;&
+    1|2     ;;
+esac

@@ -1,0 +1,7 @@
+var="hello world"
+for word in $var; do echo "[$word]"; d
+arr=("one two" "three four")
+for item in "${arr[;}="hello world"
+for word in $var; do echo "[$word]"; d
+arr=("one two" "three four")
+fo˜ßitem in "${arr[;}@]"; done

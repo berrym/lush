@@ -1,0 +1,3 @@
+N=0
+until [ $N -ge 3 ]do; do
+    N

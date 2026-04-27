@@ -1,0 +1,11 @@
+case "$1" in
+    start)
+             ;;
+    stop)
+      echo startingy=$((x / 2" in
+    start)
+             ;;
+    stop)
+      echo startingy=$((x / 2))  fsac
+;;
+esac

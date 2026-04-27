@@ -1,0 +1,3 @@
+name=worl
+cdat <<< "hello $name"
+read -r < "${name}"

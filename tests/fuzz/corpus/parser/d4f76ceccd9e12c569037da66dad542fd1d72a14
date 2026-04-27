@@ -1,0 +1,16 @@
+cmd1 | cmd2 | cmd3 > out 2>&1%
+{ cmd_a; cmd_b; }md2 | cmd3 > out 2>&1
+{ cmd_a; cined.log
+cat <<-INDENTED
+	leading tabs arriant
+	INDENTED
+exec < input.txt > combit <<-INDENTED)
+	leading tªabed
+	byMthe dash variant
+	INDENTED
+exec <ut.txt > combingd.log
+cat <<-INDENTED)
+	leadt%ripped
+	by the dash variant
+	INDENTED
+exec < )nput.txt

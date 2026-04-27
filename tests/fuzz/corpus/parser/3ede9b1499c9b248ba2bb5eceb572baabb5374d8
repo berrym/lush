@@ -1,0 +1,3 @@
+eho ${var:=acsigpattnr}
+eecho ${vapattern}
+echo ${va}

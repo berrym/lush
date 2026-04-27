@@ -1,0 +1,9 @@
+case "$1" in
+    start)
+    echo startign
+     ;;
+    *)
+          ;;
+    *)
+         ;;
+esac

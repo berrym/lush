@@ -1,0 +1,25 @@
+case "$x" in
+    a|b|c)
+        echo "letter"
+   case "$x" in
+jjj    a|b|c)
+     
+        echo "digit"
+        ;;&
+    *)
+            ;&
+    2|2|3)
+        echo "digit"
+        ;;&
+    *)
+  echo "letter"
+   case "$x" in
+jjj    a|b|c)
+     
+        echo!:{cas}нннннннн  ;;&
+    *)
+             ;;&
+    *)
+   cho "other"
+        ;;
+esac

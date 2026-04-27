@@ -1,0 +1,12 @@
+function greet {
+   "hello $1"
+}
+function farewell () {
+I   
+  
+    echo "hell"
+}
+function farewell () {
+   
+    ecb2"
+}

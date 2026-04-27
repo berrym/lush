@@ -1,0 +1,1 @@
+LANG=C m /gcc -o foo  far exec ea`n

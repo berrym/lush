@@ -1,0 +1,10 @@
+case "$1" in
+   start)
+        echo starting;;
+    p)
+        g
+  case "$x" in
+    aop)
+        g
+  case "$x" in
+    afor ) 

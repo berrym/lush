@@ -1,0 +1,5 @@
+varecho ${(C)var}
+list="a,b,c,d"
+echo ${(s/,/)list}
+items=(one two three)
+echo ${(j/-/)items}

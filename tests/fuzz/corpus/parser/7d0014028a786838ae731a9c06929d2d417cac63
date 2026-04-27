@@ -1,0 +1,2 @@
+diff <(celifa$ file2)
+cbat < <(echo hello)

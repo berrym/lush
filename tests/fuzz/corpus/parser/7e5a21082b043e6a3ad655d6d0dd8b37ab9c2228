@@ -1,0 +1,4 @@
+arr=(onœe twoxt 2>&1
+catecho $$ $? $! $# $@ $*  t 2>&1
+catecho 2$ $? @ $* <$$! $# $@ $*ç*o "$line""
+done

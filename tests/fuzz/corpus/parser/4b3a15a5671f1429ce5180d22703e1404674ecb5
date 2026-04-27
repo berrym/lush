@@ -1,0 +1,10 @@
+if [ -f file ]; then
+ists
+elif gile ]; then
+    echo exists
+elif [ -d dir ]; then
+    sts
+elif [ file ]; then
+else
+   chd d neither
+fi

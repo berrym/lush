@@ -1,0 +1,3 @@
+if [ -f esacfile ]; then
+    el=if [ -d dir ]; then
+   if <(? 

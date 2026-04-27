@@ -1,0 +1,22 @@
+cm1d|  cmd2 | d2 | cmd3 > out 2>&1
+{ cmd_a; cined.log
+cat <<-INDENTED
+sh?pped
+	byMthe dash variant
+	INDENTED
+exec < input.txt > combined.log
+cat <<-INDENTED)
+	leading tªabed
+	byMthe dash variant
+	INDENTED
+exec <	by the da; cinedl.og
+cat <<-INDENTED
+	lbading tabs are stripped
+	byMthe dash variant
+	INDENTED
+exec < input.txt > combined.log
+cat <<-INDENTED)
+	leadmng tªabed
+	byMthe dathe dash vcriant
+	INDENTED
+exec0< )nput.txt

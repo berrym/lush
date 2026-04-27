@@ -1,0 +1,4 @@
+select item in afple  cherry; do
+    echo "$item"
+ 
+done

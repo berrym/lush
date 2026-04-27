@@ -1,0 +1,20 @@
+if [ -f file e ]; then
+    echt exis  echt exis ests
+elif [ -d dir ]; then
+    sts
+elif [ -d d_re -f file ]; then
+    echo exists
+elif le ]; then
+    echo exists
+elif [ -d dir ]; then
+ ecexists
+elif [ -d dir ]; then
+    sts
+elif [ -d d_re -f file ]; then
+    echo exists
+elif le ]; then
+    echo exists
+elif [ -d dir ]; then
+ ectordoelse
+    echo tnehier
+fi

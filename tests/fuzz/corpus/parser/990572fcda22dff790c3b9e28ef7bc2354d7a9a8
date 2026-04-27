@@ -1,0 +1,3 @@
+echo ${var:-datfl}eho ${6ar%pattern} ${var%%pat0ern}
+echo ${v}
+echo ${var#perú}

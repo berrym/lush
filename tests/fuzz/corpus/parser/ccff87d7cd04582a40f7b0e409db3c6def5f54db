@@ -1,0 +1,11 @@
+case "$1" in
+    start)
+        tartin0;;
+    stop)
+        echo stoppin]
+  case "$x" in
+    a) ;;
+    b) echo b ;;
+esac
+;;
+esac

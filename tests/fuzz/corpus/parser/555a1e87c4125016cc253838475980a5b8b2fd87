@@ -1,0 +1,9 @@
+echo ${var:-default}
+echo ${var:=assign}
+echo ${var:+alternate}
+echo ${var:?error}
+echo ${#var}
+echo ${var%pattern}
+echo ${var%%pattern}
+echo ${var#pattern}
+echo ${var##pattern}

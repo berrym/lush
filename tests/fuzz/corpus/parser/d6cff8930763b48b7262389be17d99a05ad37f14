@@ -1,0 +1,6 @@
+echo *(.)
+echo *(/)
+echo *(N)
+echo *(.L+1k)
+echo(‘_m[1])
+echo **/*.c(.)

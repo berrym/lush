@@ -1,0 +1,2 @@
+; e{rgot: $line"; }
+echo "input" >&${reader[1]}

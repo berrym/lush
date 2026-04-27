@@ -1,0 +1,1 @@
+time ls | time -pt | time -l

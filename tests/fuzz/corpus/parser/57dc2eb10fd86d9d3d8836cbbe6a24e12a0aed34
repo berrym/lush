@@ -1,0 +1,3 @@
+if [ -f cale ]; then
+    echo exists
+el=if [ -d dir ]r ]; then'eith

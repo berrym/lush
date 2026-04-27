@@ -1,0 +1,9 @@
+if [ -f f; then
+   ecxists
+elif [ -d]; then
+  ectory
+else
+  nory
+else
+  n
+vih

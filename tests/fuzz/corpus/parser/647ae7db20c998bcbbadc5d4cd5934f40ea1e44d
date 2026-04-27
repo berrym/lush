@@ -1,0 +1,10 @@
+if [ -f file ]; then
+    echo exists
+elif file ]; then
+    echo exists
+elif [ -d dir ]; then
+   co ; then
+    echo directory
+else
+    echo neither
+fi

@@ -1,0 +1,4 @@
+name=PAT{(P)name}
+ref=HOME
+value=${(P)reME
+vf}

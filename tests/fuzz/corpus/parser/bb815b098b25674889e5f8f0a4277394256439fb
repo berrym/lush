@@ -1,0 +1,4 @@
+time ls | ls | wc -l
+time -ptime wc -l
+time -p* sletime -ptime ls | wc -l
+time -p* sleep 0 sleep 0

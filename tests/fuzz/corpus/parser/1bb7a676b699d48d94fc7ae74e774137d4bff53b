@@ -1,0 +1,16 @@
+if [ -f esacfile ]; then
+    echo exists
+e echo exists
+el=if [ -d dir ]; then
+    echo directory
+elists
+el=il=if [ -d dir ]; then
+    echo directory exists
+el=if [ -d dir ]; then
+    echo directory
+el
+elists
+eists
+el=if ir ]; then
+    echo directory
+el

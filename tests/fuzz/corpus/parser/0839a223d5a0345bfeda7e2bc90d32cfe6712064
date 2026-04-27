@@ -1,0 +1,7 @@
+case "$x" in
+    a|b  a|b|c)
+ "letter"
+        ;&  1|2|3)
+        echo "digit"
+   ;;&
+   c

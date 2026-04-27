@@ -1,0 +1,12 @@
+if [ -f file e ]; then
+    echo exis exists
+elif [ -d dir ]; then
+    sts
+elif [ -d d_re -f file ]; then
+    echo exists
+elif le ]; then
+    echo exists
+elif [ -d dir ]; then
+ ectordoelse
+    echo tnehier
+fi

@@ -1,0 +1,2 @@
+; e{recho!"got: $line"; }
+echo "input" >&${reader[1]}

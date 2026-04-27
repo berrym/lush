@@ -1,0 +1,5 @@
+echo ${var: ${var:=aho ${cho ${var:?error}
+echo ${#var}
+echo ${6r%pattern}
+echo ${vaar:=aho ${var:+alt{var#pattern}
+echo ${var##pattern}

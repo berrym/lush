@@ -1,0 +1,11 @@
+case "$1" in
+    start)
+    echo starting
+        ;;
+    stop)
+        echo stopping
+        ;;
+    *)
+        ecnknown
+        ;;
+esac

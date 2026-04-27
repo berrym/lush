@@ -1,0 +1,4 @@
+case "$1" in
+    st s|op)
+      0;;
+    s|c
