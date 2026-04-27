@@ -2175,3 +2175,26 @@ if fs.exists('tests/unit/test_input_continuation.c')
        suite: 'unit',
        timeout: 30)
 endif
+
+
+# ============================================================================
+# DIFFERENTIAL TEST HARNESS (Fuzzing Plan: mode-aware oracle comparison)
+# ============================================================================
+# Builds tests/fuzz/diff_oracle which compares lush's output against the
+# matching reference shell (dash for posix, bash for bash, zsh for zsh) on
+# each input in tests/fuzz/differential/corpus/. Inputs are mode-tagged via
+# their parent directory name. Lush mode has no oracle.
+#
+# Run examples:
+#   meson compile -C build diff_oracle
+#   ./build/diff_oracle tests/fuzz/differential/corpus/posix/*.sh
+#   ./build/diff_oracle tests/fuzz/differential/corpus/{posix,bash,zsh}/*.sh
+#
+# The harness honors LUSH_ORACLE_POSIX / LUSH_ORACLE_BASH / LUSH_ORACLE_ZSH
+# env overrides for oracle paths. Missing oracles cause that mode to be
+# skipped with a notice rather than failing the run.
+
+diff_oracle = executable('diff_oracle',
+                         'tests/fuzz/diff_oracle.c',
+                         include_directories: inc,
+                         build_by_default: false)

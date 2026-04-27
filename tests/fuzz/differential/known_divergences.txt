@@ -1,0 +1,3 @@
+# Known intentional divergences from the reference shell.
+# Format: <basename> <reason>
+# Empty for now - populate as legitimate lush extensions surface.
