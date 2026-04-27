@@ -454,13 +454,16 @@ static int process_input(const char *path, const char *lush_path) {
     json_escape(oracle_r.stdout_buf, oracle_out_e, sizeof(oracle_out_e));
 
     printf("{\"path\":\"%s\",\"mode\":\"%s\",\"oracle\":%s,\"agree\":%s,"
-           "\"allowed\":%s,\"lush\":{\"exit\":%d,\"timed_out\":%s},"
-           "\"oracle_result\":{\"exit\":%d,\"timed_out\":%s}}\n",
+           "\"allowed\":%s,\"lush\":{\"exit\":%d,\"timed_out\":%s,"
+           "\"stdout\":\"%s\"},"
+           "\"oracle_result\":{\"exit\":%d,\"timed_out\":%s,"
+           "\"stdout\":\"%s\"}}\n",
            path_e, MODE_NAMES[mode],
            oracle_present || mode == MODE_LUSH ? "true" : "false",
            divergent ? "false" : "true", allowed ? "true" : "false",
            lush_r.exit_status, lush_r.timed_out ? "true" : "false",
-           oracle_r.exit_status, oracle_r.timed_out ? "true" : "false");
+           lush_out_e, oracle_r.exit_status,
+           oracle_r.timed_out ? "true" : "false", oracle_out_e);
     fflush(stdout);
 
     free(input);
