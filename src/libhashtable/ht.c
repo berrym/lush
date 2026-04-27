@@ -21,8 +21,8 @@
 #define MAX_LOAD_FACTOR                                                        \
     (0.75) // Capacity point at which a table needs to grow and rehash
 #define MAX_CAPACITY                                                           \
-    (1 << 31) // Maximum capacity of table when it should not grow and rehash
-              // (2147483648)
+    ((size_t)1 << 31) // Maximum capacity of table when it should not grow and
+                      // rehash (2147483648)
 #define GROWTH_FACTOR (2) // Factor by which a table's capacity should grow
 
 typedef struct ht_bucket {
@@ -188,7 +188,7 @@ static void __ht_rehash(ht_t *ht) {
     size_t capacity;
 
     if (ht->used_buckets + 1 < (size_t)(ht->capacity * MAX_LOAD_FACTOR) ||
-        (ssize_t)ht->capacity >= MAX_CAPACITY) {
+        ht->capacity >= MAX_CAPACITY) {
         return;
     }
 
