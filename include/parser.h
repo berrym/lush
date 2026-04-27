@@ -222,6 +222,27 @@ void parser_pop_context(parser_t *parser);
 void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
                                 const char *help, const char *fmt, ...);
 
+/**
+ * @brief Add a parser error at an explicit source location, with help
+ *
+ * Identical to parser_error_add_with_help() but the location is
+ * provided by the caller rather than inferred from the parser's
+ * current token. Use when the construct that caused the error is
+ * not at the parser's current position — for example,
+ * unterminated-heredoc errors should point at the `<<` operator
+ * (long since past) rather than at end-of-input.
+ *
+ * @param parser Parser instance
+ * @param code Error code
+ * @param loc Source location of the offending construct
+ * @param help Optional help message (can be NULL)
+ * @param fmt Printf-style format string for error message
+ * @param ... Format arguments
+ */
+void parser_error_add_with_help_at(parser_t *parser, shell_error_code_t code,
+                                   source_location_t loc, const char *help,
+                                   const char *fmt, ...);
+
 /* ============================================================================
  * Recursion Depth Tracking (Stack Overflow Protection)
  * ============================================================================

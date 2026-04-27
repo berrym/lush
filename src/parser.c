@@ -63,7 +63,7 @@ static node_t *parse_anonymous_function(parser_t *parser);
 bool is_posix_mode_enabled(void);
 static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
                                      bool strip_tabs, bool expand_variables,
-                                     size_t op_position);
+                                     source_location_t op_loc);
 static void set_parser_error(parser_t *parser, const char *message);
 static bool expect_token(parser_t *parser, token_type_t expected);
 
@@ -387,18 +387,14 @@ size_t parser_get_recursion_depth(parser_t *parser) {
 /**
  * @brief Add a structured error with context and help hint
  */
-void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
-                                const char *help, const char *fmt, ...) {
+void parser_error_add_with_help_at(parser_t *parser, shell_error_code_t code,
+                                   source_location_t loc, const char *help,
+                                   const char *fmt, ...) {
     if (!parser) {
         return;
     }
 
-    /* Get current token for location */
-    token_t *current = tokenizer_current(parser->tokenizer);
-    source_location_t loc =
-        token_to_source_location(current, parser->source_name);
-
-    /* Create the error */
+    /* Create the error at the caller-supplied location */
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -445,6 +441,31 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
 
     /* Also set legacy error flag for compatibility */
     parser->has_error = true;
+}
+
+void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
+                                const char *help, const char *fmt, ...) {
+    if (!parser) {
+        return;
+    }
+
+    /* Default location: current token's position. Delegate the rest
+     * to the _at variant so the two paths share one implementation. */
+    token_t *current = tokenizer_current(parser->tokenizer);
+    source_location_t loc =
+        token_to_source_location(current, parser->source_name);
+
+    va_list args;
+    va_start(args, fmt);
+    /* Convert variadic args into a fixed string then forward — the
+     * _at variant takes its own variadic. shell_error already handles
+     * vsnprintf internally; here we just need to hand off the formatted
+     * message. Simplest: format here, pass as a literal "%s" + buffer. */
+    char message_buf[1024];
+    vsnprintf(message_buf, sizeof(message_buf), fmt, args);
+    va_end(args);
+
+    parser_error_add_with_help_at(parser, code, loc, help, "%s", message_buf);
 }
 
 /**
@@ -1793,13 +1814,16 @@ static node_t *parse_redirection(parser_t *parser) {
         return NULL;
     }
 
-    /* Capture the operator's absolute source position before any
+    /* Capture the operator's full source_location_t before any
      * tokenizer_advance — that call frees the current token, so
-     * dereferencing redir_token->position later would be use-after-free.
-     * Used by collect_heredoc_content (issue #51) to anchor the body
-     * search at THIS operator instead of scanning the whole input from
-     * byte 0 (which finds the wrong `<<` when delimiters repeat). */
-    size_t op_position = redir_token->position;
+     * dereferencing redir_token later would be use-after-free.
+     * source_location_t is the project's unified position primitive
+     * (shell_error.h:33-39); using it here keeps the heredoc body
+     * search consistent with how every other parser path tracks
+     * positions, and lets the unterminated-heredoc error point at
+     * the actual operator rather than at SOURCE_LOC_UNKNOWN. */
+    source_location_t op_loc =
+        token_to_source_location(redir_token, parser->source_name);
 
     node_type_t node_type;
     switch (redir_token->type) {
@@ -1959,7 +1983,7 @@ static node_t *parse_redirection(parser_t *parser) {
         // Collect the here document content (this will advance the tokenizer
         // further)
         char *content = collect_heredoc_content(parser, delimiter, strip_tabs,
-                                                expand_variables, op_position);
+                                                expand_variables, op_loc);
         if (!content) {
             free(delimiter);
             free_node_tree(redir_node);
@@ -2068,7 +2092,7 @@ static node_t *parse_redirection(parser_t *parser) {
  */
 static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
                                      bool strip_tabs, bool expand_variables,
-                                     size_t op_position) {
+                                     source_location_t op_loc) {
     (void)expand_variables; /* Expansion handled during execution phase */
     if (!parser || !delimiter) {
         return NULL;
@@ -2076,12 +2100,11 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 
     tokenizer_t *tokenizer = parser->tokenizer;
 
-    // Find the start of the here document content by searching for << delimiter
-    // in input
-    size_t content_start = 0;
-
-    // Look for "<<" followed by the delimiter in the input
-    // For quoted delimiters, we need to match without quotes
+    /* Strip outer quotes from the delimiter if present so body lines
+     * compare against the user-visible terminator text (`'END'` →
+     * `END`, `"EOF"` → `EOF`). Used only for the line-by-line
+     * terminator match below; the delimiter SPEC in the input is not
+     * re-parsed (see content_start computation). */
     const char *match_delimiter = delimiter;
     char *unquoted_delimiter = NULL;
     if ((delimiter[0] == '"' || delimiter[0] == '\'') &&
@@ -2096,87 +2119,45 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
         }
     }
 
-    (void)strlen(match_delimiter); /* Delimiter matching uses strcmp */
-
-    /* Anchor the search at THIS operator's source position (issue #51).
-     * Previously this was `for (size_t i = 0; ...)`, which always found
-     * the FIRST `<<` in the input that matched the delimiter. When two
-     * heredocs in the same input shared a delimiter, the search for the
-     * second always re-found the first, then reset tokenizer->position
-     * backwards — causing the parser to re-parse the second heredoc
-     * forever. The op_position is captured by the parser before its
-     * tokenizer_advance frees the operator token (UAF would otherwise
-     * occur). */
-    for (size_t i = op_position; i < tokenizer->input_length - 1; i++) {
-        if (tokenizer->input[i] == '<' && tokenizer->input[i + 1] == '<') {
-            // Found <<, now check if delimiter follows
-            size_t delimiter_pos = i + 2;
-
-            // Skip optional '-' for <<-
-            if (delimiter_pos < tokenizer->input_length &&
-                tokenizer->input[delimiter_pos] == '-') {
-                delimiter_pos++;
-            }
-
-            // Skip whitespace
-            while (delimiter_pos < tokenizer->input_length &&
-                   (tokenizer->input[delimiter_pos] == ' ' ||
-                    tokenizer->input[delimiter_pos] == '\t')) {
-                delimiter_pos++;
-            }
-
-            // Try to match delimiter - first check if it's quoted in the input
-            bool found_delimiter = false;
-            size_t delim_end_pos = delimiter_pos;
-
-            // Check for quoted delimiter in input (like 'EOF' or "EOF")
-            if (delimiter_pos < tokenizer->input_length &&
-                (tokenizer->input[delimiter_pos] == '\'' ||
-                 tokenizer->input[delimiter_pos] == '"')) {
-                char quote = tokenizer->input[delimiter_pos];
-                delim_end_pos = delimiter_pos + 1;
-
-                // Find matching quote
-                while (delim_end_pos < tokenizer->input_length &&
-                       tokenizer->input[delim_end_pos] != quote) {
-                    delim_end_pos++;
-                }
-
-                if (delim_end_pos < tokenizer->input_length &&
-                    tokenizer->input[delim_end_pos] == quote) {
-                    // Extract the quoted delimiter content
-                    size_t quoted_len = delim_end_pos - delimiter_pos - 1;
-                    if (quoted_len == strlen(match_delimiter) &&
-                        strncmp(&tokenizer->input[delimiter_pos + 1],
-                                match_delimiter, quoted_len) == 0) {
-                        found_delimiter = true;
-                        delim_end_pos++; // Include the closing quote
-                    }
-                }
-            } else {
-                // Check for unquoted delimiter
-                size_t match_len = strlen(match_delimiter);
-                if (delimiter_pos + match_len <= tokenizer->input_length &&
-                    strncmp(&tokenizer->input[delimiter_pos], match_delimiter,
-                            match_len) == 0) {
-                    found_delimiter = true;
-                    delim_end_pos = delimiter_pos + match_len;
-                }
-            }
-
-            if (found_delimiter) {
-                // Found our << delimiter, find the end of this line
-                content_start = delim_end_pos;
-                while (content_start < tokenizer->input_length &&
-                       tokenizer->input[content_start] != '\n') {
-                    content_start++;
-                }
-                if (content_start < tokenizer->input_length) {
-                    content_start++; // Skip the newline
-                }
-                break;
-            }
-        }
+    /* The heredoc body always begins on the line AFTER the operator's
+     * line. The parser captured the operator's source_location_t into
+     * op_loc before any tokenizer_advance freed the operator token,
+     * so op_loc.offset is a reliable absolute byte position of the
+     * `<<` operator. Scan from just past `<<` to the next newline;
+     * the byte after that newline is content_start.
+     *
+     * The previous implementation searched the entire input from byte
+     * 0 for a literal `<< delimiter` substring match, which had two
+     * unfixable defects:
+     *
+     *   - Issue #51: when two heredocs in the same input shared a
+     *     delimiter, the search for the second always found the first
+     *     and reset tokenizer->position backwards, causing the parser
+     *     to re-parse the second heredoc forever. Anchoring the
+     *     search at op_loc.offset (the previous fix) avoided one
+     *     backward jump but kept the search.
+     *
+     *   - Issue #52: the search couldn't handle shell quote-
+     *     concatenation in the delimiter spec (e.g. `<< ''ai`, where
+     *     the parser correctly resolves the delimiter to "ai" but the
+     *     input bytes show `''ai`). The literal-substring match
+     *     failed, content_start defaulted to the initial value of 0,
+     *     and body collection started at byte 0 of the input — finding
+     *     spurious terminator lines and resetting tokenizer->position
+     *     to inside the live parse, triggering O(N^2) command-list
+     *     growth in the case-arm body parser.
+     *
+     * Both classes are eliminated by computing content_start from
+     * op_loc.offset directly. The delimiter spec text in the input is
+     * not used for content_start; only for the terminator-line match
+     * below. */
+    size_t content_start = op_loc.offset + 2; /* past `<<` */
+    while (content_start < tokenizer->input_length &&
+           tokenizer->input[content_start] != '\n') {
+        content_start++;
+    }
+    if (content_start < tokenizer->input_length) {
+        content_start++; /* skip the newline */
     }
 
     // Collect lines until we find the delimiter
@@ -2258,12 +2239,20 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
     // partial body. Bash warns at parse time; lush -n needs an error
     // because exit code is the only signal available to tooling.
     if (!found_delimiter_line) {
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_EOF,
-                                   "the delimiter must appear alone on a "
-                                   "line; for <<- it may be preceded by tabs",
-                                   "unterminated here-document: expected "
-                                   "delimiter '%s' but reached end of input",
-                                   match_delimiter);
+        /* Use the OPERATOR's source location (op_loc), not the parser's
+         * current position (which by now is at end-of-input). Pointing
+         * the diagnostic at the `<<` operator is far more useful than
+         * pointing at EOF. parser_error_add_with_help_at() routes the
+         * error through the same context-stack / source-line / legacy-
+         * compatibility plumbing as parser_error_add_with_help, just
+         * with an explicit location. */
+        parser_error_add_with_help_at(
+            parser, SHELL_ERR_UNEXPECTED_EOF, op_loc,
+            "the delimiter must appear alone on a line; for <<- it may "
+            "be preceded by tabs",
+            "unterminated here-document: expected delimiter '%s' but "
+            "reached end of input",
+            match_delimiter);
         free(content);
         if (unquoted_delimiter) {
             free(unquoted_delimiter);

@@ -602,6 +602,38 @@ TEST(heredoc_repeated_delimiter_no_loop) {
     }
 }
 
+/* Issue #52: case-arm body with heredoc whose delimiter spec includes
+ * shell quote-concatenation (`<< ''ai`, where `''` is empty quoted
+ * concatenated with `ai` to form delimiter "ai"). The parser correctly
+ * resolves the delimiter to "ai", but collect_heredoc_content's old
+ * input scan-from-zero couldn't find the literal `<< 'ai'` substring
+ * (the input has `<< ''ai`), defaulted content_start to 0, and then
+ * body collection from byte 0 found a spurious "ai" terminator and
+ * reset tokenizer->position back into the live parse — triggering
+ * O(N^2) command-list growth in the case-arm body parser. The fix
+ * computes content_start from the operator's source_location_t
+ * directly, eliminating the input scan entirely.
+ *
+ * Pre-fix wall-clock on the 37-byte trigger: ~4 seconds at 99% CPU.
+ * Post-fix: under 50 ms; budget 1 second to tolerate slow CI. */
+TEST(heredoc_empty_quoted_concat_in_case_no_loop) {
+    /* 37 bytes: case + heredoc with empty-quote-concat delimiter,
+     * unterminated. */
+    const char *input = "case \"$1\" in\n   t)\nai\no[<< ''ai\n \nwac\n";
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    ASSERT_PARSE_FAILS(input);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long elapsed_ms = (end.tv_sec - start.tv_sec) * 1000 +
+                      (end.tv_nsec - start.tv_nsec) / 1000000;
+    if (elapsed_ms > 1000) {
+        TEST_FAIL_FMT("parse took %ld ms (budget 1000 ms); the issue #52 "
+                      "case-arm-heredoc-empty-delimiter regression has "
+                      "returned",
+                      elapsed_ms);
+    }
+}
+
 /* ============================================================================
  * MAIN
  * ============================================================================
@@ -813,6 +845,7 @@ int main(void) {
     printf("Regression:\n");
     reset_category();
     RUN_TEST(heredoc_repeated_delimiter_no_loop);
+    RUN_TEST(heredoc_empty_quoted_concat_in_case_no_loop);
     print_category_summary("Regression");
 
     return TEST_RESULT();

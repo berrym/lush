@@ -42,6 +42,7 @@
 #define LUSH_TEST_SHELL_HARNESS_H
 
 #include "executor.h"
+#include "lush_fork.h"
 #include "node.h"
 #include "parser.h"
 #include "test_framework.h"
@@ -230,7 +231,11 @@ static inline run_result_t run_shell_subprocess(const char *src) {
         return r;
     }
 
-    pid_t pid = fork();
+    /* Use the project's fork wrapper so any pending stdio buffer
+     * content is flushed before the child inherits it — otherwise
+     * captured output may include duplicated bytes from the parent's
+     * pre-fork stdio state. */
+    pid_t pid = lush_fork();
     if (pid < 0) {
         close(out_pipe[0]);
         close(out_pipe[1]);
