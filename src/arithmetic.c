@@ -1447,6 +1447,17 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             break;
         }
 
+        // '(' and ')' are paren-balance markers with eval==NULL, normally
+        // removed by shunt_op when the matching ')' is processed. If one
+        // survives to end-of-expression, the input was unbalanced; falling
+        // through to the binary-apply path below would call op->eval which
+        // is NULL. Treat it the same as shunt_op's ')' branch does.
+        if (op->op == '(' || op->op == ')') {
+            arithm_set_error("mismatched parentheses");
+            ctx.errflag = true;
+            break;
+        }
+
         // Handle ternary operator specially
         if (op->op == CH_TERNARY_C) {
             // We have the false value on the stack
