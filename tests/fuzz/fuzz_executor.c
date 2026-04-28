@@ -27,7 +27,13 @@
  * Build with libFuzzer:
  *   CC=clang meson setup build -Denable_fuzzing=true -Dfuzzer=libfuzzer
  *   meson compile -C build fuzz_executor
- *   ./build/fuzz_executor tests/fuzz/corpus/parser/ -max_len=4096 -timeout=10
+ *   ./build/fuzz_executor tests/fuzz/corpus/parser/ \
+ *       -max_len=4096 -timeout=25 -close_fd_mask=3
+ *
+ * -timeout=25 matches libFuzzer's recommended floor and tolerates
+ *   sandbox-vs-production behavior gaps on infinite-loop-shaped inputs
+ *   (issue #63). -close_fd_mask=3 silences per-input executor stderr
+ *   noise so the log stays useful.
  */
 
 #include "executor.h"
