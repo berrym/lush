@@ -1837,6 +1837,60 @@ static int evaluate_single_test(char **argv, int start, int end) {
  * @param argv Argument vector with options and variable name
  * @return 0 on success, 1 on EOF or error
  */
+/**
+ * @brief Read one line from a raw file descriptor, byte at a time
+ *
+ * Stops at '\n' (consumed but not included in result) or EOF. Returns
+ * a malloc'd NUL-terminated string on success, NULL on immediate EOF
+ * or allocation failure.
+ *
+ * Bypasses stdio because the read builtin must work after the
+ * redirection layer dup2()s a new fd into STDIN_FILENO. Stdio's stdin
+ * FILE* may carry a stale feof flag set during the shell's own script
+ * reading from the original stdin — getline()/fgets() would then
+ * return -1 immediately without ever consulting the new fd. Matches
+ * what bash and zsh do for the read builtin (issue #55).
+ *
+ * @param fd File descriptor to read from
+ * @return Newly allocated line (caller frees), or NULL on EOF / OOM
+ */
+static char *read_line_from_fd(int fd) {
+    size_t cap = 64;
+    size_t len = 0;
+    char *line = malloc(cap);
+    if (!line) {
+        return NULL;
+    }
+    bool got_any_byte = false;
+    while (1) {
+        char c;
+        ssize_t n = read(fd, &c, 1);
+        if (n <= 0) {
+            break;
+        }
+        got_any_byte = true;
+        if (c == '\n') {
+            break;
+        }
+        if (len + 1 >= cap) {
+            cap *= 2;
+            char *grown = realloc(line, cap);
+            if (!grown) {
+                free(line);
+                return NULL;
+            }
+            line = grown;
+        }
+        line[len++] = c;
+    }
+    if (!got_any_byte) {
+        free(line);
+        return NULL;
+    }
+    line[len] = '\0';
+    return line;
+}
+
 int bin_read(int argc, char **argv) {
     // Option flags
     char *prompt = NULL;
@@ -2031,8 +2085,9 @@ int bin_read(int argc, char **argv) {
             printf("\n");
         }
     } else {
-        // Normal line reading
-        line = get_input(stdin);
+        // Normal line reading via raw read() syscall — see
+        // read_line_from_fd above for why stdio is unsafe here.
+        line = read_line_from_fd(fd);
 
         // Print newline if silent mode (since echo was disabled)
         if (silent_mode && is_tty && line) {
