@@ -2740,6 +2740,46 @@ int bin_disown(int argc, char **argv) {
 }
 
 /**
+ * @brief Emit a structured "shift count exceeds positional parameter count"
+ *        error for bin_shift.
+ *
+ * Both the function-scope and global-scope paths in bin_shift detect
+ * overshift the same way and need the same diagnostic. Centralised here
+ * so the reporting block is one place, not two near-duplicates.
+ *
+ * Modeled on the bin_let error pattern: source_location_t from the
+ * builtin call site, executor context stack, builtin-specific while
+ * line, help suggestion. Returns 1 so callers can `return` the result
+ * directly.
+ *
+ * @param shift_count Requested shift amount
+ * @param available   Actual count of positional parameters
+ * @return Always 1 (so callers can `return report_shift_overflow(...)`)
+ */
+static int report_shift_overflow(int shift_count, int available) {
+    source_location_t loc = builtin_get_source_location();
+    shell_error_t *error = shell_error_create(
+        SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+        "shift count %d exceeds %d positional parameter%s",
+        shift_count, available, available == 1 ? "" : "s");
+    if (error) {
+        if (current_executor) {
+            for (size_t i = 0; i < current_executor->context_depth; i++) {
+                if (current_executor->context_stack[i]) {
+                    shell_error_push_context(
+                        error, "%s", current_executor->context_stack[i]);
+                }
+            }
+        }
+        shell_error_push_context(error, "in builtin 'shift'");
+        shell_error_set_suggestion(error, "shift count must be <= $#");
+        shell_error_display(error, stderr, isatty(STDERR_FILENO));
+        shell_error_free(error);
+    }
+    return 1;
+}
+
+/**
  * @brief Shift positional parameters left
  *
  * Shifts positional parameters ($1, $2, etc.) left by n positions.
@@ -2747,7 +2787,7 @@ int bin_disown(int argc, char **argv) {
  *
  * @param argc Argument count
  * @param argv Argument vector (argv[1] is optional shift count)
- * @return 0 on success, 1 on invalid argument
+ * @return 0 on success, 1 on invalid argument or overshift
  */
 int bin_shift(int argc, char **argv) {
     int shift_count = 1; // Default shift by 1
@@ -2772,9 +2812,10 @@ int bin_shift(int argc, char **argv) {
         int func_argc = argc_str ? atoi(argc_str) : 0;
         free(argc_str);
 
-        // Limit shift count to available parameters
+        // POSIX leaves overshift unspecified; dash, bash, and zsh all
+        // diagnose and return non-zero. Match the reference shells.
         if (shift_count > func_argc) {
-            shift_count = func_argc;
+            return report_shift_overflow(shift_count, func_argc);
         }
 
         if (shift_count > 0 && func_argc > 0) {
@@ -2826,10 +2867,10 @@ int bin_shift(int argc, char **argv) {
     // argv[0])
     int available_params = shell_argc > 1 ? shell_argc - 1 : 0;
 
-    // If shift count exceeds available parameters, limit to available count
-    // This matches POSIX behavior - don't error, just shift what's available
+    // POSIX leaves overshift unspecified; dash, bash, and zsh all
+    // diagnose and return non-zero. Match the reference shells.
     if (shift_count > available_params) {
-        shift_count = available_params;
+        return report_shift_overflow(shift_count, available_params);
     }
 
     // Perform the shift by adjusting shell_argc and shell_argv
