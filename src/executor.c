@@ -145,6 +145,7 @@ static node_t *copy_node_simple(node_t *original);
 static void copy_function_definitions(executor_t *dest, executor_t *src);
 char *expand_if_needed(executor_t *executor, const char *text);
 static char *expand_quoted_string(executor_t *executor, const char *str);
+static char *expand_arg_node(executor_t *executor, node_t *node);
 static char *expand_ansi_c_string(const char *str, size_t len);
 static bool is_assignment(const char *text);
 static int execute_assignment(executor_t *executor, const char *assignment);
@@ -2924,16 +2925,67 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
         return 0; // Empty anonymous function
     }
 
+    /* Collect and expand trailing arguments BEFORE pushing the
+     * function scope. Arg expressions (e.g. $vars inside double-quoted
+     * args) must resolve in the caller's scope, mirroring how
+     * build_argv_from_ast / execute_function_call do for regular
+     * function calls. The expanded strings are then set as positional
+     * parameters once the new scope is active. */
+    int argc = 0;
+    for (node_t *arg = body->next_sibling; arg; arg = arg->next_sibling) {
+        argc++;
+    }
+
+    char **argv = NULL;
+    if (argc > 0) {
+        argv = calloc((size_t)argc, sizeof(char *));
+        if (!argv) {
+            set_executor_error(executor,
+                               "Failed to allocate anonymous function args");
+            return 1;
+        }
+        int i = 0;
+        for (node_t *arg = body->next_sibling; arg; arg = arg->next_sibling) {
+            /* Use the shared type-aware expansion helper so anon-function
+             * args follow the same per-node-type semantics as regular
+             * command arguments — single-quoted stays literal, double-
+             * quoted expands variables, arith / command substitution /
+             * process substitution all dispatch correctly. */
+            argv[i++] = expand_arg_node(executor, arg);
+            if (!argv[i - 1]) {
+                argv[i - 1] = strdup("");
+            }
+        }
+    }
+
     // Create a new scope for the anonymous function
     if (symtable_push_scope(executor->symtable, SCOPE_FUNCTION,
                             "<anonymous>") != 0) {
+        for (int i = 0; i < argc; i++) {
+            free(argv[i]);
+        }
+        free(argv);
         set_executor_error(executor,
                            "Failed to create anonymous function scope");
         return 1;
     }
 
-    // Set positional parameters ($# = 0, no arguments)
-    symtable_set_local_var(executor->symtable, "#", "0");
+    // Set positional parameters $1..$N from the pre-expanded args.
+    for (int i = 0; i < argc; i++) {
+        char param_name[16];
+        snprintf(param_name, sizeof(param_name), "%d", i + 1);
+        symtable_set_local_var(executor->symtable, param_name,
+                               argv[i] ? argv[i] : "");
+    }
+    char argc_str[16];
+    snprintf(argc_str, sizeof(argc_str), "%d", argc);
+    symtable_set_local_var(executor->symtable, "#", argc_str);
+
+    // Free the expanded arg strings; symtable owns its own copies.
+    for (int i = 0; i < argc; i++) {
+        free(argv[i]);
+    }
+    free(argv);
 
     // Execute the body
     int result = execute_node(executor, body);
@@ -3145,6 +3197,59 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
  * @param argc Output: argument count
  * @return NULL-terminated argv array (caller must free), or NULL on error
  */
+/**
+ * @brief Expand a single argument AST node to its string value.
+ *
+ * Dispatches by node type to the correct expansion routine:
+ *   - NODE_STRING_LITERAL: no expansion (single-quoted; literal). If the
+ *     content opens with $' and FEATURE_ANSI_QUOTING is enabled, decode
+ *     it as an ANSI-C $'...' string instead.
+ *   - NODE_STRING_EXPANDABLE: expand_quoted_string (double-quoted; vars
+ *     expanded, glob/brace preserved by caller policy)
+ *   - NODE_ARITH_EXP: expand_arithmetic ($((...)))
+ *   - NODE_COMMAND_SUB: expand_command_substitution ($(...) or `...`)
+ *   - NODE_PROC_SUB_IN / NODE_PROC_SUB_OUT: expand_process_substitution
+ *   - anything else: expand_if_needed (general variable/expansion path)
+ *
+ * Used by build_argv_from_ast for command arguments and by
+ * execute_anonymous_function for trailing positional args. Single
+ * source of truth for per-node-type argument expansion across the
+ * executor; callers needing a different post-expansion policy
+ * (glob/brace/word-split) layer that on top of the value returned here.
+ *
+ * @param executor Executor context
+ * @param node Argument node (must have val.str non-NULL)
+ * @return Newly malloc'd expanded string, or NULL only if the
+ *         underlying expansion fails (notably process substitution).
+ */
+static char *expand_arg_node(executor_t *executor, node_t *node) {
+    if (!node || !node->val.str) {
+        return strdup("");
+    }
+    switch (node->type) {
+    case NODE_STRING_LITERAL:
+        if (node->val.str[0] == '$' && node->val.str[1] == '\'' &&
+            shell_mode_allows(FEATURE_ANSI_QUOTING)) {
+            size_t len = strlen(node->val.str);
+            if (len >= 3 && node->val.str[len - 1] == '\'') {
+                return expand_ansi_c_string(node->val.str + 2, len - 3);
+            }
+        }
+        return strdup(node->val.str);
+    case NODE_STRING_EXPANDABLE:
+        return expand_quoted_string(executor, node->val.str);
+    case NODE_ARITH_EXP:
+        return expand_arithmetic(executor, node->val.str);
+    case NODE_COMMAND_SUB:
+        return expand_command_substitution(executor, node->val.str);
+    case NODE_PROC_SUB_IN:
+    case NODE_PROC_SUB_OUT:
+        return expand_process_substitution(executor, node);
+    default:
+        return expand_if_needed(executor, node->val.str);
+    }
+}
+
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc) {
     if (!executor || !command || !argc) {
@@ -3199,51 +3304,14 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                 }
 
                 if (!is_delimiter) {
-                    char *expanded_arg;
-
-                    // Handle different node types appropriately
-                    if (child->type == NODE_STRING_LITERAL) {
-                        // Check for ANSI-C quoting $'...'
-                        if (child->val.str[0] == '$' &&
-                            child->val.str[1] == '\'' &&
-                            shell_mode_allows(FEATURE_ANSI_QUOTING)) {
-                            // Find closing quote and expand
-                            size_t len = strlen(child->val.str);
-                            if (len >= 3 && child->val.str[len - 1] == '\'') {
-                                expanded_arg = expand_ansi_c_string(
-                                    child->val.str + 2, len - 3);
-                            } else {
-                                expanded_arg = strdup(child->val.str);
-                            }
-                        } else {
-                            // Regular single-quoted strings: no expansion at
-                            // all
-                            expanded_arg = strdup(child->val.str);
-                        }
-                    } else if (child->type == NODE_STRING_EXPANDABLE) {
-                        // Double-quoted strings: expand variables but not globs
-                        expanded_arg =
-                            expand_quoted_string(executor, child->val.str);
-                    } else if (child->type == NODE_ARITH_EXP) {
-                        // Arithmetic expansion: $((expr))
-                        expanded_arg =
-                            expand_arithmetic(executor, child->val.str);
-                    } else if (child->type == NODE_COMMAND_SUB) {
-                        // Command substitution: $(cmd) or `cmd`
-                        expanded_arg = expand_command_substitution(
-                            executor, child->val.str);
-                    } else if (child->type == NODE_PROC_SUB_IN ||
-                               child->type == NODE_PROC_SUB_OUT) {
-                        // Process substitution: <(cmd) or >(cmd)
-                        expanded_arg =
-                            expand_process_substitution(executor, child);
-                        if (!expanded_arg) {
-                            goto cleanup_and_fail;
-                        }
-                    } else {
-                        // Regular variables and other expandable content
-                        expanded_arg =
-                            expand_if_needed(executor, child->val.str);
+                    /* Type-aware expansion via the shared helper.
+                     * Process substitution is the only path that
+                     * propagates failure as NULL — everything else
+                     * either succeeds or returns "". */
+                    char *expanded_arg = expand_arg_node(executor, child);
+                    if (!expanded_arg && (child->type == NODE_PROC_SUB_IN ||
+                                          child->type == NODE_PROC_SUB_OUT)) {
+                        goto cleanup_and_fail;
                     }
 
                     if (getenv("NEW_PARSER_DEBUG")) {

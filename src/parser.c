@@ -882,6 +882,173 @@ static node_t *parse_pipeline(parser_t *parser) {
 }
 
 /**
+ * @brief Try to consume one shell-style word argument from the current token.
+ *
+ * Tests whether the current token is "argument-like" (any of TOK_STRING,
+ * TOK_EXPANDABLE_STRING, TOK_ARITH_EXP, TOK_COMMAND_SUB, TOK_BACKQUOTE,
+ * word-like tokens, keyword tokens, TOK_VARIABLE, TOK_RBRACKET,
+ * TOK_ASSIGN, TOK_GLOB, TOK_QUESTION, TOK_NOT_EQUAL). If so, runs the
+ * adjacent-token concatenation loop (consecutive tokens with no
+ * intervening whitespace fold into one logical argument), classifies
+ * the result into the appropriate node type (NODE_STRING_LITERAL for
+ * single-quoted, NODE_STRING_EXPANDABLE for double-quoted or any
+ * multi-token concatenation, NODE_ARITH_EXP for arithmetic expansion,
+ * NODE_COMMAND_SUB for $(...) / `...`, NODE_VAR otherwise), and adds
+ * the resulting child node to `parent`. Advances the tokenizer past
+ * every consumed token.
+ *
+ * On allocation failure, sets parser->has_error and returns false; the
+ * caller is responsible for cleaning up `parent` and propagating.
+ *
+ * Used by parse_simple_command (regular command arguments) and
+ * parse_anonymous_function (trailing positional args after `() { body }`).
+ * Single source of truth for argument-collection semantics across the
+ * parser; both call sites get identical acceptance, concatenation, and
+ * classification behavior.
+ *
+ * @param parser Parser instance
+ * @param parent Node to append the collected argument as a child of
+ * @return true if an argument was consumed and added (caller can loop);
+ *         false if the current token is not argument-like (caller stops)
+ *         or allocation failed (parser->has_error is set)
+ */
+static bool collect_word_argument(parser_t *parser, node_t *parent) {
+    token_t *arg_token = tokenizer_current(parser->tokenizer);
+    if (!arg_token) {
+        return false;
+    }
+
+    /* Acceptance test — same set parse_simple_command has used since the
+     * unified-concatenation logic was introduced. */
+    bool accepted = (arg_token->type == TOK_STRING ||
+                     arg_token->type == TOK_EXPANDABLE_STRING ||
+                     arg_token->type == TOK_ARITH_EXP ||
+                     arg_token->type == TOK_COMMAND_SUB ||
+                     arg_token->type == TOK_BACKQUOTE ||
+                     token_is_word_like(arg_token->type) ||
+                     token_is_keyword(arg_token->type) ||
+                     arg_token->type == TOK_VARIABLE ||
+                     arg_token->type == TOK_RBRACKET ||
+                     arg_token->type == TOK_ASSIGN ||
+                     arg_token->type == TOK_GLOB ||
+                     arg_token->type == TOK_QUESTION ||
+                     arg_token->type == TOK_NOT_EQUAL);
+    if (!accepted) {
+        return false;
+    }
+
+    /* Adjacency-collection: gather consecutive arg-like tokens that have
+     * no whitespace between them. `pre$VAR` becomes one logical arg
+     * instead of two. */
+    typedef struct {
+        token_type_t type;
+        char *text;
+    } token_info_t;
+
+    token_info_t *collected_tokens = NULL;
+    int token_count = 0;
+    size_t last_end_pos = arg_token->position + strlen(arg_token->text);
+
+    while (arg_token && (arg_token->type == TOK_STRING ||
+                         arg_token->type == TOK_EXPANDABLE_STRING ||
+                         arg_token->type == TOK_ARITH_EXP ||
+                         arg_token->type == TOK_COMMAND_SUB ||
+                         arg_token->type == TOK_BACKQUOTE ||
+                         token_is_word_like(arg_token->type) ||
+                         token_is_keyword(arg_token->type) ||
+                         arg_token->type == TOK_VARIABLE ||
+                         arg_token->type == TOK_RBRACKET ||
+                         arg_token->type == TOK_ASSIGN ||
+                         arg_token->type == TOK_GLOB ||
+                         arg_token->type == TOK_QUESTION ||
+                         arg_token->type == TOK_NOT_EQUAL)) {
+
+        token_info_t *new_tokens = realloc(
+            collected_tokens, (token_count + 1) * sizeof(token_info_t));
+        if (!new_tokens) {
+            for (int i = 0; i < token_count; i++) {
+                free(collected_tokens[i].text);
+            }
+            free(collected_tokens);
+            parser->has_error = true;
+            return false;
+        }
+        collected_tokens = new_tokens;
+
+        collected_tokens[token_count].type = arg_token->type;
+        collected_tokens[token_count].text = strdup(arg_token->text);
+        token_count++;
+
+        last_end_pos = arg_token->position + strlen(arg_token->text);
+        tokenizer_advance(parser->tokenizer);
+        token_t *next_token = tokenizer_current(parser->tokenizer);
+
+        /* Stop collecting if next token has whitespace before it. */
+        if (next_token && next_token->position != last_end_pos) {
+            break;
+        }
+        arg_token = next_token;
+    }
+
+    /* Build a single arg node from collected tokens. */
+    if (token_count == 1) {
+        node_t *arg_node = NULL;
+        switch (collected_tokens[0].type) {
+        case TOK_STRING:
+            arg_node = new_node(NODE_STRING_LITERAL);
+            break;
+        case TOK_EXPANDABLE_STRING:
+            arg_node = new_node(NODE_STRING_EXPANDABLE);
+            break;
+        case TOK_ARITH_EXP:
+            arg_node = new_node(NODE_ARITH_EXP);
+            break;
+        case TOK_COMMAND_SUB:
+        case TOK_BACKQUOTE:
+            arg_node = new_node(NODE_COMMAND_SUB);
+            break;
+        default:
+            arg_node = new_node(NODE_VAR);
+            break;
+        }
+        if (arg_node) {
+            arg_node->val.str = strdup(collected_tokens[0].text);
+            arg_node->val_type = VAL_STR;
+            add_child_node(parent, arg_node);
+        }
+    } else if (token_count > 1) {
+        /* Multi-token concatenation: build a single NODE_STRING_EXPANDABLE
+         * with the concatenated text (matches the existing semantics in
+         * parse_simple_command). */
+        size_t total_len = 0;
+        for (int i = 0; i < token_count; i++) {
+            total_len += strlen(collected_tokens[i].text);
+        }
+        char *concatenated = malloc(total_len + 1);
+        if (concatenated) {
+            concatenated[0] = '\0';
+            for (int i = 0; i < token_count; i++) {
+                strcat(concatenated, collected_tokens[i].text);
+            }
+            node_t *arg_node = new_node(NODE_STRING_EXPANDABLE);
+            if (arg_node) {
+                arg_node->val.str = concatenated;
+                arg_node->val_type = VAL_STR;
+                add_child_node(parent, arg_node);
+            } else {
+                free(concatenated);
+            }
+        }
+    }
+
+    for (int i = 0; i < token_count; i++) {
+        free(collected_tokens[i].text);
+    }
+    free(collected_tokens);
+    return true;
+}
+
+/**
  * @brief Parse a simple command or control structure
  *
  * Dispatches to appropriate parser based on current token:
@@ -1443,134 +1610,15 @@ static node_t *parse_simple_command(parser_t *parser) {
             }
             // Not an array literal, fall through to regular argument handling
         }
-        // Handle all argument tokens with unified concatenation logic
-        if (arg_token->type == TOK_STRING ||
-            arg_token->type == TOK_EXPANDABLE_STRING ||
-            arg_token->type == TOK_ARITH_EXP ||
-            arg_token->type == TOK_COMMAND_SUB ||
-            arg_token->type == TOK_BACKQUOTE ||
-            token_is_word_like(arg_token->type) ||
-            token_is_keyword(arg_token->type) ||
-            arg_token->type == TOK_VARIABLE ||
-            arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
-            arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
-            arg_token->type == TOK_NOT_EQUAL) {
-
-            // Check for consecutive tokens that should be concatenated
-            typedef struct {
-                token_type_t type;
-                char *text;
-            } token_info_t;
-
-            token_info_t *collected_tokens = NULL;
-            int token_count = 0;
-            size_t last_end_pos = arg_token->position + strlen(arg_token->text);
-
-            // Collect all consecutive tokens without whitespace
-            while (arg_token && (arg_token->type == TOK_STRING ||
-                                 arg_token->type == TOK_EXPANDABLE_STRING ||
-                                 arg_token->type == TOK_ARITH_EXP ||
-                                 arg_token->type == TOK_COMMAND_SUB ||
-                                 arg_token->type == TOK_BACKQUOTE ||
-                                 token_is_word_like(arg_token->type) ||
-                                 token_is_keyword(arg_token->type) ||
-                                 arg_token->type == TOK_VARIABLE ||
-                                 arg_token->type == TOK_RBRACKET ||
-                                 arg_token->type == TOK_ASSIGN ||
-                                 arg_token->type == TOK_GLOB ||
-                                 arg_token->type == TOK_QUESTION ||
-                                 arg_token->type == TOK_NOT_EQUAL)) {
-
-                // Expand collected_tokens array
-                token_info_t *new_tokens = realloc(
-                    collected_tokens, (token_count + 1) * sizeof(token_info_t));
-                if (!new_tokens) {
-                    for (int i = 0; i < token_count; i++) {
-                        free(collected_tokens[i].text);
-                    }
-                    free(collected_tokens);
-                    free_node_tree(command);
-                    return NULL;
-                }
-                collected_tokens = new_tokens;
-
-                // Store token information
-                collected_tokens[token_count].type = arg_token->type;
-                collected_tokens[token_count].text = strdup(arg_token->text);
-                token_count++;
-
-                last_end_pos = arg_token->position + strlen(arg_token->text);
-                tokenizer_advance(parser->tokenizer);
-                token_t *next_token = tokenizer_current(parser->tokenizer);
-
-                // Check if the next token is adjacent (no whitespace between)
-                if (next_token && next_token->position != last_end_pos) {
-                    break; // There's whitespace between tokens
-                }
-
-                arg_token = next_token;
+        // Handle all argument tokens via the shared helper. The helper
+        // tests acceptance, runs the adjacency-concatenation loop, and
+        // creates the appropriately-classified node attached to command.
+        if (!collect_word_argument(parser, command)) {
+            if (parser->has_error) {
+                free_node_tree(command);
+                return NULL;
             }
-
-            // Create nodes based on what we collected
-            if (token_count == 1) {
-                // Single token - create appropriate node type
-                node_t *arg_node = NULL;
-                switch (collected_tokens[0].type) {
-                case TOK_STRING:
-                    arg_node = new_node(NODE_STRING_LITERAL);
-                    break;
-                case TOK_EXPANDABLE_STRING:
-                    arg_node = new_node(NODE_STRING_EXPANDABLE);
-                    break;
-                case TOK_ARITH_EXP:
-                    arg_node = new_node(NODE_ARITH_EXP);
-                    break;
-                case TOK_COMMAND_SUB:
-                case TOK_BACKQUOTE:
-                    arg_node = new_node(NODE_COMMAND_SUB);
-                    break;
-                default:
-                    arg_node = new_node(NODE_VAR);
-                    break;
-                }
-
-                if (arg_node) {
-                    arg_node->val.str = strdup(collected_tokens[0].text);
-                    arg_node->val_type = VAL_STR;
-                    add_child_node(command, arg_node);
-                }
-            } else if (token_count > 1) {
-                // Multiple tokens - create concatenated string
-                size_t total_len = 0;
-                for (int i = 0; i < token_count; i++) {
-                    total_len += strlen(collected_tokens[i].text);
-                }
-
-                char *concatenated = malloc(total_len + 1);
-                if (concatenated) {
-                    concatenated[0] = '\0';
-                    for (int i = 0; i < token_count; i++) {
-                        strcat(concatenated, collected_tokens[i].text);
-                    }
-
-                    node_t *arg_node = new_node(NODE_STRING_EXPANDABLE);
-                    if (arg_node) {
-                        arg_node->val.str = concatenated;
-                        arg_node->val_type = VAL_STR;
-                        add_child_node(command, arg_node);
-                    } else {
-                        free(concatenated);
-                    }
-                }
-            }
-
-            // Clean up collected tokens
-            for (int i = 0; i < token_count; i++) {
-                free(collected_tokens[i].text);
-            }
-            free(collected_tokens);
-        } else {
-            break; // Stop parsing arguments
+            break; // Not an arg-like token; stop parsing arguments.
         }
     }
 
@@ -3477,6 +3525,23 @@ static node_t *parse_anonymous_function(parser_t *parser) {
     }
 
     add_child_node(anon_node, body);
+
+    /* Collect trailing positional arguments after the closing '}'.
+     * Zsh's anonymous-function form is `() { body } ARG1 ARG2 ...`,
+     * where the args become $1, $2, ... within the body. Uses the
+     * shared collect_word_argument helper so anon-function args have
+     * the same acceptance, adjacency-concatenation, and node-type
+     * classification semantics as regular command arguments. The
+     * helper stops naturally at non-arg tokens (NEWLINE, SEMI, EOF,
+     * AMP, PIPE, redirection tokens, etc.). */
+    while (collect_word_argument(parser, anon_node)) {
+        /* Loop until helper returns false (non-arg token or alloc failure). */
+    }
+    if (parser->has_error) {
+        free_node_tree(anon_node);
+        return NULL;
+    }
+
     return anon_node;
 }
 
