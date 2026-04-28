@@ -146,6 +146,8 @@ static void copy_function_definitions(executor_t *dest, executor_t *src);
 char *expand_if_needed(executor_t *executor, const char *text);
 static char *expand_quoted_string(executor_t *executor, const char *str);
 static char *expand_arg_node(executor_t *executor, node_t *node);
+static char *expand_array_unsubscripted(executor_t *executor,
+                                         array_value_t *array);
 static char *expand_ansi_c_string(const char *str, size_t len);
 static bool is_assignment(const char *text);
 static int execute_assignment(executor_t *executor, const char *assignment);
@@ -3248,6 +3250,47 @@ static char *expand_arg_node(executor_t *executor, node_t *node) {
     default:
         return expand_if_needed(executor, node->val.str);
     }
+}
+
+/**
+ * @brief Expand an array reference with no subscript ($arr or ${arr}).
+ *
+ * Mode-aware semantics — matches what each shell's $arr / ${arr} form
+ * actually produces:
+ *   - bash:  first element only (equivalent to ${arr[0]})
+ *   - zsh:   all elements joined by space (default IFS behavior)
+ *   - lush:  all elements joined by space (curated pick: explicit
+ *            ${arr[0]} is available for bash-style first-element
+ *            semantics; the joined form matches the common zsh idiom
+ *            of `for x in $arr; do ...`)
+ *   - POSIX: arrays don't exist in POSIX; if one happens to be defined
+ *            (because lush carries the array across mode switches),
+ *            fall back to first-element semantics (matches zsh's POSIX
+ *            and ksh emulations and is least surprising for bash-leaning
+ *            POSIX users)
+ *
+ * Single source of truth for "$a / ${a} on an unsubscripted array" so
+ * bare and brace forms agree, and both honor the active shell mode.
+ *
+ * @param executor Executor context (currently unused but kept for
+ *                 API uniformity with other expansion helpers)
+ * @param array Array value to expand (may be NULL)
+ * @return Newly malloc'd string (caller frees), empty on NULL/error
+ */
+static char *expand_array_unsubscripted(executor_t *executor,
+                                         array_value_t *array) {
+    (void)executor;
+    if (!array) {
+        return strdup("");
+    }
+    shell_mode_t mode = shell_mode_get();
+    if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
+        const char *first = symtable_array_get_index(array, 0);
+        return strdup(first ? first : "");
+    }
+    /* zsh and lush: joined-by-space */
+    char *result = symtable_array_expand(array, " ");
+    return result ? result : strdup("");
 }
 
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
@@ -10208,13 +10251,12 @@ static char *parse_parameter_expansion(executor_t *executor,
     // Fall back to symbol table lookup for regular variables
     // Note: symtable_get_var returns a strdup'd value, caller must free
 
-    // In zsh mode, ${arr} without subscript expands to all elements
-    // Check if this is an array first
+    // ${arr} without subscript: mode-aware expansion via the shared
+    // helper. bash gives first element; zsh and lush give all elements
+    // joined. Matches the bare-$arr form behavior in expand_variable.
     array_value_t *array = symtable_get_array(expansion);
     if (array) {
-        // Array exists - expand all elements
-        char *result = symtable_array_expand(array, " ");
-        return result ? result : strdup("");
+        return expand_array_unsubscripted(executor, array);
     }
 
     char *value = symtable_get_var(executor->symtable, expansion);
@@ -10359,6 +10401,23 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                         resolved_name = target;
                         resolved_to_free = (char *)target;
                     }
+                }
+
+                // Bare $arr on an array: mode-aware expansion via the
+                // shared helper. Matches the brace-form ${arr} behavior
+                // in parse_parameter_expansion. bash gives first element;
+                // zsh and lush give all elements joined. (Issue #65.)
+                array_value_t *array = symtable_get_array(resolved_name);
+                if (array) {
+                    char *result =
+                        expand_array_unsubscripted(executor, array);
+                    if (resolved_to_free) {
+                        free(resolved_to_free);
+                    }
+                    free(name);
+                    /* Caller (expand_variables_in_string) appends any
+                     * trailing literal text after the variable name. */
+                    return result ? result : strdup("");
                 }
 
                 // Look up in modern symbol table using resolved name
