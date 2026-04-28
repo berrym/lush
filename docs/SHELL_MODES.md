@@ -25,10 +25,12 @@ Lush can operate in four distinct modes, each providing different feature sets a
 
 | Mode | Purpose | Feature Set |
 |------|---------|-------------|
-| **Lush** | Default interactive mode | All features enabled |
+| **Lush** | Default interactive mode | Curated set — opinionated picks from Bash and Zsh, plus Lush extensions |
 | **POSIX** | Maximum portability | POSIX sh standard only |
 | **Bash** | Bash script compatibility | Bash 4.x features |
 | **Zsh** | Zsh script compatibility | Zsh features |
+
+> Modes are **presets, not restrictions**. Any feature can be enabled or disabled at runtime via `set -o <feature>` / `set +o <feature>` regardless of the active mode — the mode just sets initial defaults.
 
 Modes affect:
 - Available syntax (arrays, `[[]]`, etc.)
@@ -48,7 +50,7 @@ Modes do NOT affect:
 
 **The default mode. Use this for interactive sessions and Lush-native scripts.**
 
-Lush mode combines the best features from Bash, Zsh, and adds Lush-specific capabilities.
+Lush mode is a **curated, opinionated set of defaults** — *not* "everything from bash plus everything from zsh". It picks specific features from each, rejects features deemed niche or surprising, and adds a small number of Lush-specific capabilities. See `docs/VISION.md` for the design philosophy and `src/shell_mode.c` for the authoritative feature matrix.
 
 ### Enabling
 
@@ -57,9 +59,9 @@ set -o lush           # Enable
 set +o lush           # Disable (switches to POSIX)
 ```
 
-### Features
+### Features included by default
 
-Everything works in Lush mode:
+Curated picks active in Lush mode (see `src/shell_mode.c` for the complete table):
 
 **From Bash**
 - Indexed arrays: `arr=(a b c)`
@@ -83,6 +85,18 @@ Everything works in Lush mode:
 - Plugin system foundation
 - Enhanced display system
 - Configuration interface
+
+### Deliberately not enabled by default
+
+Lush mode rejects a small set of features that one or both of bash/zsh have on by default. Each rejection is a documented design choice (see `src/shell_mode.c` for the per-feature reasoning):
+
+- `dot_glob` — globs do *not* match leading `.` files. Explicit is better than surprising.
+- `share_history` — history is per-shell-session, not auto-shared across concurrent shells. Reduces confusing cross-session interference.
+- `hist_verify` — history-substitution results are not pre-displayed for confirmation. Faster workflow.
+- `auto_pushd` / `cdable_vars` — `cd` does not implicitly push or treat words as variable lookups. Simpler mental model.
+- `locale_quoting` (bash's `$"..."`) — niche bash-only feature; not propagated.
+
+These can be opted into at runtime with `set -o <feature>` if you prefer the bash or zsh default behavior — modes are presets, not restrictions.
 
 ### When to Use
 
