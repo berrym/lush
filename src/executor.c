@@ -23,6 +23,8 @@
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
+#include "lle/unicode_grapheme.h"
+#include "lle/utf8_support.h"
 #include "lush.h"
 #include "lush_fork.h"
 #include "node.h"
@@ -8657,6 +8659,82 @@ static char *handle_required_param_error(executor_t *executor,
     return strdup("");
 }
 
+/**
+ * @brief Slice a string by grapheme cluster positions (TR#29 correct)
+ *
+ * Used by ${var[N]} / ${var[N,M]} string subscripts on scalar (non-array)
+ * variables. The bracket operators here are grapheme-indexed, not byte-
+ * indexed.
+ *
+ * Iterates by *codepoint* using lle_utf8_decode_codepoint (the canonical
+ * pattern used elsewhere in the shell — see src/tokenizer.c:2075). At
+ * each codepoint boundary, lle_is_grapheme_boundary determines whether
+ * the codepoint also starts a new *grapheme cluster*. A multi-codepoint
+ * grapheme (emoji+ZWJ+emoji, base+combining-mark, etc.) increments the
+ * grapheme counter only at its first codepoint, so all internal
+ * codepoints are correctly grouped under one grapheme index.
+ *
+ * Indexing is 0-based at this layer; the caller is responsible for
+ * converting from 1-based (zsh-style) where applicable.
+ *
+ * @param str Source string (UTF-8)
+ * @param str_len Length in bytes
+ * @param start_grapheme 0-based grapheme index to start at
+ * @param count Number of graphemes to extract (-1 for "to end")
+ * @return Newly malloc'd substring, or strdup("") on out-of-range / OOM
+ */
+static char *slice_string_graphemes(const char *str, size_t str_len,
+                                    int start_grapheme, int count) {
+    if (!str || str_len == 0 || start_grapheme < 0) {
+        return strdup("");
+    }
+
+    int grapheme_idx = 0;
+    size_t byte_start = SIZE_MAX;
+    size_t byte_end = str_len;
+    int target_end = (count < 0) ? -1 : start_grapheme + count;
+
+    size_t i = 0;
+    while (i < str_len) {
+        /* Check grapheme boundary at this codepoint start (not at every
+         * byte — continuation bytes would falsely register as boundaries
+         * because lle_is_grapheme_boundary treats invalid UTF-8 as a
+         * boundary, and continuation bytes alone are invalid as a
+         * standalone codepoint). */
+        if (lle_is_grapheme_boundary(str + i, str, str + str_len)) {
+            if (grapheme_idx == start_grapheme) {
+                byte_start = i;
+            }
+            if (target_end >= 0 && grapheme_idx == target_end) {
+                byte_end = i;
+                break;
+            }
+            grapheme_idx++;
+        }
+
+        /* Advance by one codepoint. */
+        uint32_t cp;
+        int cp_len = lle_utf8_decode_codepoint(str + i, str_len - i, &cp);
+        if (cp_len <= 0) {
+            i++; /* Skip invalid byte to avoid infinite loop. */
+        } else {
+            i += (size_t)cp_len;
+        }
+    }
+
+    if (byte_start == SIZE_MAX) {
+        return strdup("");
+    }
+    size_t slice_len = byte_end - byte_start;
+    char *result = malloc(slice_len + 1);
+    if (!result) {
+        return strdup("");
+    }
+    memcpy(result, str + byte_start, slice_len);
+    result[slice_len] = '\0';
+    return result;
+}
+
 static char *parse_parameter_expansion(executor_t *executor,
                                        const char *expansion) {
     if (!expansion) {
@@ -9455,6 +9533,48 @@ static char *parse_parameter_expansion(executor_t *executor,
                     // There's more after ] - this might be a parameter
                     // expansion on an unset array element. For now, treat as
                     // empty.
+                }
+
+                // String-slicing fallback: ${var[N]} / ${var[N,M]} on a
+                // scalar string slices grapheme clusters (TR#29 boundaries).
+                // Honors FEATURE_ARRAY_ZERO_INDEXED: 1-based for zsh-mode,
+                // 0-based for bash/lush-mode. Subscript "@" / "*" are
+                // array-only and have already been handled above.
+                if (strcmp(subscript, "@") != 0 &&
+                    strcmp(subscript, "*") != 0) {
+                    char *str_value =
+                        symtable_get_var(executor->symtable, arr_name);
+                    if (str_value) {
+                        int start_idx = 0, end_idx = -1;
+                        char *comma = strchr(subscript, ',');
+                        if (comma) {
+                            *comma = '\0';
+                            start_idx = atoi(subscript);
+                            end_idx = atoi(comma + 1);
+                            *comma = ',';
+                        } else {
+                            start_idx = atoi(subscript);
+                            end_idx = start_idx; // single grapheme
+                        }
+                        // Convert from 1-based (zsh) to 0-based if needed
+                        if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
+                            if (start_idx <= 0 || end_idx <= 0) {
+                                free(str_value);
+                                free(subscript);
+                                free(arr_name);
+                                return strdup("");
+                            }
+                            start_idx--;
+                            end_idx--;
+                        }
+                        int count = end_idx - start_idx + 1;
+                        char *result = slice_string_graphemes(
+                            str_value, strlen(str_value), start_idx, count);
+                        free(str_value);
+                        free(subscript);
+                        free(arr_name);
+                        return result ? result : strdup("");
+                    }
                 }
 
                 free(subscript);
