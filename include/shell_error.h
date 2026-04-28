@@ -131,6 +131,9 @@ typedef enum shell_error_code {
     SHELL_ERR_ARITHMETIC_SYNTAX, /**< Invalid arithmetic expression */
     SHELL_ERR_REGEX_SYNTAX,      /**< Invalid regex in [[ =~ ]] */
     SHELL_ERR_PROCESS_SUBST,     /**< Process substitution failed */
+    SHELL_ERR_PARAMETER_NULL_OR_UNSET, /**< ${var:?} or ${var?} on null/unset
+                                          parameter (POSIX required-parameter
+                                          check) */
     SHELL_ERR_EXPANSION_MAX = 1399,
 
     /* System errors (1400-1499) */

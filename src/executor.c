@@ -8609,6 +8609,38 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
  * @param expansion Content inside ${...} (without braces)
  * @return Expanded value (caller must free)
  */
+/**
+ * @brief Emit a "parameter null or unset" error for ${var:?word} / ${var?word}
+ *
+ * Both POSIX required-parameter forms share identical reporting shape:
+ * write "var: word" (or a default message if word is empty) via the
+ * structured error system, mark the executor's expansion-error state so
+ * the caller can react, and return an empty string. The split between
+ * "null or unset" and "unset only" is the trigger condition (handled at
+ * the call site); the reporting code is the same.
+ *
+ * Mirrors the existing pattern used by the unbound-variable error in
+ * parse_parameter_expansion (set executor->expansion_error +
+ * expansion_exit_status, allow || constructs to react, return "").
+ *
+ * @param executor Executor context (for error_report and expansion flags)
+ * @param var_name Name of the unset/null parameter
+ * @param word User-supplied error word (may be NULL/empty)
+ * @param default_msg Default message used when word is NULL/empty
+ * @return strdup("") (caller takes ownership)
+ */
+static char *handle_required_param_error(executor_t *executor,
+                                         const char *var_name,
+                                         const char *word,
+                                         const char *default_msg) {
+    const char *msg = (word && *word) ? word : default_msg;
+    executor_error_report(executor, SHELL_ERR_PARAMETER_NULL_OR_UNSET,
+                          SOURCE_LOC_UNKNOWN, "%s: %s", var_name, msg);
+    executor->expansion_error = true;
+    executor->expansion_exit_status = 1;
+    return strdup("");
+}
+
 static char *parse_parameter_expansion(executor_t *executor,
                                        const char *expansion) {
     if (!expansion) {
@@ -9368,6 +9400,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                                "//", // 15: replace all occurrences
                                "/",  // 16: replace first occurrence
                                "@",  // 17: transformations
+                               ":?", // 18: error if unset or null (POSIX)
+                               "?",  // 19: error if unset (POSIX)
                                NULL};
     int op_type = -1;
 
@@ -9380,12 +9414,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                 // Check if this single char is part of a longer operator
                 bool part_of_longer = false;
 
-                // Check for :- and :+ before processing single :
+                // Check for :- :+ := :? before processing single :
                 if (strcmp(operators[i], ":") == 0) {
                     if ((found > expansion &&
                          (found[-1] == '-' || found[-1] == '+')) ||
                         (found[1] == '-' || found[1] == '+' ||
-                         found[1] == '=')) {
+                         found[1] == '=' || found[1] == '?')) {
                         part_of_longer = true;
                     }
                 }
@@ -9399,6 +9433,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
                 // Check for // before processing single /
                 if (strcmp(operators[i], "/") == 0 && found[1] == '/') {
+                    part_of_longer = true;
+                }
+                // Check for :? before processing single ?
+                if (strcmp(operators[i], "?") == 0 && found > expansion &&
+                    found[-1] == ':') {
                     part_of_longer = true;
                 }
 
@@ -9708,6 +9747,26 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
             } else {
                 result = strdup("");
+            }
+            break;
+
+        case 18: // ${var:?word} - error if var unset or null (POSIX)
+            if (is_empty_or_null(var_value)) {
+                result = handle_required_param_error(executor, var_name,
+                                                     expanded_default,
+                                                     "parameter null or not set");
+            } else {
+                result = strdup(var_value);
+            }
+            break;
+
+        case 19: // ${var?word} - error if var unset (null permitted) (POSIX)
+            if (!var_value) {
+                result = handle_required_param_error(executor, var_name,
+                                                     expanded_default,
+                                                     "parameter not set");
+            } else {
+                result = strdup(var_value);
             }
             break;
         }
