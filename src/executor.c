@@ -8666,13 +8666,75 @@ static char *parse_parameter_expansion(executor_t *executor,
             // Rest of expansion after )
             const char *rest = close_paren + 1;
 
-            // Check for 'k' flag (return keys instead of values)
-            // This must be handled before inner expansion
+            // Check for 'k' / 'v' flags (return keys / values for arrays).
+            // The combination 'kv' (or 'vk') asks for interleaved key/value
+            // pairs and must be detected before the keys-only branch — see
+            // the (want_keys && want_values) handler below.
             bool want_keys = (strchr(flags, 'k') != NULL);
+            bool want_values = (strchr(flags, 'v') != NULL);
 
             char *inner_result = NULL;
 
-            if (want_keys) {
+            if (want_keys && want_values) {
+                // Handle (kv)/(vk): emit interleaved "k1 v1 k2 v2 ..."
+                // Both symtable_array_get_keys() and
+                // symtable_array_get_values() iterate the same source data
+                // (hashtable for assoc, indices array for indexed) in the
+                // same order, so keys[i] pairs with values[i].
+                char *arr_name = NULL;
+                const char *bracket = strchr(rest, '[');
+                if (bracket) {
+                    arr_name = strndup(rest, bracket - rest);
+                } else {
+                    arr_name = strdup(rest);
+                }
+
+                if (arr_name) {
+                    array_value_t *array = symtable_get_array(arr_name);
+                    if (array) {
+                        size_t kc = 0, vc = 0;
+                        char **keys =
+                            symtable_array_get_keys(array, &kc);
+                        char **values =
+                            symtable_array_get_values(array, &vc);
+                        size_t pairs = (kc < vc) ? kc : vc;
+                        if (keys && values && pairs > 0) {
+                            size_t total_len = 0;
+                            for (size_t i = 0; i < pairs; i++) {
+                                total_len += strlen(keys[i]) + 1 +
+                                             strlen(values[i]) + 1;
+                            }
+                            inner_result = malloc(total_len + 1);
+                            if (inner_result) {
+                                inner_result[0] = '\0';
+                                for (size_t i = 0; i < pairs; i++) {
+                                    if (i > 0)
+                                        strcat(inner_result, " ");
+                                    strcat(inner_result, keys[i]);
+                                    strcat(inner_result, " ");
+                                    strcat(inner_result, values[i]);
+                                }
+                            }
+                        }
+                        if (keys) {
+                            for (size_t i = 0; i < kc; i++) {
+                                free(keys[i]);
+                            }
+                            free(keys);
+                        }
+                        if (values) {
+                            for (size_t i = 0; i < vc; i++) {
+                                free(values[i]);
+                            }
+                            free(values);
+                        }
+                    }
+                    free(arr_name);
+                }
+                if (!inner_result) {
+                    inner_result = strdup("");
+                }
+            } else if (want_keys) {
                 // Handle (k) flag: return array keys instead of values
                 // Parse array name from rest (e.g., "arr[@]" -> "arr")
                 char *arr_name = NULL;
@@ -8803,12 +8865,15 @@ static char *parse_parameter_expansion(executor_t *executor,
                     p++;
                     break;
 
-                case 'j':
-                    // Join with separator: j:X:
-                    if (p[1] == ':') {
-                        // Find closing :
+                case 'j': {
+                    // Join with separator: j<DELIM>X<DELIM>
+                    // zsh accepts any non-')' character after 'j' as the
+                    // delimiter; the same character closes the argument.
+                    char delim = p[1];
+                    if (delim && delim != ')') {
+                        // Find closing delim
                         const char *sep_start = p + 2;
-                        const char *sep_end = strchr(sep_start, ':');
+                        const char *sep_end = strchr(sep_start, delim);
                         if (sep_end) {
                             size_t sep_len = sep_end - sep_start;
                             char *sep = malloc(sep_len + 1);
@@ -8850,12 +8915,16 @@ static char *parse_parameter_expansion(executor_t *executor,
                         p++; // No separator specified
                     }
                     break;
+                }
 
-                case 's':
-                    // Split on separator: s:X: - replace X with space
-                    if (p[1] == ':') {
+                case 's': {
+                    // Split on separator: s<DELIM>X<DELIM> - replace X with
+                    // space. zsh accepts any non-')' character after 's' as
+                    // the delimiter; the same character closes the argument.
+                    char delim = p[1];
+                    if (delim && delim != ')') {
                         const char *sep_start = p + 2;
-                        const char *sep_end = strchr(sep_start, ':');
+                        const char *sep_end = strchr(sep_start, delim);
                         if (sep_end) {
                             size_t sep_len = sep_end - sep_start;
                             char *sep = malloc(sep_len + 1);
@@ -8897,6 +8966,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         p++;
                     }
                     break;
+                }
 
                 case 'o':
                     // Sort ascending - split on spaces, sort, rejoin
