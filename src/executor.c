@@ -8532,6 +8532,22 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                            (isalnum(str[var_end]) || str[var_end] == '_')) {
                         var_end++;
                     }
+                    /* Zsh bare-subscript form: $var[N] / $var[N,M].
+                     * Consume the bracket span so var_expr becomes
+                     * "$var[N]" rather than "$var" + literal "[N]".
+                     * Gated on FEATURE_ZSH_BARE_SUBSCRIPT — bash mode
+                     * keeps the literal-[N]-after-$var semantic. */
+                    if (var_end > var_start && var_end < len &&
+                        str[var_end] == '[' &&
+                        shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+                        size_t scan = var_end + 1;
+                        while (scan < len && str[scan] != ']') {
+                            scan++;
+                        }
+                        if (scan < len && str[scan] == ']') {
+                            var_end = scan + 1;
+                        }
+                    }
                 }
             }
 
@@ -10115,6 +10131,30 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
             }
         }
 
+        /* Zsh bare-subscript form: $var[N] / $var[N,M]. The caller in
+         * expand_variables_in_string already consumed the bracket span
+         * into var_text when FEATURE_ZSH_BARE_SUBSCRIPT is enabled, so
+         * if we see '[' after the name we route through
+         * parse_parameter_expansion("var[N]") — same backend as the
+         * brace form ${var[N]}. Gating here is a defensive double-check;
+         * the primary gate is at the caller. */
+        if (name_len > 0 && var_name[name_len] == '[' &&
+            shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+            const char *bracket_end = strchr(var_name + name_len + 1, ']');
+            if (bracket_end) {
+                size_t total_len = (bracket_end + 1) - var_name;
+                char *expansion = malloc(total_len + 1);
+                if (expansion) {
+                    strncpy(expansion, var_name, total_len);
+                    expansion[total_len] = '\0';
+                    char *result =
+                        parse_parameter_expansion(executor, expansion);
+                    free(expansion);
+                    return result;
+                }
+            }
+        }
+
         if (name_len > 0) {
             char *name = malloc(name_len + 1);
             if (name) {
@@ -11319,6 +11359,26 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
                            (isalnum(str[var_start + var_name_len]) ||
                             str[var_start + var_name_len] == '_')) {
                         var_name_len++;
+                    }
+                    /* Zsh bare-subscript form: $var[N] / $var[N,M] inside
+                     * a double-quoted string. Extend var_name_len through
+                     * the bracket span so we pass "$var[N]" to
+                     * expand_variable, which routes it through
+                     * parse_parameter_expansion. Gated on
+                     * FEATURE_ZSH_BARE_SUBSCRIPT — bash mode keeps the
+                     * literal-[N]-after-$var semantic. Mirrors the
+                     * unquoted path in expand_variables_in_string. */
+                    if (var_name_len > 0 &&
+                        var_start + var_name_len < len &&
+                        str[var_start + var_name_len] == '[' &&
+                        shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+                        size_t scan = var_start + var_name_len + 1;
+                        while (scan < len && str[scan] != ']') {
+                            scan++;
+                        }
+                        if (scan < len && str[scan] == ']') {
+                            var_name_len = (scan + 1) - var_start;
+                        }
                     }
                 }
 

@@ -125,6 +125,7 @@ typedef enum {
                                    precmd_functions+=(fn) */
     FEATURE_PROMPT_COMMAND,     /**< Bash PROMPT_COMMAND (string and array) */
     FEATURE_ZSH_PARAM_FLAGS,    /**< Zsh-style parameter flags */
+    FEATURE_ZSH_BARE_SUBSCRIPT, /**< Zsh bare-$var[N] subscript (vs ${var[N]}) */
     FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
 
     /* Sentinel - must be last */

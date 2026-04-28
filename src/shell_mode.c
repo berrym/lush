@@ -116,6 +116,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_SIMPLE_HOOK_ARRAYS] = false,
             [FEATURE_PROMPT_COMMAND] = false, /* Not in POSIX */
             [FEATURE_ZSH_PARAM_FLAGS] = false,
+            [FEATURE_ZSH_BARE_SUBSCRIPT] = false, /* No arrays in POSIX */
             [FEATURE_PLUGIN_SYSTEM] = false,
         },
 
@@ -196,6 +197,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PROMPT_COMMAND] =
                 true, /* Bash 5.1+ supports string and array */
             [FEATURE_ZSH_PARAM_FLAGS] = false,
+            [FEATURE_ZSH_BARE_SUBSCRIPT] =
+                false, /* Bash treats $a[N] as $a + literal [N] */
             [FEATURE_PLUGIN_SYSTEM] = false, /* Not a Bash feature */
         },
 
@@ -275,6 +278,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_SIMPLE_HOOK_ARRAYS] = true, /* Zsh supports precmd+=(fn) */
             [FEATURE_PROMPT_COMMAND] = false,    /* Zsh uses precmd instead */
             [FEATURE_ZSH_PARAM_FLAGS] = true,
+            [FEATURE_ZSH_BARE_SUBSCRIPT] = true, /* Zsh native */
             [FEATURE_PLUGIN_SYSTEM] = false, /* Not a Zsh feature */
         },
 
@@ -353,7 +357,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 true, /* precmd+=(fn) works intuitively */
             [FEATURE_PROMPT_COMMAND] = true, /* Bash compat: string and array */
             [FEATURE_ZSH_PARAM_FLAGS] =
-                true,                       /* Now implemented: ${(U)var} etc */
+                true, /* Now implemented: ${(U)var} etc */
+            [FEATURE_ZSH_BARE_SUBSCRIPT] =
+                true, /* Curated: zsh native, no bash conflict */
             [FEATURE_PLUGIN_SYSTEM] = true, /* Lush extension */
         },
 };
@@ -446,6 +452,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_SIMPLE_HOOK_ARRAYS] = "simple_hook_arrays",
     [FEATURE_PROMPT_COMMAND] = "prompt_command",
     [FEATURE_ZSH_PARAM_FLAGS] = "zsh_param_flags",
+    [FEATURE_ZSH_BARE_SUBSCRIPT] = "zsh_bare_subscript",
     [FEATURE_PLUGIN_SYSTEM] = "plugin_system",
 };
 
