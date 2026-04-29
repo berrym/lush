@@ -148,8 +148,9 @@ static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
         return NULL;
     }
 
-    // Try to parse the script
-    parser_t *parser = parser_new_with_source(content, file);
+    // Try to parse the script — content is the entire script body, so
+    // its first character is line 1 of the source file.
+    parser_t *parser = parser_new_with_source(content, file, 1);
     if (!parser) {
         debug_add_analysis_issue(ctx, file, 1, "error", "syntax",
                                  "Failed to create parser",

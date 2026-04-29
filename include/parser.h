@@ -60,19 +60,35 @@ typedef struct parser {
 /**
  * @brief Create a new parser for input string
  *
+ * Equivalent to parser_new_with_source(input, "<stdin>", 1). Use the
+ * full constructor when the input is a slice from a larger source file
+ * and source-location tracking should reflect the original line.
+ *
  * @param input Shell command string to parse
  * @return New parser instance or NULL on failure
  */
 parser_t *parser_new(const char *input);
 
 /**
- * @brief Create a new parser with source name for error reporting
+ * @brief Create a new parser with source name and starting-line offset
  *
- * @param input Shell command string to parse
- * @param source_name Source filename (e.g., "script.sh" or "<stdin>")
+ * The starting_line parameter seeds the underlying tokenizer's line
+ * counter so AST nodes built from `input` carry source line numbers
+ * relative to the original source file rather than the per-statement
+ * slice the shell main loop hands to the parser. Errors emitted by the
+ * parser inherit the same offset.
+ *
+ * Pass starting_line = 1 (or use parser_new()) when `input` is the
+ * entire source or its origin is unknown.
+ *
+ * @param input         Shell command string to parse
+ * @param source_name   Source filename for `--> file:line:col` rendering
+ * @param starting_line Line number of the first character of `input`
+ *                      within the original source file (1-based)
  * @return New parser instance or NULL on failure
  */
-parser_t *parser_new_with_source(const char *input, const char *source_name);
+parser_t *parser_new_with_source(const char *input, const char *source_name,
+                                 size_t starting_line);
 
 /**
  * @brief Set the source name for error reporting

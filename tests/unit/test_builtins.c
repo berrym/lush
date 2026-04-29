@@ -82,7 +82,7 @@ TEST(bin_false_ignores_args) {
 TEST(colon_returns_zero) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, ":");
+    int status = executor_execute_command_line(exec, ":", 1);
     ASSERT_EQ(status, 0, ": should return 0");
 
     teardown_executor(exec);
@@ -91,7 +91,7 @@ TEST(colon_returns_zero) {
 TEST(colon_with_args) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, ": arg1 arg2 arg3");
+    int status = executor_execute_command_line(exec, ": arg1 arg2 arg3", 1);
     ASSERT_EQ(status, 0, ": should return 0 even with arguments");
 
     teardown_executor(exec);
@@ -264,7 +264,7 @@ TEST(bin_test_bracket_missing_close) {
 TEST(pwd_returns_directory) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "pwd");
+    int status = executor_execute_command_line(exec, "pwd", 1);
     ASSERT_EQ(status, 0, "pwd should succeed");
 
     teardown_executor(exec);
@@ -273,7 +273,7 @@ TEST(pwd_returns_directory) {
 TEST(pwd_logical_option) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "pwd -L");
+    int status = executor_execute_command_line(exec, "pwd -L", 1);
     ASSERT_EQ(status, 0, "pwd -L should succeed");
 
     teardown_executor(exec);
@@ -282,7 +282,7 @@ TEST(pwd_logical_option) {
 TEST(pwd_physical_option) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "pwd -P");
+    int status = executor_execute_command_line(exec, "pwd -P", 1);
     ASSERT_EQ(status, 0, "pwd -P should succeed");
 
     teardown_executor(exec);
@@ -297,7 +297,7 @@ TEST(cd_to_tmp) {
     executor_t *exec = setup_executor();
     char *original_dir = getcwd(NULL, 0);
 
-    int status = executor_execute_command_line(exec, "cd /tmp");
+    int status = executor_execute_command_line(exec, "cd /tmp", 1);
     ASSERT_EQ(status, 0, "cd /tmp should succeed");
 
     /* Verify we're in /tmp */
@@ -320,7 +320,7 @@ TEST(cd_to_home) {
     char *home = getenv("HOME");
 
     if (home) {
-        int status = executor_execute_command_line(exec, "cd");
+        int status = executor_execute_command_line(exec, "cd", 1);
         ASSERT_EQ(status, 0, "cd with no args should succeed");
     }
 
@@ -334,7 +334,7 @@ TEST(cd_to_home) {
 TEST(cd_nonexistent_fails) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "cd /nonexistent_dir_xyz");
+    int status = executor_execute_command_line(exec, "cd /nonexistent_dir_xyz", 1);
     ASSERT_EQ(status, 1, "cd to nonexistent directory should fail");
 
     teardown_executor(exec);
@@ -345,11 +345,11 @@ TEST(cd_dash_oldpwd) {
     char *original_dir = getcwd(NULL, 0);
 
     /* Go to /tmp first, then to /var - this sets OLDPWD to /tmp */
-    executor_execute_command_line(exec, "cd /tmp");
-    executor_execute_command_line(exec, "cd /var");
+    executor_execute_command_line(exec, "cd /tmp", 1);
+    executor_execute_command_line(exec, "cd /var", 1);
 
     /* Now cd - should go back to /tmp */
-    int status = executor_execute_command_line(exec, "cd -");
+    int status = executor_execute_command_line(exec, "cd -", 1);
     ASSERT_EQ(status, 0, "cd - should succeed");
 
     /* Verify we're back in tmp (might be /private/tmp on macOS) */
@@ -373,7 +373,7 @@ TEST(export_new_variable) {
     executor_t *exec = setup_executor();
 
     int status =
-        executor_execute_command_line(exec, "export TESTVAR=testvalue");
+        executor_execute_command_line(exec, "export TESTVAR=testvalue", 1);
     ASSERT_EQ(status, 0, "export TESTVAR=testvalue should succeed");
 
     /* Check that the variable is set */
@@ -389,10 +389,10 @@ TEST(export_existing_variable) {
     executor_t *exec = setup_executor();
 
     /* First set the variable */
-    executor_execute_command_line(exec, "MYEXPORT=myvalue");
+    executor_execute_command_line(exec, "MYEXPORT=myvalue", 1);
 
     /* Then export it */
-    int status = executor_execute_command_line(exec, "export MYEXPORT");
+    int status = executor_execute_command_line(exec, "export MYEXPORT", 1);
     ASSERT_EQ(status, 0, "export existing variable should succeed");
 
     /* Verify it's still set correctly */
@@ -408,7 +408,7 @@ TEST(export_invalid_identifier) {
     executor_t *exec = setup_executor();
 
     /* Invalid variable name starting with digit */
-    int status = executor_execute_command_line(exec, "export 1INVALID=value");
+    int status = executor_execute_command_line(exec, "export 1INVALID=value", 1);
     ASSERT_EQ(status, 1, "export with invalid identifier should fail");
 
     teardown_executor(exec);
@@ -423,7 +423,7 @@ TEST(unset_variable) {
     executor_t *exec = setup_executor();
 
     /* Set a variable */
-    executor_execute_command_line(exec, "TOBEDELETED=value");
+    executor_execute_command_line(exec, "TOBEDELETED=value", 1);
 
     /* Verify it exists */
     char *value = symtable_get_var(exec->symtable, "TOBEDELETED");
@@ -431,7 +431,7 @@ TEST(unset_variable) {
     free(value);
 
     /* Unset it */
-    int status = executor_execute_command_line(exec, "unset TOBEDELETED");
+    int status = executor_execute_command_line(exec, "unset TOBEDELETED", 1);
     ASSERT_EQ(status, 0, "unset should succeed");
 
     /* Verify it's gone */
@@ -449,7 +449,7 @@ TEST(unset_variable) {
 TEST(type_builtin_command) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "type echo");
+    int status = executor_execute_command_line(exec, "type echo", 1);
     ASSERT_EQ(status, 0, "type echo should succeed (echo is builtin)");
 
     teardown_executor(exec);
@@ -458,7 +458,7 @@ TEST(type_builtin_command) {
 TEST(type_external_command) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "type ls");
+    int status = executor_execute_command_line(exec, "type ls", 1);
     ASSERT_EQ(status, 0, "type ls should succeed");
 
     teardown_executor(exec);
@@ -468,7 +468,7 @@ TEST(type_nonexistent_command) {
     executor_t *exec = setup_executor();
 
     int status =
-        executor_execute_command_line(exec, "type nonexistent_cmd_xyz");
+        executor_execute_command_line(exec, "type nonexistent_cmd_xyz", 1);
     ASSERT_EQ(status, 1, "type nonexistent command should fail");
 
     teardown_executor(exec);
@@ -477,7 +477,7 @@ TEST(type_nonexistent_command) {
 TEST(type_t_option) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "type -t true");
+    int status = executor_execute_command_line(exec, "type -t true", 1);
     ASSERT_EQ(status, 0, "type -t true should succeed");
 
     teardown_executor(exec);
@@ -491,7 +491,7 @@ TEST(type_t_option) {
 TEST(echo_simple) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "echo hello");
+    int status = executor_execute_command_line(exec, "echo hello", 1);
     ASSERT_EQ(status, 0, "echo hello should succeed");
 
     teardown_executor(exec);
@@ -500,7 +500,7 @@ TEST(echo_simple) {
 TEST(echo_multiple_args) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "echo hello world");
+    int status = executor_execute_command_line(exec, "echo hello world", 1);
     ASSERT_EQ(status, 0, "echo hello world should succeed");
 
     teardown_executor(exec);
@@ -509,7 +509,7 @@ TEST(echo_multiple_args) {
 TEST(echo_no_newline) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "echo -n hello");
+    int status = executor_execute_command_line(exec, "echo -n hello", 1);
     ASSERT_EQ(status, 0, "echo -n should succeed");
 
     teardown_executor(exec);
@@ -518,7 +518,7 @@ TEST(echo_no_newline) {
 TEST(echo_escape_sequences) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "echo -e 'hello\\nworld'");
+    int status = executor_execute_command_line(exec, "echo -e 'hello\\nworld'", 1);
     ASSERT_EQ(status, 0, "echo -e with escapes should succeed");
 
     teardown_executor(exec);
@@ -527,7 +527,7 @@ TEST(echo_escape_sequences) {
 TEST(echo_no_escapes) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "echo -E 'hello\\nworld'");
+    int status = executor_execute_command_line(exec, "echo -E 'hello\\nworld'", 1);
     ASSERT_EQ(status, 0, "echo -E should succeed");
 
     teardown_executor(exec);
@@ -541,7 +541,7 @@ TEST(echo_no_escapes) {
 TEST(printf_string) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "printf '%s' hello");
+    int status = executor_execute_command_line(exec, "printf '%s' hello", 1);
     ASSERT_EQ(status, 0, "printf %s should succeed");
 
     teardown_executor(exec);
@@ -550,7 +550,7 @@ TEST(printf_string) {
 TEST(printf_integer) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "printf '%d' 42");
+    int status = executor_execute_command_line(exec, "printf '%d' 42", 1);
     ASSERT_EQ(status, 0, "printf %d should succeed");
 
     teardown_executor(exec);
@@ -559,7 +559,7 @@ TEST(printf_integer) {
 TEST(printf_hex) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "printf '%x' 255");
+    int status = executor_execute_command_line(exec, "printf '%x' 255", 1);
     ASSERT_EQ(status, 0, "printf %x should succeed");
 
     teardown_executor(exec);
@@ -568,7 +568,7 @@ TEST(printf_hex) {
 TEST(printf_width) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "printf '%10s' hello");
+    int status = executor_execute_command_line(exec, "printf '%10s' hello", 1);
     ASSERT_EQ(status, 0, "printf with width should succeed");
 
     teardown_executor(exec);
@@ -577,7 +577,7 @@ TEST(printf_width) {
 TEST(printf_escape_newline) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "printf 'line1\\nline2'");
+    int status = executor_execute_command_line(exec, "printf 'line1\\nline2'", 1);
     ASSERT_EQ(status, 0, "printf with \\n should succeed");
 
     teardown_executor(exec);
@@ -591,7 +591,7 @@ TEST(printf_escape_newline) {
 TEST(eval_simple) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "eval echo hello");
+    int status = executor_execute_command_line(exec, "eval echo hello", 1);
     ASSERT_EQ(status, 0, "eval echo hello should succeed");
 
     teardown_executor(exec);
@@ -600,8 +600,8 @@ TEST(eval_simple) {
 TEST(eval_variable_expansion) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "CMD=echo");
-    int status = executor_execute_command_line(exec, "eval $CMD hello");
+    executor_execute_command_line(exec, "CMD=echo", 1);
+    int status = executor_execute_command_line(exec, "eval $CMD hello", 1);
     ASSERT_EQ(status, 0, "eval $CMD should expand and execute");
 
     teardown_executor(exec);
@@ -610,7 +610,7 @@ TEST(eval_variable_expansion) {
 TEST(eval_no_args) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "eval");
+    int status = executor_execute_command_line(exec, "eval", 1);
     ASSERT_EQ(status, 0, "eval with no args should succeed with 0");
 
     teardown_executor(exec);
@@ -627,8 +627,8 @@ TEST(shift_default) {
     /* shift requires positional parameters available; overshift is a
      * diagnostic error per POSIX (matching dash, bash, zsh). Set up
      * three positional params, then shift by the default count of 1. */
-    executor_execute_command_line(exec, "set -- a b c");
-    int status = executor_execute_command_line(exec, "shift");
+    executor_execute_command_line(exec, "set -- a b c", 1);
+    int status = executor_execute_command_line(exec, "shift", 1);
     ASSERT_EQ(status, 0, "shift should succeed when params available");
 
     teardown_executor(exec);
@@ -638,8 +638,8 @@ TEST(shift_explicit_count) {
     executor_t *exec = setup_executor();
 
     /* Set up five positional params, then shift by 2. */
-    executor_execute_command_line(exec, "set -- a b c d e");
-    int status = executor_execute_command_line(exec, "shift 2");
+    executor_execute_command_line(exec, "set -- a b c d e", 1);
+    int status = executor_execute_command_line(exec, "shift 2", 1);
     ASSERT_EQ(status, 0, "shift 2 should succeed");
 
     teardown_executor(exec);
@@ -650,8 +650,8 @@ TEST(shift_overshift_errors) {
 
     /* Overshift (count > $#) must produce a diagnostic and return
      * non-zero, matching dash/bash/zsh and the POSIX convention. */
-    executor_execute_command_line(exec, "set -- a b");
-    int status = executor_execute_command_line(exec, "shift 5");
+    executor_execute_command_line(exec, "set -- a b", 1);
+    int status = executor_execute_command_line(exec, "shift 5", 1);
     ASSERT_EQ(status, 1, "shift 5 with 2 params should fail");
 
     teardown_executor(exec);
@@ -660,7 +660,7 @@ TEST(shift_overshift_errors) {
 TEST(shift_invalid_arg) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "shift abc");
+    int status = executor_execute_command_line(exec, "shift abc", 1);
     ASSERT_EQ(status, 1, "shift abc should fail");
 
     teardown_executor(exec);
@@ -675,7 +675,7 @@ TEST(return_outside_function) {
     executor_t *exec = setup_executor();
 
     /* return outside function should fail */
-    int status = executor_execute_command_line(exec, "return");
+    int status = executor_execute_command_line(exec, "return", 1);
     ASSERT_EQ(status, 1, "return outside function should fail");
 
     teardown_executor(exec);
@@ -685,8 +685,8 @@ TEST(return_in_function) {
     executor_t *exec = setup_executor();
 
     /* Define and call function with return */
-    executor_execute_command_line(exec, "testfunc() { return 5; }");
-    int status = executor_execute_command_line(exec, "testfunc");
+    executor_execute_command_line(exec, "testfunc() { return 5; }", 1);
+    int status = executor_execute_command_line(exec, "testfunc", 1);
     ASSERT_EQ(status, 5, "Function should return 5");
 
     teardown_executor(exec);
@@ -696,8 +696,8 @@ TEST(return_default_status) {
     executor_t *exec = setup_executor();
 
     /* Function with return (no value) should use last exit status */
-    executor_execute_command_line(exec, "testfunc2() { true; return; }");
-    int status = executor_execute_command_line(exec, "testfunc2");
+    executor_execute_command_line(exec, "testfunc2() { true; return; }", 1);
+    int status = executor_execute_command_line(exec, "testfunc2", 1);
     ASSERT_EQ(status, 0,
               "Function with plain return should return last status");
 
@@ -712,7 +712,7 @@ TEST(return_default_status) {
 TEST(break_outside_loop) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "break");
+    int status = executor_execute_command_line(exec, "break", 1);
     ASSERT_EQ(status, 1, "break outside loop should fail");
 
     teardown_executor(exec);
@@ -721,7 +721,7 @@ TEST(break_outside_loop) {
 TEST(continue_outside_loop) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "continue");
+    int status = executor_execute_command_line(exec, "continue", 1);
     ASSERT_EQ(status, 1, "continue outside loop should fail");
 
     teardown_executor(exec);
@@ -732,7 +732,7 @@ TEST(break_in_loop) {
 
     /* Loop with break should exit early */
     int status = executor_execute_command_line(
-        exec, "for i in 1 2 3; do if [ $i -eq 2 ]; then break; fi; done");
+        exec, "for i in 1 2 3; do if [ $i -eq 2 ]; then break; fi; done", 1);
     ASSERT_EQ(status, 0, "for loop with break should succeed");
 
     teardown_executor(exec);
@@ -743,7 +743,7 @@ TEST(continue_in_loop) {
 
     /* Loop with continue should skip to next iteration */
     int status = executor_execute_command_line(
-        exec, "for i in 1 2 3; do if [ $i -eq 2 ]; then continue; fi; done");
+        exec, "for i in 1 2 3; do if [ $i -eq 2 ]; then continue; fi; done", 1);
     ASSERT_EQ(status, 0, "for loop with continue should succeed");
 
     teardown_executor(exec);
@@ -757,7 +757,7 @@ TEST(continue_in_loop) {
 TEST(declare_variable) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "declare MYVAR=hello");
+    int status = executor_execute_command_line(exec, "declare MYVAR=hello", 1);
     ASSERT_EQ(status, 0, "declare should succeed");
 
     char *value = symtable_get_var(exec->symtable, "MYVAR");
@@ -772,7 +772,7 @@ TEST(local_outside_function) {
     executor_t *exec = setup_executor();
 
     /* local outside function might succeed but has no effect */
-    int status = executor_execute_command_line(exec, "local LOCALVAR=test");
+    int status = executor_execute_command_line(exec, "local LOCALVAR=test", 1);
     /* Some shells return error, some succeed - just verify it runs */
     (void)status;
 
@@ -784,8 +784,8 @@ TEST(local_in_function) {
 
     /* Define function with local variable */
     executor_execute_command_line(exec,
-                                  "testlocal() { local X=inside; echo $X; }");
-    int status = executor_execute_command_line(exec, "testlocal");
+                                  "testlocal() { local X=inside; echo $X; }", 1);
+    int status = executor_execute_command_line(exec, "testlocal", 1);
     ASSERT_EQ(status, 0, "Function with local should succeed");
 
     teardown_executor(exec);
@@ -799,7 +799,7 @@ TEST(local_in_function) {
 TEST(readonly_variable) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "readonly ROVAR=constant");
+    int status = executor_execute_command_line(exec, "readonly ROVAR=constant", 1);
     ASSERT_EQ(status, 0, "readonly should succeed");
 
     char *value = symtable_get_var(exec->symtable, "ROVAR");
@@ -819,7 +819,7 @@ TEST(readonly_prevents_modification) {
      */
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "readonly ROVAR2=original");
+    executor_execute_command_line(exec, "readonly ROVAR2=original", 1);
 
     /* For now, just verify readonly command works - enforcement is TODO */
     char *value = symtable_get_var(exec->symtable, "ROVAR2");
@@ -838,7 +838,7 @@ TEST(readonly_prevents_modification) {
 TEST(command_runs_external) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "command true");
+    int status = executor_execute_command_line(exec, "command true", 1);
     ASSERT_EQ(status, 0, "command true should succeed");
 
     teardown_executor(exec);
@@ -848,7 +848,7 @@ TEST(command_bypasses_alias) {
     executor_t *exec = setup_executor();
 
     /* Even if 'ls' were aliased, command ls should run the real ls */
-    int status = executor_execute_command_line(exec, "command ls /tmp");
+    int status = executor_execute_command_line(exec, "command ls /tmp", 1);
     ASSERT_EQ(status, 0, "command ls should succeed");
 
     teardown_executor(exec);
@@ -862,7 +862,7 @@ TEST(command_bypasses_alias) {
 TEST(alias_definition) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "alias ll='ls -l'");
+    int status = executor_execute_command_line(exec, "alias ll='ls -l'", 1);
     ASSERT_EQ(status, 0, "alias definition should succeed");
 
     teardown_executor(exec);
@@ -872,7 +872,7 @@ TEST(alias_list) {
     executor_t *exec = setup_executor();
 
     /* alias with no args should list aliases */
-    int status = executor_execute_command_line(exec, "alias");
+    int status = executor_execute_command_line(exec, "alias", 1);
     ASSERT_EQ(status, 0, "alias list should succeed");
 
     teardown_executor(exec);
@@ -881,8 +881,8 @@ TEST(alias_list) {
 TEST(unalias_removes) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "alias myalias='echo test'");
-    int status = executor_execute_command_line(exec, "unalias myalias");
+    executor_execute_command_line(exec, "alias myalias='echo test'", 1);
+    int status = executor_execute_command_line(exec, "unalias myalias", 1);
     ASSERT_EQ(status, 0, "unalias should succeed");
 
     teardown_executor(exec);
@@ -896,7 +896,7 @@ TEST(unalias_removes) {
 TEST(hash_list) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "hash");
+    int status = executor_execute_command_line(exec, "hash", 1);
     /* hash with no commands may return 0 or 1 depending on state */
     (void)status;
 
@@ -907,7 +907,7 @@ TEST(hash_command) {
     executor_t *exec = setup_executor();
 
     /* Hash ls to remember its location */
-    int status = executor_execute_command_line(exec, "hash ls");
+    int status = executor_execute_command_line(exec, "hash ls", 1);
     ASSERT_EQ(status, 0, "hash ls should succeed");
 
     teardown_executor(exec);
@@ -916,7 +916,7 @@ TEST(hash_command) {
 TEST(hash_clear) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "hash -r");
+    int status = executor_execute_command_line(exec, "hash -r", 1);
     ASSERT_EQ(status, 0, "hash -r should succeed");
 
     teardown_executor(exec);
@@ -930,7 +930,7 @@ TEST(hash_clear) {
 TEST(umask_display) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "umask");
+    int status = executor_execute_command_line(exec, "umask", 1);
     ASSERT_EQ(status, 0, "umask display should succeed");
 
     teardown_executor(exec);
@@ -943,7 +943,7 @@ TEST(umask_set) {
     mode_t old_mask = umask(0);
     umask(old_mask);
 
-    int status = executor_execute_command_line(exec, "umask 022");
+    int status = executor_execute_command_line(exec, "umask 022", 1);
     ASSERT_EQ(status, 0, "umask 022 should succeed");
 
     /* Restore */
@@ -960,7 +960,7 @@ TEST(umask_set) {
 TEST(trap_list) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "trap");
+    int status = executor_execute_command_line(exec, "trap", 1);
     ASSERT_EQ(status, 0, "trap list should succeed");
 
     teardown_executor(exec);
@@ -970,7 +970,7 @@ TEST(trap_set_exit) {
     executor_t *exec = setup_executor();
 
     int status =
-        executor_execute_command_line(exec, "trap 'echo exiting' EXIT");
+        executor_execute_command_line(exec, "trap 'echo exiting' EXIT", 1);
     ASSERT_EQ(status, 0, "trap EXIT should succeed");
 
     teardown_executor(exec);
@@ -979,8 +979,8 @@ TEST(trap_set_exit) {
 TEST(trap_reset) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "trap 'echo test' INT");
-    int status = executor_execute_command_line(exec, "trap - INT");
+    executor_execute_command_line(exec, "trap 'echo test' INT", 1);
+    int status = executor_execute_command_line(exec, "trap - INT", 1);
     ASSERT_EQ(status, 0, "trap - INT should reset trap");
 
     teardown_executor(exec);
@@ -995,10 +995,10 @@ TEST(pushd_and_popd) {
     executor_t *exec = setup_executor();
     char *original_dir = getcwd(NULL, 0);
 
-    int status = executor_execute_command_line(exec, "pushd /tmp");
+    int status = executor_execute_command_line(exec, "pushd /tmp", 1);
     ASSERT_EQ(status, 0, "pushd /tmp should succeed");
 
-    status = executor_execute_command_line(exec, "popd");
+    status = executor_execute_command_line(exec, "popd", 1);
     ASSERT_EQ(status, 0, "popd should succeed");
 
     chdir(original_dir);
@@ -1010,7 +1010,7 @@ TEST(pushd_and_popd) {
 TEST(dirs_command) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "dirs");
+    int status = executor_execute_command_line(exec, "dirs", 1);
     ASSERT_EQ(status, 0, "dirs should succeed");
 
     teardown_executor(exec);
@@ -1024,7 +1024,7 @@ TEST(dirs_command) {
 TEST(help_command) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "help");
+    int status = executor_execute_command_line(exec, "help", 1);
     ASSERT_EQ(status, 0, "help should succeed");
 
     teardown_executor(exec);

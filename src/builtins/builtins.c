@@ -1632,8 +1632,12 @@ int bin_source(int argc, char **argv) {
         // Update script context for debugging
         executor_set_script_context(executor, argv[1], construct_number);
 
-        // Parse and execute the complete construct
-        int construct_result = parse_and_execute(complete_input);
+        /* Parse and execute the complete construct. Sourced-script
+         * line tracking through bin_source: construct_number is the
+         * 1-based construct ordinal, not a file line; passing 1 here
+         * preserves pre-2026-04 behaviour. Threading the actual source
+         * line of each construct through bin_source is future work. */
+        int construct_result = parse_and_execute(complete_input, 1);
 
         // Check for return from sourced script (exit code 200+)
         if (construct_result >= 200 && construct_result <= 455) {
@@ -2445,8 +2449,10 @@ int bin_eval(int argc, char **argv) {
         strcat(command, argv[i]);
     }
 
-    // Execute the command string
-    int result = parse_and_execute(command);
+    /* Execute the command string. eval input is its own logical
+     * source slice — the joined argv has no surrounding script
+     * context, so line 1 is the right starting offset. */
+    int result = parse_and_execute(command, 1);
 
     free(command);
     return result;

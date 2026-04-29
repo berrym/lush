@@ -796,9 +796,13 @@ int executor_execute(executor_t *executor, node_t *ast) {
  * @param input Shell command string to parse and execute
  * @return Exit status of executed command, or error code
  */
-int executor_execute_command_line(executor_t *executor, const char *input) {
+int executor_execute_command_line(executor_t *executor, const char *input,
+                                  size_t starting_line) {
     if (!executor || !input) {
         return 1;
+    }
+    if (starting_line == 0) {
+        starting_line = 1;
     }
 
     // Preprocess input to handle line continuation (backslash-newline)
@@ -831,7 +835,8 @@ int executor_execute_command_line(executor_t *executor, const char *input) {
     const char *source_name = executor->current_script_file
                                   ? executor->current_script_file
                                   : "<stdin>";
-    parser_t *parser = parser_new_with_source(parse_input, source_name);
+    parser_t *parser =
+        parser_new_with_source(parse_input, source_name, starting_line);
     if (!parser) {
         set_executor_error(executor, "Failed to create parser");
         free(processed_input);
@@ -11285,7 +11290,9 @@ static char *expand_command_substitution(executor_t *executor,
         const char *src_name = executor->current_script_file
                                    ? executor->current_script_file
                                    : "<command substitution>";
-        parser_t *parser = parser_new_with_source(command, src_name);
+        /* Command substitution context: input is its own logical
+         * source slice, line 1 of that slice. */
+        parser_t *parser = parser_new_with_source(command, src_name, 1);
         int result = 127;
 
         if (parser) {

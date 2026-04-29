@@ -74,7 +74,8 @@ int parse_and_execute(const char *command) {
             return 1;
         }
     }
-    return executor_execute_command_line(global_executor, command);
+    /* Fuzz inputs are independent batches; line 1 of their own slice. */
+    return executor_execute_command_line(global_executor, command, 1);
 }
 
 /* ============================================================================
@@ -190,7 +191,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
      * Internally walks parser_new -> parser_parse -> executor_execute.
      * Any segfault, ASan finding, UBSan finding, or libFuzzer timeout
      * is recorded by libFuzzer as a crash artifact. */
-    (void)executor_execute_command_line(executor, input);
+    (void)executor_execute_command_line(executor, input, 1);
 
     executor_free(executor);
     free(input);

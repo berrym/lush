@@ -248,7 +248,9 @@ static int execute_command(const char *command) {
         return 1;
     }
 
-    int exit_status = executor_execute_command_line(executor, command);
+    /* fc re-executes a history entry; the joined command has no
+     * surrounding source, so line 1. */
+    int exit_status = executor_execute_command_line(executor, command, 1);
 
     if (executor_has_error(executor)) {
         fprintf(stderr, "fc: %s\n", executor_error(executor));

@@ -55,8 +55,15 @@ static void skip_whitespace(tokenizer_t *tokenizer);
  * @return New tokenizer instance, or NULL on failure
  */
 tokenizer_t *tokenizer_new(const char *input) {
+    return tokenizer_new_at(input, 1);
+}
+
+tokenizer_t *tokenizer_new_at(const char *input, size_t starting_line) {
     if (!input) {
         return NULL;
+    }
+    if (starting_line == 0) {
+        starting_line = 1; /* defensive: 0 is unknown; 1-based per source */
     }
 
     tokenizer_t *tokenizer = malloc(sizeof(tokenizer_t));
@@ -67,14 +74,15 @@ tokenizer_t *tokenizer_new(const char *input) {
     tokenizer->input = input;
     tokenizer->input_length = strlen(input);
     tokenizer->position = 0;
-    tokenizer->line = 1;
+    tokenizer->line = starting_line;
     tokenizer->column = 1;
     tokenizer->current = NULL;
     tokenizer->lookahead = NULL;
     tokenizer->enable_keywords = true;
     tokenizer->arith_cmd_depth = 0;
 
-    // Initialize by getting the first two tokens
+    /* Initialize by getting the first two tokens. The line number must
+     * be set BEFORE tokenize_next, since lookahead pre-tokenizes too. */
     tokenizer->current = tokenize_next(tokenizer);
     tokenizer->lookahead = tokenize_next(tokenizer);
 

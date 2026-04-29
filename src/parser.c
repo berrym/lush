@@ -77,10 +77,11 @@ static bool expect_token(parser_t *parser, token_type_t expected);
  * @return New parser instance, or NULL on failure
  */
 parser_t *parser_new(const char *input) {
-    return parser_new_with_source(input, "<stdin>");
+    return parser_new_with_source(input, "<stdin>", 1);
 }
 
-parser_t *parser_new_with_source(const char *input, const char *source_name) {
+parser_t *parser_new_with_source(const char *input, const char *source_name,
+                                 size_t starting_line) {
     if (!input) {
         return NULL;
     }
@@ -90,7 +91,7 @@ parser_t *parser_new_with_source(const char *input, const char *source_name) {
         return NULL;
     }
 
-    parser->tokenizer = tokenizer_new(input);
+    parser->tokenizer = tokenizer_new_at(input, starting_line);
     if (!parser->tokenizer) {
         free(parser);
         return NULL;

@@ -98,7 +98,7 @@ static inline run_result_t run_shell_with_executor(executor_t *exec,
     if (!out_tmp || !err_tmp) {
         /* Fall back to uncaptured execution rather than failing the test;
          * the caller's exit-status assertion will still run. */
-        r.exit_status = executor_execute_command_line(exec, src);
+        r.exit_status = executor_execute_command_line(exec, src, 1);
         if (out_tmp) {
             fclose(out_tmp);
         }
@@ -116,7 +116,7 @@ static inline run_result_t run_shell_with_executor(executor_t *exec,
     dup2(fileno(out_tmp), STDOUT_FILENO);
     dup2(fileno(err_tmp), STDERR_FILENO);
 
-    r.exit_status = executor_execute_command_line(exec, src);
+    r.exit_status = executor_execute_command_line(exec, src, 1);
 
     fflush(stdout);
     fflush(stderr);

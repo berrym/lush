@@ -12,8 +12,9 @@
 executor_t *get_global_executor(void) { return current_executor; }
 
 /* Parse and execute - uses executor_execute_command_line */
-int parse_and_execute(const char *input) {
+int parse_and_execute(const char *input, size_t starting_line) {
     if (!input || !current_executor)
         return 1;
-    return executor_execute_command_line(current_executor, input);
+    return executor_execute_command_line(current_executor, input,
+                                         starting_line);
 }

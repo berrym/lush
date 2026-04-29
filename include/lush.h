@@ -133,10 +133,18 @@ typedef struct string_builder {
 /**
  * @brief Parse and execute a command string
  *
- * @param command Command string to parse and execute
+ * The starting_line parameter seeds source-location tracking so errors
+ * carry file-relative line numbers when `command` is a slice of a
+ * larger script (e.g. one logical statement read from a multi-line
+ * file). Pass 1 for fresh contexts (interactive REPL turn, -c command,
+ * top of file).
+ *
+ * @param command       Shell command string to parse and execute
+ * @param starting_line Line number of `command`'s first character within
+ *                      the original source file (1-based)
  * @return Exit status of the executed command
  */
-int parse_and_execute(const char *command);
+int parse_and_execute(const char *command, size_t starting_line);
 
 /* ============================================================================
  * Executor Access Functions

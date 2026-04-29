@@ -156,11 +156,20 @@ int executor_execute(executor_t *executor, node_t *ast);
 /**
  * @brief Parse and execute a command line string
  *
- * @param executor Executor context
- * @param input Command line to execute
+ * The starting_line parameter seeds source-location tracking so errors
+ * emitted during parsing or execution carry file-relative line numbers
+ * even when `input` is a slice of a larger script.
+ *
+ * @param executor      Executor context
+ * @param input         Command line to execute
+ * @param starting_line Line number of the first character of `input`
+ *                      within the original source file (1-based; pass 1
+ *                      if input is the entire source or origin is
+ *                      unknown)
  * @return Exit status of executed command
  */
-int executor_execute_command_line(executor_t *executor, const char *input);
+int executor_execute_command_line(executor_t *executor, const char *input,
+                                  size_t starting_line);
 
 /* ============================================================================
  * Configuration

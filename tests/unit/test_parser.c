@@ -47,7 +47,7 @@ TEST(parser_new_empty) {
 }
 
 TEST(parser_new_with_source) {
-    parser_t *parser = parser_new_with_source("echo hello", "test.sh");
+    parser_t *parser = parser_new_with_source("echo hello", "test.sh", 1);
     ASSERT_NOT_NULL(parser, "parser_new_with_source should succeed");
     parser_free(parser);
 }

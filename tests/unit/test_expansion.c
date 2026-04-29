@@ -100,8 +100,8 @@ TEST(expand_ctx_init_null) {
 TEST(simple_var_expansion) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "MYVAR=hello");
-    executor_execute_command_line(exec, "RESULT=$MYVAR");
+    executor_execute_command_line(exec, "MYVAR=hello", 1);
+    executor_execute_command_line(exec, "RESULT=$MYVAR", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -114,8 +114,8 @@ TEST(simple_var_expansion) {
 TEST(braced_var_expansion) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "MYVAR=world");
-    executor_execute_command_line(exec, "RESULT=${MYVAR}");
+    executor_execute_command_line(exec, "MYVAR=world", 1);
+    executor_execute_command_line(exec, "RESULT=${MYVAR}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -138,8 +138,8 @@ TEST(var_concatenation) {
     executor_t *exec = setup_executor();
 
     /* Skip actual test until bug is fixed - just verify basic setup works */
-    executor_execute_command_line(exec, "A=hello");
-    executor_execute_command_line(exec, "B=world");
+    executor_execute_command_line(exec, "A=hello", 1);
+    executor_execute_command_line(exec, "B=world", 1);
 
     char *a = symtable_get_var(exec->symtable, "A");
     ASSERT_NOT_NULL(a, "A should be set");
@@ -152,7 +152,7 @@ TEST(var_concatenation) {
 TEST(unset_var_expands_empty) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$UNDEFINED_VAR_XYZ");
+    executor_execute_command_line(exec, "RESULT=$UNDEFINED_VAR_XYZ", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -171,7 +171,7 @@ TEST(default_value_unset) {
     executor_t *exec = setup_executor();
 
     /* ${VAR:-default} when VAR is unset */
-    executor_execute_command_line(exec, "RESULT=${UNSET_VAR:-default_value}");
+    executor_execute_command_line(exec, "RESULT=${UNSET_VAR:-default_value}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -185,8 +185,8 @@ TEST(default_value_empty) {
     executor_t *exec = setup_executor();
 
     /* ${VAR:-default} when VAR is empty */
-    executor_execute_command_line(exec, "EMPTY_VAR=");
-    executor_execute_command_line(exec, "RESULT=${EMPTY_VAR:-default_value}");
+    executor_execute_command_line(exec, "EMPTY_VAR=", 1);
+    executor_execute_command_line(exec, "RESULT=${EMPTY_VAR:-default_value}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -200,8 +200,8 @@ TEST(default_value_set) {
     executor_t *exec = setup_executor();
 
     /* ${VAR:-default} when VAR is set */
-    executor_execute_command_line(exec, "SET_VAR=actual");
-    executor_execute_command_line(exec, "RESULT=${SET_VAR:-default_value}");
+    executor_execute_command_line(exec, "SET_VAR=actual", 1);
+    executor_execute_command_line(exec, "RESULT=${SET_VAR:-default_value}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -215,8 +215,8 @@ TEST(alternate_value_set) {
     executor_t *exec = setup_executor();
 
     /* ${VAR:+alt} when VAR is set */
-    executor_execute_command_line(exec, "SET_VAR=something");
-    executor_execute_command_line(exec, "RESULT=${SET_VAR:+alternate}");
+    executor_execute_command_line(exec, "SET_VAR=something", 1);
+    executor_execute_command_line(exec, "RESULT=${SET_VAR:+alternate}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -230,7 +230,7 @@ TEST(alternate_value_unset) {
     executor_t *exec = setup_executor();
 
     /* ${VAR:+alt} when VAR is unset */
-    executor_execute_command_line(exec, "RESULT=${UNSET_VAR_XYZ:+alternate}");
+    executor_execute_command_line(exec, "RESULT=${UNSET_VAR_XYZ:+alternate}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -243,8 +243,8 @@ TEST(alternate_value_unset) {
 TEST(string_length) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "VAR=hello");
-    executor_execute_command_line(exec, "RESULT=${#VAR}");
+    executor_execute_command_line(exec, "VAR=hello", 1);
+    executor_execute_command_line(exec, "RESULT=${#VAR}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -257,8 +257,8 @@ TEST(string_length) {
 TEST(string_length_empty) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "VAR=");
-    executor_execute_command_line(exec, "RESULT=${#VAR}");
+    executor_execute_command_line(exec, "VAR=", 1);
+    executor_execute_command_line(exec, "RESULT=${#VAR}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -272,8 +272,8 @@ TEST(prefix_removal) {
     executor_t *exec = setup_executor();
 
     /* ${VAR#pattern} - remove shortest prefix */
-    executor_execute_command_line(exec, "VAR=foobar");
-    executor_execute_command_line(exec, "RESULT=${VAR#foo}");
+    executor_execute_command_line(exec, "VAR=foobar", 1);
+    executor_execute_command_line(exec, "RESULT=${VAR#foo}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -287,8 +287,8 @@ TEST(suffix_removal) {
     executor_t *exec = setup_executor();
 
     /* ${VAR%pattern} - remove shortest suffix */
-    executor_execute_command_line(exec, "VAR=foobar");
-    executor_execute_command_line(exec, "RESULT=${VAR%bar}");
+    executor_execute_command_line(exec, "VAR=foobar", 1);
+    executor_execute_command_line(exec, "RESULT=${VAR%bar}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -302,8 +302,8 @@ TEST(substitution_first) {
     executor_t *exec = setup_executor();
 
     /* ${VAR/pattern/replacement} - replace first */
-    executor_execute_command_line(exec, "VAR=hello");
-    executor_execute_command_line(exec, "RESULT=${VAR/l/L}");
+    executor_execute_command_line(exec, "VAR=hello", 1);
+    executor_execute_command_line(exec, "RESULT=${VAR/l/L}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -317,8 +317,8 @@ TEST(substitution_all) {
     executor_t *exec = setup_executor();
 
     /* ${VAR//pattern/replacement} - replace all */
-    executor_execute_command_line(exec, "VAR=hello");
-    executor_execute_command_line(exec, "RESULT=${VAR//l/L}");
+    executor_execute_command_line(exec, "VAR=hello", 1);
+    executor_execute_command_line(exec, "RESULT=${VAR//l/L}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -336,7 +336,7 @@ TEST(substitution_all) {
 TEST(arith_simple_add) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((1 + 2))");
+    executor_execute_command_line(exec, "RESULT=$((1 + 2))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -349,7 +349,7 @@ TEST(arith_simple_add) {
 TEST(arith_subtract) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((10 - 3))");
+    executor_execute_command_line(exec, "RESULT=$((10 - 3))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -362,7 +362,7 @@ TEST(arith_subtract) {
 TEST(arith_multiply) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((4 * 5))");
+    executor_execute_command_line(exec, "RESULT=$((4 * 5))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -375,7 +375,7 @@ TEST(arith_multiply) {
 TEST(arith_divide) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((20 / 4))");
+    executor_execute_command_line(exec, "RESULT=$((20 / 4))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -388,7 +388,7 @@ TEST(arith_divide) {
 TEST(arith_modulo) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((17 % 5))");
+    executor_execute_command_line(exec, "RESULT=$((17 % 5))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -401,9 +401,9 @@ TEST(arith_modulo) {
 TEST(arith_with_vars) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "X=10");
-    executor_execute_command_line(exec, "Y=3");
-    executor_execute_command_line(exec, "RESULT=$((X + Y))");
+    executor_execute_command_line(exec, "X=10", 1);
+    executor_execute_command_line(exec, "Y=3", 1);
+    executor_execute_command_line(exec, "RESULT=$((X + Y))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -416,7 +416,7 @@ TEST(arith_with_vars) {
 TEST(arith_parentheses) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$(( (2 + 3) * 4 ))");
+    executor_execute_command_line(exec, "RESULT=$(( (2 + 3) * 4 ))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -429,7 +429,7 @@ TEST(arith_parentheses) {
 TEST(arith_comparison_true) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((5 > 3))");
+    executor_execute_command_line(exec, "RESULT=$((5 > 3))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -442,7 +442,7 @@ TEST(arith_comparison_true) {
 TEST(arith_comparison_false) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((3 > 5))");
+    executor_execute_command_line(exec, "RESULT=$((3 > 5))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -455,7 +455,7 @@ TEST(arith_comparison_false) {
 TEST(arith_negative) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((-5 + 3))");
+    executor_execute_command_line(exec, "RESULT=$((-5 + 3))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -468,8 +468,8 @@ TEST(arith_negative) {
 TEST(arith_increment) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "X=5");
-    executor_execute_command_line(exec, "RESULT=$((++X))");
+    executor_execute_command_line(exec, "X=5", 1);
+    executor_execute_command_line(exec, "RESULT=$((++X))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -488,8 +488,8 @@ TEST(arith_increment) {
 TEST(arith_decrement) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "X=5");
-    executor_execute_command_line(exec, "RESULT=$((--X))");
+    executor_execute_command_line(exec, "X=5", 1);
+    executor_execute_command_line(exec, "RESULT=$((--X))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -502,7 +502,7 @@ TEST(arith_decrement) {
 TEST(arith_ternary) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((1 ? 10 : 20))");
+    executor_execute_command_line(exec, "RESULT=$((1 ? 10 : 20))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -515,7 +515,7 @@ TEST(arith_ternary) {
 TEST(arith_ternary_false) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$((0 ? 10 : 20))");
+    executor_execute_command_line(exec, "RESULT=$((0 ? 10 : 20))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -533,8 +533,8 @@ TEST(arith_ternary_false) {
 TEST(special_var_question_mark) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "true");
-    executor_execute_command_line(exec, "RESULT=$?");
+    executor_execute_command_line(exec, "true", 1);
+    executor_execute_command_line(exec, "RESULT=$?", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -547,8 +547,8 @@ TEST(special_var_question_mark) {
 TEST(special_var_question_mark_fail) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "false");
-    executor_execute_command_line(exec, "RESULT=$?");
+    executor_execute_command_line(exec, "false", 1);
+    executor_execute_command_line(exec, "RESULT=$?", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -561,7 +561,7 @@ TEST(special_var_question_mark_fail) {
 TEST(special_var_dollar) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "RESULT=$$");
+    executor_execute_command_line(exec, "RESULT=$$", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -581,8 +581,8 @@ TEST(special_var_dollar) {
 TEST(array_element_access) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "arr=(one two three)");
-    executor_execute_command_line(exec, "RESULT=${arr[1]}");
+    executor_execute_command_line(exec, "arr=(one two three)", 1);
+    executor_execute_command_line(exec, "RESULT=${arr[1]}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -595,8 +595,8 @@ TEST(array_element_access) {
 TEST(array_length) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "arr=(a b c d e)");
-    executor_execute_command_line(exec, "RESULT=${#arr[@]}");
+    executor_execute_command_line(exec, "arr=(a b c d e)", 1);
+    executor_execute_command_line(exec, "RESULT=${#arr[@]}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -609,8 +609,8 @@ TEST(array_length) {
 TEST(array_first_element) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "arr=(first second third)");
-    executor_execute_command_line(exec, "RESULT=${arr[0]}");
+    executor_execute_command_line(exec, "arr=(first second third)", 1);
+    executor_execute_command_line(exec, "RESULT=${arr[0]}", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -636,8 +636,8 @@ TEST(single_quotes_no_expansion) {
      */
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "VAR=value");
-    executor_execute_command_line(exec, "RESULT='$VAR'");
+    executor_execute_command_line(exec, "VAR=value", 1);
+    executor_execute_command_line(exec, "RESULT='$VAR'", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -652,8 +652,8 @@ TEST(single_quotes_no_expansion) {
 TEST(double_quotes_with_expansion) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "VAR=value");
-    executor_execute_command_line(exec, "RESULT=\"$VAR\"");
+    executor_execute_command_line(exec, "VAR=value", 1);
+    executor_execute_command_line(exec, "RESULT=\"$VAR\"", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -673,7 +673,7 @@ TEST(escaped_dollar) {
     executor_t *exec = setup_executor();
 
     /* Skip actual test until escaping is fixed */
-    executor_execute_command_line(exec, "RESULT=literal");
+    executor_execute_command_line(exec, "RESULT=literal", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -696,9 +696,9 @@ TEST(nested_var_expansion) {
      */
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "INNER=world");
+    executor_execute_command_line(exec, "INNER=world", 1);
     /* Just verify double quote expansion works for now */
-    executor_execute_command_line(exec, "OUTER=\"hello $INNER\"");
+    executor_execute_command_line(exec, "OUTER=\"hello $INNER\"", 1);
 
     char *result = symtable_get_var(exec->symtable, "OUTER");
     ASSERT_NOT_NULL(result, "OUTER should be set");
@@ -711,8 +711,8 @@ TEST(nested_var_expansion) {
 TEST(nested_var_double_quotes) {
     executor_t *exec = setup_executor();
 
-    executor_execute_command_line(exec, "INNER=world");
-    executor_execute_command_line(exec, "OUTER=\"hello $INNER\"");
+    executor_execute_command_line(exec, "INNER=world", 1);
+    executor_execute_command_line(exec, "OUTER=\"hello $INNER\"", 1);
 
     char *result = symtable_get_var(exec->symtable, "OUTER");
     ASSERT_NOT_NULL(result, "OUTER should be set");
@@ -741,7 +741,7 @@ TEST(brace_adjacent_text) {
     executor_t *exec = setup_executor();
 
     /* Skip actual crash-inducing test until bug is fixed */
-    executor_execute_command_line(exec, "PREFIX=hello");
+    executor_execute_command_line(exec, "PREFIX=hello", 1);
 
     char *prefix = symtable_get_var(exec->symtable, "PREFIX");
     ASSERT_NOT_NULL(prefix, "PREFIX should be set");

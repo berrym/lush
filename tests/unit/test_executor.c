@@ -91,8 +91,8 @@ TEST(execute_exit_status) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "true");
-    (void)executor_execute_command_line(exec, "echo $?");
+    executor_execute_command_line(exec, "true", 1);
+    (void)executor_execute_command_line(exec, "echo $?", 1);
     ASSERT_EQ(exec->exit_status, 0, "echo should succeed");
 
     executor_free(exec);
@@ -123,7 +123,7 @@ TEST(variable_expansion) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "MYVAR=hello");
+    executor_execute_command_line(exec, "MYVAR=hello", 1);
 
     /* Test that variable exists */
     char *value = symtable_get_var(exec->symtable, "MYVAR");
@@ -138,9 +138,9 @@ TEST(multiple_assignments) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "A=1");
-    executor_execute_command_line(exec, "B=2");
-    executor_execute_command_line(exec, "C=3");
+    executor_execute_command_line(exec, "A=1", 1);
+    executor_execute_command_line(exec, "B=2", 1);
+    executor_execute_command_line(exec, "C=3", 1);
 
     char *a = symtable_get_var(exec->symtable, "A");
     char *b = symtable_get_var(exec->symtable, "B");
@@ -317,7 +317,7 @@ TEST(and_operator_fail) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Set RESULT first, then verify it's NOT changed */
-    executor_execute_command_line(exec, "RESULT=initial");
+    executor_execute_command_line(exec, "RESULT=initial", 1);
     run_result_t r = run_shell_with_executor(exec, "false && RESULT=changed");
     ASSERT_EXIT_STATUS(r, 1);
 
@@ -334,7 +334,7 @@ TEST(or_operator_success) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* First succeeds, second should not run */
-    executor_execute_command_line(exec, "RESULT=initial");
+    executor_execute_command_line(exec, "RESULT=initial", 1);
     run_result_t r = run_shell_with_executor(exec, "true || RESULT=changed");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -408,7 +408,7 @@ TEST(function_with_args) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "setarg() { ARG1=$1; ARG2=$2; }");
+    executor_execute_command_line(exec, "setarg() { ARG1=$1; ARG2=$2; }", 1);
     run_result_t r = run_shell_with_executor(exec, "setarg hello world");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -426,7 +426,7 @@ TEST(function_return) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "retfunc() { return 42; }");
+    executor_execute_command_line(exec, "retfunc() { return 42; }", 1);
     run_result_t r = run_shell_with_executor(exec, "retfunc");
     ASSERT_EXIT_STATUS(r, 42);
 
@@ -454,8 +454,8 @@ TEST(local_plain_string_reassignment) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(
-        exec, "f() { local x=initial; x=updated; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local x=initial; x=updated; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "updated",
@@ -468,8 +468,8 @@ TEST(local_integer_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local x=0; x=42; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f() { local x=0; x=42; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -484,8 +484,8 @@ TEST(local_arith_substitution) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(exec,
-                                  "f() { local x=0; x=$((1+1)); RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+                                  "f() { local x=0; x=$((1+1)); RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -500,8 +500,8 @@ TEST(local_command_substitution) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(
-        exec, "f() { local x=initial; x=$(echo updated); RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local x=initial; x=$(echo updated); RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -516,8 +516,8 @@ TEST(declare_reassignment) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(exec,
-                                  "f() { declare x=0; x=42; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+                                  "f() { declare x=0; x=42; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -532,8 +532,8 @@ TEST(typeset_reassignment) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(exec,
-                                  "f() { typeset x=0; x=42; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+                                  "f() { typeset x=0; x=42; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "42",
@@ -546,8 +546,8 @@ TEST(local_two_step_no_initial) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local x; x=hello; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f() { local x; x=hello; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -561,10 +561,10 @@ TEST(local_does_not_leak_to_global) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "X_LEAK=outside-initial");
+    executor_execute_command_line(exec, "X_LEAK=outside-initial", 1);
     executor_execute_command_line(
-        exec, "f() { local X_LEAK=inside-local; X_LEAK=inside-updated; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local X_LEAK=inside-local; X_LEAK=inside-updated; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *outside = symtable_get_var(exec->symtable, "X_LEAK");
     ASSERT_STR_EQ(
@@ -581,8 +581,8 @@ TEST(local_for_loop_variable) {
 
     executor_execute_command_line(
         exec,
-        "f() { local i=startval; for i in 1 2 3; do :; done; RESULT=$i; }");
-    executor_execute_command_line(exec, "f");
+        "f() { local i=startval; for i in 1 2 3; do :; done; RESULT=$i; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "3",
@@ -597,8 +597,8 @@ TEST(local_plus_equals_append) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(
-        exec, "f() { local s=hello; s+=\" world\"; RESULT=$s; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local s=hello; s+=\" world\"; RESULT=$s; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "hello world",
@@ -618,8 +618,8 @@ TEST(local_while_loop_counter) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(exec, "f() { local i=0; while [ $i -lt 3 ]; "
-                                        "do i=$((i+1)); done; RESULT=$i; }");
-    executor_execute_command_line(exec, "f");
+                                        "do i=$((i+1)); done; RESULT=$i; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "3",
@@ -645,19 +645,19 @@ TEST(function_redir_out_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(exec,
-                                  "f() { echo HELLO; } > /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+                                  "f() { echo HELLO; } > /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "HELLO",
         "function trailing > redirect must write body output to the file");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -665,19 +665,19 @@ TEST(function_redir_stderr_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(
-        exec, "f() { echo OOPS 1>&2; } 2> /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { echo OOPS 1>&2; } 2> /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "OOPS",
         "function trailing 2> redirect must write body stderr to the file");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -685,20 +685,20 @@ TEST(function_redir_append_accumulates_across_calls) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(exec,
-                                  "f() { echo line; } >> /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
-    executor_execute_command_line(exec, "f");
-    executor_execute_command_line(exec, "f");
+                                  "f() { echo line; } >> /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
+    executor_execute_command_line(exec, "f", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "line\nline\nline",
                   "function trailing >> redirect must append on every call");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -706,19 +706,19 @@ TEST(function_redir_keyword_form_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(
-        exec, "function f { echo from-keyword; } > /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+        exec, "function f { echo from-keyword; } > /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "from-keyword",
         "function-keyword form trailing > redirect must apply at call");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -729,20 +729,20 @@ TEST(function_redir_input_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in", 1);
     executor_execute_command_line(exec,
-                                  "echo hello-input > /tmp/lush_test_48_in");
+                                  "echo hello-input > /tmp/lush_test_48_in", 1);
     executor_execute_command_line(
         exec,
-        "f() { read line; CAPTURED=\"got: $line\"; } < /tmp/lush_test_48_in");
-    executor_execute_command_line(exec, "f");
+        "f() { read line; CAPTURED=\"got: $line\"; } < /tmp/lush_test_48_in", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "CAPTURED");
     ASSERT_STR_EQ(
         result, "got: hello-input",
         "function trailing < redirect must feed body stdin from the file");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in", 1);
     executor_free(exec);
 }
 
@@ -752,22 +752,22 @@ TEST(function_redir_does_not_break_normal_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(exec,
-                                  "f() { echo from-f; } > /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+                                  "f() { echo from-f; } > /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     /* This echo must NOT also be captured by f's redirect — its output
      * should be discarded as normal (we don't capture stdout here). */
-    executor_execute_command_line(exec, "echo from-second-call");
+    executor_execute_command_line(exec, "echo from-second-call", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "from-f",
         "function trailing redirect must not leak to subsequent commands");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -780,7 +780,7 @@ TEST(arithmetic_basic) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "RESULT=$((2 + 3))");
+    executor_execute_command_line(exec, "RESULT=$((2 + 3))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -794,7 +794,7 @@ TEST(arithmetic_multiply) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "RESULT=$((4 * 5))");
+    executor_execute_command_line(exec, "RESULT=$((4 * 5))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -808,9 +808,9 @@ TEST(arithmetic_variable) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "X=10");
-    executor_execute_command_line(exec, "Y=20");
-    executor_execute_command_line(exec, "RESULT=$((X + Y))");
+    executor_execute_command_line(exec, "X=10", 1);
+    executor_execute_command_line(exec, "Y=20", 1);
+    executor_execute_command_line(exec, "RESULT=$((X + Y))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -824,8 +824,8 @@ TEST(arithmetic_increment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "N=5");
-    executor_execute_command_line(exec, "N=$((N + 1))");
+    executor_execute_command_line(exec, "N=5", 1);
+    executor_execute_command_line(exec, "N=$((N + 1))", 1);
 
     char *n = symtable_get_var(exec->symtable, "N");
     ASSERT_NOT_NULL(n, "N should be set");
@@ -844,9 +844,9 @@ TEST(subshell_isolation) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "OUTER=yes");
+    executor_execute_command_line(exec, "OUTER=yes", 1);
     /* Variable set in subshell should not affect parent */
-    executor_execute_command_line(exec, "(INNER=subshell)");
+    executor_execute_command_line(exec, "(INNER=subshell)", 1);
 
     char *outer = symtable_get_var(exec->symtable, "OUTER");
     ASSERT_NOT_NULL(outer, "OUTER should be set");
@@ -963,12 +963,12 @@ TEST(builtin_unset) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "TOUNSET=exists");
+    executor_execute_command_line(exec, "TOUNSET=exists", 1);
     char *before = symtable_get_var(exec->symtable, "TOUNSET");
     ASSERT_NOT_NULL(before, "Variable should exist before unset");
     free(before);
 
-    executor_execute_command_line(exec, "unset TOUNSET");
+    executor_execute_command_line(exec, "unset TOUNSET", 1);
     char *after = symtable_get_var(exec->symtable, "TOUNSET");
     ASSERT(after == NULL, "Variable should not exist after unset");
 
@@ -1010,10 +1010,10 @@ TEST(builtin_shift) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Test shift with positional parameters */
-    executor_execute_command_line(exec, "set -- a b c d e");
-    executor_execute_command_line(exec, "FIRST=$1");
-    executor_execute_command_line(exec, "shift");
-    executor_execute_command_line(exec, "AFTER=$1");
+    executor_execute_command_line(exec, "set -- a b c d e", 1);
+    executor_execute_command_line(exec, "FIRST=$1", 1);
+    executor_execute_command_line(exec, "shift", 1);
+    executor_execute_command_line(exec, "AFTER=$1", 1);
 
     char *first = symtable_get_var(exec->symtable, "FIRST");
     char *after = symtable_get_var(exec->symtable, "AFTER");
@@ -1030,8 +1030,8 @@ TEST(builtin_set_positional) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "set -- one two three");
-    executor_execute_command_line(exec, "P1=$1; P2=$2; P3=$3");
+    executor_execute_command_line(exec, "set -- one two three", 1);
+    executor_execute_command_line(exec, "P1=$1; P2=$2; P3=$3", 1);
 
     char *p1 = symtable_get_var(exec->symtable, "P1");
     char *p2 = symtable_get_var(exec->symtable, "P2");
@@ -1421,7 +1421,7 @@ TEST(command_substitution_exit_status) {
     ASSERT_EXIT_STATUS(r, 0);
 
     /* TODO: Re-enable when bug is fixed:
-     * status = executor_execute_command_line(exec, "X=$(false); Y=$?");
+     * status = executor_execute_command_line(exec, "X=$(false); Y=$?", 1);
      * ASSERT_EQ(status, 0, "Assignment after substitution should succeed");
      * char *y = symtable_get_var(exec->symtable, "Y");
      * ASSERT_STR_EQ(y, "1", "$? should capture exit status from $(false)");
@@ -1440,7 +1440,7 @@ TEST(special_var_question_mark) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "true");
+    executor_execute_command_line(exec, "true", 1);
     run_result_t r = run_shell_with_executor(exec, "STATUS=$?");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1561,10 +1561,10 @@ TEST(negation_command) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Skip actual negation test until bug is fixed */
-    /* int status = executor_execute_command_line(exec, "! false"); */
+    /* int status = executor_execute_command_line(exec, "! false", 1); */
     /* ASSERT_EQ(status, 0, "Negated false should return 0"); */
 
-    /* status = executor_execute_command_line(exec, "! true"); */
+    /* status = executor_execute_command_line(exec, "! true", 1); */
     /* ASSERT_EQ(status, 1, "Negated true should return 1"); */
 
     /* For now, just verify executor works without negation */

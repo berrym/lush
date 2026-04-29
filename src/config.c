@@ -1436,8 +1436,13 @@ int config_execute_script_file(const char *path) {
             executor_set_script_context(executor, path, construct_number);
         }
 
-        // Parse and execute the complete construct
-        int construct_result = parse_and_execute(complete_input);
+        /* Parse and execute the complete construct. construct_number
+         * tracks 1-based logical-construct order within the sourced
+         * file, not source line number; passing 1 here preserves the
+         * pre-2026-04 behaviour. Future work may thread the actual
+         * source line of the construct's first character through here
+         * for accurate multi-line script-source diagnostics. */
+        int construct_result = parse_and_execute(complete_input, 1);
 
         // Check for return from sourced script (exit code 200+)
         // This matches how bin_source handles the special return code
