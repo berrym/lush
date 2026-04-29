@@ -2519,11 +2519,16 @@ int bin_let(int argc, char **argv) {
         arithm_clear_error();
         char *result = arithm_expand(argv[i]);
 
-        if (arithm_error_flag || !result) {
-            const char *err_msg = arithm_get_last_error();
+        if (arithm_error_is_flagged() || !result) {
+            const char *err_msg = arithm_error_message();
+            const char *err_while = arithm_error_while();
+            const char *err_help = arithm_error_help();
+            shell_error_code_t err_code = arithm_error_is_flagged()
+                                              ? arithm_error_code()
+                                              : SHELL_ERR_ARITHMETIC_SYNTAX;
             source_location_t loc = builtin_get_source_location();
             shell_error_t *error = shell_error_create(
-                SHELL_ERR_ARITHMETIC_SYNTAX, SHELL_SEVERITY_ERROR, loc,
+                err_code, SHELL_SEVERITY_ERROR, loc,
                 "invalid expression '%s'", argv[i]);
             if (error) {
                 /* Add executor context stack if available */
@@ -2540,14 +2545,24 @@ int bin_let(int argc, char **argv) {
                 shell_error_push_context(error, "in builtin 'let'");
                 shell_error_push_context(error, "evaluating argument %d of %d",
                                          i, argc - 1);
+                if (err_while) {
+                    shell_error_push_context(error, "%s", err_while);
+                }
                 if (err_msg) {
                     shell_error_set_detail(error, err_msg);
                 }
-                shell_error_set_suggestion(
-                    error, "supported operators: + - * / %% ** ++ -- = += -= "
-                           "*= /= %%=\n"
-                           "   comparisons: == != < > <= >= && || !\n"
-                           "   note: variables don't need $: let x=5 y=x+1");
+                /* Prefer the per-site help from arithmetic.c when present;
+                 * fall back to the generic let-builtin operator cheat sheet. */
+                if (err_help) {
+                    shell_error_set_suggestion(error, err_help);
+                } else {
+                    shell_error_set_suggestion(
+                        error,
+                        "supported operators: + - * / %% ** ++ -- = += -= "
+                        "*= /= %%=\n"
+                        "   comparisons: == != < > <= >= && || !\n"
+                        "   note: variables don't need $: let x=5 y=x+1");
+                }
                 shell_error_display(error, stderr, isatty(STDERR_FILENO));
                 shell_error_free(error);
             }

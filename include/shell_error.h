@@ -90,6 +90,15 @@ typedef enum shell_error_code {
     SHELL_ERR_FILE_NOT_FOUND,      /**< File does not exist */
     SHELL_ERR_NOT_EXECUTABLE,      /**< File is not executable */
     SHELL_ERR_DIVISION_BY_ZERO,    /**< Arithmetic division by zero */
+    SHELL_ERR_MODULO_BY_ZERO,      /**< Arithmetic modulo by zero */
+    SHELL_ERR_ARITH_INVALID_ASSIGN_TARGET,    /**< Assignment to non-lvalue */
+    SHELL_ERR_ARITH_INVALID_INCREMENT_TARGET, /**< ++ on non-lvalue */
+    SHELL_ERR_ARITH_INVALID_DECREMENT_TARGET, /**< -- on non-lvalue */
+    SHELL_ERR_ARITH_NEGATIVE_EXPONENT,        /**< ** with negative exponent */
+    SHELL_ERR_ARITH_STACK_OVERFLOW,           /**< Operator/operand stack full */
+    SHELL_ERR_ARITH_STACK_UNDERFLOW,          /**< Operator/operand stack empty */
+    SHELL_ERR_ARITH_MISMATCHED_TERNARY,       /**< Unmatched ? : */
+    SHELL_ERR_ARITH_MISMATCHED_PARENS,        /**< Unmatched ( ) */
     SHELL_ERR_INTEGER_OVERFLOW,    /**< Arithmetic overflow */
     SHELL_ERR_INVALID_SUBSCRIPT,   /**< Invalid array subscript */
     SHELL_ERR_READONLY_VAR,        /**< Attempt to modify readonly variable */

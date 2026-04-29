@@ -2535,7 +2535,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
             if (result_str) {
                 free(result_str);
             }
-            if (arithm_error_flag && executor->debug) {
+            if (arithm_error_is_flagged() && executor->debug) {
                 fprintf(stderr, "DEBUG: C-style for init failed: %s\n",
                         init_expanded);
             }
@@ -2553,7 +2553,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 arithm_clear_error();
                 char *result_str =
                     arithm_expand_with_executor(executor, test_expanded);
-                if (!result_str || arithm_error_flag) {
+                if (!result_str || arithm_error_is_flagged()) {
                     // Arithmetic error
                     free(result_str);
                     free(test_expanded);
@@ -2598,7 +2598,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 if (result_str) {
                     free(result_str);
                 }
-                if (arithm_error_flag && executor->debug) {
+                if (arithm_error_is_flagged() && executor->debug) {
                     fprintf(stderr, "DEBUG: C-style for update failed: %s\n",
                             update_expanded);
                 }
@@ -9763,7 +9763,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             // ${#arr[n]} - length of element at index n
                             arithm_clear_error();
                             char *idx_result = arithm_expand(subscript);
-                            if (idx_result && !arithm_error_flag) {
+                            if (idx_result && !arithm_error_is_flagged()) {
                                 int idx = (int)strtoll(idx_result, NULL, 10);
                                 free(idx_result);
 
@@ -9879,7 +9879,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         // Indexed array - ${arr[n]} - specific element
                         arithm_clear_error();
                         char *idx_result = arithm_expand(subscript);
-                        if (idx_result && !arithm_error_flag) {
+                        if (idx_result && !arithm_error_is_flagged()) {
                             int idx = (int)strtoll(idx_result, NULL, 10);
                             free(idx_result);
 
@@ -11140,12 +11140,45 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
         return result;
     }
 
-    // If arithm_expand returns NULL, there was an error (like division by zero)
-    // Report structured error for arithmetic failure
-    if (arithm_error_flag && arithm_error_message) {
-        executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX,
-                              SOURCE_LOC_UNKNOWN, "arithmetic: %s",
-                              arithm_error_message);
+    /* Drain the typed error state from arithmetic.c and emit a fully
+     * structured shell error: specific code (one per failure mode rather
+     * than the old blanket SHELL_ERR_ARITHMETIC_SYNTAX), site-specific
+     * `while:` context, and site-specific `help:` suggestion. The
+     * arithmetic module owns the error semantics; the executor owns
+     * displaying them.
+     */
+    if (arithm_error_is_flagged()) {
+        const char *msg = arithm_error_message();
+        const char *while_ctx = arithm_error_while();
+        const char *help = arithm_error_help();
+        shell_error_t *err = shell_error_create(
+            arithm_error_code(), SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
+            "arithmetic: %s", msg ? msg : "evaluation error");
+        if (err) {
+            if (while_ctx) {
+                shell_error_push_context(err, "%s", while_ctx);
+            }
+            for (size_t i = 0; i < executor->context_depth &&
+                               i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(err, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
+            if (help) {
+                shell_error_set_suggestion(err, help);
+            }
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+            executor->has_error = true;
+            executor->error_message = NULL;
+        } else {
+            /* Fallback if shell_error_create failed (e.g. OOM) */
+            executor_error_report(executor, arithm_error_code(),
+                                  SOURCE_LOC_UNKNOWN, "arithmetic: %s",
+                                  msg ? msg : "evaluation error");
+        }
     } else {
         executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX,
                               SOURCE_LOC_UNKNOWN,
@@ -12791,7 +12824,7 @@ static int execute_arithmetic_command(executor_t *executor,
     arithm_clear_error();
     char *result_str = arithm_expand_with_executor(executor, expr);
 
-    if (!result_str || arithm_error_flag) {
+    if (!result_str || arithm_error_is_flagged()) {
         // Arithmetic error - could be syntax error or division by zero
         // Create structured error with help suggestion
         shell_error_t *error = shell_error_create(
@@ -13486,7 +13519,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                                 arithm_clear_error();
                                 char *idx_result = arithm_expand(idx_str);
 
-                                if (idx_result && !arithm_error_flag) {
+                                if (idx_result && !arithm_error_is_flagged()) {
                                     long long idx_val =
                                         strtoll(idx_result, NULL, 10);
                                     if (idx_val >= 0) {
@@ -13679,7 +13712,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         arithm_clear_error();
         char *idx_result = arithm_expand(subscript);
 
-        if (!idx_result || arithm_error_flag) {
+        if (!idx_result || arithm_error_is_flagged()) {
             if (idx_result)
                 free(idx_result);
             if (expanded_value)

@@ -31,6 +31,7 @@
 
 #include <ctype.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,9 +124,28 @@ static void stack_item_cleanup(stack_item_t *item) {
     }
 }
 
-// Global error state
-bool arithm_error_flag = false;
-char *arithm_error_message = NULL;
+/* Typed error state for the structured shell error system. The pre-2026-04
+ * bare globals (arithm_error_flag / arithm_error_message) were deleted as
+ * part of the error-system migration; callers now read this state through
+ * the accessor functions declared in arithmetic.h.
+ *
+ * Why file-scope state at all (rather than passing a context through
+ * eval_*): the eval_* operator functions take only the two stack-item
+ * arguments shunting yard requires. Threading a fifth parameter through
+ * every operator is a deeper API rework that overlaps with #64's source-
+ * location threading; that lands together when #64 is addressed. Until
+ * then, file-scope state is the right architectural shape — the
+ * arithmetic module owns its evaluation; the executor owns reporting.
+ */
+typedef struct {
+    bool flagged;
+    shell_error_code_t code;
+    char message[512];
+    char while_context[128];
+    char help[256];
+} arithm_error_state_t;
+
+static arithm_error_state_t s_arithm_error;
 
 // Forward declarations for internal functions
 static ssize_t long_value(stack_item_t *item);
@@ -238,7 +258,10 @@ static ssize_t eval_sub(stack_item_t *a1, stack_item_t *a2) {
 static ssize_t eval_div(stack_item_t *a1, stack_item_t *a2) {
     ssize_t divisor = long_value(a2);
     if (divisor == 0) {
-        arithm_set_error("division by zero");
+        arithm_set_error(SHELL_ERR_DIVISION_BY_ZERO,
+                         "evaluating / operator",
+                         "divisor must be non-zero",
+                         "division by zero");
         return 0;
     }
     return arithm_safe_div(long_value(a1), divisor);
@@ -248,7 +271,10 @@ static ssize_t eval_div(stack_item_t *a1, stack_item_t *a2) {
 static ssize_t eval_mod(stack_item_t *a1, stack_item_t *a2) {
     ssize_t divisor = long_value(a2);
     if (divisor == 0) {
-        arithm_set_error("division by zero in modulo operation");
+        arithm_set_error(SHELL_ERR_MODULO_BY_ZERO,
+                         "evaluating %% operator",
+                         "divisor must be non-zero",
+                         "division by zero in modulo operation");
         return 0;
     }
     return arithm_safe_mod(long_value(a1), divisor);
@@ -411,12 +437,23 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
     symtable_set_global(item->var_name, value_str);
 }
 
+/* Helper for the six assignment operators that share the same lvalue
+ * check. The `op` argument is the operator token used in the while:
+ * line ("=", "+=", etc.). */
+#define ARITHM_REQUIRE_LVALUE(item, op)                                        \
+    do {                                                                       \
+        if ((item)->type != ITEM_VAR_PTR || !(item)->var_name) {               \
+            arithm_set_error(SHELL_ERR_ARITH_INVALID_ASSIGN_TARGET,            \
+                             "evaluating " op " operator",                     \
+                             "left-hand side must be a variable name",        \
+                             "invalid assignment target");                     \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
+
 /** @brief Simple assignment operator */
 static ssize_t eval_assign(stack_item_t *a1, stack_item_t *a2) {
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid assignment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_LVALUE(a1, "=");
 
     ssize_t value = long_value(a2);
     set_var_value_scoped(a1, value);
@@ -425,10 +462,7 @@ static ssize_t eval_assign(stack_item_t *a1, stack_item_t *a2) {
 
 /** @brief Addition assignment operator (+=) */
 static ssize_t eval_addeq(stack_item_t *a1, stack_item_t *a2) {
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid assignment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_LVALUE(a1, "+=");
 
     ssize_t current_value = get_var_value_scoped(a1);
     ssize_t add_value = long_value(a2);
@@ -440,10 +474,7 @@ static ssize_t eval_addeq(stack_item_t *a1, stack_item_t *a2) {
 
 /** @brief Subtraction assignment operator (-=) */
 static ssize_t eval_subeq(stack_item_t *a1, stack_item_t *a2) {
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid assignment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_LVALUE(a1, "-=");
 
     ssize_t current_value = get_var_value_scoped(a1);
     ssize_t sub_value = long_value(a2);
@@ -455,10 +486,7 @@ static ssize_t eval_subeq(stack_item_t *a1, stack_item_t *a2) {
 
 /** @brief Multiplication assignment operator (*=) */
 static ssize_t eval_muleq(stack_item_t *a1, stack_item_t *a2) {
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid assignment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_LVALUE(a1, "*=");
 
     ssize_t current_value = get_var_value_scoped(a1);
     ssize_t mul_value = long_value(a2);
@@ -470,14 +498,14 @@ static ssize_t eval_muleq(stack_item_t *a1, stack_item_t *a2) {
 
 /** @brief Division assignment operator (/=) with zero-check */
 static ssize_t eval_diveq(stack_item_t *a1, stack_item_t *a2) {
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid assignment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_LVALUE(a1, "/=");
 
     ssize_t div_value = long_value(a2);
     if (div_value == 0) {
-        arithm_set_error("division by zero");
+        arithm_set_error(SHELL_ERR_DIVISION_BY_ZERO,
+                         "evaluating /= operator",
+                         "divisor must be non-zero",
+                         "division by zero");
         return 0;
     }
 
@@ -490,14 +518,14 @@ static ssize_t eval_diveq(stack_item_t *a1, stack_item_t *a2) {
 
 /** @brief Modulo assignment operator (%=) with zero-check */
 static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid assignment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_LVALUE(a1, "%=");
 
     ssize_t mod_value = long_value(a2);
     if (mod_value == 0) {
-        arithm_set_error("modulo by zero");
+        arithm_set_error(SHELL_ERR_MODULO_BY_ZERO,
+                         "evaluating %%= operator",
+                         "divisor must be non-zero",
+                         "modulo by zero");
         return 0;
     }
 
@@ -512,13 +540,32 @@ static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
 // INCREMENT/DECREMENT OPERATORS
 // ============================================================================
 
+#define ARITHM_REQUIRE_INC_TARGET(item, op)                                    \
+    do {                                                                       \
+        if ((item)->type != ITEM_VAR_PTR || !(item)->var_name) {               \
+            arithm_set_error(SHELL_ERR_ARITH_INVALID_INCREMENT_TARGET,         \
+                             "evaluating " op " operator",                     \
+                             "operand must be a variable name",                \
+                             "invalid increment target");                      \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
+
+#define ARITHM_REQUIRE_DEC_TARGET(item, op)                                    \
+    do {                                                                       \
+        if ((item)->type != ITEM_VAR_PTR || !(item)->var_name) {               \
+            arithm_set_error(SHELL_ERR_ARITH_INVALID_DECREMENT_TARGET,         \
+                             "evaluating " op " operator",                     \
+                             "operand must be a variable name",                \
+                             "invalid decrement target");                      \
+            return 0;                                                          \
+        }                                                                      \
+    } while (0)
+
 /** @brief Pre-increment operator (++x) */
 static ssize_t eval_preinc(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid increment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_INC_TARGET(a1, "pre-increment ++");
 
     ssize_t value = arithm_wrap_add(long_value(a1), 1);
     set_var_value_scoped(a1, value);
@@ -528,10 +575,7 @@ static ssize_t eval_preinc(stack_item_t *a1, stack_item_t *a2) {
 /** @brief Pre-decrement operator (--x) */
 static ssize_t eval_predec(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid decrement target");
-        return 0;
-    }
+    ARITHM_REQUIRE_DEC_TARGET(a1, "pre-decrement --");
 
     ssize_t value = arithm_wrap_sub(long_value(a1), 1);
     set_var_value_scoped(a1, value);
@@ -541,10 +585,7 @@ static ssize_t eval_predec(stack_item_t *a1, stack_item_t *a2) {
 /** @brief Post-increment operator (x++) - returns old value */
 static ssize_t eval_postinc(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid increment target");
-        return 0;
-    }
+    ARITHM_REQUIRE_INC_TARGET(a1, "post-increment ++");
 
     ssize_t old_value = long_value(a1);
     set_var_value_scoped(a1, arithm_wrap_add(old_value, 1));
@@ -554,10 +595,7 @@ static ssize_t eval_postinc(stack_item_t *a1, stack_item_t *a2) {
 /** @brief Post-decrement operator (x--) - returns old value */
 static ssize_t eval_postdec(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
-    if (a1->type != ITEM_VAR_PTR || !a1->var_name) {
-        arithm_set_error("invalid decrement target");
-        return 0;
-    }
+    ARITHM_REQUIRE_DEC_TARGET(a1, "post-decrement --");
 
     ssize_t old_value = long_value(a1);
     set_var_value_scoped(a1, arithm_wrap_sub(old_value, 1));
@@ -578,7 +616,10 @@ static ssize_t eval_exp(stack_item_t *a1, stack_item_t *a2) {
     ssize_t base = long_value(a1);
     ssize_t exp = long_value(a2);
     if (exp < 0) {
-        arithm_set_error("negative exponent not supported");
+        arithm_set_error(SHELL_ERR_ARITH_NEGATIVE_EXPONENT,
+                         "evaluating ** operator",
+                         "exponent must be non-negative",
+                         "negative exponent not supported");
         return 0;
     }
 
@@ -729,7 +770,10 @@ static ssize_t long_value(stack_item_t *item) {
 static void push_opstack(arithm_context_t *ctx, op_t *op) {
     if (ctx->nopstack >= MAXOPSTACK) {
         ctx->errflag = true;
-        arithm_set_error("operator stack overflow");
+        arithm_set_error(SHELL_ERR_ARITH_STACK_OVERFLOW,
+                         "shunting-yard operator stack push",
+                         "expression too deeply nested",
+                         "operator stack overflow");
         return;
     }
     ctx->opstack[ctx->nopstack++] = op;
@@ -743,7 +787,10 @@ static void push_opstack(arithm_context_t *ctx, op_t *op) {
 static op_t *pop_opstack(arithm_context_t *ctx) {
     if (ctx->nopstack <= 0) {
         ctx->errflag = true;
-        arithm_set_error("operator stack underflow");
+        arithm_set_error(SHELL_ERR_ARITH_STACK_UNDERFLOW,
+                         "shunting-yard operator stack pop",
+                         "missing operand or operator in expression",
+                         "operator stack underflow");
         return NULL;
     }
     return ctx->opstack[--ctx->nopstack];
@@ -757,7 +804,10 @@ static op_t *pop_opstack(arithm_context_t *ctx) {
 static void push_numstackl(arithm_context_t *ctx, ssize_t val) {
     if (ctx->nnumstack >= MAXNUMSTACK) {
         ctx->errflag = true;
-        arithm_set_error("number stack overflow");
+        arithm_set_error(SHELL_ERR_ARITH_STACK_OVERFLOW,
+                         "shunting-yard number stack push",
+                         "expression has too many operands",
+                         "number stack overflow");
         return;
     }
     ctx->numstack[ctx->nnumstack].type = ITEM_LONG_INT;
@@ -774,7 +824,10 @@ static void push_numstackv_with_context(arithm_context_t *ctx,
                                         const char *var_name) {
     if (ctx->nnumstack >= MAXNUMSTACK) {
         ctx->errflag = true;
-        arithm_set_error("number stack overflow");
+        arithm_set_error(SHELL_ERR_ARITH_STACK_OVERFLOW,
+                         "shunting-yard number stack push",
+                         "expression has too many operands",
+                         "number stack overflow");
         return;
     }
     ctx->numstack[ctx->nnumstack].type = ITEM_VAR_PTR;
@@ -797,7 +850,10 @@ static stack_item_t pop_numstack(arithm_context_t *ctx) {
     stack_item_t empty = {ITEM_LONG_INT, {0}, NULL};
     if (ctx->nnumstack <= 0) {
         ctx->errflag = true;
-        arithm_set_error("number stack underflow");
+        arithm_set_error(SHELL_ERR_ARITH_STACK_UNDERFLOW,
+                         "shunting-yard number stack pop",
+                         "missing operand in expression",
+                         "number stack underflow");
         return empty;
     }
     return ctx->numstack[--ctx->nnumstack];
@@ -954,7 +1010,10 @@ static char *get_var_name_with_context(arithm_context_t *ctx
     // Extract variable name
     char *name = malloc(*nchars + 1);
     if (!name) {
-        arithm_set_error("memory allocation failed");
+        arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
+                         "extracting variable name in arithmetic",
+                         "out of memory",
+                         "memory allocation failed");
         return NULL;
     }
 
@@ -1018,7 +1077,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 stack_item_cleanup(&a1);
                 stack_item_cleanup(&a2);
             }
-            if (arithm_error_flag) {
+            if (s_arithm_error.flagged) {
                 ctx->errflag = true;
                 return;
             }
@@ -1069,7 +1128,10 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                     stack_item_cleanup(&true_val);
                     stack_item_cleanup(&false_val);
                 } else {
-                    arithm_set_error("mismatched ternary operator");
+                    arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_TERNARY,
+                                     "parsing ternary expression",
+                                     "every '?' needs a matching ':'",
+                                     "mismatched ternary operator");
                     stack_item_cleanup(&false_val);
                     ctx->errflag = true;
                     return;
@@ -1085,7 +1147,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
             if (pop_op->unary) {
                 push_numstackl(ctx, pop_op->eval(&a1, NULL));
                 stack_item_cleanup(&a1);
-                if (arithm_error_flag) {
+                if (s_arithm_error.flagged) {
                     ctx->errflag = true;
                     return;
                 }
@@ -1098,7 +1160,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 push_numstackl(ctx, pop_op->eval(&a2, &a1));
                 stack_item_cleanup(&a1);
                 stack_item_cleanup(&a2);
-                if (arithm_error_flag) {
+                if (s_arithm_error.flagged) {
                     ctx->errflag = true;
                     return;
                 }
@@ -1112,7 +1174,10 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
             pop_opstack(ctx); // Remove the '('
         } else {
             ctx->errflag = true;
-            arithm_set_error("mismatched parentheses");
+            arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_PARENS,
+                             "parsing parenthesized expression",
+                             "every '(' needs a matching ')'",
+                             "mismatched parentheses");
         }
     } else {
         while (ctx->nopstack > 0 &&
@@ -1164,7 +1229,10 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                     stack_item_cleanup(&true_val);
                     stack_item_cleanup(&false_val);
                 } else {
-                    arithm_set_error("mismatched ternary operator");
+                    arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_TERNARY,
+                                     "parsing ternary expression",
+                                     "every '?' needs a matching ':'",
+                                     "mismatched ternary operator");
                     stack_item_cleanup(&false_val);
                     ctx->errflag = true;
                     return;
@@ -1180,7 +1248,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
             if (pop_op->unary) {
                 push_numstackl(ctx, pop_op->eval(&a1, NULL));
                 stack_item_cleanup(&a1);
-                if (arithm_error_flag) {
+                if (s_arithm_error.flagged) {
                     ctx->errflag = true;
                     return;
                 }
@@ -1193,7 +1261,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 push_numstackl(ctx, pop_op->eval(&a2, &a1));
                 stack_item_cleanup(&a1);
                 stack_item_cleanup(&a2);
-                if (arithm_error_flag) {
+                if (s_arithm_error.flagged) {
                     ctx->errflag = true;
                     return;
                 }
@@ -1212,22 +1280,59 @@ void arithm_init(void) { arithm_clear_error(); }
 
 void arithm_cleanup(void) { arithm_clear_error(); }
 
-const char *arithm_get_last_error(void) { return arithm_error_message; }
+void arithm_set_error(shell_error_code_t code, const char *while_context,
+                      const char *help, const char *fmt, ...) {
+    /* Preserve the first reported error of an evaluation: shunting-yard
+     * cleanup paths often try to set further errors after the original
+     * trip; the original is the actionable one. */
+    if (s_arithm_error.flagged) {
+        return;
+    }
+    s_arithm_error.flagged = true;
+    s_arithm_error.code = code;
 
-void arithm_set_error(const char *message) {
-    arithm_clear_error();
-    arithm_error_flag = true;
-    if (message) {
-        arithm_error_message = strdup(message);
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(s_arithm_error.message, sizeof(s_arithm_error.message), fmt,
+              args);
+    va_end(args);
+
+    if (while_context) {
+        snprintf(s_arithm_error.while_context,
+                 sizeof(s_arithm_error.while_context), "%s", while_context);
+    } else {
+        s_arithm_error.while_context[0] = '\0';
+    }
+    if (help) {
+        snprintf(s_arithm_error.help, sizeof(s_arithm_error.help), "%s", help);
+    } else {
+        s_arithm_error.help[0] = '\0';
     }
 }
 
 void arithm_clear_error(void) {
-    arithm_error_flag = false;
-    if (arithm_error_message) {
-        free(arithm_error_message);
-        arithm_error_message = NULL;
-    }
+    s_arithm_error.flagged = false;
+    s_arithm_error.code = SHELL_ERR_ARITHMETIC_SYNTAX;
+    s_arithm_error.message[0] = '\0';
+    s_arithm_error.while_context[0] = '\0';
+    s_arithm_error.help[0] = '\0';
+}
+
+bool arithm_error_is_flagged(void) { return s_arithm_error.flagged; }
+
+shell_error_code_t arithm_error_code(void) { return s_arithm_error.code; }
+
+const char *arithm_error_message(void) {
+    return s_arithm_error.message[0] ? s_arithm_error.message : NULL;
+}
+
+const char *arithm_error_while(void) {
+    return s_arithm_error.while_context[0] ? s_arithm_error.while_context
+                                           : NULL;
+}
+
+const char *arithm_error_help(void) {
+    return s_arithm_error.help[0] ? s_arithm_error.help : NULL;
 }
 
 // Main arithmetic expansion function
@@ -1264,15 +1369,21 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             size_t expr_len = len - 5;
             cleaned_expr = malloc(expr_len + 1);
             if (!cleaned_expr) {
-                arithm_set_error("memory allocation failed");
+                arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
+                                 "preparing arithmetic expression",
+                                 "out of memory",
+                                 "memory allocation failed");
                 return NULL;
             }
             strncpy(cleaned_expr, orig_expr + 3, expr_len);
             cleaned_expr[expr_len] = '\0';
             expr = cleaned_expr;
         } else {
-            arithm_set_error(
-                "malformed arithmetic expression: missing closing ))");
+            arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                             "scanning $((...)) wrapper",
+                             "every '$((' needs a matching '))'",
+                             "malformed arithmetic expression: "
+                             "missing closing ))");
             return NULL;
         }
     } else {
@@ -1321,7 +1432,11 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                 } else if (op->op == '+') {
                     op = OP_UPLUS;
                 } else if (op->op != '(' && !op->unary) {
-                    arithm_set_error("illegal use of binary operator");
+                    arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                                     "applying binary operator",
+                                     "binary operators require operands "
+                                     "on both sides",
+                                     "illegal use of binary operator");
                     break;
                 }
             }
@@ -1399,9 +1514,11 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
 
                 current = end + 1; // Skip past the closing )
             } else {
-                // Malformed command substitution
-                arithm_set_error(
-                    "malformed command substitution in arithmetic");
+                arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                                 "scanning $(...) in arithmetic expression",
+                                 "every '$(' needs a matching ')'",
+                                 "malformed command substitution in "
+                                 "arithmetic");
                 break;
             }
 
@@ -1442,7 +1559,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
 
                 current = end + 1; // Skip past }
             } else {
-                arithm_set_error("unmatched ${ in arithmetic expression");
+                arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                                 "scanning ${...} in arithmetic expression",
+                                 "every '${' needs a matching '}'",
+                                 "unmatched ${ in arithmetic expression");
                 break;
             }
 
@@ -1482,7 +1602,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             last_op = NULL;
             current += nchars;
         } else {
-            arithm_set_error("syntax error in arithmetic expression");
+            arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                             "tokenizing arithmetic expression",
+                             "check operator and operand placement",
+                             "syntax error in arithmetic expression");
             break;
         }
     }
@@ -1500,7 +1623,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         // through to the binary-apply path below would call op->eval which
         // is NULL. Treat it the same as shunt_op's ')' branch does.
         if (op->op == '(' || op->op == ')') {
-            arithm_set_error("mismatched parentheses");
+            arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_PARENS,
+                             "parsing parenthesized expression",
+                             "every '(' needs a matching ')'",
+                             "mismatched parentheses");
             ctx.errflag = true;
             break;
         }
@@ -1541,7 +1667,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                 stack_item_cleanup(&true_val);
                 stack_item_cleanup(&false_val);
             } else {
-                arithm_set_error("mismatched ternary operator");
+                arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_TERNARY,
+                                 "evaluating ternary expression",
+                                 "every '?' needs a matching ':'",
+                                 "mismatched ternary operator");
                 stack_item_cleanup(&false_val);
                 ctx.errflag = true;
                 break;
@@ -1551,7 +1680,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
 
         // Skip '?' - it's handled with ':'
         if (op->op == CH_TERNARY_Q) {
-            arithm_set_error("mismatched ternary operator");
+            arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_TERNARY,
+                             "evaluating ternary expression",
+                             "every '?' needs a matching ':'",
+                             "mismatched ternary operator");
             ctx.errflag = true;
             break;
         }
@@ -1564,7 +1696,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         if (op->unary) {
             push_numstackl(&ctx, op->eval(&a1, NULL));
             stack_item_cleanup(&a1);
-            if (arithm_error_flag) {
+            if (s_arithm_error.flagged) {
                 ctx.errflag = true;
                 break;
             }
@@ -1577,7 +1709,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             push_numstackl(&ctx, op->eval(&a2, &a1));
             stack_item_cleanup(&a1);
             stack_item_cleanup(&a2);
-            if (arithm_error_flag) {
+            if (s_arithm_error.flagged) {
                 ctx.errflag = true;
                 break;
             }
@@ -1593,14 +1725,17 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
     }
 
     // Check for errors
-    if (ctx.errflag || arithm_error_flag) {
+    if (ctx.errflag || s_arithm_error.flagged) {
         arithm_context_cleanup(&ctx);
         return NULL;
     }
 
     // Should have exactly one result
     if (ctx.nnumstack != 1) {
-        arithm_set_error("invalid arithmetic expression");
+        arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
+                         "evaluating arithmetic expression",
+                         "expression failed to evaluate",
+                         "invalid arithmetic expression");
         arithm_context_cleanup(&ctx);
         return NULL;
     }
@@ -1609,7 +1744,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
     ssize_t result = long_value(&ctx.numstack[0]);
     char *result_str = malloc(32);
     if (!result_str) {
-        arithm_set_error("memory allocation failed");
+        arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
+                         "formatting arithmetic result",
+                         "out of memory",
+                         "memory allocation failed");
         arithm_context_cleanup(&ctx);
         return NULL;
     }
