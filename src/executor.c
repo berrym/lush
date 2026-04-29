@@ -148,6 +148,8 @@ static char *expand_quoted_string(executor_t *executor, const char *str);
 static char *expand_arg_node(executor_t *executor, node_t *node);
 static char *expand_array_unsubscripted(executor_t *executor,
                                          array_value_t *array);
+static char *slice_string_graphemes(const char *str, size_t str_len,
+                                    int start_grapheme, int count);
 static char *expand_ansi_c_string(const char *str, size_t len);
 static bool is_assignment(const char *text);
 static int execute_assignment(executor_t *executor, const char *assignment);
@@ -7479,51 +7481,47 @@ static node_t *copy_ast_chain(node_t *node) {
 static bool is_empty_or_null(const char *str) { return !str || str[0] == '\0'; }
 
 /**
- * @brief Extract a substring with offset and length
+ * @brief Extract a substring with offset and length (TR#29 grapheme-aware)
  *
- * Supports negative offsets (from end of string).
- * Handles bounds checking and returns empty string for invalid ranges.
+ * Implements ${var:offset:length} substring expansion. Offsets and
+ * lengths are measured in Unicode grapheme clusters (TR#29), not bytes,
+ * so multi-byte UTF-8 sequences are never split mid-character. Negative
+ * offsets count from the end of the string in graphemes; length of -1
+ * means "to end".
  *
- * @param str Source string
- * @param offset Starting position (negative for from-end)
- * @param length Number of characters (-1 for rest of string)
- * @return Extracted substring (caller must free)
+ * Uses the project's TR#29 primitives (lle_utf8_count_graphemes +
+ * slice_string_graphemes) so user content with combining marks, emoji
+ * sequences, regional indicators, ZWJ joins, and other multi-codepoint
+ * graphemes is handled correctly.
+ *
+ * @param str Source string (UTF-8)
+ * @param offset Starting grapheme position (negative for from-end)
+ * @param length Number of graphemes to extract (-1 for rest of string)
+ * @return Newly malloc'd substring (caller must free)
  */
 static char *extract_substring(const char *str, int offset, int length) {
     if (!str) {
         return strdup("");
     }
 
-    int str_len = strlen(str);
+    size_t byte_len = strlen(str);
+    int total = (int)lle_utf8_count_graphemes(str, byte_len);
 
-    // Handle negative offset (from end)
     if (offset < 0) {
-        offset = str_len + offset;
+        offset = total + offset;
         if (offset < 0) {
             offset = 0;
         }
     }
-
-    // Bounds check
-    if (offset >= str_len) {
+    if (offset >= total) {
         return strdup("");
     }
-
-    // Calculate actual length
-    int remaining = str_len - offset;
+    int remaining = total - offset;
     if (length < 0 || length > remaining) {
         length = remaining;
     }
-
-    char *result = malloc(length + 1);
-    if (!result) {
-        return strdup("");
-    }
-
-    strncpy(result, str + offset, length);
-    result[length] = '\0';
-
-    return result;
+    char *result = slice_string_graphemes(str, byte_len, offset, length);
+    return result ? result : strdup("");
 }
 
 /**
