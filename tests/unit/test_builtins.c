@@ -624,9 +624,12 @@ TEST(eval_no_args) {
 TEST(shift_default) {
     executor_t *exec = setup_executor();
 
-    /* shift by default shifts by 1 */
+    /* shift requires positional parameters available; overshift is a
+     * diagnostic error per POSIX (matching dash, bash, zsh). Set up
+     * three positional params, then shift by the default count of 1. */
+    executor_execute_command_line(exec, "set -- a b c");
     int status = executor_execute_command_line(exec, "shift");
-    ASSERT_EQ(status, 0, "shift should succeed");
+    ASSERT_EQ(status, 0, "shift should succeed when params available");
 
     teardown_executor(exec);
 }
@@ -634,8 +637,22 @@ TEST(shift_default) {
 TEST(shift_explicit_count) {
     executor_t *exec = setup_executor();
 
+    /* Set up five positional params, then shift by 2. */
+    executor_execute_command_line(exec, "set -- a b c d e");
     int status = executor_execute_command_line(exec, "shift 2");
     ASSERT_EQ(status, 0, "shift 2 should succeed");
+
+    teardown_executor(exec);
+}
+
+TEST(shift_overshift_errors) {
+    executor_t *exec = setup_executor();
+
+    /* Overshift (count > $#) must produce a diagnostic and return
+     * non-zero, matching dash/bash/zsh and the POSIX convention. */
+    executor_execute_command_line(exec, "set -- a b");
+    int status = executor_execute_command_line(exec, "shift 5");
+    ASSERT_EQ(status, 1, "shift 5 with 2 params should fail");
 
     teardown_executor(exec);
 }
@@ -1133,6 +1150,7 @@ int main(void) {
     printf("\n--- shift Tests ---\n");
     RUN_TEST(shift_default);
     RUN_TEST(shift_explicit_count);
+    RUN_TEST(shift_overshift_errors);
     RUN_TEST(shift_invalid_arg);
 
     printf("\n--- return Tests ---\n");
