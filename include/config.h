@@ -214,6 +214,8 @@ typedef struct {
     bool no_word_expand;   /**< Disable word expansion */
     bool multiline_mode;   /**< Enable multiline editing */
     int brace_expansion_max; /**< Max brace expansion result count (0 = unbounded) */
+    int loop_failure_streak; /**< Consecutive non-zero body iterations before runaway-loop trip (0 = disable) */
+    int loop_failure_seconds; /**< Min wall-clock seconds streak must last before tripping */
 
     /* Auto-correction settings */
     int autocorrect_max_suggestions; /**< Maximum suggestions */

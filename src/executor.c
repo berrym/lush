@@ -1823,11 +1823,72 @@ cleanup:
     return result;
 }
 
+/* Runaway-loop safety: detect a loop body that fails with non-zero exit
+ * status N consecutive times across at least T seconds. The "consecutive
+ * non-zero" signal cleanly separates stuck-on-failure loops from any
+ * legitimate idiom — counter loops, daemons (`while true; do work; done`),
+ * read-line loops, retry-with-backoff that intermixes failures with
+ * successes — none of which produce a long stretch of consecutive
+ * non-zero body exits. The wall-clock floor prevents tripping on
+ * legitimate fast-fail-many-times-then-succeed retry patterns where the
+ * full streak fits inside hundreds of milliseconds.
+ *
+ * Tracking ANY non-zero (rather than the same status repeated) makes
+ * the heuristic robust against a body that varies its error code per
+ * iteration. Set behavior.loop_failure_streak = 0 to disable entirely
+ * and match bash/zsh exactly.
+ */
+typedef struct {
+    int streak;             /* consecutive non-zero body exits */
+    int last_status;        /* last non-zero status seen */
+    struct timespec start;  /* monotonic clock at first non-zero of streak */
+    bool armed;             /* streak start time captured */
+} loop_monitor_t;
+
+static void loop_monitor_init(loop_monitor_t *m) {
+    m->streak = 0;
+    m->last_status = 0;
+    m->armed = false;
+}
+
+/* Returns true when the streak satisfies both N and T thresholds.
+ * Caller should report SHELL_ERR_LOOP_LIMIT and break out. */
+static bool loop_monitor_check(loop_monitor_t *m, int body_status) {
+    int n_threshold = config.loop_failure_streak;
+    int t_threshold = config.loop_failure_seconds;
+    if (n_threshold <= 0) {
+        /* heuristic disabled */
+        return false;
+    }
+    if (body_status == 0) {
+        m->streak = 0;
+        m->armed = false;
+        return false;
+    }
+    m->last_status = body_status;
+    m->streak++;
+    if (!m->armed) {
+        clock_gettime(CLOCK_MONOTONIC, &m->start);
+        m->armed = true;
+    }
+    if (m->streak < n_threshold) {
+        return false;
+    }
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long elapsed_sec = now.tv_sec - m->start.tv_sec;
+    if (elapsed_sec < t_threshold) {
+        return false;
+    }
+    return true;
+}
+
 /**
  * @brief Execute a while loop
  *
  * Executes body while condition returns success (0).
- * Supports break/continue and has a safety limit of 10000 iterations.
+ * Supports break/continue with runaway-loop failure-streak detection
+ * (behavior.loop_failure_streak / behavior.loop_failure_seconds).
  *
  * @param executor Executor context
  * @param while_node While loop node
@@ -1858,8 +1919,9 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     }
 
     int last_result = 0;
-    int iteration = 0;
-    const int max_iterations = 10000; // Safety limit
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
 
     /* Push loop context for error reporting (Phase 3) */
     executor_push_context(executor, while_node->loc, "in while loop");
@@ -1881,13 +1943,12 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     // Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
-    while (iteration < max_iterations) {
+    for (;;) {
         // Execute condition
         int condition_result = execute_node(executor, condition);
 
         if (executor->debug) {
-            printf("DEBUG: WHILE iteration %d, condition result: %d\n",
-                   iteration, condition_result);
+            printf("DEBUG: WHILE condition result: %d\n", condition_result);
         }
 
         // If condition fails, exit loop
@@ -1907,7 +1968,10 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             // Continue to next iteration (just reset and loop again)
         }
 
-        iteration++;
+        if (loop_monitor_check(&monitor, last_result)) {
+            runaway_tripped = true;
+            break;
+        }
     }
 
     // Decrement loop depth before returning
@@ -1921,10 +1985,14 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     /* Pop loop context */
     executor_pop_context(executor);
 
-    if (iteration >= max_iterations) {
-        executor_error_add(executor, SHELL_ERR_LOOP_LIMIT, while_node->loc,
-                           "while loop exceeded maximum iterations (%d)",
-                           max_iterations);
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, while_node->loc,
+            "while loop body failed with status %d for %d consecutive "
+            "iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak,
+            config.loop_failure_seconds);
         return 1;
     }
 
@@ -1957,8 +2025,9 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     }
 
     int last_result = 0;
-    int iteration = 0;
-    const int max_iterations = 10000; // Safety limit
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
 
     // Check for trailing redirections on the until loop
     bool has_redirections = count_redirections(until_node) > 0;
@@ -1976,13 +2045,12 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     // Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
-    while (iteration < max_iterations) {
+    for (;;) {
         // Execute condition
         int condition_result = execute_node(executor, condition);
 
         if (executor->debug) {
-            printf("DEBUG: UNTIL iteration %d, condition result: %d\n",
-                   iteration, condition_result);
+            printf("DEBUG: UNTIL condition result: %d\n", condition_result);
         }
 
         // If condition succeeds (returns 0), exit loop
@@ -2003,7 +2071,10 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             // Continue to next iteration
         }
 
-        iteration++;
+        if (loop_monitor_check(&monitor, last_result)) {
+            runaway_tripped = true;
+            break;
+        }
     }
 
     // Decrement loop depth before returning
@@ -2017,10 +2088,14 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     // Pop error context
     executor_pop_context(executor);
 
-    if (iteration >= max_iterations) {
-        executor_error_add(executor, SHELL_ERR_LOOP_LIMIT, until_node->loc,
-                           "until loop exceeded maximum iterations (%d)",
-                           max_iterations);
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, until_node->loc,
+            "until loop body failed with status %d for %d consecutive "
+            "iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak,
+            config.loop_failure_seconds);
         return 1;
     }
 
@@ -2092,6 +2167,9 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                           var_name);
 
     int last_result = 0;
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
 
     // Build expanded word list for iteration
     char **expanded_words = NULL;
@@ -2331,6 +2409,11 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                 executor->loop_control = LOOP_NORMAL;
                 // Continue to next iteration
             }
+
+            if (loop_monitor_check(&monitor, last_result)) {
+                runaway_tripped = true;
+                break;
+            }
         }
     }
 
@@ -2358,6 +2441,17 @@ static int execute_for(executor_t *executor, node_t *for_node) {
 
     // Pop error context
     executor_pop_context(executor);
+
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_node->loc,
+            "for loop body failed with status %d for %d consecutive "
+            "iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak,
+            config.loop_failure_seconds);
+        return 1;
+    }
 
     return last_result;
 }
@@ -2427,6 +2521,9 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
     executor_push_context(executor, for_arith_node->loc, "in C-style for loop");
 
     int last_result = 0;
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
 
     // Execute init expression (once at the start)
     if (init_node && init_node->val.str && init_node->val.str[0] != '\0') {
@@ -2508,6 +2605,11 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 free(update_expanded);
             }
         }
+
+        if (loop_monitor_check(&monitor, last_result)) {
+            runaway_tripped = true;
+            break;
+        }
     }
 
     // Notify debug system we're exiting the loop
@@ -2528,6 +2630,17 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
 
     // Pop error context
     executor_pop_context(executor);
+
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_arith_node->loc,
+            "C-style for loop body failed with status %d for %d "
+            "consecutive iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak,
+            config.loop_failure_seconds);
+        return 1;
+    }
 
     return last_result;
 }

@@ -361,6 +361,14 @@ static config_option_t config_options[] = {
      &config.brace_expansion_max,
      "Max brace expansion result count (0 = unbounded)",
      config_validate_int, NULL},
+    {"behavior.loop_failure_streak", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
+     &config.loop_failure_streak,
+     "Consecutive non-zero body iterations before runaway-loop trip (0 = disable)",
+     config_validate_int, NULL},
+    {"behavior.loop_failure_seconds", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
+     &config.loop_failure_seconds,
+     "Min wall-clock seconds streak must last before tripping",
+     config_validate_int, NULL},
 
     // Color settings
     {"behavior.color_scheme", CONFIG_TYPE_STRING, CONFIG_SECTION_BEHAVIOR,
@@ -1049,6 +1057,8 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {"no_word_expand", "behavior.no_word_expand"},
     {"multiline_mode", "behavior.multiline_mode"},
     {"brace_expansion_max", "behavior.brace_expansion_max"},
+    {"loop_failure_streak", "behavior.loop_failure_streak"},
+    {"loop_failure_seconds", "behavior.loop_failure_seconds"},
     {"color_scheme", "behavior.color_scheme"},
     {"colors_enabled", "behavior.colors_enabled"},
     {"verbose_errors", "behavior.verbose_errors"},
@@ -1872,6 +1882,12 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Max brace expansion result count (0 = unbounded)\n"
     "behavior.brace_expansion_max = 65536\n"
     "\n"
+    "# Consecutive non-zero body iterations before runaway-loop trip (0 = disable)\n"
+    "behavior.loop_failure_streak = 1000\n"
+    "\n"
+    "# Min wall-clock seconds streak must last before tripping\n"
+    "behavior.loop_failure_seconds = 5\n"
+    "\n"
     "# Color scheme name: default, dark, light, solarized\n"
     "behavior.color_scheme = default\n"
     "\n"
@@ -2168,6 +2184,8 @@ void config_set_defaults(void) {
     config.no_word_expand = false;
     config.multiline_mode = true;
     config.brace_expansion_max = 65536;
+    config.loop_failure_streak = 1000;
+    config.loop_failure_seconds = 5;
 
     // Auto-correction defaults
     config.autocorrect_max_suggestions = 3;
