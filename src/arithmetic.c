@@ -30,6 +30,7 @@
 #include "symtable.h"
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -143,6 +144,52 @@ static bool valid_name_char(char c);
 // OPERATOR EVALUATION FUNCTIONS
 // ============================================================================
 
+/* Signed-overflow-safe primitives. Bash and zsh both rely on signed
+ * wraparound for +, -, *, unary -, <<; in standard C that is undefined
+ * behaviour, but performing the operation in unsigned space and casting
+ * back is well-defined and produces the same two's-complement bit
+ * pattern on every platform lush targets. Right shift is left as a
+ * signed shift (impl-defined, arithmetic on lush platforms — matches
+ * bash) but with the count masked to a defined range. Division and
+ * modulo are signed but explicitly handle the LONG_MIN/-1 UB corner
+ * to match bash's observed result. */
+_Static_assert(sizeof(ssize_t) == sizeof(long),
+               "arithm helpers assume ssize_t is long");
+#define ARITHM_BITS ((size_t)(sizeof(ssize_t) * CHAR_BIT))
+
+static inline ssize_t arithm_wrap_add(ssize_t a, ssize_t b) {
+    return (ssize_t)((size_t)a + (size_t)b);
+}
+static inline ssize_t arithm_wrap_sub(ssize_t a, ssize_t b) {
+    return (ssize_t)((size_t)a - (size_t)b);
+}
+static inline ssize_t arithm_wrap_mul(ssize_t a, ssize_t b) {
+    return (ssize_t)((size_t)a * (size_t)b);
+}
+static inline ssize_t arithm_wrap_neg(ssize_t a) {
+    return (ssize_t)(0 - (size_t)a);
+}
+static inline ssize_t arithm_wrap_lsh(ssize_t a, ssize_t count) {
+    size_t c = (size_t)count & (ARITHM_BITS - 1);
+    return (ssize_t)((size_t)a << c);
+}
+static inline ssize_t arithm_wrap_rsh(ssize_t a, ssize_t count) {
+    size_t c = (size_t)count & (ARITHM_BITS - 1);
+    return a >> c;
+}
+static inline ssize_t arithm_safe_div(ssize_t a, ssize_t b) {
+    if (a == LONG_MIN && b == -1) {
+        return LONG_MIN;
+    }
+    return a / b;
+}
+static inline ssize_t arithm_safe_mod(ssize_t a, ssize_t b) {
+    if (a == LONG_MIN && b == -1) {
+        return 0;
+    }
+    return a % b;
+}
+
 /**
  * @brief Unary minus operator evaluation
  * @param a1 Operand
@@ -151,7 +198,7 @@ static bool valid_name_char(char c);
  */
 static ssize_t eval_uminus(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
-    return -long_value(a1);
+    return arithm_wrap_neg(long_value(a1));
 }
 
 /** @brief Unary plus operator (identity) */
@@ -174,17 +221,17 @@ static ssize_t eval_bitnot(stack_item_t *a1, stack_item_t *a2) {
 
 /** @brief Multiplication operator */
 static ssize_t eval_mul(stack_item_t *a1, stack_item_t *a2) {
-    return long_value(a1) * long_value(a2);
+    return arithm_wrap_mul(long_value(a1), long_value(a2));
 }
 
 /** @brief Addition operator */
 static ssize_t eval_add(stack_item_t *a1, stack_item_t *a2) {
-    return long_value(a1) + long_value(a2);
+    return arithm_wrap_add(long_value(a1), long_value(a2));
 }
 
 /** @brief Subtraction operator */
 static ssize_t eval_sub(stack_item_t *a1, stack_item_t *a2) {
-    return long_value(a1) - long_value(a2);
+    return arithm_wrap_sub(long_value(a1), long_value(a2));
 }
 
 /** @brief Division operator with zero-check */
@@ -194,7 +241,7 @@ static ssize_t eval_div(stack_item_t *a1, stack_item_t *a2) {
         arithm_set_error("division by zero");
         return 0;
     }
-    return long_value(a1) / divisor;
+    return arithm_safe_div(long_value(a1), divisor);
 }
 
 /** @brief Modulo operator with zero-check */
@@ -204,17 +251,17 @@ static ssize_t eval_mod(stack_item_t *a1, stack_item_t *a2) {
         arithm_set_error("division by zero in modulo operation");
         return 0;
     }
-    return long_value(a1) % divisor;
+    return arithm_safe_mod(long_value(a1), divisor);
 }
 
 /** @brief Left shift operator */
 static ssize_t eval_lsh(stack_item_t *a1, stack_item_t *a2) {
-    return long_value(a1) << long_value(a2);
+    return arithm_wrap_lsh(long_value(a1), long_value(a2));
 }
 
 /** @brief Right shift operator */
 static ssize_t eval_rsh(stack_item_t *a1, stack_item_t *a2) {
-    return long_value(a1) >> long_value(a2);
+    return arithm_wrap_rsh(long_value(a1), long_value(a2));
 }
 
 /** @brief Less than comparison */
@@ -385,7 +432,7 @@ static ssize_t eval_addeq(stack_item_t *a1, stack_item_t *a2) {
 
     ssize_t current_value = get_var_value_scoped(a1);
     ssize_t add_value = long_value(a2);
-    ssize_t result = current_value + add_value;
+    ssize_t result = arithm_wrap_add(current_value, add_value);
 
     set_var_value_scoped(a1, result);
     return result;
@@ -400,7 +447,7 @@ static ssize_t eval_subeq(stack_item_t *a1, stack_item_t *a2) {
 
     ssize_t current_value = get_var_value_scoped(a1);
     ssize_t sub_value = long_value(a2);
-    ssize_t result = current_value - sub_value;
+    ssize_t result = arithm_wrap_sub(current_value, sub_value);
 
     set_var_value_scoped(a1, result);
     return result;
@@ -415,7 +462,7 @@ static ssize_t eval_muleq(stack_item_t *a1, stack_item_t *a2) {
 
     ssize_t current_value = get_var_value_scoped(a1);
     ssize_t mul_value = long_value(a2);
-    ssize_t result = current_value * mul_value;
+    ssize_t result = arithm_wrap_mul(current_value, mul_value);
 
     set_var_value_scoped(a1, result);
     return result;
@@ -435,7 +482,7 @@ static ssize_t eval_diveq(stack_item_t *a1, stack_item_t *a2) {
     }
 
     ssize_t current_value = get_var_value_scoped(a1);
-    ssize_t result = current_value / div_value;
+    ssize_t result = arithm_safe_div(current_value, div_value);
 
     set_var_value_scoped(a1, result);
     return result;
@@ -455,7 +502,7 @@ static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
     }
 
     ssize_t current_value = get_var_value_scoped(a1);
-    ssize_t result = current_value % mod_value;
+    ssize_t result = arithm_safe_mod(current_value, mod_value);
 
     set_var_value_scoped(a1, result);
     return result;
@@ -473,7 +520,7 @@ static ssize_t eval_preinc(stack_item_t *a1, stack_item_t *a2) {
         return 0;
     }
 
-    ssize_t value = long_value(a1) + 1;
+    ssize_t value = arithm_wrap_add(long_value(a1), 1);
     set_var_value_scoped(a1, value);
     return value;
 }
@@ -486,7 +533,7 @@ static ssize_t eval_predec(stack_item_t *a1, stack_item_t *a2) {
         return 0;
     }
 
-    ssize_t value = long_value(a1) - 1;
+    ssize_t value = arithm_wrap_sub(long_value(a1), 1);
     set_var_value_scoped(a1, value);
     return value;
 }
@@ -500,7 +547,7 @@ static ssize_t eval_postinc(stack_item_t *a1, stack_item_t *a2) {
     }
 
     ssize_t old_value = long_value(a1);
-    set_var_value_scoped(a1, old_value + 1);
+    set_var_value_scoped(a1, arithm_wrap_add(old_value, 1));
     return old_value;
 }
 
@@ -513,7 +560,7 @@ static ssize_t eval_postdec(stack_item_t *a1, stack_item_t *a2) {
     }
 
     ssize_t old_value = long_value(a1);
-    set_var_value_scoped(a1, old_value - 1);
+    set_var_value_scoped(a1, arithm_wrap_sub(old_value, 1));
     return old_value;
 }
 
@@ -537,7 +584,7 @@ static ssize_t eval_exp(stack_item_t *a1, stack_item_t *a2) {
 
     ssize_t result = 1;
     for (ssize_t i = 0; i < exp; i++) {
-        result *= base;
+        result = arithm_wrap_mul(result, base);
     }
     return result;
 }
