@@ -207,6 +207,14 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                                                  executor->context_stack[i]);
                     }
                 }
+                char *src_line =
+                    executor_get_source_line(executor, redir_node->loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(
+                        error, src_line, redir_node->loc.column,
+                        redir_node->loc.column + redir_node->loc.length);
+                    free(src_line);
+                }
                 shell_error_display(error, stderr, isatty(STDERR_FILENO));
                 shell_error_free(error);
                 result = 1;
@@ -215,6 +223,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                     shell_error_t *error = shell_error_create(
                         SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                         "dup2: %s", strerror(errno));
+                    char *src_line =
+                        executor_get_source_line(executor, redir_node->loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(
+                            error, src_line, redir_node->loc.column,
+                            redir_node->loc.column + redir_node->loc.length);
+                        free(src_line);
+                    }
+                    for (size_t i = 0;
+                         i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                         i++) {
+                        if (executor->context_stack[i]) {
+                            shell_error_push_context(error, "%s",
+                                                     executor->context_stack[i]);
+                        }
+                    }
                     shell_error_display(error, stderr, isatty(STDERR_FILENO));
                     shell_error_free(error);
                     result = 1;
@@ -238,6 +262,14 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                                                  executor->context_stack[i]);
                     }
                 }
+                char *src_line =
+                    executor_get_source_line(executor, redir_node->loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(
+                        error, src_line, redir_node->loc.column,
+                        redir_node->loc.column + redir_node->loc.length);
+                    free(src_line);
+                }
                 shell_error_display(error, stderr, isatty(STDERR_FILENO));
                 shell_error_free(error);
                 result = 1;
@@ -246,6 +278,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                     shell_error_t *error = shell_error_create(
                         SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                         "dup2: %s", strerror(errno));
+                    char *src_line =
+                        executor_get_source_line(executor, redir_node->loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(
+                            error, src_line, redir_node->loc.column,
+                            redir_node->loc.column + redir_node->loc.length);
+                        free(src_line);
+                    }
+                    for (size_t i = 0;
+                         i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                         i++) {
+                        if (executor->context_stack[i]) {
+                            shell_error_push_context(error, "%s",
+                                                     executor->context_stack[i]);
+                        }
+                    }
                     shell_error_display(error, stderr, isatty(STDERR_FILENO));
                     shell_error_free(error);
                     result = 1;
@@ -264,6 +312,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
                 shell_error_set_suggestion(
                     error, "use '< <(cmd)' to read from a command or "
                            "'> >(cmd)' to write to one");
+                char *src_line =
+                    executor_get_source_line(executor, redir_node->loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(
+                        error, src_line, redir_node->loc.column,
+                        redir_node->loc.column + redir_node->loc.length);
+                    free(src_line);
+                }
+                for (size_t i = 0;
+                     i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (executor->context_stack[i]) {
+                        shell_error_push_context(error, "%s",
+                                                 executor->context_stack[i]);
+                    }
+                }
                 shell_error_display(error, stderr, isatty(STDERR_FILENO));
                 shell_error_free(error);
                 result = 1;
@@ -344,6 +408,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             result = 1;
@@ -359,6 +439,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "%s: %s", target, strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             result = 1;
@@ -368,6 +464,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             close(fd);
@@ -385,6 +497,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "%s: %s", target, strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             result = 1;
@@ -394,6 +522,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             close(fd);
@@ -416,6 +560,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "%s: %s", target, strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             result = 1;
@@ -425,6 +585,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             close(fd);
@@ -472,6 +648,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             close(fd);
@@ -494,6 +686,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "%s: %s", target, strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             result = 1;
@@ -503,6 +711,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             close(fd);
@@ -545,6 +769,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             close(fd);
@@ -562,6 +802,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "%s: %s", target, strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             result = 1;
@@ -571,6 +827,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             close(fd);
@@ -632,6 +904,22 @@ static int handle_redirection_node(executor_t *executor, node_t *redir_node) {
             shell_error_t *error = shell_error_create(
                 SHELL_ERR_BAD_FD, SHELL_SEVERITY_ERROR, redir_node->loc,
                 "dup2: %s", strerror(errno));
+            char *src_line =
+                executor_get_source_line(executor, redir_node->loc.line);
+            if (src_line) {
+                shell_error_set_source_line(
+                    error, src_line, redir_node->loc.column,
+                    redir_node->loc.column + redir_node->loc.length);
+                free(src_line);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(error, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
             shell_error_display(error, stderr, isatty(STDERR_FILENO));
             shell_error_free(error);
             result = 1;
