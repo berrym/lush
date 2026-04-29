@@ -114,10 +114,17 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
     struct rlimit fs = {.rlim_cur = 1 << 28, .rlim_max = 1 << 28};
     setrlimit(RLIMIT_FSIZE, &fs);
 
-    /* Process limit: keep low. lush_fork() returns -1 under
-     * LUSH_FUZZ_SANDBOX so this should never be exercised, but if a
-     * stray fork() call is added later this caps the blast radius. */
-    struct rlimit np = {.rlim_cur = 16, .rlim_max = 16};
+    /* Process limit. lush_fork() returns -1 under LUSH_FUZZ_SANDBOX so
+     * the shell itself never spawns. The cap exists in case a stray
+     * fork() site is added later. The sanitizer runtime (ASan/UBSan)
+     * still needs to fork to spawn its external symbolizer when
+     * formatting stack traces — a too-low cap silently breaks crash
+     * reporting (symbolizer fork fails, stacks come back as raw
+     * addresses, libFuzzer exits with a non-standard code and no
+     * usable diagnostic). 256 leaves comfortable headroom for the
+     * symbolizer plus libFuzzer's own bookkeeping while still
+     * bounding any genuine fork-bomb. */
+    struct rlimit np = {.rlim_cur = 256, .rlim_max = 256};
     setrlimit(RLIMIT_NPROC, &np);
 
     /* Scratch directory. Use a per-PID path so concurrent fuzzers
