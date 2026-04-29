@@ -4298,17 +4298,39 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
         return;
     if (array->is_associative) {
         printf("declare -A %s=(", name);
-        /* Print associative array elements */
+        /* Print associative array elements. Iteration order matches
+         * the rest of the shell (issue #69): zsh / lush mode use
+         * insertion order for predictable output; bash / POSIX use
+         * hashtable bucket order. The insertion-order list lives on
+         * the array itself; we look up each value via ht_strstr_get. */
         if (array->assoc_map) {
-            ht_enum_t *e = ht_strstr_enum_create(array->assoc_map);
-            if (e) {
-                const char *k, *v;
+            shell_mode_t mode = shell_mode_get();
+            bool use_insertion_order =
+                (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&
+                array->assoc_insertion_order &&
+                array->assoc_insertion_count == array->count;
+
+            if (use_insertion_order) {
                 bool first = true;
-                while (ht_strstr_enum_next(e, &k, &v)) {
-                    printf("%s[%s]=\"%s\"", first ? "" : " ", k, v ? v : "");
+                for (size_t i = 0; i < array->assoc_insertion_count; i++) {
+                    const char *k = array->assoc_insertion_order[i];
+                    const char *v = ht_strstr_get(array->assoc_map, k);
+                    printf("%s[%s]=\"%s\"", first ? "" : " ", k,
+                           v ? v : "");
                     first = false;
                 }
-                ht_strstr_enum_destroy(e);
+            } else {
+                ht_enum_t *e = ht_strstr_enum_create(array->assoc_map);
+                if (e) {
+                    const char *k, *v;
+                    bool first = true;
+                    while (ht_strstr_enum_next(e, &k, &v)) {
+                        printf("%s[%s]=\"%s\"", first ? "" : " ", k,
+                               v ? v : "");
+                        first = false;
+                    }
+                    ht_strstr_enum_destroy(e);
+                }
             }
         }
         printf(")\n");

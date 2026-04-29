@@ -53,6 +53,22 @@ typedef struct array_value {
     size_t max_index;    /**< Highest index used (for ${#arr[@]}) */
     bool is_associative; /**< True if associative array (declare -A) */
     ht_strstr_t *assoc_map; /**< Hash table for associative arrays */
+    /**
+     * For associative arrays only: parallel ordered list of keys
+     * recording the order in which each key was first set. Enables
+     * zsh-style insertion-order iteration without modifying
+     * libhashtable (which deliberately stays generic and
+     * bucket-order-only). The key strings here ARE owned by this
+     * struct (strdup'd on insert, freed on unset and on
+     * array destroy) — there is no public API to retrieve the
+     * canonical key pointer from inside the hashtable, so this list
+     * keeps its own copies. Memory cost is one duplicate of each
+     * key string; negligible compared to value strings.
+     * (Issue #69.)
+     */
+    char **assoc_insertion_order;    /**< Keys in first-set order */
+    size_t assoc_insertion_count;    /**< Number of keys tracked */
+    size_t assoc_insertion_capacity; /**< Allocated capacity */
 } array_value_t;
 
 // Variable flags
