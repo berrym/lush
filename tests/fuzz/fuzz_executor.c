@@ -90,10 +90,18 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
     (void)argc;
     (void)argv;
 
-    /* CPU limit: 30 seconds. libFuzzer's per-input -timeout is
-     * typically 10s; this is a backstop in case a single input pegs
-     * the CPU long enough that libFuzzer has already moved on. */
-    struct rlimit cpu = {.rlim_cur = 30, .rlim_max = 30};
+    /* CPU limit: 1 hour cumulative process CPU time. RLIMIT_CPU is
+     * a process-lifetime limit (NOT per-input), so the value must
+     * accommodate full fuzz sessions. libFuzzer's own -timeout=N
+     * flag is the proper per-input safety net (fires SIGALRM after
+     * N seconds for a single input, recorded as a timeout artifact,
+     * fuzzer continues). The earlier 30s value here was a defense-
+     * in-depth cap that misfired on every multi-minute fuzz session,
+     * killing the process well short of -max_total_time and wasting
+     * 95%+ of intended fuzz budget (issue #74). 1 hour is far above
+     * any plausible single-session run while still bounding pathological
+     * runaway behavior. */
+    struct rlimit cpu = {.rlim_cur = 3600, .rlim_max = 3600};
     setrlimit(RLIMIT_CPU, &cpu);
 
     /* File size limit: 256 MiB. Bounds disk-fill from output
