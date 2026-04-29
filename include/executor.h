@@ -107,6 +107,19 @@ typedef struct executor {
     pid_t procsub_pids[32]; // Child PIDs from process substitutions
     int procsub_fd_count;   // Number of tracked fds/pids
 
+    /* Source-text retention for the structured-error system. The
+     * executor stashes the input text (and its file-relative starting
+     * line) for the current parse/execute batch so any error site —
+     * builtin, expansion, redirection, runtime — can attach the
+     * original source line via shell_error_set_source_line() and
+     * produce the full rust-style `--> file:line:col / N | ... / ^~~~`
+     * snippet. Both fields are owned by the caller (executor_execute_
+     * command_line stashes pointers; nothing is copied) and are reset
+     * to NULL/0 on entry/exit of each batch. Read via the accessor
+     * executor_get_source_line(executor, file_line). */
+    const char *source_text;
+    size_t source_starting_line;
+
 } executor_t;
 
 /** Global executor instance */
@@ -170,6 +183,31 @@ int executor_execute(executor_t *executor, node_t *ast);
  */
 int executor_execute_command_line(executor_t *executor, const char *input,
                                   size_t starting_line);
+
+/**
+ * @brief Fetch the text of a single source line for diagnostic display
+ *
+ * Returns a freshly-allocated copy of the requested line from the
+ * executor's currently-stashed source text. Translates a file-relative
+ * line number (as carried in source_location_t fields throughout the
+ * AST) into a batch-relative offset using the executor's
+ * source_starting_line, then walks the source text counting newlines
+ * to extract the line content.
+ *
+ * Use site: any error emitter that calls shell_error_create() and
+ * wants the full rust-style `N | source line / ^~~~` snippet block.
+ * Pair with shell_error_set_source_line(error, line, col_start, col_end).
+ *
+ * Returns NULL if no source text is stashed, the requested line is
+ * outside the batch's range, allocation fails, or the executor pointer
+ * is NULL. Caller owns the returned string and must free() it.
+ *
+ * @param executor   Executor context (NULL returns NULL)
+ * @param file_line  File-relative 1-based line number (typically
+ *                   `loc.line` from a source_location_t)
+ * @return Allocated source line text without trailing newline, or NULL
+ */
+char *executor_get_source_line(executor_t *executor, size_t file_line);
 
 /* ============================================================================
  * Configuration

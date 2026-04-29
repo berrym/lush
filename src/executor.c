@@ -306,6 +306,11 @@ executor_t *executor_new(void) {
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
 
+    /* Source-text retention starts empty; populated per-batch by
+     * executor_execute_command_line. */
+    executor->source_text = NULL;
+    executor->source_starting_line = 0;
+
     initialize_job_control(executor);
 
     return executor;
@@ -353,6 +358,11 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->procsub_fd_count = 0;
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
+
+    /* Source-text retention starts empty; populated per-batch by
+     * executor_execute_command_line. */
+    executor->source_text = NULL;
+    executor->source_starting_line = 0;
 
     initialize_job_control(executor);
 
@@ -805,6 +815,19 @@ int executor_execute_command_line(executor_t *executor, const char *input,
         starting_line = 1;
     }
 
+    /* Stash source text for the structured-error system. Any error
+     * site emitting via shell_error_create() can pull the actual
+     * source line via executor_get_source_line() and attach it via
+     * shell_error_set_source_line() to produce the full rust-style
+     * snippet block (`N | source line / ^~~~~`). The stash is set to
+     * the input we're about to parse and restored on exit so re-entrant
+     * dispatch (e.g. command substitution running its own batch
+     * recursively) doesn't leak text from one batch into another. */
+    const char *saved_source_text = executor->source_text;
+    size_t saved_source_starting_line = executor->source_starting_line;
+    executor->source_text = input;
+    executor->source_starting_line = starting_line;
+
     // Preprocess input to handle line continuation (backslash-newline)
     // This is needed for -c option where the string comes directly without
     // going through get_input_complete() which normally handles this
@@ -835,12 +858,13 @@ int executor_execute_command_line(executor_t *executor, const char *input,
     const char *source_name = executor->current_script_file
                                   ? executor->current_script_file
                                   : "<stdin>";
+    int result = 0;
     parser_t *parser =
         parser_new_with_source(parse_input, source_name, starting_line);
     if (!parser) {
         set_executor_error(executor, "Failed to create parser");
-        free(processed_input);
-        return 1;
+        result = 1;
+        goto cleanup;
     }
 
     node_t *ast = parser_parse(parser);
@@ -856,13 +880,12 @@ int executor_execute_command_line(executor_t *executor, const char *input,
             if (legacy_err) {
                 set_executor_error(executor, legacy_err);
             }
-            parser_free(parser);
-            free(processed_input);
-            return 2; // Syntax error
+            result = 2; // Syntax error
+        } else {
+            result = 0; // Syntax check successful
         }
         parser_free(parser);
-        free(processed_input);
-        return 0; // Syntax check successful
+        goto cleanup;
     }
 
     if (parser_has_error(parser)) {
@@ -875,22 +898,72 @@ int executor_execute_command_line(executor_t *executor, const char *input,
             set_executor_error(executor, legacy_err);
         }
         parser_free(parser);
-        free(processed_input);
-        return 1;
+        result = 1;
+        goto cleanup;
     }
 
     if (!ast) {
         parser_free(parser);
-        free(processed_input);
-        return 0; // Empty command
+        result = 0; // Empty command
+        goto cleanup;
     }
 
-    int result = executor_execute(executor, ast);
+    result = executor_execute(executor, ast);
 
     free_node_tree(ast);
     parser_free(parser);
-    free(processed_input);
 
+cleanup:
+    free(processed_input);
+    /* Restore previous source-text stash so re-entrant batches don't
+     * leak text from one batch into another. */
+    executor->source_text = saved_source_text;
+    executor->source_starting_line = saved_source_starting_line;
+    return result;
+}
+
+char *executor_get_source_line(executor_t *executor, size_t file_line) {
+    if (!executor || !executor->source_text || file_line == 0 ||
+        executor->source_starting_line == 0 ||
+        file_line < executor->source_starting_line) {
+        return NULL;
+    }
+
+    /* Translate file-relative line number into batch-relative line
+     * number. The batch's first line is executor->source_starting_line
+     * in the original file; that's batch line 1. */
+    size_t batch_line = file_line - executor->source_starting_line + 1;
+
+    const char *src = executor->source_text;
+    size_t current_line = 1;
+    size_t line_start = 0;
+    size_t i = 0;
+
+    /* Walk to the start of the requested batch-relative line. */
+    while (src[i] != '\0' && current_line < batch_line) {
+        if (src[i] == '\n') {
+            current_line++;
+            line_start = i + 1;
+        }
+        i++;
+    }
+    if (current_line != batch_line) {
+        return NULL; /* Requested line is past end of batch text. */
+    }
+
+    /* Find the end of the line (newline or end-of-string). */
+    size_t line_end = line_start;
+    while (src[line_end] != '\0' && src[line_end] != '\n') {
+        line_end++;
+    }
+
+    size_t line_len = line_end - line_start;
+    char *result = malloc(line_len + 1);
+    if (!result) {
+        return NULL;
+    }
+    memcpy(result, src + line_start, line_len);
+    result[line_len] = '\0';
     return result;
 }
 
