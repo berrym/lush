@@ -374,15 +374,16 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
         return;
     }
 
-    // Get target shell for portability checking (before potential init reset)
-    const char *target_str = compat_get_target();
-
-    // Initialize compat system if not already done
+    // Initialize compat system if not already done. compat_init() already
+    // preserves any pre-set target across the reset, so no caller-side
+    // save/restore is needed — and attempting one (passing the buffer
+    // pointer returned by compat_get_target() back into compat_set_target())
+    // produces a strncpy src/dst overlap.
     if (compat_get_entry_count() == 0) {
         compat_init(NULL);
-        // Restore target that was set before init
-        compat_set_target(target_str);
     }
+
+    const char *target_str = compat_get_target();
 
     // Convert string target to enum for API functions that still use
     // shell_mode_t
