@@ -8896,7 +8896,16 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
-                    if (array) {
+                    if (array && shell_mode_get() == SHELL_MODE_ZSH &&
+                        !array->is_associative) {
+                        /* zsh-mode special case: ${(kv)indexed_array}
+                         * emits values only — zsh treats indexed arrays
+                         * as having no meaningful "keys" so (kv) collapses
+                         * to (v). lush mode keeps the interleaved
+                         * indices+values form (curated pick: internally
+                         * consistent with lush's (k)/(v) semantics). */
+                        inner_result = symtable_array_expand(array, " ");
+                    } else if (array) {
                         size_t kc = 0, vc = 0;
                         char **keys =
                             symtable_array_get_keys(array, &kc);
@@ -8952,7 +8961,17 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
-                    if (array) {
+                    if (array && shell_mode_get() == SHELL_MODE_ZSH &&
+                        !array->is_associative) {
+                        /* zsh-mode special case: ${(k)indexed_array} emits
+                         * values only (zsh treats indexed-array indices as
+                         * not meaningfully "keys" — `(k)` collapses to
+                         * `(v)`). lush mode keeps the existing 0-based
+                         * indices behavior (curated pick: more useful for
+                         * iteration / debugging than redundantly emitting
+                         * values which `(v)` and `${arr[@]}` already give). */
+                        inner_result = symtable_array_expand(array, " ");
+                    } else if (array) {
                         // Get all keys from array (works for both indexed and
                         // associative)
                         size_t count;
