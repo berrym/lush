@@ -414,7 +414,10 @@ int bin_cd(int argc __attribute__((unused)),
 
     // Privileged mode security check
     if (shell_opts.privileged_mode) {
-        fprintf(stderr, "cd: restricted command in privileged mode\n");
+        builtin_error_help(
+            "cd", SHELL_ERR_PERMISSION_DENIED,
+            "drop privileges or run from an unrestricted shell",
+            "restricted command in privileged mode");
         return 1;
     }
 
@@ -624,7 +627,9 @@ int bin_pwd(int argc, char **argv) {
         } else if (strcmp(argv[i], "-L") == 0) {
             physical = false;
         } else if (argv[i][0] == '-') {
-            fprintf(stderr, "pwd: %s: invalid option\n", argv[i]);
+            builtin_error_help("pwd", SHELL_ERR_INVALID_OPTION,
+                               "supported options: -L (logical), -P (physical)",
+                               "%s: invalid option", argv[i]);
             return 1;
         }
     }
@@ -3593,7 +3598,9 @@ int bin_umask(int argc, char **argv) {
     if (argc == 2) {
         // Check for empty argument
         if (argv[1][0] == '\0') {
-            fprintf(stderr, "umask: invalid mode\n");
+            builtin_error_help("umask", SHELL_ERR_INVALID_ARGUMENT,
+                               "expected an octal mode (e.g. 022, 077)",
+                               "invalid mode");
             return 1;
         }
 
@@ -3602,7 +3609,9 @@ int bin_umask(int argc, char **argv) {
 
         // Validate argument
         if (*endptr != '\0' || mask_val < 0 || mask_val > 0777) {
-            fprintf(stderr, "umask: %s: invalid mode\n", argv[1]);
+            builtin_error_help("umask", SHELL_ERR_INVALID_ARGUMENT,
+                               "octal mode must be in 0..0777",
+                               "%s: invalid mode", argv[1]);
             return 1;
         }
 
@@ -3611,7 +3620,9 @@ int bin_umask(int argc, char **argv) {
     }
 
     // Too many arguments
-    fprintf(stderr, "umask: too many arguments\n");
+    builtin_error_help("umask", SHELL_ERR_TOO_MANY_ARGUMENTS,
+                       "usage: umask [octal-mode]",
+                       "too many arguments");
     return 1;
 }
 
@@ -7832,14 +7843,18 @@ int bin_pushd(int argc, char **argv) {
     if (argc == 1) {
         // pushd with no args: exchange top two entries
         if (dirstack_size() < 1) {
-            fprintf(stderr, "pushd: no other directory\n");
+            builtin_error_help("pushd", SHELL_ERR_DIRECTORY_STACK,
+                               "push a directory first: pushd <dir>",
+                               "no other directory");
             free(cwd);
             return 1;
         }
 
         const char *top = dirstack_peek(0);
         if (!top) {
-            fprintf(stderr, "pushd: directory stack empty\n");
+            builtin_error_help("pushd", SHELL_ERR_DIRECTORY_STACK,
+                               "push a directory first: pushd <dir>",
+                               "directory stack empty");
             free(cwd);
             return 1;
         }
@@ -7894,15 +7909,18 @@ int bin_pushd(int argc, char **argv) {
 
             const char *target = dirstack_peek(stack_idx);
             if (!target) {
-                fprintf(stderr,
-                        "pushd: %s: directory stack index out of range\n", arg);
+                builtin_error_help(
+                    "pushd", SHELL_ERR_DIRECTORY_STACK,
+                    "use 'dirs' to list valid stack indices",
+                    "%s: directory stack index out of range", arg);
                 free(cwd);
                 return 1;
             }
 
             // Rotate stack and cd
             if (dirstack_rotate(stack_idx) < 0) {
-                fprintf(stderr, "pushd: %s: rotation failed\n", arg);
+                builtin_error_help("pushd", SHELL_ERR_DIRECTORY_STACK, NULL,
+                                   "%s: rotation failed", arg);
                 free(cwd);
                 return 1;
             }
@@ -7962,7 +7980,9 @@ int bin_pushd(int argc, char **argv) {
  */
 int bin_popd(int argc, char **argv) {
     if (dirstack_size() < 1) {
-        fprintf(stderr, "popd: directory stack empty\n");
+        builtin_error_help("popd", SHELL_ERR_DIRECTORY_STACK,
+                           "push a directory first: pushd <dir>",
+                           "directory stack empty");
         return 1;
     }
 
@@ -7970,7 +7990,9 @@ int bin_popd(int argc, char **argv) {
         // popd with no args: pop top and cd there
         char *dir = dirstack_pop();
         if (!dir) {
-            fprintf(stderr, "popd: directory stack empty\n");
+            builtin_error_help("popd", SHELL_ERR_DIRECTORY_STACK,
+                               "push a directory first: pushd <dir>",
+                               "directory stack empty");
             return 1;
         }
 
@@ -8017,7 +8039,9 @@ int bin_popd(int argc, char **argv) {
 
             // +0 means current directory, can't remove that
             if (idx == 0) {
-                fprintf(stderr, "popd: can't remove current directory\n");
+                builtin_error_help("popd", SHELL_ERR_DIRECTORY_STACK,
+                                   "use 'cd' to change current directory",
+                                   "can't remove current directory");
                 return 1;
             }
 
@@ -8025,8 +8049,10 @@ int bin_popd(int argc, char **argv) {
             int stack_idx = idx - 1;
 
             if (dirstack_remove(stack_idx) < 0) {
-                fprintf(stderr,
-                        "popd: %s: directory stack index out of range\n", arg);
+                builtin_error_help(
+                    "popd", SHELL_ERR_DIRECTORY_STACK,
+                    "use 'dirs' to list valid stack indices",
+                    "%s: directory stack index out of range", arg);
                 return 1;
             }
 
@@ -8035,7 +8061,9 @@ int bin_popd(int argc, char **argv) {
         }
     }
 
-    fprintf(stderr, "popd: %s: invalid argument\n", arg);
+    builtin_error_help("popd", SHELL_ERR_INVALID_ARGUMENT,
+                       "usage: popd [+N | -N]",
+                       "%s: invalid argument", arg);
     return 1;
 }
 
@@ -8069,7 +8097,10 @@ int bin_dirs(int argc, char **argv) {
         } else if (strcmp(argv[i], "-l") == 0) {
             // Full paths (currently default, ~ substitution not implemented)
         } else if (argv[i][0] == '-') {
-            fprintf(stderr, "dirs: %s: invalid option\n", argv[i]);
+            builtin_error_help("dirs", SHELL_ERR_INVALID_OPTION,
+                               "supported options: -c (clear), -l (full), "
+                               "-p (per-line), -v (numbered)",
+                               "%s: invalid option", argv[i]);
             return 1;
         }
     }
