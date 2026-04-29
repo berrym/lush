@@ -97,11 +97,19 @@ bool is_posix_mode_enabled(void);
 // Hash table for remembered command paths
 ht_strstr_t *command_hash = NULL;
 
+/* Forward declaration; defined later in the file. Returns the most
+ * recent source location from the executor's context stack — i.e. the
+ * call site of the builtin invocation — or SOURCE_LOC_UNKNOWN when
+ * no executor context is available. */
+static source_location_t builtin_get_source_location(void);
+
 /**
  * @brief Report a structured builtin error
  *
- * Creates and displays a structured error for builtin commands.
- * Since builtins don't have source locations, uses a minimal display format.
+ * Creates and displays a structured error for builtin commands. The
+ * source location of the invoking command is pulled from the executor's
+ * context stack so the rust-style output gets a `--> file:line:col`
+ * line and source-snippet caret span.
  *
  * @param builtin_name Name of the builtin (e.g., "cd", "export")
  * @param code Error code from shell_error_code_t
@@ -110,11 +118,11 @@ ht_strstr_t *command_hash = NULL;
  */
 static void builtin_error(const char *builtin_name, shell_error_code_t code,
                           const char *fmt, ...) {
-    /* Create error with no source location */
+    source_location_t loc = builtin_get_source_location();
     va_list args;
     va_start(args, fmt);
-    shell_error_t *error = shell_error_createv(code, SHELL_SEVERITY_ERROR,
-                                               SOURCE_LOC_UNKNOWN, fmt, args);
+    shell_error_t *error =
+        shell_error_createv(code, SHELL_SEVERITY_ERROR, loc, fmt, args);
     va_end(args);
 
     if (error) {
@@ -126,6 +134,47 @@ static void builtin_error(const char *builtin_name, shell_error_code_t code,
         shell_error_free(error);
     } else {
         /* Fallback to simple error message */
+        va_start(args, fmt);
+        fprintf(stderr, "lush: %s: ", builtin_name);
+        vfprintf(stderr, fmt, args);
+        fprintf(stderr, "\n");
+        va_end(args);
+    }
+}
+
+/**
+ * @brief Report a structured builtin error with a `help:` suggestion
+ *
+ * Same as builtin_error() but also attaches a `help:` line for the user.
+ * Use this when the error has an actionable hint ("supported options",
+ * "expected format", etc.); use builtin_error() when the message itself
+ * is self-explanatory.
+ *
+ * @param builtin_name Name of the builtin
+ * @param code         Error code
+ * @param help         help: suggestion (NULL/empty omits the line)
+ * @param fmt          Printf-style format string for the message
+ * @param ...          Format arguments
+ */
+static void builtin_error_help(const char *builtin_name,
+                               shell_error_code_t code, const char *help,
+                               const char *fmt, ...) {
+    source_location_t loc = builtin_get_source_location();
+    va_list args;
+    va_start(args, fmt);
+    shell_error_t *error =
+        shell_error_createv(code, SHELL_SEVERITY_ERROR, loc, fmt, args);
+    va_end(args);
+
+    if (error) {
+        shell_error_push_context(error, "in builtin '%s'", builtin_name);
+        if (help && *help) {
+            shell_error_set_suggestion(error, help);
+        }
+        shell_error_display(error, stderr, isatty(STDERR_FILENO));
+        shell_error_free(error);
+    } else {
+        /* Fallback if shell_error_create fails (e.g. OOM) */
         va_start(args, fmt);
         fprintf(stderr, "lush: %s: ", builtin_name);
         vfprintf(stderr, fmt, args);
@@ -2451,13 +2500,38 @@ int bin_false(int argc, char **argv) {
     return 1;
 }
 
-/**
- * @brief Get current source location from executor context stack
+/* Per-call stash set by execute_builtin_command in executor.c via
+ * builtin_set_source_location() before dispatching to the builtin
+ * function. Tracks the source location of the command node that
+ * invoked the builtin — i.e. the actual call site, not the enclosing
+ * control-flow construct. Cleared after the builtin returns.
  *
- * Returns the most recent source location from the executor's context stack,
- * or SOURCE_LOC_UNKNOWN if no context is available.
+ * For nested builtin invocations (e.g. `eval` calling another builtin)
+ * the dispatcher saves the previous stash on the C stack and restores
+ * it on return, so the location is always correct for the innermost
+ * builtin currently executing. */
+static source_location_t s_builtin_call_loc = SOURCE_LOC_UNKNOWN;
+
+source_location_t builtin_swap_source_location(source_location_t loc) {
+    source_location_t prev = s_builtin_call_loc;
+    s_builtin_call_loc = loc;
+    return prev;
+}
+
+/**
+ * @brief Get current source location for builtin error reporting
+ *
+ * Prefers the per-call stash set by the executor's builtin dispatcher
+ * (the actual call site of the current builtin invocation). Falls back
+ * to the most recent source location on the executor's context stack
+ * (the enclosing control-flow construct) when no per-call stash exists,
+ * and finally to SOURCE_LOC_UNKNOWN.
  */
 static source_location_t builtin_get_source_location(void) {
+    if (SOURCE_LOC_VALID(s_builtin_call_loc) ||
+        s_builtin_call_loc.filename != NULL) {
+        return s_builtin_call_loc;
+    }
     if (current_executor && current_executor->context_depth > 0) {
         return current_executor
             ->context_locations[current_executor->context_depth - 1];

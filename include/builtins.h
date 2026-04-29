@@ -13,9 +13,32 @@
 #define BUILTINS_H
 
 #include "libhashtable/ht.h"
+#include "shell_error.h"
 
 #include <stdbool.h>
 #include <stddef.h>
+
+/**
+ * @brief Atomically replace the stashed builtin call-site source location
+ *
+ * Called by the executor's builtin dispatch path on entry (with the new
+ * call site's loc) and again on exit (with the previous loc returned
+ * here on entry) so re-entrant builtin dispatch — e.g. `eval` invoking
+ * another builtin — preserves the outer caller's loc when the inner
+ * call returns. The stashed location is read by the builtin error
+ * helpers so structured-error output gets a real `--> file:line:col`
+ * line and source-snippet caret span.
+ *
+ * Usage idiom in the dispatcher:
+ *   source_location_t saved = builtin_swap_source_location(command_loc);
+ *   int result = <dispatch builtin>;
+ *   (void)builtin_swap_source_location(saved);
+ *   return result;
+ *
+ * @param loc New source location to stash
+ * @return Previous stashed source location
+ */
+source_location_t builtin_swap_source_location(source_location_t loc);
 
 /** Builtin command entry */
 typedef struct builtin_s {

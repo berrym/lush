@@ -114,7 +114,8 @@ static int execute_external_command_with_setup(executor_t *executor,
                                                char **argv,
                                                bool redirect_stderr,
                                                node_t *command);
-static int execute_builtin_command(executor_t *executor, char **argv);
+static int execute_builtin_command(executor_t *executor, char **argv,
+                                   source_location_t loc);
 static int execute_brace_group(executor_t *executor, node_t *group);
 static int execute_subshell(executor_t *executor, node_t *subshell);
 static int execute_negate(executor_t *executor, node_t *negate_node);
@@ -1358,7 +1359,8 @@ static int execute_command(executor_t *executor, node_t *command) {
                 }
             }
 
-            result = execute_builtin_command(executor, filtered_argv);
+            result = execute_builtin_command(executor, filtered_argv,
+                                             command->loc);
 
             // Flush output streams after builtin execution
             // This ensures output appears immediately, especially under
@@ -1461,8 +1463,8 @@ static int execute_command(executor_t *executor, node_t *command) {
                             // Re-check if it's a builtin or function after
                             // correction
                             if (is_builtin_command(filtered_argv[0])) {
-                                result = execute_builtin_command(executor,
-                                                                 filtered_argv);
+                                result = execute_builtin_command(
+                                    executor, filtered_argv, command->loc);
                                 fflush(stdout);
                                 fflush(stderr);
                             } else if (is_function_defined(executor,
@@ -6647,13 +6649,23 @@ static int execute_test_builtin(executor_t *executor, char **argv);
  * @param argv NULL-terminated argument vector
  * @return Exit status of builtin command
  */
-static int execute_builtin_command(executor_t *executor, char **argv) {
+static int execute_builtin_command(executor_t *executor, char **argv,
+                                   source_location_t loc) {
     if (!argv || !argv[0]) {
         return 1;
     }
 
     // Set global executor for job control builtins
     current_executor = executor;
+
+    /* Stash the call-site source location for the duration of this
+     * builtin invocation so builtin error helpers can produce a real
+     * `--> file:line:col` line and source-snippet caret. The swap
+     * returns the previously-stashed loc, which we restore on every
+     * exit path so a re-entrant builtin (e.g. `eval` invoking another
+     * builtin) doesn't clobber the outer caller's location when the
+     * inner call returns. */
+    source_location_t saved_loc = builtin_swap_source_location(loc);
 
     // Find the builtin function in the builtin table
     for (size_t i = 0; i < builtins_count; i++) {
@@ -6687,14 +6699,16 @@ static int execute_builtin_command(executor_t *executor, char **argv) {
 
             int result = builtins[i].func(argc, argv);
 
-            // Clear global executor
+            // Restore previous loc + clear global executor
+            (void)builtin_swap_source_location(saved_loc);
             current_executor = NULL;
 
             return result;
         }
     }
 
-    // Clear global executor
+    // Restore previous loc + clear global executor
+    (void)builtin_swap_source_location(saved_loc);
     current_executor = NULL;
 
     return 1; // Command not found
@@ -12749,7 +12763,7 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
         }
 
         // Execute the builtin command
-        int result = execute_builtin_command(executor, argv);
+        int result = execute_builtin_command(executor, argv, command->loc);
 
         // Flush stdio buffers before _exit() - critical for file redirections
         // Without this, output redirected to files would be lost because
