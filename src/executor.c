@@ -9517,14 +9517,20 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 int idx = (int)strtoll(idx_result, NULL, 10);
                                 free(idx_result);
 
-                                // Adjust for 1-indexed arrays (zsh mode)
+                                /* Same indexing convention as ${arr[n]}:
+                                 * zsh-mode rejects 0, decrements positives,
+                                 * passes negatives through to the symtable
+                                 * helper's "from-end" handler. Lush/bash
+                                 * pass through directly. (Issue #68.) */
                                 if (!shell_mode_allows(
                                         FEATURE_ARRAY_ZERO_INDEXED)) {
-                                    if (idx <= 0) {
+                                    if (idx == 0) {
                                         snprintf(result_buf, sizeof(result_buf),
                                                  "0");
                                     } else {
-                                        idx--; // Convert 1-indexed to 0-indexed
+                                        if (idx > 0) {
+                                            idx--; /* 1-based -> 0-based */
+                                        }
                                         const char *elem =
                                             symtable_array_get_index(array,
                                                                      idx);
@@ -9627,13 +9633,21 @@ static char *parse_parameter_expansion(executor_t *executor,
                             int idx = (int)strtoll(idx_result, NULL, 10);
                             free(idx_result);
 
-                            // Adjust for 1-indexed arrays (zsh mode)
+                            /* zsh-mode (1-based): 0 is invalid (returns
+                             * empty); positive indices need
+                             * decrement-to-0-based; negative indices pass
+                             * through unchanged so the symtable helper's
+                             * built-in "from-end" handling fires.
+                             * lush/bash-mode (0-based): pass through
+                             * directly. (Issue #68 — array half.) */
                             if (!shell_mode_allows(
                                     FEATURE_ARRAY_ZERO_INDEXED)) {
-                                if (idx <= 0) {
+                                if (idx == 0) {
                                     result = strdup("");
                                 } else {
-                                    idx--; // Convert 1-indexed to 0-indexed
+                                    if (idx > 0) {
+                                        idx--; /* 1-based -> 0-based */
+                                    }
                                     const char *elem =
                                         symtable_array_get_index(array, idx);
                                     result = strdup(elem ? elem : "");
@@ -9686,6 +9700,31 @@ static char *parse_parameter_expansion(executor_t *executor,
                             start_idx = atoi(subscript);
                             end_idx = start_idx; // single grapheme
                         }
+                        size_t value_len = strlen(str_value);
+
+                        /* Negative-index handling: ${str[-N]} counts from
+                         * the end. zsh-mode (1-based): -1 = last grapheme
+                         * (position total). lush/bash-mode (0-based):
+                         * -1 = last (position total-1). Computes the
+                         * grapheme count via lle_utf8_count_graphemes
+                         * (TR#29-correct, same primitive
+                         * slice_string_graphemes uses internally).
+                         * (Issue #68.) */
+                        if (start_idx < 0 || end_idx < 0) {
+                            int total = (int)lle_utf8_count_graphemes(
+                                str_value, value_len);
+                            bool one_based = !shell_mode_allows(
+                                FEATURE_ARRAY_ZERO_INDEXED);
+                            if (start_idx < 0) {
+                                start_idx =
+                                    total + start_idx + (one_based ? 1 : 0);
+                            }
+                            if (end_idx < 0) {
+                                end_idx =
+                                    total + end_idx + (one_based ? 1 : 0);
+                            }
+                        }
+
                         // Convert from 1-based (zsh) to 0-based if needed
                         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
                             if (start_idx <= 0 || end_idx <= 0) {
@@ -9697,9 +9736,20 @@ static char *parse_parameter_expansion(executor_t *executor,
                             start_idx--;
                             end_idx--;
                         }
+
+                        /* Inverted range yields empty (catches both user-
+                         * written ${str[3,1]} and post-conversion
+                         * overshoots in 0-based mode). */
+                        if (end_idx < start_idx) {
+                            free(str_value);
+                            free(subscript);
+                            free(arr_name);
+                            return strdup("");
+                        }
+
                         int count = end_idx - start_idx + 1;
                         char *result = slice_string_graphemes(
-                            str_value, strlen(str_value), start_idx, count);
+                            str_value, value_len, start_idx, count);
                         free(str_value);
                         free(subscript);
                         free(arr_name);
