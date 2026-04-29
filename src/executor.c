@@ -11883,6 +11883,20 @@ static void initialize_job_control(executor_t *executor) {
     executor->jobs = NULL;
     executor->next_job_id = 1;
 
+#ifdef LUSH_FUZZ_SANDBOX
+    /* Fuzz harness must not perform tty job-control operations.
+     * executor_new() runs per fuzz iteration; tcgetpgrp / tcsetpgrp /
+     * kill(-pgid, SIGTTIN) inside this function send signals to the
+     * fuzzer's process group every iteration when stdin is a TTY,
+     * causing eventual SIGABRT after many iterations as accumulated
+     * signal state corrupts the process. The fuzz binary never needs
+     * to take terminal control — it does not run external commands
+     * (LUSH_FUZZ_SANDBOX makes lush_fork() return -1) and has no
+     * interactive prompt. (Issue #75.) */
+    executor->shell_pgid = getpgrp();
+    return;
+#endif
+
     // For interactive login shells, take control of the terminal
     if (isatty(STDIN_FILENO)) {
         // Wait until we're in the foreground
