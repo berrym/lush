@@ -286,6 +286,7 @@ executor_t *executor_new(void) {
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
+    executor->source_return = false;
 
     /* Initialize error context stack (Phase 3) */
     executor->context_depth = 0;
@@ -333,6 +334,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
+    executor->source_return = false;
 
     /* Initialize error context stack (Phase 3) */
     executor->context_depth = 0;
