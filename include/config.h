@@ -213,6 +213,7 @@ typedef struct {
     int tab_width;         /**< Tab display width */
     bool no_word_expand;   /**< Disable word expansion */
     bool multiline_mode;   /**< Enable multiline editing */
+    int brace_expansion_max; /**< Max brace expansion result count (0 = unbounded) */
 
     /* Auto-correction settings */
     int autocorrect_max_suggestions; /**< Maximum suggestions */

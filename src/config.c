@@ -357,6 +357,10 @@ static config_option_t config_options[] = {
     {"behavior.multiline_mode", CONFIG_TYPE_BOOL, CONFIG_SECTION_BEHAVIOR,
      &config.multiline_mode, "Enable multiline editing mode",
      config_validate_bool, NULL},
+    {"behavior.brace_expansion_max", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
+     &config.brace_expansion_max,
+     "Max brace expansion result count (0 = unbounded)",
+     config_validate_int, NULL},
 
     // Color settings
     {"behavior.color_scheme", CONFIG_TYPE_STRING, CONFIG_SECTION_BEHAVIOR,
@@ -1044,6 +1048,7 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {"tab_width", "behavior.tab_width"},
     {"no_word_expand", "behavior.no_word_expand"},
     {"multiline_mode", "behavior.multiline_mode"},
+    {"brace_expansion_max", "behavior.brace_expansion_max"},
     {"color_scheme", "behavior.color_scheme"},
     {"colors_enabled", "behavior.colors_enabled"},
     {"verbose_errors", "behavior.verbose_errors"},
@@ -1864,6 +1869,9 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Enable multiline editing mode\n"
     "behavior.multiline_mode = true\n"
     "\n"
+    "# Max brace expansion result count (0 = unbounded)\n"
+    "behavior.brace_expansion_max = 65536\n"
+    "\n"
     "# Color scheme name: default, dark, light, solarized\n"
     "behavior.color_scheme = default\n"
     "\n"
@@ -2159,6 +2167,7 @@ void config_set_defaults(void) {
     config.tab_width = 4;
     config.no_word_expand = false;
     config.multiline_mode = true;
+    config.brace_expansion_max = 65536;
 
     // Auto-correction defaults
     config.autocorrect_max_suggestions = 3;

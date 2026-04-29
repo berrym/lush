@@ -137,6 +137,11 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count);
 static bool needs_glob_expansion(const char *str);
 static char **expand_brace_pattern(const char *pattern, int *expanded_count);
 static bool needs_brace_expansion(const char *str);
+/* Sentinel returned in *expanded_count when brace expansion exceeds the
+ * configured cap (behavior.brace_expansion_max). Top-level callers detect
+ * this and emit an expansion error rather than treating it as a malloc
+ * failure. */
+#define BRACE_EXPANSION_LIMIT_SENTINEL (-1)
 static void initialize_job_control(executor_t *executor);
 static char *expand_arithmetic(executor_t *executor, const char *arith_text);
 static char *expand_command_substitution(executor_t *executor,
@@ -2162,6 +2167,18 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                             int brace_count;
                             char **brace_results =
                                 expand_brace_pattern(expanded, &brace_count);
+                            if (brace_count ==
+                                BRACE_EXPANSION_LIMIT_SENTINEL) {
+                                set_executor_error(
+                                    executor,
+                                    "brace expansion exceeds configured "
+                                    "limit (behavior.brace_expansion_max)");
+                                executor->expansion_error = true;
+                                executor->expansion_exit_status = 1;
+                                free(expanded);
+                                symtable_pop_scope(executor->symtable);
+                                return 1;
+                            }
                             if (brace_results) {
                                 // Add each brace expansion result
                                 for (int b = 0; b < brace_count; b++) {
@@ -3376,6 +3393,16 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                         char **brace_results =
                             expand_brace_pattern(expanded_arg, &brace_count);
 
+                        if (brace_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
+                            set_executor_error(
+                                executor,
+                                "brace expansion exceeds configured limit "
+                                "(behavior.brace_expansion_max)");
+                            executor->expansion_error = true;
+                            executor->expansion_exit_status = 1;
+                            free(expanded_arg);
+                            goto cleanup_and_fail;
+                        }
                         if (brace_results) {
                             // Process each brace expansion result for potential
                             // glob expansion
@@ -5782,6 +5809,13 @@ static bool needs_brace_expansion(const char *str) {
  * @param expanded_count Output: number of expansions
  * @return Array of expanded strings (caller must free), or NULL on error
  */
+/* Returns the configured brace expansion result-count cap.
+ * 0 means unbounded (matches bash/zsh — caller skips the limit check). */
+static int brace_expansion_cap(void) {
+    int cap = config.brace_expansion_max;
+    return cap > 0 ? cap : 0;
+}
+
 static char **expand_brace_range(const char *prefix, const char *content,
                                  const char *suffix, int *expanded_count) {
     *expanded_count = 0;
@@ -5891,8 +5925,17 @@ static char **expand_brace_range(const char *prefix, const char *content,
     long range = reverse ? (start_val - end_val) : (end_val - start_val);
     int count = (int)(range / step) + 1;
 
-    if (count <= 0 || count > 10000) {
-        // Sanity check - don't expand absurdly large ranges
+    int cap = brace_expansion_cap();
+    if (count <= 0 || (cap > 0 && count > cap)) {
+        /* Range exceeds configured cap (or is degenerate). Signal
+         * limit-exceeded distinctly from malloc/parse failure so the
+         * top-level caller can produce a real diagnostic. The cap path
+         * relies on the sentinel; the count<=0 path keeps prior
+         * "fall back to original pattern" behaviour by returning NULL
+         * with *expanded_count = 0 unchanged. */
+        if (cap > 0 && count > cap) {
+            *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
+        }
         free(start_str);
         free(end_str);
         free(step_str);
@@ -5955,13 +5998,33 @@ static char **expand_brace_range(const char *prefix, const char *content,
     if (strchr(suffix, '{')) {
         char **final_results = NULL;
         int final_count = 0;
+        int cap = brace_expansion_cap();
+        bool limit_hit = false;
 
         for (int i = 0; i < count; i++) {
+            if (limit_hit) {
+                free(result[i]);
+                continue;
+            }
             if (needs_brace_expansion(result[i])) {
                 int sub_count;
                 char **sub_results =
                     expand_brace_pattern(result[i], &sub_count);
+                if (sub_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 if (sub_results) {
+                    if (cap > 0 && (long)final_count + sub_count > cap) {
+                        for (int j = 0; j < sub_count; j++) {
+                            free(sub_results[j]);
+                        }
+                        free(sub_results);
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     // Add all sub-results to final
                     char **new_final =
                         realloc(final_results,
@@ -5980,24 +6043,47 @@ static char **expand_brace_range(const char *prefix, const char *content,
                     }
                     free(result[i]);
                 } else {
+                    if (cap > 0 && final_count + 1 > cap) {
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     char **new_final = realloc(
                         final_results, (final_count + 1) * sizeof(char *));
                     if (new_final) {
                         final_results = new_final;
                         final_results[final_count++] = result[i];
+                    } else {
+                        free(result[i]);
                     }
                 }
             } else {
+                if (cap > 0 && final_count + 1 > cap) {
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 char **new_final =
                     realloc(final_results, (final_count + 1) * sizeof(char *));
                 if (new_final) {
                     final_results = new_final;
                     final_results[final_count++] = result[i];
+                } else {
+                    free(result[i]);
                 }
             }
         }
 
         free(result);
+
+        if (limit_hit) {
+            for (int j = 0; j < final_count; j++) {
+                free(final_results[j]);
+            }
+            free(final_results);
+            *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
+            return NULL;
+        }
 
         char **terminated =
             realloc(final_results, (final_count + 1) * sizeof(char *));
@@ -6184,13 +6270,36 @@ static char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     if (strchr(suffix, '{')) {
         char **final_results = NULL;
         int final_count = 0;
+        int cap = brace_expansion_cap();
+        bool limit_hit = false;
 
         for (int i = 0; i < item_count; i++) {
+            if (limit_hit) {
+                /* Already over cap — drain remaining originals
+                 * cleanly to avoid leaks. */
+                free(result[i]);
+                continue;
+            }
             if (needs_brace_expansion(result[i])) {
                 int sub_count;
                 char **sub_results =
                     expand_brace_pattern(result[i], &sub_count);
+                if (sub_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
+                    /* Recursive cap propagation. */
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 if (sub_results) {
+                    if (cap > 0 && (long)final_count + sub_count > cap) {
+                        for (int j = 0; j < sub_count; j++) {
+                            free(sub_results[j]);
+                        }
+                        free(sub_results);
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     // Add all sub-results to final
                     char **new_final =
                         realloc(final_results,
@@ -6211,25 +6320,53 @@ static char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                     free(result[i]); // Free original since we expanded it
                 } else {
                     // Sub-expansion failed, keep original
+                    if (cap > 0 && final_count + 1 > cap) {
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     char **new_final = realloc(
                         final_results, (final_count + 1) * sizeof(char *));
                     if (new_final) {
                         final_results = new_final;
                         final_results[final_count++] = result[i];
+                    } else {
+                        /* realloc failed — original was unmodified, but
+                         * result[i] is now orphaned; free it to avoid
+                         * a leak under malloc pressure. */
+                        free(result[i]);
                     }
                 }
             } else {
                 // No more braces, keep as-is
+                if (cap > 0 && final_count + 1 > cap) {
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 char **new_final =
                     realloc(final_results, (final_count + 1) * sizeof(char *));
                 if (new_final) {
                     final_results = new_final;
                     final_results[final_count++] = result[i];
+                } else {
+                    free(result[i]);
                 }
             }
         }
 
         free(result); // Free original array
+
+        if (limit_hit) {
+            /* Cap exceeded — release the partial accumulation cleanly
+             * and return the limit sentinel for the top-level caller. */
+            for (int j = 0; j < final_count; j++) {
+                free(final_results[j]);
+            }
+            free(final_results);
+            *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
+            return NULL;
+        }
 
         // Add NULL terminator
         char **terminated =
