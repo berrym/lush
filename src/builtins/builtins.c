@@ -2740,7 +2740,8 @@ int bin_fg(int argc, char **argv) {
     if (current_executor) {
         return executor_builtin_fg(current_executor, argv);
     }
-    fprintf(stderr, "fg: no current job\n");
+    executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
+                          builtin_get_source_location(), "no current job");
     return 1;
 }
 
@@ -2758,7 +2759,8 @@ int bin_bg(int argc, char **argv) {
     if (current_executor) {
         return executor_builtin_bg(current_executor, argv);
     }
-    fprintf(stderr, "bg: no current job\n");
+    executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
+                          builtin_get_source_location(), "no current job");
     return 1;
 }
 
@@ -2781,7 +2783,8 @@ int bin_bg(int argc, char **argv) {
  */
 int bin_disown(int argc, char **argv) {
     if (!current_executor) {
-        fprintf(stderr, "disown: no job control\n");
+        executor_error_report(current_executor, SHELL_ERR_STATE_CORRUPTION,
+                              builtin_get_source_location(), "no job control");
         return 1;
     }
 
@@ -2805,11 +2808,44 @@ int bin_disown(int argc, char **argv) {
             case 'r':
                 flag_r = true;
                 break;
-            default:
-                fprintf(stderr, "disown: -%c: invalid option\n", opt[i]);
-                fprintf(stderr,
-                        "disown: usage: disown [-h] [-a | -r] [jobspec ...]\n");
+            default: {
+                source_location_t loc = builtin_get_source_location();
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR, loc,
+                    "-%c: invalid option", opt[i]);
+                if (err) {
+                    if (current_executor && SOURCE_LOC_VALID(loc)) {
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
+                        if (src_line) {
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
+                            free(src_line);
+                        }
+                    }
+                    if (current_executor) {
+                        for (size_t k = 0;
+                             k < current_executor->context_depth &&
+                             k < SHELL_ERROR_CONTEXT_MAX;
+                             k++) {
+                            if (current_executor->context_stack[k]) {
+                                shell_error_push_context(
+                                    err, "%s",
+                                    current_executor->context_stack[k]);
+                            }
+                        }
+                    }
+                    shell_error_set_suggestion(
+                        err, "usage: disown [-h] [-a | -r] [jobspec ...]");
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                } else {
+                    fprintf(stderr, "lush: disown: -%c: invalid option\n",
+                            opt[i]);
+                }
                 return 1;
+            }
             }
         }
         optind_local++;
@@ -2877,15 +2913,19 @@ int bin_disown(int argc, char **argv) {
             }
 
             if (job_id <= 0) {
-                fprintf(stderr, "disown: %s: invalid job specification\n",
-                        jobspec);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "%s: invalid job specification", jobspec);
                 result = 1;
                 continue;
             }
 
             job_t *job = executor_find_job(current_executor, job_id);
             if (!job) {
-                fprintf(stderr, "disown: %s: no such job\n", jobspec);
+                executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
+                                      builtin_get_source_location(),
+                                      "%s: no such job", jobspec);
                 result = 1;
                 continue;
             }
@@ -2909,7 +2949,9 @@ int bin_disown(int argc, char **argv) {
         }
 
         if (!current_job) {
-            fprintf(stderr, "disown: current: no such job\n");
+            executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
+                                  builtin_get_source_location(),
+                                  "current: no such job");
             return 1;
         }
 
@@ -4023,14 +4065,18 @@ int bin_wait(int argc, char **argv) {
             // Re-parse without the % sign
             job_or_pid = (int)strtol(argv[i] + 1, &endptr, 10);
             if (*endptr != '\0' || job_or_pid <= 0) {
-                fprintf(stderr, "wait: %s: not a valid job ID\n", argv[i]);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "%s: not a valid job ID", argv[i]);
                 return 1;
             }
         } else {
             if (*endptr != '\0' || target <= 0) {
-                fprintf(stderr,
-                        "wait: %s: arguments must be process or job IDs\n",
-                        argv[i]);
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(),
+                    "%s: arguments must be process or job IDs", argv[i]);
                 return 1;
             }
         }
@@ -4039,7 +4085,9 @@ int bin_wait(int argc, char **argv) {
             // Wait for specific job
             job_t *job = executor_find_job(current_executor, job_or_pid);
             if (!job) {
-                fprintf(stderr, "wait: %%%d: no such job\n", job_or_pid);
+                executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
+                                      builtin_get_source_location(),
+                                      "%%%d: no such job", job_or_pid);
                 return 127;
             }
 
@@ -4070,17 +4118,47 @@ int bin_wait(int argc, char **argv) {
             if (result == -1) {
                 if (errno == ECHILD) {
                     // Process doesn't exist or not a child
-                    fprintf(stderr,
-                            "wait: pid %d is not a child of this shell\n",
-                            job_or_pid);
+                    executor_error_report(
+                        current_executor, SHELL_ERR_JOB_NOT_FOUND,
+                        builtin_get_source_location(),
+                        "pid %d is not a child of this shell", job_or_pid);
                     return 127;
                 } else {
                     int saved_errno = errno;
+                    source_location_t loc = builtin_get_source_location();
                     shell_error_t *error = shell_error_create(
-                        SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR,
-                        SOURCE_LOC_UNKNOWN, "wait: %s", strerror(saved_errno));
-                    shell_error_display(error, stderr, isatty(STDERR_FILENO));
-                    shell_error_free(error);
+                        SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, loc, "%s",
+                        strerror(saved_errno));
+                    if (error) {
+                        if (current_executor && SOURCE_LOC_VALID(loc)) {
+                            char *src_line = executor_get_source_line(
+                                current_executor, loc.line);
+                            if (src_line) {
+                                shell_error_set_source_line(
+                                    error, src_line, loc.column,
+                                    loc.column + loc.length);
+                                free(src_line);
+                            }
+                        }
+                        if (current_executor) {
+                            for (size_t k = 0;
+                                 k < current_executor->context_depth &&
+                                 k < SHELL_ERROR_CONTEXT_MAX;
+                                 k++) {
+                                if (current_executor->context_stack[k]) {
+                                    shell_error_push_context(
+                                        error, "%s",
+                                        current_executor->context_stack[k]);
+                                }
+                            }
+                        }
+                        shell_error_display(error, stderr,
+                                            isatty(STDERR_FILENO));
+                        shell_error_free(error);
+                    } else {
+                        fprintf(stderr, "lush: wait: %s\n",
+                                strerror(saved_errno));
+                    }
                     return 1;
                 }
             } else if (result > 0) {
