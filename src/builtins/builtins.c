@@ -3091,14 +3091,38 @@ int bin_shift(int argc, char **argv) {
  * @return 0 on success, 1 if not in a loop or invalid argument
  */
 int bin_break(int argc, char **argv) {
-    if (!current_executor) {
-        fprintf(stderr, "break: not currently in a loop\n");
-        return 1;
-    }
-
-    // Check if we're actually in a loop
-    if (current_executor->loop_depth <= 0) {
-        fprintf(stderr, "break: not currently in a loop\n");
+    if (!current_executor || current_executor->loop_depth <= 0) {
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_LOOP_CONTROL, SHELL_SEVERITY_ERROR, loc,
+            "not currently in a loop");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "break is only valid inside while/until/for loops");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: break: not currently in a loop\n");
+        }
         return 1;
     }
 
@@ -3109,14 +3133,78 @@ int bin_break(int argc, char **argv) {
         break_level = strtol(argv[1], &endptr, 10);
 
         if (*endptr != '\0' || break_level <= 0) {
-            fprintf(stderr, "break: %s: numeric argument required\n", argv[1]);
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%s: numeric argument required", argv[1]);
+            if (err) {
+                if (SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line,
+                                                    loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+                shell_error_set_suggestion(
+                    err, "level must be a positive integer");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: break: %s: numeric argument required\n",
+                        argv[1]);
+            }
             return 1;
         }
 
         if (break_level > current_executor->loop_depth) {
-            fprintf(stderr,
-                    "break: %d: cannot break %d levels (only %d nested)\n",
-                    break_level, break_level, current_executor->loop_depth);
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%d: cannot break %d levels (only %d nested)", break_level,
+                break_level, current_executor->loop_depth);
+            if (err) {
+                if (SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line,
+                                                    loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+                shell_error_set_suggestion(
+                    err,
+                    "level cannot exceed the current loop nesting depth");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: break: %d: cannot break %d levels "
+                        "(only %d nested)\n",
+                        break_level, break_level,
+                        current_executor->loop_depth);
+            }
             return 1;
         }
     }
@@ -3139,14 +3227,38 @@ int bin_break(int argc, char **argv) {
  * @return 0 on success, 1 if not in a loop or invalid argument
  */
 int bin_continue(int argc, char **argv) {
-    if (!current_executor) {
-        fprintf(stderr, "continue: not currently in a loop\n");
-        return 1;
-    }
-
-    // Check if we're actually in a loop
-    if (current_executor->loop_depth <= 0) {
-        fprintf(stderr, "continue: not currently in a loop\n");
+    if (!current_executor || current_executor->loop_depth <= 0) {
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_LOOP_CONTROL, SHELL_SEVERITY_ERROR, loc,
+            "not currently in a loop");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "continue is only valid inside while/until/for loops");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: continue: not currently in a loop\n");
+        }
         return 1;
     }
 
@@ -3157,16 +3269,79 @@ int bin_continue(int argc, char **argv) {
         continue_level = strtol(argv[1], &endptr, 10);
 
         if (*endptr != '\0' || continue_level <= 0) {
-            fprintf(stderr, "continue: %s: numeric argument required\n",
-                    argv[1]);
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%s: numeric argument required", argv[1]);
+            if (err) {
+                if (SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line,
+                                                    loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+                shell_error_set_suggestion(
+                    err, "level must be a positive integer");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: continue: %s: numeric argument required\n",
+                        argv[1]);
+            }
             return 1;
         }
 
         if (continue_level > current_executor->loop_depth) {
-            fprintf(
-                stderr,
-                "continue: %d: cannot continue %d levels (only %d nested)\n",
-                continue_level, continue_level, current_executor->loop_depth);
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%d: cannot continue %d levels (only %d nested)",
+                continue_level, continue_level,
+                current_executor->loop_depth);
+            if (err) {
+                if (SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line,
+                                                    loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+                shell_error_set_suggestion(
+                    err,
+                    "level cannot exceed the current loop nesting depth");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: continue: %d: cannot continue %d levels "
+                        "(only %d nested)\n",
+                        continue_level, continue_level,
+                        current_executor->loop_depth);
+            }
             return 1;
         }
     }
@@ -3190,12 +3365,74 @@ int bin_continue(int argc, char **argv) {
 int bin_return_value(int argc, char **argv) {
     // POSIX compliance: return_value is not available in strict POSIX mode
     if (is_posix_mode_enabled()) {
-        fprintf(stderr, "return_value: not available in POSIX mode\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_FEATURE_DISABLED, SHELL_SEVERITY_ERROR, loc,
+            "not available in POSIX mode");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err,
+                "switch to bash/zsh/lush mode (set -o bash) to use "
+                "return_value");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: return_value: not available in POSIX mode\n");
+        }
         return 1;
     }
 
     if (argc < 2) {
-        fprintf(stderr, "return_value: missing value argument\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+            "missing value argument");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(err, "usage: return_value <value>");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: return_value: missing value argument\n");
+        }
         return 1;
     }
 
@@ -3231,9 +3468,40 @@ int bin_return(int argc, char **argv) {
     bool in_source = executor && executor->source_depth > 0;
 
     if (!in_function && !in_source) {
-        fprintf(
-            stderr,
-            "return: can only `return' from a function or sourced script\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_RETURN_OUTSIDE_FUNC, SHELL_SEVERITY_ERROR, loc,
+            "can only `return' from a function or sourced script");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err,
+                "return is only valid inside a function or sourced script");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: return: can only `return' from a function or "
+                    "sourced script\n");
+        }
         return 1;
     }
 
@@ -3244,7 +3512,41 @@ int bin_return(int argc, char **argv) {
 
         // Validate that the argument is a valid number
         if (*endptr != '\0') {
-            fprintf(stderr, "return: %s: numeric argument required\n", argv[1]);
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%s: numeric argument required", argv[1]);
+            if (err) {
+                if (current_executor && SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line,
+                                                    loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                if (current_executor) {
+                    for (size_t i = 0; i < current_executor->context_depth &&
+                                       i < SHELL_ERROR_CONTEXT_MAX;
+                         i++) {
+                        if (current_executor->context_stack[i]) {
+                            shell_error_push_context(
+                                err, "%s",
+                                current_executor->context_stack[i]);
+                        }
+                    }
+                }
+                shell_error_set_suggestion(
+                    err, "exit status must be an integer (0-255)");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: return: %s: numeric argument required\n",
+                        argv[1]);
+            }
             return 1;
         }
     }
@@ -3299,7 +3601,39 @@ int bin_trap(int argc, char **argv) {
 
     // Need at least action argument
     if (arg_index >= argc) {
-        fprintf(stderr, "trap: usage: trap [-l] [action] [signal ...]\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+            "usage: trap [-l] [action] [signal ...]");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(err,
+                                       "trap [-l] [action] [signal ...] — "
+                                       "use -l to list supported signals");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: trap: usage: trap [-l] [action] [signal ...]\n");
+        }
         return 1;
     }
 
@@ -3307,7 +3641,39 @@ int bin_trap(int argc, char **argv) {
 
     // If no signals specified, this is an error
     if (arg_index >= argc) {
-        fprintf(stderr, "trap: usage: trap [-l] [action] [signal ...]\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+            "usage: trap [-l] [action] [signal ...]");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(err,
+                                       "trap [-l] [action] [signal ...] — "
+                                       "use -l to list supported signals");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: trap: usage: trap [-l] [action] [signal ...]\n");
+        }
         return 1;
     }
 
@@ -3316,8 +3682,43 @@ int bin_trap(int argc, char **argv) {
         int signal = get_signal_number(argv[i]);
 
         if (signal < 0) {
-            fprintf(stderr, "trap: %s: invalid signal specification\n",
-                    argv[i]);
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "%s: invalid signal specification", argv[i]);
+            if (err) {
+                if (current_executor && SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line,
+                                                    loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                if (current_executor) {
+                    for (size_t i2 = 0; i2 < current_executor->context_depth &&
+                                        i2 < SHELL_ERROR_CONTEXT_MAX;
+                         i2++) {
+                        if (current_executor->context_stack[i2]) {
+                            shell_error_push_context(
+                                err, "%s",
+                                current_executor->context_stack[i2]);
+                        }
+                    }
+                }
+                shell_error_set_suggestion(
+                    err,
+                    "use 'trap -l' to list supported signal names and "
+                    "numbers");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: trap: %s: invalid signal specification\n",
+                        argv[i]);
+            }
             return 1;
         }
 
@@ -3336,8 +3737,10 @@ int bin_trap(int argc, char **argv) {
         } else {
             // Set trap command
             if (set_trap(signal, action) != 0) {
-                fprintf(stderr, "trap: failed to set trap for signal %s\n",
-                        argv[i]);
+                executor_error_report(
+                    current_executor, SHELL_ERR_TRAP_ERROR,
+                    builtin_get_source_location(),
+                    "failed to set trap for signal %s", argv[i]);
                 return 1;
             }
         }
@@ -3360,7 +3763,38 @@ int bin_trap(int argc, char **argv) {
 int bin_exec(int argc, char **argv) {
     // Privileged mode security check
     if (shell_opts.privileged_mode) {
-        fprintf(stderr, "exec: restricted command in privileged mode\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_PERMISSION_DENIED, SHELL_SEVERITY_ERROR, loc,
+            "restricted command in privileged mode");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "drop privileges or run from an unrestricted shell");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: exec: restricted command in privileged mode\n");
+        }
         return 1;
     }
 
@@ -3398,7 +3832,40 @@ int bin_exec(int argc, char **argv) {
     if (has_redirections && !has_command) {
         // TODO: Implement redirection-only exec
         // For now, we'll focus on command replacement exec
-        fprintf(stderr, "exec: redirection-only exec not yet implemented\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_NOT_IMPLEMENTED, SHELL_SEVERITY_ERROR, loc,
+            "redirection-only exec not yet implemented");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err,
+                "use 'command < file' or wrap in a subshell as a workaround");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: exec: redirection-only exec not yet "
+                    "implemented\n");
+        }
         return 1;
     }
 
@@ -3417,7 +3884,37 @@ int bin_exec(int argc, char **argv) {
     }
 
     if (cmd_start >= argc) {
-        fprintf(stderr, "exec: no command specified\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+            "no command specified");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "usage: exec [redirections] command [args ...]");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: exec: no command specified\n");
+        }
         return 1;
     }
 
