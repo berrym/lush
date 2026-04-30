@@ -26,6 +26,7 @@
 #include "history.h"
 #include "input.h"
 #include "posix_history.h"
+#include "shell_error.h"
 #include "shell_mode.h"
 
 #include "lle/completion/ssh_hosts.h"
@@ -500,8 +501,19 @@ int init(int argc, char **argv, FILE **in) {
         // Check that the script file is valid
         stat(argv[optind], &st);
         if (!(S_ISREG(st.st_mode))) {
-            error_message("error: `init`: %s is not a regular file",
-                          argv[optind]);
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
+                SOURCE_LOC_UNKNOWN, "%s is not a regular file",
+                argv[optind]);
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "pass a regular file as the script argument");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr,
+                        "lush: %s is not a regular file\n", argv[optind]);
+            }
             // Fall back to interactive mode
             IS_INTERACTIVE_SHELL = true;
             SHELL_TYPE = SHELL_INTERACTIVE;

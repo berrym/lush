@@ -708,8 +708,37 @@ int bin_history(int argc, char **argv) {
  */
 int bin_terminal(int argc, char **argv) {
     if (argc > 2) {
-        error_message("terminal: too many arguments");
-        error_message("Run 'terminal help' for usage information");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_TOO_MANY_ARGUMENTS, SHELL_SEVERITY_ERROR, loc,
+            "too many arguments");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "run 'terminal help' for usage information");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: terminal: too many arguments\n");
+        }
         return 1;
     }
 
@@ -728,7 +757,9 @@ int bin_terminal(int argc, char **argv) {
     lle_terminal_detection_result_t *detection = NULL;
     if (lle_detect_terminal_capabilities_optimized(&detection) != LLE_SUCCESS ||
         !detection) {
-        error_message("terminal: failed to detect terminal capabilities");
+        executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
+                              builtin_get_source_location(),
+                              "failed to detect terminal capabilities");
         return 1;
     }
 
@@ -1666,13 +1697,46 @@ int bin_export(int argc, char **argv) {
  */
 int bin_source(int argc, char **argv) {
     if (argc < 2) {
-        error_message("source: usage: source filename");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+            "missing filename");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(err, "usage: source filename");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: source: missing filename\n");
+        }
         return 1;
     }
 
     FILE *file = fopen(argv[1], "r");
     if (!file) {
-        error_message("source: cannot open '%s'", argv[1]);
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                              builtin_get_source_location(),
+                              "cannot open '%s': %s", argv[1],
+                              strerror(saved_errno));
         return 1;
     }
 
@@ -1680,7 +1744,9 @@ int bin_source(int argc, char **argv) {
     executor_t *executor = get_global_executor();
     if (!executor) {
         fclose(file);
-        error_message("source: no execution context available");
+        executor_error_report(current_executor, SHELL_ERR_ASSERTION,
+                              builtin_get_source_location(),
+                              "no execution context available");
         return 1;
     }
 
@@ -1964,7 +2030,9 @@ static int evaluate_single_test(char **argv, int start, int end) {
         }
     }
 
-    error_message("test: unknown test condition or invalid arguments");
+    executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                          builtin_get_source_location(),
+                          "unknown test condition or invalid arguments");
     return 2;
 }
 
@@ -2386,7 +2454,10 @@ int bin_mapfile(int argc, char **argv) {
         if (strcmp(arg, "-d") == 0) {
             // -d delim: Use delim as delimiter
             if (opt_index + 1 >= argc) {
-                error_message("mapfile: -d requires a delimiter");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-d requires a delimiter");
                 return 1;
             }
             opt_index++;
@@ -2398,34 +2469,52 @@ int bin_mapfile(int argc, char **argv) {
         } else if (strcmp(arg, "-n") == 0) {
             // -n count: Read at most count lines
             if (opt_index + 1 >= argc) {
-                error_message("mapfile: -n requires a count");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-n requires a count");
                 return 1;
             }
             max_count = atoi(argv[++opt_index]);
             if (max_count < 0) {
-                error_message("mapfile: invalid count");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid count");
                 return 1;
             }
         } else if (strcmp(arg, "-O") == 0) {
             // -O origin: Start index
             if (opt_index + 1 >= argc) {
-                error_message("mapfile: -O requires an origin index");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-O requires an origin index");
                 return 1;
             }
             origin = atoi(argv[++opt_index]);
             if (origin < 0) {
-                error_message("mapfile: invalid origin");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid origin");
                 return 1;
             }
         } else if (strcmp(arg, "-s") == 0) {
             // -s count: Skip lines
             if (opt_index + 1 >= argc) {
-                error_message("mapfile: -s requires a count");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-s requires a count");
                 return 1;
             }
             skip_count = atoi(argv[++opt_index]);
             if (skip_count < 0) {
-                error_message("mapfile: invalid skip count");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid skip count");
                 return 1;
             }
         } else if (strcmp(arg, "-t") == 0) {
@@ -2434,37 +2523,54 @@ int bin_mapfile(int argc, char **argv) {
         } else if (strcmp(arg, "-u") == 0) {
             // -u fd: Read from file descriptor
             if (opt_index + 1 >= argc) {
-                error_message("mapfile: -u requires a file descriptor");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-u requires a file descriptor");
                 return 1;
             }
             fd = atoi(argv[++opt_index]);
             if (fd < 0) {
-                error_message("mapfile: invalid file descriptor");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid file descriptor");
                 return 1;
             }
         } else if (strcmp(arg, "-C") == 0) {
             // -C callback: Callback command
             if (opt_index + 1 >= argc) {
-                error_message("mapfile: -C requires a callback command");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-C requires a callback command");
                 return 1;
             }
             callback = argv[++opt_index];
         } else if (strcmp(arg, "-c") == 0) {
             // -c quantum: Callback frequency
             if (opt_index + 1 >= argc) {
-                error_message("mapfile: -c requires a quantum");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-c requires a quantum");
                 return 1;
             }
             callback_quantum = atoi(argv[++opt_index]);
             if (callback_quantum <= 0) {
-                error_message("mapfile: invalid quantum");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid quantum");
                 return 1;
             }
         } else if (strcmp(arg, "--") == 0) {
             opt_index++;
             break;
         } else {
-            error_message("mapfile: invalid option: %s", arg);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "invalid option: %s", arg);
             return 1;
         }
         opt_index++;
@@ -2474,7 +2580,9 @@ int bin_mapfile(int argc, char **argv) {
     if (opt_index < argc) {
         array_name = argv[opt_index];
         if (!is_valid_identifier(array_name)) {
-            error_message("mapfile: '%s' not a valid identifier", array_name);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "'%s' not a valid identifier", array_name);
             return 1;
         }
     }
@@ -2487,7 +2595,11 @@ int bin_mapfile(int argc, char **argv) {
     // Read lines
     FILE *input = (fd == STDIN_FILENO) ? stdin : fdopen(fd, "r");
     if (!input) {
-        error_message("mapfile: cannot open file descriptor %d", fd);
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_BAD_FD,
+                              builtin_get_source_location(),
+                              "cannot open file descriptor %d: %s", fd,
+                              strerror(saved_errno));
         return 1;
     }
 
