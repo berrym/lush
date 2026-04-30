@@ -1508,7 +1508,9 @@ int bin_export(int argc, char **argv) {
             size_t name_len = eq - argv[i];
             char *name = malloc(name_len + 1);
             if (!name) {
-                error_message("export: memory allocation failed");
+                executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
+                                      builtin_get_source_location(),
+                                      "memory allocation failed");
                 return 1;
             }
             strncpy(name, argv[i], name_len);
@@ -1518,7 +1520,10 @@ int bin_export(int argc, char **argv) {
 
             // Validate variable name
             if (!is_valid_identifier(name)) {
-                error_message("export: invalid variable name: %s", name);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid variable name: %s", name);
                 free(name);
                 return 1;
             }
@@ -1537,7 +1542,10 @@ int bin_export(int argc, char **argv) {
 
             // Validate variable name
             if (!is_valid_identifier(name)) {
-                error_message("export: invalid variable name: %s", name);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid variable name: %s", name);
                 return 1;
             }
 
@@ -1552,7 +1560,10 @@ int bin_export(int argc, char **argv) {
         } else {
             // Just export existing variable
             if (!is_valid_identifier(argv[i])) {
-                error_message("export: '%s' not a valid identifier", argv[i]);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "'%s' not a valid identifier", argv[i]);
                 return 1;
             }
 
@@ -4860,14 +4871,46 @@ int bin_local(int argc, char **argv) {
     // Get the current symbol table manager
     symtable_manager_t *manager = symtable_get_global_manager();
     if (!manager) {
-        error_message("local: symbol table not available");
+        executor_error_report(current_executor, SHELL_ERR_STATE_CORRUPTION,
+                              builtin_get_source_location(),
+                              "symbol table not available");
         return 1;
     }
 
     // Check if we're in a function scope
     size_t current_level = symtable_current_level(manager);
     if (current_level == 0) {
-        error_message("local: can only be used in a function");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_FUNCTION_ERROR, SHELL_SEVERITY_ERROR,
+                               loc, "can only be used in a function");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "local is only valid inside a function body");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: local: can only be used in a function\n");
+        }
         return 1;
     }
 
@@ -4891,7 +4934,10 @@ int bin_local(int argc, char **argv) {
                 opt_nameref = true;
                 break;
             default:
-                fprintf(stderr, "local: -%c: invalid option\n", opt[i]);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_OPTION,
+                                      builtin_get_source_location(),
+                                      "-%c: invalid option", opt[i]);
                 return 2;
             }
         }
@@ -4908,7 +4954,9 @@ int bin_local(int argc, char **argv) {
             size_t name_len = eq - arg;
             char *name = malloc(name_len + 1);
             if (!name) {
-                error_message("local: memory allocation failed");
+                executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
+                                      builtin_get_source_location(),
+                                      "memory allocation failed");
                 return 1;
             }
 
@@ -4917,14 +4965,18 @@ int bin_local(int argc, char **argv) {
 
             // Validate variable name
             if (!name[0] || (!isalpha(name[0]) && name[0] != '_')) {
-                error_message("local: invalid variable name");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid variable name");
                 free(name);
                 return 1;
             }
 
             for (size_t j = 1; j < name_len; j++) {
                 if (!isalnum(name[j]) && name[j] != '_') {
-                    error_message("local: invalid variable name");
+                    executor_error_report(
+                        current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                        builtin_get_source_location(), "invalid variable name");
                     free(name);
                     return 1;
                 }
@@ -4936,14 +4988,20 @@ int bin_local(int argc, char **argv) {
                 // Create local nameref: local -n ref=target
                 symvar_flags_t flags = SYMVAR_LOCAL | SYMVAR_NAMEREF_FLAG;
                 if (symtable_set_nameref(manager, name, value, flags) != 0) {
-                    error_message("local: failed to create nameref");
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_SCOPE_ERROR,
+                                          builtin_get_source_location(),
+                                          "failed to create nameref");
                     free(name);
                     return 1;
                 }
             } else {
                 // Set the local variable
                 if (symtable_set_local_var(manager, name, value) != 0) {
-                    error_message("local: failed to set variable");
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_SCOPE_ERROR,
+                                          builtin_get_source_location(),
+                                          "failed to set variable");
                     free(name);
                     return 1;
                 }
@@ -4954,26 +5012,65 @@ int bin_local(int argc, char **argv) {
             // Declaration only: local var
             // Validate variable name
             if (!arg[0] || (!isalpha(arg[0]) && arg[0] != '_')) {
-                error_message("local: invalid variable name");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid variable name");
                 return 1;
             }
 
             for (size_t j = 1; arg[j]; j++) {
                 if (!isalnum(arg[j]) && arg[j] != '_') {
-                    error_message("local: invalid variable name");
+                    executor_error_report(
+                        current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                        builtin_get_source_location(), "invalid variable name");
                     return 1;
                 }
             }
 
             if (opt_nameref) {
-                error_message(
-                    "local: -n requires assignment (local -n ref=target)");
+                source_location_t loc = builtin_get_source_location();
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                    "-n requires assignment");
+                if (err) {
+                    if (current_executor && SOURCE_LOC_VALID(loc)) {
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
+                        if (src_line) {
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
+                            free(src_line);
+                        }
+                    }
+                    if (current_executor) {
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
+                             i++) {
+                            if (current_executor->context_stack[i]) {
+                                shell_error_push_context(
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
+                            }
+                        }
+                    }
+                    shell_error_set_suggestion(
+                        err, "use 'local -n ref=target' to bind a nameref");
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                } else {
+                    fprintf(stderr, "lush: local: -n requires assignment "
+                                    "(local -n ref=target)\n");
+                }
                 return 1;
             }
 
             // Declare the local variable with empty value
             if (symtable_set_local_var(manager, arg, "") != 0) {
-                error_message("local: failed to declare variable");
+                executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                                      builtin_get_source_location(),
+                                      "failed to declare variable");
                 return 1;
             }
         }
@@ -5137,7 +5234,10 @@ int bin_declare(int argc, char **argv) {
                 opt_trace = true;
                 break;
             default:
-                fprintf(stderr, "declare: -%c: invalid option\n", opt[i]);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_OPTION,
+                                      builtin_get_source_location(),
+                                      "-%c: invalid option", opt[i]);
                 return 2;
             }
         }
@@ -5146,13 +5246,75 @@ int bin_declare(int argc, char **argv) {
 
     // Can't have both -l and -u
     if (opt_lowercase && opt_uppercase) {
-        fprintf(stderr, "declare: cannot use -l and -u simultaneously\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR,
+                               loc, "cannot use -l and -u simultaneously");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "choose one of -l (lowercase) or -u (uppercase)");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: declare: cannot use -l and -u simultaneously\n");
+        }
         return 1;
     }
 
     // Can't have both -a and -A
     if (opt_indexed_array && opt_assoc_array) {
-        fprintf(stderr, "declare: cannot use -a and -A simultaneously\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR,
+                               loc, "cannot use -a and -A simultaneously");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "choose one of -a (indexed) or -A (associative)");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: declare: cannot use -a and -A simultaneously\n");
+        }
         return 1;
     }
 
@@ -5182,7 +5344,9 @@ int bin_declare(int argc, char **argv) {
             size_t name_len = eq - arg;
             name = malloc(name_len + 1);
             if (!name) {
-                fprintf(stderr, "declare: memory allocation failed\n");
+                executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
+                                      builtin_get_source_location(),
+                                      "memory allocation failed");
                 return 1;
             }
             strncpy(name, arg, name_len);
@@ -5192,7 +5356,9 @@ int bin_declare(int argc, char **argv) {
             // Declaration only: declare var
             name = strdup(arg);
             if (!name) {
-                fprintf(stderr, "declare: memory allocation failed\n");
+                executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
+                                      builtin_get_source_location(),
+                                      "memory allocation failed");
                 return 1;
             }
             value = NULL;
@@ -5200,14 +5366,18 @@ int bin_declare(int argc, char **argv) {
 
         // Validate variable name
         if (!name[0] || (!isalpha(name[0]) && name[0] != '_')) {
-            fprintf(stderr, "declare: `%s': not a valid identifier\n", name);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "`%s': not a valid identifier", name);
             free(name);
             return 1;
         }
         for (size_t j = 1; name[j]; j++) {
             if (!isalnum(name[j]) && name[j] != '_') {
-                fprintf(stderr, "declare: `%s': not a valid identifier\n",
-                        name);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "`%s': not a valid identifier", name);
                 free(name);
                 return 1;
             }
@@ -5229,10 +5399,14 @@ int bin_declare(int argc, char **argv) {
                 if (var_value) {
                     printf("declare -- %s=\"%s\"\n", name, var_value);
                 } else {
-                    fprintf(stderr, "declare: %s: not found\n", name);
+                    executor_error_report(
+                        current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                        builtin_get_source_location(), "%s: not found", name);
                 }
             } else {
-                fprintf(stderr, "declare: %s: not found\n", name);
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "%s: not found", name);
             }
             free(name);
             continue;
@@ -5242,7 +5416,9 @@ int bin_declare(int argc, char **argv) {
         if (opt_indexed_array || opt_assoc_array) {
             array_value_t *arr = symtable_array_create(opt_assoc_array);
             if (!arr) {
-                fprintf(stderr, "declare: failed to create array\n");
+                executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                                      builtin_get_source_location(),
+                                      "failed to create array");
                 free(name);
                 return 1;
             }
@@ -5310,7 +5486,9 @@ int bin_declare(int argc, char **argv) {
             }
 
             if (symtable_set_array(name, arr) != 0) {
-                fprintf(stderr, "declare: failed to store array\n");
+                executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                                      builtin_get_source_location(),
+                                      "failed to store array");
                 symtable_array_free(arr);
                 free(name);
                 return 1;
@@ -5320,7 +5498,10 @@ int bin_declare(int argc, char **argv) {
         else if (opt_integer) {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (!manager) {
-                fprintf(stderr, "declare: symbol table not available\n");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_STATE_CORRUPTION,
+                                      builtin_get_source_location(),
+                                      "symbol table not available");
                 free(name);
                 return 1;
             }
@@ -5342,12 +5523,49 @@ int bin_declare(int argc, char **argv) {
         else if (opt_nameref) {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (!manager) {
-                fprintf(stderr, "declare: symbol table not available\n");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_STATE_CORRUPTION,
+                                      builtin_get_source_location(),
+                                      "symbol table not available");
                 free(name);
                 return 1;
             }
             if (!value) {
-                fprintf(stderr, "declare: -n requires a target variable\n");
+                source_location_t loc = builtin_get_source_location();
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                    "-n requires a target variable");
+                if (err) {
+                    if (current_executor && SOURCE_LOC_VALID(loc)) {
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
+                        if (src_line) {
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
+                            free(src_line);
+                        }
+                    }
+                    if (current_executor) {
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
+                             i++) {
+                            if (current_executor->context_stack[i]) {
+                                shell_error_push_context(
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
+                            }
+                        }
+                    }
+                    shell_error_set_suggestion(
+                        err, "use 'declare -n ref=target' to bind a nameref");
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                } else {
+                    fprintf(stderr,
+                            "lush: declare: -n requires a target variable\n");
+                }
                 free(name);
                 return 1;
             }
@@ -5356,7 +5574,9 @@ int bin_declare(int argc, char **argv) {
                 flags |= SYMVAR_LOCAL;
             }
             if (symtable_set_nameref(manager, name, value, flags) != 0) {
-                fprintf(stderr, "declare: failed to create nameref\n");
+                executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
+                                      builtin_get_source_location(),
+                                      "failed to create nameref");
                 free(name);
                 return 1;
             }
@@ -5365,7 +5585,10 @@ int bin_declare(int argc, char **argv) {
         else {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (!manager) {
-                fprintf(stderr, "declare: symbol table not available\n");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_STATE_CORRUPTION,
+                                      builtin_get_source_location(),
+                                      "symbol table not available");
                 free(name);
                 return 1;
             }
@@ -5464,7 +5687,9 @@ int bin_readonly(int argc, char **argv) {
         // No arguments - print all readonly variables
         symtable_manager_t *manager = symtable_get_global_manager();
         if (!manager) {
-            error_message("readonly: symbol table not available");
+            executor_error_report(current_executor, SHELL_ERR_STATE_CORRUPTION,
+                                  builtin_get_source_location(),
+                                  "symbol table not available");
             return 1;
         }
 
@@ -5486,7 +5711,10 @@ int bin_readonly(int argc, char **argv) {
 
             // Validate variable name
             if (!is_valid_identifier(name)) {
-                error_message("readonly: '%s' not a valid identifier", name);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "'%s' not a valid identifier", name);
                 *equals = '='; // Restore the string
                 return 1;
             }
@@ -5502,7 +5730,10 @@ int bin_readonly(int argc, char **argv) {
         } else {
             // No assignment: readonly var (make existing variable readonly)
             if (!is_valid_identifier(arg)) {
-                error_message("readonly: '%s' not a valid identifier", arg);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "'%s' not a valid identifier", arg);
                 return 1;
             }
 
