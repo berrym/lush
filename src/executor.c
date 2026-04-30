@@ -6807,9 +6807,19 @@ static int execute_builtin_command(executor_t *executor, char **argv,
                 argc++;
             }
 
+            /* Push "in builtin '<name>'" onto the executor's context
+             * stack for the duration of this builtin invocation.
+             * executor_error_report() (the canonical wrapper) walks
+             * the context stack at display time, so any error a
+             * builtin emits — directly or via the wrapper — picks up
+             * this context frame automatically. Per-builtin sites no
+             * longer need to push it themselves. */
+            executor_push_context(executor, loc, "in builtin '%s'", argv[0]);
+
             int result = builtins[i].func(argc, argv);
 
-            // Restore previous loc + clear global executor
+            // Restore previous loc + clear builtin context + global executor
+            executor_pop_context(executor);
             (void)builtin_swap_source_location(saved_loc);
             current_executor = NULL;
 

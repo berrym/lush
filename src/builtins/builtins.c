@@ -2575,7 +2575,18 @@ int bin_let(int argc, char **argv) {
             shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
                                loc, "missing arithmetic expression");
         if (error) {
-            /* Add executor context stack if available */
+            /* Source-line snippet block from executor's batch text. */
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(error, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            /* Walk executor's context stack — already includes
+             * "in builtin 'let'" pushed by the dispatcher. */
             if (current_executor) {
                 for (size_t i = 0; i < current_executor->context_depth; i++) {
                     if (current_executor->context_stack[i]) {
@@ -2584,7 +2595,6 @@ int bin_let(int argc, char **argv) {
                     }
                 }
             }
-            shell_error_push_context(error, "in builtin 'let'");
             shell_error_set_detail(
                 error, "let requires at least one expression to evaluate");
             shell_error_set_suggestion(
@@ -2616,7 +2626,19 @@ int bin_let(int argc, char **argv) {
                 err_code, SHELL_SEVERITY_ERROR, loc,
                 "invalid expression '%s'", argv[i]);
             if (error) {
-                /* Add executor context stack if available */
+                /* Source-line snippet block from executor's batch text. */
+                if (current_executor && SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(error, src_line,
+                                                    loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                /* Walk executor's context stack — already includes
+                 * "in builtin 'let'" pushed by the dispatcher. */
                 if (current_executor) {
                     for (size_t i = 0; i < current_executor->context_depth;
                          i++) {
@@ -2627,7 +2649,6 @@ int bin_let(int argc, char **argv) {
                         }
                     }
                 }
-                shell_error_push_context(error, "in builtin 'let'");
                 shell_error_push_context(error, "evaluating argument %d of %d",
                                          i, argc - 1);
                 if (err_while) {
