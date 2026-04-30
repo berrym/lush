@@ -6282,7 +6282,9 @@ int bin_hash(int argc, char **argv) {
     // Handle -t option (print remembered pathname)
     if (argc >= 2 && strcmp(argv[1], "-t") == 0) {
         if (argc < 3) {
-            error_message("hash: -t: option requires an argument");
+            executor_error_report(current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "-t: option requires an argument");
             return 2;
         }
         int ret = 0;
@@ -6293,7 +6295,9 @@ int bin_hash(int argc, char **argv) {
             if (path) {
                 printf("%s\n", path);
             } else {
-                error_message("hash: %s: not found", utility);
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "%s: not found", utility);
                 ret = 1;
             }
         }
@@ -6302,7 +6306,8 @@ int bin_hash(int argc, char **argv) {
 
     // Handle invalid options
     if (argc >= 2 && argv[1][0] == '-' && strcmp(argv[1], "-r") != 0) {
-        error_message("hash: invalid option");
+        executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                              builtin_get_source_location(), "invalid option");
         return 2;
     }
 
@@ -6341,7 +6346,9 @@ int bin_hash(int argc, char **argv) {
             ht_strstr_insert(command_hash, utility, path);
             free(path);
         } else {
-            error_message("hash: %s: not found", utility);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "%s: not found", utility);
             return 1;
         }
     }
