@@ -20,6 +20,7 @@
 #include "lle/history.h"
 #include "lle/lle_editor.h"
 #include "lle/lle_shell_integration.h"
+#include "shell_error.h"
 #include "symtable.h"
 
 #include <ctype.h>
@@ -244,7 +245,9 @@ static int execute_command(const char *command) {
 
     executor_t *executor = executor_new();
     if (!executor) {
-        fprintf(stderr, "fc: failed to create executor\n");
+        executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
+                              builtin_get_source_location(),
+                              "failed to create executor");
         return 1;
     }
 
@@ -252,8 +255,15 @@ static int execute_command(const char *command) {
      * surrounding source, so line 1. */
     int exit_status = executor_execute_command_line(executor, command, 1);
 
-    if (executor_has_error(executor)) {
-        fprintf(stderr, "fc: %s\n", executor_error(executor));
+    /* Forward only legacy-text errors from the sub-executor. Structured
+     * errors set executor->error_message to NULL after displaying, so
+     * this branch fires solely for the diminishing pool of bare-string
+     * errors that haven't been migrated yet. Wrapping that opaque text
+     * in a fresh shell_error layer here would obscure the real origin,
+     * so keep a plain forwarding print. */
+    const char *err_msg = executor_error(executor);
+    if (executor_has_error(executor) && err_msg) {
+        fprintf(stderr, "lush: fc: %s\n", err_msg);
     }
 
     executor_free(executor);
@@ -329,7 +339,9 @@ static bool parse_range(lle_history_core_t *history, const char *first_str,
                         const char *last_str, fc_options_t *opts) {
     size_t count = get_history_count(history);
     if (count == 0) {
-        fprintf(stderr, "fc: no history available\n");
+        executor_error_report(current_executor, SHELL_ERR_HISTORY_ERROR,
+                              builtin_get_source_location(),
+                              "no history available");
         return false;
     }
 
@@ -345,15 +357,19 @@ static bool parse_range(lle_history_core_t *history, const char *first_str,
         }
     } else {
         if (!resolve_range_spec(history, first_str, count, &first_idx)) {
-            fprintf(stderr, "fc: %s: history specification out of range\n",
-                    first_str);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "%s: history specification out of range",
+                                  first_str);
             return false;
         }
 
         if (last_str) {
             if (!resolve_range_spec(history, last_str, count, &last_idx)) {
-                fprintf(stderr, "fc: %s: history specification out of range\n",
-                        last_str);
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(),
+                    "%s: history specification out of range", last_str);
                 return false;
             }
         } else {
@@ -397,7 +413,9 @@ static bool parse_range(lle_history_core_t *history, const char *first_str,
  */
 static int fc_list(lle_history_core_t *history, fc_options_t *opts) {
     if (!opts->range_valid) {
-        fprintf(stderr, "fc: invalid range for list operation\n");
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "invalid range for list operation");
         return 1;
     }
 
@@ -445,7 +463,9 @@ static int fc_list(lle_history_core_t *history, fc_options_t *opts) {
  */
 static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
     if (!opts->range_valid) {
-        fprintf(stderr, "fc: invalid range for edit operation\n");
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "invalid range for edit operation");
         return 1;
     }
 
@@ -454,7 +474,9 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
     size_t content_size = 0;
     char *content = malloc(content_capacity);
     if (!content) {
-        fprintf(stderr, "fc: memory allocation failed\n");
+        executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
+                              builtin_get_source_location(),
+                              "memory allocation failed");
         return 1;
     }
     content[0] = '\0';
@@ -472,7 +494,10 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
                 char *new_content = realloc(content, content_capacity);
                 if (!new_content) {
                     free(content);
-                    fprintf(stderr, "fc: memory allocation failed\n");
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_OUT_OF_MEMORY,
+                                          builtin_get_source_location(),
+                                          "memory allocation failed");
                     return 1;
                 }
                 content = new_content;
@@ -486,7 +511,9 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
 
     if (content_size == 0) {
         free(content);
-        fprintf(stderr, "fc: no commands in specified range\n");
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "no commands in specified range");
         return 1;
     }
 
@@ -495,7 +522,9 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
     free(content);
 
     if (!temp_filename) {
-        fprintf(stderr, "fc: failed to create temporary file\n");
+        executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
+                              builtin_get_source_location(),
+                              "failed to create temporary file");
         return 1;
     }
 
@@ -505,7 +534,9 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
     if (!editor_cmd) {
         unlink(temp_filename);
         free(temp_filename);
-        fprintf(stderr, "fc: no editor available\n");
+        executor_error_report(current_executor, SHELL_ERR_FEATURE_DISABLED,
+                              builtin_get_source_location(),
+                              "no editor available");
         return 1;
     }
 
@@ -519,8 +550,10 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
     if (editor_status != 0) {
         unlink(temp_filename);
         free(temp_filename);
-        fprintf(stderr, "fc: editor failed with status %d\n",
-                WEXITSTATUS(editor_status));
+        executor_error_report(current_executor, SHELL_ERR_EXEC_FAILED,
+                              builtin_get_source_location(),
+                              "editor failed with status %d",
+                              WEXITSTATUS(editor_status));
         return 1;
     }
 
@@ -530,7 +563,9 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
     free(temp_filename);
 
     if (!edited_content) {
-        fprintf(stderr, "fc: failed to read edited content\n");
+        executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
+                              builtin_get_source_location(),
+                              "failed to read edited content");
         return 1;
     }
 
@@ -586,7 +621,9 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
  */
 static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
     if (!opts->range_valid) {
-        fprintf(stderr, "fc: invalid range for substitution\n");
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "invalid range for substitution");
         return 1;
     }
 
@@ -594,7 +631,9 @@ static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
     if (lle_history_get_entry_by_index(history, (size_t)opts->first, &entry) !=
             LLE_SUCCESS ||
         !entry || !entry->command) {
-        fprintf(stderr, "fc: history entry not found\n");
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "history entry not found");
         return 1;
     }
 
@@ -610,8 +649,10 @@ static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
     /* Find pattern in command */
     const char *match = strstr(original, opts->old_pattern);
     if (!match) {
-        fprintf(stderr, "fc: pattern '%s' not found in command\n",
-                opts->old_pattern);
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "pattern '%s' not found in command",
+                              opts->old_pattern);
         return 1;
     }
 
@@ -624,7 +665,9 @@ static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
 
     char *new_command = malloc(prefix_len + new_len + suffix_len + 1);
     if (!new_command) {
-        fprintf(stderr, "fc: memory allocation failed\n");
+        executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
+                              builtin_get_source_location(),
+                              "memory allocation failed");
         return 1;
     }
 
@@ -690,7 +733,9 @@ static void fc_usage(void) {
 int bin_fc(int argc, char **argv) {
     lle_history_core_t *history = get_lle_history();
     if (!history) {
-        fprintf(stderr, "fc: history system not available\n");
+        executor_error_report(current_executor, SHELL_ERR_STATE_CORRUPTION,
+                              builtin_get_source_location(),
+                              "history system not available");
         return 1;
     }
 
@@ -728,7 +773,10 @@ int bin_fc(int argc, char **argv) {
         if (optind < argc && strchr(argv[optind], '=')) {
             if (!parse_substitution_pattern(argv[optind], &opts.old_pattern,
                                             &opts.new_pattern)) {
-                fprintf(stderr, "fc: invalid substitution pattern\n");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid substitution pattern");
                 free(opts.editor);
                 return 1;
             }
