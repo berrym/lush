@@ -385,6 +385,69 @@ size_t parser_get_recursion_depth(parser_t *parser) {
     return parser ? parser->recursion_depth : 0;
 }
 
+/* Parser loop-progress guard.
+ *
+ * Defense against parser-loop livelock: every body-parsing loop must
+ * consume tokens or it will spin forever, allocating per iteration. See
+ * #82 for the original incident -- a 1.6 GB / 89% CPU interactive shell
+ * stuck for 3 days inside parse_case_statement, with 100% of CPU samples
+ * concentrated on one while-condition. The triggering input was lost
+ * (typed interactively into a now-dead PID), so static analysis could
+ * not pinpoint the offending no-advance path. This guard is the
+ * defensive measure the issue itself recommended: track the start
+ * position of the current token across iterations and abort with a
+ * structured error if it does not advance for N consecutive iterations.
+ *
+ * The bound is small because every parse-body iteration MUST consume
+ * at least one token; even one no-advance iteration is a bug. We allow
+ * a small handful in case of edge-case interactions, but anything past
+ * that is a livelock and we fail loudly rather than burn memory.
+ */
+#define PARSER_LOOP_MAX_NO_PROGRESS 16
+
+typedef struct parser_loop_guard {
+    size_t last_pos;    /* current token's start position last iteration */
+    size_t no_progress; /* iterations seen at the same position */
+} parser_loop_guard_t;
+
+#define PARSER_LOOP_GUARD_INIT {.last_pos = SIZE_MAX, .no_progress = 0}
+
+/* Check whether the parse loop is making forward progress.
+ * Returns true if the loop should continue, false if the guard has
+ * detected livelock (in which case a structured error has been added
+ * to the parser and the caller must clean up and return NULL).
+ *
+ * @param parser    Parser context
+ * @param guard     Per-loop guard state (stack-allocated)
+ * @param loop_name Human-readable loop identifier for the error message
+ */
+static bool parser_loop_check_progress(parser_t *parser,
+                                       parser_loop_guard_t *guard,
+                                       const char *loop_name) {
+    if (!parser || !parser->tokenizer || !guard) {
+        return false;
+    }
+    size_t pos = parser->tokenizer->current
+                     ? parser->tokenizer->current->position
+                     : parser->tokenizer->position;
+    if (pos == guard->last_pos) {
+        guard->no_progress++;
+        if (guard->no_progress > PARSER_LOOP_MAX_NO_PROGRESS) {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_RESOURCE_LIMIT,
+                "this is a parser bug -- please report with a reproducer",
+                "parser loop '%s' made no progress for %d iterations "
+                "(stuck on token at position %zu)",
+                loop_name, PARSER_LOOP_MAX_NO_PROGRESS, pos);
+            return false;
+        }
+    } else {
+        guard->last_pos = pos;
+        guard->no_progress = 0;
+    }
+    return true;
+}
+
 /**
  * @brief Add a structured error with context and help hint
  */
@@ -3637,8 +3700,16 @@ static node_t *parse_case_statement(parser_t *parser) {
     skip_separators(parser);
 
     // Parse case items until 'esac'
+    parser_loop_guard_t items_guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_ESAC) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF)) {
+
+        if (!parser_loop_check_progress(parser, &items_guard,
+                                        "parse_case_statement items")) {
+            free_node_tree(case_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
 
         // Parse pattern(s)
         node_t *case_item = new_node(NODE_CASE_ITEM);
@@ -3766,8 +3837,20 @@ static node_t *parse_case_statement(parser_t *parser) {
 
         // Parse commands until case terminator (;;, ;&, ;;&) or esac
         node_t *commands = NULL;
+        parser_loop_guard_t body_guard = PARSER_LOOP_GUARD_INIT;
         while (!tokenizer_match(parser->tokenizer, TOK_ESAC) &&
                !tokenizer_match(parser->tokenizer, TOK_EOF)) {
+
+            if (!parser_loop_check_progress(parser, &body_guard,
+                                            "parse_case_statement body")) {
+                free_node_tree(case_item);
+                free_node_tree(case_node);
+                if (commands) {
+                    free_node_tree(commands);
+                }
+                parser_pop_context(parser);
+                return NULL;
+            }
 
             // Check for terminators before processing command
             if (tokenizer_match(parser->tokenizer, TOK_ESAC) ||
