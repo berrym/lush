@@ -389,7 +389,10 @@ int bin_cd(int argc __attribute__((unused)),
     // Get current directory before changing
     current_dir = getcwd(NULL, 0);
     if (!current_dir && errno != ENOENT) {
-        error_return("cd: getcwd");
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
+                              builtin_get_source_location(),
+                              "getcwd: %s", strerror(saved_errno));
         return 1;
     }
 
@@ -449,7 +452,10 @@ int bin_cd(int argc __attribute__((unused)),
                 }
             }
         }
-        error_return("cd");
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                              builtin_get_source_location(),
+                              "%s: %s", target_dir, strerror(saved_errno));
         free(current_dir);
         return 1;
     }
@@ -654,7 +660,10 @@ int bin_pwd(int argc, char **argv) {
     // Fallback - use getcwd
     char cwd[MAXLINE] = {'\0'};
     if (getcwd(cwd, MAXLINE) == NULL) {
-        error_return("pwd");
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
+                              builtin_get_source_location(),
+                              "getcwd: %s", strerror(saved_errno));
         return 1;
     }
 
@@ -8988,7 +8997,10 @@ int bin_command(int argc, char **argv) {
 int bin_pushd(int argc, char **argv) {
     char *cwd = getcwd(NULL, 0);
     if (!cwd) {
-        error_return("pushd: getcwd");
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
+                              builtin_get_source_location(),
+                              "getcwd: %s", strerror(saved_errno));
         return 1;
     }
 
@@ -9072,7 +9084,10 @@ int bin_pushd(int argc, char **argv) {
         dirstack_push(cwd);
 
         if (chdir(old_top) < 0) {
-            error_return("pushd");
+            int saved_errno = errno;
+            executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                                  builtin_get_source_location(),
+                                  "%s: %s", old_top, strerror(saved_errno));
             // Restore stack state
             dirstack_pop();
             dirstack_push(old_top);
@@ -9190,7 +9205,10 @@ int bin_pushd(int argc, char **argv) {
 
             target = dirstack_peek(0);
             if (chdir(target) < 0) {
-                error_return("pushd");
+                int saved_errno = errno;
+                executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                                      builtin_get_source_location(),
+                                      "%s: %s", target, strerror(saved_errno));
                 free(cwd);
                 return 1;
             }
@@ -9210,7 +9228,10 @@ int bin_pushd(int argc, char **argv) {
 
     // Push current directory and cd to new one
     if (chdir(arg) < 0) {
-        error_return("pushd");
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                              builtin_get_source_location(),
+                              "%s: %s", arg, strerror(saved_errno));
         free(cwd);
         return 1;
     }
@@ -9318,7 +9339,10 @@ int bin_popd(int argc, char **argv) {
         char *cwd = getcwd(NULL, 0);
 
         if (chdir(dir) < 0) {
-            error_return("popd");
+            int saved_errno = errno;
+            executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
+                                  builtin_get_source_location(),
+                                  "%s: %s", dir, strerror(saved_errno));
             // Put it back
             dirstack_push(dir);
             free(dir);
