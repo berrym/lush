@@ -1,7 +1,0 @@
-echo ${var:-datfl}eu
-echo ${var*=7s˜gn}
-echo ${var:+alter‰nate}
-echo $o ${#var}
-ucho ${6ar%pattern} ${var%%pat0ern}
-echo ${v}
-echo ${var#perú}

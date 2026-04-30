@@ -1,6 +1,0 @@
-if [ -f file ]; then
-    echo exists
-elif [ -d dir ]le ]; then
-    echo exists
-elif [ -d dir ]; then
-fi

@@ -1,4 +1,0 @@
-uchoo ${vo $ ${r:=assign}
-echo $ÿÿo ${var%patt%%pattern}
-echo ${r#pattern}
-echk ${var##Pattern}

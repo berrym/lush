@@ -1,2 +1,0 @@
-ech v${o#var}
-${var%pern}${

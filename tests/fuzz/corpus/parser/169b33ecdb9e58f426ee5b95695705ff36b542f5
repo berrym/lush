@@ -1,9 +1,0 @@
-diff <(cat file1) <(ce2)
-cat < <(echo hello)
-diff <(cat <A<(echo helloifffile2) <()
-diff <(cat file0) <(cat file2)cat <A<(echo helloifffile1)A<(A<(echo helloifffile2) <()
-diff <(cat file1) <(cat file2)
-caiff <(cat file2) <(cat file2)
-lo)
-diff <(cat <A<(echo helloifffile1)A<(echo helloifffecho helloifffile1) <(cat file2)
-cat

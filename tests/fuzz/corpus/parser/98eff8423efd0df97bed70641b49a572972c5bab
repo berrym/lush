@@ -1,8 +1,0 @@
-case "$1" in
-    start)
-             ;;
-    stop)
-;;
-    st    a) ;;
-    b) echo b;;
-esac

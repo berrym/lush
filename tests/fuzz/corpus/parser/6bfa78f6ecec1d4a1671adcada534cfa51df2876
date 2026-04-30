@@ -1,6 +1,0 @@
-{:{case "$1" in
- P)
-  tong
-  case "$x" in
-    a) ;;
-    b) e

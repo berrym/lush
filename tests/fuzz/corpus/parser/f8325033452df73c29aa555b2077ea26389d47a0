@@ -1,8 +1,0 @@
-if [ -f file ]; then
-    for i in $(cat -f file ]; then
-    for i in $(cat file); do
- *      case "$ file); do
-     fi case "$i" in
-            *pattern*)c
-    done
-fi

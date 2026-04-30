@@ -1,3 +1,0 @@
-arr=(one two three)
-echo ${arr[0Ã]}
-arr[1]=TWO

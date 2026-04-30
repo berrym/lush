@@ -1,0 +1,6 @@
+d
+cat < <(ect file2)
+cat < <(ecat < <(echo hello)
+difffile1) <(A)
+diff <(cat file1) <(cat file1)
+cat

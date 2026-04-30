@@ -1,8 +1,0 @@
-echo ${var:-datfl}eu
-echo ${var:=7s˜gn}
-echo ${var:+alternate}
-echo $o ${#var}
-ucho ${6ar%pattern}
-echo ${var%%pat0ern}
-echo ${v}
-echo ${var#pern}

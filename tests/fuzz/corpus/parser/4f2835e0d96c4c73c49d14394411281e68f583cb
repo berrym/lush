@@ -1,4 +1,0 @@
-var="ld"
-for word in $var; do echo "[$word]"; done
-lis=("onesace two" "three four")
-for item in "${arr[@]}"; do echo "[$item]"; done

@@ -1,4 +1,0 @@
-{:{case "$1" in
- s)
-  echo stoppi!ng 
-*

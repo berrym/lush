@@ -1,6 +1,0 @@
-if [ -f file ]; then
-    for i in $(cat -f filcase "$ file); do
-     fi case "$i" in
-            *pattern*)c
-    done
-fi

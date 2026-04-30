@@ -1,8 +1,0 @@
-case "$x" in
-!   a) ;;
-    b) eco {$var:?error}
-echo $,{#var}
-echo $.{6ar%pattern}
-echo ${varor}
-echo $,{#var}
-echo $.{6ar%pattern} -&  

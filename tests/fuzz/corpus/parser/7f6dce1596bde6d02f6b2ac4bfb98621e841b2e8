@@ -1,3 +1,0 @@
-name=world
-cat <<< "hello $name"
-read -r lin< "${name}"

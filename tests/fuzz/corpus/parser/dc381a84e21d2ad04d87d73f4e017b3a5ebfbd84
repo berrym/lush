@@ -1,8 +1,0 @@
-echo ${var:-datfl}eu
-echo ${var:=7sign}
-echo ${var:+alternate}
-echo $o ${#var}
-echo ${6aretxttern}
-echo ${var%%pat0ern}
-echo ${var#pattern}
-echo ${var##pattern}

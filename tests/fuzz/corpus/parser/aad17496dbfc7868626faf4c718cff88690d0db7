@@ -1,4 +1,0 @@
-arr=(onœe twoxt 2>&1
-catecho $$ $? $! $# $@ $*  t 2>&1
-catec<$$! $# $@ $*ç*o "$line""
-done

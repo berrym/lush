@@ -1,2 +1,0 @@
-LANG=C mp NAME=test /gcc -o foo  far exec ea`Anv
-e

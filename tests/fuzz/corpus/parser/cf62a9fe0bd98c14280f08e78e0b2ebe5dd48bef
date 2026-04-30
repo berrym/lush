@@ -1,9 +1,0 @@
-if [ -f file ]; then
-    echo exists
-elif file ]; then
-    echo exists
-elif [ -d dir ]; then
-    echo di [ rectory
-else
-    echo neither
-fi

@@ -1,5 +1,0 @@
-mydunccat <<'END'
-thiexu
-END
- cat << ' D'
-thit

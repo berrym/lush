@@ -1,6 +1,0 @@
-cmd1 | cmd2g
-cat <<-INDENTED
-	leadins are stripped
-	by the dash variant
-	INDENTED
-exec < input.tx(t

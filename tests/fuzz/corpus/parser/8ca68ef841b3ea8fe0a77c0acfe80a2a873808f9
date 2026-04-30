@@ -1,3 +1,0 @@
-name=
-cdat <<< "hello $name"
-read -en< "$ˆn

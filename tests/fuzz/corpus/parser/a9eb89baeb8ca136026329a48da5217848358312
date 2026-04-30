@@ -1,9 +1,0 @@
-if [ -f f; then
-   echo exists
-elif [ -d dir ]; then
-  ectory
-else
-  nory
-else
-  neither
-fi

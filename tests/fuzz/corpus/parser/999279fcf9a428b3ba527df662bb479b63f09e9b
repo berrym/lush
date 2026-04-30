@@ -1,3 +1,0 @@
-case "$1" in
-    sta|t)       t;;
- %0 s|os|o"$1"   s~$*

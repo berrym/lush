@@ -1,9 +1,0 @@
-case "$1" in
-    start!)
-       
-    ;;
-    stp)
-   
-esac
-;;
-esac

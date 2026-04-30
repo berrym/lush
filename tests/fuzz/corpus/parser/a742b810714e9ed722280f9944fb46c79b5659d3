@@ -1,2 +1,0 @@
-ltent |& cat
-make >&1 | tee build.l=g

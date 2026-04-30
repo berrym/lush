@@ -1,5 +1,0 @@
-c&>>echo ${var: ${var:=aho ${cho ${var:?error}
-echo ${#var}
-echo ${6r%pattec&>>?>?c&rn}
-e>>?>>>cho ${vaar:=aho ${var:+alt{v>ar#pattern}
-echo ${var##pattern}

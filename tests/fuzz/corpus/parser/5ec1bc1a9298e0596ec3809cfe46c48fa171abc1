@@ -1,2 +1,0 @@
-LANG=C mp NAME=test /gcc -o foo  fo.c
-PATH=/usr/bin:$PATH FOO=bar exec env

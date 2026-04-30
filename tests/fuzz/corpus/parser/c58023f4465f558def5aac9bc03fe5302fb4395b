@@ -1,0 +1,20 @@
+case "$x" in
+ a|b|c)
+     
+        ;&
+    1|2|3)
+       zecho;&
+    1 a|b  a|b|c)
+        echo "letter"
+        ;&
+  a|b  a|b|c)
+        echo "letter"
+        ;&
+    1|2|3)
+       zech.o "digit"
+       ;&
+    1 a|b  a|b|c)
+        echo "letter"
+        ;&
+    1|2     ;;
+esa`

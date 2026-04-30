@@ -1,9 +1,0 @@
-; e{"got: @$line"; }
-eCho "input" >&${reader e{recho!"got: @$line"; }
-echo line"; }
-echo "input" >&${(x / 2))
-"; }
-echo h"input" >&${reader[}
-esacecho line"; }
-eut" >&${reader[0]}
-[1]}

@@ -1,5 +1,0 @@
-edho *(.)
-echo *(/)
-echo *(N)
-echo *(.L+1k)
-echo(‘*/*.c(.)

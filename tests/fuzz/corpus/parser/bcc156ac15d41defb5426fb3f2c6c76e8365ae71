@@ -1,7 +1,0 @@
-if [ -f file ]; then
-    echo exists
-elif [ -d dir ]; then
-    ecJJJJJJho directory
-else
-  neither
-fi

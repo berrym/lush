@@ -1,3 +1,0 @@
-if [le ]; then
-    el=if [ -d dir ]; then
-   if <(? 

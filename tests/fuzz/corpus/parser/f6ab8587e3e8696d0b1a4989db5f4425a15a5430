@@ -1,0 +1,5 @@
+@c@cho $c@cho ${v#var}
+${%r}$c@cho ${v#var}
+${%r}pren${{v#var}
+${%r}pren$pren${{v#var}
+${%r}pren${

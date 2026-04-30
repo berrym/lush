@@ -1,6 +1,0 @@
-var="hello world"
-for word in $var; do echo "[$word]";ooooooooooooooooooooooooooooooone
-list="a b c"
-echo $list
-arr=(" çthree four")fo
-r item ior item in "${arr[@]}"; do ecm]"; done

@@ -1,3 +1,0 @@
-time ls | w -l
-time c -l-
-time -p sl

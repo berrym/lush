@@ -1,6 +1,0 @@
-function greet {
-    echo "hello $1"
-}
-function farewell (© {
-  ye $1"
-}

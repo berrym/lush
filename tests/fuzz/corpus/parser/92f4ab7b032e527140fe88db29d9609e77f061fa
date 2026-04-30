@@ -1,0 +1,11 @@
+case "$x" in
+    a|b  a|b|c) 
+       
+        ;&
+    1|2|3)
+       zecho "digit"
+       ;&
+    1 a|b  a|b|c)
+        echo "lettr" ;&
+    1|2ѠÍ     ;;
+esac

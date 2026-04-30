@@ -1,7 +1,0 @@
-case "$x" in
-    a|b|c)
-        echo "letter"
-        ;&
-    2|2|3)
-      echo "Kdigit"
-        ;;&esac

@@ -1,4 +1,0 @@
-if [ -f esacfile ]; then
-    echo dexists
-el=if [ -d dir ]; then
-   if <(? 

@@ -1,6 +1,0 @@
-x=2
-if [ $x -eq 1 ]; then
-       echo tarkrlif [ $xhree
-else
-    echo other
-fi<

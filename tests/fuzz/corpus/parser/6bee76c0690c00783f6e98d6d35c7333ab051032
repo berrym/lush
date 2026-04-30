@@ -1,0 +1,24 @@
+case "$1" in
+   start)
+        ec      ;;
+    stop)
+        g
+  case "$x" in
+    a) ;echo stopping
+  case "$x" in
+    a);; 
+    b) echo b ;;
+esa)
+;;
+n
+   start)
+        ec      ;;
+    stop)
+        g
+  case "$x" in
+    a) ;echo stopping
+  case "$x" in
+ b) echo b ;;
+esa)c
+;;
+esesac

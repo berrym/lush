@@ -1,3 +1,0 @@
-while ad line; do
-  "$line"
-done < Âile
