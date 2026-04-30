@@ -65,7 +65,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline);
 static int execute_function_definition(executor_t *executor, node_t *function);
 static int execute_function_call(executor_t *executor,
                                  const char *function_name, char **argv,
-                                 int argc);
+                                 int argc, source_location_t loc);
 static bool is_function_defined(executor_t *executor,
                                 const char *function_name);
 static function_def_t *find_function(executor_t *executor,
@@ -73,8 +73,9 @@ static function_def_t *find_function(executor_t *executor,
 static int store_function(executor_t *executor, const char *function_name,
                           node_t *body, function_param_t *params,
                           int param_count);
-static int validate_function_parameters(function_def_t *func, char **argv,
-                                        int argc);
+static int validate_function_parameters(executor_t *executor,
+                                        function_def_t *func, char **argv,
+                                        int argc, source_location_t loc);
 static node_t *copy_ast_node(node_t *node);
 static node_t *copy_ast_chain(node_t *node);
 static int execute_if(executor_t *executor, node_t *if_node);
@@ -154,7 +155,8 @@ static char *slice_string_graphemes(const char *str, size_t str_len,
                                     int start_grapheme, int count);
 static char *expand_ansi_c_string(const char *str, size_t len);
 static bool is_assignment(const char *text);
-static int execute_assignment(executor_t *executor, const char *assignment);
+static int execute_assignment(executor_t *executor, const char *assignment,
+                              source_location_t loc);
 static bool match_pattern(const char *str, const char *pattern);
 
 /**
@@ -1209,7 +1211,7 @@ static int execute_command(executor_t *executor, node_t *command) {
 
     // Check for assignment
     if (command->val.str && is_assignment(command->val.str)) {
-        return execute_assignment(executor, command->val.str);
+        return execute_assignment(executor, command->val.str, command->loc);
     }
 
     // Note: Parameter expansions like ${CMD} in command position are handled
@@ -1230,8 +1232,9 @@ static int execute_command(executor_t *executor, node_t *command) {
 
     // Privileged mode security check
     if (argc > 0 && !is_privileged_command_allowed(argv[0])) {
-        fprintf(stderr, "lush: %s: restricted command in privileged mode\n",
-                argv[0]);
+        executor_error_report(
+            executor, SHELL_ERR_PERMISSION_DENIED, command->loc,
+            "%s: restricted command in privileged mode", argv[0]);
         for (int i = 0; i < argc; i++) {
             free(argv[i]);
         }
@@ -1428,8 +1431,9 @@ static int execute_command(executor_t *executor, node_t *command) {
     }
 
     if (is_function_defined(executor, filtered_argv[0])) {
-        result = execute_function_call(executor, filtered_argv[0],
-                                       filtered_argv, filtered_argc);
+        result =
+            execute_function_call(executor, filtered_argv[0], filtered_argv,
+                                  filtered_argc, command->loc);
     } else if (is_builtin_command(filtered_argv[0])) {
         // For builtin commands with stdout redirections, check if stdout is
         // captured. Only fork for "pure" builtins that don't modify shell
@@ -1577,7 +1581,7 @@ static int execute_command(executor_t *executor, node_t *command) {
                                                            filtered_argv[0])) {
                                 result = execute_function_call(
                                     executor, filtered_argv[0], filtered_argv,
-                                    filtered_argc);
+                                    filtered_argc, command->loc);
                             } else {
                                 // Execute the corrected external command
                                 result = execute_external_command_with_setup(
@@ -6541,7 +6545,10 @@ static int execute_external_command_with_setup(executor_t *executor,
             exit_code = 127; // Command not found
         }
         if (!redirect_stderr) {
-            fprintf(stderr, "lush: %s: %s\n", argv[0], strerror(errno));
+            int saved_errno = errno;
+            executor_error_report(executor, SHELL_ERR_EXEC_FAILED,
+                                  command ? command->loc : SOURCE_LOC_UNKNOWN,
+                                  "%s: %s", argv[0], strerror(saved_errno));
         }
         exit(exit_code);
     } else {
@@ -6852,7 +6859,8 @@ static bool is_assignment(const char *text) {
  * @param assignment Assignment string (VAR=value)
  * @return 0 on success, 1 on failure
  */
-static int execute_assignment(executor_t *executor, const char *assignment) {
+static int execute_assignment(executor_t *executor, const char *assignment,
+                              source_location_t loc) {
     if (!executor || !assignment) {
         return 1;
     }
@@ -6881,10 +6889,10 @@ static int execute_assignment(executor_t *executor, const char *assignment) {
 
     // Privileged mode security check for environment variable modifications
     if (!is_privileged_path_modification_allowed(var_name)) {
-        fprintf(stderr,
-                "lush: %s: cannot modify restricted variable in privileged "
-                "mode\n",
-                var_name);
+        executor_error_report(
+            executor, SHELL_ERR_PERMISSION_DENIED, loc,
+            "%s: cannot modify restricted variable in privileged mode",
+            var_name);
         free(var_name);
         return 1;
     }
@@ -7265,7 +7273,7 @@ static bool is_function_defined(executor_t *executor,
  */
 static int execute_function_call(executor_t *executor,
                                  const char *function_name, char **argv,
-                                 int argc) {
+                                 int argc, source_location_t loc) {
     if (!executor || !function_name) {
         return 1;
     }
@@ -7276,9 +7284,8 @@ static int execute_function_call(executor_t *executor,
         return 1;
     }
 
-    // Validate function parameters
-    if (validate_function_parameters(func, argv, argc) != 0) {
-        set_executor_error(executor, "Function parameter validation failed");
+    // Validate function parameters (errors already displayed structurally)
+    if (validate_function_parameters(executor, func, argv, argc, loc) != 0) {
         return 1;
     }
 
@@ -7483,8 +7490,9 @@ void free_function_params(function_param_t *params) {
  * @param argc Argument count (reserved for arity checking)
  * @return 0 on success, 1 on validation failure
  */
-static int validate_function_parameters(function_def_t *func, char **argv,
-                                        int argc) {
+static int validate_function_parameters(executor_t *executor,
+                                        function_def_t *func, char **argv,
+                                        int argc, source_location_t loc) {
     (void)argv; /* Reserved for argument type validation */
     (void)argc; /* Reserved for arity checking */
     if (!func) {
@@ -7510,8 +7518,9 @@ static int validate_function_parameters(function_def_t *func, char **argv,
             arg_index++;
         } else if (param->is_required) {
             // Required parameter missing
-            fprintf(stderr, "Error: Function '%s' requires parameter '%s'\n",
-                    func->name, param->name);
+            executor_error_report(executor, SHELL_ERR_FUNCTION_ERROR, loc,
+                                  "function '%s' requires parameter '%s'",
+                                  func->name, param->name);
             return 1;
         }
         // Optional parameter without argument - will use default
@@ -7520,10 +7529,10 @@ static int validate_function_parameters(function_def_t *func, char **argv,
 
     // Check for too many arguments
     if (arg_index < argc) {
-        fprintf(stderr,
-                "Error: Function '%s' called with %d arguments but only "
-                "accepts %d\n",
-                func->name, argc - 1, func->param_count);
+        executor_error_report(
+            executor, SHELL_ERR_FUNCTION_ERROR, loc,
+            "function '%s' called with %d arguments but only accepts %d",
+            func->name, argc - 1, func->param_count);
         return 1;
     }
 
@@ -12409,7 +12418,10 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         // tracking
         pid_t pid = lush_fork();
         if (pid == -1) {
-            fprintf(stderr, "Failed to fork for background process\n");
+            int saved_errno = errno;
+            executor_error_report(executor, SHELL_ERR_FORK_FAILED, command->loc,
+                                  "failed to fork for background process: %s",
+                                  strerror(saved_errno));
             return 1;
         }
 
@@ -12435,7 +12447,10 @@ int executor_execute_background(executor_t *executor, node_t *command) {
 
     pid_t pid = lush_fork();
     if (pid == -1) {
-        fprintf(stderr, "Failed to fork for background job\n");
+        int saved_errno = errno;
+        executor_error_report(executor, SHELL_ERR_FORK_FAILED, command->loc,
+                              "failed to fork for background job: %s",
+                              strerror(saved_errno));
         return 1;
     }
 
@@ -12539,12 +12554,16 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
 
     job_t *job = executor_find_job(executor, job_id);
     if (!job) {
-        fprintf(stderr, "fg: %d: no such job\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(), "%d: no such job",
+                              job_id);
         return 1;
     }
 
     if (job->state == JOB_DONE) {
-        fprintf(stderr, "fg: %d: job has terminated\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(),
+                              "%d: job has terminated", job_id);
         return 1;
     }
 
@@ -12604,12 +12623,16 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
 
     job_t *job = executor_find_job(executor, job_id);
     if (!job) {
-        fprintf(stderr, "bg: %d: no such job\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(), "%d: no such job",
+                              job_id);
         return 1;
     }
 
     if (job->state != JOB_STOPPED) {
-        fprintf(stderr, "bg: %d: job already in background\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(),
+                              "%d: job already in background", job_id);
         return 1;
     }
 
@@ -14054,8 +14077,9 @@ int executor_call_hook(executor_t *executor, const char *hook_name,
         argc = 1;
     }
 
-    // Call the function
-    int result = execute_function_call(executor, hook_name, argv, argc);
+    // Call the function (no AST node for hook invocations)
+    int result = execute_function_call(executor, hook_name, argv, argc,
+                                       SOURCE_LOC_UNKNOWN);
 
     // Handle return code translation (200-455 range is internal return signal)
     if (result >= 200 && result <= 455) {
