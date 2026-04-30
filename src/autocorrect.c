@@ -15,6 +15,7 @@
 
 #include "builtins.h"
 #include "executor.h"
+#include "init.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -138,6 +139,19 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     memset(results, 0, sizeof(correction_results_t));
 
     if (!autocorrect_config.enabled) {
+        return 0;
+    }
+
+    /* Skip autocorrect in non-interactive shells. The "did you mean ...?"
+     * suggestions are useful only when the user reads them; in scripts
+     * and tight command-not-found loops they are wasted CPU. Per #84
+     * sample profile, autocorrect_suggest_path_commands accounts for
+     * ~95% of per-iteration cost in a `for ((;;)); do bad; done` loop
+     * because every iteration walks $PATH, stat()s every binary, and
+     * runs Damerau-Levenshtein fuzzy matching. Skipping in non-
+     * interactive mode eliminates the amplifier entirely; interactive
+     * users still get suggestions on real misspellings. */
+    if (!is_interactive_shell()) {
         return 0;
     }
 
