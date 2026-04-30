@@ -857,13 +857,46 @@ int bin_type(int argc, char **argv) {
             name_start = i + 1;
             break;
         } else {
-            error_message("type: invalid option: %s", argv[i]);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "invalid option: %s", argv[i]);
             return 1;
         }
     }
 
     if (name_start >= argc) {
-        error_message("usage: type [-t] [-p] [-a] name [name ...]");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "missing name argument");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t k = 0; k < current_executor->context_depth &&
+                                   k < SHELL_ERROR_CONTEXT_MAX;
+                     k++) {
+                    if (current_executor->context_stack[k]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[k]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "usage: type [-t] [-p] [-a] name [name ...]");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: usage: type [-t] [-p] [-a] name [name ...]\n");
+        }
         return 1;
     }
 
@@ -1126,7 +1159,38 @@ int bin_echo(int argc, char **argv) {
  */
 int bin_printf(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "printf: usage: printf format [arguments ...]\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "missing format argument");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t k = 0; k < current_executor->context_depth &&
+                                   k < SHELL_ERROR_CONTEXT_MAX;
+                     k++) {
+                    if (current_executor->context_stack[k]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[k]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(err,
+                                       "usage: printf format [arguments ...]");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: printf: usage: printf format [arguments ...]\n");
+        }
         return 1;
     }
 
@@ -1702,7 +1766,10 @@ int bin_test(int argc, char **argv) {
     // Handle closing bracket for '[' command
     if (strcmp(argv[0], "[") == 0) {
         if (argc < 2 || strcmp(argv[argc - 1], "]") != 0) {
-            error_message("test: '[' command missing closing ']'");
+            executor_error_report(current_executor,
+                                  SHELL_ERR_MALFORMED_CONSTRUCT,
+                                  builtin_get_source_location(),
+                                  "'[' command missing closing ']'");
             return 2;
         }
         argc--; // Remove the closing bracket
@@ -1974,7 +2041,10 @@ int bin_read(int argc, char **argv) {
         if (strcmp(arg, "-p") == 0) {
             // -p prompt: Display prompt before reading
             if (opt_index + 1 >= argc) {
-                error_message("read: -p requires a prompt string");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-p requires a prompt string");
                 return 1;
             }
             prompt = argv[++opt_index];
@@ -1984,23 +2054,33 @@ int bin_read(int argc, char **argv) {
         } else if (strcmp(arg, "-t") == 0) {
             // -t timeout: Timeout after specified seconds
             if (opt_index + 1 >= argc) {
-                error_message("read: -t requires a timeout value");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-t requires a timeout value");
                 return 1;
             }
             timeout_secs = atoi(argv[++opt_index]);
             if (timeout_secs < 0) {
-                error_message("read: invalid timeout value");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid timeout value");
                 return 1;
             }
         } else if (strcmp(arg, "-n") == 0) {
             // -n nchars: Read only specified number of characters
             if (opt_index + 1 >= argc) {
-                error_message("read: -n requires a character count");
+                executor_error_report(current_executor,
+                                      SHELL_ERR_MISSING_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "-n requires a character count");
                 return 1;
             }
             nchars = atoi(argv[++opt_index]);
             if (nchars <= 0) {
-                error_message("read: invalid character count");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid character count");
                 return 1;
             }
         } else if (strcmp(arg, "-s") == 0) {
@@ -2011,7 +2091,9 @@ int bin_read(int argc, char **argv) {
             opt_index++;
             break;
         } else {
-            error_message("read: invalid option: %s", arg);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "invalid option: %s", arg);
             return 1;
         }
         opt_index++;
@@ -2019,14 +2101,47 @@ int bin_read(int argc, char **argv) {
 
     // Must have at least one variable name
     if (opt_index >= argc) {
-        error_message("read: usage: read [-p prompt] [-r] variable_name");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "missing variable name");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t k = 0; k < current_executor->context_depth &&
+                                   k < SHELL_ERROR_CONTEXT_MAX;
+                     k++) {
+                    if (current_executor->context_stack[k]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[k]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "usage: read [-p prompt] [-r] variable_name");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: read: usage: read [-p prompt] [-r] variable_name\n");
+        }
         return 1;
     }
 
     // Validate variable name
     char *varname = argv[opt_index];
     if (!is_valid_identifier(varname)) {
-        error_message("read: '%s' not a valid identifier", varname);
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "'%s' not a valid identifier", varname);
         return 1;
     }
 
@@ -4693,7 +4808,38 @@ int bin_times(int argc, char **argv) {
  */
 int bin_getopts(int argc, char **argv) {
     if (argc < 3) {
-        fprintf(stderr, "getopts: usage: getopts optstring name [args...]\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "missing required arguments");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t k = 0; k < current_executor->context_depth &&
+                                   k < SHELL_ERROR_CONTEXT_MAX;
+                     k++) {
+                    if (current_executor->context_stack[k]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[k]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "usage: getopts optstring name [args...]");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr,
+                    "lush: getopts: usage: getopts optstring name [args...]\n");
+        }
         return 1;
     }
 
@@ -4821,7 +4967,9 @@ int bin_getopts(int argc, char **argv) {
             char optarg_val[2] = {opt_char, '\0'};
             symtable_set_global("OPTARG", optarg_val);
         } else {
-            fprintf(stderr, "getopts: illegal option -- %c\n", opt_char);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "illegal option -- %c", opt_char);
             symtable_set_global(varname, "?");
             symtable_set_global("OPTARG", "");
         }
@@ -4869,9 +5017,10 @@ int bin_getopts(int argc, char **argv) {
                     char optarg_val[2] = {opt_char, '\0'};
                     symtable_set_global("OPTARG", optarg_val);
                 } else {
-                    fprintf(stderr,
-                            "getopts: option requires an argument -- %c\n",
-                            opt_char);
+                    executor_error_report(
+                        current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                        builtin_get_source_location(),
+                        "option requires an argument -- %c", opt_char);
                     symtable_set_global(varname, "?");
                     symtable_set_global("OPTARG", "");
                 }
@@ -8721,7 +8870,9 @@ int bin_command(int argc, char **argv) {
                 printf("%s is %s\n", name, path);
                 free(path);
             } else {
-                fprintf(stderr, "%s: not found\n", name);
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "%s: not found", name);
                 result = 1;
             }
         }
@@ -8762,7 +8913,9 @@ int bin_command(int argc, char **argv) {
     }
 
     if (!cmd_path) {
-        fprintf(stderr, "command: %s: not found\n", cmd_name);
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(), "%s: not found",
+                              cmd_name);
         return 127;
     }
 
@@ -8771,7 +8924,10 @@ int bin_command(int argc, char **argv) {
 
     if (pid < 0) {
         /* Fork failed */
-        error_return("command: fork");
+        int saved_errno = errno;
+        executor_error_report(current_executor, SHELL_ERR_FORK_FAILED,
+                              builtin_get_source_location(), "fork: %s",
+                              strerror(saved_errno));
         free(cmd_path);
         return 1;
     }
@@ -8790,7 +8946,9 @@ int bin_command(int argc, char **argv) {
         execv(cmd_path, &argv[cmd_start]);
 
         /* execv failed */
-        fprintf(stderr, "command: %s: %s\n", cmd_path, strerror(errno));
+        executor_error_report(current_executor, SHELL_ERR_EXEC_FAILED,
+                              builtin_get_source_location(), "%s: %s", cmd_path,
+                              strerror(errno));
         _exit(126);
     }
 
