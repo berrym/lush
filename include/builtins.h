@@ -40,6 +40,19 @@
  */
 source_location_t builtin_swap_source_location(source_location_t loc);
 
+/**
+ * @brief Read the current builtin call-site source location
+ *
+ * Returns the location stashed by builtin_swap_source_location (the
+ * dispatcher's entry path). When no stash is active, falls back to the
+ * topmost frame on the executor's context-location stack, then to
+ * SOURCE_LOC_UNKNOWN. Use this from a builtin's error sites to obtain
+ * the loc to pass into shell_error_create / executor_error_report.
+ *
+ * @return Current source_location_t for the active builtin invocation
+ */
+source_location_t builtin_get_source_location(void);
+
 /** Builtin command entry */
 typedef struct builtin_s {
     const char *name;                   /**< Command name */

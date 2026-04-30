@@ -97,11 +97,9 @@ bool is_posix_mode_enabled(void);
 // Hash table for remembered command paths
 ht_strstr_t *command_hash = NULL;
 
-/* Forward declaration; defined later in the file. Returns the most
- * recent source location from the executor's context stack — i.e. the
- * call site of the builtin invocation — or SOURCE_LOC_UNKNOWN when
- * no executor context is available. */
-static source_location_t builtin_get_source_location(void);
+/* builtin_get_source_location is declared in include/builtins.h so the
+ * structured-error helpers in posix_opts.c (and other env-helper TUs)
+ * can read the dispatcher-stashed call site directly. */
 
 /* Builtin error reporting deliberately does NOT use a builtin-specific
  * helper layer. Sites use the structured-error API directly:
@@ -2548,7 +2546,7 @@ source_location_t builtin_swap_source_location(source_location_t loc) {
  * (the enclosing control-flow construct) when no per-call stash exists,
  * and finally to SOURCE_LOC_UNKNOWN.
  */
-static source_location_t builtin_get_source_location(void) {
+source_location_t builtin_get_source_location(void) {
     if (SOURCE_LOC_VALID(s_builtin_call_loc) ||
         s_builtin_call_loc.filename != NULL) {
         return s_builtin_call_loc;
@@ -5805,7 +5803,10 @@ int bin_setopt(int argc, char **argv) {
                 start_idx = i + 1;
                 break;
             } else {
-                fprintf(stderr, "setopt: invalid option: %s\n", argv[i]);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_OPTION,
+                                      builtin_get_source_location(),
+                                      "invalid option: %s", argv[i]);
                 return 1;
             }
         } else {
@@ -5816,7 +5817,9 @@ int bin_setopt(int argc, char **argv) {
     /* No option specified - list all options */
     if (start_idx >= argc) {
         if (query_mode) {
-            fprintf(stderr, "setopt: -q requires an option name\n");
+            executor_error_report(current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "-q requires an option name");
             return 1;
         }
 
@@ -5841,7 +5844,10 @@ int bin_setopt(int argc, char **argv) {
 
         if (!shell_feature_parse(argv[i], &feature)) {
             if (!query_mode) {
-                fprintf(stderr, "setopt: unknown option: %s\n", argv[i]);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_OPTION,
+                                      builtin_get_source_location(),
+                                      "unknown option: %s", argv[i]);
             }
             return 1;
         }
@@ -5898,14 +5904,18 @@ int bin_unsetopt(int argc, char **argv) {
             if (strcmp(argv[i], "--") == 0) {
                 continue;
             }
-            fprintf(stderr, "unsetopt: invalid option: %s\n", argv[i]);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "invalid option: %s", argv[i]);
             return 1;
         }
 
         shell_feature_t feature;
 
         if (!shell_feature_parse(argv[i], &feature)) {
-            fprintf(stderr, "unsetopt: unknown option: %s\n", argv[i]);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "unknown option: %s", argv[i]);
             return 1;
         }
 
@@ -5980,11 +5990,43 @@ int bin_shopt(int argc, char **argv) {
             case 'o':
                 set_o_mode = true;
                 break;
-            default:
-                fprintf(stderr, "shopt: -%c: invalid option\n", *p);
-                fprintf(stderr,
-                        "shopt: usage: shopt [-pqsu] [-o] [optname ...]\n");
+            default: {
+                source_location_t loc = builtin_get_source_location();
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR, loc,
+                    "-%c: invalid option", *p);
+                if (err) {
+                    if (current_executor && SOURCE_LOC_VALID(loc)) {
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
+                        if (src_line) {
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
+                            free(src_line);
+                        }
+                    }
+                    if (current_executor) {
+                        for (size_t k = 0;
+                             k < current_executor->context_depth &&
+                             k < SHELL_ERROR_CONTEXT_MAX;
+                             k++) {
+                            if (current_executor->context_stack[k]) {
+                                shell_error_push_context(
+                                    err, "%s",
+                                    current_executor->context_stack[k]);
+                            }
+                        }
+                    }
+                    shell_error_set_suggestion(
+                        err, "usage: shopt [-pqsu] [-o] [optname ...]");
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                } else {
+                    fprintf(stderr, "lush: shopt: -%c: invalid option\n", *p);
+                }
                 return 1;
+            }
             }
         }
         opt_end = i + 1;
@@ -5992,7 +6034,38 @@ int bin_shopt(int argc, char **argv) {
 
     /* -s and -u are mutually exclusive */
     if (set_mode && unset_mode) {
-        fprintf(stderr, "shopt: cannot set and unset options simultaneously\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR, loc,
+            "cannot set and unset options simultaneously");
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t k = 0; k < current_executor->context_depth &&
+                                   k < SHELL_ERROR_CONTEXT_MAX;
+                     k++) {
+                    if (current_executor->context_stack[k]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[k]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "use either -s (enable) or -u (disable), not both");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        } else {
+            fprintf(stderr, "lush: shopt: cannot set and unset options "
+                            "simultaneously\n");
+        }
         return 1;
     }
 
@@ -6005,7 +6078,9 @@ int bin_shopt(int argc, char **argv) {
     /* No option names given - list all options */
     if (opt_end >= argc) {
         if (query_mode) {
-            fprintf(stderr, "shopt: -q: option name required\n");
+            executor_error_report(current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "-q: option name required");
             return 1;
         }
 
@@ -6039,8 +6114,10 @@ int bin_shopt(int argc, char **argv) {
 
         if (!shell_feature_parse(argv[i], &feature)) {
             if (!query_mode) {
-                fprintf(stderr, "shopt: %s: invalid shell option name\n",
-                        argv[i]);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_OPTION,
+                                      builtin_get_source_location(),
+                                      "%s: invalid shell option name", argv[i]);
             }
             result = 1;
             continue;

@@ -12,11 +12,14 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "builtins.h"
 #include "config.h"
 #include "config_registry.h"
 #include "errors.h"
+#include "executor.h"
 #include "lle/lle_shell_integration.h"
 #include "lush.h"
+#include "shell_error.h"
 #include "shell_mode.h"
 #include "symtable.h"
 
@@ -401,8 +404,9 @@ static void print_all_shell_variables(void) {
 int builtin_set(char **args) {
     // Privileged mode security check - block all set operations
     if (shell_opts.privileged_mode && args[1]) {
-        fprintf(stderr,
-                "set: cannot modify shell options in privileged mode\n");
+        executor_error_report(current_executor, SHELL_ERR_PERMISSION_DENIED,
+                              builtin_get_source_location(),
+                              "cannot modify shell options in privileged mode");
         return 1;
     }
 
@@ -425,32 +429,40 @@ int builtin_set(char **args) {
                 // Check for shell mode options first (mutually exclusive modes)
                 if (strcmp(args[i], "posix") == 0) {
                     if (!shell_mode_set(SHELL_MODE_POSIX)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
+                        executor_error_report(
+                            current_executor, SHELL_ERR_FEATURE_DISABLED,
+                            builtin_get_source_location(),
+                            "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_POSIX);
                     shell_opts.posix_mode = true;
                 } else if (strcmp(args[i], "bash") == 0) {
                     if (!shell_mode_set(SHELL_MODE_BASH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
+                        executor_error_report(
+                            current_executor, SHELL_ERR_FEATURE_DISABLED,
+                            builtin_get_source_location(),
+                            "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_BASH);
                     shell_opts.posix_mode = false;
                 } else if (strcmp(args[i], "zsh") == 0) {
                     if (!shell_mode_set(SHELL_MODE_ZSH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
+                        executor_error_report(
+                            current_executor, SHELL_ERR_FEATURE_DISABLED,
+                            builtin_get_source_location(),
+                            "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_ZSH);
                     shell_opts.posix_mode = false;
                 } else if (strcmp(args[i], "lush") == 0) {
                     if (!shell_mode_set(SHELL_MODE_LUSH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
+                        executor_error_report(
+                            current_executor, SHELL_ERR_FEATURE_DISABLED,
+                            builtin_get_source_location(),
+                            "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_LUSH);
@@ -473,7 +485,10 @@ int builtin_set(char **args) {
                             lush_update_editing_mode();
                         }
                     } else {
-                        error_message("set: invalid option name: %s", args[i]);
+                        executor_error_report(
+                            current_executor, SHELL_ERR_INVALID_OPTION,
+                            builtin_get_source_location(),
+                            "invalid option name: %s", args[i]);
                         return 1;
                     }
                 }
@@ -499,8 +514,10 @@ int builtin_set(char **args) {
                     strcmp(args[i], "bash") == 0 ||
                     strcmp(args[i], "zsh") == 0) {
                     if (!shell_mode_set(SHELL_MODE_LUSH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
+                        executor_error_report(
+                            current_executor, SHELL_ERR_FEATURE_DISABLED,
+                            builtin_get_source_location(),
+                            "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
                     sync_shell_mode_to_config(SHELL_MODE_LUSH);
@@ -526,7 +543,10 @@ int builtin_set(char **args) {
                             lush_update_editing_mode();
                         }
                     } else {
-                        error_message("set: invalid option name: %s", args[i]);
+                        executor_error_report(
+                            current_executor, SHELL_ERR_INVALID_OPTION,
+                            builtin_get_source_location(),
+                            "invalid option name: %s", args[i]);
                         return 1;
                     }
                 }
@@ -610,7 +630,10 @@ int builtin_set(char **args) {
                     *(opt->flag) = true;
                     sync_shell_option_to_registry(opt->name, true);
                 } else {
-                    error_message("set: invalid option: -%c", arg[j]);
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_INVALID_OPTION,
+                                          builtin_get_source_location(),
+                                          "invalid option: -%c", arg[j]);
                     return 1;
                 }
             }
@@ -622,13 +645,18 @@ int builtin_set(char **args) {
                     *(opt->flag) = false;
                     sync_shell_option_to_registry(opt->name, false);
                 } else {
-                    error_message("set: invalid option: +%c", arg[j]);
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_INVALID_OPTION,
+                                          builtin_get_source_location(),
+                                          "invalid option: +%c", arg[j]);
                     return 1;
                 }
             }
         } else {
             // Regular positional parameters without -- prefix
-            error_message("set: invalid option: %s", arg);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "invalid option: %s", arg);
             return 1;
         }
     }
