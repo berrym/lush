@@ -1,13 +1,10 @@
 /**
  * @file errors.c
- * @brief Error reporting and handling utilities
+ * @brief Legacy error-reporting helpers for pre-executor and fatal paths
  *
- * Provides standardized error reporting functions for:
- * - System call errors (with errno)
- * - Non-system errors
- * - Fatal errors (with exit or abort)
- * - Informational messages (warning, info, success)
- * - Signal handlers (SIGSEGV)
+ * Provides the small set of legacy helpers that remain after migration
+ * to the structured shell-error system in shell_error.h. See errors.h
+ * for the policy on when each is appropriate.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -51,14 +48,6 @@ static void do_error(bool errnoflag, int err, const char *fmt, va_list args) {
     fflush(NULL); // flush all stdio output streams
 }
 
-/**
- * @brief Nonfatal error related to a system call
- *
- * Prints an error message with errno information and returns.
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
 void error_return(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -66,15 +55,6 @@ void error_return(const char *fmt, ...) {
     va_end(args);
 }
 
-/**
- * @brief Fatal error related to a system call
- *
- * Prints an error message with errno information and exits with
- * EXIT_FAILURE.
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
 void error_syscall(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -83,46 +63,6 @@ void error_syscall(const char *fmt, ...) {
     exit(EXIT_FAILURE);
 }
 
-/**
- * @brief Nonfatal error unrelated to a system call
- *
- * Prints an error message without errno information and returns.
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
-void error_message(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    do_error(false, 0, fmt, args);
-    va_end(args);
-}
-
-/**
- * @brief Fatal error unrelated to a system call
- *
- * Prints an error message and exits with EXIT_FAILURE.
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
-void error_quit(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    do_error(false, 0, fmt, args);
-    va_end(args);
-    exit(EXIT_FAILURE);
-}
-
-/**
- * @brief Fatal error with core dump
- *
- * Prints an error message, calls abort() to generate a core dump,
- * and terminates the process.
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
 void error_abort(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -132,59 +72,6 @@ void error_abort(const char *fmt, ...) {
     exit(EXIT_FAILURE); // should never happen
 }
 
-/**
- * @brief Print a warning message
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
-void warning_message(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    fprintf(stderr, "Warning: ");
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-    va_end(args);
-}
-
-/**
- * @brief Print an informational message
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
-void info_message(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    fprintf(stderr, "Info: ");
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-    va_end(args);
-}
-
-/**
- * @brief Print a success message
- *
- * @param fmt Format string (printf-style)
- * @param ... Variable arguments
- */
-void success_message(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    fprintf(stderr, "Success: ");
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-    va_end(args);
-}
-
-/**
- * @brief Segmentation fault signal handler
- *
- * Prints an error message with the signal number and aborts.
- * This handler is necessarily fatal.
- *
- * @param signo Signal number (SIGSEGV)
- */
 void sigsegv_handler(int signo) {
     error_abort(
         "lush: caught signal %d, terminating.\n\tAnd fix your damn code.\n",

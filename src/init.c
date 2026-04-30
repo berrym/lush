@@ -23,7 +23,6 @@
 #include "config.h"
 #include "dirstack.h"
 #include "errors.h"
-#include "history.h"
 #include "input.h"
 #include "posix_history.h"
 #include "shell_error.h"

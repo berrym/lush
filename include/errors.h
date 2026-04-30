@@ -1,9 +1,17 @@
 /**
  * @file errors.h
- * @brief Error handling and reporting utilities
+ * @brief Legacy error-reporting helpers for pre-executor and fatal paths
  *
- * Provides error codes, severity levels, and standardized error
- * reporting functions for parser and shell operations.
+ * These helpers predate the structured shell-error system in shell_error.h
+ * and remain in use only for paths that fall outside its model:
+ *   - error_return: nonfatal OOM/infrastructure failures with no executor
+ *     context (alloc_str, set_node_val_str)
+ *   - error_syscall: fatal syscall failures during early init or low-level
+ *     allocation (init.c, strings.c, input.c, node.c)
+ *   - error_abort: fatal assertion-style failures during init
+ *   - sigsegv_handler: SIGSEGV signal handler
+ *
+ * All user-facing shell errors must use shell_error.h instead.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -17,33 +25,11 @@
 #include <stddef.h>
 
 /**
- * @brief Parser error codes
- */
-typedef enum error_code_e {
-    EXPECTED_TOKEN,      /**< Expected a specific token */
-    UNEXPECTED_TOKEN,    /**< Unexpected token encountered */
-    SYNTAX_ERROR,        /**< General syntax error */
-    MISSING_QUOTE,       /**< Unclosed quote */
-    MISSING_BRACE,       /**< Unclosed brace or bracket */
-    UNMATCHED_CONTROL,   /**< Unmatched control structure (if/fi, etc.) */
-    INVALID_REDIRECTION, /**< Invalid redirection syntax */
-    UNEXPECTED_EOF,      /**< Unexpected end of input */
-} error_code;
-
-/**
- * @brief Error severity levels
- */
-typedef enum error_severity_e {
-    ERROR_WARNING,     /**< Warning - continue parsing */
-    ERROR_RECOVERABLE, /**< Error - skip to recovery point */
-    ERROR_FATAL,       /**< Fatal error - abort parsing */
-} error_severity;
-
-/**
- * @brief Report an error and return from function
+ * @brief Report a nonfatal error with errno information
  *
- * Prints an error message to stderr and returns from the calling function.
- * Uses printf-style formatting.
+ * Prints "lush: <fmt>: <strerror(errno)>\n" to stderr and returns.
+ * For OOM/infrastructure paths only; user-facing shell errors must
+ * use the structured-error API in shell_error.h.
  *
  * @param fmt Format string
  * @param ... Format arguments
@@ -51,10 +37,10 @@ typedef enum error_severity_e {
 void error_return(const char *fmt, ...);
 
 /**
- * @brief Report a system call error
+ * @brief Report a fatal error with errno information
  *
- * Prints an error message including the system error (errno) description.
- * Uses printf-style formatting.
+ * Prints "lush: <fmt>: <strerror(errno)>\n" to stderr and exits with
+ * EXIT_FAILURE. For early-init syscall failures.
  *
  * @param fmt Format string
  * @param ... Format arguments
@@ -62,32 +48,10 @@ void error_return(const char *fmt, ...);
 void error_syscall(const char *fmt, ...);
 
 /**
- * @brief Print an error message
+ * @brief Report a fatal error and abort
  *
- * Prints an error message to stderr without terminating.
- * Uses printf-style formatting.
- *
- * @param fmt Format string
- * @param ... Format arguments
- */
-void error_message(const char *fmt, ...);
-
-/**
- * @brief Report an error and exit the shell
- *
- * Prints an error message and terminates the shell process.
- * Uses printf-style formatting.
- *
- * @param fmt Format string
- * @param ... Format arguments
- */
-void error_quit(const char *fmt, ...);
-
-/**
- * @brief Report an error and abort
- *
- * Prints an error message and calls abort() for debugging.
- * Uses printf-style formatting.
+ * Prints the message and calls abort() to dump core. For internal
+ * assertion-style invariants during init.
  *
  * @param fmt Format string
  * @param ... Format arguments
@@ -95,43 +59,7 @@ void error_quit(const char *fmt, ...);
 void error_abort(const char *fmt, ...);
 
 /**
- * @brief Print a warning message with color
- *
- * Prints a yellow-colored warning message to stderr.
- * Uses printf-style formatting.
- *
- * @param fmt Format string
- * @param ... Format arguments
- */
-void warning_message(const char *fmt, ...);
-
-/**
- * @brief Print an informational message with color
- *
- * Prints a blue-colored info message to stderr.
- * Uses printf-style formatting.
- *
- * @param fmt Format string
- * @param ... Format arguments
- */
-void info_message(const char *fmt, ...);
-
-/**
- * @brief Print a success message with color
- *
- * Prints a green-colored success message to stderr.
- * Uses printf-style formatting.
- *
- * @param fmt Format string
- * @param ... Format arguments
- */
-void success_message(const char *fmt, ...);
-
-/**
  * @brief Signal handler for SIGSEGV
- *
- * Handles segmentation fault signals, printing diagnostic
- * information before terminating.
  *
  * @param sig Signal number (should be SIGSEGV)
  */
