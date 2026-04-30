@@ -612,6 +612,17 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         return;
     }
 
+    /* Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
+     * Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up. */
+    if (SOURCE_LOC_VALID(loc)) {
+        char *src_line = executor_get_source_line(executor, loc.line);
+        if (src_line) {
+            shell_error_set_source_line(error, src_line, loc.column,
+                                        loc.column + loc.length);
+            free(src_line);
+        }
+    }
+
     /* Add context stack to error */
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
@@ -656,6 +667,17 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         /* Fallback to legacy error system */
         set_executor_error(executor, "runtime error");
         return;
+    }
+
+    /* Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
+     * Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up. */
+    if (SOURCE_LOC_VALID(loc)) {
+        char *src_line = executor_get_source_line(executor, loc.line);
+        if (src_line) {
+            shell_error_set_source_line(error, src_line, loc.column,
+                                        loc.column + loc.length);
+            free(src_line);
+        }
     }
 
     /* Add context stack to error */
@@ -706,6 +728,16 @@ static void report_command_not_found(executor_t *executor, const char *command,
         /* Fallback to simple error message */
         fprintf(stderr, "lush: %s: command not found\n", command);
         return;
+    }
+
+    /* Attach source line for the rust-style snippet block */
+    if (SOURCE_LOC_VALID(loc)) {
+        char *src_line = executor_get_source_line(executor, loc.line);
+        if (src_line) {
+            shell_error_set_source_line(error, src_line, loc.column,
+                                        loc.column + loc.length);
+            free(src_line);
+        }
     }
 
     /* Add context stack to error */
