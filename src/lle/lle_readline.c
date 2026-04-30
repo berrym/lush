@@ -3148,8 +3148,23 @@ char *lle_readline(const char *prompt) {
         /* Read next input event */
         lle_input_event_t *event = NULL;
 
+        /* Idle-poll cadence: 1 second.
+         *
+         * The previous 100ms value (10 Hz polling) burned ~87% of one
+         * CPU core on idle prompts -- every 100ms the loop ran
+         * clock_gettime, allocated an arena event, called select() and
+         * returned, accumulating to substantial CPU overhead per #83.
+         *
+         * 1 second is the sweet spot: still well within the 10-second
+         * watchdog budget (lle_watchdog_pet at the top of the loop
+         * resets a 10s alarm), still well within the 2-second
+         * theme-hot-reload polling granularity, and reduces idle CPU
+         * by ~10x. Signals (SIGINT, SIGWINCH, SIGALRM) interrupt
+         * select() via EINTR immediately, so user responsiveness is
+         * unaffected.
+         */
         result = lle_input_processor_read_next_event(
-            term->input_processor, &event, 100 /* 100ms timeout */
+            term->input_processor, &event, 1000 /* 1s idle-poll timeout */
         );
 
         /* WATCHDOG: Check if watchdog fired during processing.
