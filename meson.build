@@ -1040,6 +1040,23 @@ endif
          timeout: 30)
   endif
 
+  # Splicer Tests
+  # Exercises lle_splicer_render_for_context across all quote_state
+  # rendering rules, lle_splicer_close_char lookup, and
+  # lle_splicer_compute across (item type, quote_state, accept/preview
+  # phase) combinations.
+  if fs.exists('tests/lle/unit/test_splicer.c')
+    test_splicer = executable('test_splicer',
+                              'tests/lle/unit/test_splicer.c',
+                              'tests/lle/functional/test_completion_mock.c',
+                              include_directories: [inc, include_directories('tests')],
+                              link_with: lle_lib,
+                              dependencies: [ncurses_link_dep])
+    test('LLE Splicer', test_splicer,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # UTF-8 Movement Functions Test
   # Tests cursor_manager integration for UTF-8 character movement
   # Tests: lle_forward_char, lle_backward_char, lle_forward_word, lle_backward_word

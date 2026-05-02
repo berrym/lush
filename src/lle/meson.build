@@ -230,6 +230,7 @@ lle_sources += files(
   'completion/ssh_hosts.c',
   'completion/builtin_completions.c',
   'completion/word_context.c',
+  'completion/splicer.c',
 )
 
 # ============================================================================
