@@ -113,11 +113,18 @@ typedef enum {
     LLE_CONTEXT_ASSIGNMENT_VALUE,    /**< Right side of VAR=value           */
     LLE_CONTEXT_FOR_IN_LIST,         /**< for x in <here>                   */
     LLE_CONTEXT_CASE_PATTERN,        /**< case x in <here>)                 */
-    LLE_CONTEXT_FUNCTION_BODY,       /**< Inside a function body            */
     LLE_CONTEXT_HEREDOC_BODY,        /**< Inside a heredoc body (refuse to
                                           complete; literal text)           */
     LLE_CONTEXT_UNKNOWN,
 } lle_word_context_type_t;
+
+/* Note: a "function body" is not a distinct context_type. Inside a
+ * function definition the cursor is still at COMMAND_POSITION (for the
+ * first word of an inner statement) or ARGUMENT (for arguments to that
+ * statement); completion dispatch is identical to top-level. If a
+ * future need arises to distinguish "we are inside a function" — for
+ * example to surface only function-local variables — that can be
+ * added as a separate flag without overloading context_type. */
 
 /* ============================================================================
  * Multi-value expansion branch

@@ -598,6 +598,102 @@ TEST(brace_at_end_of_word_no_path_prefix_no_branches) {
 }
 
 /* ============================================================================
+ * for/case keyword tracking and heredoc body detection
+ * ============================================================================ */
+
+TEST(for_in_list_after_for_x_in) {
+    /* for x in /tmp/|  — cursor is in the for-list, after the `in`
+     * keyword. Engine should source files for completion. */
+    const char *buf = "for x in /tmp/";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_FOR_IN_LIST);
+}
+
+TEST(for_in_list_remains_until_terminator) {
+    /* for x in a b c|  — still in the list with multiple items typed. */
+    const char *buf = "for x in a b c";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_FOR_IN_LIST);
+}
+
+TEST(for_in_list_ends_at_semicolon) {
+    /* for x in a b c; do ec|  — the `;` closes the list; the cursor
+     * after `do` is in command position again, completing a command. */
+    const char *buf = "for x in a b c; do ec";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_COMMAND_POSITION);
+}
+
+TEST(for_without_in_keyword_falls_back_to_argument) {
+    /* for x mal|  — the second word after `for` was not `in`; the
+     * keyword sequence is broken, fall back to argument completion. */
+    const char *buf = "for x mal";
+    ANALYZE(buf, strlen(buf), ctx);
+    /* No FOR_IN_LIST — sequence broken. */
+    ASSERT(ctx->context_type != LLE_CONTEXT_FOR_IN_LIST);
+}
+
+TEST(case_pattern_after_case_x_in) {
+    /* case "$x" in pat|  — cursor in the patterns position. */
+    const char *buf = "case x in pat";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_CASE_PATTERN);
+}
+
+TEST(case_pattern_ends_at_esac_keyword) {
+    /* case x in p) cmd ;; esac; ec|  — past `esac`, then a command
+     * position after `;`. */
+    const char *buf = "case x in p) cmd ;; esac; ec";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_COMMAND_POSITION);
+}
+
+TEST(heredoc_body_cursor_inside) {
+    /* cat <<EOF\nhello |world\nEOF\n  — cursor in the heredoc body
+     * between two newlines. The analyzer reports HEREDOC_BODY so the
+     * engine can refuse to complete. */
+    const char *buf = "cat <<EOF\nhello world";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_HEREDOC_BODY);
+}
+
+TEST(heredoc_body_cursor_after_delimiter_line) {
+    /* cat <<EOF\nbody\nEOF\nec|  — past the heredoc terminator; cursor
+     * is at command position again. */
+    const char *buf = "cat <<EOF\nbody\nEOF\nec";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_COMMAND_POSITION);
+}
+
+TEST(heredoc_body_dash_form_strips_leading_tabs) {
+    /* cat <<-EOF\n\t\tbody\n\tEOF\nec|  — the `<<-` form allows leading
+     * tabs on the delimiter line. After the matching tab-prefixed
+     * delimiter, the heredoc ends. */
+    const char *buf = "cat <<-EOF\n\t\tbody\n\tEOF\nec";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type == LLE_CONTEXT_COMMAND_POSITION);
+}
+
+TEST(heredoc_introducing_line_is_not_heredoc_body) {
+    /* cat <<EO|F  — cursor on the introducing line, mid-delimiter.
+     * The body has not started yet; this is still ARGUMENT context
+     * (the heredoc delimiter is a redirect-like target, but the
+     * walker has not entered the body). */
+    const char *buf = "cat <<EOF";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type != LLE_CONTEXT_HEREDOC_BODY);
+}
+
+TEST(here_string_is_not_heredoc) {
+    /* cat <<<value|  — `<<<` is a here-string operator, not a heredoc.
+     * The cursor after `value` is in argument position; no body
+     * tracking should be active. */
+    const char *buf = "cat <<<value";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->context_type != LLE_CONTEXT_HEREDOC_BODY);
+}
+
+/* ============================================================================
  * Test runner
  * ============================================================================ */
 
@@ -669,6 +765,19 @@ int main(void) {
     RUN_TEST(brace_in_path_prefix_populates_branches);
     RUN_TEST(brace_with_no_comma_does_not_populate_branches);
     RUN_TEST(brace_at_end_of_word_no_path_prefix_no_branches);
+
+    /* Keyword tracking and heredoc body */
+    RUN_TEST(for_in_list_after_for_x_in);
+    RUN_TEST(for_in_list_remains_until_terminator);
+    RUN_TEST(for_in_list_ends_at_semicolon);
+    RUN_TEST(for_without_in_keyword_falls_back_to_argument);
+    RUN_TEST(case_pattern_after_case_x_in);
+    RUN_TEST(case_pattern_ends_at_esac_keyword);
+    RUN_TEST(heredoc_body_cursor_inside);
+    RUN_TEST(heredoc_body_cursor_after_delimiter_line);
+    RUN_TEST(heredoc_body_dash_form_strips_leading_tabs);
+    RUN_TEST(heredoc_introducing_line_is_not_heredoc_body);
+    RUN_TEST(here_string_is_not_heredoc);
 
     return TEST_RESULT();
 }

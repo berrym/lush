@@ -59,6 +59,27 @@
  * ============================================================================
  */
 
+/* Keyword sequence state. The walker recognizes `for X in <list>` and
+ * `case X in <patterns>` by transitioning through these states as
+ * non-quoted words are consumed. The KW_AFTER_*_IN states represent
+ * "cursor is currently in the for-list" or "in the case-pattern" and
+ * persist until a statement terminator (;, &, |, newline) closes them
+ * out. They reset to KW_NONE on any unexpected transition. */
+typedef enum {
+    KW_NONE,
+    KW_AFTER_FOR,         /* saw `for` at command position; expect var */
+    KW_AFTER_FOR_VAR,     /* saw `for X`; expect `in` */
+    KW_AFTER_FOR_IN,      /* saw `for X in`; cursor is in the list */
+    KW_AFTER_CASE,        /* saw `case` at command position; expect word */
+    KW_AFTER_CASE_WORD,   /* saw `case X`; expect `in` */
+    KW_AFTER_CASE_IN,     /* saw `case X in`; cursor is in patterns */
+} keyword_state_t;
+
+/* Maximum heredoc delimiter length the walker captures. Real shell
+ * delimiters are typically short identifiers; truncating at 256 bytes
+ * covers every realistic case and bounds the walker's memory. */
+#define WALKER_HEREDOC_DELIM_MAX 256
+
 typedef struct walker {
     const char *buffer;
     size_t      buffer_len;
@@ -106,6 +127,28 @@ typedef struct walker {
      * statement separator). Cleared when we consume a word at this
      * position. */
     bool at_command_position;
+
+    /* Keyword sequence state for `for X in` and `case X in` tracking. */
+    keyword_state_t kw_state;
+
+    /* Heredoc tracking. The walker recognizes `<<DELIM` and `<<-DELIM`
+     * at top level, captures DELIM, and after the next newline enters
+     * heredoc-body mode where bytes are literal until a line that
+     * matches DELIM (allowing leading tabs if heredoc_dash). The
+     * here-string operator `<<<` is distinguished from `<<` by lookahead
+     * and is not treated as a heredoc. */
+    bool   expecting_heredoc_delim; /* just consumed `<<` or `<<-` */
+    bool   heredoc_dash;            /* `<<-` form: leading tabs allowed
+                                       on the delimiter line */
+    bool   heredoc_pending;         /* delimiter captured; body starts at
+                                       next newline */
+    bool   in_heredoc_body;         /* between body-start newline and
+                                       delimiter line */
+    char   heredoc_delim[WALKER_HEREDOC_DELIM_MAX];
+    size_t heredoc_delim_len;
+    size_t current_line_start;      /* byte offset of the current line's
+                                       first byte (start of buffer or
+                                       byte after the most recent \n) */
 } walker_t;
 
 /* ============================================================================
@@ -155,6 +198,158 @@ static bool is_var_name_cont(uint32_t cp) {
     return is_var_name_start(cp) || (cp >= '0' && cp <= '9');
 }
 
+/* Compare a buffer range against a literal keyword. Keywords in shell
+ * are ASCII so a byte compare is sufficient; this is one of the cases
+ * where the unicode-comparison rule's ASCII-guaranteed exception
+ * applies. */
+static bool word_equals_keyword(const char *buf, size_t start, size_t end,
+                                const char *kw) {
+    if (end < start) return false;
+    size_t len     = end - start;
+    size_t kw_len  = strlen(kw);
+    if (len != kw_len) return false;
+    return memcmp(buf + start, kw, len) == 0;
+}
+
+/* True if a word at command position is one of the shell keywords that
+ * introduces a fresh command position for the *next* word, rather than
+ * itself being a command followed by arguments. After `do`, `then`,
+ * `else`, `elif`, `until`, `while`, `if`, the next non-whitespace word
+ * is at command position again. */
+static bool word_is_command_introducer(const char *buf, size_t start,
+                                       size_t end) {
+    return word_equals_keyword(buf, start, end, "do")    ||
+           word_equals_keyword(buf, start, end, "then")  ||
+           word_equals_keyword(buf, start, end, "else")  ||
+           word_equals_keyword(buf, start, end, "elif")  ||
+           word_equals_keyword(buf, start, end, "until") ||
+           word_equals_keyword(buf, start, end, "while") ||
+           word_equals_keyword(buf, start, end, "if");
+}
+
+/* When a non-quoted word ends, advance the keyword state machine by
+ * looking at the bytes that just made up the word and the position at
+ * which it ended. Called from walker_advance_one when whitespace or a
+ * redirect/statement separator terminates a word. */
+static void advance_keyword_state(walker_t *w, size_t word_start,
+                                  size_t word_end) {
+    /* Word at command position is the candidate keyword for state-entry. */
+    bool entered_at_cmd_position =
+        (word_start == w->current_command_word_start);
+
+    if (entered_at_cmd_position) {
+        if (word_equals_keyword(w->buffer, word_start, word_end, "for")) {
+            w->kw_state = KW_AFTER_FOR;
+            return;
+        }
+        if (word_equals_keyword(w->buffer, word_start, word_end, "case")) {
+            w->kw_state = KW_AFTER_CASE;
+            return;
+        }
+        /* Any other word at command position resets the state machine —
+         * the keyword sequence is broken by a non-`for`/`case` command. */
+        w->kw_state = KW_NONE;
+        return;
+    }
+
+    /* Non-command-position word transitions. */
+    switch (w->kw_state) {
+        case KW_AFTER_FOR:
+            /* Expecting variable name; any word advances state. */
+            w->kw_state = KW_AFTER_FOR_VAR;
+            break;
+        case KW_AFTER_FOR_VAR:
+            if (word_equals_keyword(w->buffer, word_start, word_end, "in")) {
+                w->kw_state = KW_AFTER_FOR_IN;
+            } else {
+                w->kw_state = KW_NONE; /* malformed `for` sequence */
+            }
+            break;
+        case KW_AFTER_CASE:
+            w->kw_state = KW_AFTER_CASE_WORD;
+            break;
+        case KW_AFTER_CASE_WORD:
+            if (word_equals_keyword(w->buffer, word_start, word_end, "in")) {
+                w->kw_state = KW_AFTER_CASE_IN;
+            } else {
+                w->kw_state = KW_NONE;
+            }
+            break;
+        case KW_AFTER_FOR_IN:
+        case KW_AFTER_CASE_IN:
+            /* In list / pattern mode; words are list/pattern elements
+             * and don't transition the state. The state ends on a
+             * statement terminator (handled separately) or `do`/`esac`
+             * keyword (treated as a normal terminator effect). */
+            if (word_equals_keyword(w->buffer, word_start, word_end, "do") ||
+                word_equals_keyword(w->buffer, word_start, word_end, "esac")) {
+                w->kw_state = KW_NONE;
+            }
+            break;
+        case KW_NONE:
+        default:
+            break;
+    }
+}
+
+/* Capture the heredoc delimiter from a word, applying the bare/quoted
+ * delimiter normalization (single or double quotes around the
+ * delimiter are stripped; backslash escapes simplify to the escaped
+ * char). Truncates at WALKER_HEREDOC_DELIM_MAX. */
+static void capture_heredoc_delim(walker_t *w, size_t word_start,
+                                  size_t word_end) {
+    w->heredoc_delim_len = 0;
+    bool   esc           = false;
+    bool   in_sgl        = false;
+    bool   in_dbl        = false;
+    size_t i             = word_start;
+
+    while (i < word_end && w->heredoc_delim_len < WALKER_HEREDOC_DELIM_MAX - 1) {
+        char c = w->buffer[i];
+        if (esc) {
+            w->heredoc_delim[w->heredoc_delim_len++] = c;
+            esc                                       = false;
+            i++;
+            continue;
+        }
+        if (in_sgl) {
+            if (c == '\'') in_sgl = false;
+            else w->heredoc_delim[w->heredoc_delim_len++] = c;
+            i++;
+            continue;
+        }
+        if (in_dbl) {
+            if (c == '"') in_dbl = false;
+            else if (c == '\\') esc = true;
+            else w->heredoc_delim[w->heredoc_delim_len++] = c;
+            i++;
+            continue;
+        }
+        if (c == '\'') { in_sgl = true; i++; continue; }
+        if (c == '"')  { in_dbl = true; i++; continue; }
+        if (c == '\\') { esc = true; i++; continue; }
+        w->heredoc_delim[w->heredoc_delim_len++] = c;
+        i++;
+    }
+    w->heredoc_delim[w->heredoc_delim_len] = '\0';
+}
+
+/* Test whether the walker's current line (bytes [current_line_start, pos))
+ * matches the captured heredoc delimiter. The match allows leading tabs
+ * when heredoc_dash is true. The delimiter must be the entire line (no
+ * trailing characters). */
+static bool current_line_matches_heredoc_delim(const walker_t *w) {
+    size_t line_start = w->current_line_start;
+    if (w->heredoc_dash) {
+        while (line_start < w->pos && w->buffer[line_start] == '\t') {
+            line_start++;
+        }
+    }
+    size_t line_len = w->pos - line_start;
+    if (line_len != w->heredoc_delim_len) return false;
+    return memcmp(w->buffer + line_start, w->heredoc_delim, line_len) == 0;
+}
+
 /* ============================================================================
  * Walker step — one codepoint forward
  * ============================================================================
@@ -184,6 +379,32 @@ static bool is_var_name_cont(uint32_t cp) {
 static void walker_advance_one(walker_t *w) {
     uint32_t cp;
     int n = decode_at(w->buffer, w->buffer_len, w->pos, &cp);
+
+    /* Heredoc body suppresses everything else: bytes are literal until a
+     * line that matches the captured delimiter. The walker advances
+     * codepoint by codepoint, updating current_line_start at each
+     * newline and exiting heredoc mode when the just-completed line
+     * equals the delimiter. */
+    if (w->in_heredoc_body) {
+        if (cp == '\n') {
+            if (current_line_matches_heredoc_delim(w)) {
+                w->in_heredoc_body  = false;
+                w->heredoc_delim[0] = '\0';
+                w->heredoc_delim_len = 0;
+                /* Statement boundary after heredoc body ends. */
+                w->last_statement_start          = w->pos + (size_t)n;
+                w->at_command_position           = true;
+                w->current_command_word_start    = SIZE_MAX;
+                w->current_command_word_end      = SIZE_MAX;
+                w->current_arg_index             = -1;
+                w->next_word_is_redirect_target  = false;
+                w->kw_state                      = KW_NONE;
+            }
+            w->current_line_start = w->pos + (size_t)n;
+        }
+        w->pos += (size_t)n;
+        return;
+    }
 
     /* ESCAPE_PENDING absorbs whatever this codepoint is. */
     if (w->escape_pending) {
@@ -333,8 +554,38 @@ static void walker_advance_one(walker_t *w) {
     /* Statement terminators outside any nesting. */
     if (is_statement_terminator(cp) && w->paren_depth == 0 &&
         w->brace_depth == 0 && w->bracket_depth == 0) {
-        /* Close the current word, if any. */
-        w->current_word_start = SIZE_MAX;
+        /* If a word was in progress, run keyword-state and heredoc-
+         * delimiter logic before closing it. */
+        if (w->current_word_start != SIZE_MAX) {
+            size_t we = w->pos;
+            if (w->expecting_heredoc_delim) {
+                capture_heredoc_delim(w, w->current_word_start, we);
+                w->expecting_heredoc_delim = false;
+                w->heredoc_pending         = true;
+            }
+            advance_keyword_state(w, w->current_word_start, we);
+            w->current_word_start = SIZE_MAX;
+        }
+        /* While in for-list / case-pattern modes, statement terminators
+         * end the list / patterns. */
+        if (w->kw_state == KW_AFTER_FOR_IN ||
+            w->kw_state == KW_AFTER_CASE_IN) {
+            w->kw_state = KW_NONE;
+        } else {
+            /* Other unfinished keyword sequences are also broken by a
+             * terminator. */
+            w->kw_state = KW_NONE;
+        }
+        /* Newline both terminates the statement AND advances the line
+         * counter. If a heredoc body is pending, the next byte begins
+         * the body. */
+        if (cp == '\n') {
+            w->current_line_start = w->pos + (size_t)n;
+            if (w->heredoc_pending) {
+                w->heredoc_pending  = false;
+                w->in_heredoc_body  = true;
+            }
+        }
         /* Reset command tracking. */
         w->last_statement_start              = w->pos + (size_t)n;
         w->at_command_position               = true;
@@ -349,15 +600,37 @@ static void walker_advance_one(walker_t *w) {
     /* Whitespace outside any quote ends the current word. */
     if (is_shell_whitespace(cp)) {
         if (w->current_word_start != SIZE_MAX) {
+            size_t we = w->pos;
+            /* If we were expecting a heredoc delimiter, this word IS
+             * it. Capture and prime body entry. */
+            if (w->expecting_heredoc_delim) {
+                capture_heredoc_delim(w, w->current_word_start, we);
+                w->expecting_heredoc_delim = false;
+                w->heredoc_pending         = true;
+            }
             /* End-of-word transition. If this was the command word,
-             * remember its end. */
+             * either retain command position (if the word is a
+             * command-introducer keyword) or transition to argument
+             * position. */
             if (w->current_command_word_start == w->current_word_start) {
-                w->current_command_word_end = w->pos;
-                w->at_command_position      = false;
-                w->current_arg_index        = 0;
+                if (word_is_command_introducer(w->buffer,
+                                               w->current_word_start, we)) {
+                    /* `do`/`then`/`else`/`elif`/`until`/`while`/`if`:
+                     * the next word starts a fresh command position. */
+                    w->current_command_word_start = SIZE_MAX;
+                    w->current_command_word_end   = SIZE_MAX;
+                    w->current_arg_index          = -1;
+                    w->at_command_position        = true;
+                } else {
+                    w->current_command_word_end = we;
+                    w->at_command_position      = false;
+                    w->current_arg_index        = 0;
+                }
             } else if (w->current_arg_index >= 0) {
                 w->current_arg_index++;
             }
+            /* Run keyword-state transition for `for` / `case` / `in`. */
+            advance_keyword_state(w, w->current_word_start, we);
             /* If the just-finished word was a redirect target, clear the
              * flag so the FOLLOWING word is a normal arg again. */
             if (w->next_word_is_redirect_target) {
@@ -371,7 +644,12 @@ static void walker_advance_one(walker_t *w) {
 
     /* Redirect operator chars at top level. We don't try to consume the
      * whole >> / << operator; we just flag that the NEXT word is a
-     * redirect target. The redirect char itself does not start a word. */
+     * redirect target. The redirect char itself does not start a word.
+     *
+     * Special case: `<<` introduces a heredoc; `<<-` is the tab-stripping
+     * variant; `<<<` is a here-string (just a value, NOT a heredoc).
+     * Distinguish via lookahead: peek past the current `<` to detect the
+     * `<<` pair, then peek again to rule out `<<<`. */
     if (is_redirect_char(cp) && w->paren_depth == 0 && w->brace_depth == 0 &&
         w->bracket_depth == 0) {
         /* Close the current word if any. */
@@ -383,6 +661,28 @@ static void walker_advance_one(walker_t *w) {
             }
             w->current_word_start = SIZE_MAX;
         }
+
+        /* Heredoc detection on `<`. */
+        if (cp == '<' && w->pos + 1 < w->cursor &&
+            w->buffer[w->pos + 1] == '<' &&
+            !(w->pos + 2 < w->cursor && w->buffer[w->pos + 2] == '<')) {
+            /* `<<` (heredoc) or `<<-` (tab-stripping). Consume the
+             * second `<` here so the next codepoint is whatever
+             * follows. */
+            w->pos += 1; /* the first `<` is consumed at end-of-block */
+            /* Optional `-` for tab-stripping form. */
+            w->heredoc_dash = false;
+            if (w->pos + 1 < w->cursor && w->buffer[w->pos + 1] == '-') {
+                w->heredoc_dash = true;
+                w->pos += 1;
+            }
+            w->expecting_heredoc_delim = true;
+            /* Don't set next_word_is_redirect_target — the next word IS
+             * the heredoc delimiter, not a file path. */
+            w->pos += (size_t)n;
+            return;
+        }
+
         w->next_word_is_redirect_target = true;
         w->pos += (size_t)n;
         return;
@@ -951,6 +1251,14 @@ lle_result_t lle_word_context_analyze(const char *buffer,
         .current_arg_index               = -1,
         .next_word_is_redirect_target    = false,
         .at_command_position             = true,
+        .kw_state                        = KW_NONE,
+        .expecting_heredoc_delim         = false,
+        .heredoc_dash                    = false,
+        .heredoc_pending                 = false,
+        .in_heredoc_body                 = false,
+        .heredoc_delim                   = {0},
+        .heredoc_delim_len               = 0,
+        .current_line_start              = 0,
     };
 
     while (w.pos < w.cursor) {
@@ -1005,10 +1313,24 @@ lle_result_t lle_word_context_analyze(const char *buffer,
                              ctx->word_end, pool, &ctx->dequoted_filename_prefix);
     if (r != LLE_SUCCESS) return r;
 
-    /* Context type. */
-    if (ctx->expansion_kind == LLE_EXPANSION_VARIABLE_NAME ||
-        ctx->expansion_kind == LLE_EXPANSION_BRACED_VARIABLE_NAME) {
+    /* Context type. Order of precedence (most specific first):
+     *   HEREDOC_BODY  — completion is refused; trumps everything else
+     *   VARIABLE_NAME — cursor inside an in-progress $name / ${name
+     *   FOR_IN_LIST   — cursor in `for X in <list>` past `in`, before ;
+     *   CASE_PATTERN  — cursor in `case X in <patterns>` past `in`
+     *   REDIRECT_TARGET — next word after >, <, >>, etc.
+     *   COMMAND_POSITION — first word of a fresh statement
+     *   ARGUMENT      — argument to the current command
+     *   UNKNOWN       — none of the above */
+    if (w.in_heredoc_body) {
+        ctx->context_type = LLE_CONTEXT_HEREDOC_BODY;
+    } else if (ctx->expansion_kind == LLE_EXPANSION_VARIABLE_NAME ||
+               ctx->expansion_kind == LLE_EXPANSION_BRACED_VARIABLE_NAME) {
         ctx->context_type = LLE_CONTEXT_VARIABLE_NAME;
+    } else if (w.kw_state == KW_AFTER_FOR_IN) {
+        ctx->context_type = LLE_CONTEXT_FOR_IN_LIST;
+    } else if (w.kw_state == KW_AFTER_CASE_IN) {
+        ctx->context_type = LLE_CONTEXT_CASE_PATTERN;
     } else if (w.next_word_is_redirect_target) {
         ctx->context_type = LLE_CONTEXT_REDIRECT_TARGET;
     } else if (w.at_command_position) {
@@ -1095,7 +1417,6 @@ const char *lle_word_context_type_name(lle_word_context_type_t type) {
         case LLE_CONTEXT_ASSIGNMENT_VALUE: return "ASSIGNMENT_VALUE";
         case LLE_CONTEXT_FOR_IN_LIST:      return "FOR_IN_LIST";
         case LLE_CONTEXT_CASE_PATTERN:     return "CASE_PATTERN";
-        case LLE_CONTEXT_FUNCTION_BODY:    return "FUNCTION_BODY";
         case LLE_CONTEXT_HEREDOC_BODY:     return "HEREDOC_BODY";
         case LLE_CONTEXT_UNKNOWN:          return "UNKNOWN";
     }
