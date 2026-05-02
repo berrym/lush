@@ -1022,6 +1022,24 @@ endif
          timeout: 30)
   endif
 
+  # Word-Context Analyzer Tests
+  # Exercises lle_word_context_analyze across quote/escape state, word
+  # boundaries respecting quote state, filename_portion_start computation,
+  # NFC-normalized dequoting of the typed prefix, in-progress expansion
+  # detection, context-type classification, and command-name + arg-index
+  # extraction.
+  if fs.exists('tests/lle/unit/test_word_context.c')
+    test_word_context = executable('test_word_context',
+                                   'tests/lle/unit/test_word_context.c',
+                                   'tests/lle/functional/test_completion_mock.c',
+                                   include_directories: [inc, include_directories('tests')],
+                                   link_with: lle_lib,
+                                   dependencies: [ncurses_link_dep])
+    test('LLE Word Context Analyzer', test_word_context,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # UTF-8 Movement Functions Test
   # Tests cursor_manager integration for UTF-8 character movement
   # Tests: lle_forward_char, lle_backward_char, lle_forward_word, lle_backward_word
