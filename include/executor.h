@@ -321,6 +321,28 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
 char *expand_if_needed(executor_t *executor, const char *text);
 
 /**
+ * @brief Expand a brace pattern into its enumerated branches
+ *
+ * Given a pattern such as `{a,b,c}/Doc` or `{1..3}-tail`, returns a
+ * NULL-terminated heap-allocated array of branch strings. Range
+ * expansion (`{1..10}`) and list expansion (`{a,b,c}`) are both
+ * supported. When the input contains no brace pattern the returned
+ * array has a single element equal to a copy of the input.
+ *
+ * Caller owns each returned string and the array; both must be freed
+ * with free(). The terminating NULL slot is included in the
+ * allocation.
+ *
+ * @param pattern Pattern text (no quote/escape processing performed)
+ * @param expanded_count Output for the number of branches produced.
+ *        Set to 0 on failure.
+ * @return Heap-allocated array of branch strings or NULL on
+ *         allocation failure. Single-element array (length-1) on
+ *         input with no brace.
+ */
+char **expand_brace_pattern(const char *pattern, int *expanded_count);
+
+/**
  * @brief Expand a process substitution node
  *
  * Handles <(cmd) and >(cmd) process substitution by forking a child

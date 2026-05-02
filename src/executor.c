@@ -133,7 +133,11 @@ static char *expand_variable(executor_t *executor, const char *var_text);
 static char *expand_tilde(const char *text);
 static char **expand_glob_pattern(const char *pattern, int *expanded_count);
 static bool needs_glob_expansion(const char *str);
-static char **expand_brace_pattern(const char *pattern, int *expanded_count);
+/* expand_brace_pattern is declared in include/executor.h so the
+ * completion analyzer can enumerate per-branch directory targets for
+ * brace expressions in path-prefix bytes. The forward declaration
+ * here is preserved so existing static callers within this
+ * translation unit don't need to be reordered. */
 static bool needs_brace_expansion(const char *str);
 /* Sentinel returned in *expanded_count when brace expansion exceeds the
  * configured cap (behavior.brace_expansion_max). Top-level callers detect
@@ -6192,7 +6196,7 @@ static char **expand_brace_range(const char *prefix, const char *content,
  * @param expanded_count Output: number of expansions
  * @return Array of expanded strings (caller must free), or NULL on error
  */
-static char **expand_brace_pattern(const char *pattern, int *expanded_count) {
+char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     if (!pattern || !expanded_count) {
         *expanded_count = 0;
         return NULL;

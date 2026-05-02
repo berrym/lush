@@ -46,10 +46,12 @@
 
 #include "lle/completion/word_context.h"
 
+#include "executor.h"
 #include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ============================================================================
@@ -757,6 +759,163 @@ static lle_expansion_kind_t detect_expansion_kind(const char *buf,
 }
 
 /* ============================================================================
+ * Expansion resolution
+ * ============================================================================
+ *
+ * Two responsibilities:
+ *
+ *   resolve_path_prefix_to_directory()
+ *       Single-value path: takes the typed bytes from word_start up to
+ *       filename_portion_start (the path-prefix portion of the typed
+ *       shell-word), runs them through expand_if_needed() to resolve any
+ *       single-value expansions (~/, $VAR, ${VAR}, $((...)), $(...)),
+ *       and produces the absolute directory path the source should
+ *       open.
+ *
+ *   resolve_path_prefix_to_branches()
+ *       Multi-value (brace) path: takes the same typed bytes, runs them
+ *       through expand_brace_pattern() to enumerate per-branch path
+ *       prefixes, then resolves each via expand_if_needed(). Each
+ *       resulting branch is paired with the dequoted filename prefix
+ *       (which is shared across branches; brace expansion in the
+ *       path-prefix portion does not introduce per-branch filename
+ *       differences).
+ *
+ * Both helpers fail soft: if expansion isn't possible (no executor
+ * available, expansion produces an empty string, etc.), they leave the
+ * relevant output fields NULL/0 and the engine treats the word as
+ * "search cwd" or refuses, depending on context.
+ *
+ * Command-substitution evaluation is currently unconditional, matching
+ * the bash/zsh consensus default. When the central-config keys are
+ * registered, the analyzer will gate $(...) and `...` evaluation on
+ * the completion.eval_command_subst flag; until then the safe-mode
+ * opt-in is unavailable and expansion proceeds as in bash/zsh.
+ */
+
+/* Allocate a pool-owned copy of [start, end) within buffer. */
+static char *pool_substring(const char *buffer, size_t start, size_t end) {
+    if (end < start) return NULL;
+    size_t len = end - start;
+    char *out = lle_pool_alloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, buffer + start, len);
+    out[len] = '\0';
+    return out;
+}
+
+/* Allocate a pool-owned copy of a NUL-terminated string. */
+static char *pool_strdup(const char *s) {
+    if (!s) return NULL;
+    size_t len = strlen(s);
+    char *out = lle_pool_alloc(len + 1);
+    if (!out) return NULL;
+    memcpy(out, s, len + 1);
+    return out;
+}
+
+/* True if the path-prefix bytes contain a comma-separated brace list
+ * suitable for expand_brace_pattern. We accept either a list (`{a,b}`)
+ * or a range (`{1..5}`); both are handled by the existing expander. */
+static bool path_prefix_has_brace_list(const char *path_prefix) {
+    if (!path_prefix) return false;
+    const char *open = strchr(path_prefix, '{');
+    if (!open) return false;
+    const char *close = strchr(open + 1, '}');
+    if (!close) return false;
+    /* Accept either a comma (list form) or `..` (range form). */
+    for (const char *p = open + 1; p < close; p++) {
+        if (*p == ',') return true;
+        if (*p == '.' && p + 1 < close && *(p + 1) == '.') return true;
+    }
+    return false;
+}
+
+/* Resolve a single path-prefix string to an absolute directory path.
+ * Returns a pool-owned string on success, NULL if no useful resolution
+ * could be produced. */
+static char *resolve_single_path_prefix(const char *path_prefix,
+                                        lle_memory_pool_t *pool) {
+    (void)pool;
+    if (!path_prefix || path_prefix[0] == '\0') return NULL;
+    if (!current_executor) return NULL;
+
+    char *expanded = expand_if_needed(current_executor, path_prefix);
+    if (!expanded || expanded[0] == '\0') {
+        free(expanded);
+        return NULL;
+    }
+    char *result = pool_strdup(expanded);
+    free(expanded);
+    return result;
+}
+
+/* Single-value path: populate ctx->expanded_directory if the typed
+ * path-prefix bytes resolve to a meaningful directory. */
+static void resolve_path_prefix_to_directory(lle_word_context_t *ctx,
+                                             const char *buffer) {
+    if (ctx->word_start >= ctx->filename_portion_start) {
+        /* No path-prefix bytes typed (no '/' before cursor); engine uses
+         * cwd by convention. */
+        return;
+    }
+    char *path_prefix =
+        pool_substring(buffer, ctx->word_start, ctx->filename_portion_start);
+    if (!path_prefix) return;
+
+    ctx->expanded_directory = resolve_single_path_prefix(path_prefix, ctx->pool);
+}
+
+/* Multi-value (brace) path: enumerate branches via expand_brace_pattern,
+ * resolve each, attach the (shared) dequoted filename prefix. Returns
+ * true if branches[] was populated, false otherwise. */
+static bool resolve_path_prefix_to_branches(lle_word_context_t *ctx,
+                                            const char *buffer) {
+    if (ctx->word_start >= ctx->filename_portion_start) return false;
+
+    char *path_prefix =
+        pool_substring(buffer, ctx->word_start, ctx->filename_portion_start);
+    if (!path_prefix) return false;
+    if (!path_prefix_has_brace_list(path_prefix)) return false;
+
+    int branch_count = 0;
+    char **raw = expand_brace_pattern(path_prefix, &branch_count);
+    if (!raw || branch_count <= 1) {
+        if (raw) {
+            for (int i = 0; i < branch_count; i++) free(raw[i]);
+            free(raw);
+        }
+        return false;
+    }
+
+    /* Allocate the branches array from the pool. */
+    lle_word_context_branch_t *branches =
+        lle_pool_alloc(sizeof(*branches) * (size_t)branch_count);
+    if (!branches) {
+        for (int i = 0; i < branch_count; i++) free(raw[i]);
+        free(raw);
+        return false;
+    }
+
+    size_t valid = 0;
+    for (int i = 0; i < branch_count; i++) {
+        char *resolved = resolve_single_path_prefix(raw[i], ctx->pool);
+        if (resolved) {
+            branches[valid].expanded_directory       = resolved;
+            branches[valid].dequoted_filename_prefix = ctx->dequoted_filename_prefix;
+            valid++;
+        }
+        free(raw[i]);
+    }
+    free(raw);
+
+    if (valid == 0) return false;
+    ctx->branches     = branches;
+    ctx->branch_count = valid;
+    return true;
+}
+
+/* ============================================================================
  * Public API
  * ============================================================================
  */
@@ -877,12 +1036,21 @@ lle_result_t lle_word_context_analyze(const char *buffer,
 
     ctx->arg_index = w.current_arg_index;
 
-    /* expanded_directory and branches[] are not populated by this
-     * revision. They will be filled once expansion resolution via
-     * src/expand.c is integrated. */
+    /* Resolve expansions in the path-prefix portion of the typed word
+     * via lush's existing expansion machinery. Brace lists (and ranges)
+     * produce a per-branch directory set; everything else (single
+     * variable, tilde, parameter, arithmetic, command sub) produces one
+     * resolved directory. The engine reads branches[] when
+     * branch_count > 0; otherwise expanded_directory. Both can be NULL
+     * when the typed word has no path prefix or no executor is
+     * available, in which case the engine treats it as a cwd-relative
+     * completion. */
     ctx->expanded_directory = NULL;
     ctx->branches           = NULL;
     ctx->branch_count       = 0;
+    if (!resolve_path_prefix_to_branches(ctx, buffer)) {
+        resolve_path_prefix_to_directory(ctx, buffer);
+    }
 
     *out_context = ctx;
     return LLE_SUCCESS;

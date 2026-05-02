@@ -21,6 +21,17 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Mock controls defined in tests/lle/functional/test_completion_mock.c.
+ * The analyzer's resolution helpers call expand_if_needed and
+ * expand_brace_pattern; the mock returns programmed values controlled
+ * by these globals. mock_completion_reset() restores defaults. */
+typedef struct executor executor_t;
+extern executor_t *current_executor;
+extern const char *mock_expand_result;
+extern const char *const *mock_brace_branches;
+extern int mock_brace_branch_count;
+extern void mock_completion_reset(void);
+
 /* The analyzer accepts any non-NULL pool pointer; LLE's pool allocator
  * uses a process-global arena under the hood so a sentinel pointer is
  * sufficient for unit-test purposes. Same pattern as
@@ -451,6 +462,142 @@ TEST(unquoted_pipe_inside_quoted_string_is_literal) {
 }
 
 /* ============================================================================
+ * Expansion resolution (path-prefix bytes resolved to a directory or
+ * to a per-branch set via the executor's expansion machinery)
+ * ============================================================================ */
+
+TEST(resolve_path_prefix_with_tilde) {
+    /* cat ~/Doc|  — path-prefix ~/  resolves to /home/test/. */
+    mock_completion_reset();
+    current_executor = (executor_t *)1; /* sentinel; analyzer only checks NULL */
+    mock_expand_result = "/home/test/";
+    const char *buf = "cat ~/Doc";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(strcmp(ctx->expanded_directory, "/home/test/") == 0);
+    ASSERT(ctx->branch_count == 0);
+    ASSERT(strcmp(ctx->dequoted_filename_prefix, "Doc") == 0);
+    mock_completion_reset();
+}
+
+TEST(resolve_path_prefix_with_variable) {
+    /* cat $HOME/Doc|  — same shape; mock resolves $HOME/ to /home/test/. */
+    mock_completion_reset();
+    current_executor = (executor_t *)1;
+    mock_expand_result = "/home/test/";
+    const char *buf = "cat $HOME/Doc";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(strcmp(ctx->expanded_directory, "/home/test/") == 0);
+    ASSERT(strcmp(ctx->dequoted_filename_prefix, "Doc") == 0);
+    mock_completion_reset();
+}
+
+TEST(resolve_path_prefix_absolute_path) {
+    /* cat /tmp/Doc|  — absolute path; mock pass-through. */
+    mock_completion_reset();
+    current_executor = (executor_t *)1;
+    mock_expand_result = "/tmp/";
+    const char *buf = "cat /tmp/Doc";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(strcmp(ctx->expanded_directory, "/tmp/") == 0);
+    mock_completion_reset();
+}
+
+TEST(no_path_prefix_leaves_expanded_directory_null) {
+    /* cat my|  — no path prefix; analyzer doesn't call expansion. */
+    mock_completion_reset();
+    current_executor = (executor_t *)1;
+    mock_expand_result = "should_not_be_used";
+    const char *buf = "cat my";
+    ANALYZE(buf, strlen(buf), ctx);
+    /* No '/' before cursor → resolve helper short-circuits without
+     * calling the expander. */
+    ASSERT(ctx->expanded_directory == NULL);
+    mock_completion_reset();
+}
+
+TEST(no_executor_leaves_expanded_directory_null) {
+    /* When current_executor is NULL the analyzer cannot evaluate
+     * expansions; expanded_directory stays NULL even when path-prefix
+     * bytes are present. The engine treats this as "search cwd" or
+     * "refuse" depending on context. */
+    mock_completion_reset();
+    /* current_executor stays NULL; mock_expand_result is irrelevant. */
+    const char *buf = "cat ~/Doc";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory == NULL);
+    ASSERT(ctx->branch_count == 0);
+    mock_completion_reset();
+}
+
+TEST(brace_in_path_prefix_populates_branches) {
+    /* cat {a,b}/Doc|  — brace expansion yields per-directory branches.
+     * Mock expand_brace_pattern returns ["a/", "b/"]; expand_if_needed
+     * is called once per branch and pass-through returns the directory
+     * literal in each case. */
+    mock_completion_reset();
+    current_executor = (executor_t *)1;
+    static const char *branches[] = {"a/", "b/"};
+    mock_brace_branches = branches;
+    mock_brace_branch_count = 2;
+    /* For the per-branch resolution we want the expander to echo
+     * whatever it's given. The current mock returns mock_expand_result
+     * unconditionally; setting it to "a/" yields the same value for
+     * both branches, which is enough to verify branch_count and the
+     * shared dequoted_filename_prefix wiring. */
+    mock_expand_result = "a/";
+    const char *buf = "cat {a,b}/Doc";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->branch_count == 2);
+    ASSERT(ctx->branches != NULL);
+    ASSERT(ctx->branches[0].expanded_directory != NULL);
+    ASSERT(ctx->branches[1].expanded_directory != NULL);
+    /* The shared filename prefix is "Doc" — every branch points at the
+     * same dequoted_filename_prefix string the analyzer extracted from
+     * the typed bytes. */
+    ASSERT(ctx->branches[0].dequoted_filename_prefix == ctx->dequoted_filename_prefix);
+    ASSERT(strcmp(ctx->branches[0].dequoted_filename_prefix, "Doc") == 0);
+    /* When branches[] is populated, expanded_directory is left NULL —
+     * the engine reads branches when branch_count > 0. */
+    ASSERT(ctx->expanded_directory == NULL);
+    mock_completion_reset();
+}
+
+TEST(brace_with_no_comma_does_not_populate_branches) {
+    /* cat {nocomma}/Doc|  — a brace expression with no comma or range
+     * is not a multi-branch pattern; the analyzer falls through to
+     * single-value resolution. */
+    mock_completion_reset();
+    current_executor = (executor_t *)1;
+    mock_expand_result = "/expanded/";
+    const char *buf = "cat {nocomma}/Doc";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->branch_count == 0);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(strcmp(ctx->expanded_directory, "/expanded/") == 0);
+    mock_completion_reset();
+}
+
+TEST(brace_at_end_of_word_no_path_prefix_no_branches) {
+    /* cat {a,b}|  — brace at end of word with no '/' after; no path
+     * prefix to resolve. The TAB-alone-at-end-of-expansion handling
+     * happens at the engine layer, not the analyzer. */
+    mock_completion_reset();
+    current_executor = (executor_t *)1;
+    static const char *branches[] = {"a", "b"};
+    mock_brace_branches = branches;
+    mock_brace_branch_count = 2;
+    const char *buf = "cat {a,b}";
+    ANALYZE(buf, strlen(buf), ctx);
+    /* No '/' in word → no path-prefix → resolve helper does not run. */
+    ASSERT(ctx->branch_count == 0);
+    ASSERT(ctx->expanded_directory == NULL);
+    mock_completion_reset();
+}
+
+/* ============================================================================
  * Test runner
  * ============================================================================ */
 
@@ -512,6 +659,16 @@ int main(void) {
     RUN_TEST(cursor_in_second_arg_after_first_quoted_arg);
     RUN_TEST(quoted_arg_after_pipe_is_argument_not_command_position);
     RUN_TEST(unquoted_pipe_inside_quoted_string_is_literal);
+
+    /* Expansion resolution */
+    RUN_TEST(resolve_path_prefix_with_tilde);
+    RUN_TEST(resolve_path_prefix_with_variable);
+    RUN_TEST(resolve_path_prefix_absolute_path);
+    RUN_TEST(no_path_prefix_leaves_expanded_directory_null);
+    RUN_TEST(no_executor_leaves_expanded_directory_null);
+    RUN_TEST(brace_in_path_prefix_populates_branches);
+    RUN_TEST(brace_with_no_comma_does_not_populate_branches);
+    RUN_TEST(brace_at_end_of_word_no_path_prefix_no_branches);
 
     return TEST_RESULT();
 }
