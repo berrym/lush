@@ -466,38 +466,42 @@ TEST(unquoted_pipe_inside_quoted_string_is_literal) {
  * to a per-branch set via the executor's expansion machinery)
  * ============================================================================ */
 
-TEST(resolve_path_prefix_with_tilde) {
-    /* cat ~/Doc|  — path-prefix ~/  resolves to /home/test/. */
+TEST(resolve_path_prefix_with_tilde_uses_HOME) {
+    /* cat ~/Doc|  — tilde expansion is local (getenv("HOME")). The
+     * analyzer does NOT need the executor for this case; setting
+     * HOME to a known value lets us verify the resolved directory
+     * exactly. */
     mock_completion_reset();
-    current_executor = (executor_t *)1; /* sentinel; analyzer only checks NULL */
-    mock_expand_result = "/home/test/";
+    setenv("HOME", "/test/home", 1);
     const char *buf = "cat ~/Doc";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expanded_directory != NULL);
-    ASSERT(strcmp(ctx->expanded_directory, "/home/test/") == 0);
+    /* The expansion strips the leading "~" and prepends $HOME. The
+     * result here is "/test/home/" -- the HOME value plus the
+     * literal '/' from the user's typed prefix. */
+    ASSERT(strcmp(ctx->expanded_directory, "/test/home/") == 0);
     ASSERT(ctx->branch_count == 0);
     ASSERT(strcmp(ctx->dequoted_filename_prefix, "Doc") == 0);
     mock_completion_reset();
 }
 
-TEST(resolve_path_prefix_with_variable) {
-    /* cat $HOME/Doc|  — same shape; mock resolves $HOME/ to /home/test/. */
+TEST(resolve_path_prefix_with_variable_uses_getenv) {
+    /* cat $HOME/Doc|  — variable expansion is local (getenv).
+     * No executor required. */
     mock_completion_reset();
-    current_executor = (executor_t *)1;
-    mock_expand_result = "/home/test/";
+    setenv("HOME", "/test/home", 1);
     const char *buf = "cat $HOME/Doc";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expanded_directory != NULL);
-    ASSERT(strcmp(ctx->expanded_directory, "/home/test/") == 0);
+    ASSERT(strcmp(ctx->expanded_directory, "/test/home/") == 0);
     ASSERT(strcmp(ctx->dequoted_filename_prefix, "Doc") == 0);
     mock_completion_reset();
 }
 
 TEST(resolve_path_prefix_absolute_path) {
-    /* cat /tmp/Doc|  — absolute path; mock pass-through. */
+    /* cat /tmp/Doc|  — absolute path, no expansion needed; passes
+     * through verbatim. No executor required. */
     mock_completion_reset();
-    current_executor = (executor_t *)1;
-    mock_expand_result = "/tmp/";
     const char *buf = "cat /tmp/Doc";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expanded_directory != NULL);
@@ -506,26 +510,23 @@ TEST(resolve_path_prefix_absolute_path) {
 }
 
 TEST(no_path_prefix_leaves_expanded_directory_null) {
-    /* cat my|  — no path prefix; analyzer doesn't call expansion. */
+    /* cat my|  — no '/' in word, no path-prefix to resolve. */
     mock_completion_reset();
-    current_executor = (executor_t *)1;
-    mock_expand_result = "should_not_be_used";
     const char *buf = "cat my";
     ANALYZE(buf, strlen(buf), ctx);
-    /* No '/' before cursor → resolve helper short-circuits without
-     * calling the expander. */
     ASSERT(ctx->expanded_directory == NULL);
     mock_completion_reset();
 }
 
-TEST(no_executor_leaves_expanded_directory_null) {
-    /* When current_executor is NULL the analyzer cannot evaluate
-     * expansions; expanded_directory stays NULL even when path-prefix
-     * bytes are present. The engine treats this as "search cwd" or
-     * "refuse" depending on context. */
+TEST(unresolvable_command_substitution_without_executor_leaves_null) {
+    /* cat $(pwd)/Doc|  — command substitution requires the
+     * executor's expand_if_needed; without an executor the analyzer
+     * cannot resolve the directory and leaves expanded_directory
+     * NULL. The engine then treats the completion as cwd-relative or
+     * refuses. */
     mock_completion_reset();
-    /* current_executor stays NULL; mock_expand_result is irrelevant. */
-    const char *buf = "cat ~/Doc";
+    /* current_executor stays NULL. */
+    const char *buf = "cat $(pwd)/Doc";
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expanded_directory == NULL);
     ASSERT(ctx->branch_count == 0);
@@ -577,6 +578,57 @@ TEST(brace_with_no_comma_does_not_populate_branches) {
     ASSERT(ctx->branch_count == 0);
     ASSERT(ctx->expanded_directory != NULL);
     ASSERT(strcmp(ctx->expanded_directory, "/expanded/") == 0);
+    mock_completion_reset();
+}
+
+TEST(plain_relative_path_resolves_without_executor) {
+    /* Issue #89 (regression): typed `cd lush/<TAB>` must resolve
+     * expanded_directory to "lush/" so the file source scans the
+     * subdirectory rather than cwd. The path prefix has no expansion
+     * markers, so the analyzer's local resolution path produces it
+     * verbatim -- no executor required. */
+    mock_completion_reset();
+    /* current_executor stays NULL; mock_expand_result is unset. */
+    const char *buf = "cd lush/";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(strcmp(ctx->expanded_directory, "lush/") == 0);
+    mock_completion_reset();
+}
+
+TEST(parent_dir_relative_path_resolves_without_executor) {
+    /* Issue #89: typed `cd ../<TAB>` resolves to "../". */
+    mock_completion_reset();
+    const char *buf = "cd ../";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(strcmp(ctx->expanded_directory, "../") == 0);
+    mock_completion_reset();
+}
+
+TEST(absolute_path_resolves_without_executor) {
+    /* Issue #89: typed `cat /tmp/<TAB>` resolves to "/tmp/". */
+    mock_completion_reset();
+    const char *buf = "cat /tmp/";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(strcmp(ctx->expanded_directory, "/tmp/") == 0);
+    mock_completion_reset();
+}
+
+TEST(tilde_path_resolves_without_executor) {
+    /* `cat ~/<TAB>` should resolve to the user's home directory via
+     * getenv("HOME") -- no executor required. The exact value depends
+     * on the test environment's HOME, so we just assert it begins
+     * with '/' and ends with '/'. */
+    mock_completion_reset();
+    const char *buf = "cat ~/";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expanded_directory != NULL);
+    ASSERT(ctx->expanded_directory[0] == '/');
+    /* ~/ → $HOME + '/' (the trailing slash from the user's prefix). */
+    size_t n = strlen(ctx->expanded_directory);
+    ASSERT(n > 0 && ctx->expanded_directory[n - 1] == '/');
     mock_completion_reset();
 }
 
@@ -757,14 +809,18 @@ int main(void) {
     RUN_TEST(unquoted_pipe_inside_quoted_string_is_literal);
 
     /* Expansion resolution */
-    RUN_TEST(resolve_path_prefix_with_tilde);
-    RUN_TEST(resolve_path_prefix_with_variable);
+    RUN_TEST(resolve_path_prefix_with_tilde_uses_HOME);
+    RUN_TEST(resolve_path_prefix_with_variable_uses_getenv);
     RUN_TEST(resolve_path_prefix_absolute_path);
     RUN_TEST(no_path_prefix_leaves_expanded_directory_null);
-    RUN_TEST(no_executor_leaves_expanded_directory_null);
+    RUN_TEST(unresolvable_command_substitution_without_executor_leaves_null);
     RUN_TEST(brace_in_path_prefix_populates_branches);
     RUN_TEST(brace_with_no_comma_does_not_populate_branches);
     RUN_TEST(brace_at_end_of_word_no_path_prefix_no_branches);
+    RUN_TEST(plain_relative_path_resolves_without_executor);
+    RUN_TEST(parent_dir_relative_path_resolves_without_executor);
+    RUN_TEST(absolute_path_resolves_without_executor);
+    RUN_TEST(tilde_path_resolves_without_executor);
 
     /* Keyword tracking and heredoc body */
     RUN_TEST(for_in_list_after_for_x_in);

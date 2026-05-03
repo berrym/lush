@@ -50,9 +50,12 @@
 #include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
 
+#include <ctype.h>
+#include <pwd.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 /* ============================================================================
  * Walker — internal state held during one analyze() call
@@ -1158,23 +1161,166 @@ static bool path_prefix_has_brace_list(const char *path_prefix) {
     return false;
 }
 
-/* Resolve a single path-prefix string to an absolute directory path.
- * Returns a pool-owned string on success, NULL if no useful resolution
- * could be produced. */
+/* Look up a user's home directory by name. Returns NULL if the user
+ * doesn't exist. Result is borrowed from /etc/passwd via getpwnam --
+ * caller copies before assuming any lifetime. */
+static const char *lookup_user_home(const char *user) {
+    if (!user || !user[0]) {
+        const char *h = getenv("HOME");
+        if (h && h[0]) return h;
+        struct passwd *pw = getpwuid(getuid());
+        return pw ? pw->pw_dir : NULL;
+    }
+    struct passwd *pw = getpwnam(user);
+    return pw ? pw->pw_dir : NULL;
+}
+
+/* Tilde expansion: ~/path or ~user/path. Returns a pool-owned string
+ * with the tilde replaced by the resolved home directory, or NULL if
+ * the resolution fails (no HOME / unknown user). */
+static char *expand_tilde_local(const char *path_prefix,
+                                lle_memory_pool_t *pool) {
+    (void)pool;
+    if (!path_prefix || path_prefix[0] != '~') return NULL;
+
+    /* Find the username portion: bytes after `~` up to the first `/` or
+     * end of string. Empty username means "current user." */
+    const char *slash = strchr(path_prefix, '/');
+    size_t name_len   = slash ? (size_t)(slash - path_prefix - 1)
+                              : strlen(path_prefix) - 1;
+
+    const char *home = NULL;
+    if (name_len == 0) {
+        home = lookup_user_home(NULL);
+    } else {
+        char user[256];
+        if (name_len >= sizeof(user)) return NULL;
+        memcpy(user, path_prefix + 1, name_len);
+        user[name_len] = '\0';
+        home = lookup_user_home(user);
+    }
+    if (!home) return NULL;
+
+    const char *rest      = slash ? slash : "";
+    size_t      home_len  = strlen(home);
+    size_t      rest_len  = strlen(rest);
+    char       *result    = lle_pool_alloc(home_len + rest_len + 1);
+    if (!result) return NULL;
+    memcpy(result, home, home_len);
+    memcpy(result + home_len, rest, rest_len + 1);
+    return result;
+}
+
+/* Variable expansion at start of path: $NAME/path or ${NAME}/path.
+ * Only handles bare and braced names (no parameter operators like
+ * :-default); returns NULL for unsupported forms or unset vars. */
+static char *expand_variable_local(const char *path_prefix,
+                                   lle_memory_pool_t *pool) {
+    (void)pool;
+    if (!path_prefix || path_prefix[0] != '$') return NULL;
+
+    const char *name_start;
+    const char *name_end;
+    const char *rest;
+    if (path_prefix[1] == '{') {
+        name_start = path_prefix + 2;
+        const char *close = strchr(name_start, '}');
+        if (!close) return NULL;
+        /* Refuse parameter operators ${NAME:-default} etc. */
+        for (const char *p = name_start; p < close; p++) {
+            if (*p == ':' || *p == '-' || *p == '+' || *p == '?' ||
+                *p == '=' || *p == '#' || *p == '%' || *p == '/') {
+                return NULL;
+            }
+        }
+        name_end = close;
+        rest     = close + 1;
+    } else {
+        name_start = path_prefix + 1;
+        name_end   = name_start;
+        while (*name_end && (isalnum((unsigned char)*name_end) ||
+                              *name_end == '_')) {
+            name_end++;
+        }
+        if (name_end == name_start) return NULL; /* bare $ */
+        rest = name_end;
+    }
+
+    size_t name_len = (size_t)(name_end - name_start);
+    char   name_buf[256];
+    if (name_len >= sizeof(name_buf)) return NULL;
+    memcpy(name_buf, name_start, name_len);
+    name_buf[name_len] = '\0';
+
+    const char *value = getenv(name_buf);
+    if (!value) return NULL;
+    size_t value_len = strlen(value);
+    size_t rest_len  = strlen(rest);
+    char  *result    = lle_pool_alloc(value_len + rest_len + 1);
+    if (!result) return NULL;
+    memcpy(result, value, value_len);
+    memcpy(result + value_len, rest, rest_len + 1);
+    return result;
+}
+
+/* Resolve a single path-prefix string to an absolute or relative
+ * directory path the file source can pass to opendir().
+ *
+ * The expansion is done locally for the side-effect-free cases that
+ * don't require the shell's executor: plain paths pass through
+ * unchanged, leading `~` and `~user` resolve via getenv / getpwnam,
+ * leading `$NAME` and `${NAME}` resolve via getenv. For richer forms
+ * (parameter expansion operators, command substitution, arithmetic,
+ * mid-string variables) we delegate to lush's full expand_if_needed
+ * when an executor is available; otherwise we return NULL and the
+ * file source falls back to cwd.
+ *
+ * Returns a pool-owned string on success, NULL otherwise.
+ */
 static char *resolve_single_path_prefix(const char *path_prefix,
                                         lle_memory_pool_t *pool) {
-    (void)pool;
     if (!path_prefix || path_prefix[0] == '\0') return NULL;
-    if (!current_executor) return NULL;
 
-    char *expanded = expand_if_needed(current_executor, path_prefix);
-    if (!expanded || expanded[0] == '\0') {
-        free(expanded);
-        return NULL;
+    /* Tilde expansion at start: handled locally. */
+    if (path_prefix[0] == '~') {
+        char *r = expand_tilde_local(path_prefix, pool);
+        if (r) return r;
+        /* Fall through to executor path on failure. */
     }
-    char *result = pool_strdup(expanded);
-    free(expanded);
-    return result;
+
+    /* Bare / braced variable at start: handled locally if simple. */
+    if (path_prefix[0] == '$' && path_prefix[1] != '(') {
+        char *r = expand_variable_local(path_prefix, pool);
+        if (r) return r;
+        /* Fall through to executor path on more complex forms. */
+    }
+
+    /* Anything containing $(... or backtick, or richer forms we don't
+     * recognize, requires the shell's expansion machinery. Use it
+     * when an executor is available; otherwise leave NULL. */
+    if (current_executor) {
+        char *expanded = expand_if_needed(current_executor, path_prefix);
+        if (expanded && expanded[0]) {
+            char *result = pool_strdup(expanded);
+            free(expanded);
+            return result;
+        }
+        free(expanded);
+    }
+
+    /* Final fallback: plain paths (no expansion markers) pass through
+     * verbatim. opendir() handles relative and absolute paths
+     * uniformly. */
+    if (path_prefix[0] != '$' && path_prefix[0] != '`' &&
+        path_prefix[0] != '~') {
+        return pool_strdup(path_prefix);
+    }
+
+    /* Path begins with an expansion marker we couldn't resolve (e.g.,
+     * `$(cmd)/` without an executor). Leave the directory NULL so the
+     * source treats this as cwd or refuses, depending on its own
+     * applicability rules. */
+    return NULL;
 }
 
 /* Single-value path: populate ctx->expanded_directory if the typed
