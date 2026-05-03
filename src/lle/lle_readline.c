@@ -64,6 +64,8 @@
 #include "lle/arena.h" /* Hierarchical arena allocator */
 #include "lle/buffer_management.h"
 #include "lle/completion/completion_system.h" /* Completion system for menu visibility */
+#include "lle/completion/splicer.h"
+#include "lle/completion/word_context.h"
 #include "lle/display_integration.h" /* Spec 08: Complete display integration */
 #include "lle/error_handling.h"
 #include "lle/event_system.h"
@@ -1200,36 +1202,68 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* If completion menu is active, accept the selected completion instead of
-     * the line */
-    if (ctx->editor) {
-        /* Check completion system first */
-        if (ctx->editor->completion_system &&
-            lle_completion_system_is_menu_visible(
-                ctx->editor->completion_system)) {
+    /* If completion menu is active, finalize the cycled selection
+     * before accepting the line. The preview phase placed the
+     * candidate's literal text in the buffer (no close-quote, no
+     * trailing space, no slash); accept-phase appends the type-
+     * driven suffix -- "/" for directories, the matching close-
+     * quote (when a quote is open) plus a space for everything
+     * else. After the splice we clear the menu and continue with
+     * the rest of the accept-line flow so the now-finalized buffer
+     * is what gets submitted (or extended on a follow-up TAB
+     * inside a directory). */
+    if (ctx->editor && ctx->editor->completion_system &&
+        lle_completion_system_is_menu_visible(
+            ctx->editor->completion_system)) {
 
-            /* NOTE: The inline preview has already updated the buffer with the
-             * selected completion text. When navigating completions
-             * (UP/DOWN/TAB), update_inline_completion() replaces the current
-             * word with each selected item. So the buffer already contains the
-             * correct text.
-             *
-             * We just need to clear the menu and NOT modify the buffer further.
-             * The old code tried to replace based on stale context, causing
-             * duplicates.
-             */
+        lle_completion_state_t *state =
+            lle_completion_system_get_state(ctx->editor->completion_system);
+        lle_completion_menu_state_t *menu =
+            lle_completion_system_get_menu(ctx->editor->completion_system);
 
-            /* Clear the completion menu */
-            lle_completion_system_clear(ctx->editor->completion_system);
-            display_controller_t *dc = display_integration_get_controller();
-            if (dc) {
-                display_controller_clear_completion_menu(dc);
+        if (state && menu) {
+            const lle_completion_item_t *selected =
+                lle_completion_menu_get_selected(menu);
+            if (selected) {
+                lle_completion_item_t synthetic_item = *selected;
+                if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
+                    selected->description != NULL) {
+                    synthetic_item.text = (char *)selected->description;
+                }
+
+                lle_word_context_t *splice_context = NULL;
+                lle_result_t        ctx_result     = lle_word_context_analyze(
+                    ctx->buffer->data, ctx->buffer->cursor.byte_offset,
+                    ctx->editor->lle_pool, &splice_context);
+                if (ctx_result == LLE_SUCCESS && splice_context) {
+                    (void)lle_splicer_apply_accept(
+                        ctx->buffer, ctx->editor->cursor_manager,
+                        splice_context, &synthetic_item,
+                        ctx->editor->lle_pool);
+                    lle_word_context_free(splice_context);
+                }
             }
-
-            /* Refresh display and return - don't accept line yet */
-            refresh_display(ctx);
-            return LLE_SUCCESS;
         }
+
+        /* Clear the completion menu now that the selection is
+         * finalized. */
+        lle_completion_system_clear(ctx->editor->completion_system);
+        display_controller_t *dc = display_integration_get_controller();
+        if (dc) {
+            display_controller_clear_completion_menu(dc);
+        }
+
+        /* Directory selections leave the cursor inside an open
+         * quote with a trailing "/" and the user generally wants to
+         * keep typing; non-directory selections terminate the
+         * argument with a close-quote (if needed) and a trailing
+         * space. Either way, the user's first ENTER finalizes the
+         * cycle but does NOT submit the line -- a second ENTER
+         * submits the now-finalized buffer. This matches the
+         * existing readline behavior; only the buffer-finalization
+         * step is new. */
+        refresh_display(ctx);
+        return LLE_SUCCESS;
     }
 
     /* Check for incomplete input using shared continuation parser */

@@ -2585,51 +2585,21 @@ lle_result_t lle_accept_line(lle_editor_t *editor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* If completion menu is active, accept the selected completion */
+    /* This is the simple keybinding action for line acceptance. The
+     * full menu-aware ENTER handling -- including splicer-driven
+     * finalization of a cycled completion candidate (close-quote,
+     * trailing space, "/" for directories) -- lives in
+     * lle_accept_line_context (src/lle/lle_readline.c), which
+     * overrides this action for the ENTER binding via
+     * lle_keybinding_manager_bind_context. lle_accept_line itself is
+     * a fallback for any binding path that does not have access to
+     * the readline_context_t and so cannot run the splicer. In that
+     * fallback path the most we can do for an active menu is clear
+     * it; the buffer content (possibly a preview from cycling) is
+     * left as-is. */
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
-        lle_completion_state_t *state =
-            lle_completion_system_get_state(editor->completion_system);
-        lle_completion_menu_state_t *menu =
-            lle_completion_system_get_menu(editor->completion_system);
-
-        if (state && menu && state->context) {
-            const lle_completion_item_t *selected =
-                lle_completion_menu_get_selected(menu);
-
-            if (selected) {
-                /* External commands shadowing a builtin/alias are
-                 * spliced via their full PATH-resolved path. */
-                lle_completion_item_t synthetic_item = *selected;
-                if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
-                    selected->description != NULL) {
-                    synthetic_item.text = (char *)selected->description;
-                }
-
-                /* Re-analyze the buffer at its current cursor for the
-                 * accept-phase splice. The state's stored context
-                 * captures the buffer at generation time, but cycling
-                 * may have moved the cursor since then. */
-                lle_word_context_t *splice_context = NULL;
-                lle_result_t ctx_result = lle_word_context_analyze(
-                    editor->buffer->data, editor->buffer->cursor.byte_offset,
-                    editor->lle_pool, &splice_context);
-                if (ctx_result == LLE_SUCCESS && splice_context) {
-                    lle_result_t result = lle_splicer_apply_accept(
-                        editor->buffer, editor->cursor_manager,
-                        splice_context, &synthetic_item, editor->lle_pool);
-                    lle_word_context_free(splice_context);
-                    clear_completion_menu(editor);
-                    return result;
-                }
-                clear_completion_menu(editor);
-                return LLE_SUCCESS;
-            }
-        }
-
-        /* Fallback: just clear menu and accept line */
         clear_completion_menu(editor);
-        return LLE_SUCCESS;
     }
 
     /* Signal that line is accepted (caller handles execution) */
