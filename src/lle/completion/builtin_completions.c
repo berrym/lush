@@ -531,7 +531,7 @@ size_t lle_builtin_get_spec_count(void) { return builtin_specs_count; }
  * @param out_depth Output: depth in subcommand hierarchy
  */
 static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
-                                    const lle_context_analyzer_t *context,
+                                    const lle_word_context_t *context,
                                     const lle_builtin_subcommand_t **out_subcmd,
                                     int *out_depth) {
     *out_subcmd = NULL;
@@ -551,7 +551,7 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
     size_t subcommand_count = spec->subcommand_count;
     const lle_builtin_subcommand_t *current = NULL;
 
-    for (int i = 0; i < context->argument_count; i++) {
+    for (size_t i = 0; i < context->argument_count; i++) {
         const char *arg = context->arguments[i];
         if (!arg) {
             break;
@@ -679,10 +679,10 @@ generate_theme_completions(lle_memory_pool_t *pool, const char *prefix,
  * @brief Generate alias completions for unalias
  */
 static lle_result_t
-generate_alias_completions(lle_memory_pool_t *pool, const char *prefix,
+generate_alias_completions(lle_memory_pool_t *pool,
+                           const lle_word_context_t *context,
                            lle_completion_result_t *result) {
-    /* Use the existing alias completion source */
-    return lle_completion_source_aliases(pool, prefix, result);
+    return lle_completion_source_aliases(pool, context, result);
 }
 
 /**
@@ -745,30 +745,36 @@ generate_feature_completions(lle_memory_pool_t *pool, const char *prefix,
 
 /**
  * @brief Generate completions based on argument type
+ *
+ * Routes to the appropriate source. Path-shaped sources receive the
+ * full word context so they can access expanded_directory; non-path
+ * sources read the dequoted prefix from context->dequoted_filename_prefix.
  */
 static lle_result_t generate_dynamic_completions(
     lle_memory_pool_t *pool, lle_builtin_arg_type_t arg_type,
-    const char *prefix, lle_completion_result_t *result) {
+    const lle_word_context_t *context, lle_completion_result_t *result) {
+    const char *prefix =
+        context->dequoted_filename_prefix ? context->dequoted_filename_prefix
+                                           : "";
     switch (arg_type) {
     case LLE_BUILTIN_ARG_NONE:
         return LLE_SUCCESS;
 
     case LLE_BUILTIN_ARG_FILE:
-        return lle_completion_source_files(pool, prefix, result);
+        return lle_completion_source_files(pool, context, result);
 
     case LLE_BUILTIN_ARG_DIRECTORY:
-        return lle_completion_source_directories(pool, prefix, result);
+        return lle_completion_source_directories(pool, context, result);
 
     case LLE_BUILTIN_ARG_VARIABLE:
-        return lle_completion_source_variables(pool, prefix, result);
+        return lle_completion_source_variables(pool, context, result);
 
     case LLE_BUILTIN_ARG_ALIAS:
-        return generate_alias_completions(pool, prefix, result);
+        return generate_alias_completions(pool, context, result);
 
     case LLE_BUILTIN_ARG_COMMAND:
-        /* Builtins + PATH commands */
-        lle_completion_source_builtins(pool, prefix, result);
-        return lle_completion_source_commands(pool, prefix, result);
+        lle_completion_source_builtins(pool, context, result);
+        return lle_completion_source_commands(pool, context, result);
 
     case LLE_BUILTIN_ARG_SIGNAL:
         return generate_signal_completions(pool, prefix, result);
@@ -790,13 +796,13 @@ static lle_result_t generate_dynamic_completions(
 // APPLICABILITY CHECK
 // ============================================================================
 
-bool lle_builtin_completions_applicable(const lle_context_analyzer_t *context) {
+bool lle_builtin_completions_applicable(const lle_word_context_t *context) {
     if (!context) {
         return false;
     }
 
     /* Only applicable when completing arguments to a command */
-    if (context->type != LLE_CONTEXT_ARGUMENT) {
+    if (context->context_type != LLE_CONTEXT_ARGUMENT) {
         return false;
     }
 
@@ -813,8 +819,8 @@ bool lle_builtin_completions_applicable(const lle_context_analyzer_t *context) {
 // ============================================================================
 
 lle_result_t lle_builtin_completions_generate(
-    lle_memory_pool_t *pool, const lle_context_analyzer_t *context,
-    const char *prefix, lle_completion_result_t *result) {
+    lle_memory_pool_t *pool, const lle_word_context_t *context,
+    lle_completion_result_t *result) {
     if (!pool || !context || !result) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
@@ -826,7 +832,9 @@ lle_result_t lle_builtin_completions_generate(
         return LLE_SUCCESS; /* Not a builtin we know about */
     }
 
-    const char *match_prefix = prefix ? prefix : "";
+    const char *match_prefix = context->dequoted_filename_prefix
+                                   ? context->dequoted_filename_prefix
+                                   : "";
     size_t prefix_len = strlen(match_prefix);
 
     /* Find current position in subcommand hierarchy */
@@ -891,7 +899,7 @@ lle_result_t lle_builtin_completions_generate(
     /* Add dynamic completions based on arg type */
     if (arg_type != LLE_BUILTIN_ARG_NONE) {
         lle_result_t res =
-            generate_dynamic_completions(pool, arg_type, match_prefix, result);
+            generate_dynamic_completions(pool, arg_type, context, result);
         if (res != LLE_SUCCESS) {
             return res;
         }

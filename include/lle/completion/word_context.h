@@ -194,6 +194,17 @@ typedef struct lle_word_context {
     int   arg_index;               /**< Zero-based index of this argument
                                         within its command. -1 if not
                                         applicable.                         */
+    char **arguments;              /**< Pool-allocated array of completed
+                                        argument strings before the
+                                        cursor's current word, dequoted
+                                        and NFC-normalized. Used by
+                                        builtin-arg sources to walk
+                                        subcommand hierarchies (e.g.,
+                                        recognizing the chain in
+                                        `display lle theme set <here>`).
+                                        NULL when no completed arguments
+                                        exist.                              */
+    size_t argument_count;         /**< Number of entries in arguments[]. */
 
     /* Resolved data for sources ------------------------------------------ */
     char *expanded_directory;      /**< Absolute path to scan when the word

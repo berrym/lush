@@ -19,7 +19,6 @@
  * - Phase 5.4: Runtime State (completion_system)
  */
 
-#include "lle/completion/completion_generator.h"
 #include "lle/completion/completion_menu_logic.h"
 #include "lle/completion/completion_menu_renderer.h"
 #include "lle/completion/completion_menu_state.h"
@@ -144,30 +143,29 @@ void test_completion_result_structure(void) {
 }
 
 /**
- * @brief Test: Verify completion context enumeration
+ * @brief Test: Verify the analyzer's context-type enumeration
+ *
+ * The legacy lle_completion_context_t enum was removed alongside the
+ * old completion_generator. Context classification now lives on the
+ * word_context analyzer's lle_word_context_type_t. This test
+ * confirms the canonical context values are present and distinct.
  */
 void test_completion_context_enum(void) {
-    printf("[ TEST ] Completion context enumeration\n");
+    printf("[ TEST ] Word-context type enumeration\n");
 
-    lle_completion_context_t ctx;
+    lle_word_context_type_t ctx;
+    ctx = LLE_CONTEXT_COMMAND_POSITION;
+    TEST_ASSERT(ctx == LLE_CONTEXT_COMMAND_POSITION,
+                "COMMAND_POSITION context exists");
+    ctx = LLE_CONTEXT_ARGUMENT;
+    TEST_ASSERT(ctx == LLE_CONTEXT_ARGUMENT, "ARGUMENT context exists");
+    ctx = LLE_CONTEXT_VARIABLE_NAME;
+    TEST_ASSERT(ctx == LLE_CONTEXT_VARIABLE_NAME,
+                "VARIABLE_NAME context exists");
+    ctx = LLE_CONTEXT_UNKNOWN;
+    TEST_ASSERT(ctx == LLE_CONTEXT_UNKNOWN, "UNKNOWN context exists");
 
-    ctx = LLE_COMPLETION_CONTEXT_COMMAND;
-    TEST_ASSERT(ctx == LLE_COMPLETION_CONTEXT_COMMAND,
-                "COMMAND context exists");
-
-    ctx = LLE_COMPLETION_CONTEXT_ARGUMENT;
-    TEST_ASSERT(ctx == LLE_COMPLETION_CONTEXT_ARGUMENT,
-                "ARGUMENT context exists");
-
-    ctx = LLE_COMPLETION_CONTEXT_VARIABLE;
-    TEST_ASSERT(ctx == LLE_COMPLETION_CONTEXT_VARIABLE,
-                "VARIABLE context exists");
-
-    ctx = LLE_COMPLETION_CONTEXT_UNKNOWN;
-    TEST_ASSERT(ctx == LLE_COMPLETION_CONTEXT_UNKNOWN,
-                "UNKNOWN context exists");
-
-    printf("[ PASS ] Completion context enumeration\n");
+    printf("[ PASS ] Word-context type enumeration\n");
 }
 
 /**

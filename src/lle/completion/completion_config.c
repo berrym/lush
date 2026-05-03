@@ -464,7 +464,7 @@ static bool pattern_matches(const char *pattern, const char *command_name,
  * @return true if source is applicable, false otherwise
  */
 static bool config_source_is_applicable(void *user_data,
-                                        const lle_context_analyzer_t *context) {
+                                        const lle_word_context_t *context) {
     lle_command_source_config_t *config =
         (lle_command_source_config_t *)user_data;
 
@@ -473,14 +473,14 @@ static bool config_source_is_applicable(void *user_data,
     }
 
     /* Check argument position constraint */
-    if (config->argument > 0 && context->argument_index != config->argument) {
+    if (config->argument > 0 && context->arg_index != config->argument) {
         return false;
     }
 
     /* Check applies_to patterns */
     for (size_t i = 0; i < config->applies_to_count; i++) {
         if (pattern_matches(config->applies_to[i], context->command_name,
-                            context->argument_index)) {
+                            context->arg_index)) {
             return true;
         }
     }
@@ -501,14 +501,17 @@ static bool config_source_is_applicable(void *user_data,
  * @return LLE_SUCCESS or error code
  */
 static lle_result_t
-config_source_generate(void *user_data, const lle_context_analyzer_t *context,
-                       const char *prefix, lle_completion_result_t *result) {
+config_source_generate(void *user_data, const lle_word_context_t *context,
+                       lle_completion_result_t *result) {
     lle_command_source_config_t *config =
         (lle_command_source_config_t *)user_data;
 
-    if (!config || !prefix || !result) {
+    if (!config || !context || !result) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
+    const char *prefix =
+        context->dequoted_filename_prefix ? context->dequoted_filename_prefix
+                                           : "";
 
     char **lines = NULL;
     size_t line_count = 0;

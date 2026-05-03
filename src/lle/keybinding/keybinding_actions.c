@@ -18,9 +18,10 @@
 #include "display_controller.h"
 #include "display_integration.h"
 #include "lle/buffer_management.h"
-#include "lle/completion/completion_generator.h"
 #include "lle/completion/completion_menu_logic.h"
 #include "lle/completion/completion_system.h"
+#include "lle/completion/splicer.h"
+#include "lle/completion/word_context.h"
 #include "lle/display_integration.h"
 #include "lle/history.h"
 #include "lle/keybinding.h"
@@ -312,54 +313,6 @@ static void refresh_after_completion(display_controller_t *dc) {
     }
 }
 
-/**
- * @brief Replace word at cursor with completion text
- *
- * Deletes the word being completed and inserts the selected completion.
- *
- * @param editor Editor instance
- * @param word_start Byte offset where word starts
- * @param word_length Length of word to replace
- * @param replacement Replacement text to insert
- * @return LLE_SUCCESS on success, error code on failure
- */
-static lle_result_t replace_word_at_cursor(lle_editor_t *editor,
-                                           size_t word_start,
-                                           size_t word_length,
-                                           const char *replacement) {
-    if (!editor || !editor->buffer || !replacement) {
-        return LLE_ERROR_INVALID_PARAMETER;
-    }
-
-    /* Delete the word being completed */
-    if (word_length > 0) {
-        lle_result_t result =
-            lle_buffer_delete_text(editor->buffer, word_start, word_length);
-        if (result != LLE_SUCCESS) {
-            return result;
-        }
-    }
-
-    /* Insert the replacement text at word_start */
-    lle_result_t result = lle_buffer_insert_text(
-        editor->buffer, word_start, replacement, strlen(replacement));
-    if (result != LLE_SUCCESS) {
-        return result;
-    }
-
-    /* Move cursor to end of inserted text */
-    size_t new_pos = word_start + strlen(replacement);
-    lle_result_t move_result =
-        lle_cursor_manager_move_to_byte_offset(editor->cursor_manager, new_pos);
-
-    /* CRITICAL: Sync buffer cursor back from cursor manager after movement */
-    if (move_result == LLE_SUCCESS) {
-        lle_cursor_manager_get_position(editor->cursor_manager,
-                                        &editor->buffer->cursor);
-    }
-
-    return move_result;
-}
 
 /**
  * @brief Update inline text with selected completion
@@ -389,33 +342,29 @@ static void update_inline_completion(lle_editor_t *editor,
     const lle_completion_item_t *selected =
         &state->results->items[menu->selected_index];
 
-    /* Determine what text to insert:
-     * - For external commands that shadow builtins/aliases, use the full path
-     *   stored in the description field (e.g., "/usr/bin/echo")
-     * - For all other completions, use the normal text field
-     */
-    const char *insert_text = selected->text;
+    /* Re-analyze the buffer at its CURRENT cursor: prior cycling
+     * iterations have mutated the filename-portion bytes, so the
+     * boundaries from the initial generation are stale. */
+    lle_word_context_t *current_context = NULL;
+    lle_result_t ctx_result = lle_word_context_analyze(
+        editor->buffer->data, editor->buffer->cursor.byte_offset,
+        editor->lle_pool, &current_context);
+    if (ctx_result != LLE_SUCCESS || !current_context) return;
+
+    /* External commands that shadow a builtin or alias carry their
+     * full PATH-resolved path in description; the engine splices that
+     * full path so the user picks the disambiguating absolute name.
+     * For all other types the candidate's text is what gets spliced. */
+    lle_completion_item_t synthetic_item = *selected;
     if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
         selected->description != NULL) {
-        insert_text = selected->description;
+        synthetic_item.text = (char *)selected->description;
     }
 
-    /* Find CURRENT word boundaries - not the stale ones from initial context */
-    lle_completion_context_info_t current_context;
-    memset(&current_context, 0, sizeof(current_context));
-    lle_result_t ctx_result = lle_completion_analyze_context(
-        editor->buffer->data, editor->buffer->cursor.byte_offset,
-        &current_context);
-
-    if (ctx_result == LLE_SUCCESS) {
-        replace_word_at_cursor(editor, current_context.word_start,
-                               current_context.word_length, insert_text);
-    }
-
-    /* Free the word allocated by lle_completion_analyze_context */
-    if (current_context.word) {
-        lle_pool_free((void *)current_context.word);
-    }
+    (void)lle_splicer_apply_preview(editor->buffer, editor->cursor_manager,
+                                    current_context, &synthetic_item,
+                                    editor->lle_pool);
+    lle_word_context_free(current_context);
 }
 
 /**
@@ -2527,103 +2476,69 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Extract word being completed */
-    lle_completion_context_info_t context;
-    memset(&context, 0, sizeof(context));
-    lle_result_t ctx_result =
-        lle_completion_analyze_context(buffer, cursor_pos, &context);
-    if (ctx_result != LLE_SUCCESS) {
-        lle_completion_system_clear(editor->completion_system);
-        return LLE_SUCCESS;
-    }
-
-    /* If only one completion, insert it directly */
+    /* Single match: splice the candidate into the buffer with the
+     * accept-phase suffix (close-quote + trailing space for files,
+     * "/" for directories). Multi-match: open the menu and let the
+     * preview path render the first candidate. */
     if (result->count == 1) {
         const lle_completion_item_t *item = &result->items[0];
 
-        /* For external commands that shadow builtins/aliases, use full path */
-        const char *completion_text = item->text;
+        /* External commands shadowing a builtin/alias are spliced as
+         * their full PATH-resolved path so the user disambiguates
+         * away from the builtin. */
+        lle_completion_item_t synthetic_item = *item;
         if (item->type == LLE_COMPLETION_TYPE_COMMAND &&
             item->description != NULL) {
-            completion_text = item->description;
+            synthetic_item.text = (char *)item->description;
         }
 
-        lle_result_t replace_result = replace_word_at_cursor(
-            editor, context.word_start, context.word_length, completion_text);
-
-        /* Free context.word allocated by lle_completion_analyze_context */
-        if (context.word) {
-            lle_pool_free((void *)context.word);
+        /* Re-analyze the buffer to obtain the splice context. The
+         * completion_system already analyzed once during generate,
+         * but the analyzer is cheap and re-running keeps the apply
+         * path self-contained. */
+        lle_word_context_t *splice_context = NULL;
+        lle_result_t ctx_result = lle_word_context_analyze(
+            buffer, cursor_pos, editor->lle_pool, &splice_context);
+        if (ctx_result != LLE_SUCCESS || !splice_context) {
+            lle_completion_system_clear(editor->completion_system);
+            return LLE_SUCCESS;
         }
 
-        /* Clear completion system state since we auto-inserted the single
-         * completion. Without this, the state remains active (is_active=true)
-         * but with no menu, causing subsequent TAB presses to not regenerate
-         * completions.
-         * NOTE: This also frees the result - we don't call result_free
-         * separately since current_state owns the result. */
+        lle_result_t replace_result = lle_splicer_apply_accept(
+            editor->buffer, editor->cursor_manager, splice_context,
+            &synthetic_item, editor->lle_pool);
+        lle_word_context_free(splice_context);
+
+        /* Single-match path consumed the active completion state;
+         * clear it so the next TAB starts a fresh session. */
         lle_completion_system_clear(editor->completion_system);
 
-        /* Trigger display refresh */
         display_controller_t *dc = display_integration_get_controller();
-        if (dc) {
-            refresh_after_completion(dc);
-        }
+        if (dc) refresh_after_completion(dc);
 
         return replace_result;
     }
 
-    /* Multiple completions - activate completion system with menu */
-    /* Completion system stores state internally during generate, just need to
-     * show menu
-     */
+    /* Multiple completions: open the menu. The completion system
+     * already stored the state during generate, so we just preview
+     * the first candidate inline and hand the menu to the display
+     * controller. */
     lle_completion_menu_state_t *menu =
         lle_completion_system_get_menu(editor->completion_system);
     if (!menu) {
-        /* Free context.word before returning */
-        if (context.word) {
-            lle_pool_free((void *)context.word);
-        }
-        /* No menu despite multiple completions - clear state to avoid stuck
-         * active flag. This also frees the result since current_state owns it.
-         */
         lle_completion_system_clear(editor->completion_system);
         return LLE_SUCCESS;
     }
 
-    /* Display menu via display_controller (proper architecture) */
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
-        if (menu) {
-            /* CRITICAL: Update text to show first selected item */
-            lle_completion_state_t *state =
-                lle_completion_system_get_state(editor->completion_system);
-            if (state) {
-                update_inline_completion(editor, menu, state);
-            }
-
-            display_controller_set_completion_menu(dc, menu);
-            /* NOTE: Don't call refresh_after_completion() here!
-             * The caller (execute_keybinding_action) will call
-             * refresh_display(ctx) which goes through lle_render →
-             * lle_display_bridge → command_layer_set_command → REDRAW_NEEDED
-             * event → dc_handle_redraw_needed → menu rendered
-             */
+        lle_completion_state_t *state =
+            lle_completion_system_get_state(editor->completion_system);
+        if (state) {
+            update_inline_completion(editor, menu, state);
         }
+        display_controller_set_completion_menu(dc, menu);
     }
-
-    /* NOTE: Do NOT free the result here - the menu stores a pointer to it.
-     * The result is owned by the completion_state which is managed by the
-     * completion_system. It will be freed when:
-     * - lle_completion_system_clear() is called, or
-     * - A new completion is generated (replaces the old state)
-     */
-
-    /* Free context.word allocated by lle_completion_analyze_context */
-    if (context.word) {
-        lle_pool_free((void *)context.word);
-    }
-
     return LLE_SUCCESS;
 }
 
@@ -2682,24 +2597,33 @@ lle_result_t lle_accept_line(lle_editor_t *editor) {
             const lle_completion_item_t *selected =
                 lle_completion_menu_get_selected(menu);
 
-            if (selected && state->context->partial_word) {
-                /* For external commands that shadow builtins/aliases, use
-                 * full path from description field to bypass the builtin */
-                const char *insert_text = selected->text;
+            if (selected) {
+                /* External commands shadowing a builtin/alias are
+                 * spliced via their full PATH-resolved path. */
+                lle_completion_item_t synthetic_item = *selected;
                 if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
                     selected->description != NULL) {
-                    insert_text = selected->description;
+                    synthetic_item.text = (char *)selected->description;
                 }
 
-                /* Replace word with selected completion */
-                lle_result_t result = replace_word_at_cursor(
-                    editor, state->context->word_start,
-                    strlen(state->context->partial_word), insert_text);
-
-                /* Clear completion menu */
+                /* Re-analyze the buffer at its current cursor for the
+                 * accept-phase splice. The state's stored context
+                 * captures the buffer at generation time, but cycling
+                 * may have moved the cursor since then. */
+                lle_word_context_t *splice_context = NULL;
+                lle_result_t ctx_result = lle_word_context_analyze(
+                    editor->buffer->data, editor->buffer->cursor.byte_offset,
+                    editor->lle_pool, &splice_context);
+                if (ctx_result == LLE_SUCCESS && splice_context) {
+                    lle_result_t result = lle_splicer_apply_accept(
+                        editor->buffer, editor->cursor_manager,
+                        splice_context, &synthetic_item, editor->lle_pool);
+                    lle_word_context_free(splice_context);
+                    clear_completion_menu(editor);
+                    return result;
+                }
                 clear_completion_menu(editor);
-
-                return result;
+                return LLE_SUCCESS;
             }
         }
 

@@ -171,6 +171,9 @@ bool is_interactive_shell(void) {
 
 #include "executor.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 /* Mock executor for tests - no jobs */
 executor_t *current_executor = NULL;
 
@@ -181,6 +184,42 @@ void executor_update_job_status(executor_t *executor) {
 int executor_count_jobs(executor_t *executor) {
     (void)executor;
     return 0; /* No jobs in tests */
+}
+
+/* The completion analyzer's resolution layer references these
+ * executor symbols. The full executor isn't linked into these test
+ * binaries; the stubs below satisfy the link without exercising
+ * real expansion. */
+
+char *expand_if_needed(executor_t *executor, const char *text) {
+    (void)executor;
+    (void)text;
+    return NULL; /* No expansion available in tests. */
+}
+
+char **expand_brace_pattern(const char *pattern, int *expanded_count) {
+    if (!pattern || !expanded_count) {
+        if (expanded_count) *expanded_count = 0;
+        return NULL;
+    }
+    /* Pass-through: return a single-element array with the pattern.
+     * Matches the no-brace path of the real implementation. */
+    char **r = malloc(sizeof(char *) * 2);
+    if (!r) {
+        *expanded_count = 0;
+        return NULL;
+    }
+    size_t n = strlen(pattern);
+    r[0] = malloc(n + 1);
+    if (!r[0]) {
+        free(r);
+        *expanded_count = 0;
+        return NULL;
+    }
+    memcpy(r[0], pattern, n + 1);
+    r[1] = NULL;
+    *expanded_count = 1;
+    return r;
 }
 
 executor_t *get_global_executor(void) {

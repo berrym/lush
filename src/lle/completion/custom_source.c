@@ -94,22 +94,11 @@ static custom_source_entry_t *find_entry_by_name(const char *name) {
  */
 static lle_result_t
 custom_generate_wrapper(lle_memory_pool_t *pool,
-                        const lle_context_analyzer_t *context,
-                        const char *prefix, lle_completion_result_t *result) {
+                        const lle_word_context_t *context,
+                        lle_completion_result_t *result) {
 
     (void)pool; /* Pool is available in result->pool if needed */
 
-    /*
-     * We need to find which custom source this call is for.
-     * The internal source manager doesn't pass user_data through its callback,
-     * so we use a different approach: the custom source stores its user_data
-     * in the lle_completion_source_t.user_data field.
-     *
-     * For now, we iterate through registered sources to find a match.
-     * This is O(n) but n is small (max 32).
-     */
-
-    /* Find which custom source is being queried based on the context */
     pthread_mutex_lock(&g_custom_registry.mutex);
 
     for (size_t i = 0; i < g_custom_registry.count; i++) {
@@ -118,7 +107,6 @@ custom_generate_wrapper(lle_memory_pool_t *pool,
             continue;
         }
 
-        /* Check if this source is applicable */
         if (entry->source.is_applicable) {
             if (!entry->source.is_applicable(entry->source.user_data,
                                              context)) {
@@ -126,13 +114,9 @@ custom_generate_wrapper(lle_memory_pool_t *pool,
             }
         }
 
-        /* Generate completions from this source */
         lle_result_t res = entry->source.generate(entry->source.user_data,
-                                                  context, prefix, result);
-
-        if (res != LLE_SUCCESS) {
-            /* Log but continue - don't fail the whole query */
-        }
+                                                  context, result);
+        (void)res;
     }
 
     pthread_mutex_unlock(&g_custom_registry.mutex);
@@ -148,7 +132,7 @@ custom_generate_wrapper(lle_memory_pool_t *pool,
  * themselves)
  * @return true always - custom sources filter internally
  */
-static bool custom_applicable_wrapper(const lle_context_analyzer_t *context) {
+static bool custom_applicable_wrapper(const lle_word_context_t *context) {
     (void)context;
     return true; /* Always query custom sources; they filter internally */
 }

@@ -308,3 +308,54 @@ lle_result_t lle_splicer_compute(const lle_word_context_t *context,
 
     return LLE_SUCCESS;
 }
+
+/* ============================================================================
+ * Apply layer
+ * ============================================================================ */
+
+static lle_result_t apply_phase(lle_buffer_t *buffer,
+                                lle_cursor_manager_t *cursor_mgr,
+                                const lle_word_context_t *context,
+                                const lle_completion_item_t *item,
+                                lle_memory_pool_t *pool, bool accept_phase) {
+    if (!buffer || !cursor_mgr || !context || !item || !pool) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+
+    lle_splicer_splice_t splice;
+    lle_result_t r = lle_splicer_compute(context, item, accept_phase, pool,
+                                         &splice);
+    if (r != LLE_SUCCESS) return r;
+
+    /* Atomic delete + insert via the buffer's combined replace
+     * operation. */
+    r = lle_buffer_replace_text(buffer, splice.delete_start,
+                                 splice.delete_length, splice.insert_text,
+                                 splice.insert_length);
+    if (r != LLE_SUCCESS) return r;
+
+    /* Move the cursor manager and sync the buffer's cached cursor
+     * field, matching the invariant maintained by other buffer-
+     * mutation paths in the keybinding actions. */
+    r = lle_cursor_manager_move_to_byte_offset(cursor_mgr, splice.cursor_after);
+    if (r != LLE_SUCCESS) return r;
+    lle_cursor_manager_get_position(cursor_mgr, &buffer->cursor);
+
+    return LLE_SUCCESS;
+}
+
+lle_result_t lle_splicer_apply_accept(lle_buffer_t *buffer,
+                                      lle_cursor_manager_t *cursor_mgr,
+                                      const lle_word_context_t *context,
+                                      const lle_completion_item_t *item,
+                                      lle_memory_pool_t *pool) {
+    return apply_phase(buffer, cursor_mgr, context, item, pool, true);
+}
+
+lle_result_t lle_splicer_apply_preview(lle_buffer_t *buffer,
+                                       lle_cursor_manager_t *cursor_mgr,
+                                       const lle_word_context_t *context,
+                                       const lle_completion_item_t *item,
+                                       lle_memory_pool_t *pool) {
+    return apply_phase(buffer, cursor_mgr, context, item, pool, false);
+}

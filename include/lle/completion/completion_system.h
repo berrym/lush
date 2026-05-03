@@ -22,7 +22,7 @@
 #include "lle/completion/completion_menu_state.h"
 #include "lle/completion/completion_state.h"
 #include "lle/completion/completion_types.h"
-#include "lle/completion/context_analyzer.h"
+#include "lle/completion/word_context.h"
 #include "lle/completion/source_manager.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"

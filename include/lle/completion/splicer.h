@@ -70,6 +70,7 @@
 #ifndef LLE_SPLICER_H
 #define LLE_SPLICER_H
 
+#include "lle/buffer_management.h"
 #include "lle/completion/completion_types.h"
 #include "lle/completion/word_context.h"
 #include "lle/error_handling.h"
@@ -175,6 +176,43 @@ lle_result_t lle_splicer_compute(const lle_word_context_t *context,
                                  bool accept_phase,
                                  lle_memory_pool_t *pool,
                                  lle_splicer_splice_t *out);
+
+/**
+ * @brief Apply a splice to a real buffer and cursor manager
+ *
+ * Convenience wrapper that calls lle_splicer_compute then performs
+ * the buffer mutation via lle_buffer_replace_text and updates the
+ * cursor via lle_cursor_manager_move_to_byte_offset, syncing the
+ * buffer's cursor field afterward (the same invariant that
+ * existing buffer-mutation code in keybinding_actions maintains).
+ *
+ * @param buffer Buffer to mutate
+ * @param cursor_mgr Cursor manager for the buffer
+ * @param context Word context produced by lle_word_context_analyze
+ * @param item Completion item chosen by the engine
+ * @param pool Memory pool for the splice's transient allocations
+ *
+ * @return LLE_SUCCESS or an error code from compute / buffer mutation.
+ */
+lle_result_t lle_splicer_apply_accept(lle_buffer_t *buffer,
+                                      lle_cursor_manager_t *cursor_mgr,
+                                      const lle_word_context_t *context,
+                                      const lle_completion_item_t *item,
+                                      lle_memory_pool_t *pool);
+
+/**
+ * @brief Apply a preview-phase splice (no close-quote / suffix)
+ *
+ * Same as lle_splicer_apply_accept but the splice is computed for
+ * preview phase: the rendered candidate is inserted without the
+ * close-char and trailing space. Used for multi-match cycling
+ * preview.
+ */
+lle_result_t lle_splicer_apply_preview(lle_buffer_t *buffer,
+                                       lle_cursor_manager_t *cursor_mgr,
+                                       const lle_word_context_t *context,
+                                       const lle_completion_item_t *item,
+                                       lle_memory_pool_t *pool);
 
 #ifdef __cplusplus
 }

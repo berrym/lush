@@ -80,6 +80,14 @@ typedef enum {
  * covers every realistic case and bounds the walker's memory. */
 #define WALKER_HEREDOC_DELIM_MAX 256
 
+/* Maximum number of completed arguments (between the command word and
+ * the current cursor's word) the walker captures. Real-world commands
+ * fit within 64 arguments; longer commands have their tail
+ * arguments dropped from the captured set, which only affects
+ * subcommand-recognition heuristics that don't apply at deep
+ * positions anyway. */
+#define WALKER_MAX_CAPTURED_ARGS 64
+
 typedef struct walker {
     const char *buffer;
     size_t      buffer_len;
@@ -149,6 +157,14 @@ typedef struct walker {
     size_t current_line_start;      /* byte offset of the current line's
                                        first byte (start of buffer or
                                        byte after the most recent \n) */
+
+    /* Captured byte ranges for completed arguments (arguments before
+     * the cursor's current word, in command order, excluding the
+     * command word itself). Used by builtin-arg sources to walk
+     * subcommand hierarchies. */
+    size_t arg_starts[WALKER_MAX_CAPTURED_ARGS];
+    size_t arg_ends[WALKER_MAX_CAPTURED_ARGS];
+    size_t arg_capture_count;
 } walker_t;
 
 /* ============================================================================
@@ -593,6 +609,7 @@ static void walker_advance_one(walker_t *w) {
         w->current_command_word_end          = SIZE_MAX;
         w->current_arg_index                 = -1;
         w->next_word_is_redirect_target      = false;
+        w->arg_capture_count                 = 0;
         w->pos += (size_t)n;
         return;
     }
@@ -611,7 +628,9 @@ static void walker_advance_one(walker_t *w) {
             /* End-of-word transition. If this was the command word,
              * either retain command position (if the word is a
              * command-introducer keyword) or transition to argument
-             * position. */
+             * position. Otherwise the word is an argument that has
+             * just completed; capture its byte range for the
+             * arguments[] output. */
             if (w->current_command_word_start == w->current_word_start) {
                 if (word_is_command_introducer(w->buffer,
                                                w->current_word_start, we)) {
@@ -621,12 +640,20 @@ static void walker_advance_one(walker_t *w) {
                     w->current_command_word_end   = SIZE_MAX;
                     w->current_arg_index          = -1;
                     w->at_command_position        = true;
+                    w->arg_capture_count          = 0;
                 } else {
                     w->current_command_word_end = we;
                     w->at_command_position      = false;
                     w->current_arg_index        = 0;
+                    /* New command starting -- reset captured args. */
+                    w->arg_capture_count        = 0;
                 }
             } else if (w->current_arg_index >= 0) {
+                if (w->arg_capture_count < WALKER_MAX_CAPTURED_ARGS) {
+                    w->arg_starts[w->arg_capture_count] = w->current_word_start;
+                    w->arg_ends[w->arg_capture_count]   = we;
+                    w->arg_capture_count++;
+                }
                 w->current_arg_index++;
             }
             /* Run keyword-state transition for `for` / `case` / `in`. */
@@ -1259,6 +1286,9 @@ lle_result_t lle_word_context_analyze(const char *buffer,
         .heredoc_delim                   = {0},
         .heredoc_delim_len               = 0,
         .current_line_start              = 0,
+        .arg_starts                      = {0},
+        .arg_ends                        = {0},
+        .arg_capture_count               = 0,
     };
 
     while (w.pos < w.cursor) {
@@ -1357,6 +1387,29 @@ lle_result_t lle_word_context_analyze(const char *buffer,
     }
 
     ctx->arg_index = w.current_arg_index;
+
+    /* Populate arguments[] from captured byte ranges. Each captured
+     * range is dequoted and NFC-normalized so subcommand sources can
+     * compare against builtin specs without further processing. */
+    if (w.arg_capture_count > 0) {
+        char **args =
+            lle_pool_alloc(sizeof(char *) * (size_t)w.arg_capture_count);
+        if (!args) return LLE_ERROR_OUT_OF_MEMORY;
+        size_t valid = 0;
+        for (size_t i = 0; i < w.arg_capture_count; i++) {
+            char *arg_text = NULL;
+            lle_result_t arr = dequote_range_to_nfc(
+                buffer, w.arg_starts[i], w.arg_ends[i], pool, &arg_text);
+            if (arr == LLE_SUCCESS && arg_text) {
+                args[valid++] = arg_text;
+            }
+        }
+        ctx->arguments      = args;
+        ctx->argument_count = valid;
+    } else {
+        ctx->arguments      = NULL;
+        ctx->argument_count = 0;
+    }
 
     /* Resolve expansions in the path-prefix portion of the typed word
      * via lush's existing expansion machinery. Brace lists (and ranges)
