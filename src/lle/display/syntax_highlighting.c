@@ -59,8 +59,22 @@ static const lle_syntax_colors_t default_colors = {
     .variable = 0x00D787FF,         /* Light purple (256: 177) */
     .variable_special = 0x00FF87FF, /* Bright orchid */
 
-    /* Paths */
-    .path_valid = 0x0087D787,   /* Pale green (256: 114) */
+    /* Paths -- ship the three base knobs; leave the six shape-specific
+     * slots at 0 (unset → fall through to the kind-only knob).
+     *
+     * Files ship unset on the kind-only knob too: valid regular files
+     * are intentionally unhighlighted by default, matching the rule
+     * "the line itself shows the user what they typed; emphasis is
+     * for things that might warrant attention." Power users can set
+     * `path_file = "..."` to opt in to file coloring. */
+    .path_file_absolute = 0,
+    .path_file_relative = 0,
+    .path_file_home = 0,
+    .path_dir_absolute = 0,
+    .path_dir_relative = 0,
+    .path_dir_home = 0,
+    .path_file = 0,             /* unset → file paths render as ARGUMENT */
+    .path_dir = 0x0087D787,     /* Pale green (256: 114) */
     .path_invalid = 0x00FF0000, /* Bright red (256: 196) */
 
     /* Operators */
@@ -149,6 +163,42 @@ static unsigned int hash_string(const char *str) {
         hash = ((hash << 5) + hash) + c;
     }
     return hash % CMD_CACHE_SIZE;
+}
+
+/* ========================================================================== */
+/*                         PATH CACHE                                         */
+/* ========================================================================== */
+
+/* Path-classification cache. Mirrors the command cache structurally but
+ * lives in its own namespace so command-vs-path lookups don't collide
+ * and can be invalidated independently (cmd cache ages with PATH, path
+ * cache ages with cwd / filesystem changes). 30s TTL matches the cmd
+ * side -- short enough that a freshly-created file is reflected
+ * promptly, long enough that progressive typing of a path doesn't
+ * stat() each prefix on every keystroke. */
+#define PATH_CACHE_SIZE 128
+#define PATH_CACHE_TTL 30 /* seconds */
+
+typedef struct path_cache_entry {
+    char *path;                   /**< Dequoted path string (owned) */
+    lle_syntax_token_type_t type; /**< Cached classification */
+    time_t timestamp;
+} path_cache_entry_t;
+
+typedef struct path_cache {
+    path_cache_entry_t entries[PATH_CACHE_SIZE];
+} path_cache_t;
+
+static unsigned int path_hash(const char *str) {
+    /* Same djb2 used for the cmd cache, modulo the path table size --
+     * keeping the function distinct lets the two tables be sized
+     * independently in the future without a coupled change. */
+    unsigned int hash = 5381;
+    int c;
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c;
+    }
+    return hash % PATH_CACHE_SIZE;
 }
 
 /* ========================================================================== */
@@ -387,14 +437,28 @@ static size_t skip_whitespace(const char *input, size_t pos, size_t len) {
 /* Use is_alias() from alias.h (already included above) */
 
 /**
- * @brief Check if a path exists on the filesystem
+ * @brief Forward declarations for path helpers implemented below.
  *
- * Forward declaration - implementation below tokenizer section.
+ * `path_exists` survives because the command-side path branches in
+ * lle_syntax_check_command (./..., /..., ~/...) still want a yes/no
+ * existence answer for command-as-path classification. The shape ×
+ * kind taxonomy applies to argument-position paths only; commands
+ * keep the simpler valid/invalid model.
  *
- * @param path Path to check
- * @return true if path exists, false otherwise
+ * `dequote_unquoted_path` strips POSIX-unquoted backslash escapes so
+ * stat() sees the actual filename; the highlighter's word scanner
+ * keeps `\X` pairs verbatim in the word range so colored spans line
+ * up with what the user typed (issue #90 carry-over).
+ *
+ * `classify_path_token` returns one of LLE_TOKEN_PATH_* given the raw
+ * (post-tokenize, pre-dequote) word slice; it owns the dequote pass,
+ * the optional tilde expansion, the stat call, and cache lookup.
  */
 static bool path_exists(const char *path);
+static bool dequote_unquoted_path(const char *path, char *out, size_t out_size);
+static lle_syntax_token_type_t
+classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
+                    size_t word_len);
 
 /**
  * @brief Check if a command exists in PATH
@@ -548,6 +612,162 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
 static bool path_exists(const char *path) {
     struct stat st;
     return stat(path, &st) == 0;
+}
+
+/**
+ * @brief Strip POSIX-unquoted backslash escapes from a word's source bytes.
+ *
+ * Mirrors parser.c's posix_unquoted_dequote -- an unquoted `\X` collapses
+ * to literal X (with `\<newline>` already eaten by the tokenizer). The
+ * highlighter's word scanner keeps `\X` pairs verbatim in the word range
+ * so colored spans line up with the source the user typed; this pass
+ * produces the dequoted form that stat() / access() actually need.
+ *
+ * Truncates to fit `out_size` (worst case: zero shrinkage). Returns
+ * true on success; false only on bad arguments.
+ */
+static bool dequote_unquoted_path(const char *path, char *out,
+                                  size_t out_size) {
+    if (!path || !out || out_size == 0) {
+        return false;
+    }
+    size_t cap = out_size - 1;
+    size_t w = 0;
+    for (size_t i = 0; path[i] != '\0' && w < cap; i++) {
+        if (path[i] == '\\' && path[i + 1] != '\0') {
+            out[w++] = path[i + 1];
+            i++;
+            continue;
+        }
+        out[w++] = path[i];
+    }
+    out[w] = '\0';
+    return true;
+}
+
+/**
+ * @brief Resolve a raw shell-source path word into a shape × kind token.
+ *
+ * Walks the full classification pipeline:
+ *   1. Copy `word_len` bytes of the raw word into a stable buffer.
+ *   2. Cache lookup keyed on the raw bytes (TTL: PATH_CACHE_TTL).
+ *      Caching pre-dequote means progressive typing of `cat /usr/share/dic`
+ *      hits the cache for `/usr/share/di` once that prefix has been
+ *      classified, instead of stat()ing every prefix again on every keystroke.
+ *   3. Dequote (POSIX-unquoted backslash escapes).
+ *   4. Expand a leading `~` against $HOME, but remember the original
+ *      shape: a path written `~/foo` stays in the HOME shape bucket
+ *      regardless of where $HOME points.
+ *   5. stat() the resolved path. ENOENT and friends → PATH_INVALID.
+ *      S_ISDIR → DIR shape variant; anything else → FILE shape variant.
+ *   6. Cache the result and return.
+ *
+ * No-cache path: highlighter->path_cache may be NULL during init or in
+ * minimal test fixtures; the helper still works, just does the stat
+ * unconditionally.
+ */
+static lle_syntax_token_type_t
+classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
+                    size_t word_len) {
+    char raw[4096];
+    size_t copy_len = word_len < sizeof(raw) - 1 ? word_len : sizeof(raw) - 1;
+    memcpy(raw, raw_word, copy_len);
+    raw[copy_len] = '\0';
+
+    /* Cache lookup keyed on the raw (pre-dequote) bytes. */
+    if (highlighter && highlighter->path_cache) {
+        path_cache_t *cache = (path_cache_t *)highlighter->path_cache;
+        unsigned int idx = path_hash(raw);
+        path_cache_entry_t *entry = &cache->entries[idx];
+        if (entry->path && strcmp(entry->path, raw) == 0) {
+            time_t now = time(NULL);
+            if (now - entry->timestamp < PATH_CACHE_TTL) {
+                return entry->type;
+            }
+        }
+    }
+
+    /* Determine the source-level shape before any expansion -- the
+     * shape bucket is anchored to what the user typed, not what it
+     * resolves to. */
+    enum {
+        SHAPE_ABSOLUTE, /* leading '/' */
+        SHAPE_HOME,     /* leading '~' */
+        SHAPE_RELATIVE  /* anything else (./, ../, bare-with-slash) */
+    } shape;
+    if (raw[0] == '/') {
+        shape = SHAPE_ABSOLUTE;
+    } else if (raw[0] == '~') {
+        shape = SHAPE_HOME;
+    } else {
+        shape = SHAPE_RELATIVE;
+    }
+
+    /* Dequote, then optionally expand `~`. The dequote pass acts on
+     * the source bytes, so a path like `~/a\ b` becomes `~/a b` first
+     * and then `$HOME/a b`. */
+    char dequoted[4096];
+    if (!dequote_unquoted_path(raw, dequoted, sizeof(dequoted))) {
+        memcpy(dequoted, raw, copy_len);
+        dequoted[copy_len] = '\0';
+    }
+
+    char resolved[4096];
+    const char *to_stat = dequoted;
+    if (shape == SHAPE_HOME) {
+        const char *home = getenv("HOME");
+        if (home) {
+            snprintf(resolved, sizeof(resolved), "%s%s", home, dequoted + 1);
+            to_stat = resolved;
+        }
+        /* If HOME is unset we still try the literal `~/...` -- it
+         * almost certainly fails, which yields PATH_INVALID below. */
+    }
+
+    struct stat st;
+    lle_syntax_token_type_t type;
+    if (stat(to_stat, &st) != 0) {
+        type = LLE_TOKEN_PATH_INVALID;
+    } else if (S_ISDIR(st.st_mode)) {
+        switch (shape) {
+        case SHAPE_ABSOLUTE:
+            type = LLE_TOKEN_PATH_DIR_ABSOLUTE;
+            break;
+        case SHAPE_HOME:
+            type = LLE_TOKEN_PATH_DIR_HOME;
+            break;
+        case SHAPE_RELATIVE:
+        default:
+            type = LLE_TOKEN_PATH_DIR_RELATIVE;
+            break;
+        }
+    } else {
+        switch (shape) {
+        case SHAPE_ABSOLUTE:
+            type = LLE_TOKEN_PATH_FILE_ABSOLUTE;
+            break;
+        case SHAPE_HOME:
+            type = LLE_TOKEN_PATH_FILE_HOME;
+            break;
+        case SHAPE_RELATIVE:
+        default:
+            type = LLE_TOKEN_PATH_FILE_RELATIVE;
+            break;
+        }
+    }
+
+    /* Update cache. Slot collisions are LRU-by-overwrite. */
+    if (highlighter && highlighter->path_cache) {
+        path_cache_t *cache = (path_cache_t *)highlighter->path_cache;
+        unsigned int idx = path_hash(raw);
+        path_cache_entry_t *entry = &cache->entries[idx];
+        free(entry->path);
+        entry->path = strdup(raw);
+        entry->type = type;
+        entry->timestamp = time(NULL);
+    }
+
+    return type;
 }
 
 /* ========================================================================== */
@@ -1102,31 +1322,12 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 } else if (has_glob) {
                     type = LLE_TOKEN_GLOB;
                 } else if (has_slash && highlighter->validate_paths) {
-                    /* Looks like a path - check if it exists */
-                    char path[4096];
-                    size_t copy_len = word_len < sizeof(path) - 1
-                                          ? word_len
-                                          : sizeof(path) - 1;
-                    memcpy(path, input + token_start, copy_len);
-                    path[copy_len] = '\0';
-
-                    /* Expand ~ if present */
-                    if (path[0] == '~') {
-                        const char *home = getenv("HOME");
-                        if (home) {
-                            char expanded[4096];
-                            snprintf(expanded, sizeof(expanded), "%s%s", home,
-                                     path + 1);
-                            type = path_exists(expanded)
-                                       ? LLE_TOKEN_PATH_VALID
-                                       : LLE_TOKEN_PATH_INVALID;
-                        } else {
-                            type = LLE_TOKEN_PATH_INVALID;
-                        }
-                    } else {
-                        type = path_exists(path) ? LLE_TOKEN_PATH_VALID
-                                                 : LLE_TOKEN_PATH_INVALID;
-                    }
+                    /* Path-shaped argument: shape × kind classification
+                     * via classify_path_token (dequote → tilde-expand →
+                     * stat → cache, single helper, see definition for
+                     * the full pipeline). */
+                    type = classify_path_token(highlighter, input + token_start,
+                                               word_len);
                 } else if (has_slash) {
                     type =
                         LLE_TOKEN_ARGUMENT; /* Path-like but not validating */
@@ -1195,10 +1396,58 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         case LLE_TOKEN_VARIABLE_SPECIAL:
             tok->color = c->variable_special;
             break;
-        case LLE_TOKEN_PATH_VALID:
-            tok->color = c->path_valid;
-            if (c->path_underline)
+        /* Path tokens use the shape × kind fallback chain documented
+         * on the lle_syntax_colors struct: shape-specific knob, then
+         * kind-only knob, then 0 (token demoted to ARGUMENT, default
+         * text). The chain is computed inline -- explicit per-case
+         * rather than table-driven so the code is grep-friendly and
+         * the failure mode for an unset knob is obvious from reading
+         * the case body. */
+        case LLE_TOKEN_PATH_FILE_ABSOLUTE:
+            tok->color =
+                c->path_file_absolute ? c->path_file_absolute : c->path_file;
+            if (tok->color && c->path_underline)
                 tok->attributes |= LLE_ATTR_UNDERLINE;
+            if (!tok->color)
+                tok->color = c->argument;
+            break;
+        case LLE_TOKEN_PATH_FILE_RELATIVE:
+            tok->color =
+                c->path_file_relative ? c->path_file_relative : c->path_file;
+            if (tok->color && c->path_underline)
+                tok->attributes |= LLE_ATTR_UNDERLINE;
+            if (!tok->color)
+                tok->color = c->argument;
+            break;
+        case LLE_TOKEN_PATH_FILE_HOME:
+            tok->color = c->path_file_home ? c->path_file_home : c->path_file;
+            if (tok->color && c->path_underline)
+                tok->attributes |= LLE_ATTR_UNDERLINE;
+            if (!tok->color)
+                tok->color = c->argument;
+            break;
+        case LLE_TOKEN_PATH_DIR_ABSOLUTE:
+            tok->color =
+                c->path_dir_absolute ? c->path_dir_absolute : c->path_dir;
+            if (tok->color && c->path_underline)
+                tok->attributes |= LLE_ATTR_UNDERLINE;
+            if (!tok->color)
+                tok->color = c->argument;
+            break;
+        case LLE_TOKEN_PATH_DIR_RELATIVE:
+            tok->color =
+                c->path_dir_relative ? c->path_dir_relative : c->path_dir;
+            if (tok->color && c->path_underline)
+                tok->attributes |= LLE_ATTR_UNDERLINE;
+            if (!tok->color)
+                tok->color = c->argument;
+            break;
+        case LLE_TOKEN_PATH_DIR_HOME:
+            tok->color = c->path_dir_home ? c->path_dir_home : c->path_dir;
+            if (tok->color && c->path_underline)
+                tok->attributes |= LLE_ATTR_UNDERLINE;
+            if (!tok->color)
+                tok->color = c->argument;
             break;
         case LLE_TOKEN_PATH_INVALID:
             tok->color = c->path_invalid;
@@ -1491,8 +1740,10 @@ int lle_syntax_highlighter_create(lle_syntax_highlighter_t **highlighter) {
         h->color_depth = 3; /* Fallback: assume truecolor */
     }
 
-    /* Create command cache */
+    /* Create caches. Both are best-effort allocations: a NULL cache
+     * just disables caching, classification still works. */
     h->command_cache = calloc(1, sizeof(cmd_cache_t));
+    h->path_cache = calloc(1, sizeof(path_cache_t));
 
     *highlighter = h;
     return 0;
@@ -1511,6 +1762,15 @@ void lle_syntax_highlighter_destroy(lle_syntax_highlighter_t *highlighter) {
         cmd_cache_t *cache = (cmd_cache_t *)highlighter->command_cache;
         for (int i = 0; i < CMD_CACHE_SIZE; i++) {
             free(cache->entries[i].command);
+        }
+        free(cache);
+    }
+
+    /* Free path cache */
+    if (highlighter->path_cache) {
+        path_cache_t *cache = (path_cache_t *)highlighter->path_cache;
+        for (int i = 0; i < PATH_CACHE_SIZE; i++) {
+            free(cache->entries[i].path);
         }
         free(cache);
     }
@@ -1546,7 +1806,14 @@ void lle_syntax_highlighter_set_colors(lle_syntax_highlighter_t *highlighter,
     MERGE_COLOR(string_escape);
     MERGE_COLOR(variable);
     MERGE_COLOR(variable_special);
-    MERGE_COLOR(path_valid);
+    MERGE_COLOR(path_file_absolute);
+    MERGE_COLOR(path_file_relative);
+    MERGE_COLOR(path_file_home);
+    MERGE_COLOR(path_dir_absolute);
+    MERGE_COLOR(path_dir_relative);
+    MERGE_COLOR(path_dir_home);
+    MERGE_COLOR(path_file);
+    MERGE_COLOR(path_dir);
     MERGE_COLOR(path_invalid);
     MERGE_COLOR(pipe);
     MERGE_COLOR(redirect);
@@ -1608,22 +1875,38 @@ lle_syntax_get_tokens(lle_syntax_highlighter_t *highlighter, size_t *count) {
 }
 
 /**
- * @brief Clear the command existence cache
+ * @brief Clear the highlighter's filesystem-lookup caches.
  *
- * Invalidates all cached command lookup results. Call this when PATH
- * changes or commands are installed/removed.
+ * Invalidates both the command-existence cache (call after PATH
+ * changes or after a command is installed/removed) and the path
+ * classification cache (call after cwd changes or filesystem mutations
+ * that should be reflected immediately rather than waiting out the
+ * TTL). Both caches are cleared together because the common triggers
+ * for clearing one usually warrant clearing the other.
  *
  * @param highlighter Highlighter instance
  */
 void lle_syntax_clear_cache(lle_syntax_highlighter_t *highlighter) {
-    if (!highlighter || !highlighter->command_cache)
+    if (!highlighter)
         return;
 
-    cmd_cache_t *cache = (cmd_cache_t *)highlighter->command_cache;
-    for (int i = 0; i < CMD_CACHE_SIZE; i++) {
-        free(cache->entries[i].command);
-        cache->entries[i].command = NULL;
-        cache->entries[i].type = LLE_TOKEN_UNKNOWN;
-        cache->entries[i].timestamp = 0;
+    if (highlighter->command_cache) {
+        cmd_cache_t *cache = (cmd_cache_t *)highlighter->command_cache;
+        for (int i = 0; i < CMD_CACHE_SIZE; i++) {
+            free(cache->entries[i].command);
+            cache->entries[i].command = NULL;
+            cache->entries[i].type = LLE_TOKEN_UNKNOWN;
+            cache->entries[i].timestamp = 0;
+        }
+    }
+
+    if (highlighter->path_cache) {
+        path_cache_t *cache = (path_cache_t *)highlighter->path_cache;
+        for (int i = 0; i < PATH_CACHE_SIZE; i++) {
+            free(cache->entries[i].path);
+            cache->entries[i].path = NULL;
+            cache->entries[i].type = LLE_TOKEN_UNKNOWN;
+            cache->entries[i].timestamp = 0;
+        }
     }
 }

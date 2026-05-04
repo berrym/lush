@@ -62,8 +62,24 @@ typedef enum lle_syntax_token_type {
     LLE_TOKEN_VARIABLE_SPECIAL, /**< Special variable ($?, $#, $@, $$, $!,
                                    $0-$9) */
 
-    /* Paths */
-    LLE_TOKEN_PATH_VALID,   /**< Valid file/directory path */
+    /* Paths -- two-axis classification.
+     *
+     * Shape (per spec § 6.2): absolute (`/...`), relative (`./`, `../`,
+     * bare with a slash), home (`~/...`).
+     * Kind: regular file vs. directory, determined by stat() at
+     * highlight time when validate_paths is on.
+     *
+     * The cross-product yields six (shape × kind) tokens; PATH_INVALID
+     * is the seventh, reserved for paths that fail stat. Defaults
+     * leave file-side coloring to fall through to ARGUMENT (no
+     * highlight) and emphasize directories; themes can override every
+     * shape × kind slot independently or use the kind-only fallbacks. */
+    LLE_TOKEN_PATH_FILE_ABSOLUTE,
+    LLE_TOKEN_PATH_FILE_RELATIVE,
+    LLE_TOKEN_PATH_FILE_HOME,
+    LLE_TOKEN_PATH_DIR_ABSOLUTE,
+    LLE_TOKEN_PATH_DIR_RELATIVE,
+    LLE_TOKEN_PATH_DIR_HOME,
     LLE_TOKEN_PATH_INVALID, /**< Non-existent path */
 
     /* Operators */
@@ -141,9 +157,33 @@ typedef struct lle_syntax_colors {
     uint32_t variable;         /**< Variables (typically magenta/purple) */
     uint32_t variable_special; /**< Special variables */
 
-    /* Paths */
-    uint32_t path_valid;   /**< Valid paths (typically underlined green) */
-    uint32_t path_invalid; /**< Invalid paths (typically underlined red) */
+    /* Paths -- shape × kind grid with kind-only fallbacks.
+     *
+     * Resolution at color-application time:
+     *   PATH_FILE_<SHAPE>  -> path_file_<shape> if non-zero
+     *                      -> else path_file    if non-zero
+     *                      -> else 0 (token demoted to ARGUMENT,
+     *                                 i.e. default text -- no highlight)
+     *   PATH_DIR_<SHAPE>   -> path_dir_<shape>  if non-zero
+     *                      -> else path_dir     if non-zero
+     *                      -> else 0 (token demoted to ARGUMENT)
+     *   PATH_INVALID       -> path_invalid (no fallback chain)
+     *
+     * A value of 0 means "unset, fall through" -- consistent with the
+     * struct's standing convention. Most themes will set only the
+     * three base knobs (path_file, path_dir, path_invalid); the six
+     * shape-specific slots exist for power-user themes. Defaults ship
+     * file-side unset (so valid files stay unhighlighted), dir-side
+     * pale-green-underlined, invalid red-underlined. */
+    uint32_t path_file_absolute;
+    uint32_t path_file_relative;
+    uint32_t path_file_home;
+    uint32_t path_dir_absolute;
+    uint32_t path_dir_relative;
+    uint32_t path_dir_home;
+    uint32_t path_file;    /**< Kind-only fallback for any file path */
+    uint32_t path_dir;     /**< Kind-only fallback for any directory path */
+    uint32_t path_invalid; /**< Non-existent paths (no fallback) */
 
     /* Operators */
     uint32_t pipe;           /**< Pipe operator */
@@ -238,8 +278,14 @@ typedef struct lle_syntax_highlighter {
     /* Terminal capabilities */
     int color_depth; /**< 0=none, 1=8, 2=256, 3=truecolor */
 
-    /* Cache for command existence checks */
-    void *command_cache; /**< Opaque pointer to cache */
+    /* Caches for filesystem lookups -- opaque to keep the public ABI
+     * insulated from the cache layout. The path cache is a separate
+     * structure from the command cache because they age independently
+     * (PATH changes invalidate one, cwd changes invalidate the other)
+     * and because keying them in the same table would conflate the
+     * two namespaces (`bash` the command vs. `bash` the file). */
+    void *command_cache; /**< Opaque pointer to cmd_cache_t */
+    void *path_cache;    /**< Opaque pointer to path_cache_t */
 } lle_syntax_highlighter_t;
 
 /* ========================================================================== */
