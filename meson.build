@@ -1022,6 +1022,32 @@ endif
          timeout: 30)
   endif
 
+  # Shell Quoting and Escape Functional Tests
+  # Verifies tokenizer/parser/executor handle backslash escapes outside
+  # quotes, double-quoted strings, single-quoted strings, and end-to-end
+  # filename-with-space scenarios via the test_shell_harness. Some cases
+  # use run_shell_subprocess() which forks the real lush binary, so the
+  # test depends on the lush executable target.
+  if fs.exists('tests/unit/test_shell_quoting.c')
+    test_shell_quoting_sources = []
+    foreach s : src
+      if not s.endswith('lush.c')
+        test_shell_quoting_sources += s
+      endif
+    endforeach
+    test_shell_quoting = executable('test_shell_quoting',
+                                    'tests/unit/test_shell_quoting.c',
+                                    'tests/unit/test_executor_stubs.c',
+                                    test_shell_quoting_sources + lle_shell_sources,
+                                    include_directories: [inc, include_directories('tests')],
+                                    dependencies: [lle_dep, libm])
+    test('Shell Quoting and Escapes', test_shell_quoting,
+         suite: 'unit',
+         timeout: 30,
+         depends: [lush_exe],
+         env: ['LUSH_TEST_BINARY=' + lush_exe.full_path()])
+  endif
+
   # Word-Context Analyzer Tests
   # Exercises lle_word_context_analyze across quote/escape state, word
   # boundaries respecting quote state, filename_portion_start computation,

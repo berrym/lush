@@ -946,6 +946,49 @@ static node_t *parse_pipeline(parser_t *parser) {
 }
 
 /**
+ * @brief Strip POSIX-unquoted backslash escapes from a word token's text.
+ *
+ * The tokenizer's word-context scanner keeps `\X` pairs in the token text
+ * verbatim — escape interpretation is deferred. For tokens that did NOT
+ * come from a quoted run, POSIX quote-removal says any `\X` (other than
+ * `\<newline>`, which the tokenizer already eats as line continuation)
+ * collapses to a literal X. Quote-removal happens after parameter
+ * expansion in POSIX, but for backslashes that originated outside any
+ * quote in the shell source we can collapse them here at parse time —
+ * those backslashes never ride along inside variable values, so doing
+ * it now does not corrupt later expansion. Tokens from `"..."` are NOT
+ * touched: their backslashes (kept as `\$`, `\\`, etc. by the
+ * double-quote scanner) follow double-quote escape rules and are
+ * resolved later by the executor's expand_quoted_string.
+ *
+ * Returns a freshly malloc'd string the caller owns.
+ */
+static char *posix_unquoted_dequote(const char *text) {
+    if (!text) {
+        return NULL;
+    }
+    size_t len = strlen(text);
+    char *out = malloc(len + 1);
+    if (!out) {
+        return NULL;
+    }
+    size_t w = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (text[i] == '\\' && i + 1 < len) {
+            /* `\<newline>` was already removed by the tokenizer's word
+             * scanner; no special case needed here. Any other `\X`
+             * collapses to a literal X. */
+            out[w++] = text[i + 1];
+            i++;
+            continue;
+        }
+        out[w++] = text[i];
+    }
+    out[w] = '\0';
+    return out;
+}
+
+/**
  * @brief Try to consume one shell-style word argument from the current token.
  *
  * Tests whether the current token is "argument-like" (any of TOK_STRING,
@@ -984,19 +1027,17 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
 
     /* Acceptance test — same set parse_simple_command has used since the
      * unified-concatenation logic was introduced. */
-    bool accepted = (arg_token->type == TOK_STRING ||
-                     arg_token->type == TOK_EXPANDABLE_STRING ||
-                     arg_token->type == TOK_ARITH_EXP ||
-                     arg_token->type == TOK_COMMAND_SUB ||
-                     arg_token->type == TOK_BACKQUOTE ||
-                     token_is_word_like(arg_token->type) ||
-                     token_is_keyword(arg_token->type) ||
-                     arg_token->type == TOK_VARIABLE ||
-                     arg_token->type == TOK_RBRACKET ||
-                     arg_token->type == TOK_ASSIGN ||
-                     arg_token->type == TOK_GLOB ||
-                     arg_token->type == TOK_QUESTION ||
-                     arg_token->type == TOK_NOT_EQUAL);
+    bool accepted =
+        (arg_token->type == TOK_STRING ||
+         arg_token->type == TOK_EXPANDABLE_STRING ||
+         arg_token->type == TOK_ARITH_EXP ||
+         arg_token->type == TOK_COMMAND_SUB ||
+         arg_token->type == TOK_BACKQUOTE ||
+         token_is_word_like(arg_token->type) ||
+         token_is_keyword(arg_token->type) || arg_token->type == TOK_VARIABLE ||
+         arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+         arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
+         arg_token->type == TOK_NOT_EQUAL);
     if (!accepted) {
         return false;
     }
@@ -1013,22 +1054,21 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
     int token_count = 0;
     size_t last_end_pos = arg_token->position + strlen(arg_token->text);
 
-    while (arg_token && (arg_token->type == TOK_STRING ||
-                         arg_token->type == TOK_EXPANDABLE_STRING ||
-                         arg_token->type == TOK_ARITH_EXP ||
-                         arg_token->type == TOK_COMMAND_SUB ||
-                         arg_token->type == TOK_BACKQUOTE ||
-                         token_is_word_like(arg_token->type) ||
-                         token_is_keyword(arg_token->type) ||
-                         arg_token->type == TOK_VARIABLE ||
-                         arg_token->type == TOK_RBRACKET ||
-                         arg_token->type == TOK_ASSIGN ||
-                         arg_token->type == TOK_GLOB ||
-                         arg_token->type == TOK_QUESTION ||
-                         arg_token->type == TOK_NOT_EQUAL)) {
+    while (arg_token &&
+           (arg_token->type == TOK_STRING ||
+            arg_token->type == TOK_EXPANDABLE_STRING ||
+            arg_token->type == TOK_ARITH_EXP ||
+            arg_token->type == TOK_COMMAND_SUB ||
+            arg_token->type == TOK_BACKQUOTE ||
+            token_is_word_like(arg_token->type) ||
+            token_is_keyword(arg_token->type) ||
+            arg_token->type == TOK_VARIABLE ||
+            arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+            arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
+            arg_token->type == TOK_NOT_EQUAL)) {
 
-        token_info_t *new_tokens = realloc(
-            collected_tokens, (token_count + 1) * sizeof(token_info_t));
+        token_info_t *new_tokens =
+            realloc(collected_tokens, (token_count + 1) * sizeof(token_info_t));
         if (!new_tokens) {
             for (int i = 0; i < token_count; i++) {
                 free(collected_tokens[i].text);
@@ -1083,16 +1123,78 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
     } else if (token_count > 1) {
         /* Multi-token concatenation: build a single NODE_STRING_EXPANDABLE
          * with the concatenated text (matches the existing semantics in
-         * parse_simple_command). */
+         * parse_simple_command).
+         *
+         * Word-context tokens (TOK_WORD, keywords-as-words, etc.) carry
+         * raw `\X` pairs because the tokenizer defers escape resolution.
+         * For unquoted shell input, POSIX-unquoted quote-removal collapses
+         * any such `\X` to literal X. Doing that here, before
+         * concatenation, has two effects: (1) the `$DIR/a\ b` family of
+         * inputs no longer ships backslashes through to argv, fixing #90
+         * for the multi-token case; (2) any backslashes that survive into
+         * the concatenated string came from a quoted segment
+         * (TOK_EXPANDABLE_STRING kept its `\X` for the four DQ-meaningful
+         * escapes), so the executor can apply double-quote rules safely
+         * in `expand_quoted_string` without a quote-context flag.
+         *
+         * Tokens that already had escape semantics applied (or that are
+         * sub-expressions evaluated later) pass through untouched:
+         *   TOK_STRING               — single-quoted, no escapes ever
+         *   TOK_EXPANDABLE_STRING    — double-quoted, DQ rules later
+         *   TOK_ARITH_EXP            — `$((...))`, evaluated as arith
+         *   TOK_COMMAND_SUB          — `$(...)`, evaluated as cmd
+         *   TOK_BACKQUOTE            — `` `...` ``, evaluated as cmd
+         *   TOK_VARIABLE             — `$VAR`, no escapes by construction
+         */
+        char **dequoted = malloc((size_t)token_count * sizeof(char *));
+        if (!dequoted) {
+            for (int i = 0; i < token_count; i++) {
+                free(collected_tokens[i].text);
+            }
+            free(collected_tokens);
+            parser->has_error = true;
+            return false;
+        }
         size_t total_len = 0;
+        bool ok = true;
         for (int i = 0; i < token_count; i++) {
-            total_len += strlen(collected_tokens[i].text);
+            switch (collected_tokens[i].type) {
+            case TOK_STRING:
+            case TOK_EXPANDABLE_STRING:
+            case TOK_ARITH_EXP:
+            case TOK_COMMAND_SUB:
+            case TOK_BACKQUOTE:
+            case TOK_VARIABLE:
+                dequoted[i] = strdup(collected_tokens[i].text);
+                break;
+            default:
+                /* Word-like tokens: word-context backslashes collapse. */
+                dequoted[i] = posix_unquoted_dequote(collected_tokens[i].text);
+                break;
+            }
+            if (!dequoted[i]) {
+                ok = false;
+                break;
+            }
+            total_len += strlen(dequoted[i]);
+        }
+        if (!ok) {
+            for (int i = 0; i < token_count; i++) {
+                free(dequoted[i]);
+            }
+            free(dequoted);
+            for (int i = 0; i < token_count; i++) {
+                free(collected_tokens[i].text);
+            }
+            free(collected_tokens);
+            parser->has_error = true;
+            return false;
         }
         char *concatenated = malloc(total_len + 1);
         if (concatenated) {
             concatenated[0] = '\0';
             for (int i = 0; i < token_count; i++) {
-                strcat(concatenated, collected_tokens[i].text);
+                strcat(concatenated, dequoted[i]);
             }
             node_t *arg_node = new_node(NODE_STRING_EXPANDABLE);
             if (arg_node) {
@@ -1103,6 +1205,10 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                 free(concatenated);
             }
         }
+        for (int i = 0; i < token_count; i++) {
+            free(dequoted[i]);
+        }
+        free(dequoted);
     }
 
     for (int i = 0; i < token_count; i++) {

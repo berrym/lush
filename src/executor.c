@@ -151,10 +151,11 @@ static char *expand_command_substitution(executor_t *executor,
 static node_t *copy_node_simple(node_t *original);
 static void copy_function_definitions(executor_t *dest, executor_t *src);
 char *expand_if_needed(executor_t *executor, const char *text);
-static char *expand_quoted_string(executor_t *executor, const char *str);
+static char *expand_quoted_string(executor_t *executor, const char *str,
+                                  bool in_double_quotes);
 static char *expand_arg_node(executor_t *executor, node_t *node);
 static char *expand_array_unsubscripted(executor_t *executor,
-                                         array_value_t *array);
+                                        array_value_t *array);
 static char *slice_string_graphemes(const char *str, size_t str_len,
                                     int start_grapheme, int count);
 static char *expand_ansi_c_string(const char *str, size_t len);
@@ -1473,8 +1474,8 @@ static int execute_command(executor_t *executor, node_t *command) {
                 }
             }
 
-            result = execute_builtin_command(executor, filtered_argv,
-                                             command->loc);
+            result =
+                execute_builtin_command(executor, filtered_argv, command->loc);
 
             // Flush output streams after builtin execution
             // This ensures output appears immediately, especially under
@@ -1955,10 +1956,10 @@ cleanup:
  * and match bash/zsh exactly.
  */
 typedef struct {
-    int streak;             /* consecutive non-zero body exits */
-    int last_status;        /* last non-zero status seen */
-    struct timespec start;  /* monotonic clock at first non-zero of streak */
-    bool armed;             /* streak start time captured */
+    int streak;            /* consecutive non-zero body exits */
+    int last_status;       /* last non-zero status seen */
+    struct timespec start; /* monotonic clock at first non-zero of streak */
+    bool armed;            /* streak start time captured */
 } loop_monitor_t;
 
 static void loop_monitor_init(loop_monitor_t *m) {
@@ -2107,8 +2108,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             "while loop body failed with status %d for %d consecutive "
             "iterations over %d+ seconds — likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
-            monitor.last_status, monitor.streak,
-            config.loop_failure_seconds);
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
     }
 
@@ -2210,8 +2210,7 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             "until loop body failed with status %d for %d consecutive "
             "iterations over %d+ seconds — likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
-            monitor.last_status, monitor.streak,
-            config.loop_failure_seconds);
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
     }
 
@@ -2361,8 +2360,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                             int brace_count;
                             char **brace_results =
                                 expand_brace_pattern(expanded, &brace_count);
-                            if (brace_count ==
-                                BRACE_EXPANSION_LIMIT_SENTINEL) {
+                            if (brace_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
                                 set_executor_error(
                                     executor,
                                     "brace expansion exceeds configured "
@@ -2564,8 +2562,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
             "for loop body failed with status %d for %d consecutive "
             "iterations over %d+ seconds — likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
-            monitor.last_status, monitor.streak,
-            config.loop_failure_seconds);
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
     }
 
@@ -2753,8 +2750,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
             "C-style for loop body failed with status %d for %d "
             "consecutive iterations over %d+ seconds — likely stuck "
             "(set behavior.loop_failure_streak = 0 to disable this check)",
-            monitor.last_status, monitor.streak,
-            config.loop_failure_seconds);
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
     }
 
@@ -3489,7 +3485,11 @@ static char *expand_arg_node(executor_t *executor, node_t *node) {
         }
         return strdup(node->val.str);
     case NODE_STRING_EXPANDABLE:
-        return expand_quoted_string(executor, node->val.str);
+        /* Per parser.c collect_word_argument: word-context backslashes
+         * have been pre-stripped during multi-token concat, so any `\X`
+         * still present in node->val.str came from a `"..."` segment and
+         * must be resolved with double-quote rules. */
+        return expand_quoted_string(executor, node->val.str, true);
     case NODE_ARITH_EXP:
         return expand_arithmetic(executor, node->val.str);
     case NODE_COMMAND_SUB:
@@ -3528,7 +3528,7 @@ static char *expand_arg_node(executor_t *executor, node_t *node) {
  * @return Newly malloc'd string (caller frees), empty on NULL/error
  */
 static char *expand_array_unsubscripted(executor_t *executor,
-                                         array_value_t *array) {
+                                        array_value_t *array) {
     (void)executor;
     if (!array) {
         return strdup("");
@@ -4048,7 +4048,9 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                 if (dq_content) {
                     strncpy(dq_content, &text[dq_start], dq_len);
                     dq_content[dq_len] = '\0';
-                    char *expanded = expand_quoted_string(executor, dq_content);
+                    /* Content inside `"..."` -- DQ rules apply. */
+                    char *expanded =
+                        expand_quoted_string(executor, dq_content, true);
                     free(dq_content);
                     if (expanded) {
                         size_t exp_len = strlen(expanded);
@@ -4154,8 +4156,10 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             // Tilde was expanded, now check if result needs variable expansion
             const char *first_dollar = strchr(tilde_expanded, '$');
             if (first_dollar) {
+                /* Unquoted text post-tilde-expansion: POSIX-unquoted
+                 * escape rules apply to any surviving backslashes. */
                 char *final_result =
-                    expand_quoted_string(executor, tilde_expanded);
+                    expand_quoted_string(executor, tilde_expanded, false);
                 free(tilde_expanded);
                 return final_result;
             }
@@ -4179,9 +4183,12 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         }
 
         // If we have multiple dollar signs or the first dollar is not at
-        // position 0, treat as quoted string with multiple expansions
+        // position 0, treat as quoted string with multiple expansions.
+        // This branch is reached from unquoted contexts (NODE_VAR with
+        // embedded $ etc.); pass in_double_quotes=false so any surviving
+        // `\X` follows POSIX-unquoted rules.
         if (dollar_count > 1 || first_dollar != text) {
-            return expand_quoted_string(executor, text);
+            return expand_quoted_string(executor, text, false);
         }
 
         // Single expansion starting at position 0
@@ -4235,8 +4242,8 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             // ${var} format - check if there's more text after }
             const char *close_brace = strchr(text, '}');
             if (close_brace && close_brace[1] != '\0') {
-                // Text continues after ${var}, use quoted string expansion
-                return expand_quoted_string(executor, text);
+                // Text continues after ${var}; unquoted context.
+                return expand_quoted_string(executor, text, false);
             }
             return expand_variable(executor, text);
         } else {
@@ -4251,10 +4258,9 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     p++;
                 }
             }
-            // If there's more text after the variable, use quoted string
-            // expansion
+            // Trailing text after the variable; unquoted context.
             if (*p != '\0') {
-                return expand_quoted_string(executor, text);
+                return expand_quoted_string(executor, text, false);
             }
             return expand_variable(executor, text);
         }
@@ -4265,8 +4271,44 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         return expand_command_substitution(executor, text);
     }
 
-    // Regular text - just duplicate
-    return strdup(text);
+    /* Regular text reaching this path has no quote machinery and no
+     * expansion markers ($, ~, `, ') -- only possibly backslash
+     * escapes. Per POSIX, `\X` outside any quote produces a literal X
+     * (with `\<newline>` removed entirely as line continuation). The
+     * older code was returning strdup(text) here, which left the
+     * backslashes in the argument and produced bug #90 (a typed
+     * `rm a\ test\ file.txt` shipped the literal backslash through
+     * to rm). The fix walks the text removing the escape backslashes;
+     * the post-walk string is the dequoted form the executor will
+     * eventually pass through field splitting and into argv. */
+    {
+        size_t len = strlen(text);
+        char *result = malloc(len + 1);
+        if (!result)
+            return strdup(text); /* OOM fallback */
+        size_t out = 0;
+        for (size_t i = 0; i < len; i++) {
+            if (text[i] == '\\' && i + 1 < len) {
+                char next = text[i + 1];
+                if (next == '\n') {
+                    /* Line continuation: drop both bytes. */
+                    i++;
+                    continue;
+                }
+                /* Strip the backslash; emit the escaped character.
+                 * Multi-byte UTF-8 escapees survive because their
+                 * continuation bytes are >= 0x80 and are not '\\'
+                 * themselves; the next loop iteration sees them as
+                 * regular bytes and copies them through. */
+                result[out++] = next;
+                i++;
+                continue;
+            }
+            result[out++] = text[i];
+        }
+        result[out] = '\0';
+        return result;
+    }
 }
 
 /**
@@ -9008,8 +9050,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
  * @return strdup("") (caller takes ownership)
  */
 static char *handle_required_param_error(executor_t *executor,
-                                         const char *var_name,
-                                         const char *word,
+                                         const char *var_name, const char *word,
                                          const char *default_msg) {
     const char *msg = (word && *word) ? word : default_msg;
     executor_error_report(executor, SHELL_ERR_PARAMETER_NULL_OR_UNSET,
@@ -9156,16 +9197,14 @@ static char *parse_parameter_expansion(executor_t *executor,
                         inner_result = symtable_array_expand(array, " ");
                     } else if (array) {
                         size_t kc = 0, vc = 0;
-                        char **keys =
-                            symtable_array_get_keys(array, &kc);
-                        char **values =
-                            symtable_array_get_values(array, &vc);
+                        char **keys = symtable_array_get_keys(array, &kc);
+                        char **values = symtable_array_get_values(array, &vc);
                         size_t pairs = (kc < vc) ? kc : vc;
                         if (keys && values && pairs > 0) {
                             size_t total_len = 0;
                             for (size_t i = 0; i < pairs; i++) {
-                                total_len += strlen(keys[i]) + 1 +
-                                             strlen(values[i]) + 1;
+                                total_len +=
+                                    strlen(keys[i]) + 1 + strlen(values[i]) + 1;
                             }
                             inner_result = malloc(total_len + 1);
                             if (inner_result) {
@@ -9962,15 +10001,14 @@ static char *parse_parameter_expansion(executor_t *executor,
                         if (start_idx < 0 || end_idx < 0) {
                             int total = (int)lle_utf8_count_graphemes(
                                 str_value, value_len);
-                            bool one_based = !shell_mode_allows(
-                                FEATURE_ARRAY_ZERO_INDEXED);
+                            bool one_based =
+                                !shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED);
                             if (start_idx < 0) {
                                 start_idx =
                                     total + start_idx + (one_based ? 1 : 0);
                             }
                             if (end_idx < 0) {
-                                end_idx =
-                                    total + end_idx + (one_based ? 1 : 0);
+                                end_idx = total + end_idx + (one_based ? 1 : 0);
                             }
                         }
 
@@ -10387,9 +10425,9 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         case 18: // ${var:?word} - error if var unset or null (POSIX)
             if (is_empty_or_null(var_value)) {
-                result = handle_required_param_error(executor, var_name,
-                                                     expanded_default,
-                                                     "parameter null or not set");
+                result = handle_required_param_error(
+                    executor, var_name, expanded_default,
+                    "parameter null or not set");
             } else {
                 result = strdup(var_value);
             }
@@ -10397,9 +10435,8 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         case 19: // ${var?word} - error if var unset (null permitted) (POSIX)
             if (!var_value) {
-                result = handle_required_param_error(executor, var_name,
-                                                     expanded_default,
-                                                     "parameter not set");
+                result = handle_required_param_error(
+                    executor, var_name, expanded_default, "parameter not set");
             } else {
                 result = strdup(var_value);
             }
@@ -10727,8 +10764,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                 // zsh and lush give all elements joined. (Issue #65.)
                 array_value_t *array = symtable_get_array(resolved_name);
                 if (array) {
-                    char *result =
-                        expand_array_unsubscripted(executor, array);
+                    char *result = expand_array_unsubscripted(executor, array);
                     if (resolved_to_free) {
                         free(resolved_to_free);
                     }
@@ -11157,8 +11193,8 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
             if (while_ctx) {
                 shell_error_push_context(err, "%s", while_ctx);
             }
-            for (size_t i = 0; i < executor->context_depth &&
-                               i < SHELL_ERROR_CONTEXT_MAX;
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
                  i++) {
                 if (executor->context_stack[i]) {
                     shell_error_push_context(err, "%s",
@@ -11743,7 +11779,8 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
  * @param str Double-quoted string content
  * @return Expanded string (caller must free)
  */
-static char *expand_quoted_string(executor_t *executor, const char *str) {
+static char *expand_quoted_string(executor_t *executor, const char *str,
+                                  bool in_double_quotes) {
     if (!executor || !str) {
         return strdup("");
     }
@@ -11968,8 +12005,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
                      * FEATURE_ZSH_BARE_SUBSCRIPT — bash mode keeps the
                      * literal-[N]-after-$var semantic. Mirrors the
                      * unquoted path in expand_variables_in_string. */
-                    if (var_name_len > 0 &&
-                        var_start + var_name_len < len &&
+                    if (var_name_len > 0 && var_start + var_name_len < len &&
                         str[var_start + var_name_len] == '[' &&
                         shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
                         size_t scan = var_start + var_name_len + 1;
@@ -12076,33 +12112,25 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
             // If we get here, no matching backtick found, treat as literal
             result[result_pos++] = str[i++];
         } else if (str[i] == '\\' && i + 1 < len) {
-            // Handle escape sequences
+            /* Two escape regimes share this loop:
+             *  in_double_quotes=true  -- POSIX double-quote: only \\, \",
+             *      \$, \` are meaningful; all other `\X` is kept literally
+             *      as `\X` so the consumer (e.g. echo with XPG escape
+             *      interp) can still process it.
+             *  in_double_quotes=false -- POSIX unquoted: any `\X` (other
+             *      than `\<newline>` already eaten by the tokenizer)
+             *      collapses to literal X, including suppressing the
+             *      special meaning of `$` and `` ` `` so that `\$VAR`
+             *      yields literal `$VAR` with no parameter expansion.
+             *      Single-pass interleaving with variable expansion
+             *      relies on emitting the literal byte and skipping past
+             *      it, so we never re-enter the var-scan on the escaped
+             *      character. */
             char next_char = str[i + 1];
-            char escape_char;
+            bool is_dq_meta = (next_char == '\\' || next_char == '"' ||
+                               next_char == '$' || next_char == '`');
 
-            switch (next_char) {
-            case '\\':
-                escape_char = '\\';
-                break;
-            case '"':
-                escape_char = '"';
-                break;
-            case '$':
-                escape_char = '$';
-                break;
-            case '`':
-                escape_char = '`';
-                break;
-            default:
-                // POSIX: only \, ", $, ` are valid escapes in double quotes
-                // All other backslash sequences are literal
-                escape_char = '\\';
-                break;
-            }
-
-            if (next_char == '\\' || next_char == '"' || next_char == '$' ||
-                next_char == '`') {
-                // Valid escape sequence, skip both backslash and next char
+            if (!in_double_quotes || is_dq_meta) {
                 if (result_pos >= buffer_size - 1) {
                     buffer_size *= 2;
                     result = realloc(result, buffer_size);
@@ -12110,11 +12138,10 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
                         return strdup("");
                     }
                 }
-                result[result_pos++] = escape_char;
-                i += 2; // Skip both backslash and next character
+                result[result_pos++] = next_char;
+                i += 2;
             } else {
-                // Invalid escape sequence, include backslash and next char
-                // literally
+                /* DQ + non-meta: keep the backslash and char literally. */
                 if (result_pos >= buffer_size - 2) {
                     buffer_size *= 2;
                     result = realloc(result, buffer_size);
@@ -12122,9 +12149,9 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
                         return strdup("");
                     }
                 }
-                result[result_pos++] = '\\';       // Add backslash
-                result[result_pos++] = str[i + 1]; // Add following character
-                i += 2; // Skip both backslash and next character
+                result[result_pos++] = '\\';
+                result[result_pos++] = next_char;
+                i += 2;
             }
         } else {
             // Regular character
