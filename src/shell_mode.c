@@ -97,6 +97,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = false,
             [FEATURE_AUTO_PUSHD] = false,
             [FEATURE_CDABLE_VARS] = false,
+            [FEATURE_XPG_ECHO] = true, /* POSIX XSI mandates escape interp */
 
             /* History Behavior */
             [FEATURE_HISTAPPEND] = false,
@@ -176,6 +177,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = false, /* shopt autocd, off by default */
             [FEATURE_AUTO_PUSHD] = false,
             [FEATURE_CDABLE_VARS] = false,
+            [FEATURE_XPG_ECHO] = false, /* shopt xpg_echo, off by default */
 
             /* History Behavior */
             [FEATURE_HISTAPPEND] = true,          /* Bash default on */
@@ -258,6 +260,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = false, /* AUTO_CD option, off by default */
             [FEATURE_AUTO_PUSHD] = false,
             [FEATURE_CDABLE_VARS] = false,
+            [FEATURE_XPG_ECHO] = true, /* zsh: BSD_ECHO off → escapes interp'd
+                                          by default in zsh's echo builtin */
 
             /* History Behavior */
             [FEATURE_HISTAPPEND] = true, /* APPEND_HISTORY */
@@ -279,7 +283,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PROMPT_COMMAND] = false,    /* Zsh uses precmd instead */
             [FEATURE_ZSH_PARAM_FLAGS] = true,
             [FEATURE_ZSH_BARE_SUBSCRIPT] = true, /* Zsh native */
-            [FEATURE_PLUGIN_SYSTEM] = false, /* Not a Zsh feature */
+            [FEATURE_PLUGIN_SYSTEM] = false,     /* Not a Zsh feature */
         },
 
     /* SHELL_MODE_LUSH - Curated best of both (DEFAULT) */
@@ -337,6 +341,12 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = true,             /* Convenience feature */
             [FEATURE_AUTO_PUSHD] = false,         /* Optional */
             [FEATURE_CDABLE_VARS] = false,        /* Optional */
+            [FEATURE_XPG_ECHO] =
+                true, /* Curated zsh-style: echo interprets escapes by
+                         default. More predictable and modern than bash's
+                         literal-by-default — `echo "\n"` produces a newline
+                         consistently. Use `unsetopt xpg_echo` or
+                         `setopt bsd_echo` for bash-style literal. */
 
             /* History Behavior - better defaults */
             [FEATURE_HISTAPPEND] = true,         /* Preserve history */
@@ -433,6 +443,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_AUTO_CD] = "auto_cd",
     [FEATURE_AUTO_PUSHD] = "auto_pushd",
     [FEATURE_CDABLE_VARS] = "cdable_vars",
+    [FEATURE_XPG_ECHO] = "xpg_echo",
 
     /* History Behavior */
     [FEATURE_HISTAPPEND] = "histappend",
@@ -456,31 +467,44 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_PLUGIN_SYSTEM] = "plugin_system",
 };
 
-/* Feature short names for common features (for config convenience) */
+/* Feature short names and cross-shell aliases.
+ *
+ * `invert = true` marks an alias whose semantic is the INVERSE of the
+ * canonical feature: `setopt <alias>` disables the feature, `unsetopt
+ * <alias>` enables it. This lets one underlying flag bridge two shells'
+ * opposite-named knobs (e.g. bash's `xpg_echo` and zsh's `BSD_ECHO`
+ * control the same echo-escape behavior with inverted semantics).
+ */
 static const struct {
     const char *short_name;
     shell_feature_t feature;
-} feature_aliases[] = {{"arrays", FEATURE_INDEXED_ARRAYS},
-                       {"assoc", FEATURE_ASSOCIATIVE_ARRAYS},
-                       {"exttest", FEATURE_EXTENDED_TEST},
-                       {"regex", FEATURE_REGEX_MATCH},
-                       {"procsub", FEATURE_PROCESS_SUBSTITUTION},
-                       {"extglob", FEATURE_EXTENDED_GLOB},
-                       {"nullglob", FEATURE_NULL_GLOB},
-                       {"dotglob", FEATURE_DOT_GLOB},
-                       {"globstar", FEATURE_GLOBSTAR},
-                       {"braceexp", FEATURE_BRACE_EXPANSION},
-                       {"ansiquoting", FEATURE_ANSI_QUOTING},
-                       {"dollarquote", FEATURE_ANSI_QUOTING},
-                       {"autocd", FEATURE_AUTO_CD},
-                       {"wordsplit", FEATURE_WORD_SPLIT_DEFAULT},
-                       {"histappend", FEATURE_HISTAPPEND},
-                       {"incappendhistory", FEATURE_INC_APPEND_HISTORY},
-                       {"sharehistory", FEATURE_SHARE_HISTORY},
-                       {"histverify", FEATURE_HIST_VERIFY},
-                       {"checkjobs", FEATURE_CHECKJOBS},
-                       {"plugins", FEATURE_PLUGIN_SYSTEM},
-                       {NULL, 0}};
+    bool invert;
+} feature_aliases[] = {{"arrays", FEATURE_INDEXED_ARRAYS, false},
+                       {"assoc", FEATURE_ASSOCIATIVE_ARRAYS, false},
+                       {"exttest", FEATURE_EXTENDED_TEST, false},
+                       {"regex", FEATURE_REGEX_MATCH, false},
+                       {"procsub", FEATURE_PROCESS_SUBSTITUTION, false},
+                       {"extglob", FEATURE_EXTENDED_GLOB, false},
+                       {"nullglob", FEATURE_NULL_GLOB, false},
+                       {"dotglob", FEATURE_DOT_GLOB, false},
+                       {"globstar", FEATURE_GLOBSTAR, false},
+                       {"braceexp", FEATURE_BRACE_EXPANSION, false},
+                       {"ansiquoting", FEATURE_ANSI_QUOTING, false},
+                       {"dollarquote", FEATURE_ANSI_QUOTING, false},
+                       {"autocd", FEATURE_AUTO_CD, false},
+                       {"wordsplit", FEATURE_WORD_SPLIT_DEFAULT, false},
+                       {"histappend", FEATURE_HISTAPPEND, false},
+                       {"incappendhistory", FEATURE_INC_APPEND_HISTORY, false},
+                       {"sharehistory", FEATURE_SHARE_HISTORY, false},
+                       {"histverify", FEATURE_HIST_VERIFY, false},
+                       {"checkjobs", FEATURE_CHECKJOBS, false},
+                       {"plugins", FEATURE_PLUGIN_SYSTEM, false},
+                       {"xpgecho", FEATURE_XPG_ECHO, false},
+                       /* zsh BSD_ECHO is the inverse of xpg_echo:
+                        * `setopt BSD_ECHO` disables escape interpretation. */
+                       {"bsd_echo", FEATURE_XPG_ECHO, true},
+                       {"bsdecho", FEATURE_XPG_ECHO, true},
+                       {NULL, 0, false}};
 
 /* ============================================================================
  * Mode Query Functions
@@ -615,14 +639,19 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode) {
     return false;
 }
 
-bool shell_feature_parse(const char *name, shell_feature_t *feature) {
+bool shell_feature_parse(const char *name, shell_feature_t *feature,
+                         bool *invert) {
     if (!name || !feature) {
         return false;
     }
 
+    if (invert) {
+        *invert = false;
+    }
+
     /* Check full names */
     for (int i = 0; i < FEATURE_COUNT; i++) {
-        if (strcasecmp(name, feature_names[i]) == 0) {
+        if (feature_names[i] && strcasecmp(name, feature_names[i]) == 0) {
             *feature = (shell_feature_t)i;
             return true;
         }
@@ -632,6 +661,9 @@ bool shell_feature_parse(const char *name, shell_feature_t *feature) {
     for (int i = 0; feature_aliases[i].short_name != NULL; i++) {
         if (strcasecmp(name, feature_aliases[i].short_name) == 0) {
             *feature = feature_aliases[i].feature;
+            if (invert) {
+                *invert = feature_aliases[i].invert;
+            }
             return true;
         }
     }

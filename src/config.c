@@ -359,11 +359,12 @@ static config_option_t config_options[] = {
      config_validate_bool, NULL},
     {"behavior.brace_expansion_max", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
      &config.brace_expansion_max,
-     "Max brace expansion result count (0 = unbounded)",
-     config_validate_int, NULL},
+     "Max brace expansion result count (0 = unbounded)", config_validate_int,
+     NULL},
     {"behavior.loop_failure_streak", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
      &config.loop_failure_streak,
-     "Consecutive non-zero body iterations before runaway-loop trip (0 = disable)",
+     "Consecutive non-zero body iterations before runaway-loop trip (0 = "
+     "disable)",
      config_validate_int, NULL},
     {"behavior.loop_failure_seconds", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
      &config.loop_failure_seconds,
@@ -1887,7 +1888,8 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Max brace expansion result count (0 = unbounded)\n"
     "behavior.brace_expansion_max = 65536\n"
     "\n"
-    "# Consecutive non-zero body iterations before runaway-loop trip (0 = disable)\n"
+    "# Consecutive non-zero body iterations before runaway-loop trip (0 = "
+    "disable)\n"
     "behavior.loop_failure_streak = 1000\n"
     "\n"
     "# Min wall-clock seconds streak must last before tripping\n"
@@ -3571,14 +3573,16 @@ void config_get_value(const char *key) {
     if (strncmp(key, "shell.feature.", 14) == 0) {
         const char *feature_name = key + 14; // Skip "shell.feature."
         shell_feature_t feature;
+        bool invert = false;
 
-        if (!shell_feature_parse(feature_name, &feature)) {
+        if (!shell_feature_parse(feature_name, &feature, &invert)) {
             printf("Unknown feature: %s\n", feature_name);
             printf("Use 'debug features' to see available features\n");
             return;
         }
 
-        printf("%s\n", shell_mode_allows(feature) ? "true" : "false");
+        bool effective = shell_mode_allows(feature) ^ invert;
+        printf("%s\n", effective ? "true" : "false");
         return;
     }
 
@@ -3667,8 +3671,9 @@ void config_set_value(const char *key, const char *value) {
     if (strncmp(key, "shell.feature.", 14) == 0) {
         const char *feature_name = key + 14; // Skip "shell.feature."
         shell_feature_t feature;
+        bool invert = false;
 
-        if (!shell_feature_parse(feature_name, &feature)) {
+        if (!shell_feature_parse(feature_name, &feature, &invert)) {
             printf("Unknown feature: %s\n", feature_name);
             printf("Use 'debug features' to see available features\n");
             return;
@@ -3687,7 +3692,10 @@ void config_set_value(const char *key, const char *value) {
             return;
         }
 
-        if (enable) {
+        /* `enable` is the user's intent in alias terms; flip onto the
+         * underlying feature when the alias is inverted. */
+        bool target = enable ^ invert;
+        if (target) {
             shell_feature_enable(feature);
         } else {
             shell_feature_disable(feature);

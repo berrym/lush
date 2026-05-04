@@ -308,18 +308,38 @@ TEST(feature_names) {
 
 TEST(feature_parse) {
     shell_feature_t feature;
+    bool invert = true; /* seed non-default to verify reset */
 
     /* Parse valid feature names */
-    ASSERT(shell_feature_parse("indexed_arrays", &feature),
+    ASSERT(shell_feature_parse("indexed_arrays", &feature, &invert),
            "Should parse 'indexed_arrays'");
     ASSERT_EQ(feature, FEATURE_INDEXED_ARRAYS, "Parsed feature should match");
+    ASSERT(!invert, "Canonical name should not be inverted");
 
-    ASSERT(shell_feature_parse("extended_test", &feature),
+    ASSERT(shell_feature_parse("extended_test", &feature, &invert),
            "Should parse 'extended_test'");
     ASSERT_EQ(feature, FEATURE_EXTENDED_TEST, "Parsed feature should match");
+    ASSERT(!invert, "Canonical name should not be inverted");
+
+    /* Inverted alias: bsd_echo bridges to xpg_echo with inverted semantic */
+    ASSERT(shell_feature_parse("bsd_echo", &feature, &invert),
+           "Should parse zsh's 'bsd_echo' alias");
+    ASSERT_EQ(feature, FEATURE_XPG_ECHO,
+              "bsd_echo should map to FEATURE_XPG_ECHO");
+    ASSERT(invert, "bsd_echo is the inverted alias for xpg_echo");
+
+    /* xpg_echo (canonical) is not inverted */
+    ASSERT(shell_feature_parse("xpg_echo", &feature, &invert),
+           "Should parse 'xpg_echo'");
+    ASSERT_EQ(feature, FEATURE_XPG_ECHO, "Parsed feature should match");
+    ASSERT(!invert, "xpg_echo is the canonical (non-inverted) name");
+
+    /* NULL invert pointer is allowed (callers that don't care) */
+    ASSERT(shell_feature_parse("indexed_arrays", &feature, NULL),
+           "Should accept NULL invert out-param");
 
     /* Invalid feature name should fail */
-    ASSERT(!shell_feature_parse("not_a_real_feature", &feature),
+    ASSERT(!shell_feature_parse("not_a_real_feature", &feature, NULL),
            "Should fail to parse invalid feature name");
 }
 

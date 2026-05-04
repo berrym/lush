@@ -423,9 +423,11 @@ void debug_handle_user_input(debug_context_t *ctx, const char *input) {
         while (*feat_name == ' ')
             feat_name++;
         shell_feature_t feat;
-        if (shell_feature_parse(feat_name, &feat)) {
+        bool invert = false;
+        if (shell_feature_parse(feat_name, &feat, &invert)) {
+            bool effective = shell_mode_allows(feat) ^ invert;
             debug_printf(ctx, "Feature '%s': %s\n", feat_name,
-                         shell_mode_allows(feat) ? "ON" : "OFF");
+                         effective ? "ON" : "OFF");
         } else {
             debug_printf(ctx, "Unknown feature: %s\n", feat_name);
         }

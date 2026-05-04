@@ -104,6 +104,11 @@ typedef enum {
     FEATURE_AUTO_CD,     /**< Auto-cd to directories without cd command */
     FEATURE_AUTO_PUSHD,  /**< Auto-push directories to stack on cd */
     FEATURE_CDABLE_VARS, /**< Treat unset vars as directory names for cd */
+    FEATURE_XPG_ECHO,    /**< echo interprets \n, \t, etc. by default (XSI/zsh
+                            behavior); when false, echo prints args literally
+                            unless `-e` is given (bash default). Bridged via
+                            `xpg_echo` (bash shopt name) and inverted alias
+                            `bsd_echo` (zsh setopt name). */
 
     /* History Behavior */
     FEATURE_HISTAPPEND, /**< Append to history file instead of overwrite */
@@ -125,7 +130,8 @@ typedef enum {
                                    precmd_functions+=(fn) */
     FEATURE_PROMPT_COMMAND,     /**< Bash PROMPT_COMMAND (string and array) */
     FEATURE_ZSH_PARAM_FLAGS,    /**< Zsh-style parameter flags */
-    FEATURE_ZSH_BARE_SUBSCRIPT, /**< Zsh bare-$var[N] subscript (vs ${var[N]}) */
+    FEATURE_ZSH_BARE_SUBSCRIPT, /**< Zsh bare-$var[N] subscript (vs ${var[N]})
+                                 */
     FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
 
     /* Sentinel - must be last */
@@ -302,11 +308,22 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode);
  * Converts a feature name string to the corresponding shell_feature_t value.
  * Accepts both full names ("indexed_arrays") and short names ("arrays").
  *
+ * Some aliases are *inverted*: `setopt <inverted-alias>` is semantically
+ * equivalent to `unsetopt <canonical>`. For example, `bsd_echo` (zsh
+ * setopt name) is an inverted alias for the canonical `xpg_echo` —
+ * `setopt bsd_echo` disables XSI escape interpretation; `setopt xpg_echo`
+ * enables it. Pass a non-NULL `invert` to receive that flag; callers that
+ * don't care (e.g. test code, config readers that already know the
+ * canonical name) may pass NULL.
+ *
  * @param name Feature name to parse
  * @param feature Output parameter for parsed feature
+ * @param invert Optional output: true if name semantically inverts the
+ *               feature (caller should flip enable/disable). May be NULL.
  * @return true on success, false if name is not recognized
  */
-bool shell_feature_parse(const char *name, shell_feature_t *feature);
+bool shell_feature_parse(const char *name, shell_feature_t *feature,
+                         bool *invert);
 
 /* ============================================================================
  * Initialization and Lifecycle

@@ -353,7 +353,8 @@ int bin_cd(int argc __attribute__((unused)),
         {
             source_location_t loc = builtin_get_source_location();
             shell_error_t *err = shell_error_create(
-                SHELL_ERR_PERMISSION_DENIED, SHELL_SEVERITY_ERROR, loc, "restricted command in privileged mode");
+                SHELL_ERR_PERMISSION_DENIED, SHELL_SEVERITY_ERROR, loc,
+                "restricted command in privileged mode");
             if (err) {
                 if (current_executor && SOURCE_LOC_VALID(loc)) {
                     char *src_line =
@@ -374,11 +375,16 @@ int bin_cd(int argc __attribute__((unused)),
                         }
                     }
                 }
-            shell_error_set_suggestion(err, "drop privileges or run from an unrestricted shell");
+                shell_error_set_suggestion(
+                    err, "drop privileges or run from an unrestricted shell");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
-                fprintf(stderr, "lush: %s: " "restricted command in privileged mode" "\n", "cd");
+                fprintf(stderr,
+                        "lush: %s: "
+                        "restricted command in privileged mode"
+                        "\n",
+                        "cd");
             }
         }
         return 1;
@@ -389,8 +395,8 @@ int bin_cd(int argc __attribute__((unused)),
     if (!current_dir && errno != ENOENT) {
         int saved_errno = errno;
         executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
-                              builtin_get_source_location(),
-                              "getcwd: %s", strerror(saved_errno));
+                              builtin_get_source_location(), "getcwd: %s",
+                              strerror(saved_errno));
         return 1;
     }
 
@@ -452,8 +458,8 @@ int bin_cd(int argc __attribute__((unused)),
         }
         int saved_errno = errno;
         executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
-                              builtin_get_source_location(),
-                              "%s: %s", target_dir, strerror(saved_errno));
+                              builtin_get_source_location(), "%s: %s",
+                              target_dir, strerror(saved_errno));
         free(current_dir);
         return 1;
     }
@@ -603,32 +609,41 @@ int bin_pwd(int argc, char **argv) {
             {
                 source_location_t loc = builtin_get_source_location();
                 shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR, loc, "%s: invalid option", argv[i]);
+                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR, loc,
+                    "%s: invalid option", argv[i]);
                 if (err) {
                     if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line =
-                            executor_get_source_line(current_executor, loc.line);
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
                         if (src_line) {
-                            shell_error_set_source_line(err, src_line, loc.column,
-                                                        loc.column + loc.length);
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
                             free(src_line);
                         }
                     }
                     if (current_executor) {
-                        for (size_t i = 0; i < current_executor->context_depth &&
-                                           i < SHELL_ERROR_CONTEXT_MAX;
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
                              i++) {
                             if (current_executor->context_stack[i]) {
                                 shell_error_push_context(
-                                    err, "%s", current_executor->context_stack[i]);
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
                             }
                         }
                     }
-                shell_error_set_suggestion(err, "supported options: -L (logical), -P (physical)");
+                    shell_error_set_suggestion(
+                        err, "supported options: -L (logical), -P (physical)");
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr, "lush: %s: " "%s: invalid option" "\n", "pwd", argv[i]);
+                    fprintf(stderr,
+                            "lush: %s: "
+                            "%s: invalid option"
+                            "\n",
+                            "pwd", argv[i]);
                 }
             }
             return 1;
@@ -660,8 +675,8 @@ int bin_pwd(int argc, char **argv) {
     if (getcwd(cwd, MAXLINE) == NULL) {
         int saved_errno = errno;
         executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
-                              builtin_get_source_location(),
-                              "getcwd: %s", strerror(saved_errno));
+                              builtin_get_source_location(), "getcwd: %s",
+                              strerror(saved_errno));
         return 1;
     }
 
@@ -707,9 +722,9 @@ int bin_history(int argc, char **argv) {
 int bin_terminal(int argc, char **argv) {
     if (argc > 2) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_TOO_MANY_ARGUMENTS, SHELL_SEVERITY_ERROR, loc,
-            "too many arguments");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_TOO_MANY_ARGUMENTS,
+                               SHELL_SEVERITY_ERROR, loc, "too many arguments");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -1122,7 +1137,12 @@ static char *process_escape_sequences(const char *str) {
  * @return Always returns 0
  */
 int bin_echo(int argc, char **argv) {
-    bool interpret_escapes = true; // XSI: interpret escape sequences by default
+    /* Default escape-interpretation policy is the FEATURE_XPG_ECHO flag,
+     * curated zsh-style in lush mode (escapes interpreted unless `-E` is
+     * given). Bash mode and `unsetopt xpg_echo` (or the inverted-alias
+     * `setopt bsd_echo`) flip the default to literal. `-e` / `-E` always
+     * override per-call. */
+    bool interpret_escapes = shell_mode_allows(FEATURE_XPG_ECHO);
     bool no_newline = false;
     int arg_start = 1;
 
@@ -1696,9 +1716,9 @@ int bin_export(int argc, char **argv) {
 int bin_source(int argc, char **argv) {
     if (argc < 2) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-            "missing filename");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "missing filename");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -2452,10 +2472,9 @@ int bin_mapfile(int argc, char **argv) {
         if (strcmp(arg, "-d") == 0) {
             // -d delim: Use delim as delimiter
             if (opt_index + 1 >= argc) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_MISSING_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "-d requires a delimiter");
+                executor_error_report(
+                    current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                    builtin_get_source_location(), "-d requires a delimiter");
                 return 1;
             }
             opt_index++;
@@ -2467,18 +2486,16 @@ int bin_mapfile(int argc, char **argv) {
         } else if (strcmp(arg, "-n") == 0) {
             // -n count: Read at most count lines
             if (opt_index + 1 >= argc) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_MISSING_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "-n requires a count");
+                executor_error_report(
+                    current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                    builtin_get_source_location(), "-n requires a count");
                 return 1;
             }
             max_count = atoi(argv[++opt_index]);
             if (max_count < 0) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_INVALID_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "invalid count");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid count");
                 return 1;
             }
         } else if (strcmp(arg, "-O") == 0) {
@@ -2492,27 +2509,24 @@ int bin_mapfile(int argc, char **argv) {
             }
             origin = atoi(argv[++opt_index]);
             if (origin < 0) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_INVALID_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "invalid origin");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid origin");
                 return 1;
             }
         } else if (strcmp(arg, "-s") == 0) {
             // -s count: Skip lines
             if (opt_index + 1 >= argc) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_MISSING_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "-s requires a count");
+                executor_error_report(
+                    current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                    builtin_get_source_location(), "-s requires a count");
                 return 1;
             }
             skip_count = atoi(argv[++opt_index]);
             if (skip_count < 0) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_INVALID_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "invalid skip count");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid skip count");
                 return 1;
             }
         } else if (strcmp(arg, "-t") == 0) {
@@ -2529,10 +2543,9 @@ int bin_mapfile(int argc, char **argv) {
             }
             fd = atoi(argv[++opt_index]);
             if (fd < 0) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_INVALID_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "invalid file descriptor");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid file descriptor");
                 return 1;
             }
         } else if (strcmp(arg, "-C") == 0) {
@@ -2548,18 +2561,16 @@ int bin_mapfile(int argc, char **argv) {
         } else if (strcmp(arg, "-c") == 0) {
             // -c quantum: Callback frequency
             if (opt_index + 1 >= argc) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_MISSING_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "-c requires a quantum");
+                executor_error_report(
+                    current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                    builtin_get_source_location(), "-c requires a quantum");
                 return 1;
             }
             callback_quantum = atoi(argv[++opt_index]);
             if (callback_quantum <= 0) {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_INVALID_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "invalid quantum");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "invalid quantum");
                 return 1;
             }
         } else if (strcmp(arg, "--") == 0) {
@@ -2594,10 +2605,9 @@ int bin_mapfile(int argc, char **argv) {
     FILE *input = (fd == STDIN_FILENO) ? stdin : fdopen(fd, "r");
     if (!input) {
         int saved_errno = errno;
-        executor_error_report(current_executor, SHELL_ERR_BAD_FD,
-                              builtin_get_source_location(),
-                              "cannot open file descriptor %d: %s", fd,
-                              strerror(saved_errno));
+        executor_error_report(
+            current_executor, SHELL_ERR_BAD_FD, builtin_get_source_location(),
+            "cannot open file descriptor %d: %s", fd, strerror(saved_errno));
         return 1;
     }
 
@@ -2864,17 +2874,16 @@ int bin_let(int argc, char **argv) {
                                               ? arithm_error_code()
                                               : SHELL_ERR_ARITHMETIC_SYNTAX;
             source_location_t loc = builtin_get_source_location();
-            shell_error_t *error = shell_error_create(
-                err_code, SHELL_SEVERITY_ERROR, loc,
-                "invalid expression '%s'", argv[i]);
+            shell_error_t *error =
+                shell_error_create(err_code, SHELL_SEVERITY_ERROR, loc,
+                                   "invalid expression '%s'", argv[i]);
             if (error) {
                 /* Source-line snippet block from executor's batch text. */
                 if (current_executor && SOURCE_LOC_VALID(loc)) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
                     if (src_line) {
-                        shell_error_set_source_line(error, src_line,
-                                                    loc.column,
+                        shell_error_set_source_line(error, src_line, loc.column,
                                                     loc.column + loc.length);
                         free(src_line);
                     }
@@ -3220,8 +3229,8 @@ static int report_shift_overflow(int shift_count, int available) {
     source_location_t loc = builtin_get_source_location();
     shell_error_t *error = shell_error_create(
         SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-        "shift count %d exceeds %d positional parameter%s",
-        shift_count, available, available == 1 ? "" : "s");
+        "shift count %d exceeds %d positional parameter%s", shift_count,
+        available, available == 1 ? "" : "s");
     if (error) {
         if (current_executor) {
             for (size_t i = 0; i < current_executor->context_depth; i++) {
@@ -3378,9 +3387,9 @@ int bin_shift(int argc, char **argv) {
 int bin_break(int argc, char **argv) {
     if (!current_executor || current_executor->loop_depth <= 0) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_LOOP_CONTROL, SHELL_SEVERITY_ERROR, loc,
-            "not currently in a loop");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_LOOP_CONTROL, SHELL_SEVERITY_ERROR,
+                               loc, "not currently in a loop");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -3427,8 +3436,7 @@ int bin_break(int argc, char **argv) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
                     if (src_line) {
-                        shell_error_set_source_line(err, src_line,
-                                                    loc.column,
+                        shell_error_set_source_line(err, src_line, loc.column,
                                                     loc.column + loc.length);
                         free(src_line);
                     }
@@ -3441,13 +3449,12 @@ int bin_break(int argc, char **argv) {
                             err, "%s", current_executor->context_stack[i]);
                     }
                 }
-                shell_error_set_suggestion(
-                    err, "level must be a positive integer");
+                shell_error_set_suggestion(err,
+                                           "level must be a positive integer");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
-                fprintf(stderr,
-                        "lush: break: %s: numeric argument required\n",
+                fprintf(stderr, "lush: break: %s: numeric argument required\n",
                         argv[1]);
             }
             return 1;
@@ -3464,8 +3471,7 @@ int bin_break(int argc, char **argv) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
                     if (src_line) {
-                        shell_error_set_source_line(err, src_line,
-                                                    loc.column,
+                        shell_error_set_source_line(err, src_line, loc.column,
                                                     loc.column + loc.length);
                         free(src_line);
                     }
@@ -3479,16 +3485,14 @@ int bin_break(int argc, char **argv) {
                     }
                 }
                 shell_error_set_suggestion(
-                    err,
-                    "level cannot exceed the current loop nesting depth");
+                    err, "level cannot exceed the current loop nesting depth");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
                 fprintf(stderr,
                         "lush: break: %d: cannot break %d levels "
                         "(only %d nested)\n",
-                        break_level, break_level,
-                        current_executor->loop_depth);
+                        break_level, break_level, current_executor->loop_depth);
             }
             return 1;
         }
@@ -3514,9 +3518,9 @@ int bin_break(int argc, char **argv) {
 int bin_continue(int argc, char **argv) {
     if (!current_executor || current_executor->loop_depth <= 0) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_LOOP_CONTROL, SHELL_SEVERITY_ERROR, loc,
-            "not currently in a loop");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_LOOP_CONTROL, SHELL_SEVERITY_ERROR,
+                               loc, "not currently in a loop");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -3563,8 +3567,7 @@ int bin_continue(int argc, char **argv) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
                     if (src_line) {
-                        shell_error_set_source_line(err, src_line,
-                                                    loc.column,
+                        shell_error_set_source_line(err, src_line, loc.column,
                                                     loc.column + loc.length);
                         free(src_line);
                     }
@@ -3577,8 +3580,8 @@ int bin_continue(int argc, char **argv) {
                             err, "%s", current_executor->context_stack[i]);
                     }
                 }
-                shell_error_set_suggestion(
-                    err, "level must be a positive integer");
+                shell_error_set_suggestion(err,
+                                           "level must be a positive integer");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
@@ -3594,15 +3597,13 @@ int bin_continue(int argc, char **argv) {
             shell_error_t *err = shell_error_create(
                 SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
                 "%d: cannot continue %d levels (only %d nested)",
-                continue_level, continue_level,
-                current_executor->loop_depth);
+                continue_level, continue_level, current_executor->loop_depth);
             if (err) {
                 if (SOURCE_LOC_VALID(loc)) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
                     if (src_line) {
-                        shell_error_set_source_line(err, src_line,
-                                                    loc.column,
+                        shell_error_set_source_line(err, src_line, loc.column,
                                                     loc.column + loc.length);
                         free(src_line);
                     }
@@ -3616,8 +3617,7 @@ int bin_continue(int argc, char **argv) {
                     }
                 }
                 shell_error_set_suggestion(
-                    err,
-                    "level cannot exceed the current loop nesting depth");
+                    err, "level cannot exceed the current loop nesting depth");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
@@ -3651,9 +3651,9 @@ int bin_return_value(int argc, char **argv) {
     // POSIX compliance: return_value is not available in strict POSIX mode
     if (is_posix_mode_enabled()) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_FEATURE_DISABLED, SHELL_SEVERITY_ERROR, loc,
-            "not available in POSIX mode");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_FEATURE_DISABLED, SHELL_SEVERITY_ERROR,
+                               loc, "not available in POSIX mode");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -3675,9 +3675,8 @@ int bin_return_value(int argc, char **argv) {
                 }
             }
             shell_error_set_suggestion(
-                err,
-                "switch to bash/zsh/lush mode (set -o bash) to use "
-                "return_value");
+                err, "switch to bash/zsh/lush mode (set -o bash) to use "
+                     "return_value");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {
@@ -3689,9 +3688,9 @@ int bin_return_value(int argc, char **argv) {
 
     if (argc < 2) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-            "missing value argument");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "missing value argument");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -3806,8 +3805,7 @@ int bin_return(int argc, char **argv) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
                     if (src_line) {
-                        shell_error_set_source_line(err, src_line,
-                                                    loc.column,
+                        shell_error_set_source_line(err, src_line, loc.column,
                                                     loc.column + loc.length);
                         free(src_line);
                     }
@@ -3818,8 +3816,7 @@ int bin_return(int argc, char **argv) {
                          i++) {
                         if (current_executor->context_stack[i]) {
                             shell_error_push_context(
-                                err, "%s",
-                                current_executor->context_stack[i]);
+                                err, "%s", current_executor->context_stack[i]);
                         }
                     }
                 }
@@ -3828,8 +3825,7 @@ int bin_return(int argc, char **argv) {
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
-                fprintf(stderr,
-                        "lush: return: %s: numeric argument required\n",
+                fprintf(stderr, "lush: return: %s: numeric argument required\n",
                         argv[1]);
             }
             return 1;
@@ -3887,9 +3883,9 @@ int bin_trap(int argc, char **argv) {
     // Need at least action argument
     if (arg_index >= argc) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-            "usage: trap [-l] [action] [signal ...]");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "usage: trap [-l] [action] [signal ...]");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -3910,9 +3906,8 @@ int bin_trap(int argc, char **argv) {
                     }
                 }
             }
-            shell_error_set_suggestion(err,
-                                       "trap [-l] [action] [signal ...] — "
-                                       "use -l to list supported signals");
+            shell_error_set_suggestion(err, "trap [-l] [action] [signal ...] — "
+                                            "use -l to list supported signals");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {
@@ -3927,9 +3922,9 @@ int bin_trap(int argc, char **argv) {
     // If no signals specified, this is an error
     if (arg_index >= argc) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-            "usage: trap [-l] [action] [signal ...]");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "usage: trap [-l] [action] [signal ...]");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -3950,9 +3945,8 @@ int bin_trap(int argc, char **argv) {
                     }
                 }
             }
-            shell_error_set_suggestion(err,
-                                       "trap [-l] [action] [signal ...] — "
-                                       "use -l to list supported signals");
+            shell_error_set_suggestion(err, "trap [-l] [action] [signal ...] — "
+                                            "use -l to list supported signals");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {
@@ -3976,8 +3970,7 @@ int bin_trap(int argc, char **argv) {
                     char *src_line =
                         executor_get_source_line(current_executor, loc.line);
                     if (src_line) {
-                        shell_error_set_source_line(err, src_line,
-                                                    loc.column,
+                        shell_error_set_source_line(err, src_line, loc.column,
                                                     loc.column + loc.length);
                         free(src_line);
                     }
@@ -3988,15 +3981,13 @@ int bin_trap(int argc, char **argv) {
                          i2++) {
                         if (current_executor->context_stack[i2]) {
                             shell_error_push_context(
-                                err, "%s",
-                                current_executor->context_stack[i2]);
+                                err, "%s", current_executor->context_stack[i2]);
                         }
                     }
                 }
                 shell_error_set_suggestion(
-                    err,
-                    "use 'trap -l' to list supported signal names and "
-                    "numbers");
+                    err, "use 'trap -l' to list supported signal names and "
+                         "numbers");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
@@ -4022,10 +4013,10 @@ int bin_trap(int argc, char **argv) {
         } else {
             // Set trap command
             if (set_trap(signal, action) != 0) {
-                executor_error_report(
-                    current_executor, SHELL_ERR_TRAP_ERROR,
-                    builtin_get_source_location(),
-                    "failed to set trap for signal %s", argv[i]);
+                executor_error_report(current_executor, SHELL_ERR_TRAP_ERROR,
+                                      builtin_get_source_location(),
+                                      "failed to set trap for signal %s",
+                                      argv[i]);
                 return 1;
             }
         }
@@ -4147,9 +4138,8 @@ int bin_exec(int argc, char **argv) {
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {
-            fprintf(stderr,
-                    "lush: exec: redirection-only exec not yet "
-                    "implemented\n");
+            fprintf(stderr, "lush: exec: redirection-only exec not yet "
+                            "implemented\n");
         }
         return 1;
     }
@@ -4170,9 +4160,9 @@ int bin_exec(int argc, char **argv) {
 
     if (cmd_start >= argc) {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
-            "no command specified");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "no command specified");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -4439,32 +4429,41 @@ int bin_umask(int argc, char **argv) {
             {
                 source_location_t loc = builtin_get_source_location();
                 shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc, "invalid mode");
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                    "invalid mode");
                 if (err) {
                     if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line =
-                            executor_get_source_line(current_executor, loc.line);
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
                         if (src_line) {
-                            shell_error_set_source_line(err, src_line, loc.column,
-                                                        loc.column + loc.length);
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
                             free(src_line);
                         }
                     }
                     if (current_executor) {
-                        for (size_t i = 0; i < current_executor->context_depth &&
-                                           i < SHELL_ERROR_CONTEXT_MAX;
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
                              i++) {
                             if (current_executor->context_stack[i]) {
                                 shell_error_push_context(
-                                    err, "%s", current_executor->context_stack[i]);
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
                             }
                         }
                     }
-                shell_error_set_suggestion(err, "expected an octal mode (e.g. 022, 077)");
+                    shell_error_set_suggestion(
+                        err, "expected an octal mode (e.g. 022, 077)");
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr, "lush: %s: " "invalid mode" "\n", "umask");
+                    fprintf(stderr,
+                            "lush: %s: "
+                            "invalid mode"
+                            "\n",
+                            "umask");
                 }
             }
             return 1;
@@ -4478,32 +4477,41 @@ int bin_umask(int argc, char **argv) {
             {
                 source_location_t loc = builtin_get_source_location();
                 shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc, "%s: invalid mode", argv[1]);
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                    "%s: invalid mode", argv[1]);
                 if (err) {
                     if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line =
-                            executor_get_source_line(current_executor, loc.line);
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
                         if (src_line) {
-                            shell_error_set_source_line(err, src_line, loc.column,
-                                                        loc.column + loc.length);
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
                             free(src_line);
                         }
                     }
                     if (current_executor) {
-                        for (size_t i = 0; i < current_executor->context_depth &&
-                                           i < SHELL_ERROR_CONTEXT_MAX;
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
                              i++) {
                             if (current_executor->context_stack[i]) {
                                 shell_error_push_context(
-                                    err, "%s", current_executor->context_stack[i]);
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
                             }
                         }
                     }
-                shell_error_set_suggestion(err, "octal mode must be in 0..0777");
+                    shell_error_set_suggestion(err,
+                                               "octal mode must be in 0..0777");
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr, "lush: %s: " "%s: invalid mode" "\n", "umask", argv[1]);
+                    fprintf(stderr,
+                            "lush: %s: "
+                            "%s: invalid mode"
+                            "\n",
+                            "umask", argv[1]);
                 }
             }
             return 1;
@@ -4516,8 +4524,9 @@ int bin_umask(int argc, char **argv) {
     // Too many arguments
     {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_TOO_MANY_ARGUMENTS, SHELL_SEVERITY_ERROR, loc, "too many arguments");
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_TOO_MANY_ARGUMENTS,
+                               SHELL_SEVERITY_ERROR, loc, "too many arguments");
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -4538,11 +4547,15 @@ int bin_umask(int argc, char **argv) {
                     }
                 }
             }
-        shell_error_set_suggestion(err, "usage: umask [octal-mode]");
+            shell_error_set_suggestion(err, "usage: umask [octal-mode]");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {
-            fprintf(stderr, "lush: %s: " "too many arguments" "\n", "umask");
+            fprintf(stderr,
+                    "lush: %s: "
+                    "too many arguments"
+                    "\n",
+                    "umask");
         }
     }
     return 1;
@@ -5463,8 +5476,7 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
                 for (size_t i = 0; i < array->assoc_insertion_count; i++) {
                     const char *k = array->assoc_insertion_order[i];
                     const char *v = ht_strstr_get(array->assoc_map, k);
-                    printf("%s[%s]=\"%s\"", first ? "" : " ", k,
-                           v ? v : "");
+                    printf("%s[%s]=\"%s\"", first ? "" : " ", k, v ? v : "");
                     first = false;
                 }
             } else {
@@ -6187,8 +6199,9 @@ int bin_setopt(int argc, char **argv) {
     /* Process each option */
     for (int i = start_idx; i < argc; i++) {
         shell_feature_t feature;
+        bool invert = false;
 
-        if (!shell_feature_parse(argv[i], &feature)) {
+        if (!shell_feature_parse(argv[i], &feature, &invert)) {
             if (!query_mode) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_OPTION,
@@ -6199,19 +6212,27 @@ int bin_setopt(int argc, char **argv) {
         }
 
         if (query_mode) {
-            /* Return status based on current state */
-            return shell_mode_allows(feature) ? 0 : 1;
+            /* For query, return status based on the *aliased* sense:
+             * `setopt -q bsd_echo` is true when xpg_echo is OFF. */
+            bool effective = shell_mode_allows(feature) ^ invert;
+            return effective ? 0 : 1;
         }
 
-        /* Enable the feature */
-        shell_feature_enable(feature);
+        /* Enable from the alias's perspective; flip on the underlying
+         * feature when the alias is inverted. */
+        bool target_value = !invert;
+        if (target_value) {
+            shell_feature_enable(feature);
+        } else {
+            shell_feature_disable(feature);
+        }
 
         /* Sync to registry if initialized */
         if (config_registry_is_initialized()) {
             char key[CREG_KEY_MAX];
             snprintf(key, sizeof(key), "shell.features.%s",
                      shell_feature_name(feature));
-            config_registry_set_boolean(key, true);
+            config_registry_set_boolean(key, target_value);
         }
     }
 
@@ -6257,23 +6278,30 @@ int bin_unsetopt(int argc, char **argv) {
         }
 
         shell_feature_t feature;
+        bool invert = false;
 
-        if (!shell_feature_parse(argv[i], &feature)) {
+        if (!shell_feature_parse(argv[i], &feature, &invert)) {
             executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
                                   builtin_get_source_location(),
                                   "unknown option: %s", argv[i]);
             return 1;
         }
 
-        /* Disable the feature */
-        shell_feature_disable(feature);
+        /* Disable from the alias's perspective; flip on the underlying
+         * feature when the alias is inverted. */
+        bool target_value = invert;
+        if (target_value) {
+            shell_feature_enable(feature);
+        } else {
+            shell_feature_disable(feature);
+        }
 
         /* Sync to registry if initialized */
         if (config_registry_is_initialized()) {
             char key[CREG_KEY_MAX];
             snprintf(key, sizeof(key), "shell.features.%s",
                      shell_feature_name(feature));
-            config_registry_set_boolean(key, false);
+            config_registry_set_boolean(key, target_value);
         }
     }
 
@@ -6457,8 +6485,9 @@ int bin_shopt(int argc, char **argv) {
     int result = 0;
     for (int i = opt_end; i < argc; i++) {
         shell_feature_t feature;
+        bool invert = false;
 
-        if (!shell_feature_parse(argv[i], &feature)) {
+        if (!shell_feature_parse(argv[i], &feature, &invert)) {
             if (!query_mode) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_OPTION,
@@ -6469,43 +6498,55 @@ int bin_shopt(int argc, char **argv) {
             continue;
         }
 
-        bool enabled = shell_mode_allows(feature);
+        bool underlying = shell_mode_allows(feature);
+        /* From the alias's perspective: an inverted alias is "on" when the
+         * underlying feature is off. */
+        bool effective = underlying ^ invert;
 
         if (query_mode) {
-            /* -q: return status based on option state */
-            if (!enabled) {
+            /* -q: return status based on option state (alias perspective) */
+            if (!effective) {
                 result = 1;
             }
         } else if (set_mode) {
-            /* -s: enable the option */
-            shell_feature_enable(feature);
-
-            /* Sync to registry if initialized */
+            /* -s: enable the option (alias perspective) */
+            bool target = !invert;
+            if (target) {
+                shell_feature_enable(feature);
+            } else {
+                shell_feature_disable(feature);
+            }
             if (config_registry_is_initialized()) {
                 char key[CREG_KEY_MAX];
                 snprintf(key, sizeof(key), "shell.features.%s",
                          shell_feature_name(feature));
-                config_registry_set_boolean(key, true);
+                config_registry_set_boolean(key, target);
             }
         } else if (unset_mode) {
-            /* -u: disable the option */
-            shell_feature_disable(feature);
-
-            /* Sync to registry if initialized */
+            /* -u: disable the option (alias perspective) */
+            bool target = invert;
+            if (target) {
+                shell_feature_enable(feature);
+            } else {
+                shell_feature_disable(feature);
+            }
             if (config_registry_is_initialized()) {
                 char key[CREG_KEY_MAX];
                 snprintf(key, sizeof(key), "shell.features.%s",
                          shell_feature_name(feature));
-                config_registry_set_boolean(key, false);
+                config_registry_set_boolean(key, target);
             }
         } else {
-            /* No -s/-u: just print the option state */
+            /* No -s/-u: just print the option state.
+             * Print under the user-supplied alias name and its effective
+             * sense; round-tripping that through `shopt -s/-u` yields the
+             * same configuration. */
+            const char *display_name =
+                invert ? argv[i] : shell_feature_name(feature);
             if (print_mode) {
-                printf("shopt %s %s\n", enabled ? "-s" : "-u",
-                       shell_feature_name(feature));
+                printf("shopt %s %s\n", effective ? "-s" : "-u", display_name);
             } else {
-                printf("%-30s %s\n", shell_feature_name(feature),
-                       enabled ? "on" : "off");
+                printf("%-30s %s\n", display_name, effective ? "on" : "off");
             }
         }
     }
@@ -9109,8 +9150,8 @@ int bin_pushd(int argc, char **argv) {
     if (!cwd) {
         int saved_errno = errno;
         executor_error_report(current_executor, SHELL_ERR_IO_ERROR,
-                              builtin_get_source_location(),
-                              "getcwd: %s", strerror(saved_errno));
+                              builtin_get_source_location(), "getcwd: %s",
+                              strerror(saved_errno));
         return 1;
     }
 
@@ -9120,32 +9161,41 @@ int bin_pushd(int argc, char **argv) {
             {
                 source_location_t loc = builtin_get_source_location();
                 shell_error_t *err = shell_error_create(
-                    SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "no other directory");
+                    SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
+                    "no other directory");
                 if (err) {
                     if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line =
-                            executor_get_source_line(current_executor, loc.line);
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
                         if (src_line) {
-                            shell_error_set_source_line(err, src_line, loc.column,
-                                                        loc.column + loc.length);
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
                             free(src_line);
                         }
                     }
                     if (current_executor) {
-                        for (size_t i = 0; i < current_executor->context_depth &&
-                                           i < SHELL_ERROR_CONTEXT_MAX;
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
                              i++) {
                             if (current_executor->context_stack[i]) {
                                 shell_error_push_context(
-                                    err, "%s", current_executor->context_stack[i]);
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
                             }
                         }
                     }
-                shell_error_set_suggestion(err, "push a directory first: pushd <dir>");
+                    shell_error_set_suggestion(
+                        err, "push a directory first: pushd <dir>");
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr, "lush: %s: " "no other directory" "\n", "pushd");
+                    fprintf(stderr,
+                            "lush: %s: "
+                            "no other directory"
+                            "\n",
+                            "pushd");
                 }
             }
             free(cwd);
@@ -9157,32 +9207,41 @@ int bin_pushd(int argc, char **argv) {
             {
                 source_location_t loc = builtin_get_source_location();
                 shell_error_t *err = shell_error_create(
-                    SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "directory stack empty");
+                    SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
+                    "directory stack empty");
                 if (err) {
                     if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line =
-                            executor_get_source_line(current_executor, loc.line);
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
                         if (src_line) {
-                            shell_error_set_source_line(err, src_line, loc.column,
-                                                        loc.column + loc.length);
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
                             free(src_line);
                         }
                     }
                     if (current_executor) {
-                        for (size_t i = 0; i < current_executor->context_depth &&
-                                           i < SHELL_ERROR_CONTEXT_MAX;
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
                              i++) {
                             if (current_executor->context_stack[i]) {
                                 shell_error_push_context(
-                                    err, "%s", current_executor->context_stack[i]);
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
                             }
                         }
                     }
-                shell_error_set_suggestion(err, "push a directory first: pushd <dir>");
+                    shell_error_set_suggestion(
+                        err, "push a directory first: pushd <dir>");
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr, "lush: %s: " "directory stack empty" "\n", "pushd");
+                    fprintf(stderr,
+                            "lush: %s: "
+                            "directory stack empty"
+                            "\n",
+                            "pushd");
                 }
             }
             free(cwd);
@@ -9196,8 +9255,8 @@ int bin_pushd(int argc, char **argv) {
         if (chdir(old_top) < 0) {
             int saved_errno = errno;
             executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
-                                  builtin_get_source_location(),
-                                  "%s: %s", old_top, strerror(saved_errno));
+                                  builtin_get_source_location(), "%s: %s",
+                                  old_top, strerror(saved_errno));
             // Restore stack state
             dirstack_pop();
             dirstack_push(old_top);
@@ -9245,32 +9304,41 @@ int bin_pushd(int argc, char **argv) {
                 {
                     source_location_t loc = builtin_get_source_location();
                     shell_error_t *err = shell_error_create(
-                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "%s: directory stack index out of range", arg);
+                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
+                        "%s: directory stack index out of range", arg);
                     if (err) {
                         if (current_executor && SOURCE_LOC_VALID(loc)) {
-                            char *src_line =
-                                executor_get_source_line(current_executor, loc.line);
+                            char *src_line = executor_get_source_line(
+                                current_executor, loc.line);
                             if (src_line) {
-                                shell_error_set_source_line(err, src_line, loc.column,
-                                                            loc.column + loc.length);
+                                shell_error_set_source_line(
+                                    err, src_line, loc.column,
+                                    loc.column + loc.length);
                                 free(src_line);
                             }
                         }
                         if (current_executor) {
-                            for (size_t i = 0; i < current_executor->context_depth &&
-                                               i < SHELL_ERROR_CONTEXT_MAX;
+                            for (size_t i = 0;
+                                 i < current_executor->context_depth &&
+                                 i < SHELL_ERROR_CONTEXT_MAX;
                                  i++) {
                                 if (current_executor->context_stack[i]) {
                                     shell_error_push_context(
-                                        err, "%s", current_executor->context_stack[i]);
+                                        err, "%s",
+                                        current_executor->context_stack[i]);
                                 }
                             }
                         }
-                    shell_error_set_suggestion(err, "use 'dirs' to list valid stack indices");
+                        shell_error_set_suggestion(
+                            err, "use 'dirs' to list valid stack indices");
                         shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);
                     } else {
-                        fprintf(stderr, "lush: %s: " "%s: directory stack index out of range" "\n", "pushd", arg);
+                        fprintf(stderr,
+                                "lush: %s: "
+                                "%s: directory stack index out of range"
+                                "\n",
+                                "pushd", arg);
                     }
                 }
                 free(cwd);
@@ -9282,31 +9350,39 @@ int bin_pushd(int argc, char **argv) {
                 {
                     source_location_t loc = builtin_get_source_location();
                     shell_error_t *err = shell_error_create(
-                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "%s: rotation failed", arg);
+                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
+                        "%s: rotation failed", arg);
                     if (err) {
                         if (current_executor && SOURCE_LOC_VALID(loc)) {
-                            char *src_line =
-                                executor_get_source_line(current_executor, loc.line);
+                            char *src_line = executor_get_source_line(
+                                current_executor, loc.line);
                             if (src_line) {
-                                shell_error_set_source_line(err, src_line, loc.column,
-                                                            loc.column + loc.length);
+                                shell_error_set_source_line(
+                                    err, src_line, loc.column,
+                                    loc.column + loc.length);
                                 free(src_line);
                             }
                         }
                         if (current_executor) {
-                            for (size_t i = 0; i < current_executor->context_depth &&
-                                               i < SHELL_ERROR_CONTEXT_MAX;
+                            for (size_t i = 0;
+                                 i < current_executor->context_depth &&
+                                 i < SHELL_ERROR_CONTEXT_MAX;
                                  i++) {
                                 if (current_executor->context_stack[i]) {
                                     shell_error_push_context(
-                                        err, "%s", current_executor->context_stack[i]);
+                                        err, "%s",
+                                        current_executor->context_stack[i]);
                                 }
                             }
                         }
                         shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);
                     } else {
-                        fprintf(stderr, "lush: %s: " "%s: rotation failed" "\n", "pushd", arg);
+                        fprintf(stderr,
+                                "lush: %s: "
+                                "%s: rotation failed"
+                                "\n",
+                                "pushd", arg);
                     }
                 }
                 free(cwd);
@@ -9316,9 +9392,10 @@ int bin_pushd(int argc, char **argv) {
             target = dirstack_peek(0);
             if (chdir(target) < 0) {
                 int saved_errno = errno;
-                executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
-                                      builtin_get_source_location(),
-                                      "%s: %s", target, strerror(saved_errno));
+                executor_error_report(current_executor,
+                                      SHELL_ERR_FILE_NOT_FOUND,
+                                      builtin_get_source_location(), "%s: %s",
+                                      target, strerror(saved_errno));
                 free(cwd);
                 return 1;
             }
@@ -9340,8 +9417,8 @@ int bin_pushd(int argc, char **argv) {
     if (chdir(arg) < 0) {
         int saved_errno = errno;
         executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
-                              builtin_get_source_location(),
-                              "%s: %s", arg, strerror(saved_errno));
+                              builtin_get_source_location(), "%s: %s", arg,
+                              strerror(saved_errno));
         free(cwd);
         return 1;
     }
@@ -9376,8 +9453,9 @@ int bin_popd(int argc, char **argv) {
     if (dirstack_size() < 1) {
         {
             source_location_t loc = builtin_get_source_location();
-            shell_error_t *err = shell_error_create(
-                SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "directory stack empty");
+            shell_error_t *err = shell_error_create(SHELL_ERR_DIRECTORY_STACK,
+                                                    SHELL_SEVERITY_ERROR, loc,
+                                                    "directory stack empty");
             if (err) {
                 if (current_executor && SOURCE_LOC_VALID(loc)) {
                     char *src_line =
@@ -9398,11 +9476,16 @@ int bin_popd(int argc, char **argv) {
                         }
                     }
                 }
-            shell_error_set_suggestion(err, "push a directory first: pushd <dir>");
+                shell_error_set_suggestion(
+                    err, "push a directory first: pushd <dir>");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
             } else {
-                fprintf(stderr, "lush: %s: " "directory stack empty" "\n", "popd");
+                fprintf(stderr,
+                        "lush: %s: "
+                        "directory stack empty"
+                        "\n",
+                        "popd");
             }
         }
         return 1;
@@ -9415,32 +9498,41 @@ int bin_popd(int argc, char **argv) {
             {
                 source_location_t loc = builtin_get_source_location();
                 shell_error_t *err = shell_error_create(
-                    SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "directory stack empty");
+                    SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
+                    "directory stack empty");
                 if (err) {
                     if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line =
-                            executor_get_source_line(current_executor, loc.line);
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
                         if (src_line) {
-                            shell_error_set_source_line(err, src_line, loc.column,
-                                                        loc.column + loc.length);
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
                             free(src_line);
                         }
                     }
                     if (current_executor) {
-                        for (size_t i = 0; i < current_executor->context_depth &&
-                                           i < SHELL_ERROR_CONTEXT_MAX;
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
                              i++) {
                             if (current_executor->context_stack[i]) {
                                 shell_error_push_context(
-                                    err, "%s", current_executor->context_stack[i]);
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
                             }
                         }
                     }
-                shell_error_set_suggestion(err, "push a directory first: pushd <dir>");
+                    shell_error_set_suggestion(
+                        err, "push a directory first: pushd <dir>");
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr, "lush: %s: " "directory stack empty" "\n", "popd");
+                    fprintf(stderr,
+                            "lush: %s: "
+                            "directory stack empty"
+                            "\n",
+                            "popd");
                 }
             }
             return 1;
@@ -9451,8 +9543,8 @@ int bin_popd(int argc, char **argv) {
         if (chdir(dir) < 0) {
             int saved_errno = errno;
             executor_error_report(current_executor, SHELL_ERR_FILE_NOT_FOUND,
-                                  builtin_get_source_location(),
-                                  "%s: %s", dir, strerror(saved_errno));
+                                  builtin_get_source_location(), "%s: %s", dir,
+                                  strerror(saved_errno));
             // Put it back
             dirstack_push(dir);
             free(dir);
@@ -9495,32 +9587,41 @@ int bin_popd(int argc, char **argv) {
                 {
                     source_location_t loc = builtin_get_source_location();
                     shell_error_t *err = shell_error_create(
-                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "can't remove current directory");
+                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
+                        "can't remove current directory");
                     if (err) {
                         if (current_executor && SOURCE_LOC_VALID(loc)) {
-                            char *src_line =
-                                executor_get_source_line(current_executor, loc.line);
+                            char *src_line = executor_get_source_line(
+                                current_executor, loc.line);
                             if (src_line) {
-                                shell_error_set_source_line(err, src_line, loc.column,
-                                                            loc.column + loc.length);
+                                shell_error_set_source_line(
+                                    err, src_line, loc.column,
+                                    loc.column + loc.length);
                                 free(src_line);
                             }
                         }
                         if (current_executor) {
-                            for (size_t i = 0; i < current_executor->context_depth &&
-                                               i < SHELL_ERROR_CONTEXT_MAX;
+                            for (size_t i = 0;
+                                 i < current_executor->context_depth &&
+                                 i < SHELL_ERROR_CONTEXT_MAX;
                                  i++) {
                                 if (current_executor->context_stack[i]) {
                                     shell_error_push_context(
-                                        err, "%s", current_executor->context_stack[i]);
+                                        err, "%s",
+                                        current_executor->context_stack[i]);
                                 }
                             }
                         }
-                    shell_error_set_suggestion(err, "use 'cd' to change current directory");
+                        shell_error_set_suggestion(
+                            err, "use 'cd' to change current directory");
                         shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);
                     } else {
-                        fprintf(stderr, "lush: %s: " "can't remove current directory" "\n", "popd");
+                        fprintf(stderr,
+                                "lush: %s: "
+                                "can't remove current directory"
+                                "\n",
+                                "popd");
                     }
                 }
                 return 1;
@@ -9533,32 +9634,41 @@ int bin_popd(int argc, char **argv) {
                 {
                     source_location_t loc = builtin_get_source_location();
                     shell_error_t *err = shell_error_create(
-                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc, "%s: directory stack index out of range", arg);
+                        SHELL_ERR_DIRECTORY_STACK, SHELL_SEVERITY_ERROR, loc,
+                        "%s: directory stack index out of range", arg);
                     if (err) {
                         if (current_executor && SOURCE_LOC_VALID(loc)) {
-                            char *src_line =
-                                executor_get_source_line(current_executor, loc.line);
+                            char *src_line = executor_get_source_line(
+                                current_executor, loc.line);
                             if (src_line) {
-                                shell_error_set_source_line(err, src_line, loc.column,
-                                                            loc.column + loc.length);
+                                shell_error_set_source_line(
+                                    err, src_line, loc.column,
+                                    loc.column + loc.length);
                                 free(src_line);
                             }
                         }
                         if (current_executor) {
-                            for (size_t i = 0; i < current_executor->context_depth &&
-                                               i < SHELL_ERROR_CONTEXT_MAX;
+                            for (size_t i = 0;
+                                 i < current_executor->context_depth &&
+                                 i < SHELL_ERROR_CONTEXT_MAX;
                                  i++) {
                                 if (current_executor->context_stack[i]) {
                                     shell_error_push_context(
-                                        err, "%s", current_executor->context_stack[i]);
+                                        err, "%s",
+                                        current_executor->context_stack[i]);
                                 }
                             }
                         }
-                    shell_error_set_suggestion(err, "use 'dirs' to list valid stack indices");
+                        shell_error_set_suggestion(
+                            err, "use 'dirs' to list valid stack indices");
                         shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);
                     } else {
-                        fprintf(stderr, "lush: %s: " "%s: directory stack index out of range" "\n", "popd", arg);
+                        fprintf(stderr,
+                                "lush: %s: "
+                                "%s: directory stack index out of range"
+                                "\n",
+                                "popd", arg);
                     }
                 }
                 return 1;
@@ -9571,8 +9681,9 @@ int bin_popd(int argc, char **argv) {
 
     {
         source_location_t loc = builtin_get_source_location();
-        shell_error_t *err = shell_error_create(
-            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc, "%s: invalid argument", arg);
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "%s: invalid argument", arg);
         if (err) {
             if (current_executor && SOURCE_LOC_VALID(loc)) {
                 char *src_line =
@@ -9593,11 +9704,15 @@ int bin_popd(int argc, char **argv) {
                     }
                 }
             }
-        shell_error_set_suggestion(err, "usage: popd [+N | -N]");
+            shell_error_set_suggestion(err, "usage: popd [+N | -N]");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {
-            fprintf(stderr, "lush: %s: " "%s: invalid argument" "\n", "popd", arg);
+            fprintf(stderr,
+                    "lush: %s: "
+                    "%s: invalid argument"
+                    "\n",
+                    "popd", arg);
         }
     }
     return 1;
@@ -9636,33 +9751,42 @@ int bin_dirs(int argc, char **argv) {
             {
                 source_location_t loc = builtin_get_source_location();
                 shell_error_t *err = shell_error_create(
-                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR, loc, "%s: invalid option", argv[i]);
+                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR, loc,
+                    "%s: invalid option", argv[i]);
                 if (err) {
                     if (current_executor && SOURCE_LOC_VALID(loc)) {
-                        char *src_line =
-                            executor_get_source_line(current_executor, loc.line);
+                        char *src_line = executor_get_source_line(
+                            current_executor, loc.line);
                         if (src_line) {
-                            shell_error_set_source_line(err, src_line, loc.column,
-                                                        loc.column + loc.length);
+                            shell_error_set_source_line(
+                                err, src_line, loc.column,
+                                loc.column + loc.length);
                             free(src_line);
                         }
                     }
                     if (current_executor) {
-                        for (size_t i = 0; i < current_executor->context_depth &&
-                                           i < SHELL_ERROR_CONTEXT_MAX;
+                        for (size_t i = 0;
+                             i < current_executor->context_depth &&
+                             i < SHELL_ERROR_CONTEXT_MAX;
                              i++) {
                             if (current_executor->context_stack[i]) {
                                 shell_error_push_context(
-                                    err, "%s", current_executor->context_stack[i]);
+                                    err, "%s",
+                                    current_executor->context_stack[i]);
                             }
                         }
                     }
-                shell_error_set_suggestion(err, "supported options: -c (clear), -l (full), "
-                               "-p (per-line), -v (numbered)");
+                    shell_error_set_suggestion(
+                        err, "supported options: -c (clear), -l (full), "
+                             "-p (per-line), -v (numbered)");
                     shell_error_display(err, stderr, isatty(STDERR_FILENO));
                     shell_error_free(err);
                 } else {
-                    fprintf(stderr, "lush: %s: " "%s: invalid option" "\n", "dirs", argv[i]);
+                    fprintf(stderr,
+                            "lush: %s: "
+                            "%s: invalid option"
+                            "\n",
+                            "dirs", argv[i]);
                 }
             }
             return 1;
