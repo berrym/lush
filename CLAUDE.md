@@ -201,6 +201,7 @@ meson test -C build -v test_history_phase1
 
 - `docs/VISION.md` - Project philosophy (read first)
 - `docs/development/ARCHITECTURE-SYNTAX-BRIDGING.md` - Syntax bridging design
+- `docs/development/COMPLETION_ARCHITECTURE.md` - Completion subsystem reference (analyzer, sources, splicer, menu, how to add a source). Authoritative; supersedes spec 12
 - `docs/development/SPEC-COMPATIBILITY.md` - Compatibility targets
 - `docs/lle_specification/LLE_DESIGN_DOCUMENT.md` - LLE architecture
 - `docs/development/SCREEN_BUFFER_SPECIFICATION.md` - Screen buffer details

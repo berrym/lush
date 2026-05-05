@@ -45,7 +45,8 @@
 
 | Document | Description |
 |----------|-------------|
-| [Completion System](COMPLETION_SYSTEM.md) | LLE completions, context-aware builtin completions |
+| [Completion System](COMPLETION_SYSTEM.md) | User-facing: LLE completions, context-aware builtin completions |
+| [Completion Architecture](development/COMPLETION_ARCHITECTURE.md) | Developer reference: analyzer, sources, splicer, menu, configuration, how to add a source |
 
 ### Hook System
 

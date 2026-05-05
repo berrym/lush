@@ -3,8 +3,30 @@
 **Document**: 12_completion_system_complete.md  
 **Version**: 1.0.0  
 **Date**: 2025-01-07  
-**Status**: Implementation-Ready Specification  
+**Status**: Aspirational end-state — implementation in progress  
 **Classification**: Critical Core Component  
+
+---
+
+> [!IMPORTANT]
+> **This specification describes the eventual end-state of the
+> completion subsystem. The current implementation is a deliberate
+> architectural rewrite that landed correct foundations first; several
+> spec components (fuzzy matcher, plugin registry, security context,
+> performance monitor) are tracked future work on top of that
+> foundation, not dropped scope.**
+>
+> For an accurate reference of what the code *currently* does —
+> including type definitions, data flow, source/engine contract,
+> splicer rules, configuration, integration points, and how to add a
+> new source — see:
+>
+> **[`docs/development/COMPLETION_ARCHITECTURE.md`](../development/COMPLETION_ARCHITECTURE.md)**
+>
+> That document's §12 catalogues which spec components are implemented,
+> which are replaced by simpler equivalents that fit the new
+> architecture, and which remain future work. Use it as the source of
+> truth for current behavior; use this spec as the design target.
 
 ---
 
