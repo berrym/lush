@@ -33,6 +33,7 @@ typedef enum {
     LLE_SOURCE_HISTORY,           /**< Command history */
     LLE_SOURCE_ALIASES,           /**< Shell aliases (future) */
     LLE_SOURCE_FUNCTIONS,         /**< Shell functions (future) */
+    LLE_SOURCE_SSH_HOSTS,         /**< Hosts from ~/.ssh/{config,known_hosts} */
     LLE_SOURCE_CUSTOM,            /**< User-registered custom sources */
 } lle_source_type_t;
 

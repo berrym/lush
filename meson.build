@@ -1022,6 +1022,25 @@ endif
          timeout: 30)
   endif
 
+  # SSH Host Completion Tests
+  # Behaviour tests for lle_completion_source_ssh_hosts: configured-host
+  # emission, user@ prefix preservation, and remote-path bypass. Uses
+  # fixture ~/.ssh/config in a tmpdir and force-cycles the global
+  # ssh_hosts cache between tests. Pulls in test_completion_mock.c for
+  # the shell-core symbols (aliases, builtins, environ) that the
+  # completion sources reference -- same pattern as test_word_context.
+  if fs.exists('tests/lle/unit/test_ssh_completion.c')
+    test_ssh_completion = executable('test_ssh_completion',
+                                     'tests/lle/unit/test_ssh_completion.c',
+                                     'tests/lle/functional/test_completion_mock.c',
+                                     include_directories: [inc, include_directories('tests')],
+                                     link_with: lle_lib,
+                                     dependencies: [ncurses_link_dep])
+    test('LLE SSH Host Completion', test_ssh_completion,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # Shell Quoting and Escape Functional Tests
   # Verifies tokenizer/parser/executor handle backslash escapes outside
   # quotes, double-quoted strings, single-quoted strings, and end-to-end
