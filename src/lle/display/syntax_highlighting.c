@@ -646,6 +646,33 @@ static bool dequote_unquoted_path(const char *path, char *out,
 }
 
 /**
+ * @brief Slashless words that should still be treated as path-shaped.
+ *
+ * The path-validation branch is normally gated on the presence of a `/`
+ * in the word range (the classic "if it has a slash, it's path-shaped"
+ * heuristic). That heuristic misses three common bare arguments which
+ * are unambiguously paths in every shell: `.` (current dir), `..`
+ * (parent dir), and `~` (home dir). Tab completion already treats them
+ * as path targets in bash and zsh; the highlighter's filesystem-aware
+ * classification should follow.
+ *
+ * Intentionally narrow: `.bashrc`, `..foo`, `~user`, etc. are NOT
+ * treated as implicit paths -- they would require stat()ing every bare
+ * word (expensive) or per-user home lookups (`getpwnam`, scope creep).
+ * Adding `~user` is a tracked follow-up; for now the rule is "exact
+ * match on the three single-shape indicators."
+ */
+static bool is_implicit_path_word(const char *word, size_t len) {
+    if (len == 1 && (word[0] == '.' || word[0] == '~')) {
+        return true;
+    }
+    if (len == 2 && word[0] == '.' && word[1] == '.') {
+        return true;
+    }
+    return false;
+}
+
+/**
  * @brief Resolve a raw shell-source path word into a shape × kind token.
  *
  * Walks the full classification pipeline:
@@ -1321,14 +1348,20 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     type = LLE_TOKEN_OPTION;
                 } else if (has_glob) {
                     type = LLE_TOKEN_GLOB;
-                } else if (has_slash && highlighter->validate_paths) {
+                } else if ((has_slash || is_implicit_path_word(
+                                             input + token_start, word_len)) &&
+                           highlighter->validate_paths) {
                     /* Path-shaped argument: shape × kind classification
                      * via classify_path_token (dequote → tilde-expand →
                      * stat → cache, single helper, see definition for
-                     * the full pipeline). */
+                     * the full pipeline). The trigger admits both
+                     * slash-bearing forms (the classic heuristic) and
+                     * the bare `.` / `..` / `~` indicators per
+                     * is_implicit_path_word. */
                     type = classify_path_token(highlighter, input + token_start,
                                                word_len);
-                } else if (has_slash) {
+                } else if (has_slash || is_implicit_path_word(
+                                            input + token_start, word_len)) {
                     type =
                         LLE_TOKEN_ARGUMENT; /* Path-like but not validating */
                 } else {

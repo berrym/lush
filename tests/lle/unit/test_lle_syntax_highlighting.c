@@ -605,6 +605,95 @@ TEST(path_shape_home_dir) {
     lle_syntax_highlighter_destroy(h);
 }
 
+/* Test: bare `.` (no slash, no expansion) is classified as a path. The
+ * default `has_slash` heuristic skips it; is_implicit_path_word lets
+ * it through and the classifier resolves it to PATH_DIR_RELATIVE
+ * because cwd always exists as a directory. */
+TEST(path_implicit_dot) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    const char *input = "ls .";
+    lle_syntax_highlight(h, input, strlen(input));
+
+    lle_syntax_token_type_t type = find_path_token(h);
+    if (type == LLE_TOKEN_PATH_DIR_RELATIVE) {
+        TEST_PASS();
+    } else {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "expected PATH_DIR_RELATIVE for bare `.`, got %d", (int)type);
+        TEST_FAIL(msg);
+    }
+
+    lle_syntax_highlighter_destroy(h);
+}
+
+/* Test: bare `..` resolves to PATH_DIR_RELATIVE. `..` is always a
+ * directory (parent of cwd; equals cwd when cwd is `/`). */
+TEST(path_implicit_dotdot) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    const char *input = "ls ..";
+    lle_syntax_highlight(h, input, strlen(input));
+
+    lle_syntax_token_type_t type = find_path_token(h);
+    if (type == LLE_TOKEN_PATH_DIR_RELATIVE) {
+        TEST_PASS();
+    } else {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "expected PATH_DIR_RELATIVE for bare `..`, got %d", (int)type);
+        TEST_FAIL(msg);
+    }
+
+    lle_syntax_highlighter_destroy(h);
+}
+
+/* Test: bare `~` resolves to PATH_DIR_HOME. Uses a known temp dir as
+ * $HOME so the test is independent of the runner's actual home. */
+TEST(path_implicit_tilde_alone) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    char *dir = make_test_dir();
+    if (!dir) {
+        TEST_FAIL("could not create test directory");
+        lle_syntax_highlighter_destroy(h);
+        return;
+    }
+
+    const char *saved_home = getenv("HOME");
+    char *saved_copy = saved_home ? strdup(saved_home) : NULL;
+    setenv("HOME", dir, 1);
+
+    const char *input = "ls ~";
+    lle_syntax_highlight(h, input, strlen(input));
+
+    lle_syntax_token_type_t type = find_path_token(h);
+
+    if (saved_copy) {
+        setenv("HOME", saved_copy, 1);
+        free(saved_copy);
+    } else {
+        unsetenv("HOME");
+    }
+
+    if (type == LLE_TOKEN_PATH_DIR_HOME) {
+        TEST_PASS();
+    } else {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "expected PATH_DIR_HOME for bare `~`, got %d", (int)type);
+        TEST_FAIL(msg);
+    }
+
+    rmdir(dir);
+    free(dir);
+    lle_syntax_highlighter_destroy(h);
+}
+
 /* Test: shape-specific color knob takes precedence over the kind-only
  * fallback. Sets both path_file and path_file_absolute and verifies
  * an absolute file path resolves to the specific knob's value. */
@@ -716,6 +805,9 @@ int main(void) {
     RUN_TEST(path_dequote_backslash_space);
     RUN_TEST(path_shape_relative_dir);
     RUN_TEST(path_shape_home_dir);
+    RUN_TEST(path_implicit_dot);
+    RUN_TEST(path_implicit_dotdot);
+    RUN_TEST(path_implicit_tilde_alone);
     RUN_TEST(path_color_shape_specific_overrides_kind);
     RUN_TEST(path_color_falls_to_kind_only);
     RUN_TEST(ansi_render);
