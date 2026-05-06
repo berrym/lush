@@ -8758,106 +8758,140 @@ int bin_display(int argc, char **argv) {
                 return 1;
             }
 
-        } else if (strcmp(lle_cmd, "completions") == 0) {
-            /* LLE custom completion source management */
-            const char *comp_subcmd = (argc >= 4) ? argv[3] : "list";
+        } else if (strcmp(lle_cmd, "completion") == 0) {
+            /* LLE completion subsystem. The umbrella command groups
+             * source-list management (under `sources`) with future
+             * behavior knobs registered alongside it. Bare
+             * `display lle completion` prints the namespace help; an
+             * unrecognized subcommand is an error. */
+            const char *comp_subcmd = (argc >= 4) ? argv[3] : "help";
 
-            if (strcmp(comp_subcmd, "list") == 0) {
-                /* List all completion sources */
-                printf("LLE Completion Sources\n");
-                printf("======================\n\n");
+            if (strcmp(comp_subcmd, "sources") == 0) {
+                const char *sources_subcmd = (argc >= 5) ? argv[4] : "list";
 
-                /* Built-in sources */
-                printf("Built-in Sources:\n");
-                size_t total = lle_completion_get_source_count();
-                for (size_t i = 0; i < total; i++) {
-                    if (!lle_completion_source_is_custom(i)) {
-                        const char *name = lle_completion_get_source_name(i);
-                        printf("  - %s\n", name ? name : "(unknown)");
-                    }
-                }
+                if (strcmp(sources_subcmd, "list") == 0) {
+                    /* List all completion sources */
+                    printf("LLE Completion Sources\n");
+                    printf("======================\n\n");
 
-                /* Custom sources */
-                size_t custom_count = lle_completion_get_custom_source_count();
-                if (custom_count > 0) {
-                    printf("\nCustom Sources:\n");
-                    for (size_t i = 0; i < custom_count; i++) {
-                        const char *name =
-                            lle_completion_get_custom_source_name(i);
-                        const char *desc =
-                            lle_completion_get_custom_source_description(i);
-                        if (desc) {
-                            printf("  - %s: %s\n", name ? name : "(unknown)",
-                                   desc);
-                        } else {
+                    /* Built-in sources */
+                    printf("Built-in Sources:\n");
+                    size_t total = lle_completion_get_source_count();
+                    for (size_t i = 0; i < total; i++) {
+                        if (!lle_completion_source_is_custom(i)) {
+                            const char *name =
+                                lle_completion_get_source_name(i);
                             printf("  - %s\n", name ? name : "(unknown)");
                         }
                     }
-                } else {
-                    printf("\nNo custom sources registered.\n");
-                }
 
-                /* Config file info */
-                const lle_completion_config_t *cfg =
-                    lle_completion_get_config();
-                if (cfg && cfg->config_path) {
-                    printf("\nConfig file: %s\n", cfg->config_path);
-                    printf("Config sources: %zu\n", cfg->source_count);
-                } else {
-                    printf("\nNo config file loaded.\n");
-                    printf("Create ~/.config/lush/completions.toml to define "
-                           "custom sources.\n");
-                }
+                    /* Custom sources */
+                    size_t custom_count =
+                        lle_completion_get_custom_source_count();
+                    if (custom_count > 0) {
+                        printf("\nCustom Sources:\n");
+                        for (size_t i = 0; i < custom_count; i++) {
+                            const char *name =
+                                lle_completion_get_custom_source_name(i);
+                            const char *desc =
+                                lle_completion_get_custom_source_description(i);
+                            if (desc) {
+                                printf("  - %s: %s\n",
+                                       name ? name : "(unknown)", desc);
+                            } else {
+                                printf("  - %s\n", name ? name : "(unknown)");
+                            }
+                        }
+                    } else {
+                        printf("\nNo custom sources registered.\n");
+                    }
 
-                return 0;
-
-            } else if (strcmp(comp_subcmd, "reload") == 0) {
-                /* Reload completion config */
-                printf("Reloading completion config...\n");
-                lle_result_t result = lle_completion_reload_config();
-                if (result == LLE_SUCCESS) {
+                    /* Config file info */
                     const lle_completion_config_t *cfg =
                         lle_completion_get_config();
-                    if (cfg) {
-                        printf("Loaded %zu custom source(s)\n",
-                               cfg->source_count);
+                    if (cfg && cfg->config_path) {
+                        printf("\nConfig file: %s\n", cfg->config_path);
+                        printf("Config sources: %zu\n", cfg->source_count);
                     } else {
-                        printf("Config reloaded (no sources defined)\n");
+                        printf("\nNo config file loaded.\n");
+                        printf("Create ~/.config/lush/completions.toml to "
+                               "define custom sources.\n");
                     }
+
                     return 0;
+
+                } else if (strcmp(sources_subcmd, "reload") == 0) {
+                    /* Reload completion config */
+                    printf("Reloading completion config...\n");
+                    lle_result_t result = lle_completion_reload_config();
+                    if (result == LLE_SUCCESS) {
+                        const lle_completion_config_t *cfg =
+                            lle_completion_get_config();
+                        if (cfg) {
+                            printf("Loaded %zu custom source(s)\n",
+                                   cfg->source_count);
+                        } else {
+                            printf("Config reloaded (no sources defined)\n");
+                        }
+                        return 0;
+                    } else {
+                        fprintf(stderr, "Failed to reload config (error %d)\n",
+                                result);
+                        return 1;
+                    }
+
+                } else if (strcmp(sources_subcmd, "help") == 0 ||
+                           strcmp(sources_subcmd, "--help") == 0) {
+                    printf("LLE Completion Source Commands\n");
+                    printf("==============================\n\n");
+                    printf("Usage: display lle completion sources [command]\n");
+                    printf("\nCommands:\n");
+                    printf("  list    - Show all completion sources "
+                           "(default)\n");
+                    printf("  reload  - Reload custom sources from config "
+                           "file\n");
+                    printf("  help    - Show this help message\n");
+                    printf("\nConfig File:\n");
+                    printf("  ~/.config/lush/completions.toml\n");
+                    printf("\nExample config:\n");
+                    printf("  [sources.git-branches]\n");
+                    printf("  description = \"Git branch names\"\n");
+                    printf(
+                        "  applies_to = [\"git checkout\", \"git merge\"]\n");
+                    printf("  argument = 2\n");
+                    printf("  command = \"git branch --list 2>/dev/null | sed "
+                           "'s/^[* ]*//'\"\n");
+                    printf("  cache_seconds = 5\n");
+                    return 0;
+
                 } else {
-                    fprintf(stderr, "Failed to reload config (error %d)\n",
-                            result);
+                    fprintf(stderr,
+                            "display lle completion sources: Unknown "
+                            "subcommand '%s'\n",
+                            sources_subcmd);
+                    fprintf(stderr, "Usage: display lle completion sources "
+                                    "[list|reload|help]\n");
                     return 1;
                 }
 
             } else if (strcmp(comp_subcmd, "help") == 0 ||
                        strcmp(comp_subcmd, "--help") == 0) {
-                printf("LLE Completion Source Commands\n");
-                printf("==============================\n\n");
-                printf("Usage: display lle completions [command]\n\n");
-                printf("Commands:\n");
-                printf("  list    - Show all completion sources (default)\n");
-                printf("  reload  - Reload custom sources from config file\n");
-                printf("  help    - Show this help message\n");
-                printf("\nConfig File:\n");
-                printf("  ~/.config/lush/completions.toml\n");
-                printf("\nExample config:\n");
-                printf("  [sources.git-branches]\n");
-                printf("  description = \"Git branch names\"\n");
-                printf("  applies_to = [\"git checkout\", \"git merge\"]\n");
-                printf("  argument = 2\n");
-                printf("  command = \"git branch --list 2>/dev/null | sed "
-                       "'s/^[* ]*//'\"\n");
-                printf("  cache_seconds = 5\n");
+                printf("LLE Completion Subsystem\n");
+                printf("========================\n\n");
+                printf("Usage: display lle completion <subcommand>\n\n");
+                printf("Subcommands:\n");
+                printf("  sources [list|reload|help]  - Manage completion "
+                       "sources\n");
+                printf("  help                        - Show this help "
+                       "message\n");
                 return 0;
 
             } else {
                 fprintf(stderr,
-                        "display lle completions: Unknown subcommand '%s'\n",
+                        "display lle completion: Unknown subcommand '%s'\n",
                         comp_subcmd);
                 fprintf(stderr,
-                        "Usage: display lle completions [list|reload|help]\n");
+                        "Usage: display lle completion <sources|help>\n");
                 return 1;
             }
 

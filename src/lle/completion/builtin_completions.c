@@ -264,6 +264,23 @@ static const lle_builtin_subcommand_t display_lle_history_subcmds[] = {
      NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
+/* display lle completion sources subcommands */
+static const lle_builtin_subcommand_t display_lle_completion_sources_subcmds[] =
+    {
+        {"list", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {"reload", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+};
+
+/* display lle completion subcommands */
+static const lle_builtin_subcommand_t display_lle_completion_subcmds[] = {
+    {"sources", display_lle_completion_sources_subcmds,
+     sizeof(display_lle_completion_sources_subcmds) /
+         sizeof(display_lle_completion_sources_subcmds[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+};
+
 /* display lle subcommands */
 static const lle_builtin_subcommand_t display_lle_subcmds[] = {
     {"status", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -280,7 +297,10 @@ static const lle_builtin_subcommand_t display_lle_subcmds[] = {
      NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"reset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"keybindings", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"completions", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"completion", display_lle_completion_subcmds,
+     sizeof(display_lle_completion_subcmds) /
+         sizeof(display_lle_completion_subcmds[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display performance subcommands */
@@ -753,9 +773,9 @@ generate_feature_completions(lle_memory_pool_t *pool, const char *prefix,
 static lle_result_t generate_dynamic_completions(
     lle_memory_pool_t *pool, lle_builtin_arg_type_t arg_type,
     const lle_word_context_t *context, lle_completion_result_t *result) {
-    const char *prefix =
-        context->dequoted_filename_prefix ? context->dequoted_filename_prefix
-                                           : "";
+    const char *prefix = context->dequoted_filename_prefix
+                             ? context->dequoted_filename_prefix
+                             : "";
     switch (arg_type) {
     case LLE_BUILTIN_ARG_NONE:
         return LLE_SUCCESS;
@@ -818,9 +838,9 @@ bool lle_builtin_completions_applicable(const lle_word_context_t *context) {
 // MAIN COMPLETION GENERATOR
 // ============================================================================
 
-lle_result_t lle_builtin_completions_generate(
-    lle_memory_pool_t *pool, const lle_word_context_t *context,
-    lle_completion_result_t *result) {
+lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
+                                              const lle_word_context_t *context,
+                                              lle_completion_result_t *result) {
     if (!pool || !context || !result) {
         return LLE_ERROR_INVALID_PARAMETER;
     }

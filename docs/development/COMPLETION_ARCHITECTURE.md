@@ -688,8 +688,8 @@ real-world template). The TOML parser is
 | `COMMAND_TIMEOUT_SECONDS` | 2 | Per-invocation timeout |
 | `DEFAULT_CACHE_SECONDS` | 0 | Default TTL when `cache_seconds` is omitted |
 
-Reload via `display lle completions reload` (the shell builtin). List
-active sources via `display lle completions list`.
+Reload via `display lle completion sources reload` (the shell builtin).
+List active sources via `display lle completion sources list`.
 
 A worked example of adding a TOML source is in
 [§15.2 TOML config](#152-toml-config).
@@ -994,7 +994,7 @@ location is resolved by `completion_config.c:get_config_path()`:
 `$XDG_CONFIG_HOME/lush/completions.toml` if `XDG_CONFIG_HOME` is set,
 else `~/.config/lush/completions.toml`. Loaded by `lle_editor_create()`
 at startup (`src/lle/lle_editor.c:150`). Reload at runtime via the
-shell builtin `display lle completions reload` (which calls
+shell builtin `display lle completion sources reload` (which calls
 `lle_completion_reload_config()`).
 
 ### 9.3 What is *not* yet configurable
@@ -1113,9 +1113,9 @@ whether to re-render.
 
 ### 11.6 Shell builtins for inspection / management
 
-`display lle completions list` — list registered sources (custom and
-default).
-`display lle completions reload` — `lle_completion_reload_config()`.
+`display lle completion sources list` — list registered sources (custom
+and default).
+`display lle completion sources reload` — `lle_completion_reload_config()`.
 Both wired through `src/builtins/builtins.c`.
 
 ---
@@ -1361,7 +1361,7 @@ cache_seconds = 5
 
 | Field | Meaning |
 |---|---|
-| `description` | Shown by `display lle completions list` |
+| `description` | Shown by `display lle completion sources list` |
 | `applies_to` | List of `"command"` or `"command subcommand"` patterns. Source fires only when the typed command line matches one of these |
 | `argument` | Argument position to fire on. `0` = any |
 | `command` | Shell command to execute. Each line of stdout becomes a candidate |
@@ -1371,7 +1371,7 @@ cache_seconds = 5
 The reference example file `examples/completions.toml` covers git,
 docker, ssh, npm, brew, kubectl, systemctl, make, meson.
 
-After editing, reload via `display lle completions reload` (no
+After editing, reload via `display lle completion sources reload` (no
 restart needed).
 
 ### 15.3 Built-in source
