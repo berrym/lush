@@ -1,14 +1,15 @@
 /**
  * @file bin_display.c
- * @brief `display` builtin -- the layered display system management surface
+ * @brief `display` builtin -- top-level dispatcher for the layered display
+ * system
  *
- * This file holds bin_display's complete dispatch tree. It's the largest
- * builtin in the shell (~1860 lines) and is itself a multi-subsystem
- * dispatcher: status / config / stats / diagnostics / test / performance
- * / lle / help, each with their own subcommand hierarchies. A future
- * cleanup may split it into src/builtins/display/<subsystem>.c files;
- * for now the wholesale extraction puts it in its own translation unit
- * and out of builtins.c.
+ * Top-level subcommands (status / config / stats / diagnostics / test /
+ * performance / help) live inline here. The LLE subcommand chain
+ * delegates to per-subcommand handlers in
+ * `src/builtins/display/lle_<sub>.c`, declared in
+ * `include/builtins/display.h`. The router is a thin
+ * `if/else if (strcmp(lle_cmd, X)) return display_lle_X(argc-2, argv+2)`
+ * chain.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -16,28 +17,9 @@
 
 #include "builtins.h"
 #include "builtins/display.h"
-#include "config.h"
-#include "config_registry.h"
-#include "display/command_layer.h"
-#include "display/composition_engine.h"
 #include "display_integration.h"
-#include "lle/adaptive_terminal_integration.h"
-#include "lle/completion/completion_state.h"
-#include "lle/completion/completion_system.h"
-#include "lle/completion/custom_source.h"
-#include "lle/keybinding.h"
-#include "lle/keybinding_config.h"
-#include "lle/lle_editor.h"
-#include "lle/lle_safety.h"
-#include "lle/lle_shell_integration.h"
-#include "lle/lle_watchdog.h"
-#include "lle/prompt/composer.h"
-#include "lle/prompt/theme.h"
-#include "lle/prompt/theme_loader.h"
 
-#include <errno.h>
 #include <inttypes.h>
-#include <sys/stat.h>
 
 /**
  * @brief Manage the layered display system
@@ -454,32 +436,7 @@ int bin_display(int argc, char **argv) {
         const char *lle_cmd = argv[2];
 
         if (strcmp(lle_cmd, "status") == 0) {
-            lle_editor_t *editor = lle_get_global_editor();
-
-            printf("LLE Status:\n");
-            printf("  Line Editor: LLE (Lush Line Editor)\n");
-            printf("  History file: ~/.lush_history\n");
-            printf("  Editor: %s\n",
-                   editor ? "initialized" : "not initialized");
-
-            printf("\nLLE Features:\n");
-            printf("  Multi-line editing: %s\n",
-                   config.lle_enable_multiline_editing ? "enabled"
-                                                       : "disabled");
-            printf("  History deduplication: %s\n",
-                   config.lle_enable_deduplication ? "enabled" : "disabled");
-            printf("  Forensic tracking: %s\n",
-                   config.lle_enable_forensic_tracking ? "enabled"
-                                                       : "disabled");
-
-            if (editor && editor->history_system) {
-                size_t count = 0;
-                lle_history_get_entry_count(editor->history_system, &count);
-                printf("\nHistory:\n");
-                printf("  Entries: %zu\n", count);
-            }
-            return 0;
-
+            return display_lle_status(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "history") == 0) {
             return display_lle_history(argc - 2, argv + 2);
 

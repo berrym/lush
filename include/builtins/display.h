@@ -21,6 +21,7 @@
 #ifndef BUILTINS_DISPLAY_H
 #define BUILTINS_DISPLAY_H
 
+int display_lle_status(int argc, char **argv);
 int display_lle_history(int argc, char **argv);
 int display_lle_keybindings(int argc, char **argv);
 int display_lle_autosuggestions(int argc, char **argv);
