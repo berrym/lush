@@ -7,15 +7,9 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 #include "shell_mode.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /* Defined in src/builtins/bin_printf.c. Bin_echo and bin_printf both
  * need to interpret escape sequences (\n, \t, etc.) the same way. */

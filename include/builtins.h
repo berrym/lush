@@ -12,11 +12,27 @@
 #ifndef BUILTINS_H
 #define BUILTINS_H
 
+/* Universal builtin contract.
+ *
+ * Every src/builtins/bin_<name>.c includes this header. The headers
+ * pulled in here are the ones every builtin needs: structured-error
+ * reporting, the executor + current_executor + executor_error_report
+ * surface, and the C stdlib basics that ~every builtin uses. Per-file
+ * includes in bin_<name>.c list only their own non-universal
+ * dependencies (lush.h, symtable.h, <errno.h>, etc.).
+ *
+ * Threshold for inclusion here was ~50/56 usage across the bin_*.c
+ * files at split time. Headers used by smaller subsets stay per-file. */
+#include "executor.h"
 #include "libhashtable/ht.h"
 #include "shell_error.h"
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /**
  * @brief Atomically replace the stashed builtin call-site source location

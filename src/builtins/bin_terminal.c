@@ -7,14 +7,7 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "lle/adaptive_terminal_integration.h"
-#include "shell_error.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Display terminal capability information

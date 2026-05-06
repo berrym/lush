@@ -7,15 +7,9 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/wait.h>
-#include <unistd.h>
 
 /**
  * @brief Resume a job in the background

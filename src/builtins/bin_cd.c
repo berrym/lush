@@ -8,19 +8,13 @@
 
 #include "builtins.h"
 #include "dirstack.h"
-#include "executor.h"
 #include "lle/lle_shell_event_hub.h"
 #include "lush.h"
-#include "shell_error.h"
 #include "shell_mode.h"
 #include "symtable.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 /**
  * @brief Canonicalize a path by resolving . and .. components logically

@@ -7,16 +7,10 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 
 #include <errno.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/wait.h>
-#include <unistd.h>
 
 /**
  * @brief Wait for background jobs to complete

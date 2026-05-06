@@ -7,19 +7,13 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 #include "symtable.h"
 
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/select.h>
 #include <termios.h>
-#include <unistd.h>
 
 /**
  * @brief Read one line from a raw file descriptor, byte at a time

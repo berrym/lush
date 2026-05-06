@@ -8,16 +8,10 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "lush_fork.h"
-#include "shell_error.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/wait.h>
-#include <unistd.h>
 
 extern char **environ;
 

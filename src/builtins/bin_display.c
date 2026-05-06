@@ -20,7 +20,6 @@
 #include "display/command_layer.h"
 #include "display/composition_engine.h"
 #include "display_integration.h"
-#include "executor.h"
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/completion/completion_state.h"
 #include "lle/completion/completion_system.h"
@@ -34,15 +33,10 @@
 #include "lle/prompt/composer.h"
 #include "lle/prompt/theme.h"
 #include "lle/prompt/theme_loader.h"
-#include "shell_error.h"
 
 #include <errno.h>
 #include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 /**
  * @brief Manage the layered display system

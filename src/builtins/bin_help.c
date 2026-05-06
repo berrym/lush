@@ -8,8 +8,6 @@
 
 #include "builtins.h"
 
-#include <stdio.h>
-
 /**
  * @brief Print a list of builtins and their descriptions
  *

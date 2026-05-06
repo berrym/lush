@@ -7,19 +7,13 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "lush.h"
-#include "shell_error.h"
 #include "signals.h"
 #include "symtable.h"
 
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Replace the shell process with a command

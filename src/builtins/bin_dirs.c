@@ -8,13 +8,6 @@
 
 #include "builtins.h"
 #include "dirstack.h"
-#include "executor.h"
-#include "shell_error.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Display directory stack

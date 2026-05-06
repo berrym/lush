@@ -7,15 +7,9 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 #include "signals.h"
 
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Set or display signal traps

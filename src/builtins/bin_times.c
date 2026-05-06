@@ -7,15 +7,9 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/times.h>
-#include <unistd.h>
 
 /**
  * @brief Display accumulated user and system times

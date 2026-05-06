@@ -8,15 +8,9 @@
 
 #include "alias.h"
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 #include "symtable.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 /**
  * @brief Display how a command would be interpreted

@@ -9,9 +9,6 @@
 #include "builtins.h"
 #include "lush.h"
 
-#include <stdlib.h>
-#include <string.h>
-
 /**
  * @brief Evaluate arguments as shell commands
  *

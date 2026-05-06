@@ -8,17 +8,11 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "input.h"
 #include "lush.h"
-#include "shell_error.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 /**
  * @brief Source (execute) a script file in the current shell

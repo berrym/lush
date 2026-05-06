@@ -8,17 +8,11 @@
 
 #include "alias.h"
 #include "builtins.h"
-#include "executor.h"
 #include "lush_fork.h"
-#include "shell_error.h"
 #include "symtable.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 /**
  * @brief Execute command bypassing shell functions and builtins

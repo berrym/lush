@@ -8,16 +8,10 @@
 
 #include "builtins.h"
 #include "dirstack.h"
-#include "executor.h"
 #include "lush.h"
-#include "shell_error.h"
 #include "symtable.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Push directory onto stack and change to it

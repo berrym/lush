@@ -7,16 +7,10 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "lush.h"
-#include "shell_error.h"
 #include "symtable.h"
 
 #include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Emit a structured "shift count exceeds positional parameter count"

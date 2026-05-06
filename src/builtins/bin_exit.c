@@ -9,8 +9,6 @@
 #include "builtins.h"
 #include "lush.h"
 
-#include <stdlib.h>
-
 /**
  * @brief Exit the shell (builtin command)
  *

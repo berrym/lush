@@ -7,14 +7,7 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "lle/completion/ssh_hosts.h"
-#include "shell_error.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Manage network and SSH host completion

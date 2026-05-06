@@ -7,15 +7,9 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
 /* Forward declarations for mutual recursion. */
 static int evaluate_test_expression(char **argv, int start, int end);

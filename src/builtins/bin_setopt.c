@@ -8,15 +8,8 @@
 
 #include "builtins.h"
 #include "config_registry.h"
-#include "executor.h"
 #include "lush.h"
-#include "shell_error.h"
 #include "shell_mode.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Set shell options (enable features)

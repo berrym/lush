@@ -9,9 +9,6 @@
 #include "builtins.h"
 #include "lle/history.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
 /**
  * @brief Display or manipulate the command history
  *

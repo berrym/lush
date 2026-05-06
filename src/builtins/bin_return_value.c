@@ -7,17 +7,10 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "lush.h"
-#include "shell_error.h"
 
 /* Forward declaration -- defined in src/posix_opts.c */
 bool is_posix_mode_enabled(void);
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Set a string return value for the current function

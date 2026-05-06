@@ -7,14 +7,7 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "ht.h"
-#include "shell_error.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /* command_hash is owned by src/builtins/builtins.c (registry-side). */
 extern ht_strstr_t *command_hash;

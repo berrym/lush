@@ -7,16 +7,10 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
 #include "lush.h"
-#include "shell_error.h"
 #include "symtable.h"
 
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Print the current working directory

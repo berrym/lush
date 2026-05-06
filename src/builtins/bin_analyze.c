@@ -9,15 +9,8 @@
 #include "builtins.h"
 #include "compat.h"
 #include "debug.h"
-#include "executor.h"
 #include "fixer.h"
 #include "lush.h"
-#include "shell_error.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Analyze scripts for issues and portability (builtin command)

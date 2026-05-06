@@ -8,9 +8,6 @@
 
 #include "builtins.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
 /**
  * @brief Null command - does nothing and returns success
  *

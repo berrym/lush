@@ -8,16 +8,10 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 #include "symtable.h"
 
 #include <ctype.h>
 #include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 /**
  * @brief Read lines from stdin into an array variable

@@ -7,16 +7,10 @@
  */
 
 #include "builtins.h"
-#include "executor.h"
-#include "shell_error.h"
 
 #include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
 /**
  * @brief Set or display the file creation mask
