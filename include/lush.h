@@ -259,6 +259,14 @@ typedef struct shell_options {
                                      */
     bool physical_mode;             /**< physical: resolve symlinks in paths */
     bool privileged_mode; /**< privileged: restricted shell security mode */
+
+    /* Early-init CLI mode override. Populated by --posix/--bash/--zsh/--lush
+     * during parse_opts; consumed by detect_initial_mode() before
+     * config_init so the user's lushrc layers on top of the right preset.
+     * Stored as int rather than shell_mode_t to avoid pulling shell_mode.h
+     * into lush.h. */
+    int cli_mode_override;
+    bool cli_mode_override_set;
 } shell_options_t;
 
 /** @brief Global shell options */

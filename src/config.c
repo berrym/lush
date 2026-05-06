@@ -2032,6 +2032,20 @@ int config_init(void) {
     // Initialize config registry and register all sections
     config_register_sections();
 
+    // The registry's section defaults include shell.mode = "lush". The
+    // active mode (set earlier by apply_mode_preset() from CLI flag /
+    // shebang peek / default lush) may differ from "lush". Write the
+    // active mode into the registry now so subsequent sync_to_runtime
+    // calls (after user-config load) see the right value -- otherwise
+    // the registry's section default would clobber a CLI-flag mode
+    // when sync runs.
+    config_registry_set_string("shell.mode", shell_mode_name(shell_mode_get()));
+
+    // Apply per-mode default overrides for the active shell mode before
+    // loading user config, so any user lushrc settings layer on top of
+    // the right preset.
+    config_registry_apply_mode_defaults(shell_mode_get());
+
     // Get XDG directory path
     char xdg_dir[CONFIG_PATH_MAX];
     if (config_get_xdg_dir(xdg_dir, sizeof(xdg_dir)) == 0) {
@@ -2236,9 +2250,12 @@ void config_set_defaults(void) {
     // Script execution defaults
     config.script_execution = true;
 
-    // Shell mode defaults (Phase 0: Extended Language Support)
-    config.shell_mode = SHELL_MODE_LUSH; // Curated best of Bash/Zsh
-    config.shell_mode_strict = false;    // Allow runtime mode changes
+    // Shell mode defaults: config.shell_mode is owned by
+    // apply_mode_preset() (called at startup before config_init from
+    // CLI flag / shebang peek / default lush; called at runtime by the
+    // `mode` builtin and the `set -o posix` bridge). Do NOT reset it
+    // here -- doing so would clobber the early-init mode resolution.
+    config.shell_mode_strict = false; // Allow runtime mode changes
 
     // Line editor - LLE is always enabled (sole line editor)
     // LLE is the only line editor - no config option needed
