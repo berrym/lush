@@ -449,6 +449,35 @@ int bin_popd(int argc, char **argv);
 int bin_dirs(int argc, char **argv);
 
 /* ============================================================================
+ * Additional builtin declarations
+ * ============================================================================
+ *
+ * These declarations are public so each builtin can live in its own
+ * `src/builtins/bin_<name>.c` file and the registry table in
+ * `src/builtins/builtins.c` can reference them without per-file forward
+ * declarations.
+ */
+
+int bin_jobs(int argc, char **argv);
+int bin_fg(int argc, char **argv);
+int bin_bg(int argc, char **argv);
+int bin_colon(int argc, char **argv);
+int bin_readonly(int argc, char **argv);
+int bin_config(int argc, char **argv);
+int bin_setopt(int argc, char **argv);
+int bin_unsetopt(int argc, char **argv);
+int bin_shopt(int argc, char **argv);
+int bin_mode(int argc, char **argv);
+int bin_display(int argc, char **argv);
+int bin_network(int argc, char **argv);
+int bin_mapfile(int argc, char **argv);
+int bin_env(int argc, char **argv);
+int bin_analyze(int argc, char **argv);
+int bin_lint(int argc, char **argv);
+int bin_disown(int argc, char **argv);
+int bin_let(int argc, char **argv);
+
+/* ============================================================================
  * Command Hash Table
  * ============================================================================
  */

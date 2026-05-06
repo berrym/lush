@@ -58,28 +58,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-// Forward declarations for job control builtins
-int bin_jobs(int argc, char **argv);
-int bin_fg(int argc, char **argv);
-int bin_bg(int argc, char **argv);
-int bin_colon(int argc, char **argv);
-int bin_readonly(int argc, char **argv);
-int bin_config(int argc, char **argv);
-int bin_setopt(int argc, char **argv);
-int bin_unsetopt(int argc, char **argv);
-int bin_shopt(int argc, char **argv);
-int bin_mode(int argc, char **argv);
-int bin_hash(int argc, char **argv);
-int bin_display(int argc, char **argv);
-int bin_network(int argc, char **argv);
-int bin_debug(int argc, char **argv);
-int bin_mapfile(int argc, char **argv);
-int bin_env(int argc, char **argv);
-int bin_analyze(int argc, char **argv);
-int bin_lint(int argc, char **argv);
-int bin_disown(int argc, char **argv);
-int bin_let(int argc, char **argv);
-
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
 
