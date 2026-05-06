@@ -27,12 +27,11 @@
 | Vi mode | In development - see LLE Guide |
 | Syntax highlighting | See LLE Guide |
 
-### Shell Modes
+### Configuration
 
 | Document | Description |
 |----------|-------------|
-| [Shell Modes](SHELL_MODES.md) | POSIX, Bash, Zsh, Lush mode documentation |
-| [POSIX Compliance](SHELL_OPTIONS.md) | All 24 POSIX shell options |
+| [Configuration](CONFIGURATION.md) | The four configuration surfaces: `mode`, `set`, `setopt`/`shopt`, `config` -- including POSIX modes, shell options, and the registry |
 
 ### Extended Syntax
 
@@ -69,13 +68,12 @@
 | Document | Description |
 |----------|-------------|
 | [Builtin Commands](BUILTIN_COMMANDS.md) | All 48 shell builtins |
-| [Shell Options](SHELL_OPTIONS.md) | All shell options with modern and traditional syntax |
+| [Configuration](CONFIGURATION.md) | Mode preset selector, POSIX options, feature matrix, central registry |
 
-### Configuration
+### Other reference
 
 | Document | Description |
 |----------|-------------|
-| [Configuration System](CONFIG_SYSTEM.md) | Config file format, `config` command, startup files |
 | [Installation](INSTALLATION.md) | Build requirements, installation, platform notes |
 
 ### Comparison
@@ -98,26 +96,26 @@
 
 1. [User Guide](USER_GUIDE.md) - Feature reference
 2. [Builtin Commands](BUILTIN_COMMANDS.md) - Command reference
-3. [Configuration System](CONFIG_SYSTEM.md) - Customize your shell
+3. [Configuration](CONFIGURATION.md) - Customize your shell
 4. [Completion System](COMPLETION_SYSTEM.md) - Tab completion
 
 ### Script Writers
 
 1. [Extended Syntax](EXTENDED_SYNTAX.md) - Arrays, tests, process substitution
 2. [Advanced Scripting](ADVANCED_SCRIPTING_GUIDE.md) - Best practices
-3. [Shell Modes](SHELL_MODES.md) - Choose the right mode
+3. [Configuration](CONFIGURATION.md) - Mode presets and options
 4. [Debugger Guide](DEBUGGER_GUIDE.md) - Debug your scripts
 
 ### Power Users
 
 1. [Hooks and Plugins](HOOKS_AND_PLUGINS.md) - Customize shell behavior
-2. [Shell Options](SHELL_OPTIONS.md) - Fine-tune options
+2. [Configuration](CONFIGURATION.md) - Fine-tune options
 3. [LLE Guide](LLE_GUIDE.md) - Master line editing
 
 ### Migrating Users
 
 1. [Feature Comparison](FEATURE_COMPARISON.md) - Compare with your current shell
-2. [Shell Modes](SHELL_MODES.md) - Run existing scripts
+2. [Configuration](CONFIGURATION.md) - Choose a mode for existing scripts
 3. [Getting Started](GETTING_STARTED.md) - Transition guide
 
 ---
@@ -159,7 +157,7 @@ New documents for v1.4.0:
 |----------|---------|
 | [LLE Guide](LLE_GUIDE.md) | Complete LLE reference |
 | [Extended Syntax](EXTENDED_SYNTAX.md) | Extended language features |
-| [Shell Modes](SHELL_MODES.md) | Mode documentation |
+| [Configuration](CONFIGURATION.md) | Modes, options, registry |
 | [Hooks and Plugins](HOOKS_AND_PLUGINS.md) | Hook system |
 
 ---
@@ -194,13 +192,11 @@ config show             # Configuration overview
 | `USER_GUIDE.md` | Complete feature reference |
 | `LLE_GUIDE.md` | Line editor documentation |
 | `EXTENDED_SYNTAX.md` | Extended shell syntax |
-| `SHELL_MODES.md` | Mode documentation |
+| `CONFIGURATION.md` | Modes, set, setopt/shopt, config -- all four configuration surfaces |
 | `COMPLETION_SYSTEM.md` | Completion documentation |
 | `HOOKS_AND_PLUGINS.md` | Hook system |
 | `DEBUGGER_GUIDE.md` | Debugging reference |
 | `BUILTIN_COMMANDS.md` | Builtin reference |
-| `SHELL_OPTIONS.md` | Shell options reference |
-| `CONFIG_SYSTEM.md` | Configuration reference |
 | `INSTALLATION.md` | Installation guide |
 | `ADVANCED_SCRIPTING_GUIDE.md` | Scripting guide |
 | `FEATURE_COMPARISON.md` | Shell comparison |

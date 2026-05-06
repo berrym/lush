@@ -551,4 +551,4 @@ display lle diagnostics
 
 - [LLE_GUIDE.md](LLE_GUIDE.md) - Complete LLE documentation
 - [BUILTIN_COMMANDS.md](BUILTIN_COMMANDS.md) - All shell builtins
-- [CONFIG_SYSTEM.md](CONFIG_SYSTEM.md) - Configuration reference
+- [CONFIGURATION.md](CONFIGURATION.md) - Configuration reference

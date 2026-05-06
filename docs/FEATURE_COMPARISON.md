@@ -299,5 +299,5 @@ The integrated debugger alone makes Lush worth using for anyone who writes shell
 
 - [USER_GUIDE.md](USER_GUIDE.md) - Complete feature reference
 - [LLE_GUIDE.md](LLE_GUIDE.md) - Line editor details
-- [SHELL_MODES.md](SHELL_MODES.md) - Mode documentation
+- [CONFIGURATION.md](CONFIGURATION.md) - Mode documentation
 - [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) - Debugging features

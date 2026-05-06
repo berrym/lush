@@ -398,4 +398,4 @@ sudo ninja -C build install
 
 - [GETTING_STARTED.md](GETTING_STARTED.md) - First steps after installation
 - [USER_GUIDE.md](USER_GUIDE.md) - Complete feature reference
-- [CONFIG_SYSTEM.md](CONFIG_SYSTEM.md) - Configuration options
+- [CONFIGURATION.md](CONFIGURATION.md) - Configuration options

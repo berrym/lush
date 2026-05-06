@@ -1089,9 +1089,7 @@ debug profile off
 |----------|-------------|
 | [LLE_GUIDE.md](LLE_GUIDE.md) | Complete LLE documentation |
 | [EXTENDED_SYNTAX.md](EXTENDED_SYNTAX.md) | Detailed syntax reference |
-| [SHELL_MODES.md](SHELL_MODES.md) | Mode documentation |
+| [CONFIGURATION.md](CONFIGURATION.md) | Modes, options, registry -- all four configuration surfaces |
 | [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) | Debugging reference |
 | [BUILTIN_COMMANDS.md](BUILTIN_COMMANDS.md) | All 50 builtins |
 | [HOOKS_AND_PLUGINS.md](HOOKS_AND_PLUGINS.md) | Hook system |
-| [CONFIG_SYSTEM.md](CONFIG_SYSTEM.md) | Configuration reference |
-| [SHELL_OPTIONS.md](SHELL_OPTIONS.md) | All shell options |

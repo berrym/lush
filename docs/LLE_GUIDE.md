@@ -628,4 +628,4 @@ LLE is not thread-safe. All operations must occur on the main thread. The async 
 
 - [USER_GUIDE.md](USER_GUIDE.md) - Complete shell reference
 - [COMPLETION_SYSTEM.md](COMPLETION_SYSTEM.md) - Detailed completion documentation
-- [CONFIG_SYSTEM.md](CONFIG_SYSTEM.md) - Configuration reference
+- [CONFIGURATION.md](CONFIGURATION.md) - Configuration reference

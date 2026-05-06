@@ -518,5 +518,5 @@ precmd_functions=(critical ${precmd_functions[@]} final_hook)
 ## See Also
 
 - [USER_GUIDE.md](USER_GUIDE.md) - Complete shell reference
-- [CONFIG_SYSTEM.md](CONFIG_SYSTEM.md) - Configuration reference
-- [SHELL_MODES.md](SHELL_MODES.md) - Mode requirements for hooks
+- [CONFIGURATION.md](CONFIGURATION.md) - Configuration reference
+- [CONFIGURATION.md](CONFIGURATION.md) - Mode requirements for hooks

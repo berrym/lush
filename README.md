@@ -172,7 +172,7 @@ The shell is functional for many use cases. 82 extended syntax tests pass. Some 
 
 - [User Guide](docs/USER_GUIDE.md) - Feature reference
 - [LLE Guide](docs/LLE_GUIDE.md) - Line editor
-- [Config System](docs/CONFIG_SYSTEM.md) - Configuration
+- [Configuration](docs/CONFIGURATION.md) - Modes, set, setopt, shopt, config
 - [Debugger Guide](docs/DEBUGGER_GUIDE.md) - Debugging
 - [Builtin Commands](docs/BUILTIN_COMMANDS.md) - All 50 builtins
 - [Changelog](docs/CHANGELOG.md) - Version history
