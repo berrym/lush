@@ -57,6 +57,7 @@
  */
 
 #include "config.h" /* For config_values_t and history config options */
+#include "config_registry.h" /* For completion.chain_directories */
 #include "display/display_controller.h"
 #include "display/prompt_layer.h"
 #include "display_integration.h" /* Lush display integration */
@@ -1213,14 +1214,14 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
      * is what gets submitted (or extended on a follow-up TAB
      * inside a directory). */
     if (ctx->editor && ctx->editor->completion_system &&
-        lle_completion_system_is_menu_visible(
-            ctx->editor->completion_system)) {
+        lle_completion_system_is_menu_visible(ctx->editor->completion_system)) {
 
         lle_completion_state_t *state =
             lle_completion_system_get_state(ctx->editor->completion_system);
         lle_completion_menu_state_t *menu =
             lle_completion_system_get_menu(ctx->editor->completion_system);
 
+        bool selected_was_directory = false;
         if (state && menu) {
             const lle_completion_item_t *selected =
                 lle_completion_menu_get_selected(menu);
@@ -1232,15 +1233,16 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
                 }
 
                 lle_word_context_t *splice_context = NULL;
-                lle_result_t        ctx_result     = lle_word_context_analyze(
+                lle_result_t ctx_result = lle_word_context_analyze(
                     ctx->buffer->data, ctx->buffer->cursor.byte_offset,
                     ctx->editor->lle_pool, &splice_context);
                 if (ctx_result == LLE_SUCCESS && splice_context) {
                     (void)lle_splicer_apply_accept(
                         ctx->buffer, ctx->editor->cursor_manager,
-                        splice_context, &synthetic_item,
-                        ctx->editor->lle_pool);
+                        splice_context, &synthetic_item, ctx->editor->lle_pool);
                     lle_word_context_free(splice_context);
+                    selected_was_directory =
+                        (synthetic_item.type == LLE_COMPLETION_TYPE_DIRECTORY);
                 }
             }
         }
@@ -1251,6 +1253,18 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_clear_completion_menu(dc);
+        }
+
+        /* Directory-chain (issue #85): if the accepted item was a
+         * directory and completion.chain_directories is on, re-trigger
+         * completion at the new cursor position so the next-level menu
+         * opens immediately. Mirrors the same gate at the TAB
+         * single-match site in keybinding_actions.c. */
+        bool chain = false;
+        (void)config_registry_get_boolean("completion.chain_directories",
+                                          &chain);
+        if (selected_was_directory && chain && ctx->editor) {
+            (void)lle_complete(ctx->editor);
         }
 
         /* Directory selections leave the cursor inside an open

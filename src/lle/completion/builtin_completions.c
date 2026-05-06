@@ -241,8 +241,9 @@ static const lle_builtin_subcommand_t display_lle_history_dedup_subcmds[] = {
     {"clean", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-/* display lle history nav-dedup values */
-static const lle_builtin_subcommand_t display_lle_history_onoff_vals[] = {
+/* Generic on/off value pair for boolean LLE knobs (history nav-dedup,
+ * nav-unique, completion chain_directories, ...). */
+static const lle_builtin_subcommand_t lle_onoff_vals[] = {
     {"on", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"off", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
@@ -254,14 +255,12 @@ static const lle_builtin_subcommand_t display_lle_history_subcmds[] = {
      sizeof(display_lle_history_dedup_subcmds) /
          sizeof(display_lle_history_dedup_subcmds[0]),
      NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"nav-dedup", display_lle_history_onoff_vals,
-     sizeof(display_lle_history_onoff_vals) /
-         sizeof(display_lle_history_onoff_vals[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"nav-unique", display_lle_history_onoff_vals,
-     sizeof(display_lle_history_onoff_vals) /
-         sizeof(display_lle_history_onoff_vals[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"nav-dedup", lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
+     LLE_BUILTIN_ARG_NONE},
+    {"nav-unique", lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
+     LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle completion sources subcommands */
@@ -278,6 +277,9 @@ static const lle_builtin_subcommand_t display_lle_completion_subcmds[] = {
      sizeof(display_lle_completion_sources_subcmds) /
          sizeof(display_lle_completion_sources_subcmds[0]),
      NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"chain_directories", lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
+     LLE_BUILTIN_ARG_NONE},
     {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 

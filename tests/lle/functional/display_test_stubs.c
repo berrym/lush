@@ -199,7 +199,8 @@ char *expand_if_needed(executor_t *executor, const char *text) {
 
 char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     if (!pattern || !expanded_count) {
-        if (expanded_count) *expanded_count = 0;
+        if (expanded_count)
+            *expanded_count = 0;
         return NULL;
     }
     /* Pass-through: return a single-element array with the pattern.
@@ -240,4 +241,28 @@ typedef struct ssh_host_cache {
 
 ssh_host_cache_t *get_ssh_host_cache(void) {
     return NULL; /* No SSH hosts in tests */
+}
+
+/* ============================================================================
+ * Config Registry Stubs (for LLE keybinding chain_directories check)
+ * ============================================================================
+ *
+ * keybinding_actions.c and lle_readline.c read
+ * completion.chain_directories from the registry. LLE tests don't link
+ * the real config_registry; provide stubs that report "not initialized"
+ * and return defaults. The chain-directory feature is always off in
+ * tests, which matches the LLE test expectation of single-tab completion
+ * behavior.
+ */
+
+#include "config_registry.h"
+
+bool config_registry_is_initialized(void) { return false; }
+
+creg_result_t config_registry_get_boolean(const char *key, bool *out) {
+    (void)key;
+    if (out) {
+        *out = false;
+    }
+    return CREG_ERROR_NOT_FOUND;
 }

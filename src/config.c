@@ -666,6 +666,12 @@ static const creg_option_t completion_options[] = {
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Case-sensitive completion",
      true},
+    {"chain_directories",
+     CREG_VALUE_BOOLEAN,
+     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Re-trigger completion after accepting a directory (per-mode "
+     "default: lush=true, others=false)",
+     true},
 };
 
 static const creg_section_t completion_section = {
@@ -941,6 +947,36 @@ static void config_register_sections(void) {
     config_registry_register_section(&display_section);
     config_registry_register_section(&completion_section);
     config_registry_register_section(&behavior_section);
+}
+
+/**
+ * @brief Register per-mode default overrides for mode-aware options.
+ *
+ * Most config options use a single default that's right across all
+ * modes. The handful that legitimately diverge per mode register
+ * per-mode defaults here. apply_mode_preset() applies these on every
+ * mode change.
+ *
+ * Called from config_init() right after config_register_sections() so
+ * the registered options exist by the time we attach mode defaults to
+ * them.
+ */
+static void config_register_per_mode_defaults(void) {
+    /* completion.chain_directories: lush curates the fish-style
+     * auto-recurse-into-directory experience as a discoverability
+     * default; bash/zsh/posix all stop after one tab (script users
+     * expect a single insertion per keypress). */
+    creg_value_t bool_true = creg_value_boolean(true);
+    creg_value_t bool_false = creg_value_boolean(false);
+
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_LUSH, &bool_true);
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_BASH, &bool_false);
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_ZSH, &bool_false);
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_POSIX, &bool_false);
 }
 
 /**
@@ -2031,6 +2067,12 @@ int config_init(void) {
 
     // Initialize config registry and register all sections
     config_register_sections();
+
+    // Register per-mode default overrides. Must come after section
+    // registration (the options must exist before per-mode defaults
+    // can attach to them), and before the per-mode defaults apply
+    // call below.
+    config_register_per_mode_defaults();
 
     // The registry's section defaults include shell.mode = "lush". The
     // active mode (set earlier by apply_mode_preset() from CLI flag /

@@ -8978,15 +8978,54 @@ int bin_display(int argc, char **argv) {
                     return 1;
                 }
 
+            } else if (strcmp(comp_subcmd, "chain_directories") == 0) {
+                /* completion.chain_directories: when on, accepting a
+                 * directory completion auto-re-triggers completion at
+                 * the new prefix (fish-style cascading). Per-mode
+                 * default: lush=true, others=false. */
+                if (argc < 5) {
+                    bool cur = false;
+                    creg_result_t r = config_registry_get_boolean(
+                        "completion.chain_directories", &cur);
+                    if (r != CREG_SUCCESS) {
+                        cur = false;
+                    }
+                    printf("chain_directories: %s\n", cur ? "on" : "off");
+                    printf("Usage: display lle completion chain_directories "
+                           "<on|off>\n");
+                    return 0;
+                }
+
+                const char *state = argv[4];
+                if (strcmp(state, "on") == 0) {
+                    config_registry_set_boolean("completion.chain_directories",
+                                                true);
+                    printf("chain_directories enabled\n");
+                    return 0;
+                } else if (strcmp(state, "off") == 0) {
+                    config_registry_set_boolean("completion.chain_directories",
+                                                false);
+                    printf("chain_directories disabled\n");
+                    return 0;
+                } else {
+                    fprintf(stderr,
+                            "display lle completion chain_directories: "
+                            "invalid value '%s' (use on|off)\n",
+                            state);
+                    return 1;
+                }
+
             } else if (strcmp(comp_subcmd, "help") == 0 ||
                        strcmp(comp_subcmd, "--help") == 0) {
                 printf("LLE Completion Subsystem\n");
                 printf("========================\n\n");
                 printf("Usage: display lle completion <subcommand>\n\n");
                 printf("Subcommands:\n");
-                printf("  sources [list|reload|help]  - Manage completion "
+                printf("  sources [list|reload|help]   - Manage completion "
                        "sources\n");
-                printf("  help                        - Show this help "
+                printf("  chain_directories <on|off>   - Re-trigger "
+                       "completion after directory accept\n");
+                printf("  help                         - Show this help "
                        "message\n");
                 return 0;
 
@@ -8994,8 +9033,8 @@ int bin_display(int argc, char **argv) {
                 fprintf(stderr,
                         "display lle completion: Unknown subcommand '%s'\n",
                         comp_subcmd);
-                fprintf(stderr,
-                        "Usage: display lle completion <sources|help>\n");
+                fprintf(stderr, "Usage: display lle completion "
+                                "<sources|chain_directories|help>\n");
                 return 1;
             }
 

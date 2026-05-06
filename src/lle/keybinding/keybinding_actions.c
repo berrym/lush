@@ -14,7 +14,8 @@
  */
 
 #include "lle/keybinding_actions.h"
-#include "config.h" /* For lle_dedup_navigation config option */
+#include "config.h"          /* For lle_dedup_navigation config option */
+#include "config_registry.h" /* For completion.chain_directories */
 #include "display_controller.h"
 #include "display_integration.h"
 #include "lle/buffer_management.h"
@@ -313,7 +314,6 @@ static void refresh_after_completion(display_controller_t *dc) {
     }
 }
 
-
 /**
  * @brief Update inline text with selected completion
  *
@@ -349,7 +349,8 @@ static void update_inline_completion(lle_editor_t *editor,
     lle_result_t ctx_result = lle_word_context_analyze(
         editor->buffer->data, editor->buffer->cursor.byte_offset,
         editor->lle_pool, &current_context);
-    if (ctx_result != LLE_SUCCESS || !current_context) return;
+    if (ctx_result != LLE_SUCCESS || !current_context)
+        return;
 
     /* External commands that shadow a builtin or alias carry their
      * full PATH-resolved path in description; the engine splices that
@@ -2509,12 +2510,29 @@ lle_result_t lle_complete(lle_editor_t *editor) {
             &synthetic_item, editor->lle_pool);
         lle_word_context_free(splice_context);
 
+        /* Directory-chain (issue #85): if the accepted item was a
+         * directory and completion.chain_directories is on, recurse
+         * into lle_complete() instead of clearing. This re-triggers
+         * completion at the new cursor position (after the inserted
+         * "/") so the next-level menu opens immediately, fish-style.
+         * The buffer + cursor are already updated by the splice, so
+         * re-entry is clean. */
+        bool chain = false;
+        (void)config_registry_get_boolean("completion.chain_directories",
+                                          &chain);
+        if (replace_result == LLE_SUCCESS && chain &&
+            synthetic_item.type == LLE_COMPLETION_TYPE_DIRECTORY) {
+            lle_completion_system_clear(editor->completion_system);
+            return lle_complete(editor);
+        }
+
         /* Single-match path consumed the active completion state;
          * clear it so the next TAB starts a fresh session. */
         lle_completion_system_clear(editor->completion_system);
 
         display_controller_t *dc = display_integration_get_controller();
-        if (dc) refresh_after_completion(dc);
+        if (dc)
+            refresh_after_completion(dc);
 
         return replace_result;
     }
