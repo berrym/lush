@@ -669,6 +669,117 @@ TEST(sync_hooks) {
 }
 
 /* ============================================================================
+ * Per-Mode Default Tests
+ * ============================================================================
+ */
+
+TEST(mode_default_unregistered_option_fails) {
+    creg_value_t v = creg_value_boolean(true);
+    creg_result_t r = config_registry_set_mode_default("shell.does_not_exist",
+                                                       SHELL_MODE_LUSH, &v);
+    ASSERT(r != CREG_SUCCESS);
+}
+
+TEST(mode_default_type_mismatch_fails) {
+    config_registry_register_section(&shell_section);
+    /* errexit is BOOLEAN; passing INTEGER should fail */
+    creg_value_t v = creg_value_integer(42);
+    creg_result_t r =
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_LUSH, &v);
+    ASSERT(r == CREG_ERROR_TYPE_MISMATCH);
+}
+
+TEST(mode_default_applies_for_registered_mode) {
+    config_registry_register_section(&shell_section);
+
+    /* Register a per-mode default: errexit=true under POSIX, false elsewhere
+     * (default). */
+    creg_value_t posix_default = creg_value_boolean(true);
+    ASSERT_EQ(config_registry_set_mode_default(
+                  "shell.errexit", SHELL_MODE_POSIX, &posix_default),
+              CREG_SUCCESS);
+
+    /* Apply POSIX defaults: errexit should now be true. */
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_POSIX),
+              CREG_SUCCESS);
+    bool got = false;
+    ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
+    ASSERT(got == true);
+
+    /* Apply LUSH defaults: errexit has no per-mode default for LUSH, so
+     * the value persists from the prior apply. */
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_LUSH),
+              CREG_SUCCESS);
+    got = false;
+    ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
+    ASSERT(got == true); /* unchanged because LUSH has no override */
+}
+
+TEST(mode_default_replaces_prior_value_for_same_mode) {
+    config_registry_register_section(&shell_section);
+
+    creg_value_t v1 = creg_value_boolean(true);
+    creg_value_t v2 = creg_value_boolean(false);
+
+    ASSERT_EQ(
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_BASH, &v1),
+        CREG_SUCCESS);
+    ASSERT_EQ(
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_BASH, &v2),
+        CREG_SUCCESS);
+
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_BASH),
+              CREG_SUCCESS);
+    bool got = true;
+    ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
+    ASSERT(got == false); /* second registration won */
+}
+
+TEST(mode_default_independent_per_mode) {
+    config_registry_register_section(&shell_section);
+
+    creg_value_t bash_v = creg_value_boolean(true);
+    creg_value_t posix_v = creg_value_boolean(false);
+
+    ASSERT_EQ(config_registry_set_mode_default("shell.errexit", SHELL_MODE_BASH,
+                                               &bash_v),
+              CREG_SUCCESS);
+    ASSERT_EQ(config_registry_set_mode_default("shell.errexit",
+                                               SHELL_MODE_POSIX, &posix_v),
+              CREG_SUCCESS);
+
+    /* Apply BASH defaults: errexit -> true */
+    config_registry_apply_mode_defaults(SHELL_MODE_BASH);
+    bool got;
+    config_registry_get_boolean("shell.errexit", &got);
+    ASSERT(got == true);
+
+    /* Apply POSIX defaults: errexit -> false */
+    config_registry_apply_mode_defaults(SHELL_MODE_POSIX);
+    config_registry_get_boolean("shell.errexit", &got);
+    ASSERT(got == false);
+
+    /* Back to BASH: errexit -> true again (re-seed-every-time). */
+    config_registry_apply_mode_defaults(SHELL_MODE_BASH);
+    config_registry_get_boolean("shell.errexit", &got);
+    ASSERT(got == true);
+}
+
+TEST(mode_default_invalid_mode_fails) {
+    config_registry_register_section(&shell_section);
+    creg_value_t v = creg_value_boolean(true);
+    creg_result_t r =
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_COUNT, &v);
+    ASSERT(r == CREG_ERROR_INVALID_PARAM);
+}
+
+TEST(mode_default_apply_invalid_mode_fails) {
+    config_registry_register_section(&shell_section);
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_COUNT),
+              CREG_ERROR_INVALID_PARAM);
+}
+
+/* ============================================================================
  * Main
  * ============================================================================
  */
@@ -726,6 +837,15 @@ int main(void) {
     printf("\nLifecycle Hook Tests:\n");
     RUN_TEST(on_load_hook);
     RUN_TEST(sync_hooks);
+
+    printf("\nPer-Mode Default Tests:\n");
+    RUN_TEST(mode_default_unregistered_option_fails);
+    RUN_TEST(mode_default_type_mismatch_fails);
+    RUN_TEST(mode_default_applies_for_registered_mode);
+    RUN_TEST(mode_default_replaces_prior_value_for_same_mode);
+    RUN_TEST(mode_default_independent_per_mode);
+    RUN_TEST(mode_default_invalid_mode_fails);
+    RUN_TEST(mode_default_apply_invalid_mode_fails);
 
     return TEST_RESULT();
 }

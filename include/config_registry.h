@@ -28,6 +28,8 @@
 #ifndef CONFIG_REGISTRY_H
 #define CONFIG_REGISTRY_H
 
+#include "shell_mode.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -56,6 +58,9 @@ extern "C" {
 
 /** @brief Maximum number of change subscribers */
 #define CREG_SUBSCRIBERS_MAX 32
+
+/** @brief Maximum number of registered per-mode default overrides */
+#define CREG_MODE_DEFAULTS_MAX 64
 
 /* ============================================================================
  * VALUE TYPES
@@ -404,6 +409,61 @@ creg_result_t config_registry_reset_section(const char *section_name);
  * @brief Reset entire registry to defaults
  */
 void config_registry_reset_all(void);
+
+/* ============================================================================
+ * MODE-AWARE DEFAULTS
+ * ============================================================================
+ *
+ * Lush modes are identity presets that re-seed configuration on switch.
+ * Most options are mode-invariant (a single default works across all
+ * modes). Some options diverge per mode -- e.g. lush curates a default
+ * that differs from the bash/zsh consensus. Such options register
+ * per-mode defaults via config_registry_set_mode_default(), and
+ * apply_mode_preset() applies them on every mode change.
+ *
+ * Options without registered per-mode defaults are unaffected by mode
+ * changes; their single default_val from the option definition stands.
+ */
+
+/**
+ * @brief Register a per-mode default for an option.
+ *
+ * Associates a default value with a specific shell mode. When
+ * config_registry_apply_mode_defaults(mode) is called, every option
+ * with a registered per-mode default for that mode has its current
+ * value reset to that default.
+ *
+ * The option must already be registered (via its section). Type must
+ * match the option's declared type.
+ *
+ * Multiple per-mode defaults can be registered for the same key (one
+ * per mode). Calling this with a mode that already has a default for
+ * the given key replaces the prior value.
+ *
+ * @param key   Full key path (e.g., "completion.chain_directories")
+ * @param mode  Shell mode this default applies to
+ * @param value The default value for this option in this mode
+ * @return CREG_SUCCESS on success, error code otherwise
+ */
+creg_result_t config_registry_set_mode_default(const char *key,
+                                               shell_mode_t mode,
+                                               const creg_value_t *value);
+
+/**
+ * @brief Apply all registered per-mode defaults for the given mode.
+ *
+ * For every option that has a registered per-mode default for the
+ * given mode, sets the option's current value to that default.
+ * Options without per-mode defaults are untouched.
+ *
+ * Called from apply_mode_preset() so mode change re-seeds the
+ * registry. Mid-session mode changes overwrite any user tweaks to
+ * mode-aware options (re-seed-every-time semantic).
+ *
+ * @param mode Mode whose per-mode defaults should be applied
+ * @return CREG_SUCCESS on success
+ */
+creg_result_t config_registry_apply_mode_defaults(shell_mode_t mode);
 
 /**
  * @brief Get the default value for a key

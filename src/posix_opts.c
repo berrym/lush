@@ -63,6 +63,11 @@ bool apply_mode_preset(shell_mode_t mode) {
     config.shell_mode = (int)mode;
     if (config_registry_is_initialized()) {
         config_registry_set_string("shell.mode", shell_mode_name(mode));
+        /* Re-seed any registered per-mode default overrides. Options
+         * without per-mode defaults are unaffected. Re-seed-every-time
+         * semantic: mid-session mode changes overwrite user tweaks to
+         * mode-aware options (picking a preset means asking for it). */
+        config_registry_apply_mode_defaults(mode);
     }
 
     return true;
