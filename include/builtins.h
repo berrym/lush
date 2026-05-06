@@ -477,6 +477,16 @@ int bin_lint(int argc, char **argv);
 int bin_disown(int argc, char **argv);
 int bin_let(int argc, char **argv);
 
+/**
+ * @brief Validate a string as a shell variable identifier.
+ *
+ * Returns 1 if `name` is non-NULL, non-empty, starts with letter or
+ * underscore, and contains only alphanumerics or underscores after.
+ * Otherwise 0. Shared by every builtin that accepts identifier
+ * arguments (declare, local, export, readonly, unset, ...).
+ */
+int is_valid_identifier(const char *name);
+
 /* ============================================================================
  * Command Hash Table
  * ============================================================================
