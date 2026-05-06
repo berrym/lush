@@ -3677,8 +3677,8 @@ int bin_return_value(int argc, char **argv) {
                 }
             }
             shell_error_set_suggestion(
-                err, "switch to bash/zsh/lush mode (set -o bash) to use "
-                     "return_value");
+                err, "switch to bash/zsh/lush mode (e.g. `mode bash`) to "
+                     "use return_value");
             shell_error_display(err, stderr, isatty(STDERR_FILENO));
             shell_error_free(err);
         } else {

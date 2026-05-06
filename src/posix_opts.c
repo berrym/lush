@@ -429,30 +429,34 @@ int builtin_set(char **args) {
                 // Set named option
                 i++; // consume the option name
 
-                // Check for shell mode options first (mutually exclusive modes)
-                shell_mode_t mode_target;
-                bool is_mode_arg = true;
+                /* `set -o posix` is preserved as a recognized
+                 * bash-bridge alias for `mode posix`: it's bash's
+                 * canonical spelling for entering POSIX mode and a
+                 * common bash-script idiom. The lush-native spelling
+                 * is `mode posix`; both route through the same
+                 * apply_mode_preset() entry point.
+                 *
+                 * `set -o {bash,zsh,lush}` are no longer recognized:
+                 * modes are a discriminated enum, not toggles. Use
+                 * the `mode` builtin instead. */
                 if (strcmp(args[i], "posix") == 0) {
-                    mode_target = SHELL_MODE_POSIX;
-                } else if (strcmp(args[i], "bash") == 0) {
-                    mode_target = SHELL_MODE_BASH;
-                } else if (strcmp(args[i], "zsh") == 0) {
-                    mode_target = SHELL_MODE_ZSH;
-                } else if (strcmp(args[i], "lush") == 0) {
-                    mode_target = SHELL_MODE_LUSH;
-                } else {
-                    is_mode_arg = false;
-                    mode_target = SHELL_MODE_LUSH; /* unused */
-                }
-
-                if (is_mode_arg) {
-                    if (!apply_mode_preset(mode_target)) {
+                    if (!apply_mode_preset(SHELL_MODE_POSIX)) {
                         executor_error_report(
                             current_executor, SHELL_ERR_FEATURE_DISABLED,
                             builtin_get_source_location(),
                             "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
+                } else if (strcmp(args[i], "bash") == 0 ||
+                           strcmp(args[i], "zsh") == 0 ||
+                           strcmp(args[i], "lush") == 0) {
+                    executor_error_report(
+                        current_executor, SHELL_ERR_INVALID_OPTION,
+                        builtin_get_source_location(),
+                        "set -o %s: shell modes are not toggles; "
+                        "use `mode %s` instead",
+                        args[i], args[i]);
+                    return 1;
                 } else {
                     option_mapping_t *opt = find_option_by_name(args[i]);
                     if (opt) {
@@ -485,8 +489,9 @@ int builtin_set(char **args) {
                     printf("set %co %s\n", *(option_map[j].flag) ? '-' : '+',
                            option_map[j].name);
                 }
-                // Also show current shell mode
-                printf("set -o %s  (shell mode)\n",
+                // Also show current shell mode (use the `mode` builtin to
+                // change it; `set -o posix` is the bash-bridge alias).
+                printf("(shell mode: %s -- use `mode` builtin to change)\n",
                        shell_mode_name(shell_mode_get()));
                 return 0;
             }
@@ -495,10 +500,11 @@ int builtin_set(char **args) {
                 // Unset named option
                 i++; // consume the option name
 
-                // Shell mode options - +o switches back to lush (default)
-                if (strcmp(args[i], "posix") == 0 ||
-                    strcmp(args[i], "bash") == 0 ||
-                    strcmp(args[i], "zsh") == 0) {
+                /* `set +o posix` is the bash-bridge counterpart to
+                 * `set -o posix`: it lifts the POSIX preset and
+                 * returns to lush. `set +o {bash,zsh,lush}` are
+                 * rejected -- modes aren't toggles. */
+                if (strcmp(args[i], "posix") == 0) {
                     if (!apply_mode_preset(SHELL_MODE_LUSH)) {
                         executor_error_report(
                             current_executor, SHELL_ERR_FEATURE_DISABLED,
@@ -506,9 +512,16 @@ int builtin_set(char **args) {
                             "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
-                } else if (strcmp(args[i], "lush") == 0) {
-                    // +o lush is a no-op (can't disable default mode)
-                    // Do nothing
+                } else if (strcmp(args[i], "bash") == 0 ||
+                           strcmp(args[i], "zsh") == 0 ||
+                           strcmp(args[i], "lush") == 0) {
+                    executor_error_report(
+                        current_executor, SHELL_ERR_INVALID_OPTION,
+                        builtin_get_source_location(),
+                        "set +o %s: shell modes are not toggles; "
+                        "use `mode <name>` to switch presets",
+                        args[i]);
+                    return 1;
                 } else {
                     option_mapping_t *opt = find_option_by_name(args[i]);
                     if (opt) {
@@ -542,8 +555,9 @@ int builtin_set(char **args) {
                     printf("set %co %s\n", *(option_map[j].flag) ? '-' : '+',
                            option_map[j].name);
                 }
-                // Also show current shell mode
-                printf("set -o %s  (shell mode)\n",
+                // Also show current shell mode (use the `mode` builtin to
+                // change it; `set -o posix` is the bash-bridge alias).
+                printf("(shell mode: %s -- use `mode` builtin to change)\n",
                        shell_mode_name(shell_mode_get()));
                 return 0;
             }
