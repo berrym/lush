@@ -205,6 +205,27 @@ shell_mode_t shell_mode_get(void);
  */
 bool shell_mode_set(shell_mode_t mode);
 
+/**
+ * @brief Apply a mode preset across all configuration surfaces
+ *
+ * The canonical entry point for switching the active shell mode. Performs
+ * a full re-seed:
+ *   - Sets the active mode via shell_mode_set().
+ *   - Clears any per-feature overrides (mode-change is a clean reset).
+ *   - Updates legacy POSIX bookkeeping (shell_opts.posix_mode).
+ *   - Writes the canonical mode label to the central registry
+ *     (shell.mode key).
+ *
+ * Per-mode registry default re-seeding is layered on top of this in
+ * commit 4 of the configuration cleanup; for now the surface is the
+ * feature matrix + POSIX bookkeeping + the shell.mode label.
+ *
+ * @param mode Mode preset to apply
+ * @return true on success, false if mode change is disallowed (strict mode)
+ *         or the mode value is invalid
+ */
+bool apply_mode_preset(shell_mode_t mode);
+
 /* ============================================================================
  * Feature Override Functions
  * ============================================================================

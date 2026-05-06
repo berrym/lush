@@ -334,7 +334,8 @@ TEST(cd_to_home) {
 TEST(cd_nonexistent_fails) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "cd /nonexistent_dir_xyz", 1);
+    int status =
+        executor_execute_command_line(exec, "cd /nonexistent_dir_xyz", 1);
     ASSERT_EQ(status, 1, "cd to nonexistent directory should fail");
 
     teardown_executor(exec);
@@ -408,7 +409,8 @@ TEST(export_invalid_identifier) {
     executor_t *exec = setup_executor();
 
     /* Invalid variable name starting with digit */
-    int status = executor_execute_command_line(exec, "export 1INVALID=value", 1);
+    int status =
+        executor_execute_command_line(exec, "export 1INVALID=value", 1);
     ASSERT_EQ(status, 1, "export with invalid identifier should fail");
 
     teardown_executor(exec);
@@ -518,7 +520,8 @@ TEST(echo_no_newline) {
 TEST(echo_escape_sequences) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "echo -e 'hello\\nworld'", 1);
+    int status =
+        executor_execute_command_line(exec, "echo -e 'hello\\nworld'", 1);
     ASSERT_EQ(status, 0, "echo -e with escapes should succeed");
 
     teardown_executor(exec);
@@ -527,7 +530,8 @@ TEST(echo_escape_sequences) {
 TEST(echo_no_escapes) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "echo -E 'hello\\nworld'", 1);
+    int status =
+        executor_execute_command_line(exec, "echo -E 'hello\\nworld'", 1);
     ASSERT_EQ(status, 0, "echo -E should succeed");
 
     teardown_executor(exec);
@@ -577,7 +581,8 @@ TEST(printf_width) {
 TEST(printf_escape_newline) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "printf 'line1\\nline2'", 1);
+    int status =
+        executor_execute_command_line(exec, "printf 'line1\\nline2'", 1);
     ASSERT_EQ(status, 0, "printf with \\n should succeed");
 
     teardown_executor(exec);
@@ -783,8 +788,8 @@ TEST(local_in_function) {
     executor_t *exec = setup_executor();
 
     /* Define function with local variable */
-    executor_execute_command_line(exec,
-                                  "testlocal() { local X=inside; echo $X; }", 1);
+    executor_execute_command_line(
+        exec, "testlocal() { local X=inside; echo $X; }", 1);
     int status = executor_execute_command_line(exec, "testlocal", 1);
     ASSERT_EQ(status, 0, "Function with local should succeed");
 
@@ -799,7 +804,8 @@ TEST(local_in_function) {
 TEST(readonly_variable) {
     executor_t *exec = setup_executor();
 
-    int status = executor_execute_command_line(exec, "readonly ROVAR=constant", 1);
+    int status =
+        executor_execute_command_line(exec, "readonly ROVAR=constant", 1);
     ASSERT_EQ(status, 0, "readonly should succeed");
 
     char *value = symtable_get_var(exec->symtable, "ROVAR");
@@ -1053,6 +1059,102 @@ TEST(is_builtin_false_for_external) {
 }
 
 /* ============================================================================
+ * MODE BUILTIN TESTS
+ * ============================================================================
+ */
+
+#include "lush.h"
+#include "shell_mode.h"
+
+extern int bin_mode(int argc, char **argv);
+
+TEST(bin_mode_no_args_succeeds) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    char *argv[] = {"mode", NULL};
+    int result = bin_mode(1, argv);
+    ASSERT_EQ(result, 0, "mode with no args should return 0");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH,
+              "mode with no args should not change the active mode");
+}
+
+TEST(bin_mode_switches_to_bash) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    char *argv[] = {"mode", "bash", NULL};
+    int result = bin_mode(2, argv);
+    ASSERT_EQ(result, 0, "mode bash should return 0");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_BASH,
+              "mode bash should switch active mode to bash");
+}
+
+TEST(bin_mode_switches_to_posix_sets_legacy_flag) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    char *argv[] = {"mode", "posix", NULL};
+    int result = bin_mode(2, argv);
+    ASSERT_EQ(result, 0, "mode posix should return 0");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_POSIX,
+              "mode posix should switch active mode to posix");
+    ASSERT_TRUE(shell_opts.posix_mode,
+                "shell_opts.posix_mode should be true after mode posix");
+}
+
+TEST(bin_mode_switches_to_zsh_clears_legacy_flag) {
+    apply_mode_preset(SHELL_MODE_POSIX);
+    char *argv[] = {"mode", "zsh", NULL};
+    int result = bin_mode(2, argv);
+    ASSERT_EQ(result, 0, "mode zsh should return 0");
+    ASSERT_FALSE(shell_opts.posix_mode,
+                 "shell_opts.posix_mode should be false after mode zsh");
+}
+
+TEST(bin_mode_unknown_name_errors) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    char *argv[] = {"mode", "frobnicate", NULL};
+    int result = bin_mode(2, argv);
+    ASSERT_EQ(result, 1, "mode <unknown> should return 1");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH,
+              "mode <unknown> should not change the active mode");
+}
+
+TEST(bin_mode_unknown_option_errors) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    char *argv[] = {"mode", "--frobnicate", NULL};
+    int result = bin_mode(2, argv);
+    ASSERT_EQ(result, 1, "mode --<unknown> should return 1");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH,
+              "mode --<unknown> should not change the active mode");
+}
+
+TEST(bin_mode_too_many_args_errors) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    char *argv[] = {"mode", "bash", "extra", NULL};
+    int result = bin_mode(3, argv);
+    ASSERT_EQ(result, 1, "mode <name> <extra> should return 1");
+    ASSERT_EQ(shell_mode_get(), SHELL_MODE_LUSH,
+              "mode with too many args should not change the active mode");
+}
+
+TEST(bin_mode_show_succeeds) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    char *argv[] = {"mode", "--show", NULL};
+    int result = bin_mode(2, argv);
+    ASSERT_EQ(result, 0, "mode --show should return 0");
+}
+
+TEST(bin_mode_reset_drops_overrides) {
+    apply_mode_preset(SHELL_MODE_LUSH);
+    /* Apply a per-feature override that --reset should drop. */
+    shell_feature_disable(FEATURE_INDEXED_ARRAYS);
+    ASSERT_TRUE(shell_feature_is_overridden(FEATURE_INDEXED_ARRAYS),
+                "override should be set before --reset");
+
+    char *argv[] = {"mode", "--reset", NULL};
+    int result = bin_mode(2, argv);
+    ASSERT_EQ(result, 0, "mode --reset should return 0");
+    ASSERT_FALSE(shell_feature_is_overridden(FEATURE_INDEXED_ARRAYS),
+                 "override should be cleared after --reset");
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -1206,6 +1308,17 @@ int main(void) {
     printf("\n--- is_builtin Tests ---\n");
     RUN_TEST(is_builtin_true_for_builtins);
     RUN_TEST(is_builtin_false_for_external);
+
+    printf("\n--- mode Builtin Tests ---\n");
+    RUN_TEST(bin_mode_no_args_succeeds);
+    RUN_TEST(bin_mode_switches_to_bash);
+    RUN_TEST(bin_mode_switches_to_posix_sets_legacy_flag);
+    RUN_TEST(bin_mode_switches_to_zsh_clears_legacy_flag);
+    RUN_TEST(bin_mode_unknown_name_errors);
+    RUN_TEST(bin_mode_unknown_option_errors);
+    RUN_TEST(bin_mode_too_many_args_errors);
+    RUN_TEST(bin_mode_show_succeeds);
+    RUN_TEST(bin_mode_reset_drops_overrides);
 
     return TEST_RESULT();
 }

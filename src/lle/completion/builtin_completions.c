@@ -381,6 +381,19 @@ static const lle_builtin_subcommand_t config_subcmds[] = {
 };
 
 // ============================================================================
+// MODE SUBCOMMAND HIERARCHY
+// ============================================================================
+
+static const lle_builtin_subcommand_t mode_subcmds[] = {
+    {"lush", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"posix", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"bash", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"zsh", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"--reset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"--show", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+};
+
+// ============================================================================
 // NETWORK SUBCOMMAND HIERARCHY
 // ============================================================================
 
@@ -446,6 +459,8 @@ static const lle_builtin_completion_spec_t builtin_specs[] = {
     {"network", NULL, 0, network_subcmds,
      sizeof(network_subcmds) / sizeof(network_subcmds[0]),
      LLE_BUILTIN_ARG_NONE},
+    {"mode", NULL, 0, mode_subcmds,
+     sizeof(mode_subcmds) / sizeof(mode_subcmds[0]), LLE_BUILTIN_ARG_NONE},
 
     /* Builtins with only dynamic arguments */
     {"cd", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_DIRECTORY},

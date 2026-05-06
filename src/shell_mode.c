@@ -544,6 +544,12 @@ bool shell_mode_set(shell_mode_t mode) {
     return true;
 }
 
+/* apply_mode_preset() is defined in src/posix_opts.c. It integrates
+ * shell_mode, config, config_registry, and shell_opts; keeping the
+ * implementation in posix_opts.c (which already pulls those headers)
+ * preserves the lighter dependency graph for test binaries that link
+ * shell_mode.c standalone. */
+
 /* ============================================================================
  * Feature Override Functions
  * ============================================================================
