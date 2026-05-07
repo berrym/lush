@@ -215,6 +215,9 @@ typedef struct {
     bool multiline_mode;      /**< Enable multiline editing */
     int brace_expansion_max;  /**< Max brace expansion result count (0 =
                                  unbounded) */
+    int regex_pattern_max;    /**< Max regex pattern length before rejection
+                                 (0 = unbounded; covers `[[ =~ ]]` and
+                                 extglob translation paths) */
     int loop_failure_streak;  /**< Consecutive non-zero body iterations before
                                  runaway-loop trip (0 = disable) */
     int loop_failure_seconds; /**< Min wall-clock seconds streak must last

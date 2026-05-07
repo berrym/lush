@@ -4874,10 +4874,41 @@ static char *zsh_extglob_to_regex(const char *pattern) {
 }
 
 /**
+ * @brief Reject regex patterns that exceed behavior.regex_pattern_max length.
+ *
+ * Platform regcomp implementations (TRE on macOS, glibc regex on Linux)
+ * exhibit catastrophic compile-time on pathological patterns -- deeply
+ * nested alternations with quantifiers, very long alternation lists,
+ * specific bounded-repetition shapes. Fuzz mutation generates such
+ * inputs trivially; real users essentially never type them.
+ *
+ * Pre-validation by length is the simplest defense that bounds worst-
+ * case compile time without rejecting human input. The default cap of
+ * 1024 chars is ~10x larger than any realistic shell regex; setting
+ * the cap to 0 disables the check entirely (parity with bash/zsh which
+ * have no cap).
+ *
+ * @param pattern Regex pattern about to be passed to regcomp.
+ * @return true if pattern is OK to compile, false if it exceeds the cap.
+ */
+static bool regex_pattern_is_safe(const char *pattern) {
+    if (!pattern) {
+        return false;
+    }
+    if (config.regex_pattern_max <= 0) {
+        return true; /* explicitly unbounded */
+    }
+    return strlen(pattern) <= (size_t)config.regex_pattern_max;
+}
+
+/**
  * @brief Match filename against zsh extglob pattern
  */
 static bool match_zsh_extglob(const char *filename, const char *pattern,
                               bool is_negated) {
+    if (!regex_pattern_is_safe(pattern)) {
+        return false;
+    }
     char *regex_pattern = zsh_extglob_to_regex(pattern);
     if (!regex_pattern) {
         return false;
@@ -5188,6 +5219,9 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
  * @return true if matches
  */
 static bool match_extglob(const char *filename, const char *pattern) {
+    if (!regex_pattern_is_safe(pattern)) {
+        return false;
+    }
     bool is_negated = false;
     char *regex_pattern = extglob_to_regex(pattern, &is_negated);
     if (!regex_pattern) {
@@ -12959,6 +12993,14 @@ static bool extended_test_pattern_match(const char *str, const char *pattern) {
 static bool extended_test_regex_match(executor_t *executor, const char *str,
                                       const char *pattern) {
     if (!str || !pattern) {
+        return false;
+    }
+
+    if (!regex_pattern_is_safe(pattern)) {
+        executor_error_report(
+            executor, SHELL_ERR_INVALID_ARGUMENT, builtin_get_source_location(),
+            "regex pattern exceeds behavior.regex_pattern_max (%d)",
+            config.regex_pattern_max);
         return false;
     }
 
