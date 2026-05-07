@@ -30,15 +30,15 @@
 
 /* ============================================================================
  * Lifecycle: init / cleanup / is_valid
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(init_zeroes_the_struct_and_invalidates) {
     lle_utf8_index_t idx;
     /* Fill with garbage to confirm init clears it */
     memset(&idx, 0xAB, sizeof(idx));
     ASSERT_EQ(lle_utf8_index_init(&idx), LLE_SUCCESS, "init returns SUCCESS");
-    ASSERT_FALSE(lle_utf8_index_is_valid(&idx),
-                 "fresh index is not yet valid");
+    ASSERT_FALSE(lle_utf8_index_is_valid(&idx), "fresh index is not yet valid");
     ASSERT_EQ(idx.byte_count, 0, "byte_count zeroed");
     ASSERT_EQ(idx.codepoint_count, 0, "codepoint_count zeroed");
     ASSERT_EQ(idx.grapheme_count, 0, "grapheme_count zeroed");
@@ -58,13 +58,13 @@ TEST(cleanup_tolerates_null) {
 }
 
 TEST(is_valid_returns_false_on_null) {
-    ASSERT_FALSE(lle_utf8_index_is_valid(NULL),
-                 "is_valid(NULL) returns false");
+    ASSERT_FALSE(lle_utf8_index_is_valid(NULL), "is_valid(NULL) returns false");
 }
 
 /* ============================================================================
  * rebuild — basic shapes
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(rebuild_empty_text) {
     lle_utf8_index_t idx;
@@ -116,8 +116,7 @@ TEST(rebuild_combining_mark_collapses_graphemes) {
               "rebuild succeeds");
     ASSERT_EQ(idx.byte_count, 3, "3 bytes total");
     ASSERT_EQ(idx.codepoint_count, 2, "2 codepoints");
-    ASSERT_EQ(idx.grapheme_count, 1,
-              "1 grapheme (combining mark attaches)");
+    ASSERT_EQ(idx.grapheme_count, 1, "1 grapheme (combining mark attaches)");
     ASSERT_EQ(idx.display_width, 1, "1 column wide");
     lle_utf8_index_cleanup(&idx);
 }
@@ -125,7 +124,8 @@ TEST(rebuild_combining_mark_collapses_graphemes) {
 TEST(rebuild_mixed_ascii_and_cjk) {
     /* "A中B": 1 + 3 + 1 = 5 bytes, 3 codepoints, 3 graphemes,
      * 1 + 2 + 1 = 4 columns. */
-    const char *text = "A\xE4\xB8\xAD" "B";
+    const char *text = "A\xE4\xB8\xAD"
+                       "B";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 5), LLE_SUCCESS,
@@ -147,8 +147,7 @@ TEST(rebuild_rejects_null_text) {
 }
 
 TEST(rebuild_rejects_null_index) {
-    ASSERT_EQ(lle_utf8_index_rebuild(NULL, "x", 1),
-              LLE_ERROR_INVALID_PARAMETER,
+    ASSERT_EQ(lle_utf8_index_rebuild(NULL, "x", 1), LLE_ERROR_INVALID_PARAMETER,
               "rebuild(NULL index) returns INVALID_PARAMETER");
 }
 
@@ -157,8 +156,7 @@ TEST(rebuild_rejects_invalid_utf8_truncated) {
     const char *text = "\xE4";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
-    ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 1),
-              LLE_ERROR_INVALID_ENCODING,
+    ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 1), LLE_ERROR_INVALID_ENCODING,
               "truncated UTF-8 -> INVALID_ENCODING");
     lle_utf8_index_cleanup(&idx);
 }
@@ -168,8 +166,7 @@ TEST(rebuild_rejects_invalid_utf8_lone_continuation) {
     const char *text = "\x80";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
-    ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 1),
-              LLE_ERROR_INVALID_ENCODING,
+    ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 1), LLE_ERROR_INVALID_ENCODING,
               "lone continuation -> INVALID_ENCODING");
     lle_utf8_index_cleanup(&idx);
 }
@@ -179,8 +176,7 @@ TEST(rebuild_rejects_invalid_utf8_overlong) {
     const char *text = "\xC0\xAF";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
-    ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 2),
-              LLE_ERROR_INVALID_ENCODING,
+    ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 2), LLE_ERROR_INVALID_ENCODING,
               "overlong encoding -> INVALID_ENCODING");
     lle_utf8_index_cleanup(&idx);
 }
@@ -193,10 +189,12 @@ TEST(rebuild_rejects_invalid_utf8_overlong) {
  *   0    : 'A'   (codepoint 0, grapheme 0, column 0)
  *   1-3  : '中'  (codepoint 1, grapheme 1, column 1)
  *   4    : 'B'   (codepoint 2, grapheme 2, column 3)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(roundtrip_byte_codepoint_and_back) {
-    const char *text = "A\xE4\xB8\xAD" "B";
+    const char *text = "A\xE4\xB8\xAD"
+                       "B";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 5), LLE_SUCCESS, "rebuild");
@@ -237,7 +235,8 @@ TEST(roundtrip_codepoint_grapheme_and_back) {
      *   bytes: 0='e', 1-2 = combining, 3='X'
      *   codepoints: 0='e', 1=combining, 2='X'
      *   graphemes:  0=é (cp 0+1), 1=X (cp 2) */
-    const char *text = "e\xCC\x81" "X";
+    const char *text = "e\xCC\x81"
+                       "X";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 4), LLE_SUCCESS, "rebuild");
@@ -275,8 +274,10 @@ TEST(roundtrip_codepoint_grapheme_and_back) {
 
 TEST(roundtrip_grapheme_display_and_back) {
     /* "A中B": graphemes at columns 0, 1, 3.
-     * display columns: 0 -> 'A', 1 -> '中' (start), 2 -> '中' (cont), 3 -> 'B' */
-    const char *text = "A\xE4\xB8\xAD" "B";
+     * display columns: 0 -> 'A', 1 -> '中' (start), 2 -> '中' (cont), 3 -> 'B'
+     */
+    const char *text = "A\xE4\xB8\xAD"
+                       "B";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 5), LLE_SUCCESS, "rebuild");
@@ -316,7 +317,8 @@ TEST(roundtrip_grapheme_display_and_back) {
 
 /* ============================================================================
  * Error paths
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(lookups_reject_null_index) {
     size_t out;
@@ -363,7 +365,7 @@ TEST(lookups_reject_out_of_range_indices) {
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
     lle_utf8_index_rebuild(&idx, "abc", 3); /* 3 bytes, 3 cps, 3 graphemes,
-                                              * 3 display cols */
+                                             * 3 display cols */
     size_t out;
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 3, &out),
               LLE_ERROR_INVALID_RANGE, "byte 3 (off-end) out of range");
@@ -382,7 +384,8 @@ TEST(lookups_reject_out_of_range_indices) {
 
 /* ============================================================================
  * State machine: invalidate / is_valid / rebuild
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(invalidate_marks_index_invalid) {
     lle_utf8_index_t idx;
@@ -390,8 +393,7 @@ TEST(invalidate_marks_index_invalid) {
     lle_utf8_index_rebuild(&idx, "abc", 3);
     ASSERT_TRUE(lle_utf8_index_is_valid(&idx), "valid after rebuild");
     lle_utf8_index_invalidate(&idx);
-    ASSERT_FALSE(lle_utf8_index_is_valid(&idx),
-                 "invalid after invalidate()");
+    ASSERT_FALSE(lle_utf8_index_is_valid(&idx), "invalid after invalidate()");
     /* Lookups should now refuse to operate */
     size_t out;
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 0, &out),
@@ -424,7 +426,8 @@ TEST(rebuild_after_invalidate_restores_validity) {
 
 /* ============================================================================
  * Main runner
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("=== LLE UTF-8 Index Tests ===\n\n");

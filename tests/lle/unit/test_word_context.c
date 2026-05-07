@@ -50,7 +50,8 @@ extern void mock_completion_reset(void);
 
 /* ============================================================================
  * Quote-state and word-boundary cases
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(empty_buffer) {
     ANALYZE("", 0, ctx);
@@ -155,7 +156,8 @@ TEST(double_quote_with_internal_backslash_escape) {
 
 /* ============================================================================
  * filename_portion_start computation
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(filename_portion_after_slash_unquoted) {
     /* cat path/to/Doc|  — filename_portion_start at byte after last '/' */
@@ -198,7 +200,8 @@ TEST(no_slash_in_quoted_word_filename_portion_skips_open_quote) {
 
 /* ============================================================================
  * Context type detection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(command_position_at_buffer_start) {
     ANALYZE("", 0, ctx);
@@ -257,7 +260,8 @@ TEST(command_name_extraction) {
 
 /* ============================================================================
  * In-progress expansion_kind
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(expansion_kind_variable_name) {
     /* echo $HO|  — cursor mid-variable-name */
@@ -327,7 +331,8 @@ TEST(expansion_kind_variable_name_at_end_of_word) {
 
 /* ============================================================================
  * NFC normalization of dequoted prefix
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(nfc_normalization_handles_decomposed_input) {
     /* The user types 'caf' followed by 'e' + combining acute (U+0301).
@@ -345,7 +350,8 @@ TEST(nfc_normalization_handles_decomposed_input) {
 
 /* ============================================================================
  * Multiline buffer handling
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(multiline_buffer_command_position_after_newline) {
     /* "echo hi\ncat my|"  — newline outside any quote resets to command
@@ -370,7 +376,8 @@ TEST(multiline_buffer_newline_inside_double_quote_is_literal) {
 
 /* ============================================================================
  * Edge cases
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(cursor_past_buffer_end_clamps) {
     /* Pass cursor offset > strlen(buffer); analyzer should clamp. */
@@ -410,7 +417,8 @@ TEST(free_handles_null) {
 
 /* ============================================================================
  * Bug-relevant scenarios (exercise the actual regression surfaces)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(cursor_in_second_arg_after_first_quoted_arg) {
     /* cat "my file" /tmp/o|  — first arg is a complete quoted string;
@@ -464,7 +472,8 @@ TEST(unquoted_pipe_inside_quoted_string_is_literal) {
 /* ============================================================================
  * Expansion resolution (path-prefix bytes resolved to a directory or
  * to a per-branch set via the executor's expansion machinery)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(resolve_path_prefix_with_tilde_uses_HOME) {
     /* cat ~/Doc|  — tilde expansion is local (getenv("HOME")). The
@@ -558,7 +567,8 @@ TEST(brace_in_path_prefix_populates_branches) {
     /* The shared filename prefix is "Doc" — every branch points at the
      * same dequoted_filename_prefix string the analyzer extracted from
      * the typed bytes. */
-    ASSERT(ctx->branches[0].dequoted_filename_prefix == ctx->dequoted_filename_prefix);
+    ASSERT(ctx->branches[0].dequoted_filename_prefix ==
+           ctx->dequoted_filename_prefix);
     ASSERT(strcmp(ctx->branches[0].dequoted_filename_prefix, "Doc") == 0);
     /* When branches[] is populated, expanded_directory is left NULL —
      * the engine reads branches when branch_count > 0. */
@@ -651,7 +661,8 @@ TEST(brace_at_end_of_word_no_path_prefix_no_branches) {
 
 /* ============================================================================
  * for/case keyword tracking and heredoc body detection
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(for_in_list_after_for_x_in) {
     /* for x in /tmp/|  — cursor is in the for-list, after the `in`
@@ -747,7 +758,8 @@ TEST(here_string_is_not_heredoc) {
 
 /* ============================================================================
  * Test runner
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("=== LLE Word-Context Analyzer Foundation Tests ===\n");

@@ -2341,14 +2341,12 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
         /* Append to insertion-order list. zsh semantic: a key keeps
          * its original position when overwritten; only first-set
          * appends. (Issue #69.) */
-        if (array->assoc_insertion_count >=
-            array->assoc_insertion_capacity) {
+        if (array->assoc_insertion_count >= array->assoc_insertion_capacity) {
             size_t new_cap = array->assoc_insertion_capacity
                                  ? array->assoc_insertion_capacity * 2
                                  : 8;
             char **grown =
-                realloc(array->assoc_insertion_order,
-                        new_cap * sizeof(char *));
+                realloc(array->assoc_insertion_order, new_cap * sizeof(char *));
             if (grown) {
                 array->assoc_insertion_order = grown;
                 array->assoc_insertion_capacity = new_cap;
@@ -2357,12 +2355,11 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
              * won't include this key in insertion order. Hashtable
              * fallback path remains correct. */
         }
-        if (array->assoc_insertion_count <
-            array->assoc_insertion_capacity) {
+        if (array->assoc_insertion_count < array->assoc_insertion_capacity) {
             char *key_copy = strdup(key);
             if (key_copy) {
-                array->assoc_insertion_order
-                    [array->assoc_insertion_count++] = key_copy;
+                array->assoc_insertion_order[array->assoc_insertion_count++] =
+                    key_copy;
             }
         }
     }
@@ -2533,8 +2530,7 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
             }
         } else {
             // Get keys from hash table (bucket order)
-            ht_enum_t *enumerator =
-                ht_strstr_enum_create(array->assoc_map);
+            ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
             if (enumerator) {
                 size_t i = 0;
                 const char *key;
@@ -2592,15 +2588,13 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
 
         if (use_insertion_order) {
             for (size_t i = 0; i < array->count; i++) {
-                const char *v = ht_strstr_get(
-                    array->assoc_map,
-                    array->assoc_insertion_order[i]);
+                const char *v = ht_strstr_get(array->assoc_map,
+                                              array->assoc_insertion_order[i]);
                 values[i] = strdup(v ? v : "");
             }
         } else {
             // Get values from hash table (bucket order)
-            ht_enum_t *enumerator =
-                ht_strstr_enum_create(array->assoc_map);
+            ht_enum_t *enumerator = ht_strstr_enum_create(array->assoc_map);
             if (enumerator) {
                 size_t i = 0;
                 const char *key;

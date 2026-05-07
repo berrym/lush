@@ -139,9 +139,9 @@ bool lle_builtin_completions_applicable(const lle_word_context_t *context);
  * @param result Result structure to append completions to
  * @return LLE_SUCCESS or error code
  */
-lle_result_t lle_builtin_completions_generate(
-    lle_memory_pool_t *pool, const lle_word_context_t *context,
-    lle_completion_result_t *result);
+lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
+                                              const lle_word_context_t *context,
+                                              lle_completion_result_t *result);
 
 /**
  * @brief Get all defined signal names for trap completion

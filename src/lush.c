@@ -459,8 +459,8 @@ int parse_and_execute(const char *command, size_t starting_line) {
         }
     }
 
-    int exit_status = executor_execute_command_line(global_executor, command,
-                                                    starting_line);
+    int exit_status =
+        executor_execute_command_line(global_executor, command, starting_line);
 
     // Flush output streams after command execution
     // This ensures output appears immediately, especially under valgrind/piping

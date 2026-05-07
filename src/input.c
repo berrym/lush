@@ -1083,9 +1083,7 @@ char *get_input_complete_counted(FILE *in, size_t *lines_consumed) {
  * @param in File stream for non-interactive mode, or NULL for stdin
  * @return Allocated complete command string, or NULL on EOF or error
  */
-char *get_unified_input(FILE *in) {
-    return get_unified_input_at(in, NULL);
-}
+char *get_unified_input(FILE *in) { return get_unified_input_at(in, NULL); }
 
 char *get_unified_input_at(FILE *in, size_t *lines_consumed) {
     if (is_interactive_shell()) {

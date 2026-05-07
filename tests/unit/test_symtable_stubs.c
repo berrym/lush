@@ -23,9 +23,7 @@ bool shell_mode_allows(shell_feature_t feature) {
  * insertion-order vs hashtable-order dispatch on assoc array
  * iteration. Tests run in lush mode (default) by convention so
  * insertion-order ordering applies. */
-shell_mode_t shell_mode_get(void) {
-    return SHELL_MODE_LUSH;
-}
+shell_mode_t shell_mode_get(void) { return SHELL_MODE_LUSH; }
 
 /* Interactive shell stub */
 bool is_interactive_shell(void) { return false; /* Non-interactive in tests */ }

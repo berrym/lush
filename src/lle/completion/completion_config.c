@@ -500,18 +500,18 @@ static bool config_source_is_applicable(void *user_data,
  * @param result Result set to populate
  * @return LLE_SUCCESS or error code
  */
-static lle_result_t
-config_source_generate(void *user_data, const lle_word_context_t *context,
-                       lle_completion_result_t *result) {
+static lle_result_t config_source_generate(void *user_data,
+                                           const lle_word_context_t *context,
+                                           lle_completion_result_t *result) {
     lle_command_source_config_t *config =
         (lle_command_source_config_t *)user_data;
 
     if (!config || !context || !result) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
-    const char *prefix =
-        context->dequoted_filename_prefix ? context->dequoted_filename_prefix
-                                           : "";
+    const char *prefix = context->dequoted_filename_prefix
+                             ? context->dequoted_filename_prefix
+                             : "";
 
     char **lines = NULL;
     size_t line_count = 0;

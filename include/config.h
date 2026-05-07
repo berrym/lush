@@ -207,15 +207,18 @@ typedef struct {
     int theme_color_support_override;  /**< Override detected color support */
 
     /* Behavior settings */
-    bool auto_cd;          /**< Auto-cd to directories */
-    bool spell_correction; /**< Enable spell correction */
-    bool confirm_exit;     /**< Confirm before exit */
-    int tab_width;         /**< Tab display width */
-    bool no_word_expand;   /**< Disable word expansion */
-    bool multiline_mode;   /**< Enable multiline editing */
-    int brace_expansion_max; /**< Max brace expansion result count (0 = unbounded) */
-    int loop_failure_streak; /**< Consecutive non-zero body iterations before runaway-loop trip (0 = disable) */
-    int loop_failure_seconds; /**< Min wall-clock seconds streak must last before tripping */
+    bool auto_cd;             /**< Auto-cd to directories */
+    bool spell_correction;    /**< Enable spell correction */
+    bool confirm_exit;        /**< Confirm before exit */
+    int tab_width;            /**< Tab display width */
+    bool no_word_expand;      /**< Disable word expansion */
+    bool multiline_mode;      /**< Enable multiline editing */
+    int brace_expansion_max;  /**< Max brace expansion result count (0 =
+                                 unbounded) */
+    int loop_failure_streak;  /**< Consecutive non-zero body iterations before
+                                 runaway-loop trip (0 = disable) */
+    int loop_failure_seconds; /**< Min wall-clock seconds streak must last
+                                 before tripping */
 
     /* Auto-correction settings */
     int autocorrect_max_suggestions; /**< Maximum suggestions */

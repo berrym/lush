@@ -22,7 +22,8 @@
 
 /* ============================================================================
  * Control characters: width 0
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(c0_control_characters_zero_width) {
     ASSERT_EQ(lle_codepoint_width(0x00), 0, "NUL"); /* C0: 0x00-0x1F */
@@ -33,9 +34,7 @@ TEST(c0_control_characters_zero_width) {
     ASSERT_EQ(lle_codepoint_width(0x1F), 0, "US (last C0)");
 }
 
-TEST(del_is_zero_width) {
-    ASSERT_EQ(lle_codepoint_width(0x7F), 0, "DEL");
-}
+TEST(del_is_zero_width) { ASSERT_EQ(lle_codepoint_width(0x7F), 0, "DEL"); }
 
 TEST(c1_control_characters_zero_width) {
     ASSERT_EQ(lle_codepoint_width(0x80), 0, "first C1");
@@ -54,7 +53,8 @@ TEST(boundary_just_after_c1_is_one) {
 
 /* ============================================================================
  * ASCII printable: width 1
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(ascii_printable_width_one) {
     ASSERT_EQ(lle_codepoint_width('A'), 1, "uppercase letter");
@@ -67,7 +67,8 @@ TEST(ascii_printable_width_one) {
 
 /* ============================================================================
  * Combining marks: width 0
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(combining_diacritical_marks_zero_width) {
     /* U+0300..U+036F */
@@ -102,7 +103,8 @@ TEST(combining_half_marks_zero_width) {
 
 /* ============================================================================
  * Explicit zero-width characters
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(explicit_zero_width_characters) {
     ASSERT_EQ(lle_codepoint_width(0x200B), 0, "ZERO WIDTH SPACE");
@@ -113,7 +115,8 @@ TEST(explicit_zero_width_characters) {
 
 /* ============================================================================
  * Hangul Jamo: choseong is wide, jungseong/jongseong are combining
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(hangul_jamo_choseong_wide) {
     /* U+1100..U+115F : initial consonants render as wide */
@@ -131,7 +134,8 @@ TEST(hangul_jamo_jungseong_jongseong_zero_width) {
 
 /* ============================================================================
  * CJK Unified Ideographs and extensions: width 2
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(cjk_unified_ideographs_wide) {
     /* U+4E00..U+9FFF : the main CJK block */
@@ -162,7 +166,8 @@ TEST(cjk_extension_c_through_g_wide) {
 
 /* ============================================================================
  * Hangul Syllables: width 2
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(hangul_syllables_wide) {
     /* U+AC00..U+D7A3 */
@@ -174,7 +179,8 @@ TEST(hangul_syllables_wide) {
 
 /* ============================================================================
  * Hiragana and Katakana: width 2
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(hiragana_wide) {
     /* U+3040..U+309F */
@@ -198,7 +204,8 @@ TEST(katakana_phonetic_extensions_wide) {
 
 /* ============================================================================
  * Halfwidth and Fullwidth Forms: width 2 in the implementation's ranges
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(fullwidth_forms_wide) {
     /* U+FF00..U+FF60 */
@@ -215,7 +222,8 @@ TEST(fullwidth_forms_secondary_range_wide) {
 
 /* ============================================================================
  * Emoji and pictographs: width 2
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(emoji_main_block_wide) {
     /* U+1F300..U+1F9FF — the dominant emoji blocks */
@@ -251,7 +259,8 @@ TEST(stars_wide) {
 
 /* ============================================================================
  * Variation selectors: zero-width
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(variation_selectors_zero_width) {
     /* U+FE00..U+FE0F */
@@ -268,7 +277,8 @@ TEST(variation_selectors_zero_width) {
  * handled by the grapheme detector, not by lle_codepoint_width(). They
  * also fall inside the broader emoji block (U+1F300..U+1F9FF) so even
  * without a special branch they are width 2.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(emoji_skin_tone_modifiers_wide) {
     ASSERT_EQ(lle_codepoint_width(0x1F3FB), 2, "skin tone 1-2 (light)");
@@ -280,7 +290,8 @@ TEST(emoji_skin_tone_modifiers_wide) {
 
 /* ============================================================================
  * Regional Indicators (flags): width 2
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(regional_indicators_wide) {
     /* U+1F1E6..U+1F1FF — flag letters */
@@ -292,7 +303,8 @@ TEST(regional_indicators_wide) {
 /* ============================================================================
  * Drawing characters: explicitly width 1 (overrides "wide" defaults
  * because terminals render them as single-width)
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(box_drawing_width_one) {
     /* U+2500..U+257F */
@@ -317,7 +329,8 @@ TEST(geometric_shapes_width_one) {
 
 /* ============================================================================
  * Default width-1 fallback for unmapped codepoints
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(unmapped_codepoints_default_to_one) {
     ASSERT_EQ(lle_codepoint_width(0x00A0), 1, "NBSP");
@@ -331,7 +344,8 @@ TEST(unmapped_codepoints_default_to_one) {
  * Boundary tests: codepoints just outside named ranges should fall to
  * the default (1) or to the next category's value, never to a stale prior
  * range. These catch off-by-one errors in the table-driven branches.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(boundary_just_before_cjk_unified) {
     /* 0x4DFF is just before the CJK block (0x4E00..) and is the end of
@@ -365,7 +379,8 @@ TEST(boundary_just_after_block_elements) {
 
 /* ============================================================================
  * lle_is_wide_character() — should agree with width == 2
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(is_wide_character_true_for_width_2) {
     ASSERT_TRUE(lle_is_wide_character(0x4E00), "CJK is wide");
@@ -386,7 +401,8 @@ TEST(is_wide_character_false_for_width_0_or_1) {
 
 /* ============================================================================
  * Main runner
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("=== LLE Char Width Tests ===\n\n");

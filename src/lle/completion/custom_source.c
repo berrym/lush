@@ -92,10 +92,9 @@ static custom_source_entry_t *find_entry_by_name(const char *name) {
  * @return LLE_SUCCESS always (individual source errors are logged but not
  * propagated)
  */
-static lle_result_t
-custom_generate_wrapper(lle_memory_pool_t *pool,
-                        const lle_word_context_t *context,
-                        lle_completion_result_t *result) {
+static lle_result_t custom_generate_wrapper(lle_memory_pool_t *pool,
+                                            const lle_word_context_t *context,
+                                            lle_completion_result_t *result) {
 
     (void)pool; /* Pool is available in result->pool if needed */
 
@@ -114,8 +113,8 @@ custom_generate_wrapper(lle_memory_pool_t *pool,
             }
         }
 
-        lle_result_t res = entry->source.generate(entry->source.user_data,
-                                                  context, result);
+        lle_result_t res =
+            entry->source.generate(entry->source.user_data, context, result);
         (void)res;
     }
 

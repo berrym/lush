@@ -83,28 +83,36 @@ void mock_completion_reset(void) {
 char *expand_if_needed(executor_t *executor, const char *text) {
     (void)executor;
     (void)text;
-    if (!mock_expand_result) return NULL;
+    if (!mock_expand_result)
+        return NULL;
     size_t n = strlen(mock_expand_result);
     char *out = malloc(n + 1);
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
     memcpy(out, mock_expand_result, n + 1);
     return out;
 }
 
 char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     if (!pattern || !expanded_count) {
-        if (expanded_count) *expanded_count = 0;
+        if (expanded_count)
+            *expanded_count = 0;
         return NULL;
     }
     /* Programmed branches: emit them verbatim. */
     if (mock_brace_branches && mock_brace_branch_count > 0) {
-        char **r = malloc(sizeof(char *) * (size_t)(mock_brace_branch_count + 1));
-        if (!r) { *expanded_count = 0; return NULL; }
+        char **r =
+            malloc(sizeof(char *) * (size_t)(mock_brace_branch_count + 1));
+        if (!r) {
+            *expanded_count = 0;
+            return NULL;
+        }
         for (int i = 0; i < mock_brace_branch_count; i++) {
             size_t n = strlen(mock_brace_branches[i]);
             r[i] = malloc(n + 1);
             if (!r[i]) {
-                for (int j = 0; j < i; j++) free(r[j]);
+                for (int j = 0; j < i; j++)
+                    free(r[j]);
                 free(r);
                 *expanded_count = 0;
                 return NULL;
@@ -117,10 +125,17 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     }
     /* Default: pass through (matches expand_brace_pattern's no-brace case). */
     char **r = malloc(sizeof(char *) * 2);
-    if (!r) { *expanded_count = 0; return NULL; }
+    if (!r) {
+        *expanded_count = 0;
+        return NULL;
+    }
     size_t n = strlen(pattern);
     r[0] = malloc(n + 1);
-    if (!r[0]) { free(r); *expanded_count = 0; return NULL; }
+    if (!r[0]) {
+        free(r);
+        *expanded_count = 0;
+        return NULL;
+    }
     memcpy(r[0], pattern, n + 1);
     r[1] = NULL;
     *expanded_count = 1;

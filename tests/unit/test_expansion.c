@@ -171,7 +171,8 @@ TEST(default_value_unset) {
     executor_t *exec = setup_executor();
 
     /* ${VAR:-default} when VAR is unset */
-    executor_execute_command_line(exec, "RESULT=${UNSET_VAR:-default_value}", 1);
+    executor_execute_command_line(exec, "RESULT=${UNSET_VAR:-default_value}",
+                                  1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -186,7 +187,8 @@ TEST(default_value_empty) {
 
     /* ${VAR:-default} when VAR is empty */
     executor_execute_command_line(exec, "EMPTY_VAR=", 1);
-    executor_execute_command_line(exec, "RESULT=${EMPTY_VAR:-default_value}", 1);
+    executor_execute_command_line(exec, "RESULT=${EMPTY_VAR:-default_value}",
+                                  1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -230,7 +232,8 @@ TEST(alternate_value_unset) {
     executor_t *exec = setup_executor();
 
     /* ${VAR:+alt} when VAR is unset */
-    executor_execute_command_line(exec, "RESULT=${UNSET_VAR_XYZ:+alternate}", 1);
+    executor_execute_command_line(exec, "RESULT=${UNSET_VAR_XYZ:+alternate}",
+                                  1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");

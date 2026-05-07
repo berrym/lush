@@ -85,12 +85,13 @@ typedef enum {
  */
 typedef enum {
     LLE_EXPANSION_NONE,
-    LLE_EXPANSION_VARIABLE_NAME,        /**< $HO|     — bare $name being typed  */
-    LLE_EXPANSION_BRACED_VARIABLE_NAME, /**< ${HO|}   — braced ${name} being typed */
-    LLE_EXPANSION_COMMAND_SUBST,        /**< $(ls|)   — inside $(...)           */
-    LLE_EXPANSION_ARITHMETIC,           /**< $((1+|)) — inside $((...))         */
-    LLE_EXPANSION_BRACE_LIST,           /**< {a,b|}   — inside an open brace    */
-    LLE_EXPANSION_GLOB,                 /**< *.t|     — cursor in mid-glob      */
+    LLE_EXPANSION_VARIABLE_NAME, /**< $HO|     — bare $name being typed  */
+    LLE_EXPANSION_BRACED_VARIABLE_NAME, /**< ${HO|}   — braced ${name} being
+                                           typed */
+    LLE_EXPANSION_COMMAND_SUBST, /**< $(ls|)   — inside $(...)           */
+    LLE_EXPANSION_ARITHMETIC,    /**< $((1+|)) — inside $((...))         */
+    LLE_EXPANSION_BRACE_LIST,    /**< {a,b|}   — inside an open brace    */
+    LLE_EXPANSION_GLOB,          /**< *.t|     — cursor in mid-glob      */
 } lle_expansion_kind_t;
 
 /* ============================================================================
@@ -105,16 +106,16 @@ typedef enum {
  * this field to decide applicability without having to re-walk the buffer.
  */
 typedef enum {
-    LLE_CONTEXT_COMMAND_POSITION,    /**< Start of pipeline/list element   */
-    LLE_CONTEXT_ARGUMENT,            /**< Argument to the current command  */
-    LLE_CONTEXT_REDIRECT_TARGET,     /**< After >, <, >>, etc.             */
-    LLE_CONTEXT_VARIABLE_NAME,       /**< Inside $name or ${name (variable
-                                          name completion, not file)        */
-    LLE_CONTEXT_ASSIGNMENT_VALUE,    /**< Right side of VAR=value           */
-    LLE_CONTEXT_FOR_IN_LIST,         /**< for x in <here>                   */
-    LLE_CONTEXT_CASE_PATTERN,        /**< case x in <here>)                 */
-    LLE_CONTEXT_HEREDOC_BODY,        /**< Inside a heredoc body (refuse to
-                                          complete; literal text)           */
+    LLE_CONTEXT_COMMAND_POSITION, /**< Start of pipeline/list element   */
+    LLE_CONTEXT_ARGUMENT,         /**< Argument to the current command  */
+    LLE_CONTEXT_REDIRECT_TARGET,  /**< After >, <, >>, etc.             */
+    LLE_CONTEXT_VARIABLE_NAME,    /**< Inside $name or ${name (variable
+                                       name completion, not file)        */
+    LLE_CONTEXT_ASSIGNMENT_VALUE, /**< Right side of VAR=value           */
+    LLE_CONTEXT_FOR_IN_LIST,      /**< for x in <here>                   */
+    LLE_CONTEXT_CASE_PATTERN,     /**< case x in <here>)                 */
+    LLE_CONTEXT_HEREDOC_BODY,     /**< Inside a heredoc body (refuse to
+                                       complete; literal text)           */
     LLE_CONTEXT_UNKNOWN,
 } lle_word_context_type_t;
 
@@ -183,48 +184,48 @@ typedef struct lle_word_context {
                                         leading bytes).                     */
 
     /* Lexical state at cursor -------------------------------------------- */
-    lle_quote_state_t    quote_state;
+    lle_quote_state_t quote_state;
     lle_expansion_kind_t expansion_kind;
 
     /* Surrounding-command context --------------------------------------- */
     lle_word_context_type_t context_type;
-    char *command_name;            /**< Owner command for builtin-arg
-                                        dispatch (e.g., "cd", "set"). NULL
-                                        in command-position contexts.       */
-    int   arg_index;               /**< Zero-based index of this argument
-                                        within its command. -1 if not
-                                        applicable.                         */
-    char **arguments;              /**< Pool-allocated array of completed
-                                        argument strings before the
-                                        cursor's current word, dequoted
-                                        and NFC-normalized. Used by
-                                        builtin-arg sources to walk
-                                        subcommand hierarchies (e.g.,
-                                        recognizing the chain in
-                                        `display lle theme set <here>`).
-                                        NULL when no completed arguments
-                                        exist.                              */
-    size_t argument_count;         /**< Number of entries in arguments[]. */
+    char *command_name;    /**< Owner command for builtin-arg
+                                dispatch (e.g., "cd", "set"). NULL
+                                in command-position contexts.       */
+    int arg_index;         /**< Zero-based index of this argument
+                                within its command. -1 if not
+                                applicable.                         */
+    char **arguments;      /**< Pool-allocated array of completed
+                                argument strings before the
+                                cursor's current word, dequoted
+                                and NFC-normalized. Used by
+                                builtin-arg sources to walk
+                                subcommand hierarchies (e.g.,
+                                recognizing the chain in
+                                `display lle theme set <here>`).
+                                NULL when no completed arguments
+                                exist.                              */
+    size_t argument_count; /**< Number of entries in arguments[]. */
 
     /* Resolved data for sources ------------------------------------------ */
-    char *expanded_directory;      /**< Absolute path to scan when the word
-                                        is path-shaped and produces a
-                                        single resolved directory. NULL for
-                                        non-path words and for multi-value
-                                        expansions (use branches[] then).   */
-    char *dequoted_filename_prefix;/**< NFC-normalized, dequoted, post-/
-                                        literal prefix the source uses for
-                                        prefix-matching against
-                                        candidates.                         */
+    char *expanded_directory;       /**< Absolute path to scan when the word
+                                         is path-shaped and produces a
+                                         single resolved directory. NULL for
+                                         non-path words and for multi-value
+                                         expansions (use branches[] then).   */
+    char *dequoted_filename_prefix; /**< NFC-normalized, dequoted, post-/
+                                         literal prefix the source uses for
+                                         prefix-matching against
+                                         candidates.                         */
 
     /* Multi-value expansion (brace only currently) ----------------------- */
     lle_word_context_branch_t *branches; /**< Array of per-branch resolved
                                               directory + prefix pairs.
                                               NULL when single-value.       */
-    size_t                     branch_count;
+    size_t branch_count;
 
     /* Bookkeeping -------------------------------------------------------- */
-    lle_memory_pool_t *pool;       /**< Pool used for all allocations.      */
+    lle_memory_pool_t *pool; /**< Pool used for all allocations.      */
 } lle_word_context_t;
 
 /* ============================================================================

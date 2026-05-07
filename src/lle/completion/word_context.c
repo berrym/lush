@@ -70,12 +70,12 @@
  * out. They reset to KW_NONE on any unexpected transition. */
 typedef enum {
     KW_NONE,
-    KW_AFTER_FOR,         /* saw `for` at command position; expect var */
-    KW_AFTER_FOR_VAR,     /* saw `for X`; expect `in` */
-    KW_AFTER_FOR_IN,      /* saw `for X in`; cursor is in the list */
-    KW_AFTER_CASE,        /* saw `case` at command position; expect word */
-    KW_AFTER_CASE_WORD,   /* saw `case X`; expect `in` */
-    KW_AFTER_CASE_IN,     /* saw `case X in`; cursor is in patterns */
+    KW_AFTER_FOR,       /* saw `for` at command position; expect var */
+    KW_AFTER_FOR_VAR,   /* saw `for X`; expect `in` */
+    KW_AFTER_FOR_IN,    /* saw `for X in`; cursor is in the list */
+    KW_AFTER_CASE,      /* saw `case` at command position; expect word */
+    KW_AFTER_CASE_WORD, /* saw `case X`; expect `in` */
+    KW_AFTER_CASE_IN,   /* saw `case X in`; cursor is in patterns */
 } keyword_state_t;
 
 /* Maximum heredoc delimiter length the walker captures. Real shell
@@ -93,8 +93,8 @@ typedef enum {
 
 typedef struct walker {
     const char *buffer;
-    size_t      buffer_len;
-    size_t      cursor;
+    size_t buffer_len;
+    size_t cursor;
 
     /* Position. Always advances by full UTF-8 sequence. */
     size_t pos;
@@ -125,10 +125,10 @@ typedef struct walker {
      * boundary outside open quote/escape. The command's first word is
      * the first non-whitespace word seen since the most recent statement
      * boundary. */
-    size_t current_word_start;        /* SIZE_MAX if not in a word */
+    size_t current_word_start;         /* SIZE_MAX if not in a word */
     size_t current_command_word_start; /* SIZE_MAX if not seen yet */
     size_t current_command_word_end;   /* SIZE_MAX if not seen yet */
-    int    current_arg_index;          /* -1 if no command word yet */
+    int current_arg_index;             /* -1 if no command word yet */
 
     /* Set when we cross a redirect operator and the next non-ws word
      * should be a redirect target. Cleared when we consume that word. */
@@ -148,18 +148,18 @@ typedef struct walker {
      * matches DELIM (allowing leading tabs if heredoc_dash). The
      * here-string operator `<<<` is distinguished from `<<` by lookahead
      * and is not treated as a heredoc. */
-    bool   expecting_heredoc_delim; /* just consumed `<<` or `<<-` */
-    bool   heredoc_dash;            /* `<<-` form: leading tabs allowed
-                                       on the delimiter line */
-    bool   heredoc_pending;         /* delimiter captured; body starts at
-                                       next newline */
-    bool   in_heredoc_body;         /* between body-start newline and
-                                       delimiter line */
-    char   heredoc_delim[WALKER_HEREDOC_DELIM_MAX];
+    bool expecting_heredoc_delim; /* just consumed `<<` or `<<-` */
+    bool heredoc_dash;            /* `<<-` form: leading tabs allowed
+                                     on the delimiter line */
+    bool heredoc_pending;         /* delimiter captured; body starts at
+                                     next newline */
+    bool in_heredoc_body;         /* between body-start newline and
+                                     delimiter line */
+    char heredoc_delim[WALKER_HEREDOC_DELIM_MAX];
     size_t heredoc_delim_len;
-    size_t current_line_start;      /* byte offset of the current line's
-                                       first byte (start of buffer or
-                                       byte after the most recent \n) */
+    size_t current_line_start; /* byte offset of the current line's
+                                  first byte (start of buffer or
+                                  byte after the most recent \n) */
 
     /* Captured byte ranges for completed arguments (arguments before
      * the cursor's current word, in command order, excluding the
@@ -223,10 +223,12 @@ static bool is_var_name_cont(uint32_t cp) {
  * applies. */
 static bool word_equals_keyword(const char *buf, size_t start, size_t end,
                                 const char *kw) {
-    if (end < start) return false;
-    size_t len     = end - start;
-    size_t kw_len  = strlen(kw);
-    if (len != kw_len) return false;
+    if (end < start)
+        return false;
+    size_t len = end - start;
+    size_t kw_len = strlen(kw);
+    if (len != kw_len)
+        return false;
     return memcmp(buf + start, kw, len) == 0;
 }
 
@@ -237,10 +239,10 @@ static bool word_equals_keyword(const char *buf, size_t start, size_t end,
  * is at command position again. */
 static bool word_is_command_introducer(const char *buf, size_t start,
                                        size_t end) {
-    return word_equals_keyword(buf, start, end, "do")    ||
-           word_equals_keyword(buf, start, end, "then")  ||
-           word_equals_keyword(buf, start, end, "else")  ||
-           word_equals_keyword(buf, start, end, "elif")  ||
+    return word_equals_keyword(buf, start, end, "do") ||
+           word_equals_keyword(buf, start, end, "then") ||
+           word_equals_keyword(buf, start, end, "else") ||
+           word_equals_keyword(buf, start, end, "elif") ||
            word_equals_keyword(buf, start, end, "until") ||
            word_equals_keyword(buf, start, end, "while") ||
            word_equals_keyword(buf, start, end, "if");
@@ -273,41 +275,41 @@ static void advance_keyword_state(walker_t *w, size_t word_start,
 
     /* Non-command-position word transitions. */
     switch (w->kw_state) {
-        case KW_AFTER_FOR:
-            /* Expecting variable name; any word advances state. */
-            w->kw_state = KW_AFTER_FOR_VAR;
-            break;
-        case KW_AFTER_FOR_VAR:
-            if (word_equals_keyword(w->buffer, word_start, word_end, "in")) {
-                w->kw_state = KW_AFTER_FOR_IN;
-            } else {
-                w->kw_state = KW_NONE; /* malformed `for` sequence */
-            }
-            break;
-        case KW_AFTER_CASE:
-            w->kw_state = KW_AFTER_CASE_WORD;
-            break;
-        case KW_AFTER_CASE_WORD:
-            if (word_equals_keyword(w->buffer, word_start, word_end, "in")) {
-                w->kw_state = KW_AFTER_CASE_IN;
-            } else {
-                w->kw_state = KW_NONE;
-            }
-            break;
-        case KW_AFTER_FOR_IN:
-        case KW_AFTER_CASE_IN:
-            /* In list / pattern mode; words are list/pattern elements
-             * and don't transition the state. The state ends on a
-             * statement terminator (handled separately) or `do`/`esac`
-             * keyword (treated as a normal terminator effect). */
-            if (word_equals_keyword(w->buffer, word_start, word_end, "do") ||
-                word_equals_keyword(w->buffer, word_start, word_end, "esac")) {
-                w->kw_state = KW_NONE;
-            }
-            break;
-        case KW_NONE:
-        default:
-            break;
+    case KW_AFTER_FOR:
+        /* Expecting variable name; any word advances state. */
+        w->kw_state = KW_AFTER_FOR_VAR;
+        break;
+    case KW_AFTER_FOR_VAR:
+        if (word_equals_keyword(w->buffer, word_start, word_end, "in")) {
+            w->kw_state = KW_AFTER_FOR_IN;
+        } else {
+            w->kw_state = KW_NONE; /* malformed `for` sequence */
+        }
+        break;
+    case KW_AFTER_CASE:
+        w->kw_state = KW_AFTER_CASE_WORD;
+        break;
+    case KW_AFTER_CASE_WORD:
+        if (word_equals_keyword(w->buffer, word_start, word_end, "in")) {
+            w->kw_state = KW_AFTER_CASE_IN;
+        } else {
+            w->kw_state = KW_NONE;
+        }
+        break;
+    case KW_AFTER_FOR_IN:
+    case KW_AFTER_CASE_IN:
+        /* In list / pattern mode; words are list/pattern elements
+         * and don't transition the state. The state ends on a
+         * statement terminator (handled separately) or `do`/`esac`
+         * keyword (treated as a normal terminator effect). */
+        if (word_equals_keyword(w->buffer, word_start, word_end, "do") ||
+            word_equals_keyword(w->buffer, word_start, word_end, "esac")) {
+            w->kw_state = KW_NONE;
+        }
+        break;
+    case KW_NONE:
+    default:
+        break;
     }
 }
 
@@ -318,35 +320,53 @@ static void advance_keyword_state(walker_t *w, size_t word_start,
 static void capture_heredoc_delim(walker_t *w, size_t word_start,
                                   size_t word_end) {
     w->heredoc_delim_len = 0;
-    bool   esc           = false;
-    bool   in_sgl        = false;
-    bool   in_dbl        = false;
-    size_t i             = word_start;
+    bool esc = false;
+    bool in_sgl = false;
+    bool in_dbl = false;
+    size_t i = word_start;
 
-    while (i < word_end && w->heredoc_delim_len < WALKER_HEREDOC_DELIM_MAX - 1) {
+    while (i < word_end &&
+           w->heredoc_delim_len < WALKER_HEREDOC_DELIM_MAX - 1) {
         char c = w->buffer[i];
         if (esc) {
             w->heredoc_delim[w->heredoc_delim_len++] = c;
-            esc                                       = false;
+            esc = false;
             i++;
             continue;
         }
         if (in_sgl) {
-            if (c == '\'') in_sgl = false;
-            else w->heredoc_delim[w->heredoc_delim_len++] = c;
+            if (c == '\'')
+                in_sgl = false;
+            else
+                w->heredoc_delim[w->heredoc_delim_len++] = c;
             i++;
             continue;
         }
         if (in_dbl) {
-            if (c == '"') in_dbl = false;
-            else if (c == '\\') esc = true;
-            else w->heredoc_delim[w->heredoc_delim_len++] = c;
+            if (c == '"')
+                in_dbl = false;
+            else if (c == '\\')
+                esc = true;
+            else
+                w->heredoc_delim[w->heredoc_delim_len++] = c;
             i++;
             continue;
         }
-        if (c == '\'') { in_sgl = true; i++; continue; }
-        if (c == '"')  { in_dbl = true; i++; continue; }
-        if (c == '\\') { esc = true; i++; continue; }
+        if (c == '\'') {
+            in_sgl = true;
+            i++;
+            continue;
+        }
+        if (c == '"') {
+            in_dbl = true;
+            i++;
+            continue;
+        }
+        if (c == '\\') {
+            esc = true;
+            i++;
+            continue;
+        }
         w->heredoc_delim[w->heredoc_delim_len++] = c;
         i++;
     }
@@ -365,7 +385,8 @@ static bool current_line_matches_heredoc_delim(const walker_t *w) {
         }
     }
     size_t line_len = w->pos - line_start;
-    if (line_len != w->heredoc_delim_len) return false;
+    if (line_len != w->heredoc_delim_len)
+        return false;
     return memcmp(w->buffer + line_start, w->heredoc_delim, line_len) == 0;
 }
 
@@ -407,17 +428,17 @@ static void walker_advance_one(walker_t *w) {
     if (w->in_heredoc_body) {
         if (cp == '\n') {
             if (current_line_matches_heredoc_delim(w)) {
-                w->in_heredoc_body  = false;
+                w->in_heredoc_body = false;
                 w->heredoc_delim[0] = '\0';
                 w->heredoc_delim_len = 0;
                 /* Statement boundary after heredoc body ends. */
-                w->last_statement_start          = w->pos + (size_t)n;
-                w->at_command_position           = true;
-                w->current_command_word_start    = SIZE_MAX;
-                w->current_command_word_end      = SIZE_MAX;
-                w->current_arg_index             = -1;
-                w->next_word_is_redirect_target  = false;
-                w->kw_state                      = KW_NONE;
+                w->last_statement_start = w->pos + (size_t)n;
+                w->at_command_position = true;
+                w->current_command_word_start = SIZE_MAX;
+                w->current_command_word_end = SIZE_MAX;
+                w->current_arg_index = -1;
+                w->next_word_is_redirect_target = false;
+                w->kw_state = KW_NONE;
             }
             w->current_line_start = w->pos + (size_t)n;
         }
@@ -515,12 +536,12 @@ static void walker_advance_one(walker_t *w) {
             w->bracket_depth == 0) {
             /* Subshell start at top level — also treat as statement
              * boundary. */
-            w->last_statement_start              = w->pos + (size_t)n;
-            w->at_command_position               = true;
-            w->current_command_word_start        = SIZE_MAX;
-            w->current_command_word_end          = SIZE_MAX;
-            w->current_arg_index                 = -1;
-            w->next_word_is_redirect_target      = false;
+            w->last_statement_start = w->pos + (size_t)n;
+            w->at_command_position = true;
+            w->current_command_word_start = SIZE_MAX;
+            w->current_command_word_end = SIZE_MAX;
+            w->current_arg_index = -1;
+            w->next_word_is_redirect_target = false;
         }
         w->paren_depth++;
         if (w->current_word_start == SIZE_MAX) {
@@ -530,7 +551,8 @@ static void walker_advance_one(walker_t *w) {
         return;
     }
     if (cp == ')') {
-        if (w->paren_depth > 0) w->paren_depth--;
+        if (w->paren_depth > 0)
+            w->paren_depth--;
         if (w->current_word_start == SIZE_MAX) {
             w->current_word_start = w->pos;
         }
@@ -546,7 +568,8 @@ static void walker_advance_one(walker_t *w) {
         return;
     }
     if (cp == '}') {
-        if (w->brace_depth > 0) w->brace_depth--;
+        if (w->brace_depth > 0)
+            w->brace_depth--;
         if (w->current_word_start == SIZE_MAX) {
             w->current_word_start = w->pos;
         }
@@ -562,7 +585,8 @@ static void walker_advance_one(walker_t *w) {
         return;
     }
     if (cp == ']') {
-        if (w->bracket_depth > 0) w->bracket_depth--;
+        if (w->bracket_depth > 0)
+            w->bracket_depth--;
         if (w->current_word_start == SIZE_MAX) {
             w->current_word_start = w->pos;
         }
@@ -580,15 +604,14 @@ static void walker_advance_one(walker_t *w) {
             if (w->expecting_heredoc_delim) {
                 capture_heredoc_delim(w, w->current_word_start, we);
                 w->expecting_heredoc_delim = false;
-                w->heredoc_pending         = true;
+                w->heredoc_pending = true;
             }
             advance_keyword_state(w, w->current_word_start, we);
             w->current_word_start = SIZE_MAX;
         }
         /* While in for-list / case-pattern modes, statement terminators
          * end the list / patterns. */
-        if (w->kw_state == KW_AFTER_FOR_IN ||
-            w->kw_state == KW_AFTER_CASE_IN) {
+        if (w->kw_state == KW_AFTER_FOR_IN || w->kw_state == KW_AFTER_CASE_IN) {
             w->kw_state = KW_NONE;
         } else {
             /* Other unfinished keyword sequences are also broken by a
@@ -601,18 +624,18 @@ static void walker_advance_one(walker_t *w) {
         if (cp == '\n') {
             w->current_line_start = w->pos + (size_t)n;
             if (w->heredoc_pending) {
-                w->heredoc_pending  = false;
-                w->in_heredoc_body  = true;
+                w->heredoc_pending = false;
+                w->in_heredoc_body = true;
             }
         }
         /* Reset command tracking. */
-        w->last_statement_start              = w->pos + (size_t)n;
-        w->at_command_position               = true;
-        w->current_command_word_start        = SIZE_MAX;
-        w->current_command_word_end          = SIZE_MAX;
-        w->current_arg_index                 = -1;
-        w->next_word_is_redirect_target      = false;
-        w->arg_capture_count                 = 0;
+        w->last_statement_start = w->pos + (size_t)n;
+        w->at_command_position = true;
+        w->current_command_word_start = SIZE_MAX;
+        w->current_command_word_end = SIZE_MAX;
+        w->current_arg_index = -1;
+        w->next_word_is_redirect_target = false;
+        w->arg_capture_count = 0;
         w->pos += (size_t)n;
         return;
     }
@@ -626,7 +649,7 @@ static void walker_advance_one(walker_t *w) {
             if (w->expecting_heredoc_delim) {
                 capture_heredoc_delim(w, w->current_word_start, we);
                 w->expecting_heredoc_delim = false;
-                w->heredoc_pending         = true;
+                w->heredoc_pending = true;
             }
             /* End-of-word transition. If this was the command word,
              * either retain command position (if the word is a
@@ -635,26 +658,26 @@ static void walker_advance_one(walker_t *w) {
              * just completed; capture its byte range for the
              * arguments[] output. */
             if (w->current_command_word_start == w->current_word_start) {
-                if (word_is_command_introducer(w->buffer,
-                                               w->current_word_start, we)) {
+                if (word_is_command_introducer(w->buffer, w->current_word_start,
+                                               we)) {
                     /* `do`/`then`/`else`/`elif`/`until`/`while`/`if`:
                      * the next word starts a fresh command position. */
                     w->current_command_word_start = SIZE_MAX;
-                    w->current_command_word_end   = SIZE_MAX;
-                    w->current_arg_index          = -1;
-                    w->at_command_position        = true;
-                    w->arg_capture_count          = 0;
+                    w->current_command_word_end = SIZE_MAX;
+                    w->current_arg_index = -1;
+                    w->at_command_position = true;
+                    w->arg_capture_count = 0;
                 } else {
                     w->current_command_word_end = we;
-                    w->at_command_position      = false;
-                    w->current_arg_index        = 0;
+                    w->at_command_position = false;
+                    w->current_arg_index = 0;
                     /* New command starting -- reset captured args. */
-                    w->arg_capture_count        = 0;
+                    w->arg_capture_count = 0;
                 }
             } else if (w->current_arg_index >= 0) {
                 if (w->arg_capture_count < WALKER_MAX_CAPTURED_ARGS) {
                     w->arg_starts[w->arg_capture_count] = w->current_word_start;
-                    w->arg_ends[w->arg_capture_count]   = we;
+                    w->arg_ends[w->arg_capture_count] = we;
                     w->arg_capture_count++;
                 }
                 w->current_arg_index++;
@@ -686,8 +709,8 @@ static void walker_advance_one(walker_t *w) {
         if (w->current_word_start != SIZE_MAX) {
             if (w->current_command_word_start == w->current_word_start) {
                 w->current_command_word_end = w->pos;
-                w->at_command_position      = false;
-                w->current_arg_index        = 0;
+                w->at_command_position = false;
+                w->current_arg_index = 0;
             }
             w->current_word_start = SIZE_MAX;
         }
@@ -722,7 +745,8 @@ static void walker_advance_one(walker_t *w) {
      * one; if at command position, mark it as the command word. */
     if (w->current_word_start == SIZE_MAX) {
         w->current_word_start = w->pos;
-        if (w->at_command_position && w->current_command_word_start == SIZE_MAX) {
+        if (w->at_command_position &&
+            w->current_command_word_start == SIZE_MAX) {
             w->current_command_word_start = w->pos;
         }
     }
@@ -759,29 +783,32 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
     (void)pool; /* lle_pool_alloc is the canonical allocator; pool param
                    is reserved for future targeted pools. */
 
-    if (end < start) return LLE_ERROR_INVALID_PARAMETER;
+    if (end < start)
+        return LLE_ERROR_INVALID_PARAMETER;
 
     /* First pass: dequote into a working buffer. Worst-case size is the
      * input range itself (dequoting only removes bytes). */
     size_t span = end - start;
-    char  *raw  = lle_pool_alloc(span + 1);
-    if (!raw) return LLE_ERROR_OUT_OF_MEMORY;
+    char *raw = lle_pool_alloc(span + 1);
+    if (!raw)
+        return LLE_ERROR_OUT_OF_MEMORY;
 
     /* Dequoting state machine (mirrors walker_advance_one but accumulating
      * literal bytes). */
-    bool   in_single     = false;
-    bool   in_double     = false;
-    bool   esc_pending   = false;
-    size_t out_pos       = 0;
-    size_t i             = start;
+    bool in_single = false;
+    bool in_double = false;
+    bool esc_pending = false;
+    size_t out_pos = 0;
+    size_t i = start;
 
     while (i < end) {
         uint32_t cp;
-        int      n = decode_at(buf, end, i, &cp);
+        int n = decode_at(buf, end, i, &cp);
 
         if (esc_pending) {
             /* Emit the codepoint's bytes literally. */
-            for (int k = 0; k < n; k++) raw[out_pos++] = buf[i + k];
+            for (int k = 0; k < n; k++)
+                raw[out_pos++] = buf[i + k];
             esc_pending = false;
             i += (size_t)n;
             continue;
@@ -793,7 +820,8 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
                 i += (size_t)n;
                 continue;
             }
-            for (int k = 0; k < n; k++) raw[out_pos++] = buf[i + k];
+            for (int k = 0; k < n; k++)
+                raw[out_pos++] = buf[i + k];
             i += (size_t)n;
             continue;
         }
@@ -809,15 +837,12 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
                  * \ and emit the next char unescaped. Otherwise, emit \
                  * literally and let the next iteration handle the next
                  * char. POSIX double-quote behavior. */
-                size_t   peek_i = i + (size_t)n;
+                size_t peek_i = i + (size_t)n;
                 uint32_t peek_cp;
-                int      peek_n =
-                    (peek_i < end)
-                        ? decode_at(buf, end, peek_i, &peek_cp)
-                        : 0;
-                if (peek_n > 0 &&
-                    (peek_cp == '$' || peek_cp == '`' || peek_cp == '\\' ||
-                     peek_cp == '"')) {
+                int peek_n =
+                    (peek_i < end) ? decode_at(buf, end, peek_i, &peek_cp) : 0;
+                if (peek_n > 0 && (peek_cp == '$' || peek_cp == '`' ||
+                                   peek_cp == '\\' || peek_cp == '"')) {
                     /* Skip the backslash, emit the escaped char. */
                     for (int k = 0; k < peek_n; k++)
                         raw[out_pos++] = buf[peek_i + k];
@@ -829,18 +854,32 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
                 i += (size_t)n;
                 continue;
             }
-            for (int k = 0; k < n; k++) raw[out_pos++] = buf[i + k];
+            for (int k = 0; k < n; k++)
+                raw[out_pos++] = buf[i + k];
             i += (size_t)n;
             continue;
         }
 
         /* NONE quote */
-        if (cp == '\'') { in_single = true; i += (size_t)n; continue; }
-        if (cp == '"')  { in_double = true; i += (size_t)n; continue; }
-        if (cp == '\\') { esc_pending = true; i += (size_t)n; continue; }
+        if (cp == '\'') {
+            in_single = true;
+            i += (size_t)n;
+            continue;
+        }
+        if (cp == '"') {
+            in_double = true;
+            i += (size_t)n;
+            continue;
+        }
+        if (cp == '\\') {
+            esc_pending = true;
+            i += (size_t)n;
+            continue;
+        }
 
         /* Ordinary literal byte. */
-        for (int k = 0; k < n; k++) raw[out_pos++] = buf[i + k];
+        for (int k = 0; k < n; k++)
+            raw[out_pos++] = buf[i + k];
         i += (size_t)n;
     }
     raw[out_pos] = '\0';
@@ -848,12 +887,12 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
     /* Second pass: NFC normalize. Worst case NFC output is roughly 3x
      * input for pathological cases; allocate generously. */
     size_t nfc_cap = (out_pos * 4) + 16;
-    char  *nfc     = lle_pool_alloc(nfc_cap);
-    if (!nfc) return LLE_ERROR_OUT_OF_MEMORY;
+    char *nfc = lle_pool_alloc(nfc_cap);
+    if (!nfc)
+        return LLE_ERROR_OUT_OF_MEMORY;
 
     size_t nfc_len = 0;
-    int    rc      = lle_unicode_normalize_nfc(raw, out_pos, nfc, nfc_cap,
-                                               &nfc_len);
+    int rc = lle_unicode_normalize_nfc(raw, out_pos, nfc, nfc_cap, &nfc_len);
     if (rc != 0) {
         /* Fallback: emit dequoted bytes as-is (still valid UTF-8 if the
          * input was; just not normalized). */
@@ -885,16 +924,16 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
  */
 static size_t compute_filename_portion_start(const char *buf, size_t word_start,
                                              size_t cursor) {
-    size_t result      = word_start;
-    bool   in_single   = false;
-    bool   in_double   = false;
-    bool   esc_pending = false;
-    size_t i           = word_start;
+    size_t result = word_start;
+    bool in_single = false;
+    bool in_double = false;
+    bool esc_pending = false;
+    size_t i = word_start;
 
     /* Skip an open quote opener if it's at word_start. */
     if (i < cursor) {
         uint32_t cp;
-        int      n = decode_at(buf, cursor, i, &cp);
+        int n = decode_at(buf, cursor, i, &cp);
         if (cp == '\'' || cp == '"') {
             i += (size_t)n;
             result = i;
@@ -903,7 +942,7 @@ static size_t compute_filename_portion_start(const char *buf, size_t word_start,
 
     while (i < cursor) {
         uint32_t cp;
-        int      n = decode_at(buf, cursor, i, &cp);
+        int n = decode_at(buf, cursor, i, &cp);
 
         if (esc_pending) {
             esc_pending = false;
@@ -912,24 +951,45 @@ static size_t compute_filename_portion_start(const char *buf, size_t word_start,
         }
 
         if (in_single) {
-            if (cp == '\'') in_single = false;
-            else if (cp == '/') result = i + 1;
+            if (cp == '\'')
+                in_single = false;
+            else if (cp == '/')
+                result = i + 1;
             i += (size_t)n;
             continue;
         }
         if (in_double) {
-            if (cp == '"') in_double = false;
-            else if (cp == '\\') esc_pending = true;
-            else if (cp == '/') result = i + 1;
+            if (cp == '"')
+                in_double = false;
+            else if (cp == '\\')
+                esc_pending = true;
+            else if (cp == '/')
+                result = i + 1;
             i += (size_t)n;
             continue;
         }
 
         /* NONE */
-        if (cp == '\'') { in_single = true; i += (size_t)n; continue; }
-        if (cp == '"')  { in_double = true; i += (size_t)n; continue; }
-        if (cp == '\\') { esc_pending = true; i += (size_t)n; continue; }
-        if (cp == '/')  { result = i + 1; i += (size_t)n; continue; }
+        if (cp == '\'') {
+            in_single = true;
+            i += (size_t)n;
+            continue;
+        }
+        if (cp == '"') {
+            in_double = true;
+            i += (size_t)n;
+            continue;
+        }
+        if (cp == '\\') {
+            esc_pending = true;
+            i += (size_t)n;
+            continue;
+        }
+        if (cp == '/') {
+            result = i + 1;
+            i += (size_t)n;
+            continue;
+        }
 
         i += (size_t)n;
     }
@@ -958,59 +1018,78 @@ static size_t compute_filename_portion_start(const char *buf, size_t word_start,
  * the analyzer's view here is an approximation that is correct for the
  * cases listed in the design doc's walkthroughs.
  */
-static lle_expansion_kind_t detect_expansion_kind(const char *buf,
-                                                  size_t word_start,
-                                                  size_t cursor) {
+static lle_expansion_kind_t
+detect_expansion_kind(const char *buf, size_t word_start, size_t cursor) {
     /* Track simple state: most recent unmatched-opener. */
-    bool   esc       = false;
-    bool   in_sgl    = false;
-    bool   in_dbl    = false;
-    int    paren_d   = 0;
-    int    brace_d   = 0;
-    bool   any_glob  = false;
-    bool   in_dollar = false; /* just saw $, expecting name/{/( */
-    bool   in_var_name        = false;
-    bool   in_braced_var_name = false;
-    bool   in_cmd_sub         = false;
-    bool   in_arith           = false;
-    bool   in_brace_list      = false;
-    bool   brace_has_comma    = false;
+    bool esc = false;
+    bool in_sgl = false;
+    bool in_dbl = false;
+    int paren_d = 0;
+    int brace_d = 0;
+    bool any_glob = false;
+    bool in_dollar = false; /* just saw $, expecting name/{/( */
+    bool in_var_name = false;
+    bool in_braced_var_name = false;
+    bool in_cmd_sub = false;
+    bool in_arith = false;
+    bool in_brace_list = false;
+    bool brace_has_comma = false;
 
     size_t i = word_start;
     while (i < cursor) {
         uint32_t cp;
-        int      n = decode_at(buf, cursor, i, &cp);
+        int n = decode_at(buf, cursor, i, &cp);
 
-        if (esc) { esc = false; i += (size_t)n; continue; }
+        if (esc) {
+            esc = false;
+            i += (size_t)n;
+            continue;
+        }
         if (in_sgl) {
-            if (cp == '\'') in_sgl = false;
+            if (cp == '\'')
+                in_sgl = false;
             i += (size_t)n;
             continue;
         }
         if (in_dbl) {
-            if (cp == '"') in_dbl = false;
-            else if (cp == '\\') esc = true;
-            else if (cp == '$' && !in_dollar) in_dollar = true;
+            if (cp == '"')
+                in_dbl = false;
+            else if (cp == '\\')
+                esc = true;
+            else if (cp == '$' && !in_dollar)
+                in_dollar = true;
             /* `$` inside "..." can begin an expansion; we still detect it. */
             i += (size_t)n;
             continue;
         }
 
-        if (cp == '\'') { in_sgl = true; i += (size_t)n; continue; }
-        if (cp == '"')  { in_dbl = true; i += (size_t)n; continue; }
-        if (cp == '\\') { esc   = true; i += (size_t)n; continue; }
+        if (cp == '\'') {
+            in_sgl = true;
+            i += (size_t)n;
+            continue;
+        }
+        if (cp == '"') {
+            in_dbl = true;
+            i += (size_t)n;
+            continue;
+        }
+        if (cp == '\\') {
+            esc = true;
+            i += (size_t)n;
+            continue;
+        }
 
         if (in_dollar) {
             if (cp == '{') {
-                in_braced_var_name = true; brace_d++;
+                in_braced_var_name = true;
+                brace_d++;
             } else if (cp == '(') {
                 /* peek for second ( → arithmetic */
-                size_t   peek_i = i + (size_t)n;
+                size_t peek_i = i + (size_t)n;
                 uint32_t peek_cp;
-                int      peek_n =
-                    (peek_i < cursor)
-                        ? decode_at(buf, cursor, peek_i, &peek_cp)
-                        : 0;
+                int peek_n = (peek_i < cursor)
+                                 ? decode_at(buf, cursor, peek_i, &peek_cp)
+                                 : 0;
                 if (peek_n > 0 && peek_cp == '(') {
                     in_arith = true;
                     paren_d += 2;
@@ -1037,7 +1116,10 @@ static lle_expansion_kind_t detect_expansion_kind(const char *buf,
         }
 
         if (in_braced_var_name) {
-            if (cp == '}') { in_braced_var_name = false; brace_d--; }
+            if (cp == '}') {
+                in_braced_var_name = false;
+                brace_d--;
+            }
             i += (size_t)n;
             continue;
         }
@@ -1045,19 +1127,30 @@ static lle_expansion_kind_t detect_expansion_kind(const char *buf,
         if (in_cmd_sub || in_arith) {
             if (cp == ')') {
                 paren_d--;
-                if (in_arith && paren_d == 0) in_arith = false;
-                else if (in_cmd_sub && paren_d == 0) in_cmd_sub = false;
-            } else if (cp == '(') paren_d++;
+                if (in_arith && paren_d == 0)
+                    in_arith = false;
+                else if (in_cmd_sub && paren_d == 0)
+                    in_cmd_sub = false;
+            } else if (cp == '(')
+                paren_d++;
             i += (size_t)n;
             continue;
         }
 
-        if (cp == '$') { in_dollar = true; i += (size_t)n; continue; }
+        if (cp == '$') {
+            in_dollar = true;
+            i += (size_t)n;
+            continue;
+        }
         if (cp == '{') {
-            in_brace_list = true; brace_d++; i += (size_t)n; continue;
+            in_brace_list = true;
+            brace_d++;
+            i += (size_t)n;
+            continue;
         }
         if (cp == '}') {
-            if (brace_d > 0) brace_d--;
+            if (brace_d > 0)
+                brace_d--;
             if (brace_d == 0) {
                 in_brace_list = false;
                 brace_has_comma = false;
@@ -1070,7 +1163,8 @@ static lle_expansion_kind_t detect_expansion_kind(const char *buf,
             i += (size_t)n;
             continue;
         }
-        if (cp == '*' || cp == '?' || cp == '[') any_glob = true;
+        if (cp == '*' || cp == '?' || cp == '[')
+            any_glob = true;
 
         i += (size_t)n;
     }
@@ -1078,13 +1172,20 @@ static lle_expansion_kind_t detect_expansion_kind(const char *buf,
     /* Resolve precedence: in-progress expansions take priority; glob is
      * only reported as "in-progress" when no other expansion is
      * unfinished and the word contains a glob char. */
-    if (in_arith)           return LLE_EXPANSION_ARITHMETIC;
-    if (in_cmd_sub)         return LLE_EXPANSION_COMMAND_SUBST;
-    if (in_braced_var_name) return LLE_EXPANSION_BRACED_VARIABLE_NAME;
-    if (in_var_name)        return LLE_EXPANSION_VARIABLE_NAME;
-    if (in_dollar)          return LLE_EXPANSION_VARIABLE_NAME;
-    if (in_brace_list && brace_has_comma) return LLE_EXPANSION_BRACE_LIST;
-    if (any_glob)           return LLE_EXPANSION_GLOB;
+    if (in_arith)
+        return LLE_EXPANSION_ARITHMETIC;
+    if (in_cmd_sub)
+        return LLE_EXPANSION_COMMAND_SUBST;
+    if (in_braced_var_name)
+        return LLE_EXPANSION_BRACED_VARIABLE_NAME;
+    if (in_var_name)
+        return LLE_EXPANSION_VARIABLE_NAME;
+    if (in_dollar)
+        return LLE_EXPANSION_VARIABLE_NAME;
+    if (in_brace_list && brace_has_comma)
+        return LLE_EXPANSION_BRACE_LIST;
+    if (any_glob)
+        return LLE_EXPANSION_GLOB;
     return LLE_EXPANSION_NONE;
 }
 
@@ -1125,10 +1226,12 @@ static lle_expansion_kind_t detect_expansion_kind(const char *buf,
 
 /* Allocate a pool-owned copy of [start, end) within buffer. */
 static char *pool_substring(const char *buffer, size_t start, size_t end) {
-    if (end < start) return NULL;
+    if (end < start)
+        return NULL;
     size_t len = end - start;
     char *out = lle_pool_alloc(len + 1);
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
     memcpy(out, buffer + start, len);
     out[len] = '\0';
     return out;
@@ -1136,10 +1239,12 @@ static char *pool_substring(const char *buffer, size_t start, size_t end) {
 
 /* Allocate a pool-owned copy of a NUL-terminated string. */
 static char *pool_strdup(const char *s) {
-    if (!s) return NULL;
+    if (!s)
+        return NULL;
     size_t len = strlen(s);
     char *out = lle_pool_alloc(len + 1);
-    if (!out) return NULL;
+    if (!out)
+        return NULL;
     memcpy(out, s, len + 1);
     return out;
 }
@@ -1148,15 +1253,20 @@ static char *pool_strdup(const char *s) {
  * suitable for expand_brace_pattern. We accept either a list (`{a,b}`)
  * or a range (`{1..5}`); both are handled by the existing expander. */
 static bool path_prefix_has_brace_list(const char *path_prefix) {
-    if (!path_prefix) return false;
+    if (!path_prefix)
+        return false;
     const char *open = strchr(path_prefix, '{');
-    if (!open) return false;
+    if (!open)
+        return false;
     const char *close = strchr(open + 1, '}');
-    if (!close) return false;
+    if (!close)
+        return false;
     /* Accept either a comma (list form) or `..` (range form). */
     for (const char *p = open + 1; p < close; p++) {
-        if (*p == ',') return true;
-        if (*p == '.' && p + 1 < close && *(p + 1) == '.') return true;
+        if (*p == ',')
+            return true;
+        if (*p == '.' && p + 1 < close && *(p + 1) == '.')
+            return true;
     }
     return false;
 }
@@ -1167,7 +1277,8 @@ static bool path_prefix_has_brace_list(const char *path_prefix) {
 static const char *lookup_user_home(const char *user) {
     if (!user || !user[0]) {
         const char *h = getenv("HOME");
-        if (h && h[0]) return h;
+        if (h && h[0])
+            return h;
         struct passwd *pw = getpwuid(getuid());
         return pw ? pw->pw_dir : NULL;
     }
@@ -1181,31 +1292,35 @@ static const char *lookup_user_home(const char *user) {
 static char *expand_tilde_local(const char *path_prefix,
                                 lle_memory_pool_t *pool) {
     (void)pool;
-    if (!path_prefix || path_prefix[0] != '~') return NULL;
+    if (!path_prefix || path_prefix[0] != '~')
+        return NULL;
 
     /* Find the username portion: bytes after `~` up to the first `/` or
      * end of string. Empty username means "current user." */
     const char *slash = strchr(path_prefix, '/');
-    size_t name_len   = slash ? (size_t)(slash - path_prefix - 1)
-                              : strlen(path_prefix) - 1;
+    size_t name_len =
+        slash ? (size_t)(slash - path_prefix - 1) : strlen(path_prefix) - 1;
 
     const char *home = NULL;
     if (name_len == 0) {
         home = lookup_user_home(NULL);
     } else {
         char user[256];
-        if (name_len >= sizeof(user)) return NULL;
+        if (name_len >= sizeof(user))
+            return NULL;
         memcpy(user, path_prefix + 1, name_len);
         user[name_len] = '\0';
         home = lookup_user_home(user);
     }
-    if (!home) return NULL;
+    if (!home)
+        return NULL;
 
-    const char *rest      = slash ? slash : "";
-    size_t      home_len  = strlen(home);
-    size_t      rest_len  = strlen(rest);
-    char       *result    = lle_pool_alloc(home_len + rest_len + 1);
-    if (!result) return NULL;
+    const char *rest = slash ? slash : "";
+    size_t home_len = strlen(home);
+    size_t rest_len = strlen(rest);
+    char *result = lle_pool_alloc(home_len + rest_len + 1);
+    if (!result)
+        return NULL;
     memcpy(result, home, home_len);
     memcpy(result + home_len, rest, rest_len + 1);
     return result;
@@ -1217,7 +1332,8 @@ static char *expand_tilde_local(const char *path_prefix,
 static char *expand_variable_local(const char *path_prefix,
                                    lle_memory_pool_t *pool) {
     (void)pool;
-    if (!path_prefix || path_prefix[0] != '$') return NULL;
+    if (!path_prefix || path_prefix[0] != '$')
+        return NULL;
 
     const char *name_start;
     const char *name_end;
@@ -1225,39 +1341,44 @@ static char *expand_variable_local(const char *path_prefix,
     if (path_prefix[1] == '{') {
         name_start = path_prefix + 2;
         const char *close = strchr(name_start, '}');
-        if (!close) return NULL;
+        if (!close)
+            return NULL;
         /* Refuse parameter operators ${NAME:-default} etc. */
         for (const char *p = name_start; p < close; p++) {
-            if (*p == ':' || *p == '-' || *p == '+' || *p == '?' ||
-                *p == '=' || *p == '#' || *p == '%' || *p == '/') {
+            if (*p == ':' || *p == '-' || *p == '+' || *p == '?' || *p == '=' ||
+                *p == '#' || *p == '%' || *p == '/') {
                 return NULL;
             }
         }
         name_end = close;
-        rest     = close + 1;
+        rest = close + 1;
     } else {
         name_start = path_prefix + 1;
-        name_end   = name_start;
-        while (*name_end && (isalnum((unsigned char)*name_end) ||
-                              *name_end == '_')) {
+        name_end = name_start;
+        while (*name_end &&
+               (isalnum((unsigned char)*name_end) || *name_end == '_')) {
             name_end++;
         }
-        if (name_end == name_start) return NULL; /* bare $ */
+        if (name_end == name_start)
+            return NULL; /* bare $ */
         rest = name_end;
     }
 
     size_t name_len = (size_t)(name_end - name_start);
-    char   name_buf[256];
-    if (name_len >= sizeof(name_buf)) return NULL;
+    char name_buf[256];
+    if (name_len >= sizeof(name_buf))
+        return NULL;
     memcpy(name_buf, name_start, name_len);
     name_buf[name_len] = '\0';
 
     const char *value = getenv(name_buf);
-    if (!value) return NULL;
+    if (!value)
+        return NULL;
     size_t value_len = strlen(value);
-    size_t rest_len  = strlen(rest);
-    char  *result    = lle_pool_alloc(value_len + rest_len + 1);
-    if (!result) return NULL;
+    size_t rest_len = strlen(rest);
+    char *result = lle_pool_alloc(value_len + rest_len + 1);
+    if (!result)
+        return NULL;
     memcpy(result, value, value_len);
     memcpy(result + value_len, rest, rest_len + 1);
     return result;
@@ -1279,19 +1400,22 @@ static char *expand_variable_local(const char *path_prefix,
  */
 static char *resolve_single_path_prefix(const char *path_prefix,
                                         lle_memory_pool_t *pool) {
-    if (!path_prefix || path_prefix[0] == '\0') return NULL;
+    if (!path_prefix || path_prefix[0] == '\0')
+        return NULL;
 
     /* Tilde expansion at start: handled locally. */
     if (path_prefix[0] == '~') {
         char *r = expand_tilde_local(path_prefix, pool);
-        if (r) return r;
+        if (r)
+            return r;
         /* Fall through to executor path on failure. */
     }
 
     /* Bare / braced variable at start: handled locally if simple. */
     if (path_prefix[0] == '$' && path_prefix[1] != '(') {
         char *r = expand_variable_local(path_prefix, pool);
-        if (r) return r;
+        if (r)
+            return r;
         /* Fall through to executor path on more complex forms. */
     }
 
@@ -1334,9 +1458,11 @@ static void resolve_path_prefix_to_directory(lle_word_context_t *ctx,
     }
     char *path_prefix =
         pool_substring(buffer, ctx->word_start, ctx->filename_portion_start);
-    if (!path_prefix) return;
+    if (!path_prefix)
+        return;
 
-    ctx->expanded_directory = resolve_single_path_prefix(path_prefix, ctx->pool);
+    ctx->expanded_directory =
+        resolve_single_path_prefix(path_prefix, ctx->pool);
 }
 
 /* Multi-value (brace) path: enumerate branches via expand_brace_pattern,
@@ -1344,18 +1470,22 @@ static void resolve_path_prefix_to_directory(lle_word_context_t *ctx,
  * true if branches[] was populated, false otherwise. */
 static bool resolve_path_prefix_to_branches(lle_word_context_t *ctx,
                                             const char *buffer) {
-    if (ctx->word_start >= ctx->filename_portion_start) return false;
+    if (ctx->word_start >= ctx->filename_portion_start)
+        return false;
 
     char *path_prefix =
         pool_substring(buffer, ctx->word_start, ctx->filename_portion_start);
-    if (!path_prefix) return false;
-    if (!path_prefix_has_brace_list(path_prefix)) return false;
+    if (!path_prefix)
+        return false;
+    if (!path_prefix_has_brace_list(path_prefix))
+        return false;
 
     int branch_count = 0;
     char **raw = expand_brace_pattern(path_prefix, &branch_count);
     if (!raw || branch_count <= 1) {
         if (raw) {
-            for (int i = 0; i < branch_count; i++) free(raw[i]);
+            for (int i = 0; i < branch_count; i++)
+                free(raw[i]);
             free(raw);
         }
         return false;
@@ -1365,7 +1495,8 @@ static bool resolve_path_prefix_to_branches(lle_word_context_t *ctx,
     lle_word_context_branch_t *branches =
         lle_pool_alloc(sizeof(*branches) * (size_t)branch_count);
     if (!branches) {
-        for (int i = 0; i < branch_count; i++) free(raw[i]);
+        for (int i = 0; i < branch_count; i++)
+            free(raw[i]);
         free(raw);
         return false;
     }
@@ -1374,16 +1505,18 @@ static bool resolve_path_prefix_to_branches(lle_word_context_t *ctx,
     for (int i = 0; i < branch_count; i++) {
         char *resolved = resolve_single_path_prefix(raw[i], ctx->pool);
         if (resolved) {
-            branches[valid].expanded_directory       = resolved;
-            branches[valid].dequoted_filename_prefix = ctx->dequoted_filename_prefix;
+            branches[valid].expanded_directory = resolved;
+            branches[valid].dequoted_filename_prefix =
+                ctx->dequoted_filename_prefix;
             valid++;
         }
         free(raw[i]);
     }
     free(raw);
 
-    if (valid == 0) return false;
-    ctx->branches     = branches;
+    if (valid == 0)
+        return false;
+    ctx->branches = branches;
     ctx->branch_count = valid;
     return true;
 }
@@ -1402,39 +1535,40 @@ lle_result_t lle_word_context_analyze(const char *buffer,
     }
 
     size_t buf_len = strlen(buffer);
-    if (cursor_byte_offset > buf_len) cursor_byte_offset = buf_len;
+    if (cursor_byte_offset > buf_len)
+        cursor_byte_offset = buf_len;
 
     /* Run the walker from byte 0 to the cursor. */
     walker_t w = (walker_t){
-        .buffer                          = buffer,
-        .buffer_len                      = buf_len,
-        .cursor                          = cursor_byte_offset,
-        .pos                             = 0,
-        .in_single                       = false,
-        .in_double                       = false,
-        .in_backtick                     = false,
-        .escape_pending                  = false,
-        .paren_depth                     = 0,
-        .brace_depth                     = 0,
-        .bracket_depth                   = 0,
-        .last_statement_start            = 0,
-        .current_word_start              = SIZE_MAX,
-        .current_command_word_start      = SIZE_MAX,
-        .current_command_word_end        = SIZE_MAX,
-        .current_arg_index               = -1,
-        .next_word_is_redirect_target    = false,
-        .at_command_position             = true,
-        .kw_state                        = KW_NONE,
-        .expecting_heredoc_delim         = false,
-        .heredoc_dash                    = false,
-        .heredoc_pending                 = false,
-        .in_heredoc_body                 = false,
-        .heredoc_delim                   = {0},
-        .heredoc_delim_len               = 0,
-        .current_line_start              = 0,
-        .arg_starts                      = {0},
-        .arg_ends                        = {0},
-        .arg_capture_count               = 0,
+        .buffer = buffer,
+        .buffer_len = buf_len,
+        .cursor = cursor_byte_offset,
+        .pos = 0,
+        .in_single = false,
+        .in_double = false,
+        .in_backtick = false,
+        .escape_pending = false,
+        .paren_depth = 0,
+        .brace_depth = 0,
+        .bracket_depth = 0,
+        .last_statement_start = 0,
+        .current_word_start = SIZE_MAX,
+        .current_command_word_start = SIZE_MAX,
+        .current_command_word_end = SIZE_MAX,
+        .current_arg_index = -1,
+        .next_word_is_redirect_target = false,
+        .at_command_position = true,
+        .kw_state = KW_NONE,
+        .expecting_heredoc_delim = false,
+        .heredoc_dash = false,
+        .heredoc_pending = false,
+        .in_heredoc_body = false,
+        .heredoc_delim = {0},
+        .heredoc_delim_len = 0,
+        .current_line_start = 0,
+        .arg_starts = {0},
+        .arg_ends = {0},
+        .arg_capture_count = 0,
     };
 
     while (w.pos < w.cursor) {
@@ -1443,16 +1577,17 @@ lle_result_t lle_word_context_analyze(const char *buffer,
 
     /* Allocate output struct. */
     lle_word_context_t *ctx = lle_pool_alloc(sizeof(*ctx));
-    if (!ctx) return LLE_ERROR_OUT_OF_MEMORY;
+    if (!ctx)
+        return LLE_ERROR_OUT_OF_MEMORY;
     memset(ctx, 0, sizeof(*ctx));
     ctx->pool = pool;
 
     /* Word coordinates. If the cursor sits at whitespace or at a position
      * with no active word, word_start = word_end = cursor (an empty word
      * being completed). */
-    ctx->word_start = (w.current_word_start == SIZE_MAX) ? w.cursor
-                                                          : w.current_word_start;
-    ctx->word_end   = w.cursor;
+    ctx->word_start =
+        (w.current_word_start == SIZE_MAX) ? w.cursor : w.current_word_start;
+    ctx->word_end = w.cursor;
 
     /* Quote state at cursor. */
     if (w.escape_pending) {
@@ -1485,9 +1620,10 @@ lle_result_t lle_word_context_analyze(const char *buffer,
 
     /* Dequote and NFC-normalize the filename prefix portion. */
     lle_result_t r =
-        dequote_range_to_nfc(buffer, ctx->filename_portion_start,
-                             ctx->word_end, pool, &ctx->dequoted_filename_prefix);
-    if (r != LLE_SUCCESS) return r;
+        dequote_range_to_nfc(buffer, ctx->filename_portion_start, ctx->word_end,
+                             pool, &ctx->dequoted_filename_prefix);
+    if (r != LLE_SUCCESS)
+        return r;
 
     /* Context type. Order of precedence (most specific first):
      *   HEREDOC_BODY  — completion is refused; trumps everything else
@@ -1524,9 +1660,10 @@ lle_result_t lle_word_context_analyze(const char *buffer,
         size_t cn_len =
             w.current_command_word_end - w.current_command_word_start;
         char *cn = lle_pool_alloc(cn_len + 1);
-        if (!cn) return LLE_ERROR_OUT_OF_MEMORY;
+        if (!cn)
+            return LLE_ERROR_OUT_OF_MEMORY;
         memcpy(cn, buffer + w.current_command_word_start, cn_len);
-        cn[cn_len]       = '\0';
+        cn[cn_len] = '\0';
         ctx->command_name = cn;
     } else {
         ctx->command_name = NULL;
@@ -1540,7 +1677,8 @@ lle_result_t lle_word_context_analyze(const char *buffer,
     if (w.arg_capture_count > 0) {
         char **args =
             lle_pool_alloc(sizeof(char *) * (size_t)w.arg_capture_count);
-        if (!args) return LLE_ERROR_OUT_OF_MEMORY;
+        if (!args)
+            return LLE_ERROR_OUT_OF_MEMORY;
         size_t valid = 0;
         for (size_t i = 0; i < w.arg_capture_count; i++) {
             char *arg_text = NULL;
@@ -1550,10 +1688,10 @@ lle_result_t lle_word_context_analyze(const char *buffer,
                 args[valid++] = arg_text;
             }
         }
-        ctx->arguments      = args;
+        ctx->arguments = args;
         ctx->argument_count = valid;
     } else {
-        ctx->arguments      = NULL;
+        ctx->arguments = NULL;
         ctx->argument_count = 0;
     }
 
@@ -1567,8 +1705,8 @@ lle_result_t lle_word_context_analyze(const char *buffer,
      * available, in which case the engine treats it as a cwd-relative
      * completion. */
     ctx->expanded_directory = NULL;
-    ctx->branches           = NULL;
-    ctx->branch_count       = 0;
+    ctx->branches = NULL;
+    ctx->branch_count = 0;
     if (!resolve_path_prefix_to_branches(ctx, buffer)) {
         resolve_path_prefix_to_directory(ctx, buffer);
     }
@@ -1585,39 +1723,60 @@ void lle_word_context_free(lle_word_context_t *context) {
 
 const char *lle_quote_state_name(lle_quote_state_t state) {
     switch (state) {
-        case LLE_QUOTE_NONE:           return "NONE";
-        case LLE_QUOTE_SINGLE:         return "SINGLE";
-        case LLE_QUOTE_DOUBLE:         return "DOUBLE";
-        case LLE_QUOTE_BACKTICK:       return "BACKTICK";
-        case LLE_QUOTE_ESCAPE_PENDING: return "ESCAPE_PENDING";
+    case LLE_QUOTE_NONE:
+        return "NONE";
+    case LLE_QUOTE_SINGLE:
+        return "SINGLE";
+    case LLE_QUOTE_DOUBLE:
+        return "DOUBLE";
+    case LLE_QUOTE_BACKTICK:
+        return "BACKTICK";
+    case LLE_QUOTE_ESCAPE_PENDING:
+        return "ESCAPE_PENDING";
     }
     return "INVALID";
 }
 
 const char *lle_expansion_kind_name(lle_expansion_kind_t kind) {
     switch (kind) {
-        case LLE_EXPANSION_NONE:                return "NONE";
-        case LLE_EXPANSION_VARIABLE_NAME:       return "VARIABLE_NAME";
-        case LLE_EXPANSION_BRACED_VARIABLE_NAME:return "BRACED_VARIABLE_NAME";
-        case LLE_EXPANSION_COMMAND_SUBST:       return "COMMAND_SUBST";
-        case LLE_EXPANSION_ARITHMETIC:          return "ARITHMETIC";
-        case LLE_EXPANSION_BRACE_LIST:          return "BRACE_LIST";
-        case LLE_EXPANSION_GLOB:                return "GLOB";
+    case LLE_EXPANSION_NONE:
+        return "NONE";
+    case LLE_EXPANSION_VARIABLE_NAME:
+        return "VARIABLE_NAME";
+    case LLE_EXPANSION_BRACED_VARIABLE_NAME:
+        return "BRACED_VARIABLE_NAME";
+    case LLE_EXPANSION_COMMAND_SUBST:
+        return "COMMAND_SUBST";
+    case LLE_EXPANSION_ARITHMETIC:
+        return "ARITHMETIC";
+    case LLE_EXPANSION_BRACE_LIST:
+        return "BRACE_LIST";
+    case LLE_EXPANSION_GLOB:
+        return "GLOB";
     }
     return "INVALID";
 }
 
 const char *lle_word_context_type_name(lle_word_context_type_t type) {
     switch (type) {
-        case LLE_CONTEXT_COMMAND_POSITION: return "COMMAND_POSITION";
-        case LLE_CONTEXT_ARGUMENT:         return "ARGUMENT";
-        case LLE_CONTEXT_REDIRECT_TARGET:  return "REDIRECT_TARGET";
-        case LLE_CONTEXT_VARIABLE_NAME:    return "VARIABLE_NAME";
-        case LLE_CONTEXT_ASSIGNMENT_VALUE: return "ASSIGNMENT_VALUE";
-        case LLE_CONTEXT_FOR_IN_LIST:      return "FOR_IN_LIST";
-        case LLE_CONTEXT_CASE_PATTERN:     return "CASE_PATTERN";
-        case LLE_CONTEXT_HEREDOC_BODY:     return "HEREDOC_BODY";
-        case LLE_CONTEXT_UNKNOWN:          return "UNKNOWN";
+    case LLE_CONTEXT_COMMAND_POSITION:
+        return "COMMAND_POSITION";
+    case LLE_CONTEXT_ARGUMENT:
+        return "ARGUMENT";
+    case LLE_CONTEXT_REDIRECT_TARGET:
+        return "REDIRECT_TARGET";
+    case LLE_CONTEXT_VARIABLE_NAME:
+        return "VARIABLE_NAME";
+    case LLE_CONTEXT_ASSIGNMENT_VALUE:
+        return "ASSIGNMENT_VALUE";
+    case LLE_CONTEXT_FOR_IN_LIST:
+        return "FOR_IN_LIST";
+    case LLE_CONTEXT_CASE_PATTERN:
+        return "CASE_PATTERN";
+    case LLE_CONTEXT_HEREDOC_BODY:
+        return "HEREDOC_BODY";
+    case LLE_CONTEXT_UNKNOWN:
+        return "UNKNOWN";
     }
     return "INVALID";
 }

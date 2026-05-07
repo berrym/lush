@@ -461,9 +461,9 @@ static int process_input(const char *path, const char *lush_path) {
            path_e, MODE_NAMES[mode],
            oracle_present || mode == MODE_LUSH ? "true" : "false",
            divergent ? "false" : "true", allowed ? "true" : "false",
-           lush_r.exit_status, lush_r.timed_out ? "true" : "false",
-           lush_out_e, oracle_r.exit_status,
-           oracle_r.timed_out ? "true" : "false", oracle_out_e);
+           lush_r.exit_status, lush_r.timed_out ? "true" : "false", lush_out_e,
+           oracle_r.exit_status, oracle_r.timed_out ? "true" : "false",
+           oracle_out_e);
     fflush(stdout);
 
     free(input);

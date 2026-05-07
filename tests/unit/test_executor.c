@@ -468,7 +468,8 @@ TEST(local_integer_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local x=0; x=42; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f() { local x=0; x=42; RESULT=$x; }",
+                                  1);
     executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -483,8 +484,8 @@ TEST(local_arith_substitution) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec,
-                                  "f() { local x=0; x=$((1+1)); RESULT=$x; }", 1);
+    executor_execute_command_line(
+        exec, "f() { local x=0; x=$((1+1)); RESULT=$x; }", 1);
     executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -515,8 +516,8 @@ TEST(declare_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec,
-                                  "f() { declare x=0; x=42; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f() { declare x=0; x=42; RESULT=$x; }",
+                                  1);
     executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -531,8 +532,8 @@ TEST(typeset_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec,
-                                  "f() { typeset x=0; x=42; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f() { typeset x=0; x=42; RESULT=$x; }",
+                                  1);
     executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -546,7 +547,8 @@ TEST(local_two_step_no_initial) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local x; x=hello; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f() { local x; x=hello; RESULT=$x; }",
+                                  1);
     executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -617,8 +619,10 @@ TEST(local_while_loop_counter) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local i=0; while [ $i -lt 3 ]; "
-                                        "do i=$((i+1)); done; RESULT=$i; }", 1);
+    executor_execute_command_line(exec,
+                                  "f() { local i=0; while [ $i -lt 3 ]; "
+                                  "do i=$((i+1)); done; RESULT=$i; }",
+                                  1);
     executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -734,7 +738,8 @@ TEST(function_redir_input_applied_at_call) {
                                   "echo hello-input > /tmp/lush_test_48_in", 1);
     executor_execute_command_line(
         exec,
-        "f() { read line; CAPTURED=\"got: $line\"; } < /tmp/lush_test_48_in", 1);
+        "f() { read line; CAPTURED=\"got: $line\"; } < /tmp/lush_test_48_in",
+        1);
     executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "CAPTURED");
@@ -753,8 +758,8 @@ TEST(function_redir_does_not_break_normal_call) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
-    executor_execute_command_line(exec,
-                                  "f() { echo from-f; } > /tmp/lush_test_48", 1);
+    executor_execute_command_line(
+        exec, "f() { echo from-f; } > /tmp/lush_test_48", 1);
     executor_execute_command_line(exec, "f", 1);
     /* This echo must NOT also be captured by f's redirect — its output
      * should be discarded as normal (we don't capture stdout here). */

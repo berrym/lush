@@ -96,11 +96,11 @@ extern "C" {
  * release on its own schedule.
  */
 typedef struct lle_splicer_splice {
-    size_t delete_start;     /**< First byte to delete from buffer    */
-    size_t delete_length;    /**< Number of bytes to delete           */
-    char  *insert_text;      /**< Pool-allocated bytes to insert      */
-    size_t insert_length;    /**< Length of insert_text in bytes      */
-    size_t cursor_after;     /**< Byte offset of cursor after splice  */
+    size_t delete_start;  /**< First byte to delete from buffer    */
+    size_t delete_length; /**< Number of bytes to delete           */
+    char *insert_text;    /**< Pool-allocated bytes to insert      */
+    size_t insert_length; /**< Length of insert_text in bytes      */
+    size_t cursor_after;  /**< Byte offset of cursor after splice  */
 } lle_splicer_splice_t;
 
 /* ============================================================================
@@ -125,12 +125,9 @@ typedef struct lle_splicer_splice {
  * @return LLE_SUCCESS or LLE_ERROR_INVALID_PARAMETER /
  *         LLE_ERROR_OUT_OF_MEMORY.
  */
-lle_result_t lle_splicer_render_for_context(const char *text,
-                                            size_t text_length,
-                                            lle_quote_state_t quote_state,
-                                            lle_memory_pool_t *pool,
-                                            char **out_rendered,
-                                            size_t *out_length);
+lle_result_t lle_splicer_render_for_context(
+    const char *text, size_t text_length, lle_quote_state_t quote_state,
+    lle_memory_pool_t *pool, char **out_rendered, size_t *out_length);
 
 /**
  * @brief Get the close character that matches a quote state
@@ -173,8 +170,7 @@ char lle_splicer_close_char(lle_quote_state_t quote_state);
  */
 lle_result_t lle_splicer_compute(const lle_word_context_t *context,
                                  const lle_completion_item_t *item,
-                                 bool accept_phase,
-                                 lle_memory_pool_t *pool,
+                                 bool accept_phase, lle_memory_pool_t *pool,
                                  lle_splicer_splice_t *out);
 
 /**

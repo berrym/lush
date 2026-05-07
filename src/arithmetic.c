@@ -258,10 +258,8 @@ static ssize_t eval_sub(stack_item_t *a1, stack_item_t *a2) {
 static ssize_t eval_div(stack_item_t *a1, stack_item_t *a2) {
     ssize_t divisor = long_value(a2);
     if (divisor == 0) {
-        arithm_set_error(SHELL_ERR_DIVISION_BY_ZERO,
-                         "evaluating / operator",
-                         "divisor must be non-zero",
-                         "division by zero");
+        arithm_set_error(SHELL_ERR_DIVISION_BY_ZERO, "evaluating / operator",
+                         "divisor must be non-zero", "division by zero");
         return 0;
     }
     return arithm_safe_div(long_value(a1), divisor);
@@ -271,8 +269,7 @@ static ssize_t eval_div(stack_item_t *a1, stack_item_t *a2) {
 static ssize_t eval_mod(stack_item_t *a1, stack_item_t *a2) {
     ssize_t divisor = long_value(a2);
     if (divisor == 0) {
-        arithm_set_error(SHELL_ERR_MODULO_BY_ZERO,
-                         "evaluating %% operator",
+        arithm_set_error(SHELL_ERR_MODULO_BY_ZERO, "evaluating %% operator",
                          "divisor must be non-zero",
                          "division by zero in modulo operation");
         return 0;
@@ -445,7 +442,7 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
         if ((item)->type != ITEM_VAR_PTR || !(item)->var_name) {               \
             arithm_set_error(SHELL_ERR_ARITH_INVALID_ASSIGN_TARGET,            \
                              "evaluating " op " operator",                     \
-                             "left-hand side must be a variable name",        \
+                             "left-hand side must be a variable name",         \
                              "invalid assignment target");                     \
             return 0;                                                          \
         }                                                                      \
@@ -502,10 +499,8 @@ static ssize_t eval_diveq(stack_item_t *a1, stack_item_t *a2) {
 
     ssize_t div_value = long_value(a2);
     if (div_value == 0) {
-        arithm_set_error(SHELL_ERR_DIVISION_BY_ZERO,
-                         "evaluating /= operator",
-                         "divisor must be non-zero",
-                         "division by zero");
+        arithm_set_error(SHELL_ERR_DIVISION_BY_ZERO, "evaluating /= operator",
+                         "divisor must be non-zero", "division by zero");
         return 0;
     }
 
@@ -522,10 +517,8 @@ static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
 
     ssize_t mod_value = long_value(a2);
     if (mod_value == 0) {
-        arithm_set_error(SHELL_ERR_MODULO_BY_ZERO,
-                         "evaluating %%= operator",
-                         "divisor must be non-zero",
-                         "modulo by zero");
+        arithm_set_error(SHELL_ERR_MODULO_BY_ZERO, "evaluating %%= operator",
+                         "divisor must be non-zero", "modulo by zero");
         return 0;
     }
 
@@ -616,10 +609,9 @@ static ssize_t eval_exp(stack_item_t *a1, stack_item_t *a2) {
     ssize_t base = long_value(a1);
     ssize_t exp = long_value(a2);
     if (exp < 0) {
-        arithm_set_error(SHELL_ERR_ARITH_NEGATIVE_EXPONENT,
-                         "evaluating ** operator",
-                         "exponent must be non-negative",
-                         "negative exponent not supported");
+        arithm_set_error(
+            SHELL_ERR_ARITH_NEGATIVE_EXPONENT, "evaluating ** operator",
+            "exponent must be non-negative", "negative exponent not supported");
         return 0;
     }
 
@@ -770,10 +762,9 @@ static ssize_t long_value(stack_item_t *item) {
 static void push_opstack(arithm_context_t *ctx, op_t *op) {
     if (ctx->nopstack >= MAXOPSTACK) {
         ctx->errflag = true;
-        arithm_set_error(SHELL_ERR_ARITH_STACK_OVERFLOW,
-                         "shunting-yard operator stack push",
-                         "expression too deeply nested",
-                         "operator stack overflow");
+        arithm_set_error(
+            SHELL_ERR_ARITH_STACK_OVERFLOW, "shunting-yard operator stack push",
+            "expression too deeply nested", "operator stack overflow");
         return;
     }
     ctx->opstack[ctx->nopstack++] = op;
@@ -804,10 +795,9 @@ static op_t *pop_opstack(arithm_context_t *ctx) {
 static void push_numstackl(arithm_context_t *ctx, ssize_t val) {
     if (ctx->nnumstack >= MAXNUMSTACK) {
         ctx->errflag = true;
-        arithm_set_error(SHELL_ERR_ARITH_STACK_OVERFLOW,
-                         "shunting-yard number stack push",
-                         "expression has too many operands",
-                         "number stack overflow");
+        arithm_set_error(
+            SHELL_ERR_ARITH_STACK_OVERFLOW, "shunting-yard number stack push",
+            "expression has too many operands", "number stack overflow");
         return;
     }
     ctx->numstack[ctx->nnumstack].type = ITEM_LONG_INT;
@@ -824,10 +814,9 @@ static void push_numstackv_with_context(arithm_context_t *ctx,
                                         const char *var_name) {
     if (ctx->nnumstack >= MAXNUMSTACK) {
         ctx->errflag = true;
-        arithm_set_error(SHELL_ERR_ARITH_STACK_OVERFLOW,
-                         "shunting-yard number stack push",
-                         "expression has too many operands",
-                         "number stack overflow");
+        arithm_set_error(
+            SHELL_ERR_ARITH_STACK_OVERFLOW, "shunting-yard number stack push",
+            "expression has too many operands", "number stack overflow");
         return;
     }
     ctx->numstack[ctx->nnumstack].type = ITEM_VAR_PTR;
@@ -850,10 +839,9 @@ static stack_item_t pop_numstack(arithm_context_t *ctx) {
     stack_item_t empty = {ITEM_LONG_INT, {0}, NULL};
     if (ctx->nnumstack <= 0) {
         ctx->errflag = true;
-        arithm_set_error(SHELL_ERR_ARITH_STACK_UNDERFLOW,
-                         "shunting-yard number stack pop",
-                         "missing operand in expression",
-                         "number stack underflow");
+        arithm_set_error(
+            SHELL_ERR_ARITH_STACK_UNDERFLOW, "shunting-yard number stack pop",
+            "missing operand in expression", "number stack underflow");
         return empty;
     }
     return ctx->numstack[--ctx->nnumstack];
@@ -1012,8 +1000,7 @@ static char *get_var_name_with_context(arithm_context_t *ctx
     if (!name) {
         arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
                          "extracting variable name in arithmetic",
-                         "out of memory",
-                         "memory allocation failed");
+                         "out of memory", "memory allocation failed");
         return NULL;
     }
 
@@ -1371,8 +1358,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             if (!cleaned_expr) {
                 arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
                                  "preparing arithmetic expression",
-                                 "out of memory",
-                                 "memory allocation failed");
+                                 "out of memory", "memory allocation failed");
                 return NULL;
             }
             strncpy(cleaned_expr, orig_expr + 3, expr_len);
@@ -1732,10 +1718,9 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
 
     // Should have exactly one result
     if (ctx.nnumstack != 1) {
-        arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
-                         "evaluating arithmetic expression",
-                         "expression failed to evaluate",
-                         "invalid arithmetic expression");
+        arithm_set_error(
+            SHELL_ERR_ARITHMETIC_SYNTAX, "evaluating arithmetic expression",
+            "expression failed to evaluate", "invalid arithmetic expression");
         arithm_context_cleanup(&ctx);
         return NULL;
     }
@@ -1745,8 +1730,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
     char *result_str = malloc(32);
     if (!result_str) {
         arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
-                         "formatting arithmetic result",
-                         "out of memory",
+                         "formatting arithmetic result", "out of memory",
                          "memory allocation failed");
         arithm_context_cleanup(&ctx);
         return NULL;

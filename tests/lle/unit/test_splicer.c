@@ -27,13 +27,15 @@
 
 /* ============================================================================
  * Render rules — NONE quote state
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(render_none_passes_through_plain_alphanumerics) {
     char *out = NULL;
     size_t len = 0;
-    lle_result_t r = lle_splicer_render_for_context(
-        "Documents123", strlen("Documents123"), LLE_QUOTE_NONE, POOL, &out, &len);
+    lle_result_t r =
+        lle_splicer_render_for_context("Documents123", strlen("Documents123"),
+                                       LLE_QUOTE_NONE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
     ASSERT(strcmp(out, "Documents123") == 0);
     ASSERT(len == strlen("Documents123"));
@@ -89,7 +91,7 @@ TEST(render_none_escapes_tilde_only_at_position_zero) {
 
     /* Same character mid-word does NOT escape. */
     r = lle_splicer_render_for_context("foo~bar", strlen("foo~bar"),
-                                        LLE_QUOTE_NONE, POOL, &out, &len);
+                                       LLE_QUOTE_NONE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
     ASSERT(strcmp(out, "foo~bar") == 0);
 }
@@ -103,7 +105,7 @@ TEST(render_none_escapes_hash_only_at_position_zero) {
     ASSERT(strcmp(out, "\\#foo") == 0);
 
     r = lle_splicer_render_for_context("foo#bar", strlen("foo#bar"),
-                                        LLE_QUOTE_NONE, POOL, &out, &len);
+                                       LLE_QUOTE_NONE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
     ASSERT(strcmp(out, "foo#bar") == 0);
 }
@@ -123,13 +125,15 @@ TEST(render_none_passes_non_ascii_bytes_through) {
 
 /* ============================================================================
  * Render rules — DOUBLE quote state
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(render_double_passes_space_through_unescaped) {
     char *out = NULL;
     size_t len = 0;
-    lle_result_t r = lle_splicer_render_for_context(
-        "my file.txt", strlen("my file.txt"), LLE_QUOTE_DOUBLE, POOL, &out, &len);
+    lle_result_t r =
+        lle_splicer_render_for_context("my file.txt", strlen("my file.txt"),
+                                       LLE_QUOTE_DOUBLE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
     /* Inside double quotes, space is literal — no backslash. */
     ASSERT(strcmp(out, "my file.txt") == 0);
@@ -150,7 +154,8 @@ TEST(render_double_escapes_only_dollar_backtick_backslash_doublequote) {
 
 /* ============================================================================
  * Render rules — SINGLE quote state
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(render_single_passes_metacharacters_through) {
     /* Inside '...' nothing escapes (POSIX). All metacharacters are
@@ -177,7 +182,8 @@ TEST(render_single_handles_embedded_single_quote) {
 
 /* ============================================================================
  * Render rules — BACKTICK quote state
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(render_backtick_escapes_dollar_backtick_backslash) {
     /* Inside `...` only $ ` \ are special. Double-quote is NOT
@@ -212,9 +218,9 @@ TEST(render_backtick_escapes_dollar_backtick_backslash) {
 static void make_context(lle_word_context_t *ctx, lle_quote_state_t qs,
                          size_t fp_start, size_t word_end) {
     memset(ctx, 0, sizeof(*ctx));
-    ctx->quote_state            = qs;
+    ctx->quote_state = qs;
     ctx->filename_portion_start = fp_start;
-    ctx->word_end               = word_end;
+    ctx->word_end = word_end;
 }
 
 static void make_item(lle_completion_item_t *item, const char *text,
@@ -356,7 +362,8 @@ TEST(compute_invalid_inputs_return_error) {
 
 /* ============================================================================
  * Test runner
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("=== LLE Splicer Unit Tests ===\n");

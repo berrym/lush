@@ -36,7 +36,8 @@
 
 /* ============================================================================
  * get_grapheme_break_property — classification
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(prop_cr_lf) {
     ASSERT_EQ(get_grapheme_break_property(0x000D), GB_CR, "U+000D is CR");
@@ -114,7 +115,8 @@ TEST(prop_hangul_syllable_lv_vs_lvt) {
      */
     ASSERT_EQ(get_grapheme_break_property(0xAC00), GB_LV, "가 (LV)");
     ASSERT_EQ(get_grapheme_break_property(0xAC01), GB_LVT, "각 (LVT)");
-    ASSERT_EQ(get_grapheme_break_property(0xAC1B), GB_LVT, "갛 (LVT, last in row)");
+    ASSERT_EQ(get_grapheme_break_property(0xAC1B), GB_LVT,
+              "갛 (LVT, last in row)");
     ASSERT_EQ(get_grapheme_break_property(0xAC1C), GB_LV, "개 (LV, next row)");
     ASSERT_EQ(get_grapheme_break_property(0xD7A3), GB_LVT, "힣 (LVT, last)");
 }
@@ -161,7 +163,8 @@ TEST(prop_other_default) {
 
 /* ============================================================================
  * is_grapheme_cluster_boundary — UAX #29 rules
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(rule_gb3_cr_then_lf_no_break) {
     /* GB3: CR × LF — the CR/LF pair is one grapheme */
@@ -303,7 +306,8 @@ TEST(rule_gb999_default_break) {
 
 /* ============================================================================
  * is_grapheme_boundary_at_position — UTF-8 byte-position queries
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(pos_start_of_text_is_boundary) {
     const char *text = "hello";
@@ -358,7 +362,8 @@ TEST(pos_at_continuation_byte_scans_back) {
     /* U+4E2D '中' = 0xE4 0xB8 0xAD (3 bytes). text = "中A".
      * The string is split so the hex escape \xAD does not absorb the
      * following 'A' into a single (out-of-range) hex literal. */
-    const char *text = "\xE4\xB8\xAD" "A";
+    const char *text = "\xE4\xB8\xAD"
+                       "A";
     /* Position 3 is just after the CJK char and before 'A' — boundary. */
     ASSERT_TRUE(is_grapheme_boundary_at_position(text + 3, text, text + 4),
                 "between CJK char and ASCII letter is a boundary");
@@ -366,7 +371,8 @@ TEST(pos_at_continuation_byte_scans_back) {
 
 /* ============================================================================
  * Main runner
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("=== LLE Grapheme Detector Tests ===\n\n");

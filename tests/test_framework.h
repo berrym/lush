@@ -47,7 +47,8 @@
 
 /* ============================================================================
  * Internal state — file-scope so each test binary has its own copy.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 static int test_framework_run = 0;
 static int test_framework_passed = 0;
@@ -57,7 +58,8 @@ static const char *test_framework_current_name = "(none)";
 
 /* ============================================================================
  * Test definition and execution
- * ============================================================================ */
+ * ============================================================================
+ */
 
 /** @brief Define a test function */
 #define TEST(name) static void test_##name(void)
@@ -87,8 +89,7 @@ static const char *test_framework_current_name = "(none)";
 /** @brief Print summary and return process exit status */
 #define TEST_RESULT()                                                          \
     (printf("\n--- Results: %d passed, %d failed (of %d) ---\n",               \
-            test_framework_passed, test_framework_failed,                      \
-            test_framework_run),                                               \
+            test_framework_passed, test_framework_failed, test_framework_run), \
      test_framework_failed > 0 ? 1 : 0)
 
 /* ============================================================================
@@ -96,7 +97,8 @@ static const char *test_framework_current_name = "(none)";
  *
  * On failure: print "FAIL\n  at file:line: <expression> [: msg]" and
  * longjmp back to RUN_TEST. The next RUN_TEST resumes execution.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 #define TEST_FAIL_FMT(fmt, ...)                                                \
     do {                                                                       \

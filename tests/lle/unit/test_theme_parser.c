@@ -37,7 +37,8 @@
  * The parser delivers each key-value pair to a callback. For tests we
  * collect every callback invocation into a small array so the test can
  * assert what was parsed and in what order.
- * ============================================================================ */
+ * ============================================================================
+ */
 
 #define MAX_COLLECTED 64
 
@@ -66,7 +67,8 @@ static lle_result_t collect_callback(const char *section, const char *key,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
     collected_kv_t *item = &c->items[c->count++];
-    snprintf(item->section, sizeof(item->section), "%s", section ? section : "");
+    snprintf(item->section, sizeof(item->section), "%s",
+             section ? section : "");
     snprintf(item->key, sizeof(item->key), "%s", key ? key : "");
     item->type = value->type;
     switch (value->type) {
@@ -105,7 +107,8 @@ static lle_result_t parse_to_collector(const char *input, collector_t *c) {
 
 /* ============================================================================
  * Lifecycle
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(init_zeroes_state) {
     lle_theme_parser_t p;
@@ -115,19 +118,18 @@ TEST(init_zeroes_state) {
     ASSERT_EQ(p.line, 1, "line starts at 1");
     ASSERT_EQ(p.column, 1, "column starts at 1");
     ASSERT_EQ(p.keys_parsed, 0, "no keys parsed yet");
-    ASSERT_STR_EQ(lle_theme_parser_error(&p), "",
-                  "no error before parsing");
+    ASSERT_STR_EQ(lle_theme_parser_error(&p), "", "no error before parsing");
 }
 
 TEST(init_rejects_null_parser) {
-    ASSERT_EQ(lle_theme_parser_init(NULL, "x = 1"),
-              LLE_ERROR_INVALID_PARAMETER, "init(NULL parser)");
+    ASSERT_EQ(lle_theme_parser_init(NULL, "x = 1"), LLE_ERROR_INVALID_PARAMETER,
+              "init(NULL parser)");
 }
 
 TEST(init_rejects_null_input) {
     lle_theme_parser_t p;
-    ASSERT_EQ(lle_theme_parser_init(&p, NULL),
-              LLE_ERROR_INVALID_PARAMETER, "init(NULL input)");
+    ASSERT_EQ(lle_theme_parser_init(&p, NULL), LLE_ERROR_INVALID_PARAMETER,
+              "init(NULL input)");
 }
 
 TEST(reset_brings_state_back_to_start) {
@@ -150,13 +152,13 @@ TEST(reset_tolerates_null) {
 
 /* ============================================================================
  * Empty / whitespace / comments
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(parse_empty_input_succeeds_with_no_callbacks) {
     collector_t c;
     collector_init(&c);
-    ASSERT_EQ(parse_to_collector("", &c), LLE_SUCCESS,
-              "empty input succeeds");
+    ASSERT_EQ(parse_to_collector("", &c), LLE_SUCCESS, "empty input succeeds");
     ASSERT_EQ(c.count, 0, "no callbacks fired for empty input");
 }
 
@@ -178,13 +180,14 @@ TEST(parse_comment_only_succeeds) {
 
 /* ============================================================================
  * Scalar values: string / integer / boolean
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(parse_string_value) {
     collector_t c;
     collector_init(&c);
-    ASSERT_EQ(parse_to_collector("name = \"hello world\"\n", &c),
-              LLE_SUCCESS, "parse");
+    ASSERT_EQ(parse_to_collector("name = \"hello world\"\n", &c), LLE_SUCCESS,
+              "parse");
     ASSERT_EQ(c.count, 1, "one key-value");
     ASSERT_STR_EQ(c.items[0].key, "name", "key");
     ASSERT_EQ(c.items[0].type, LLE_THEME_VALUE_STRING, "type is STRING");
@@ -239,7 +242,8 @@ TEST(parse_multiple_keys_in_order) {
 
 /* ============================================================================
  * Sections [foo] and dotted [foo.bar]
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(parse_section_qualifies_keys) {
     const char *input = "[colors]\nfg = \"red\"\nbg = \"blue\"\n";
@@ -257,8 +261,7 @@ TEST(parse_dotted_section) {
     collector_init(&c);
     ASSERT_EQ(parse_to_collector(input, &c), LLE_SUCCESS, "parse");
     ASSERT_EQ(c.count, 1, "one key-value");
-    ASSERT_STR_EQ(c.items[0].section, "symbols.ascii",
-                  "dotted section path");
+    ASSERT_STR_EQ(c.items[0].section, "symbols.ascii", "dotted section path");
     ASSERT_STR_EQ(c.items[0].key, "plus", "key");
 }
 
@@ -277,7 +280,8 @@ TEST(parse_multiple_sections) {
 
 /* ============================================================================
  * String escape sequences
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(parse_string_with_newline_escape) {
     collector_t c;
@@ -300,15 +304,16 @@ TEST(parse_string_with_escaped_quote) {
 TEST(parse_string_with_escaped_backslash) {
     collector_t c;
     collector_init(&c);
-    ASSERT_EQ(parse_to_collector("path = \"a\\\\b\"\n", &c),
-              LLE_SUCCESS, "parse");
+    ASSERT_EQ(parse_to_collector("path = \"a\\\\b\"\n", &c), LLE_SUCCESS,
+              "parse");
     ASSERT_STR_EQ(c.items[0].string_value, "a\\b",
                   "\\\\ becomes one backslash");
 }
 
 /* ============================================================================
  * Comments in mixed input
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(parse_inline_comment_after_value) {
     collector_t c;
@@ -316,7 +321,8 @@ TEST(parse_inline_comment_after_value) {
     ASSERT_EQ(parse_to_collector("x = 7  # documented value\n", &c),
               LLE_SUCCESS, "parse");
     ASSERT_EQ(c.count, 1, "one key");
-    ASSERT_EQ(c.items[0].int_value, 7, "value not affected by trailing comment");
+    ASSERT_EQ(c.items[0].int_value, 7,
+              "value not affected by trailing comment");
 }
 
 TEST(parse_comment_lines_between_keys) {
@@ -331,7 +337,8 @@ TEST(parse_comment_lines_between_keys) {
 
 /* ============================================================================
  * Error reporting
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(error_unterminated_string_reports_position) {
     lle_theme_parser_t p;
@@ -342,8 +349,7 @@ TEST(error_unterminated_string_reports_position) {
     ASSERT_NE(r, LLE_SUCCESS, "unterminated string must error");
     ASSERT_GT(strlen(lle_theme_parser_error(&p)), 0,
               "error message is non-empty");
-    ASSERT_GT(lle_theme_parser_error_line(&p), 0,
-              "error line is reported");
+    ASSERT_GT(lle_theme_parser_error_line(&p), 0, "error line is reported");
 }
 
 TEST(error_missing_equals_reports_position) {
@@ -378,13 +384,14 @@ TEST(error_accessors_tolerate_null) {
 
 /* ============================================================================
  * Callback can stop the parse by returning an error
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(callback_error_stops_parse) {
     const char *input = "first = 1\nsecond = 2\nthird = 3\n";
     collector_t c;
     collector_init(&c);
-    c.return_code = LLE_ERROR_INVALID_STATE;  /* propagate from callback */
+    c.return_code = LLE_ERROR_INVALID_STATE; /* propagate from callback */
     lle_result_t r = parse_to_collector(input, &c);
     ASSERT_NE(r, LLE_SUCCESS, "callback's error code propagates");
     /* Exactly the first key should have been collected, then parser bailed. */
@@ -395,7 +402,8 @@ TEST(callback_error_stops_parse) {
 
 /* ============================================================================
  * Value helpers
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(value_set_string_populates_string) {
     lle_theme_value_t v;
@@ -408,8 +416,8 @@ TEST(value_set_string_rejects_null) {
     lle_theme_value_t v;
     ASSERT_EQ(lle_theme_value_set_string(NULL, "x"),
               LLE_ERROR_INVALID_PARAMETER, "NULL value");
-    ASSERT_EQ(lle_theme_value_set_string(&v, NULL),
-              LLE_ERROR_INVALID_PARAMETER, "NULL string");
+    ASSERT_EQ(lle_theme_value_set_string(&v, NULL), LLE_ERROR_INVALID_PARAMETER,
+              "NULL string");
 }
 
 TEST(value_set_integer_populates_integer) {
@@ -442,7 +450,8 @@ TEST(value_free_clears_scalar_safely) {
 
 /* ============================================================================
  * Color spec parsing
- * ============================================================================ */
+ * ============================================================================
+ */
 
 TEST(color_spec_named_basic_colors) {
     lle_color_t c;
@@ -459,16 +468,13 @@ TEST(color_spec_256_color_index) {
               "256-color index 196");
     ASSERT_EQ(lle_parse_color_spec("255", &c), LLE_SUCCESS,
               "256-color index 255");
-    ASSERT_EQ(lle_parse_color_spec("0", &c), LLE_SUCCESS,
-              "256-color index 0");
+    ASSERT_EQ(lle_parse_color_spec("0", &c), LLE_SUCCESS, "256-color index 0");
 }
 
 TEST(color_spec_hex_rgb_long_form) {
     lle_color_t c;
-    ASSERT_EQ(lle_parse_color_spec("#ff5500", &c), LLE_SUCCESS,
-              "#ff5500");
-    ASSERT_EQ(lle_parse_color_spec("#000000", &c), LLE_SUCCESS,
-              "#000000");
+    ASSERT_EQ(lle_parse_color_spec("#ff5500", &c), LLE_SUCCESS, "#ff5500");
+    ASSERT_EQ(lle_parse_color_spec("#000000", &c), LLE_SUCCESS, "#000000");
     ASSERT_EQ(lle_parse_color_spec("#FFFFFF", &c), LLE_SUCCESS,
               "#FFFFFF (uppercase)");
 }
@@ -497,7 +503,8 @@ TEST(color_spec_rejects_bogus_input) {
 
 /* ============================================================================
  * Main runner
- * ============================================================================ */
+ * ============================================================================
+ */
 
 int main(void) {
     printf("=== LLE Theme Parser Tests ===\n\n");
