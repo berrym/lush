@@ -32,6 +32,7 @@
 
 #include "builtins.h"
 
+#include "config.h"
 #include "executor.h"
 #include "ht.h"
 
@@ -39,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 /* bin_set's underlying impl lives in src/posix_opts.c. */
@@ -47,6 +49,102 @@ int builtin_set(char **argv);
 /* Hash table for remembered command paths. Owned here; bin_hash.c
  * (src/builtins/bin_hash.c) declares it `extern`. */
 ht_strstr_t *command_hash = NULL;
+
+/* ============================================================================
+ * Negative PATH-search cache
+ *
+ * Bounds the syscall cost of tight loops repeatedly resolving a missing
+ * command (the #79 / #73-Layer-2 case). A small fixed-size FIFO of
+ * recently-failed lookups with a TTL: hits within the TTL short-circuit
+ * find_command_in_path() to return NULL without walking PATH again.
+ *
+ * Sizing: 32 entries is enough to cover typical interactive churn
+ * (compose-pipelines, tab-completion misses, build scripts probing for
+ * optional tools). The FIFO replacement policy is simpler than true LRU
+ * and still effective for the loop pattern that motivated the cache.
+ *
+ * TTL is configurable via behavior.path_negative_cache_ttl_ms (default
+ * 1000ms). Setting the TTL to 0 disables the cache; this matches POSIX
+ * and bash/zsh which have no negative cache. The default is short
+ * enough that newly installed binaries appear within a second, long
+ * enough that a tight loop's lookups become O(1) instead of
+ * O(PATH_dirs).
+ * ============================================================================
+ */
+
+#define PATH_NEG_CACHE_SIZE 32
+#define PATH_NEG_CACHE_NAME_MAX 256
+
+typedef struct {
+    char name[PATH_NEG_CACHE_NAME_MAX];
+    struct timespec timestamp;
+    bool valid;
+} path_neg_cache_entry_t;
+
+static path_neg_cache_entry_t path_neg_cache[PATH_NEG_CACHE_SIZE];
+static size_t path_neg_cache_next; /* FIFO insertion index */
+
+static int64_t timespec_diff_ms(const struct timespec *later,
+                                const struct timespec *earlier) {
+    int64_t sec_diff = (int64_t)later->tv_sec - (int64_t)earlier->tv_sec;
+    int64_t nsec_diff = (int64_t)later->tv_nsec - (int64_t)earlier->tv_nsec;
+    return sec_diff * 1000 + nsec_diff / 1000000;
+}
+
+/* Returns true if `command` is in the negative cache and the entry is
+ * still within TTL. Stale entries are invalidated as a side effect. */
+static bool path_neg_cache_check(const char *command) {
+    int ttl_ms = config.path_negative_cache_ttl_ms;
+    if (ttl_ms <= 0) {
+        return false; /* disabled */
+    }
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return false; /* defensive: treat clock failure as "not cached" */
+    }
+    for (size_t i = 0; i < PATH_NEG_CACHE_SIZE; i++) {
+        if (!path_neg_cache[i].valid) {
+            continue;
+        }
+        if (strcmp(path_neg_cache[i].name, command) == 0) {
+            if (timespec_diff_ms(&now, &path_neg_cache[i].timestamp) <=
+                ttl_ms) {
+                return true;
+            }
+            path_neg_cache[i].valid = false; /* stale */
+            return false;
+        }
+    }
+    return false;
+}
+
+/* Record `command` as recently failed to resolve. FIFO replacement
+ * overwrites the oldest entry when the cache is full. */
+static void path_neg_cache_insert(const char *command) {
+    int ttl_ms = config.path_negative_cache_ttl_ms;
+    if (ttl_ms <= 0) {
+        return;
+    }
+    if (strlen(command) >= PATH_NEG_CACHE_NAME_MAX) {
+        return; /* too long to cache; PATH walk will retry next time */
+    }
+    size_t idx = path_neg_cache_next;
+    path_neg_cache_next = (path_neg_cache_next + 1) % PATH_NEG_CACHE_SIZE;
+    strncpy(path_neg_cache[idx].name, command, PATH_NEG_CACHE_NAME_MAX - 1);
+    path_neg_cache[idx].name[PATH_NEG_CACHE_NAME_MAX - 1] = '\0';
+    if (clock_gettime(CLOCK_MONOTONIC, &path_neg_cache[idx].timestamp) != 0) {
+        path_neg_cache[idx].valid = false;
+        return;
+    }
+    path_neg_cache[idx].valid = true;
+}
+
+void path_negative_cache_clear(void) {
+    for (size_t i = 0; i < PATH_NEG_CACHE_SIZE; i++) {
+        path_neg_cache[i].valid = false;
+    }
+    path_neg_cache_next = 0;
+}
 
 /* ============================================================================
  * Builtin Registry
@@ -260,8 +358,31 @@ char *find_command_in_path(const char *command) {
         return NULL;
     }
 
+    /* Positive cache: command_hash holds previously-resolved paths
+     * (also populated by the POSIX `hash` builtin). On hit, revalidate
+     * with access(X_OK) so a removed binary doesn't keep a stale path
+     * pinned -- on revalidation failure, drop the stale entry and fall
+     * through to a fresh PATH walk. */
+    if (command_hash) {
+        const char *cached = ht_strstr_get(command_hash, command);
+        if (cached) {
+            if (access(cached, X_OK) == 0) {
+                return strdup(cached);
+            }
+            ht_strstr_remove(command_hash, command);
+        }
+    }
+
+    /* Negative cache: short-circuit a recent miss within TTL so a tight
+     * loop calling a missing command pays O(1) instead of O(PATH_dirs)
+     * per iteration. */
+    if (path_neg_cache_check(command)) {
+        return NULL;
+    }
+
     const char *path_env = getenv("PATH");
     if (!path_env) {
+        path_neg_cache_insert(command);
         return NULL;
     }
 
@@ -294,5 +415,19 @@ char *find_command_in_path(const char *command) {
     }
 
     free(path_copy);
+
+    if (result) {
+        /* Populate positive cache. POSIX hash table doubles as the
+         * positive cache; the `hash` builtin shows / clears it. */
+        if (!command_hash) {
+            init_command_hash();
+        }
+        if (command_hash) {
+            ht_strstr_insert(command_hash, command, result);
+        }
+    } else {
+        /* Populate negative cache so the next call within TTL is O(1). */
+        path_neg_cache_insert(command);
+    }
     return result;
 }

@@ -515,6 +515,17 @@ void init_command_hash(void);
 void free_command_hash(void);
 
 /**
+ * @brief Clear the negative PATH-search cache.
+ *
+ * The negative cache short-circuits repeated find_command_in_path()
+ * lookups for missing commands within a TTL window
+ * (behavior.path_negative_cache_ttl_ms). `hash -r` clears it alongside
+ * the positive command_hash so a freshly-installed binary is picked up
+ * immediately instead of waiting for the TTL to expire.
+ */
+void path_negative_cache_clear(void);
+
+/**
  * @brief Check if a command is a builtin
  *
  * Searches the builtins table for a matching command name.

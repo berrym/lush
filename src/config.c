@@ -367,6 +367,13 @@ static config_option_t config_options[] = {
      "compile time on pathological patterns fed to platform regcomp from "
      "[[ =~ ]] and extglob translation paths.",
      config_validate_int, NULL},
+    {"behavior.path_negative_cache_ttl_ms", CONFIG_TYPE_INT,
+     CONFIG_SECTION_BEHAVIOR, &config.path_negative_cache_ttl_ms,
+     "TTL in milliseconds for negative PATH-search cache. Bounds the "
+     "syscall cost of repeated lookups of a missing command in tight "
+     "loops to O(1) instead of O(PATH_dirs). Short enough that newly "
+     "installed binaries appear quickly. (0 = disabled)",
+     config_validate_int, NULL},
     {"behavior.loop_failure_streak", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
      &config.loop_failure_streak,
      "Consecutive non-zero body iterations before runaway-loop trip (0 = "
@@ -1101,6 +1108,7 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {"multiline_mode", "behavior.multiline_mode"},
     {"brace_expansion_max", "behavior.brace_expansion_max"},
     {"regex_pattern_max", "behavior.regex_pattern_max"},
+    {"path_negative_cache_ttl_ms", "behavior.path_negative_cache_ttl_ms"},
     {"loop_failure_streak", "behavior.loop_failure_streak"},
     {"loop_failure_seconds", "behavior.loop_failure_seconds"},
     {"color_scheme", "behavior.color_scheme"},
@@ -1936,6 +1944,11 @@ const char *CONFIG_FILE_TEMPLATE =
     "[[ =~ ]] and extglob translation paths.\n"
     "behavior.regex_pattern_max = 1024\n"
     "\n"
+    "# TTL in milliseconds for negative PATH-search cache (0 = disabled). "
+    "Bounds syscall cost of tight loops calling a missing command to O(1) "
+    "instead of O(PATH_dirs).\n"
+    "behavior.path_negative_cache_ttl_ms = 1000\n"
+    "\n"
     "# Consecutive non-zero body iterations before runaway-loop trip (0 = "
     "disable)\n"
     "behavior.loop_failure_streak = 1000\n"
@@ -2260,6 +2273,7 @@ void config_set_defaults(void) {
     config.multiline_mode = true;
     config.brace_expansion_max = 65536;
     config.regex_pattern_max = 1024;
+    config.path_negative_cache_ttl_ms = 1000;
     config.loop_failure_streak = 1000;
     config.loop_failure_seconds = 5;
 

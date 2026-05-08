@@ -33,6 +33,7 @@ int bin_hash(int argc, char **argv) {
             ht_strstr_destroy(command_hash);
             command_hash = ht_strstr_create(HT_STR_CASECMP | HT_SEED_RANDOM);
         }
+        path_negative_cache_clear();
         return 0;
     }
 

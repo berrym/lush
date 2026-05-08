@@ -207,17 +207,22 @@ typedef struct {
     int theme_color_support_override;  /**< Override detected color support */
 
     /* Behavior settings */
-    bool auto_cd;             /**< Auto-cd to directories */
-    bool spell_correction;    /**< Enable spell correction */
-    bool confirm_exit;        /**< Confirm before exit */
-    int tab_width;            /**< Tab display width */
-    bool no_word_expand;      /**< Disable word expansion */
-    bool multiline_mode;      /**< Enable multiline editing */
-    int brace_expansion_max;  /**< Max brace expansion result count (0 =
-                                 unbounded) */
-    int regex_pattern_max;    /**< Max regex pattern length before rejection
-                                 (0 = unbounded; covers `[[ =~ ]]` and
-                                 extglob translation paths) */
+    bool auto_cd;            /**< Auto-cd to directories */
+    bool spell_correction;   /**< Enable spell correction */
+    bool confirm_exit;       /**< Confirm before exit */
+    int tab_width;           /**< Tab display width */
+    bool no_word_expand;     /**< Disable word expansion */
+    bool multiline_mode;     /**< Enable multiline editing */
+    int brace_expansion_max; /**< Max brace expansion result count (0 =
+                                unbounded) */
+    int regex_pattern_max;   /**< Max regex pattern length before rejection
+                                (0 = unbounded; covers `[[ =~ ]]` and
+                                extglob translation paths) */
+    int path_negative_cache_ttl_ms; /**< TTL (ms) for negative PATH-search
+                                       cache; bounds repeated lookups of a
+                                       missing command in tight loops to
+                                       O(1) instead of O(PATH_dirs)
+                                       (0 = disabled) */
     int loop_failure_streak;  /**< Consecutive non-zero body iterations before
                                  runaway-loop trip (0 = disable) */
     int loop_failure_seconds; /**< Min wall-clock seconds streak must last
