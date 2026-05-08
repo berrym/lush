@@ -646,9 +646,15 @@ static void skip_separators(parser_t *parser) {
 static node_t *parse_command_body(parser_t *parser, token_type_t terminator) {
     node_t *first_command = NULL;
     node_t *current = NULL;
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
 
     while (!tokenizer_match(parser->tokenizer, terminator) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_command_body")) {
+            free_node_tree(first_command);
+            return NULL;
+        }
 
         // Skip separators between commands
         skip_separators(parser);
@@ -696,10 +702,16 @@ static node_t *parse_if_body(parser_t *parser) {
         return NULL;
     }
 
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_ELSE) &&
            !tokenizer_match(parser->tokenizer, TOK_ELIF) &&
            !tokenizer_match(parser->tokenizer, TOK_FI) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_if_body")) {
+            free_node_tree(command_list);
+            return NULL;
+        }
 
         // Skip separators between commands
         skip_separators(parser);
@@ -800,7 +812,13 @@ static node_t *parse_command_list(parser_t *parser) {
     node_t *first_command = NULL;
     node_t *current = NULL;
 
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+        if (!parser_loop_check_progress(parser, &guard, "parse_command_list")) {
+            free_node_tree(first_command);
+            return NULL;
+        }
+
         // Skip separators, newlines, and comments
         while (tokenizer_match(parser->tokenizer, TOK_SEMICOLON) ||
                tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
@@ -1841,8 +1859,16 @@ static node_t *parse_brace_group(parser_t *parser) {
     skip_separators(parser);
 
     // Parse commands until '}'
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_RBRACE) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_brace_group")) {
+            free_node_tree(group_node);
+            parser_pop_context(parser);
+            parser_exit_recursion(parser);
+            return NULL;
+        }
 
         node_t *command = parse_logical_expression(parser);
         if (!command) {
@@ -1928,8 +1954,16 @@ static node_t *parse_subshell(parser_t *parser) {
     skip_separators(parser);
 
     // Parse commands until ')'
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_RPAREN) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_subshell")) {
+            free_node_tree(subshell_node);
+            parser_pop_context(parser);
+            parser_exit_recursion(parser);
+            return NULL;
+        }
 
         node_t *command = parse_logical_expression(parser);
         if (!command) {
