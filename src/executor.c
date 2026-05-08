@@ -1968,6 +1968,14 @@ static void loop_monitor_init(loop_monitor_t *m) {
     m->armed = false;
 }
 
+/* errexit_in_loops: when FEATURE_ERREXIT_IN_LOOPS is enabled (curated
+ * lush-mode default; off in POSIX/bash/zsh for polyglot parity), the
+ * first non-zero body exit aborts the loop. Caller should report
+ * SHELL_ERR_LOOP_LIMIT with iteration context and break out. */
+static bool loop_errexit_tripped(int body_status) {
+    return body_status != 0 && shell_mode_allows(FEATURE_ERREXIT_IN_LOOPS);
+}
+
 /* Returns true when the streak satisfies both N and T thresholds.
  * Caller should report SHELL_ERR_LOOP_LIMIT and break out. */
 static bool loop_monitor_check(loop_monitor_t *m, int body_status) {
@@ -2039,6 +2047,8 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     loop_monitor_t monitor;
     loop_monitor_init(&monitor);
     bool runaway_tripped = false;
+    bool errexit_tripped = false;
+    int iteration = 0;
 
     /* Push loop context for error reporting (Phase 3) */
     executor_push_context(executor, while_node->loc, "in while loop");
@@ -2075,6 +2085,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
 
         // Execute body
         last_result = execute_command_chain(executor, body);
+        iteration++;
 
         // Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
@@ -2083,6 +2094,11 @@ static int execute_while(executor_t *executor, node_t *while_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             // Continue to next iteration (just reset and loop again)
+        }
+
+        if (loop_errexit_tripped(last_result)) {
+            errexit_tripped = true;
+            break;
         }
 
         if (loop_monitor_check(&monitor, last_result)) {
@@ -2101,6 +2117,16 @@ static int execute_while(executor_t *executor, node_t *while_node) {
 
     /* Pop loop context */
     executor_pop_context(executor);
+
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, while_node->loc,
+            "while loop body failed with status %d in iteration %d "
+            "(errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
 
     if (runaway_tripped) {
         executor_error_add(
@@ -2144,6 +2170,8 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     loop_monitor_t monitor;
     loop_monitor_init(&monitor);
     bool runaway_tripped = false;
+    bool errexit_tripped = false;
+    int iteration = 0;
 
     // Check for trailing redirections on the until loop
     bool has_redirections = count_redirections(until_node) > 0;
@@ -2177,6 +2205,7 @@ static int execute_until(executor_t *executor, node_t *until_node) {
 
         // Execute body
         last_result = execute_command_chain(executor, body);
+        iteration++;
 
         // Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
@@ -2185,6 +2214,11 @@ static int execute_until(executor_t *executor, node_t *until_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             // Continue to next iteration
+        }
+
+        if (loop_errexit_tripped(last_result)) {
+            errexit_tripped = true;
+            break;
         }
 
         if (loop_monitor_check(&monitor, last_result)) {
@@ -2203,6 +2237,16 @@ static int execute_until(executor_t *executor, node_t *until_node) {
 
     // Pop error context
     executor_pop_context(executor);
+
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, until_node->loc,
+            "until loop body failed with status %d in iteration %d "
+            "(errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
 
     if (runaway_tripped) {
         executor_error_add(
@@ -2285,6 +2329,8 @@ static int execute_for(executor_t *executor, node_t *for_node) {
     loop_monitor_t monitor;
     loop_monitor_init(&monitor);
     bool runaway_tripped = false;
+    bool errexit_tripped = false;
+    int iteration = 0;
 
     // Build expanded word list for iteration
     char **expanded_words = NULL;
@@ -2514,6 +2560,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
 
             // Execute body
             last_result = execute_command_chain(executor, body);
+            iteration++;
 
             // Check for break/continue
             if (executor->loop_control == LOOP_BREAK) {
@@ -2522,6 +2569,11 @@ static int execute_for(executor_t *executor, node_t *for_node) {
             } else if (executor->loop_control == LOOP_CONTINUE) {
                 executor->loop_control = LOOP_NORMAL;
                 // Continue to next iteration
+            }
+
+            if (loop_errexit_tripped(last_result)) {
+                errexit_tripped = true;
+                break;
             }
 
             if (loop_monitor_check(&monitor, last_result)) {
@@ -2555,6 +2607,16 @@ static int execute_for(executor_t *executor, node_t *for_node) {
 
     // Pop error context
     executor_pop_context(executor);
+
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_node->loc,
+            "for loop body failed with status %d in iteration %d "
+            "(errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
 
     if (runaway_tripped) {
         executor_error_add(
@@ -2637,6 +2699,8 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
     loop_monitor_t monitor;
     loop_monitor_init(&monitor);
     bool runaway_tripped = false;
+    bool errexit_tripped = false;
+    int iteration = 0;
 
     // Execute init expression (once at the start)
     if (init_node && init_node->val.str && init_node->val.str[0] != '\0') {
@@ -2689,6 +2753,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
 
         // Execute body
         last_result = execute_command_chain(executor, body);
+        iteration++;
 
         // Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
@@ -2697,6 +2762,11 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             // Fall through to update expression
+        }
+
+        if (loop_errexit_tripped(last_result)) {
+            errexit_tripped = true;
+            break;
         }
 
         // Execute update expression
@@ -2743,6 +2813,16 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
 
     // Pop error context
     executor_pop_context(executor);
+
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_arith_node->loc,
+            "C-style for loop body failed with status %d in iteration "
+            "%d (errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
 
     if (runaway_tripped) {
         executor_error_add(

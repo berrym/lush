@@ -101,14 +101,18 @@ typedef enum {
 
     /* Behavior Defaults */
     FEATURE_WORD_SPLIT_DEFAULT, /**< Word splitting on by default (Bash) */
-    FEATURE_AUTO_CD,     /**< Auto-cd to directories without cd command */
-    FEATURE_AUTO_PUSHD,  /**< Auto-push directories to stack on cd */
-    FEATURE_CDABLE_VARS, /**< Treat unset vars as directory names for cd */
-    FEATURE_XPG_ECHO,    /**< echo interprets \n, \t, etc. by default (XSI/zsh
-                            behavior); when false, echo prints args literally
-                            unless `-e` is given (bash default). Bridged via
-                            `xpg_echo` (bash shopt name) and inverted alias
-                            `bsd_echo` (zsh setopt name). */
+    FEATURE_AUTO_CD,          /**< Auto-cd to directories without cd command */
+    FEATURE_AUTO_PUSHD,       /**< Auto-push directories to stack on cd */
+    FEATURE_CDABLE_VARS,      /**< Treat unset vars as directory names for cd */
+    FEATURE_ERREXIT_IN_LOOPS, /**< Loop body's first non-zero exit aborts the
+                                 loop. Curated lush-mode default; off in
+                                 POSIX/bash/zsh modes for polyglot parity.
+                                 Toggleable per-script via setopt/unsetopt. */
+    FEATURE_XPG_ECHO, /**< echo interprets \n, \t, etc. by default (XSI/zsh
+                         behavior); when false, echo prints args literally
+                         unless `-e` is given (bash default). Bridged via
+                         `xpg_echo` (bash shopt name) and inverted alias
+                         `bsd_echo` (zsh setopt name). */
 
     /* History Behavior */
     FEATURE_HISTAPPEND, /**< Append to history file instead of overwrite */

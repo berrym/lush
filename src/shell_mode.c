@@ -97,6 +97,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = false,
             [FEATURE_AUTO_PUSHD] = false,
             [FEATURE_CDABLE_VARS] = false,
+            [FEATURE_ERREXIT_IN_LOOPS] =
+                false, /* POSIX permits failing loop bodies; do not deviate */
             [FEATURE_XPG_ECHO] = true, /* POSIX XSI mandates escape interp */
 
             /* History Behavior */
@@ -177,6 +179,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = false, /* shopt autocd, off by default */
             [FEATURE_AUTO_PUSHD] = false,
             [FEATURE_CDABLE_VARS] = false,
+            [FEATURE_ERREXIT_IN_LOOPS] =
+                false, /* bash permits failing loop bodies; preserve parity */
             [FEATURE_XPG_ECHO] = false, /* shopt xpg_echo, off by default */
 
             /* History Behavior */
@@ -260,6 +264,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = false, /* AUTO_CD option, off by default */
             [FEATURE_AUTO_PUSHD] = false,
             [FEATURE_CDABLE_VARS] = false,
+            [FEATURE_ERREXIT_IN_LOOPS] =
+                false, /* zsh permits failing loop bodies; preserve parity */
             [FEATURE_XPG_ECHO] = true, /* zsh: BSD_ECHO off → escapes interp'd
                                           by default in zsh's echo builtin */
 
@@ -341,6 +347,15 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_AUTO_CD] = true,             /* Convenience feature */
             [FEATURE_AUTO_PUSHD] = false,         /* Optional */
             [FEATURE_CDABLE_VARS] = false,        /* Optional */
+            [FEATURE_ERREXIT_IN_LOOPS] =
+                true, /* Curated lush-mode default: a loop body that fails
+                         on its first iteration is almost always a
+                         programmer error; aborting immediately catches the
+                         bug instantly instead of waiting for the
+                         failure-streak detector (#73 Layer 1) to fire after
+                         5+ seconds. Off in POSIX/bash/zsh modes for
+                         polyglot parity. Toggle per-script via
+                         `unsetopt errexit_in_loops`. */
             [FEATURE_XPG_ECHO] =
                 true, /* Curated zsh-style: echo interprets escapes by
                          default. More predictable and modern than bash's
@@ -443,6 +458,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_AUTO_CD] = "auto_cd",
     [FEATURE_AUTO_PUSHD] = "auto_pushd",
     [FEATURE_CDABLE_VARS] = "cdable_vars",
+    [FEATURE_ERREXIT_IN_LOOPS] = "errexit_in_loops",
     [FEATURE_XPG_ECHO] = "xpg_echo",
 
     /* History Behavior */
