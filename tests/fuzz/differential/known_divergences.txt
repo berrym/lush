@@ -1,3 +1,8 @@
 # Known intentional divergences from the reference shell.
 # Format: <basename> <reason>
-# Empty for now - populate as legitimate lush extensions surface.
+# Each entry documents a case where lush's output deliberately differs
+# from the reference shell for a principled reason. diff_oracle treats
+# allow-listed divergences as expected: the JSONL record still shows
+# them but they do not contribute to the unexpected-divergence count.
+
+052_zsh_assoc_array.sh  Insertion-order iteration of associative arrays via libhashtable's ht_enum_t is a deliberate polyglot choice; zsh's hash-bucket order is implementation-detail and unspecified by spec. Explicit ordering via ${(ko)hash} / ${(kO)hash} (sorted and reverse-sorted) is already wired for scripts that need a deterministic order.
