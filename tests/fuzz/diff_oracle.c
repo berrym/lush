@@ -63,17 +63,45 @@ static const char *MODE_NAMES[] = {
 };
 
 typedef struct {
-    const char *env_var;        /* env var override of binary path */
-    const char *default_binary; /* fallback path */
-    const char *lush_set_o;     /* `set -o X` to inject when running lush */
+    const char *env_var;           /* env var override of binary path */
+    const char *binary_name;       /* basename for PATH lookup */
+    const char *const *candidates; /* NULL-terminated list of absolute paths */
+    const char *lush_mode; /* `mode X` preset to inject when running lush */
 } oracle_config_t;
 
+/* Candidate paths probed in order when env override is unset and PATH
+ * lookup fails. Covers macOS (Homebrew Intel /usr/local, Apple Silicon
+ * /opt/homebrew, system /bin) and Linux (Debian/Ubuntu /usr/bin, /bin;
+ * Arch /usr/bin; Fedora /usr/bin). dash is not installed by default
+ * on macOS or RHEL-family so its absence is expected there. */
+static const char *const DASH_CANDIDATES[] = {
+    "/usr/bin/dash",          /* Debian/Ubuntu, Arch, Fedora */
+    "/bin/dash",              /* some Debian variants */
+    "/usr/local/bin/dash",    /* macOS Homebrew (Intel) */
+    "/opt/homebrew/bin/dash", /* macOS Homebrew (Apple Silicon) */
+    NULL,
+};
+static const char *const BASH_CANDIDATES[] = {
+    "/bin/bash",              /* most Linux */
+    "/usr/bin/bash",          /* Fedora/Arch */
+    "/usr/local/bin/bash",    /* macOS Homebrew (Intel) */
+    "/opt/homebrew/bin/bash", /* macOS Homebrew (Apple Silicon) */
+    NULL,
+};
+static const char *const ZSH_CANDIDATES[] = {
+    "/bin/zsh",              /* macOS default, some Linux */
+    "/usr/bin/zsh",          /* most Linux distros */
+    "/usr/local/bin/zsh",    /* macOS Homebrew (Intel) */
+    "/opt/homebrew/bin/zsh", /* macOS Homebrew (Apple Silicon) */
+    NULL,
+};
+
 static const oracle_config_t ORACLES[] = {
-    [MODE_POSIX] = {"LUSH_ORACLE_POSIX", "/usr/local/bin/dash", "posix"},
-    [MODE_BASH] = {"LUSH_ORACLE_BASH", "/usr/local/bin/bash", "bash"},
-    [MODE_ZSH] = {"LUSH_ORACLE_ZSH", "/bin/zsh", "zsh"},
-    [MODE_LUSH] = {NULL, NULL, NULL},
-    [MODE_UNKNOWN] = {NULL, NULL, NULL},
+    [MODE_POSIX] = {"LUSH_ORACLE_POSIX", "dash", DASH_CANDIDATES, "posix"},
+    [MODE_BASH] = {"LUSH_ORACLE_BASH", "bash", BASH_CANDIDATES, "bash"},
+    [MODE_ZSH] = {"LUSH_ORACLE_ZSH", "zsh", ZSH_CANDIDATES, "zsh"},
+    [MODE_LUSH] = {NULL, NULL, NULL, "lush"},
+    [MODE_UNKNOWN] = {NULL, NULL, NULL, NULL},
 };
 
 typedef struct {
@@ -116,6 +144,94 @@ static mode_t_ mode_from_path(const char *path) {
         }
     }
     return MODE_UNKNOWN;
+}
+
+/* ============================================================================
+ * Oracle binary resolution
+ * ============================================================================
+ *
+ * Resolution order:
+ *   1. The mode's LUSH_ORACLE_* env var, if set and executable.
+ *   2. The binary basename via PATH lookup (handles unusual install
+ *      prefixes like Nix store paths or /opt/local).
+ *   3. The fixed candidate list (covers macOS Homebrew + the common
+ *      Linux distro locations without requiring PATH to be set).
+ *
+ * Each step is gated by access(path, X_OK) so a present-but-unusable
+ * binary doesn't get selected. Returns the first match or NULL.
+ *
+ * The returned pointer is either a string literal from the candidate
+ * table, an env-var pointer (lifetime: program), or a heap pointer
+ * returned via the static_buf so callers can treat it as live for the
+ * remainder of the per-input call. We use a static buffer for the
+ * PATH search result instead of malloc so we never leak; the buffer
+ * is overwritten on subsequent calls, which is fine because the
+ * caller consumes the path before resolving the next oracle.
+ */
+
+static bool path_executable(const char *path) {
+    return path && path[0] && access(path, X_OK) == 0;
+}
+
+/* PATH lookup. Returns true and fills out_buf if found. out_buf must
+ * be at least PATH_MAX bytes. */
+static bool resolve_via_path(const char *name, char *out_buf, size_t out_cap) {
+    const char *path_env = getenv("PATH");
+    if (!path_env || !path_env[0] || !name || !name[0]) {
+        return false;
+    }
+    const char *p = path_env;
+    while (*p) {
+        const char *colon = strchr(p, ':');
+        size_t dirlen = colon ? (size_t)(colon - p) : strlen(p);
+        if (dirlen > 0 && dirlen + 1 + strlen(name) + 1 <= out_cap) {
+            memcpy(out_buf, p, dirlen);
+            out_buf[dirlen] = '/';
+            size_t name_len = strlen(name);
+            memcpy(out_buf + dirlen + 1, name, name_len);
+            out_buf[dirlen + 1 + name_len] = '\0';
+            if (path_executable(out_buf)) {
+                return true;
+            }
+        }
+        if (!colon) {
+            break;
+        }
+        p = colon + 1;
+    }
+    return false;
+}
+
+static const char *resolve_oracle(mode_t_ mode) {
+    if (mode != MODE_POSIX && mode != MODE_BASH && mode != MODE_ZSH) {
+        return NULL;
+    }
+    const oracle_config_t *cfg = &ORACLES[mode];
+
+    /* 1. Env override */
+    if (cfg->env_var) {
+        const char *env_val = getenv(cfg->env_var);
+        if (path_executable(env_val)) {
+            return env_val;
+        }
+    }
+
+    /* 2. PATH lookup */
+    static char path_buf[MODE_LUSH + 1][4096];
+    if (resolve_via_path(cfg->binary_name, path_buf[mode],
+                         sizeof(path_buf[mode]))) {
+        return path_buf[mode];
+    }
+
+    /* 3. Candidate list */
+    if (cfg->candidates) {
+        for (const char *const *c = cfg->candidates; *c; c++) {
+            if (path_executable(*c)) {
+                return *c;
+            }
+        }
+    }
+    return NULL;
 }
 
 /* ============================================================================
@@ -398,13 +514,16 @@ static int process_input(const char *path, const char *lush_path) {
         return 1;
     }
 
-    const char *lush_set_o = ORACLES[mode].lush_set_o;
+    const char *lush_mode = ORACLES[mode].lush_mode;
 
-    /* Run lush in matching mode. Inject `set -o X` before the input
-     * by passing the combined script via stdin. */
+    /* Run lush in matching mode. Inject `mode X` before the input by
+     * passing the combined script via stdin. `mode` is the canonical
+     * mode-preset selector (May-06 configuration cleanup removed the
+     * `set -o {bash,zsh,lush}` toggles; `set -o posix` survives only
+     * as a bash-bridge alias, so we use `mode` uniformly). */
     char lush_input[DIFF_BUF_SIZE];
-    if (lush_set_o) {
-        snprintf(lush_input, sizeof(lush_input), "set -o %s\n%s", lush_set_o,
+    if (lush_mode) {
+        snprintf(lush_input, sizeof(lush_input), "mode %s\n%s", lush_mode,
                  input);
     } else {
         snprintf(lush_input, sizeof(lush_input), "%s", input);
@@ -413,19 +532,14 @@ static int process_input(const char *path, const char *lush_path) {
     run_result_t lush_r =
         run_with_input(lush_path, lush_argv, lush_input, DIFF_TIMEOUT_SEC);
 
-    /* Resolve oracle binary, with env override. */
-    const char *oracle_bin = NULL;
-    if (mode != MODE_LUSH) {
-        const char *env_val =
-            ORACLES[mode].env_var ? getenv(ORACLES[mode].env_var) : NULL;
-        oracle_bin =
-            (env_val && env_val[0]) ? env_val : ORACLES[mode].default_binary;
-    }
+    /* Resolve oracle binary via env override → PATH → candidate list.
+     * Missing oracle is not fatal: the JSONL record marks it as
+     * absent and the input is skipped from comparison. */
+    const char *oracle_bin = (mode != MODE_LUSH) ? resolve_oracle(mode) : NULL;
 
-    bool oracle_present = false;
+    bool oracle_present = (oracle_bin != NULL);
     run_result_t oracle_r = {0};
-    if (oracle_bin && access(oracle_bin, X_OK) == 0) {
-        oracle_present = true;
+    if (oracle_present) {
         const char *oracle_argv[] = {oracle_bin, NULL};
         oracle_r =
             run_with_input(oracle_bin, oracle_argv, input, DIFF_TIMEOUT_SEC);
@@ -489,10 +603,13 @@ static void usage(const char *prog) {
             "                    (default: "
             "tests/fuzz/differential/known_divergences.txt)\n"
             "\n"
-            "Env overrides for oracles:\n"
-            "  LUSH_ORACLE_POSIX (default /usr/local/bin/dash)\n"
-            "  LUSH_ORACLE_BASH  (default /usr/local/bin/bash)\n"
-            "  LUSH_ORACLE_ZSH   (default /bin/zsh)\n",
+            "Oracle binary resolution (per mode): LUSH_ORACLE_* env var\n"
+            "(if set and executable) -> PATH lookup for 'dash'/'bash'/'zsh'\n"
+            "-> portable candidate list (Homebrew + common Linux paths).\n"
+            "Env overrides:\n"
+            "  LUSH_ORACLE_POSIX  (basename: dash)\n"
+            "  LUSH_ORACLE_BASH   (basename: bash)\n"
+            "  LUSH_ORACLE_ZSH    (basename: zsh)\n",
             prog);
 }
 
