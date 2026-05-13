@@ -7306,16 +7306,27 @@ static int execute_case(executor_t *executor, node_t *node) {
         bool matched = execute_next; // If fall-through, execute without testing
 
         if (!matched) {
-            // Split patterns by | and test each one
-            char *pattern_copy = strdup(patterns);
-            if (!pattern_copy) {
-                free(test_word);
-                return 1;
-            }
+            /* Split patterns by `|` and test each. strtok cannot be
+             * used here because it skips empty tokens -- POSIX `case`
+             * accepts an empty pattern (`''` matches the empty word),
+             * and a multi-pattern arm may legitimately contain an
+             * empty alternative (`case x in ''|a) ...`). strtok would
+             * silently drop those, falling through to the default
+             * `*)` and producing a POSIX-violating result (issue #95).
+             *
+             * Use strchr-based splitting that emits empty tokens. */
+            const char *p = patterns;
+            while (p && !matched) {
+                const char *bar = strchr(p, '|');
+                size_t plen = bar ? (size_t)(bar - p) : strlen(p);
+                char *pattern = malloc(plen + 1);
+                if (!pattern) {
+                    free(test_word);
+                    return 1;
+                }
+                memcpy(pattern, p, plen);
+                pattern[plen] = '\0';
 
-            char *pattern = strtok(pattern_copy, "|");
-            while (pattern && !matched) {
-                // Expand variables in pattern
                 char *expanded_pattern = expand_if_needed(executor, pattern);
                 if (expanded_pattern) {
                     if (match_pattern(test_word, expanded_pattern)) {
@@ -7323,10 +7334,13 @@ static int execute_case(executor_t *executor, node_t *node) {
                     }
                     free(expanded_pattern);
                 }
-                pattern = strtok(NULL, "|");
-            }
+                free(pattern);
 
-            free(pattern_copy);
+                if (!bar) {
+                    break;
+                }
+                p = bar + 1;
+            }
         }
 
         if (matched) {
