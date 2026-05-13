@@ -136,6 +136,7 @@ typedef enum {
     FEATURE_ZSH_PARAM_FLAGS,    /**< Zsh-style parameter flags */
     FEATURE_ZSH_BARE_SUBSCRIPT, /**< Zsh bare-$var[N] subscript (vs ${var[N]})
                                  */
+    FEATURE_ZSH_PRINT_BUILTIN,  /**< Zsh `print` builtin (-l/-n/-r/-u/-f) */
     FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
 
     /* Sentinel - must be last */

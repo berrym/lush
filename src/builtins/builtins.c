@@ -165,6 +165,7 @@ builtin builtins[] = {
     {"type", "display command type", bin_type},
     {"unset", "unset a shell variable", bin_unset},
     {"echo", "echo text to stdout", bin_echo},
+    {"print", "zsh-style print (-l/-n/-r/-u/-f/-P)", bin_print},
     {"printf", "formatted output", bin_printf},
     {"export", "export shell variables", bin_export},
     {"source", "source a script", bin_source},

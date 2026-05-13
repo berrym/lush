@@ -120,6 +120,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PROMPT_COMMAND] = false, /* Not in POSIX */
             [FEATURE_ZSH_PARAM_FLAGS] = false,
             [FEATURE_ZSH_BARE_SUBSCRIPT] = false, /* No arrays in POSIX */
+            [FEATURE_ZSH_PRINT_BUILTIN] = false,  /* Not a POSIX builtin */
             [FEATURE_PLUGIN_SYSTEM] = false,
         },
 
@@ -205,6 +206,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PARAM_FLAGS] = false,
             [FEATURE_ZSH_BARE_SUBSCRIPT] =
                 false, /* Bash treats $a[N] as $a + literal [N] */
+            [FEATURE_ZSH_PRINT_BUILTIN] =
+                false,                       /* Bash has no `print` builtin */
             [FEATURE_PLUGIN_SYSTEM] = false, /* Not a Bash feature */
         },
 
@@ -289,6 +292,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_PROMPT_COMMAND] = false,    /* Zsh uses precmd instead */
             [FEATURE_ZSH_PARAM_FLAGS] = true,
             [FEATURE_ZSH_BARE_SUBSCRIPT] = true, /* Zsh native */
+            [FEATURE_ZSH_PRINT_BUILTIN] = true,  /* Zsh native builtin */
             [FEATURE_PLUGIN_SYSTEM] = false,     /* Not a Zsh feature */
         },
 
@@ -385,7 +389,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 true, /* Now implemented: ${(U)var} etc */
             [FEATURE_ZSH_BARE_SUBSCRIPT] =
                 true, /* Curated: zsh native, no bash conflict */
-            [FEATURE_PLUGIN_SYSTEM] = true, /* Lush extension */
+            [FEATURE_ZSH_PRINT_BUILTIN] = true, /* Curated: -P prompt-expansion
+                                                   uses lush template engine */
+            [FEATURE_PLUGIN_SYSTEM] = true,     /* Lush extension */
         },
 };
 
@@ -480,6 +486,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_PROMPT_COMMAND] = "prompt_command",
     [FEATURE_ZSH_PARAM_FLAGS] = "zsh_param_flags",
     [FEATURE_ZSH_BARE_SUBSCRIPT] = "zsh_bare_subscript",
+    [FEATURE_ZSH_PRINT_BUILTIN] = "zsh_print_builtin",
     [FEATURE_PLUGIN_SYSTEM] = "plugin_system",
 };
 

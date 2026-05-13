@@ -192,6 +192,14 @@ int bin_echo(int argc, char **argv);
 int bin_printf(int argc, char **argv);
 
 /**
+ * @brief Zsh-style print: -l/-n/-r/-u/-f/-P
+ * @param argc Argument count
+ * @param argv Argument vector
+ * @return 0 on success, non-zero on error
+ */
+int bin_print(int argc, char **argv);
+
+/**
  * @brief Export variables to environment
  * @param argc Argument count
  * @param argv Argument vector
