@@ -10132,6 +10132,92 @@ static char *parse_parameter_expansion(executor_t *executor,
                         strcmp(subscript, "*") == 0) {
                         // ${arr[@]} or ${arr[*]} - all elements
                         result = symtable_array_expand(array, " ");
+                    } else if (strchr(subscript, ',') &&
+                               !array->is_associative) {
+                        /* zsh-style range subscript ${arr[N,M]} / $arr[N,M]
+                         * on an indexed array: join elements N..M with a
+                         * single space, matching zsh's default output of
+                         * `$arr[N,M]`. The arithmetic expander interprets
+                         * `N,M` as the C comma operator and returns M --
+                         * which without this branch silently selected the
+                         * M-th element instead of slicing. Supports
+                         * negative indices (zsh: -1 = last); honors
+                         * FEATURE_ARRAY_ZERO_INDEXED for the 1-based vs
+                         * 0-based decision (same shape as the string-
+                         * slicing fallback further down). Comma in
+                         * associative-array subscripts has no range
+                         * meaning -- those keep the C-comma key path. */
+                        char *comma = strchr(subscript, ',');
+                        *comma = '\0';
+                        int start_idx = atoi(subscript);
+                        int end_idx = atoi(comma + 1);
+                        *comma = ',';
+                        size_t total = symtable_array_length(array);
+                        bool one_based =
+                            !shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED);
+                        if (start_idx < 0) {
+                            start_idx =
+                                (int)total + start_idx + (one_based ? 1 : 0);
+                        }
+                        if (end_idx < 0) {
+                            end_idx =
+                                (int)total + end_idx + (one_based ? 1 : 0);
+                        }
+                        if (one_based) {
+                            if (start_idx > 0) {
+                                start_idx--;
+                            }
+                            if (end_idx > 0) {
+                                end_idx--;
+                            }
+                        }
+                        if (start_idx < 0) {
+                            start_idx = 0;
+                        }
+                        if (end_idx >= (int)total) {
+                            end_idx = (int)total - 1;
+                        }
+                        if (end_idx < start_idx || (int)total == 0) {
+                            result = strdup("");
+                        } else {
+                            /* Concatenate elements [start_idx..end_idx]
+                             * with single-space separator. */
+                            size_t cap = 64;
+                            size_t pos = 0;
+                            result = malloc(cap);
+                            if (result) {
+                                result[0] = '\0';
+                                for (int k = start_idx; k <= end_idx; k++) {
+                                    const char *elem =
+                                        symtable_array_get_index(array, k);
+                                    if (!elem) {
+                                        continue;
+                                    }
+                                    size_t elen = strlen(elem);
+                                    size_t need =
+                                        pos + elen + (pos > 0 ? 1 : 0) + 1;
+                                    while (need > cap) {
+                                        cap *= 2;
+                                        char *nr = realloc(result, cap);
+                                        if (!nr) {
+                                            free(result);
+                                            result = NULL;
+                                            break;
+                                        }
+                                        result = nr;
+                                    }
+                                    if (!result) {
+                                        break;
+                                    }
+                                    if (pos > 0) {
+                                        result[pos++] = ' ';
+                                    }
+                                    memcpy(result + pos, elem, elen);
+                                    pos += elen;
+                                    result[pos] = '\0';
+                                }
+                            }
+                        }
                     } else if (array->is_associative) {
                         // Associative array - use subscript as string key
                         char *expanded_subscript =

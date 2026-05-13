@@ -1233,6 +1233,59 @@ static token_t *tokenize_next(tokenizer_t *tokenizer) {
                             break;
                         }
                     }
+
+                    /* Zsh bare-form subscript: $var[N] / $var[N,M] in
+                     * unquoted context. Without this, the tokenizer
+                     * emits TOK_VARIABLE($var) + TOK_LBRACKET([) + ...
+                     * and the parser dispatches `[1]` as the `[` test
+                     * builtin (issue #58). When FEATURE_ZSH_BARE_SUBSCRIPT
+                     * is enabled, absorb the entire [...] into the
+                     * TOK_VARIABLE so parse_parameter_expansion sees
+                     * `$var[N]` as one unit -- same shape as the brace
+                     * form ${var[N]} and the quoted bare form "$var[N]"
+                     * which both already work.
+                     *
+                     * The subscript is scanned by balanced-bracket
+                     * counter so nested brackets in expressions like
+                     * $arr[$other[i]] or $a[$((b[c]+1))] absorb
+                     * correctly. A bracket without a matching close is
+                     * left for the parser to surface as a normal error;
+                     * we don't advance position in that case. The flag
+                     * is curated true in zsh+lush modes, false in
+                     * posix+bash (see src/shell_mode.c). */
+                    if (tokenizer->position < tokenizer->input_length &&
+                        tokenizer->input[tokenizer->position] == '[' &&
+                        shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+                        size_t scan = tokenizer->position;
+                        size_t scan_col = tokenizer->column;
+                        size_t scan_line = tokenizer->line;
+                        int depth = 0;
+                        bool closed = false;
+                        while (scan < tokenizer->input_length) {
+                            char sc = tokenizer->input[scan];
+                            if (sc == '[') {
+                                depth++;
+                            } else if (sc == ']') {
+                                depth--;
+                                if (depth == 0) {
+                                    scan++;
+                                    scan_col++;
+                                    closed = true;
+                                    break;
+                                }
+                            } else if (sc == '\n') {
+                                scan_line++;
+                                scan_col = 0;
+                            }
+                            scan++;
+                            scan_col++;
+                        }
+                        if (closed) {
+                            tokenizer->position = scan;
+                            tokenizer->column = scan_col;
+                            tokenizer->line = scan_line;
+                        }
+                    }
                 }
 
                 size_t length = tokenizer->position - start;
