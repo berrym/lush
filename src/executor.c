@@ -292,6 +292,8 @@ executor_t *executor_new(void) {
     executor->in_script_execution = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
+    executor->shell_exit_requested = false;
+    executor->shell_exit_status = 0;
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
@@ -345,6 +347,8 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->in_script_execution = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
+    executor->shell_exit_requested = false;
+    executor->shell_exit_status = 0;
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
@@ -1166,6 +1170,14 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return last_result;
         }
 
+        /* POSIX-required shell abort (set by executor_request_posix_exit
+         * from sites like ${var:?word}). Subsequent statements in this
+         * batch must not run; the REPL terminates the shell with
+         * shell_exit_status after we return. */
+        if (executor->shell_exit_requested) {
+            return executor->shell_exit_status;
+        }
+
         // Flush stdout to prevent pipeline from picking up residual output
         fflush(stdout);
 
@@ -1807,6 +1819,12 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
             return last_result;
         }
 
+        /* POSIX-required shell abort: short-circuit the chain so the
+         * abort propagates up to execute_command_list and the REPL. */
+        if (executor->shell_exit_requested) {
+            return executor->shell_exit_status;
+        }
+
         // Handle set -e (exit_on_error): exit if command failed and not part of
         // conditional
         if (shell_opts.exit_on_error && last_result != 0) {
@@ -2105,6 +2123,11 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             runaway_tripped = true;
             break;
         }
+
+        /* POSIX-required shell abort fired from inside the body. */
+        if (executor->shell_exit_requested) {
+            break;
+        }
     }
 
     // Decrement loop depth before returning
@@ -2223,6 +2246,11 @@ static int execute_until(executor_t *executor, node_t *until_node) {
 
         if (loop_monitor_check(&monitor, last_result)) {
             runaway_tripped = true;
+            break;
+        }
+
+        /* POSIX-required shell abort fired from inside the body. */
+        if (executor->shell_exit_requested) {
             break;
         }
     }
@@ -2580,6 +2608,16 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                 runaway_tripped = true;
                 break;
             }
+
+            /* POSIX-required shell abort fired from inside the body. */
+            if (executor->shell_exit_requested) {
+                break;
+            }
+        }
+
+        /* Honor abort across the outer iteration as well. */
+        if (executor->shell_exit_requested) {
+            break;
         }
     }
 
@@ -2766,6 +2804,12 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
 
         if (loop_errexit_tripped(last_result)) {
             errexit_tripped = true;
+            break;
+        }
+
+        /* POSIX-required shell abort fired from inside the body --
+         * skip the update expression and exit the loop. */
+        if (executor->shell_exit_requested) {
             break;
         }
 
@@ -3022,6 +3066,11 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                 break;
             }
 
+            /* POSIX-required shell abort: drop out of the select body. */
+            if (executor->shell_exit_requested) {
+                break;
+            }
+
             cmd = cmd->next_sibling;
         }
 
@@ -3032,6 +3081,11 @@ static int execute_select(executor_t *executor, node_t *select_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             continue;
+        }
+
+        /* POSIX-required shell abort: stop the outer select loop. */
+        if (executor->shell_exit_requested) {
+            break;
         }
     }
 
@@ -4480,6 +4534,12 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
 
         // Check for loop control (break/continue)
         if (executor->loop_control != LOOP_NORMAL) {
+            break;
+        }
+
+        /* POSIX-required shell abort: drop out of the brace group so
+         * the request propagates to the surrounding command list. */
+        if (executor->shell_exit_requested) {
             break;
         }
 
@@ -7076,6 +7136,22 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     char *value = expand_if_needed(executor, eq + 1);
     int cmd_sub_exit_status = executor->exit_status;
 
+    /* Propagate expansion failure. ${var:?word} and friends set
+     * expansion_error during expand_if_needed; without this check
+     * execute_assignment silently stores the empty fallback and
+     * returns 0, masking the failure from the caller (execute_command
+     * does check this flag in the command-not-assignment path, but
+     * assignment-only commands bypassed that check). Free what was
+     * allocated and surface expansion_exit_status. shell_exit_requested,
+     * if set, has already been raised by executor_request_posix_exit
+     * and will short-circuit the surrounding command list / loop /
+     * function body. */
+    if (executor->expansion_error) {
+        free(value);
+        free(var_name);
+        return executor->expansion_exit_status;
+    }
+
     // Resolve nameref if the variable is a nameref (max depth 10)
     const char *target_name = var_name;
     char *resolved_to_free = NULL; // Track if we need to free resolved name
@@ -9144,6 +9220,45 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
  * @return Expanded value (caller must free)
  */
 /**
+ * @brief Queue a POSIX-required shell-level exit
+ *
+ * IEEE 1003.1 defines several conditions under which a non-interactive
+ * shell shall exit immediately: ${var:?word} on a null-or-unset
+ * parameter, ${var?word} on an unset parameter, and (when `set -u` is
+ * active) any reference to an unbound variable, among others. This
+ * helper centralizes the trigger:
+ *
+ *  - Always sets expansion_error + expansion_exit_status so the
+ *    current expansion bails and the immediate command surfaces a
+ *    non-zero exit. This is the existing behavior for these sites.
+ *  - In non-interactive shells, additionally raises
+ *    shell_exit_requested with shell_exit_status. Every command-list
+ *    walker, loop body, function-call dispatcher, and the top-level
+ *    REPL honors that flag by short-circuiting up to the run loop,
+ *    which terminates the shell with shell_exit_status. The flag
+ *    persists across statements within the batch -- this is the
+ *    point: subsequent statements in the script must NOT run.
+ *  - Interactive shells never set shell_exit_requested. They emit
+ *    the diagnostic and continue at the next prompt, per spec.
+ *
+ * is_interactive_shell() is the canonical query used elsewhere in the
+ * executor for the same exit-on-error distinction (see executor.c
+ * around line 10598 where the symmetric query gates an exit() call
+ * for SHELL_ERR_UNBOUND_VARIABLE inside command-builtin paths).
+ *
+ * @param executor Executor context (must be non-NULL)
+ * @param status Status the shell exits with
+ */
+static void executor_request_posix_exit(executor_t *executor, int status) {
+    executor->expansion_error = true;
+    executor->expansion_exit_status = status;
+    if (!is_interactive_shell()) {
+        executor->shell_exit_requested = true;
+        executor->shell_exit_status = status;
+    }
+}
+
+/**
  * @brief Emit a "parameter null or unset" error for ${var:?word} / ${var?word}
  *
  * Both POSIX required-parameter forms share identical reporting shape:
@@ -9153,9 +9268,10 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
  * "null or unset" and "unset only" is the trigger condition (handled at
  * the call site); the reporting code is the same.
  *
- * Mirrors the existing pattern used by the unbound-variable error in
- * parse_parameter_expansion (set executor->expansion_error +
- * expansion_exit_status, allow || constructs to react, return "").
+ * Routes through executor_request_posix_exit() so the shell-level
+ * abort fires in non-interactive shells per POSIX -- the prior
+ * implementation only marked expansion_error, which made the current
+ * command fail but allowed subsequent script statements to run.
  *
  * @param executor Executor context (for error_report and expansion flags)
  * @param var_name Name of the unset/null parameter
@@ -9169,8 +9285,7 @@ static char *handle_required_param_error(executor_t *executor,
     const char *msg = (word && *word) ? word : default_msg;
     executor_error_report(executor, SHELL_ERR_PARAMETER_NULL_OR_UNSET,
                           SOURCE_LOC_UNKNOWN, "%s: %s", var_name, msg);
-    executor->expansion_error = true;
-    executor->expansion_exit_status = 1;
+    executor_request_posix_exit(executor, 1);
     return strdup("");
 }
 

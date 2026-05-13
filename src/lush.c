@@ -357,6 +357,17 @@ int main(int argc, char **argv) {
         last_exit_status = exit_status;
         set_exit_status(exit_status);
 
+        /* POSIX-required shell abort (e.g. ${var:?word} on a null-or-
+         * unset parameter in a non-interactive shell). The trigger
+         * sites raise this flag via executor_request_posix_exit() and
+         * every loop body / command list short-circuits up to here.
+         * Honor it before consuming any more script input. */
+        if (global_executor && global_executor->shell_exit_requested) {
+            last_exit_status = global_executor->shell_exit_status;
+            set_exit_status(last_exit_status);
+            exit_flag = true;
+        }
+
         /* Advance cumulative line counter by the number of source
          * lines consumed by this batch. Interactive mode skips this
          * since the counter stays at 1. */

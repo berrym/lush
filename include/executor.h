@@ -97,6 +97,18 @@ typedef struct executor {
     bool expansion_error;      // True if error occurred during expansion
     int expansion_exit_status; // Exit status from expansion errors
 
+    /* POSIX-required shell-level exit. A handful of error sites are
+     * defined by IEEE 1003.1 to cause a non-interactive shell to exit
+     * (e.g. ${var:?word} on null-or-unset, ${var?word} on unset, set -u
+     * unbound-variable references). The trigger sites set
+     * shell_exit_requested=true and stash the status here; every loop
+     * body, command-list, and the top-level REPL honors the flag by
+     * short-circuiting. Interactive shells never set the flag -- they
+     * print the diagnostic and continue at the next prompt, per spec.
+     * Set via executor_request_posix_exit(); never written directly. */
+    bool shell_exit_requested;
+    int shell_exit_status;
+
     // Error context stack (Phase 3: context-aware error management)
     char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; // "while executing X"
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
