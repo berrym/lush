@@ -449,6 +449,13 @@ int bin_declare(int argc, char **argv) {
             } else {
                 symtable_set(manager, name, "0");
             }
+            /* Mark the variable as integer-typed so subsequent
+             * assignments arith-evaluate their RHS (issue #102).
+             * Without this, `declare -i n=5; n=n+10` would only
+             * apply arithmetic to the initial 5; the n=n+10 line
+             * would store the literal string "n+10". */
+            symvar_flags_t flags = symtable_get_flags(manager, name);
+            symtable_set_flags(manager, name, flags | SYMVAR_INTEGER_ATTR);
         }
         // Handle nameref declaration (-n)
         else if (opt_nameref) {

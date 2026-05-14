@@ -82,7 +82,9 @@ typedef enum {
     SYMVAR_NAMEREF_FLAG = (1 << 5), // Variable is a nameref (local -n)
     SYMVAR_LOWERCASE = (1 << 6),    // Convert value to lowercase (declare -l)
     SYMVAR_UPPERCASE = (1 << 7),    // Convert value to uppercase (declare -u)
-    SYMVAR_TRACE = (1 << 8)         // Trace attribute (declare -t)
+    SYMVAR_TRACE = (1 << 8),        // Trace attribute (declare -t)
+    SYMVAR_INTEGER_ATTR = (1 << 9)  // Integer (declare -i): RHS of
+                                    // assignment is arith-evaluated
 } symvar_flags_t;
 
 // Scope types for different contexts

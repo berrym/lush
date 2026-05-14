@@ -95,6 +95,41 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc);
 static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                                   char ***out_vec, int *out_count);
+
+/* Context for ${!prefix*} / ${!prefix@} name collection. Callback
+ * appends every variable whose name starts with `prefix` into a
+ * growable string array. Defined at file scope (rather than nested
+ * in the use site) because C lacks nested functions. Issue #102. */
+typedef struct {
+    char **names;
+    size_t count;
+    size_t capacity;
+    const char *prefix;
+    size_t prefix_len;
+} prefix_collect_ctx_t;
+
+static void prefix_collect_cb(const char *key, const char *value,
+                              void *userdata) {
+    (void)value;
+    prefix_collect_ctx_t *c = (prefix_collect_ctx_t *)userdata;
+    if (strncmp(key, c->prefix, c->prefix_len) != 0) {
+        return;
+    }
+    if (c->count >= c->capacity) {
+        size_t newcap = c->capacity ? c->capacity * 2 : 16;
+        char **nn = realloc(c->names, newcap * sizeof(char *));
+        if (!nn) {
+            return;
+        }
+        c->names = nn;
+        c->capacity = newcap;
+    }
+    c->names[c->count++] = strdup(key);
+}
+
+static int strptr_cmp(const void *a, const void *b) {
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
 static bool is_stdout_captured(void);
 static bool has_stdout_redirections(node_t *command);
 static bool builtin_can_fork(const char *name);
@@ -4548,7 +4583,31 @@ char *expand_if_needed(executor_t *executor, const char *text) {
     // Single-quoted content should not be expanded (POSIX requirement)
     // BUT: Don't enter this path for command substitution $(...) or `...`
     // which may contain quotes internally
-    if (strchr(text, '\'') && !(text[0] == '$' && text[1] == '(') &&
+    /* Enter the single-quote-handling block only when the text has
+     * at least one MATCHED pair of UNESCAPED single quotes. The
+     * parser pre-escapes `'` chars inside TOK_EXPANDABLE_STRING
+     * content (issue #102) so they appear here as `\'` and must
+     * not count toward the pair check -- those are literal
+     * characters that the POSIX-unquoted backslash rule resolves
+     * downstream. */
+    bool has_paired_single_quote = false;
+    {
+        size_t unescaped = 0;
+        for (const char *p = text; *p; p++) {
+            if (*p == '\\' && p[1]) {
+                p++;
+                continue;
+            }
+            if (*p == '\'') {
+                unescaped++;
+                if (unescaped >= 2) {
+                    has_paired_single_quote = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (has_paired_single_quote && !(text[0] == '$' && text[1] == '(') &&
         !(text[0] == '`')) {
         size_t len = strlen(text);
         size_t result_capacity = len + 1;
@@ -7680,6 +7739,21 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         return executor->expansion_exit_status;
     }
 
+    /* Integer attribute (declare -i): subsequent assignments to the
+     * variable arith-evaluate the RHS rather than storing the literal
+     * string. `declare -i n; n=5+3` stores "8", not "5+3". Same for
+     * `n=other_var+1` -- the RHS is evaluated as an arithmetic
+     * expression which resolves identifiers as variables. Issue #102. */
+    if (symtable_get_flags(executor->symtable, var_name) &
+        SYMVAR_INTEGER_ATTR) {
+        char *evaluated =
+            arithm_expand_with_executor(executor, value ? value : "");
+        if (evaluated) {
+            free(value);
+            value = evaluated;
+        }
+    }
+
     // Resolve nameref if the variable is a nameref (max depth 10)
     const char *target_name = var_name;
     char *resolved_to_free = NULL; // Track if we need to free resolved name
@@ -9285,19 +9359,29 @@ static char *transform_quote(const char *str) {
         return strdup("''");
     }
 
-    // Use $'...' quoting for strings with special characters
     size_t len = strlen(str);
-    bool needs_special = false;
 
+    /* ${var@Q} produces a quoted representation safe to re-eval.
+     * bash uses two output forms:
+     *   - For printable strings without control chars: 'content'
+     *     with embedded single quotes escaped as '\'' (close quote,
+     *     literal '\'', reopen quote).
+     *   - For strings containing control chars (\n, \t, etc): $'...'
+     *     ANSI-C quoting with \n / \t / \xNN escapes.
+     * Match bash's choice so diff_oracle can byte-compare against
+     * the corpus. Issue #102.
+     */
+    bool has_control = false;
     for (size_t i = 0; i < len; i++) {
-        if (str[i] < 32 || str[i] == '\'' || str[i] == '\\') {
-            needs_special = true;
+        unsigned char c = (unsigned char)str[i];
+        if (c < 32) {
+            has_control = true;
             break;
         }
     }
 
-    if (needs_special) {
-        // Use $'...' format with escape sequences
+    if (has_control) {
+        /* $'...' ANSI-C form for strings with control chars. */
         size_t result_size = len * 4 + 4;
         char *result = malloc(result_size);
         if (!result) {
@@ -9336,13 +9420,34 @@ static char *transform_quote(const char *str) {
         result[pos] = '\0';
         return result;
     } else {
-        // Simple single quotes
-        size_t result_size = len + 3;
+        /* Single-quoted form with bash's close-escape-reopen idiom
+         * for embedded single quotes. Each `'` in str becomes
+         * `'\''`: close the open quote (`'`), emit a literal-quoted
+         * single quote (`\'`), then reopen (`'`). For a string
+         * with no embedded quotes this collapses to the simple
+         * `'content'` form. Each `'` worst-case expands to 4 chars,
+         * so worst-case output size is len*4 + 3. */
+        size_t result_size = len * 4 + 3;
         char *result = malloc(result_size);
         if (!result) {
             return strdup("''");
         }
-        snprintf(result, result_size, "'%s'", str);
+        size_t pos = 0;
+        result[pos++] = '\'';
+        for (size_t i = 0; i < len; i++) {
+            unsigned char c = (unsigned char)str[i];
+            if (c == '\'') {
+                /* Emit `'\''`: close, escape, reopen. */
+                result[pos++] = '\'';
+                result[pos++] = '\\';
+                result[pos++] = '\'';
+                result[pos++] = '\'';
+            } else {
+                result[pos++] = c;
+            }
+        }
+        result[pos++] = '\'';
+        result[pos] = '\0';
         return result;
     }
 }
@@ -9649,6 +9754,14 @@ static char *get_variable_attributes(const char *name) {
     // Get variable flags
     symvar_flags_t flags = symtable_get_flags(mgr, name);
 
+    /* Bash ${var@a} attribute-string ordering: bash emits `irx` form
+     * (integer, readonly, exported) and 'a' / 'A' for indexed /
+     * associative arrays. Order matters only for stylistic match
+     * with bash output; bash's actual order is by attribute introduction
+     * date. Issue #102. */
+    if (flags & SYMVAR_INTEGER_ATTR) {
+        attrs[idx++] = 'i';
+    }
     if (flags & SYMVAR_READONLY) {
         attrs[idx++] = 'r';
     }
@@ -10692,46 +10805,48 @@ static char *parse_parameter_expansion(executor_t *executor,
             strncpy(prefix, var_name, name_len - 1);
             prefix[name_len - 1] = '\0';
 
-            // Get all variable names matching prefix from environment
-            // For now, scan environment variables
-            size_t prefix_len = strlen(prefix);
-            size_t result_size = 256;
-            char *result = malloc(result_size);
-            if (!result) {
-                free(prefix);
-                return strdup("");
-            }
-            result[0] = '\0';
-            size_t result_pos = 0;
+            /* Enumerate the symbol table for matching names. The prior
+             * implementation only scanned `environ` (exported vars
+             * only); most shell-local variables never reach environ.
+             * Collect into a dynamic array via the symtable enumerator,
+             * sort alphabetically for determinism (bash documents the
+             * order as unspecified but the corpus depends on a stable
+             * order for byte-for-byte diff_oracle comparison).
+             * Issue #102. The callback and qsort comparator are
+             * file-scope helpers because C lacks nested functions. */
+            prefix_collect_ctx_t ctx = {NULL, 0, 0, prefix, strlen(prefix)};
+            symtable_enumerate_global_vars(prefix_collect_cb, &ctx);
 
-            extern char **environ;
-            for (char **env = environ; *env; env++) {
-                if (strncmp(*env, prefix, prefix_len) == 0) {
-                    char *eq = strchr(*env, '=');
-                    if (eq) {
-                        size_t var_len = eq - *env;
-                        if (result_pos + var_len + 2 >= result_size) {
-                            result_size *= 2;
-                            char *new_result = realloc(result, result_size);
-                            if (!new_result) {
-                                free(result);
-                                free(prefix);
-                                return strdup("");
-                            }
-                            result = new_result;
-                        }
-                        if (result_pos > 0) {
-                            result[result_pos++] = ' ';
-                        }
-                        strncpy(result + result_pos, *env, var_len);
-                        result_pos += var_len;
-                        result[result_pos] = '\0';
+            if (ctx.count > 1) {
+                qsort(ctx.names, ctx.count, sizeof(char *), strptr_cmp);
+            }
+
+            /* Build space-separated result. */
+            size_t total_len = 0;
+            for (size_t i = 0; i < ctx.count; i++) {
+                total_len += strlen(ctx.names[i]) + 1;
+            }
+            char *result = malloc(total_len + 1);
+            if (result) {
+                result[0] = '\0';
+                size_t pos = 0;
+                for (size_t i = 0; i < ctx.count; i++) {
+                    if (i > 0) {
+                        result[pos++] = ' ';
                     }
+                    size_t l = strlen(ctx.names[i]);
+                    memcpy(result + pos, ctx.names[i], l);
+                    pos += l;
+                    result[pos] = '\0';
                 }
             }
 
+            for (size_t i = 0; i < ctx.count; i++) {
+                free(ctx.names[i]);
+            }
+            free(ctx.names);
             free(prefix);
-            return result;
+            return result ? result : strdup("");
         }
 
         // Check for ${!arr[@]} or ${!arr[*]} - array keys
@@ -11884,8 +11999,24 @@ static char *parse_parameter_expansion(executor_t *executor,
             break;
 
         case 17: // ${var@op} - transformations
-            if (var_value && expanded_default[0]) {
+            if (expanded_default[0]) {
                 char op = expanded_default[0];
+                /* The @a (attribute query) variant only inspects the
+                 * variable's metadata and doesn't need var_value to
+                 * be set. Arrays specifically have NULL var_value
+                 * (scalar lookup misses them), so the prior
+                 * `if (var_value && ...)` guard hid the attribute
+                 * for `declare -A arr; echo "${arr@a}"`. Issue #102.
+                 * Other @op flavors do still need a value; for those
+                 * fall through to the empty-result path. */
+                if (op == 'a') {
+                    result = get_variable_attributes(var_name);
+                    break;
+                }
+                if (!var_value) {
+                    result = strdup("");
+                    break;
+                }
                 switch (op) {
                 case 'Q': // Quote value for reuse as input
                     result = transform_quote(var_value);
@@ -11898,9 +12029,6 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
                 case 'A': // Assignment statement form
                     result = transform_assignment(var_name, var_value);
-                    break;
-                case 'a': // Attribute flags
-                    result = get_variable_attributes(var_name);
                     break;
                 case 'U': // Uppercase all
                     result = convert_case_all_upper(var_value);
