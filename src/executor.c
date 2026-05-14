@@ -3604,6 +3604,347 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
  * @return Newly malloc'd expanded string, or NULL only if the
  *         underlying expansion fails (notably process substitution).
  */
+/**
+ * @brief Detect a "vector-yielding" argument and expand it to N words
+ *
+ * Several parameter-expansion shapes produce a sequence of words that,
+ * when used in argv position, must occupy N separate slots rather than
+ * one concatenated slot. This is the bash special-case that makes
+ * `"$@"` / `"${arr[@]}"` / `"${!arr[@]}"` and their `[*]:N:M` slice
+ * variants behave correctly: in unquoted context IFS-split happens on
+ * the joined string, in quoted context the original element boundaries
+ * are preserved.
+ *
+ * lush's parser strips outer quotes from the node's val.str, so we
+ * can't distinguish `"${arr[@]}"` from `${arr[@]}` by punctuation
+ * alone. Instead this helper matches by structure: if val.str is
+ * exactly a single vector-yielding form (no surrounding text), we
+ * explode it; otherwise we return false and let the caller fall back
+ * to scalar expansion. The structural restriction is what bash uses
+ * too -- `"prefix${arr[@]}suffix"` does NOT preserve word boundaries
+ * (it becomes one concatenated string), only the bare form does.
+ *
+ * Recognized forms (after trimming surrounding whitespace):
+ *   $@                       positional params
+ *   $*                       positional params
+ *   ${@}, ${*}               braced positional params
+ *   ${NAME[@]}, ${NAME[*]}   array all-elements
+ *   ${!NAME[@]}              array keys (assoc) / indices (indexed)
+ *   ${NAME[@]:N},  ${NAME[@]:N:M}, ${NAME[*]:N:M}  array slice
+ *
+ * @param executor Executor context
+ * @param node     Argument node
+ * @param out_vec  Output: array of N newly-malloc'd strings (caller
+ *                 frees each element AND the array). Untouched on false.
+ * @param out_count Output: N (number of words produced). 0 is valid.
+ * @return true if the node was a vector form and out_vec/out_count were
+ *         populated; false otherwise.
+ */
+static bool try_expand_vector_arg(executor_t *executor, node_t *node,
+                                  char ***out_vec, int *out_count) {
+    if (!node || !node->val.str) {
+        return false;
+    }
+    /* Only quoted-string and string-expandable shapes carry a single
+     * parameter-expansion as their entire payload. Other node types
+     * (command sub, arith, etc.) are not vector candidates. */
+    if (node->type != NODE_STRING_EXPANDABLE && node->type != NODE_VAR) {
+        return false;
+    }
+
+    const char *s = node->val.str;
+    while (*s && isspace((unsigned char)*s)) {
+        s++;
+    }
+    size_t len = strlen(s);
+    while (len > 0 && isspace((unsigned char)s[len - 1])) {
+        len--;
+    }
+    if (len == 0) {
+        return false;
+    }
+
+    /* $@ / $* (unbraced). */
+    bool positional_at =
+        (len == 2 && s[0] == '$' && (s[1] == '@' || s[1] == '*'));
+    /* ${...} braced forms. */
+    bool braced = (len >= 3 && s[0] == '$' && s[1] == '{' && s[len - 1] == '}');
+
+    if (!positional_at && !braced) {
+        return false;
+    }
+
+    /* Distinguish what's inside the braces. For positional_at the
+     * "name" is `@` / `*`; subscript is implied. For braced forms:
+     * - `${@}` / `${*}` -> positional, same as $@/$*
+     * - `${NAME[@]}` / `${NAME[*]}` -> array all
+     * - `${!NAME[@]}` -> array keys
+     * - any of the above with `:N` or `:N:M` slicing suffix
+     * - anything else -> not a vector form
+     */
+    bool keys_form = false;
+    const char *name_start = NULL;
+    size_t name_len = 0;
+    char subscript = '@'; /* @ vs *; only matters for joining policy */
+    int slice_offset = 0;
+    int slice_length = -1; /* -1 = "to end" */
+    bool has_slice = false;
+    bool is_positional = positional_at;
+
+    if (positional_at) {
+        subscript = s[1];
+    } else {
+        /* inner content between { and } */
+        const char *p = s + 2;
+        const char *end = s + len - 1;
+        if (p == end) {
+            return false;
+        }
+        if (*p == '!') {
+            keys_form = true;
+            p++;
+        }
+        if (p == end) {
+            return false;
+        }
+        /* Special-cased ${@} / ${*}: positional, no subscript. */
+        if (!keys_form && (end - p) == 1 && (*p == '@' || *p == '*')) {
+            is_positional = true;
+            subscript = *p;
+        } else {
+            /* Must be NAME[@] / NAME[*] optionally followed by :N or :N:M */
+            name_start = p;
+            while (p < end && (isalnum((unsigned char)*p) || *p == '_')) {
+                p++;
+            }
+            name_len = (size_t)(p - name_start);
+            if (name_len == 0) {
+                return false;
+            }
+            if (p >= end || *p != '[') {
+                return false;
+            }
+            p++;
+            if (p >= end || (*p != '@' && *p != '*')) {
+                return false;
+            }
+            subscript = *p;
+            p++;
+            if (p >= end || *p != ']') {
+                return false;
+            }
+            p++;
+            /* Optional slicing :N or :N:M. */
+            if (p < end && *p == ':') {
+                has_slice = true;
+                p++;
+                if (p >= end) {
+                    return false;
+                }
+                char *endp = NULL;
+                /* end is past the trailing `}`; we need a NUL-terminated
+                 * span. Copy the slice spec into a scratch buffer. */
+                size_t spec_len = (size_t)(end - p);
+                char spec[64];
+                if (spec_len >= sizeof(spec)) {
+                    return false;
+                }
+                memcpy(spec, p, spec_len);
+                spec[spec_len] = '\0';
+                slice_offset = (int)strtol(spec, &endp, 10);
+                if (!endp) {
+                    return false;
+                }
+                if (*endp == ':') {
+                    slice_length = (int)strtol(endp + 1, NULL, 10);
+                } else if (*endp != '\0') {
+                    return false;
+                }
+            } else if (p != end) {
+                /* Junk between `]` and `}`. Not a recognised vector form. */
+                return false;
+            }
+        }
+    }
+
+    /* Now produce the element vector. */
+    char **vec = NULL;
+    int vcount = 0;
+    int vcap = 0;
+
+    if (is_positional) {
+        /* Iterate $1..$N from positional params. Match the existing
+         * "$@" loop in execute_for: in function scope use symtable
+         * "1".."N"; otherwise use shell_argv. */
+        int total;
+        if (symtable_in_function_scope(executor->symtable)) {
+            char *argc_str = symtable_get_var(executor->symtable, "#");
+            total = argc_str ? atoi(argc_str) : 0;
+            free(argc_str);
+            for (int i = 1; i <= total; i++) {
+                char name[16];
+                snprintf(name, sizeof(name), "%d", i);
+                char *val = symtable_get_var(executor->symtable, name);
+                if (!val) {
+                    val = strdup("");
+                }
+                if (!add_to_argv_list(&vec, &vcount, &vcap, val)) {
+                    for (int k = 0; k < vcount; k++) {
+                        free(vec[k]);
+                    }
+                    free(vec);
+                    return false;
+                }
+            }
+        } else {
+            for (int i = 1; i < shell_argc; i++) {
+                char *val = strdup(shell_argv[i] ? shell_argv[i] : "");
+                if (!add_to_argv_list(&vec, &vcount, &vcap, val)) {
+                    free(val);
+                    for (int k = 0; k < vcount; k++) {
+                        free(vec[k]);
+                    }
+                    free(vec);
+                    return false;
+                }
+            }
+        }
+    } else {
+        /* Array name lookup. Need a NUL-terminated name. */
+        char name_buf[256];
+        if (name_len >= sizeof(name_buf)) {
+            return false;
+        }
+        memcpy(name_buf, name_start, name_len);
+        name_buf[name_len] = '\0';
+
+        array_value_t *array = symtable_get_array(name_buf);
+        if (!array) {
+            /* Not actually an array -- not our case; fall back. */
+            return false;
+        }
+
+        if (keys_form) {
+            /* Produce keys (assoc) or indices (indexed). Honor slicing. */
+            if (array->is_associative) {
+                size_t kcount = 0;
+                char **keys = symtable_array_get_keys(array, &kcount);
+                if (!keys) {
+                    return false;
+                }
+                int start = 0, end_idx = (int)kcount - 1;
+                if (has_slice) {
+                    start = slice_offset;
+                    if (start < 0) {
+                        start = (int)kcount + start;
+                        if (start < 0) {
+                            start = 0;
+                        }
+                    }
+                    if (slice_length >= 0) {
+                        end_idx = start + slice_length - 1;
+                    } else {
+                        end_idx = (int)kcount - 1;
+                    }
+                    if (end_idx >= (int)kcount) {
+                        end_idx = (int)kcount - 1;
+                    }
+                }
+                for (int k = start; k <= end_idx; k++) {
+                    if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                          strdup(keys[k]))) {
+                        for (int j = 0; j < vcount; j++) {
+                            free(vec[j]);
+                        }
+                        free(vec);
+                        for (size_t j = 0; j < kcount; j++) {
+                            free(keys[j]);
+                        }
+                        free(keys);
+                        return false;
+                    }
+                }
+                for (size_t j = 0; j < kcount; j++) {
+                    free(keys[j]);
+                }
+                free(keys);
+            } else {
+                /* Indexed array: keys are numeric indices 0..N-1. */
+                size_t total = symtable_array_length(array);
+                int start = 0, end_idx = (int)total - 1;
+                if (has_slice) {
+                    start = slice_offset;
+                    if (start < 0) {
+                        start = (int)total + start;
+                        if (start < 0) {
+                            start = 0;
+                        }
+                    }
+                    if (slice_length >= 0) {
+                        end_idx = start + slice_length - 1;
+                    } else {
+                        end_idx = (int)total - 1;
+                    }
+                    if (end_idx >= (int)total) {
+                        end_idx = (int)total - 1;
+                    }
+                }
+                for (int k = start; k <= end_idx; k++) {
+                    char idx_str[16];
+                    snprintf(idx_str, sizeof(idx_str), "%d", k);
+                    if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                          strdup(idx_str))) {
+                        for (int j = 0; j < vcount; j++) {
+                            free(vec[j]);
+                        }
+                        free(vec);
+                        return false;
+                    }
+                }
+            }
+        } else {
+            /* Produce values. Honor slicing. */
+            size_t total = symtable_array_length(array);
+            int start = 0, end_idx = (int)total - 1;
+            if (has_slice) {
+                start = slice_offset;
+                if (start < 0) {
+                    start = (int)total + start;
+                    if (start < 0) {
+                        start = 0;
+                    }
+                }
+                if (slice_length >= 0) {
+                    end_idx = start + slice_length - 1;
+                } else {
+                    end_idx = (int)total - 1;
+                }
+                if (end_idx >= (int)total) {
+                    end_idx = (int)total - 1;
+                }
+            }
+            for (int k = start; k <= end_idx; k++) {
+                const char *elem = symtable_array_get_index(array, k);
+                if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                      strdup(elem ? elem : ""))) {
+                    for (int j = 0; j < vcount; j++) {
+                        free(vec[j]);
+                    }
+                    free(vec);
+                    return false;
+                }
+            }
+        }
+    }
+
+    (void)subscript; /* @ vs * matters only for joining; vector form
+                        is the same for both. */
+
+    *out_vec = vec;
+    *out_count = vcount;
+    return true;
+}
+
 static char *expand_arg_node(executor_t *executor, node_t *node) {
     if (!node || !node->val.str) {
         return strdup("");
@@ -3731,6 +4072,30 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                 }
 
                 if (!is_delimiter) {
+                    /* Vector-yielding expansion: `"$@"`, `"${arr[@]}"`,
+                     * `"${!arr[@]}"` and their slice variants must
+                     * produce N separate argv slots, not one
+                     * concatenated slot. Detect before scalar
+                     * expansion so the original element boundaries
+                     * survive (issue #97). */
+                    char **vec = NULL;
+                    int vcount = 0;
+                    if (try_expand_vector_arg(executor, child, &vec, &vcount)) {
+                        for (int j = 0; j < vcount; j++) {
+                            if (!add_to_argv_list(&argv_list, &argv_count,
+                                                  &argv_capacity, vec[j])) {
+                                for (int k = j; k < vcount; k++) {
+                                    free(vec[k]);
+                                }
+                                free(vec);
+                                goto cleanup_and_fail;
+                            }
+                        }
+                        free(vec);
+                        child = child->next_sibling;
+                        continue;
+                    }
+
                     /* Type-aware expansion via the shared helper.
                      * Process substitution is the only path that
                      * propagates failure as NULL — everything else
@@ -10142,8 +10507,91 @@ static char *parse_parameter_expansion(executor_t *executor,
                 if (array) {
                     char *result = NULL;
 
-                    if (strcmp(subscript, "@") == 0 ||
-                        strcmp(subscript, "*") == 0) {
+                    /* Detect a bash slicing suffix `:N` / `:N:M` after
+                     * the closing `]`. ${arr[@]:N}, ${arr[@]:N:M},
+                     * ${arr[*]:N:M} are element-wise slices on the
+                     * array, not byte-wise on the joined string -- the
+                     * generic substring case (parse_parameter_expansion
+                     * case 14) would silently drop these because it
+                     * couldn't resolve `arr[@]` as a scalar var, and
+                     * even with a resolution it would byte-slice the
+                     * joined string instead of picking elements. Issue
+                     * #97. */
+                    int slice_offset = 0;
+                    int slice_length = -1; /* -1 = "to end" */
+                    bool has_slice = (close[1] == ':' &&
+                                      (strcmp(subscript, "@") == 0 ||
+                                       strcmp(subscript, "*") == 0) &&
+                                      !array->is_associative);
+                    if (has_slice) {
+                        const char *spec = close + 2;
+                        char *endp = NULL;
+                        slice_offset = (int)strtol(spec, &endp, 10);
+                        if (endp && *endp == ':') {
+                            slice_length = (int)strtol(endp + 1, NULL, 10);
+                        }
+                    }
+
+                    if (has_slice) {
+                        size_t total = symtable_array_length(array);
+                        /* Negative offset counts from end (bash). */
+                        if (slice_offset < 0) {
+                            slice_offset = (int)total + slice_offset;
+                            if (slice_offset < 0) {
+                                slice_offset = 0;
+                            }
+                        }
+                        int end_idx;
+                        if (slice_length < 0) {
+                            end_idx = (int)total - 1;
+                        } else {
+                            end_idx = slice_offset + slice_length - 1;
+                        }
+                        if (end_idx >= (int)total) {
+                            end_idx = (int)total - 1;
+                        }
+                        if (slice_offset >= (int)total ||
+                            end_idx < slice_offset) {
+                            result = strdup("");
+                        } else {
+                            size_t cap = 64;
+                            size_t pos = 0;
+                            result = malloc(cap);
+                            if (result) {
+                                result[0] = '\0';
+                                for (int k = slice_offset; k <= end_idx; k++) {
+                                    const char *elem =
+                                        symtable_array_get_index(array, k);
+                                    if (!elem) {
+                                        continue;
+                                    }
+                                    size_t elen = strlen(elem);
+                                    size_t need =
+                                        pos + elen + (pos > 0 ? 1 : 0) + 1;
+                                    while (need > cap) {
+                                        cap *= 2;
+                                        char *nr = realloc(result, cap);
+                                        if (!nr) {
+                                            free(result);
+                                            result = NULL;
+                                            break;
+                                        }
+                                        result = nr;
+                                    }
+                                    if (!result) {
+                                        break;
+                                    }
+                                    if (pos > 0) {
+                                        result[pos++] = ' ';
+                                    }
+                                    memcpy(result + pos, elem, elen);
+                                    pos += elen;
+                                    result[pos] = '\0';
+                                }
+                            }
+                        }
+                    } else if (strcmp(subscript, "@") == 0 ||
+                               strcmp(subscript, "*") == 0) {
                         // ${arr[@]} or ${arr[*]} - all elements
                         result = symtable_array_expand(array, " ");
                     } else if (strchr(subscript, ',') &&
@@ -11601,13 +12049,17 @@ static char *expand_command_substitution(executor_t *executor,
         }
     }
 
-    // Expand variables in the command before executing it
-    char *expanded_command = expand_variables_in_string(executor, command);
-    free(command);
-    if (!expanded_command) {
-        return strdup("");
-    }
-    command = expanded_command;
+    /* Pre-fork variable expansion of the command text was removed in
+     * the #97 fix: it collapsed array values ("${!arr[@]}", "${arr[@]}")
+     * into space-joined scalars before the child parser ever saw them,
+     * which destroyed the per-element word boundaries the child would
+     * otherwise have honored via the vector-expansion path in
+     * build_argv_from_ast. The child inherits parent state through
+     * fork() (full memory copy, including non-exported locals), so it
+     * can parse and expand the raw command text natively -- which is
+     * also what bash/dash/zsh do for $(...) -- and produce correctly
+     * separated arguments. Pre-expansion was an architectural layering
+     * violation that masked array semantics. */
 
     // Create a pipe to capture command output
     int pipefd[2];
@@ -13589,6 +14041,47 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
             result = (*p == '\0');
         } else if (strcmp(op, "-n") == 0) {
             result = (*p != '\0');
+        } else if (strcmp(op, "-v") == 0) {
+            /* -v NAME -- true if scalar variable NAME is set.
+             * -v NAME[KEY] / NAME[N] -- true if the array element
+             * is set (associative key present, indexed slot has a
+             * value). Bash semantics: -v on an unset arr[k] returns
+             * false; on an unset scalar also false. Issue #97. */
+            char *arg = strdup(p);
+            if (arg) {
+                char *end = arg + strlen(arg) - 1;
+                while (end > arg && isspace(*end)) {
+                    *end-- = '\0';
+                }
+                char *bracket = strchr(arg, '[');
+                if (bracket) {
+                    *bracket = '\0';
+                    char *close = strchr(bracket + 1, ']');
+                    if (close) {
+                        *close = '\0';
+                        const char *key = bracket + 1;
+                        array_value_t *array = symtable_get_array(arg);
+                        if (array) {
+                            if (array->is_associative) {
+                                result = symtable_array_get_assoc(array, key) !=
+                                         NULL;
+                            } else {
+                                char *endp = NULL;
+                                long idx = strtol(key, &endp, 10);
+                                if (endp && *endp == '\0') {
+                                    result = symtable_array_get_index(
+                                                 array, (int)idx) != NULL;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    char *val = symtable_get_var(executor->symtable, arg);
+                    result = (val != NULL);
+                    free(val);
+                }
+                free(arg);
+            }
         } else {
             // File tests - get the path (rest of line, trimmed)
             char *path = strdup(p);
