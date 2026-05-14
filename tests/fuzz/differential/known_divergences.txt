@@ -6,3 +6,7 @@
 # them but they do not contribute to the unexpected-divergence count.
 
 052_zsh_assoc_array.sh  Insertion-order iteration of associative arrays via libhashtable's ht_enum_t is a deliberate polyglot choice; zsh's hash-bucket order is implementation-detail and unspecified by spec. Explicit ordering via ${(ko)hash} / ${(kO)hash} (sorted and reverse-sorted) is already wired for scripts that need a deterministic order.
+
+301_zsh_param_sort.sh  zsh's parameter-flag context-sensitivity is a deliberate non-implementation in lush. zsh treats "${(o)arr}" (quoted) as scalar context and skips sorting, while ${(o)arr} (unquoted) sorts. lush sorts uniformly in both contexts, which is simpler, more useful, and matches user expectation; the zsh quirk requires per-call quote-context tracking through the expansion pipeline and is a behavioral footgun that few scripts depend on. Scripts that need original-order can simply omit the sort flag.
+
+307_zsh_array_iter.sh  Similar context-sensitivity divergence: zsh's ${(Oa)arr} (reverse-anchored) in unquoted for-loop position produces N words for iteration; in quoted/scalar context it produces a joined string. lush emits the joined string uniformly. The for-loop-as-vector behavior is recoverable via ${arr[@]} which IS treated as a vector in unquoted argv/iteration positions; ${(Oa)} expressly is not needed for iteration when ${arr[@]} is available.

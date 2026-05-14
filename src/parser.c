@@ -1531,8 +1531,25 @@ static node_t *parse_simple_command(parser_t *parser) {
                     }
 
                     size_t token_len = strlen(value->text);
-                    // For single-quoted strings, add 2 for surrounding quotes
-                    size_t extra_len = (value->type == TOK_STRING) ? 2 : 0;
+                    /* TOK_STRING is shared by two token shapes:
+                     * - Regular single-quoted '...': tokenizer text is
+                     *   the content only; the parser must re-wrap with
+                     *   ' to preserve no-expansion semantics for the
+                     *   assignment value.
+                     * - ANSI-C $'...': tokenizer text includes the
+                     *   $' and trailing ' markers; re-wrapping would
+                     *   produce '$'content'' and route the value
+                     *   through expand_if_needed's single-quote-
+                     *   stripping path, leaving a stray literal $
+                     *   and breaking ANSI-C escape interpretation
+                     *   (issue #98).
+                     * Detect ANSI-C by the $' prefix and skip the
+                     * wrapping for that case. */
+                    bool is_ansi_c =
+                        (value->type == TOK_STRING && token_len >= 2 &&
+                         value->text[0] == '$' && value->text[1] == '\'');
+                    size_t extra_len =
+                        (value->type == TOK_STRING && !is_ansi_c) ? 2 : 0;
 
                     // Grow buffer if needed
                     if (value_len + token_len + extra_len + 1 >
@@ -1553,14 +1570,18 @@ static node_t *parse_simple_command(parser_t *parser) {
                     // Only single quotes need to be preserved to prevent
                     // expansion Double quotes: expand variables but don't keep
                     // quotes
-                    if (value->type == TOK_STRING) {
-                        // Single-quoted: preserve quotes to prevent expansion
+                    if (value->type == TOK_STRING && !is_ansi_c) {
+                        // Regular single-quoted: re-wrap with quotes to
+                        // preserve no-expansion semantics through
+                        // expand_if_needed.
                         strcat(full_value, "'");
                         strcat(full_value, value->text);
                         strcat(full_value, "'");
                         value_len += token_len + 2;
                     } else {
-                        // All other types: just append the text
+                        /* All other types (including ANSI-C $'...', whose
+                         * tokenizer text already carries its own $' and
+                         * ' markers): append the text verbatim. */
                         strcat(full_value, value->text);
                         value_len += token_len;
                     }

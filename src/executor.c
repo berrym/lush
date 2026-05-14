@@ -10264,8 +10264,25 @@ static char *parse_parameter_expansion(executor_t *executor,
                     inner_result = strdup("0");
                 }
             } else {
-                // Normal expansion
-                inner_result = parse_parameter_expansion(executor, rest);
+                /* Normal expansion. `rest` is what comes after the
+                 * flag-paren group: typically a variable name like
+                 * `var`, but in nested form it can be a full
+                 * parameter expansion like `${(s/,/)csv}` -- the zsh
+                 * idiom ${(flag)${INNER}} applies the outer flag to
+                 * the inner expansion's result.
+                 *
+                 * If `rest` starts with `${` route it through the
+                 * variable-reference path (expand_variable) which
+                 * understands the full ${...} form and recursively
+                 * invokes parse_parameter_expansion on the inner
+                 * content. Otherwise treat rest as a bare name and
+                 * call parse_parameter_expansion directly (existing
+                 * behavior). Issue #98. */
+                if (rest[0] == '$' && rest[1] == '{') {
+                    inner_result = expand_variable(executor, rest);
+                } else {
+                    inner_result = parse_parameter_expansion(executor, rest);
+                }
             }
 
             if (!inner_result) {
@@ -10716,6 +10733,21 @@ static char *parse_parameter_expansion(executor_t *executor,
     // Handle array length: ${#arr[@]} or ${#arr[*]}
     if (expansion[0] == '#') {
         const char *var_name = expansion + 1;
+
+        /* Nested form ${#${INNER}}: count the length of the inner
+         * expansion's result. expand_variable handles the full ${...}
+         * form. Issue #98. */
+        if (var_name[0] == '$' && var_name[1] == '{') {
+            char *inner = expand_variable(executor, var_name);
+            if (inner) {
+                size_t inner_len = strlen(inner);
+                free(inner);
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%zu", inner_len);
+                return strdup(buf);
+            }
+            return strdup("0");
+        }
 
         // Check for array subscript
         const char *bracket = strchr(var_name, '[');
@@ -12096,7 +12128,15 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
     // Handle ${var} format with advanced parameter expansion
     if (var_name[0] == '{') {
 
-        char *close = strchr(var_name, '}');
+        /* Find the matching closing brace, not the first one. Nested
+         * parameter expansion ${(flag)${INNER}} has an inner `}` that
+         * the outer brace match must skip past. strchr would stop at
+         * the inner brace and leave the outer expansion truncated.
+         * find_closing_brace counts depth and returns the matched
+         * close. Issue #98. */
+        size_t close_offset = find_closing_brace((char *)var_name);
+        char *close = close_offset > 0 ? (char *)(var_name + close_offset)
+                                       : strchr(var_name, '}');
         if (close) {
             size_t len = close - var_name - 1;
             char *expansion = malloc(len + 1);
