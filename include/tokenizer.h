@@ -102,6 +102,7 @@ typedef enum {
     TOK_SELECT, // select keyword for select loop
     TOK_TIME,   // time keyword for timing pipelines
     TOK_COPROC, // coproc keyword for coprocesses
+    TOK_REPEAT, // zsh repeat keyword (#103)
 
     // Special
     TOK_NEWLINE,    // \n (significant in shell)

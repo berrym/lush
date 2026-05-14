@@ -31,6 +31,7 @@ static node_t *parse_subshell(parser_t *parser);
 static node_t *parse_if_statement(parser_t *parser);
 static node_t *parse_while_statement(parser_t *parser);
 static node_t *parse_until_statement(parser_t *parser);
+static node_t *parse_repeat_statement(parser_t *parser);
 static node_t *parse_for_statement(parser_t *parser);
 static node_t *parse_case_statement(parser_t *parser);
 static node_t *parse_function_definition(parser_t *parser);
@@ -1328,6 +1329,8 @@ static node_t *parse_simple_command(parser_t *parser) {
             return parse_time_command(parser);
         case TOK_COPROC:
             return parse_coproc(parser);
+        case TOK_REPEAT:
+            return parse_repeat_statement(parser);
         default:
             // Other keywords (like ESAC, FI, DONE, etc.) are handled by their
             // parent constructs - returning NULL here lets the parent detect
@@ -2843,6 +2846,109 @@ static node_t *parse_while_statement(parser_t *parser) {
     }
 
     return while_node;
+}
+
+/**
+ * @brief Parse a zsh repeat loop
+ *
+ * Accepts both:
+ *   repeat N; do BODY; done    (do/done form)
+ *   repeat N { BODY }          (brace form)
+ *
+ * N is a single word (number or variable reference) -- not a full
+ * arithmetic expression here, matching zsh's accepted syntax;
+ * arithmetic count is supported via `repeat $((expr))`. The body
+ * runs N times in a fresh loop scope. Issue #103.
+ *
+ * @param parser Parser instance
+ * @return NODE_REPEAT AST node
+ */
+static node_t *parse_repeat_statement(parser_t *parser) {
+    token_t *kw = tokenizer_current(parser->tokenizer);
+    source_location_t kw_loc =
+        token_to_source_location(kw, parser->source_name);
+
+    if (!expect_token(parser, TOK_REPEAT)) {
+        return NULL;
+    }
+    parser_push_context(parser, "parsing repeat loop");
+
+    node_t *repeat_node = new_node_at(NODE_REPEAT, kw_loc);
+    if (!repeat_node) {
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    /* Parse count as a single word using the shared argument
+     * collector so $var / $((..)) / `(cmd)` all work. */
+    if (!collect_word_argument(parser, repeat_node)) {
+        free_node_tree(repeat_node);
+        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                                   "'repeat' requires a count expression",
+                                   "invalid repeat loop count");
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    skip_separators(parser);
+
+    /* Body: either `do ... done` or `{ ... }`. */
+    token_t *body_open = tokenizer_current(parser->tokenizer);
+    node_t *body = NULL;
+
+    if (body_open && body_open->type == TOK_DO) {
+        tokenizer_advance(parser->tokenizer);
+        skip_separators(parser);
+        body = parse_command_body(parser, TOK_DONE);
+        if (!body) {
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        skip_separators(parser);
+        if (!expect_token_with_help(parser, TOK_DONE,
+                                    "'repeat ...; do' must end with 'done'")) {
+            free_node_tree(body);
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+    } else if (body_open && body_open->type == TOK_LBRACE) {
+        tokenizer_advance(parser->tokenizer);
+        skip_separators(parser);
+        body = parse_command_body(parser, TOK_RBRACE);
+        if (!body) {
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        skip_separators(parser);
+        if (!expect_token_with_help(parser, TOK_RBRACE,
+                                    "'repeat ... {' must end with '}'")) {
+            free_node_tree(body);
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+    } else {
+        free_node_tree(repeat_node);
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "'repeat N' must be followed by '; do ... done' or '{ ... }'",
+            "invalid repeat loop body");
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    add_child_node(repeat_node, body);
+
+    parser_pop_context(parser);
+
+    if (!parse_trailing_redirections(parser, repeat_node)) {
+        free_node_tree(repeat_node);
+        return NULL;
+    }
+    return repeat_node;
 }
 
 /**

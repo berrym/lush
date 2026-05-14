@@ -81,6 +81,7 @@ static node_t *copy_ast_chain(node_t *node);
 static int execute_if(executor_t *executor, node_t *if_node);
 static int execute_while(executor_t *executor, node_t *while_node);
 static int execute_until(executor_t *executor, node_t *until_node);
+static int execute_repeat(executor_t *executor, node_t *repeat_node);
 static int execute_for(executor_t *executor, node_t *for_node);
 static int execute_for_arith(executor_t *executor, node_t *for_arith_node);
 static int execute_select(executor_t *executor, node_t *select_node);
@@ -1113,6 +1114,8 @@ static int execute_node(executor_t *executor, node_t *node) {
         return execute_while(executor, node);
     case NODE_UNTIL:
         return execute_until(executor, node);
+    case NODE_REPEAT:
+        return execute_repeat(executor, node);
     case NODE_FOR:
         return execute_for(executor, node);
     case NODE_FOR_ARITH:
@@ -2329,6 +2332,82 @@ static int execute_until(executor_t *executor, node_t *until_node) {
         return 1;
     }
 
+    return last_result;
+}
+
+/**
+ * @brief Execute a zsh repeat loop
+ *
+ * Runs the body N times. The count expression is the first child
+ * (a NODE_VAR / NODE_COMMAND_SUB / NODE_ARITH_EXP / etc.) and the
+ * body is the second child (a NODE_COMMAND_LIST or similar). The
+ * count is arithmetic-evaluated so `repeat $((expr))` and
+ * `repeat $var` both work. Non-positive counts are no-ops (zsh
+ * compat). Honors break/continue/shell_exit_requested. Issue #103.
+ *
+ * @param executor Executor context
+ * @param repeat_node NODE_REPEAT with [count, body] children
+ * @return Exit status of last executed body command, or 0 if body
+ *         never ran
+ */
+static int execute_repeat(executor_t *executor, node_t *repeat_node) {
+    if (!repeat_node || repeat_node->type != NODE_REPEAT) {
+        return 1;
+    }
+
+    node_t *count_node = repeat_node->first_child;
+    node_t *body = count_node ? count_node->next_sibling : NULL;
+    if (!count_node || !body) {
+        executor_error_add(executor, SHELL_ERR_MALFORMED_CONSTRUCT,
+                           repeat_node->loc, "malformed repeat loop");
+        return 1;
+    }
+
+    /* Evaluate count via the standard arg-expansion path (handles
+     * $var, $(cmd), $((expr)), literal numbers) and then parse as
+     * an integer. zsh accepts a negative or zero count as "do
+     * nothing"; match that. */
+    char *count_text = expand_arg_node(executor, count_node);
+    if (!count_text) {
+        return 1;
+    }
+    char *count_eval = arithm_expand_with_executor(executor, count_text);
+    long count = count_eval ? strtol(count_eval, NULL, 10) : 0;
+    free(count_text);
+    free(count_eval);
+
+    if (count <= 0) {
+        return 0;
+    }
+
+    if (symtable_push_scope(executor->symtable, SCOPE_LOOP, "repeat-loop") !=
+        0) {
+        executor_error_add(executor, SHELL_ERR_SCOPE_ERROR, repeat_node->loc,
+                           "failed to create loop scope");
+        return 1;
+    }
+    executor->loop_depth++;
+    executor_push_context(executor, repeat_node->loc, "in repeat loop");
+
+    int last_result = 0;
+    for (long i = 0; i < count; i++) {
+        last_result = execute_command_chain(executor, body);
+
+        if (executor->loop_control == LOOP_BREAK) {
+            executor->loop_control = LOOP_NORMAL;
+            break;
+        } else if (executor->loop_control == LOOP_CONTINUE) {
+            executor->loop_control = LOOP_NORMAL;
+            continue;
+        }
+        if (executor->shell_exit_requested) {
+            break;
+        }
+    }
+
+    executor->loop_depth--;
+    executor_pop_context(executor);
+    symtable_pop_scope(executor->symtable);
     return last_result;
 }
 
@@ -10772,6 +10851,317 @@ static char *parse_parameter_expansion(executor_t *executor,
                     // Values flag - no-op (values are the default)
                     p++;
                     break;
+
+                case 'u': {
+                    /* Unique: dedupe consecutive (and non-consecutive)
+                     * elements after splitting on spaces. zsh's (u)
+                     * removes ALL duplicates, not just adjacent ones.
+                     * Combine with (o) or (O) for sort+unique. Issue
+                     * #103. */
+                    size_t word_count = 0;
+                    bool in_word = false;
+                    for (const char *c = result; *c; c++) {
+                        if (*c == ' ') {
+                            in_word = false;
+                        } else if (!in_word) {
+                            word_count++;
+                            in_word = true;
+                        }
+                    }
+                    if (word_count > 1) {
+                        char **words = malloc(word_count * sizeof(char *));
+                        if (words) {
+                            char *copy = strdup(result);
+                            if (copy) {
+                                size_t idx = 0;
+                                char *tok = strtok(copy, " ");
+                                while (tok && idx < word_count) {
+                                    /* Skip if already seen. O(N^2)
+                                     * is fine for typical zsh array
+                                     * sizes; switching to a hash set
+                                     * would be premature. */
+                                    bool seen = false;
+                                    for (size_t k = 0; k < idx; k++) {
+                                        if (strcmp(words[k], tok) == 0) {
+                                            seen = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!seen) {
+                                        words[idx++] = strdup(tok);
+                                    }
+                                    tok = strtok(NULL, " ");
+                                }
+                                size_t unique_count = idx;
+                                size_t total_len = 0;
+                                for (size_t k = 0; k < unique_count; k++) {
+                                    total_len += strlen(words[k]) + 1;
+                                }
+                                new_result = malloc(total_len + 1);
+                                if (new_result) {
+                                    new_result[0] = '\0';
+                                    for (size_t k = 0; k < unique_count; k++) {
+                                        if (k > 0) {
+                                            strcat(new_result, " ");
+                                        }
+                                        strcat(new_result, words[k]);
+                                    }
+                                }
+                                for (size_t k = 0; k < unique_count; k++) {
+                                    free(words[k]);
+                                }
+                                free(copy);
+                            }
+                            free(words);
+                        }
+                        if (new_result) {
+                            if (result != inner_result) {
+                                free(result);
+                            }
+                            result = new_result;
+                        }
+                    }
+                    p++;
+                    break;
+                }
+
+                case 'l':
+                case 'r': {
+                    /* Padding flags. zsh syntax:
+                     *   (l:N:)              -- left-pad to width N w/ spaces
+                     *   (l:N::FILL:)        -- left-pad with FILL string
+                     *   (r:N:) / (r:N::FILL:) -- right-pad analogously
+                     * If the value is wider than N, zsh truncates the
+                     * value to N chars (left-pad keeps the rightmost
+                     * N; right-pad keeps the leftmost N). The N
+                     * argument is bracketed by `:` chars (zsh accepts
+                     * any non-`)` delimiter; we accept `:` to match
+                     * the common form the corpus uses). Issue #103. */
+                    bool pad_left = (*p == 'l');
+                    char open = p[1];
+                    if (!open || open == ')') {
+                        p++;
+                        break;
+                    }
+                    const char *spec = p + 2;
+                    const char *width_end = strchr(spec, open);
+                    if (!width_end) {
+                        p++;
+                        break;
+                    }
+                    size_t width_str_len = (size_t)(width_end - spec);
+                    char width_buf[32];
+                    if (width_str_len >= sizeof(width_buf)) {
+                        p++;
+                        break;
+                    }
+                    memcpy(width_buf, spec, width_str_len);
+                    width_buf[width_str_len] = '\0';
+                    int width = atoi(width_buf);
+
+                    /* Optional fill: another :FILL: after the width. */
+                    char *fill = NULL;
+                    const char *after_width = width_end + 1;
+                    const char *closing = after_width;
+                    if (*after_width == ':') {
+                        const char *fill_start = after_width + 1;
+                        const char *fill_end = strchr(fill_start, ':');
+                        if (fill_end) {
+                            size_t fill_len = (size_t)(fill_end - fill_start);
+                            fill = malloc(fill_len + 1);
+                            if (fill) {
+                                memcpy(fill, fill_start, fill_len);
+                                fill[fill_len] = '\0';
+                            }
+                            closing = fill_end + 1;
+                        } else {
+                            closing = after_width + 1;
+                        }
+                    }
+
+                    /* Advance p past the entire (l:N::FILL:) span,
+                     * up to but not including the closing `)` of the
+                     * flag group -- the outer while loop is iterating
+                     * `flags` which is the content between `(` and `)`
+                     * already, so `closing` is the position right
+                     * after the trailing `:`. */
+                    p = closing;
+
+                    const char *fill_str = (fill && fill[0]) ? fill : " ";
+                    size_t fill_len = strlen(fill_str);
+                    size_t result_len = strlen(result);
+
+                    if (width <= 0) {
+                        free(fill);
+                        break;
+                    }
+                    if ((int)result_len >= width) {
+                        /* Truncate. For left-pad, keep last N chars;
+                         * for right-pad, keep first N chars. */
+                        new_result = malloc((size_t)width + 1);
+                        if (new_result) {
+                            if (pad_left) {
+                                memcpy(new_result,
+                                       result + (result_len - (size_t)width),
+                                       (size_t)width);
+                            } else {
+                                memcpy(new_result, result, (size_t)width);
+                            }
+                            new_result[width] = '\0';
+                        }
+                    } else {
+                        size_t pad_count = (size_t)width - result_len;
+                        new_result = malloc((size_t)width + 1);
+                        if (new_result) {
+                            if (pad_left) {
+                                for (size_t k = 0; k < pad_count; k++) {
+                                    new_result[k] = fill_str[k % fill_len];
+                                }
+                                memcpy(new_result + pad_count, result,
+                                       result_len);
+                            } else {
+                                memcpy(new_result, result, result_len);
+                                for (size_t k = 0; k < pad_count; k++) {
+                                    new_result[result_len + k] =
+                                        fill_str[k % fill_len];
+                                }
+                            }
+                            new_result[width] = '\0';
+                        }
+                    }
+                    free(fill);
+                    if (new_result) {
+                        if (result != inner_result) {
+                            free(result);
+                        }
+                        result = new_result;
+                    }
+                    break;
+                }
+
+                case 'Q': {
+                    /* (Q) flag: strip one level of quoting from the
+                     * value. zsh accepts `'a b c'` -> `a b c` and
+                     * `"a b c"` -> `a b c`. If the value isn't wrapped
+                     * in matching quotes, return unchanged.
+                     * Issue #103. */
+                    size_t result_len = strlen(result);
+                    if (result_len >= 2 &&
+                        ((result[0] == '\'' &&
+                          result[result_len - 1] == '\'') ||
+                         (result[0] == '"' && result[result_len - 1] == '"'))) {
+                        new_result = malloc(result_len - 1);
+                        if (new_result) {
+                            memcpy(new_result, result + 1, result_len - 2);
+                            new_result[result_len - 2] = '\0';
+                        }
+                    } else {
+                        new_result = strdup(result);
+                    }
+                    p++;
+                    if (new_result) {
+                        if (result != inner_result) {
+                            free(result);
+                        }
+                        result = new_result;
+                    }
+                    break;
+                }
+
+                case 'q': {
+                    /* Quote-family flags (issue #103):
+                     *   (q)   -- backslash-escape shell metacharacters
+                     *   (qq)  -- single-quote the entire value
+                     *   (qqq) -- double-quote the entire value
+                     * Count consecutive 'q' chars to pick the variant.
+                     */
+                    int q_count = 0;
+                    while (p[q_count] == 'q') {
+                        q_count++;
+                    }
+
+                    size_t result_len = strlen(result);
+                    if (q_count == 2) {
+                        /* Single-quote: wrap with ' and escape any
+                         * embedded ' using bash's '\\'' idiom (zsh
+                         * accepts the same form). */
+                        size_t cap = result_len * 4 + 3;
+                        new_result = malloc(cap);
+                        if (new_result) {
+                            size_t pos = 0;
+                            new_result[pos++] = '\'';
+                            for (size_t k = 0; k < result_len; k++) {
+                                if (result[k] == '\'') {
+                                    new_result[pos++] = '\'';
+                                    new_result[pos++] = '\\';
+                                    new_result[pos++] = '\'';
+                                    new_result[pos++] = '\'';
+                                } else {
+                                    new_result[pos++] = result[k];
+                                }
+                            }
+                            new_result[pos++] = '\'';
+                            new_result[pos] = '\0';
+                        }
+                    } else if (q_count == 3) {
+                        /* Double-quote: wrap with " and escape `"` `$`
+                         * `` ` `` `\` chars. */
+                        size_t cap = result_len * 2 + 3;
+                        new_result = malloc(cap);
+                        if (new_result) {
+                            size_t pos = 0;
+                            new_result[pos++] = '"';
+                            for (size_t k = 0; k < result_len; k++) {
+                                char c = result[k];
+                                if (c == '"' || c == '$' || c == '`' ||
+                                    c == '\\') {
+                                    new_result[pos++] = '\\';
+                                }
+                                new_result[pos++] = c;
+                            }
+                            new_result[pos++] = '"';
+                            new_result[pos] = '\0';
+                        }
+                    } else {
+                        /* (q): backslash-escape shell-meta chars. zsh's
+                         * (q) escapes characters that would be
+                         * special in any shell context -- space, tab,
+                         * newline, and shell metacharacters
+                         * (; & | < > ( ) { } [ ] $ ` " ' \ * ? ~ # !
+                         * = % ^). */
+                        size_t cap = result_len * 2 + 1;
+                        new_result = malloc(cap);
+                        if (new_result) {
+                            size_t pos = 0;
+                            for (size_t k = 0; k < result_len; k++) {
+                                unsigned char c = (unsigned char)result[k];
+                                bool meta =
+                                    (c == ' ' || c == '\t' || c == '\n' ||
+                                     c == ';' || c == '&' || c == '|' ||
+                                     c == '<' || c == '>' || c == '(' ||
+                                     c == ')' || c == '{' || c == '}' ||
+                                     c == '[' || c == ']' || c == '$' ||
+                                     c == '`' || c == '"' || c == '\'' ||
+                                     c == '\\' || c == '*' || c == '?' ||
+                                     c == '~' || c == '#' || c == '!' ||
+                                     c == '=');
+                                if (meta) {
+                                    new_result[pos++] = '\\';
+                                }
+                                new_result[pos++] = (char)c;
+                            }
+                            new_result[pos] = '\0';
+                        }
+                    }
+                    p += q_count;
+                    if (new_result) {
+                        if (result != inner_result) {
+                            free(result);
+                        }
+                        result = new_result;
+                    }
+                    break;
+                }
 
                 default:
                     // Unknown flag, skip

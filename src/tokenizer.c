@@ -31,7 +31,8 @@ static const struct {
     {"case", TOK_CASE},     {"esac", TOK_ESAC},
     {"until", TOK_UNTIL},   {"function", TOK_FUNCTION},
     {"select", TOK_SELECT}, {"time", TOK_TIME},
-    {"coproc", TOK_COPROC}, {NULL, TOK_WORD} // Sentinel
+    {"coproc", TOK_COPROC}, {"repeat", TOK_REPEAT},
+    {NULL, TOK_WORD} // Sentinel
 };
 
 // Helper functions
@@ -313,6 +314,8 @@ const char *token_type_name(token_type_t type) {
         return "SELECT";
     case TOK_TIME:
         return "TIME";
+    case TOK_REPEAT:
+        return "REPEAT";
     case TOK_IF:
         return "IF";
     case TOK_THEN:
@@ -364,7 +367,7 @@ const char *token_type_name(token_type_t type) {
  * @return true if token is a keyword
  */
 bool token_is_keyword(token_type_t type) {
-    return type >= TOK_IF && type <= TOK_COPROC;
+    return type >= TOK_IF && type <= TOK_REPEAT;
 }
 
 /**
