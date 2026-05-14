@@ -3899,6 +3899,142 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         if (p == end) {
             return false;
         }
+        /* ${(FLAGS)NAME} -- zsh parameter-flag vector form. Recognised
+         * flag chars: k (keys), v (values, default), o (sort ascending),
+         * O (sort descending), a (array-order, no sort), u (unique).
+         * Builds the vector directly and short-circuits the rest of
+         * try_expand_vector_arg. Issue #104. */
+        if (*p == '(') {
+            const char *flag_start = p + 1;
+            const char *flag_end = flag_start;
+            while (flag_end < end && *flag_end != ')') {
+                flag_end++;
+            }
+            if (flag_end < end && *flag_end == ')') {
+                bool flag_k = false, flag_o = false, flag_O = false;
+                bool flag_u = false;
+                bool ok_flags = true;
+                for (const char *f = flag_start; f < flag_end; f++) {
+                    switch (*f) {
+                    case 'k':
+                        flag_k = true;
+                        break;
+                    case 'v':
+                        flag_k = false;
+                        break;
+                    case 'o':
+                        flag_o = true;
+                        break;
+                    case 'O':
+                        flag_O = true;
+                        break;
+                    case 'a':
+                        /* array order, no sort -- default */
+                        flag_o = false;
+                        flag_O = false;
+                        break;
+                    case 'u':
+                        flag_u = true;
+                        break;
+                    default:
+                        ok_flags = false;
+                        break;
+                    }
+                }
+                const char *np = flag_end + 1;
+                const char *nstart = np;
+                while (np < end &&
+                       (isalnum((unsigned char)*np) || *np == '_')) {
+                    np++;
+                }
+                if (ok_flags && np == end && np > nstart) {
+                    char nbuf[256];
+                    size_t nlen = (size_t)(np - nstart);
+                    if (nlen < sizeof(nbuf)) {
+                        memcpy(nbuf, nstart, nlen);
+                        nbuf[nlen] = '\0';
+                        array_value_t *arr = symtable_get_array(nbuf);
+                        if (arr) {
+                            size_t kc = 0;
+                            char **items = NULL;
+                            if (flag_k) {
+                                items = symtable_array_get_keys(arr, &kc);
+                            } else {
+                                size_t total = symtable_array_length(arr);
+                                items = malloc(sizeof(char *) * (total + 1));
+                                if (items) {
+                                    for (size_t i = 0; i < total; i++) {
+                                        const char *e =
+                                            symtable_array_get_index(arr,
+                                                                     (int)i);
+                                        items[i] = strdup(e ? e : "");
+                                    }
+                                    kc = total;
+                                }
+                            }
+                            if (items) {
+                                if (flag_u) {
+                                    size_t w = 0;
+                                    for (size_t i = 0; i < kc; i++) {
+                                        bool dup = false;
+                                        for (size_t j = 0; j < w; j++) {
+                                            if (strcmp(items[i], items[j]) ==
+                                                0) {
+                                                dup = true;
+                                                break;
+                                            }
+                                        }
+                                        if (dup) {
+                                            free(items[i]);
+                                        } else {
+                                            items[w++] = items[i];
+                                        }
+                                    }
+                                    kc = w;
+                                }
+                                if (flag_o || flag_O) {
+                                    for (size_t i = 0; i + 1 < kc; i++) {
+                                        for (size_t j = i + 1; j < kc; j++) {
+                                            int cmp =
+                                                strcmp(items[i], items[j]);
+                                            if ((flag_O && cmp < 0) ||
+                                                (!flag_O && cmp > 0)) {
+                                                char *tmp = items[i];
+                                                items[i] = items[j];
+                                                items[j] = tmp;
+                                            }
+                                        }
+                                    }
+                                }
+                                char **vec = NULL;
+                                int vcount = 0, vcap = 0;
+                                bool ok = true;
+                                for (size_t i = 0; i < kc; i++) {
+                                    if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                                          items[i])) {
+                                        ok = false;
+                                        break;
+                                    }
+                                }
+                                free(items);
+                                if (!ok) {
+                                    for (int j = 0; j < vcount; j++) {
+                                        free(vec[j]);
+                                    }
+                                    free(vec);
+                                    return false;
+                                }
+                                *out_vec = vec;
+                                *out_count = vcount;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            /* Not our shape -- not a vector form. */
+            return false;
+        }
         if (*p == '!') {
             keys_form = true;
             p++;
@@ -11582,6 +11718,39 @@ static char *parse_parameter_expansion(executor_t *executor,
                                strcmp(subscript, "*") == 0) {
                         // ${arr[@]} or ${arr[*]} - all elements
                         result = symtable_array_expand(array, " ");
+                    } else if ((strncmp(subscript, "(r)", 3) == 0 ||
+                                strncmp(subscript, "(R)", 3) == 0) &&
+                               !array->is_associative) {
+                        /* zsh subscript flags ${arr[(r)pat]} / ${arr[(R)pat]}:
+                         * return the VALUE of the first / last element
+                         * matching pat, or empty string on no match.
+                         * pat is fnmatch-style. Issue #104. */
+                        bool last_match = (subscript[1] == 'R');
+                        const char *pat = subscript + 3;
+                        size_t total = symtable_array_length(array);
+                        const char *found = NULL;
+                        bool is_glob = (strchr(pat, '*') || strchr(pat, '?') ||
+                                        strchr(pat, '['));
+                        for (size_t k = 0; k < total; k++) {
+                            const char *elem =
+                                symtable_array_get_index(array, (int)k);
+                            if (!elem) {
+                                continue;
+                            }
+                            bool match;
+                            if (is_glob) {
+                                match = (fnmatch(pat, elem, 0) == 0);
+                            } else {
+                                match = (strcmp(elem, pat) == 0);
+                            }
+                            if (match) {
+                                found = elem;
+                                if (!last_match) {
+                                    break;
+                                }
+                            }
+                        }
+                        result = strdup(found ? found : "");
                     } else if ((strncmp(subscript, "(i)", 3) == 0 ||
                                 strncmp(subscript, "(I)", 3) == 0) &&
                                !array->is_associative) {

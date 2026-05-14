@@ -639,6 +639,20 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, "\033[49m");
                 break;
             }
+            case '{': { /* %{...%} -- literal escape region.
+                          Markers are stripped; the bytes between are emitted
+                          verbatim (they are terminal-control sequences that
+                          should pass through without being counted as
+                          display columns). Zsh-compatible. */
+                while (*p) {
+                    if (*p == '%' && *(p + 1) == '}') {
+                        p += 2; /* skip closing %} */
+                        break;
+                    }
+                    buf_append_char(&b, *p++);
+                }
+                break;
+            }
             default:
                 /* Unknown zsh escape: pass through literally */
                 buf_append_char(&b, '%');

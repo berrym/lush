@@ -5081,6 +5081,7 @@ static node_t *parse_extended_test(parser_t *parser) {
     size_t expr_len = 0;
     size_t expr_capacity = 256;
     int paren_depth = 0;
+    int bracket_depth = 0; // Track [...] for glob char classes (#104)
     bool in_regex = false; // Track if we're parsing a regex pattern after =~
 
     expr = malloc(expr_capacity);
@@ -5119,6 +5120,13 @@ static node_t *parse_extended_test(parser_t *parser) {
             }
         }
 
+        // Track [...] bracket depth so a glob char-class is preserved
+        // intact in the expression buffer; otherwise [a-z]* would arrive
+        // at the matcher as "[ a-z ] *" and never match.  Issue #104.
+        if (current->type == TOK_LBRACKET) {
+            bracket_depth++;
+        }
+
         // Append token text to expression
         size_t token_len = strlen(current->text);
         if (expr_len + token_len + 2 > expr_capacity) {
@@ -5138,6 +5146,12 @@ static node_t *parse_extended_test(parser_t *parser) {
         if (in_regex) {
             // In regex mode: don't add spaces between regex tokens
             // This keeps ^hello$ as one unit instead of ^ hello $
+            skip_space = true;
+        } else if (bracket_depth > 0 ||
+                   (expr_len > 0 && expr[expr_len - 1] == ']' &&
+                    !token_is_operator(current->type))) {
+            // Inside a glob char-class or immediately after one: no spaces
+            // so [a-z]* stays glued. Issue #104.
             skip_space = true;
         } else {
             // Normal mode: add spaces between tokens with some exceptions
@@ -5174,6 +5188,12 @@ static node_t *parse_extended_test(parser_t *parser) {
         // Check if we just added the =~ operator - next tokens are regex
         if (current->type == TOK_REGEX_MATCH) {
             in_regex = true;
+        }
+
+        // Close bracket AFTER append so the ']' itself doesn't get a leading
+        // space from the bracket_depth>0 rule.
+        if (current->type == TOK_RBRACKET && bracket_depth > 0) {
+            bracket_depth--;
         }
 
         tokenizer_advance(parser->tokenizer);
