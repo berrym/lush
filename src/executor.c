@@ -1780,13 +1780,19 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
     // Pop error context before returning
     executor_pop_context(executor);
 
-    // Pipefail behavior: return failure if ANY command in pipeline fails
+    /* Pipefail behavior: pipeline status is the LAST (rightmost)
+     * non-zero exit status. Bash docs: "Exit status of a pipeline
+     * is the value of the LAST (rightmost) command to exit with a
+     * non-zero status, or zero if all exit successfully." Checking
+     * the right side first preserves this even for the nested 3-stage
+     * case where the inner pipeline's pipefail result becomes the
+     * outer's left_exit. Issue #100. */
     if (is_pipefail_enabled()) {
-        if (left_exit != 0) {
-            return left_exit;
-        }
         if (right_exit != 0) {
             return right_exit;
+        }
+        if (left_exit != 0) {
+            return left_exit;
         }
         return 0;
     }
@@ -5079,6 +5085,37 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
                 continue;
             }
             last_result = execute_node(executor, command);
+
+            /* Update $? between subshell commands so subsequent
+             * argv expansions see the correct exit status. NODE_PIPE
+             * and NODE_BUILTIN paths set last_exit_status via
+             * set_exit_status() inside execute_command, but the
+             * pipeline executor itself returns directly without
+             * updating it. The outer execute_command_list does this
+             * after each command; the subshell loop was missing the
+             * same update. Issue #100. */
+            set_exit_status(last_result);
+
+            /* Honor set -e inside the subshell: if a command fails
+             * (non-zero exit) and the option is on, abort the rest
+             * of the subshell body. The existing exit_on_error check
+             * lives in execute_command_list / execute_command_chain
+             * which the subshell loop bypasses. The standard
+             * exceptions for if-conditions and ||/&& chains are
+             * already handled by their respective execute_* paths
+             * not propagating last_result to here. Issue #100. */
+            if (shell_opts.exit_on_error && last_result != 0) {
+                break;
+            }
+
+            /* POSIX-required shell abort -- same flag the outer
+             * walker honors; if the subshell hit a ${var:?} or
+             * similar, terminate. */
+            if (executor->shell_exit_requested) {
+                last_result = executor->shell_exit_status;
+                break;
+            }
+
             command = command->next_sibling;
         }
 
