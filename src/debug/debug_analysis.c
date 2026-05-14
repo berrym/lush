@@ -76,9 +76,16 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
         return;
     }
 
-    fread(script_content, 1, file_size, file);
-    script_content[file_size] = '\0';
+    size_t bytes_read = fread(script_content, 1, (size_t)file_size, file);
     fclose(file);
+    if (bytes_read != (size_t)file_size) {
+        debug_printf(ctx,
+                     "ERROR: Short read on %s (expected %ld, got %zu)\n",
+                     script_path, file_size, bytes_read);
+        free(script_content);
+        return;
+    }
+    script_content[file_size] = '\0';
 
     // Clear previous analysis results
     debug_clear_analysis_issues(ctx);
@@ -797,9 +804,16 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
         return -1;
     }
 
-    fread(script_content, 1, file_size, file);
-    script_content[file_size] = '\0';
+    size_t bytes_read = fread(script_content, 1, (size_t)file_size, file);
     fclose(file);
+    if (bytes_read != (size_t)file_size) {
+        debug_printf(ctx,
+                     "ERROR: Short read on %s (expected %ld, got %zu)\n",
+                     script_path, file_size, bytes_read);
+        free(script_content);
+        return -1;
+    }
+    script_content[file_size] = '\0';
 
     // Clear previous analysis results
     debug_clear_analysis_issues(ctx);

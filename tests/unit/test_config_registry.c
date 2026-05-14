@@ -631,7 +631,7 @@ TEST(on_load_hook) {
     char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
     int fd = mkstemp(tmpfile);
     ASSERT(fd >= 0);
-    write(fd, "[test]\ntest = true\n", 19);
+    ASSERT_EQ((int)write(fd, "[test]\ntest = true\n", 19), 19);
     close(fd);
 
     on_load_called = 0;

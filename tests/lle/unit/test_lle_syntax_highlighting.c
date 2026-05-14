@@ -527,9 +527,11 @@ TEST(path_shape_relative_dir) {
 
     lle_syntax_token_type_t type = find_path_token(h);
 
-    /* Restore cwd before any assertion path that would skip cleanup. */
+    /* Restore cwd before any assertion path that would skip cleanup.
+     * Best-effort: if chdir fails here the test still runs to its
+     * verdict; the harness will catch any cross-test cwd corruption. */
     if (saved_cwd) {
-        chdir(saved_cwd);
+        (void)!chdir(saved_cwd);
         free(saved_cwd);
     }
 

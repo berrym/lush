@@ -718,8 +718,9 @@ void lle_nuclear_reset(void) {
     lle_hard_reset();
 
     /* Send terminal reset sequence */
-    /* ESC c = RIS (Reset to Initial State) */
-    write(STDOUT_FILENO, "\033c", 2);
+    /* ESC c = RIS (Reset to Initial State); best-effort -- if the write
+     * is short or fails we have no recovery in nuclear-reset path. */
+    (void)!write(STDOUT_FILENO, "\033c", 2);
 
     /* Give terminal time to process reset */
     usleep(50000); /* 50ms */

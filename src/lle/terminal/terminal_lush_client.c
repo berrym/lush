@@ -168,17 +168,24 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
                                           : "(null)");
     }
 
+    /* All write() calls below target stdout for terminal display
+     * (mirroring what GNU readline's rl_redisplay does). Return values
+     * are intentionally discarded via the (void)! suppression idiom --
+     * short writes on a TTY are rare and there is no useful recovery
+     * path inside the render function. The fflush(stdout) at the end
+     * of this function provides the cross-platform commit point. */
+
     /* Clear line and move to start: \r\033[K */
-    write(STDOUT_FILENO, "\r\033[K", 4);
+    (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
     /* Write each line of content */
     for (size_t i = 0; i < content->line_count; i++) {
         if (i > 0) {
-            write(STDOUT_FILENO, "\r\n", 2); /* CR+LF for new line */
+            (void)!write(STDOUT_FILENO, "\r\n", 2); /* CR+LF for new line */
         }
         if (content->lines[i].content && content->lines[i].length > 0) {
-            write(STDOUT_FILENO, content->lines[i].content,
-                  content->lines[i].length);
+            (void)!write(STDOUT_FILENO, content->lines[i].content,
+                         content->lines[i].length);
         }
     }
 
@@ -193,18 +200,18 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
             char move_up[32];
             int len = snprintf(move_up, sizeof(move_up), "\033[%zuA", lines_up);
             if (len > 0 && (size_t)len < sizeof(move_up)) {
-                write(STDOUT_FILENO, move_up, (size_t)len);
+                (void)!write(STDOUT_FILENO, move_up, (size_t)len);
             }
         }
 
         /* Move to correct column */
-        write(STDOUT_FILENO, "\r", 1);
+        (void)!write(STDOUT_FILENO, "\r", 1);
         if (content->cursor_column > 0) {
             char move_right[32];
             int len = snprintf(move_right, sizeof(move_right), "\033[%zuC",
                                content->cursor_column);
             if (len > 0 && (size_t)len < sizeof(move_right)) {
-                write(STDOUT_FILENO, move_right, (size_t)len);
+                (void)!write(STDOUT_FILENO, move_right, (size_t)len);
             }
         }
     }

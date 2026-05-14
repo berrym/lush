@@ -106,8 +106,11 @@ static void sigint_handler(int signo) {
         // Set the flag so the main loop knows this was SIGINT, not EOF
         sigint_received_during_readline = 1;
         // Print newline to move past current input
-        // NOTE: Using write() instead of printf/fflush for async-signal-safety
-        write(STDOUT_FILENO, "\n", 1);
+        // NOTE: Using write() instead of printf/fflush for async-signal-safety.
+        // No recovery path inside a signal handler -- a short/EINTR write
+        // here cannot be retried without violating async-signal-safety, so
+        // the return value is intentionally discarded.
+        (void)!write(STDOUT_FILENO, "\n", 1);
     }
 }
 
@@ -427,7 +430,10 @@ void execute_pending_traps(void) {
         if (pending & (1 << signo)) {
             trap_entry_t *trap = find_trap(signo);
             if (trap && trap->command) {
-                system(trap->command);
+                /* Trap commands are fire-and-forget; their exit status
+                 * is propagated by the surrounding shell context, not by
+                 * this trap dispatch. */
+                (void)!system(trap->command);
             }
         }
     }
@@ -444,8 +450,8 @@ void execute_exit_traps(void) {
     if (trap && trap->command) {
         // Execute the EXIT trap command
         // For now, we'll use system() - this could be improved to use the
-        // shell's executor
-        system(trap->command);
+        // shell's executor.  Exit-trap status is not propagated.
+        (void)!system(trap->command);
     }
 
     // Reset terminal to clean state on exit

@@ -199,7 +199,10 @@ static void ensure_bottom_margin(void) {
     char cmd[64];
     int len = snprintf(cmd, sizeof(cmd), "\x1b[s\x1b[%d;1H\n\x1b[u", rows);
     if (len > 0 && (size_t)len < sizeof(cmd)) {
-        (void)write(STDOUT_FILENO, cmd, (size_t)len);
+        /* (void)! is the portable suppression idiom; plain (void)cast
+         * does not silence gcc -Wunused-result on functions decorated
+         * with warn_unused_result. */
+        (void)!write(STDOUT_FILENO, cmd, (size_t)len);
     }
 
     margin_created = true;

@@ -217,7 +217,7 @@ TEST(callback_invoked_on_completion) {
 
     /* Get current directory for the request */
     char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
+    ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
     lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
     snprintf(req->cwd, sizeof(req->cwd), "%s", cwd);
@@ -248,7 +248,7 @@ TEST(git_status_detects_repo) {
 
     /* Use parent of build directory (should be the git repo) */
     char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
+    ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
     /* If we're in builddir, go up one level to the repo root */
     char *builddir = strstr(cwd, "/build");
@@ -327,7 +327,7 @@ TEST(statistics_tracking) {
 
     /* Submit a request */
     char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
+    ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
     lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
     snprintf(req->cwd, sizeof(req->cwd), "%s", cwd);

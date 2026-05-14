@@ -308,7 +308,7 @@ TEST(cd_to_tmp) {
     free(current);
 
     /* Return to original directory */
-    chdir(original_dir);
+    ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
     free(original_dir);
 
     teardown_executor(exec);
@@ -325,7 +325,7 @@ TEST(cd_to_home) {
     }
 
     /* Return to original directory */
-    chdir(original_dir);
+    ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
     free(original_dir);
 
     teardown_executor(exec);
@@ -359,7 +359,7 @@ TEST(cd_dash_oldpwd) {
     free(current);
 
     /* Restore */
-    chdir(original_dir);
+    ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
     free(original_dir);
 
     teardown_executor(exec);
@@ -1007,7 +1007,7 @@ TEST(pushd_and_popd) {
     status = executor_execute_command_line(exec, "popd", 1);
     ASSERT_EQ(status, 0, "popd should succeed");
 
-    chdir(original_dir);
+    ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
     free(original_dir);
 
     teardown_executor(exec);

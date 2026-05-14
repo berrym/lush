@@ -774,9 +774,10 @@ void lle_terminal_reset(void) {
         return;
     }
 
-    /* Reset all attributes, show cursor, move to new line */
+    /* Reset all attributes, show cursor, move to new line.
+     * Best-effort terminal cleanup; nothing useful to do on failure. */
     static const char reset_seq[] = "\x1b[0m\x1b[?25h\n";
-    (void)write(STDOUT_FILENO, reset_seq, sizeof(reset_seq) - 1);
+    (void)!write(STDOUT_FILENO, reset_seq, sizeof(reset_seq) - 1);
 }
 
 /**

@@ -2419,18 +2419,20 @@ static void refresh_search_display(readline_context_t *ctx) {
     const char *current_match =
         lle_history_interactive_search_get_current_command();
 
-    /* Clear line and move to beginning */
-    /* \r = carriage return, \033[K = clear to end of line */
-    write(STDOUT_FILENO, "\r\033[K", 4);
+    /* Clear line and move to beginning.
+     * \r = carriage return, \033[K = clear to end of line.
+     * (void)! suppresses -Wunused-result; terminal output failures here
+     * have no recoverable path in the search-display refresh. */
+    (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
     /* Write the search prompt */
     if (search_prompt && *search_prompt) {
-        write(STDOUT_FILENO, search_prompt, strlen(search_prompt));
+        (void)!write(STDOUT_FILENO, search_prompt, strlen(search_prompt));
     }
 
     /* Write the matched command */
     if (current_match && *current_match) {
-        write(STDOUT_FILENO, current_match, strlen(current_match));
+        (void)!write(STDOUT_FILENO, current_match, strlen(current_match));
     }
 }
 
@@ -2445,7 +2447,7 @@ static void exit_search_mode_and_refresh(readline_context_t *ctx) {
         return;
 
     /* Clear the search line */
-    write(STDOUT_FILENO, "\r\033[K", 4);
+    (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
     /* Clear autosuggestion to prevent ghost text */
     display_controller_t *dc = display_integration_get_controller();
@@ -3163,7 +3165,7 @@ char *lle_readline(const char *prompt) {
          * displays a fresh prompt, rather than exiting the shell. */
         if (check_and_clear_sigint_flag()) {
             /* Echo ^C to show user that Ctrl+C was pressed */
-            write(STDOUT_FILENO, "^C\n", 3);
+            (void)!write(STDOUT_FILENO, "^C\n", 3);
 
             /* Clear any completion menu or autosuggestion */
             if (ctx.editor && ctx.editor->completion_system) {
@@ -3282,7 +3284,7 @@ char *lle_readline(const char *prompt) {
          * check and the read would be delayed until the next iteration.
          */
         if (check_and_clear_sigint_flag()) {
-            write(STDOUT_FILENO, "^C\n", 3);
+            (void)!write(STDOUT_FILENO, "^C\n", 3);
             if (ctx.editor && ctx.editor->completion_system) {
                 lle_completion_system_clear(ctx.editor->completion_system);
             }

@@ -28,13 +28,16 @@ static const char *test_script_dir = "/tmp/lush_test_scripts";
 static void setup_test_dir(void) {
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "mkdir -p %s", test_script_dir);
-    system(cmd);
+    if (system(cmd) != 0) {
+        fprintf(stderr, "test setup: mkdir failed for %s\n", test_script_dir);
+        exit(EXIT_FAILURE);
+    }
 }
 
 static void cleanup_test_dir(void) {
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", test_script_dir);
-    system(cmd);
+    (void)!system(cmd);
 }
 
 static char *create_test_script(const char *name, const char *content) {
@@ -601,8 +604,8 @@ TEST(lint_with_dry_run) {
     FILE *f = fopen(path, "r");
     ASSERT_NOT_NULL(f, "File should still exist");
     char buf[256];
-    fgets(buf, sizeof(buf), f);
-    fgets(buf, sizeof(buf), f); // Second line
+    ASSERT_NOT_NULL(fgets(buf, sizeof(buf), f), "read first line");
+    ASSERT_NOT_NULL(fgets(buf, sizeof(buf), f), "read second line");
     fclose(f);
 
     // File should still have "source" not "."
