@@ -462,6 +462,8 @@ int bin_display(int argc, char **argv) {
             return display_lle_theme(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "completion") == 0) {
             return display_lle_completion(argc - 2, argv + 2);
+        } else {
+            fprintf(stderr, "display lle: Unknown command '%s'\n", lle_cmd);
             fprintf(stderr,
                     "display lle: Use 'display lle' for usage information\n");
             return 1;

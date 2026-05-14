@@ -316,7 +316,11 @@ TEST(pos_start_of_text_is_boundary) {
 }
 
 TEST(pos_end_of_text_is_boundary) {
-    const char *text = "hello";
+    /* Use a real char[] so the pos > text_end probe (text + 10) lives
+     * inside the actual array -- otherwise the pointer arithmetic is
+     * UB and gcc -Warray-bounds flags it. The logical text_end stays
+     * at text + 5 (after "hello"). */
+    char text[16] = "hello";
     ASSERT_TRUE(is_grapheme_boundary_at_position(text + 5, text, text + 5),
                 "pos == text_end");
     ASSERT_TRUE(is_grapheme_boundary_at_position(text + 10, text, text + 5),
