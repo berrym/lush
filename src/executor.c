@@ -8647,6 +8647,63 @@ static char *convert_case_first_lower(const char *str) {
  * @param str String to convert
  * @return Converted string (caller must free)
  */
+/**
+ * @brief Pattern-restricted case modification
+ *
+ * Bash `${var^^[pat]}` / `${var,,[pat]}` / `${var^[pat]}` / `${var,[pat]}`
+ * apply case conversion only to characters that match `pattern`.
+ * `pattern` is fnmatch-style and matched single-character against each
+ * byte. If `first_only` is true, only the first matching character is
+ * converted (the `^` / `,` operators); otherwise all matches convert
+ * (`^^` / `,,`).
+ *
+ * Pattern restriction operates byte-by-byte; bash itself documents the
+ * feature as glob-pattern based and does not support Unicode-aware
+ * pattern matching here. Issue #96.
+ *
+ * @param str Input string
+ * @param pattern Glob pattern (may be NULL/empty -- treated as "any char")
+ * @param to_upper true for uppercase conversion, false for lowercase
+ * @param first_only true for `^` / `,`, false for `^^` / `,,`
+ * @return Newly malloc'd converted string
+ */
+static char *convert_case_pattern(const char *str, const char *pattern,
+                                  bool to_upper, bool first_only) {
+    if (!str) {
+        return strdup("");
+    }
+    size_t len = strlen(str);
+    char *result = malloc(len + 1);
+    if (!result) {
+        return strdup("");
+    }
+    bool any_pattern = (pattern && pattern[0]);
+    for (size_t i = 0; i < len; i++) {
+        char c = str[i];
+        bool should_convert;
+        if (first_only && i > 0) {
+            /* Per bash spec: `^pat` / `,pat` only inspect the first
+             * character of the expanded value; subsequent characters
+             * are copied unchanged regardless of whether they would
+             * match the pattern. */
+            should_convert = false;
+        } else if (!any_pattern) {
+            should_convert = true;
+        } else {
+            char buf[2] = {c, '\0'};
+            should_convert = (fnmatch(pattern, buf, 0) == 0);
+        }
+        if (should_convert) {
+            result[i] = to_upper ? (char)toupper((unsigned char)c)
+                                 : (char)tolower((unsigned char)c);
+        } else {
+            result[i] = c;
+        }
+    }
+    result[len] = '\0';
+    return result;
+}
+
 static char *convert_case_all_upper(const char *str) {
     if (!str) {
         return strdup("");
@@ -8820,9 +8877,142 @@ static char *pattern_substitute(const char *str, const char *pattern,
         replacement = "";
     }
 
+    /* Bash anchored-substitution prefixes:
+     *   ${var/#pat/repl}  match pat at the START of str only
+     *   ${var/%pat/repl}  match pat at the END of str only
+     * Detect and strip the marker; the remainder is the real pattern.
+     * Anchored substitution implies a single replacement -- there is
+     * only one start and one end -- so global is ignored when anchored.
+     * Issue #96.
+     */
+    bool anchor_start = false;
+    bool anchor_end = false;
+    if (pattern[0] == '#') {
+        anchor_start = true;
+        pattern++;
+    } else if (pattern[0] == '%') {
+        anchor_end = true;
+        pattern++;
+    }
+    if (!pattern[0]) {
+        return strdup(str);
+    }
+
     size_t str_len = strlen(str);
     size_t pattern_len = strlen(pattern);
     size_t replacement_len = strlen(replacement);
+
+    /* Detect glob metacharacters that route through fnmatch. The
+     * original check missed `[` (character class) and treated `[bd]`
+     * patterns as exact-substring matches, which never matched
+     * because the literal string never contained `[bd]`. fnmatch
+     * supports character classes natively. */
+    bool is_glob =
+        (strchr(pattern, '*') || strchr(pattern, '?') || strchr(pattern, '['));
+
+    /* Anchored-start: match pattern once at position 0, then copy the
+     * remainder. Anchored-end: match pattern once at the suffix, copy
+     * the prefix then the replacement. Both are simpler one-shot
+     * cases than the general scanner below. */
+    if (anchor_start) {
+        size_t match_len = 0;
+        bool matched = false;
+        if (is_glob) {
+            for (size_t try_len = 1; try_len <= str_len; try_len++) {
+                char *substr = malloc(try_len + 1);
+                if (!substr) {
+                    break;
+                }
+                memcpy(substr, str, try_len);
+                substr[try_len] = '\0';
+                if (fnmatch(pattern, substr, 0) == 0) {
+                    matched = true;
+                    match_len = try_len;
+                    /* For glob with *, prefer longest match. */
+                    if (strchr(pattern, '*')) {
+                        for (size_t longer = try_len + 1; longer <= str_len;
+                             longer++) {
+                            char *l = malloc(longer + 1);
+                            if (!l) {
+                                break;
+                            }
+                            memcpy(l, str, longer);
+                            l[longer] = '\0';
+                            if (fnmatch(pattern, l, 0) == 0) {
+                                match_len = longer;
+                            }
+                            free(l);
+                        }
+                    }
+                    free(substr);
+                    break;
+                }
+                free(substr);
+            }
+        } else {
+            if (str_len >= pattern_len &&
+                strncmp(str, pattern, pattern_len) == 0) {
+                matched = true;
+                match_len = pattern_len;
+            }
+        }
+        if (!matched) {
+            return strdup(str);
+        }
+        size_t tail_len = str_len - match_len;
+        char *result = malloc(replacement_len + tail_len + 1);
+        if (!result) {
+            return strdup(str);
+        }
+        memcpy(result, replacement, replacement_len);
+        memcpy(result + replacement_len, str + match_len, tail_len);
+        result[replacement_len + tail_len] = '\0';
+        return result;
+    }
+
+    if (anchor_end) {
+        size_t match_len = 0;
+        bool matched = false;
+        if (is_glob) {
+            /* Try suffixes from longest to shortest. For * patterns we
+             * want longest; for fixed-length patterns either order is
+             * fine. Longest-first matches bash. */
+            for (size_t try_len = str_len; try_len >= 1; try_len--) {
+                size_t start = str_len - try_len;
+                char *substr = malloc(try_len + 1);
+                if (!substr) {
+                    break;
+                }
+                memcpy(substr, str + start, try_len);
+                substr[try_len] = '\0';
+                if (fnmatch(pattern, substr, 0) == 0) {
+                    matched = true;
+                    match_len = try_len;
+                    free(substr);
+                    break;
+                }
+                free(substr);
+            }
+        } else {
+            if (str_len >= pattern_len && strncmp(str + str_len - pattern_len,
+                                                  pattern, pattern_len) == 0) {
+                matched = true;
+                match_len = pattern_len;
+            }
+        }
+        if (!matched) {
+            return strdup(str);
+        }
+        size_t head_len = str_len - match_len;
+        char *result = malloc(head_len + replacement_len + 1);
+        if (!result) {
+            return strdup(str);
+        }
+        memcpy(result, str, head_len);
+        memcpy(result + head_len, replacement, replacement_len);
+        result[head_len + replacement_len] = '\0';
+        return result;
+    }
 
     // Allocate result buffer - estimate size
     size_t result_size = str_len * 2 + 1;
@@ -8842,7 +9032,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
         size_t match_len = 0;
 
         // Simple pattern matching - check for exact match or glob
-        if (strchr(pattern, '*') || strchr(pattern, '?')) {
+        if (is_glob) {
             // Use fnmatch for glob patterns
             // Try increasing lengths to find the match
             for (size_t try_len = 1; try_len <= str_len - i; try_len++) {
@@ -10473,8 +10663,37 @@ static char *parse_parameter_expansion(executor_t *executor,
         return strdup("0");
     }
 
-    // Handle array element access: ${arr[n]}, ${arr[@]}, ${arr[*]}
+    /* Handle array element access: ${arr[n]}, ${arr[@]}, ${arr[*]}.
+     * Only routes through this branch when the prefix before `[` is a
+     * valid shell identifier; otherwise the `[` belongs to something
+     * else (e.g. the character-class pattern inside a substitution
+     * `${var/[abc]/X}`) and must not be consumed here. The prior
+     * unconditional `strchr(expansion, '[')` matched any `[` and
+     * silently emptied substitutions whose patterns happened to
+     * contain a bracket. Issue #96. */
     const char *bracket = strchr(expansion, '[');
+    if (bracket && bracket > expansion) {
+        size_t name_len = bracket - expansion;
+        bool valid_name = true;
+        if (!isalpha((unsigned char)expansion[0]) && expansion[0] != '_') {
+            valid_name = false;
+        } else {
+            for (size_t i = 1; i < name_len; i++) {
+                if (!isalnum((unsigned char)expansion[i]) &&
+                    expansion[i] != '_') {
+                    valid_name = false;
+                    break;
+                }
+            }
+        }
+        if (!valid_name) {
+            bracket = NULL;
+        }
+    } else if (bracket && bracket == expansion) {
+        /* `[` at the very start means there is no name -- not an
+         * array access. */
+        bracket = NULL;
+    }
     if (bracket) {
         size_t name_len = bracket - expansion;
         char *arr_name = malloc(name_len + 1);
@@ -10855,9 +11074,30 @@ static char *parse_parameter_expansion(executor_t *executor,
                                NULL};
     int op_type = -1;
 
+    /* Special-parameter names at position 0 (@, *, #, ?, !, $, -, 0..9)
+     * are variable names, not operators. Without this guard ${@^}
+     * gets parsed as the `@` transformation operator (op_type 17)
+     * applied to an empty var_name, instead of `@` as the variable
+     * with the `^` case-mod operator. Same for ${*^}, ${#:-default}
+     * variants on the special params, etc. Issue #96. */
+    bool first_is_special_param = false;
+    if (expansion[0]) {
+        char c0 = expansion[0];
+        if (c0 == '@' || c0 == '*' || c0 == '#' || c0 == '?' || c0 == '!' ||
+            c0 == '$' || c0 == '-' || (c0 >= '0' && c0 <= '9')) {
+            first_is_special_param = true;
+        }
+    }
+
     // Find the first valid operator - prioritize longer operators first
     for (int i = 0; operators[i]; i++) {
         const char *found = strstr(expansion, operators[i]);
+        /* If the operator matches at position 0 and the first char is
+         * a special-param name, search again starting after it -- the
+         * apparent operator at position 0 is really the variable. */
+        if (found == expansion && first_is_special_param) {
+            found = strstr(expansion + 1, operators[i]);
+        }
         if (found) {
             // Skip single-character operators that are part of longer ones
             if (strlen(operators[i]) == 1) {
@@ -10940,6 +11180,131 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         char *result = NULL;
 
+        /* Per-element dispatch for vector-yielding var names with case-
+         * modification operators. ${@^}, ${@^^[pat]}, ${@,}, ${@,,[pat]}
+         * and the analogous ${arr[@]^^[pat]} family apply the operator
+         * to each positional parameter or array element independently,
+         * then join with space. Bash semantics; scope intentionally
+         * narrowed to case-mod ops for issue #96 (other operators on
+         * vector names -- substitution, trim, substring -- are
+         * separate work). */
+        bool case_mod_op =
+            (op_type == 4 || op_type == 5 || op_type == 8 || op_type == 9);
+        bool is_at_or_star =
+            (strcmp(var_name, "@") == 0 || strcmp(var_name, "*") == 0);
+        size_t vn_len = strlen(var_name);
+        bool is_arr_at_or_star =
+            (vn_len >= 4 &&
+             ((var_name[vn_len - 3] == '[' &&
+               (var_name[vn_len - 2] == '@' || var_name[vn_len - 2] == '*') &&
+               var_name[vn_len - 1] == ']')));
+        if (case_mod_op && (is_at_or_star || is_arr_at_or_star)) {
+            char **elems = NULL;
+            int n_elems = 0;
+            int cap = 0;
+
+            if (is_at_or_star) {
+                int total;
+                if (symtable_in_function_scope(executor->symtable)) {
+                    char *argc_str = symtable_get_var(executor->symtable, "#");
+                    total = argc_str ? atoi(argc_str) : 0;
+                    free(argc_str);
+                    for (int i = 1; i <= total; i++) {
+                        char name[16];
+                        snprintf(name, sizeof(name), "%d", i);
+                        char *v = symtable_get_var(executor->symtable, name);
+                        if (!v) {
+                            v = strdup("");
+                        }
+                        add_to_argv_list(&elems, &n_elems, &cap, v);
+                    }
+                } else {
+                    for (int i = 1; i < shell_argc; i++) {
+                        add_to_argv_list(
+                            &elems, &n_elems, &cap,
+                            strdup(shell_argv[i] ? shell_argv[i] : ""));
+                    }
+                }
+            } else {
+                /* arr[@] / arr[*] */
+                char arr_name[256];
+                size_t name_len = vn_len - 3;
+                if (name_len < sizeof(arr_name)) {
+                    memcpy(arr_name, var_name, name_len);
+                    arr_name[name_len] = '\0';
+                    array_value_t *array = symtable_get_array(arr_name);
+                    if (array) {
+                        size_t total = symtable_array_length(array);
+                        for (size_t i = 0; i < total; i++) {
+                            const char *e =
+                                symtable_array_get_index(array, (int)i);
+                            add_to_argv_list(&elems, &n_elems, &cap,
+                                             strdup(e ? e : ""));
+                        }
+                    }
+                }
+            }
+
+            /* Apply the case-mod op to each element. */
+            size_t out_cap = 64;
+            size_t out_pos = 0;
+            char *joined = malloc(out_cap);
+            if (joined) {
+                joined[0] = '\0';
+                for (int i = 0; i < n_elems; i++) {
+                    char *converted = NULL;
+                    bool to_upper = (op_type == 4 || op_type == 8);
+                    bool first_only = (op_type == 8 || op_type == 9);
+                    if (expanded_default && expanded_default[0]) {
+                        converted = convert_case_pattern(
+                            elems[i], expanded_default, to_upper, first_only);
+                    } else if (first_only) {
+                        converted = to_upper
+                                        ? convert_case_first_upper(elems[i])
+                                        : convert_case_first_lower(elems[i]);
+                    } else {
+                        converted = to_upper ? convert_case_all_upper(elems[i])
+                                             : convert_case_all_lower(elems[i]);
+                    }
+                    if (!converted) {
+                        converted = strdup("");
+                    }
+                    size_t clen = strlen(converted);
+                    size_t need = out_pos + (out_pos > 0 ? 1 : 0) + clen + 1;
+                    while (need > out_cap) {
+                        out_cap *= 2;
+                        char *nb = realloc(joined, out_cap);
+                        if (!nb) {
+                            free(joined);
+                            joined = NULL;
+                            break;
+                        }
+                        joined = nb;
+                    }
+                    if (!joined) {
+                        free(converted);
+                        break;
+                    }
+                    if (out_pos > 0) {
+                        joined[out_pos++] = ' ';
+                    }
+                    memcpy(joined + out_pos, converted, clen);
+                    out_pos += clen;
+                    joined[out_pos] = '\0';
+                    free(converted);
+                }
+            }
+            result = joined ? joined : strdup("");
+            for (int i = 0; i < n_elems; i++) {
+                free(elems[i]);
+            }
+            free(elems);
+            free(var_name);
+            free(var_value);
+            free(expanded_default);
+            return result;
+        }
+
         switch (op_type) {
         case 0: // ${var:-default} - use default if var is unset or empty
             if (is_empty_or_null(var_value)) {
@@ -10987,17 +11352,31 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 4: // ${var^^} - convert all characters to uppercase
+        case 4: // ${var^^[pat]} - convert all characters to uppercase
             if (var_value) {
-                result = convert_case_all_upper(var_value);
+                /* Pattern restriction (issue #96): ${var^^[abc]} converts
+                 * only characters matching the glob pattern. Empty
+                 * pattern falls through to the UTF-8-aware path so
+                 * non-ASCII content is upper-cased correctly. */
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  true, false);
+                } else {
+                    result = convert_case_all_upper(var_value);
+                }
             } else {
                 result = strdup("");
             }
             break;
 
-        case 5: // ${var,,} - convert all characters to lowercase
+        case 5: // ${var,,[pat]} - convert all characters to lowercase
             if (var_value) {
-                result = convert_case_all_lower(var_value);
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  false, false);
+                } else {
+                    result = convert_case_all_lower(var_value);
+                }
             } else {
                 result = strdup("");
             }
@@ -11032,17 +11411,27 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 8: // ${var^} - convert first character to uppercase
+        case 8: // ${var^[pat]} - convert first matching character to uppercase
             if (var_value) {
-                result = convert_case_first_upper(var_value);
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  true, true);
+                } else {
+                    result = convert_case_first_upper(var_value);
+                }
             } else {
                 result = strdup("");
             }
             break;
 
-        case 9: // ${var,} - convert first character to lowercase
+        case 9: // ${var,[pat]} - convert first matching character to lowercase
             if (var_value) {
-                result = convert_case_first_lower(var_value);
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  false, true);
+                } else {
+                    result = convert_case_first_lower(var_value);
+                }
             } else {
                 result = strdup("");
             }
@@ -11109,54 +11498,79 @@ static char *parse_parameter_expansion(executor_t *executor,
             break;
 
         case 15: // ${var//pattern/replacement} - replace all occurrences
-            if (var_value) {
-                // expanded_default contains "pattern/replacement"
-                // Find the separator between pattern and replacement
-                char *sep = strchr(expanded_default, '/');
-                if (sep) {
-                    size_t pattern_len = sep - expanded_default;
-                    char *pattern = malloc(pattern_len + 1);
-                    if (pattern) {
-                        strncpy(pattern, expanded_default, pattern_len);
-                        pattern[pattern_len] = '\0';
-                        const char *replacement = sep + 1;
-                        result = pattern_substitute(var_value, pattern,
-                                                    replacement, true);
-                        free(pattern);
-                    } else {
-                        result = strdup(var_value);
-                    }
-                } else {
-                    // No replacement, just remove pattern
-                    result = pattern_substitute(var_value, expanded_default, "",
-                                                true);
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
         case 16: // ${var/pattern/replacement} - replace first occurrence
+            /* Pattern/replacement split honoring backslash-escaped
+             * slashes. ${path//\//.} has pattern `\/` (literal slash)
+             * and replacement `.`; the prior strchr-based split took
+             * the FIRST `/` as the separator even when it was preceded
+             * by `\`, splitting pattern as `\` (nothing) and replacement
+             * as `/.` -- silently producing the original string back.
+             * Walk the spec and break at the first unescaped `/`.
+             * Backslash-escapes other than `\/` pass through to
+             * fnmatch which handles them per glob spec. Issue #96. */
             if (var_value) {
-                // expanded_default contains "pattern/replacement"
-                char *sep = strchr(expanded_default, '/');
+                char *sep = NULL;
+                for (char *p = expanded_default; *p; p++) {
+                    if (*p == '\\' && p[1] == '/') {
+                        p++;
+                        continue;
+                    }
+                    if (*p == '/') {
+                        sep = p;
+                        break;
+                    }
+                }
+                bool global = (op_type == 15);
                 if (sep) {
                     size_t pattern_len = sep - expanded_default;
                     char *pattern = malloc(pattern_len + 1);
                     if (pattern) {
-                        strncpy(pattern, expanded_default, pattern_len);
-                        pattern[pattern_len] = '\0';
+                        /* Strip `\/` -> `/` in the extracted pattern
+                         * so downstream matchers see the canonical
+                         * literal slash. Other backslash sequences
+                         * pass through. */
+                        size_t pj = 0;
+                        for (size_t pi = 0; pi < pattern_len; pi++) {
+                            if (expanded_default[pi] == '\\' &&
+                                pi + 1 < pattern_len &&
+                                expanded_default[pi + 1] == '/') {
+                                pattern[pj++] = '/';
+                                pi++;
+                            } else {
+                                pattern[pj++] = expanded_default[pi];
+                            }
+                        }
+                        pattern[pj] = '\0';
                         const char *replacement = sep + 1;
                         result = pattern_substitute(var_value, pattern,
-                                                    replacement, false);
+                                                    replacement, global);
                         free(pattern);
                     } else {
                         result = strdup(var_value);
                     }
                 } else {
-                    // No replacement, just remove pattern
-                    result = pattern_substitute(var_value, expanded_default, "",
-                                                false);
+                    /* No replacement, just remove pattern. Same `\/`
+                     * canonicalization as the pattern half. */
+                    size_t plen = strlen(expanded_default);
+                    char *pattern = malloc(plen + 1);
+                    if (pattern) {
+                        size_t pj = 0;
+                        for (size_t pi = 0; pi < plen; pi++) {
+                            if (expanded_default[pi] == '\\' && pi + 1 < plen &&
+                                expanded_default[pi + 1] == '/') {
+                                pattern[pj++] = '/';
+                                pi++;
+                            } else {
+                                pattern[pj++] = expanded_default[pi];
+                            }
+                        }
+                        pattern[pj] = '\0';
+                        result =
+                            pattern_substitute(var_value, pattern, "", global);
+                        free(pattern);
+                    } else {
+                        result = strdup(var_value);
+                    }
                 }
             } else {
                 result = strdup("");
