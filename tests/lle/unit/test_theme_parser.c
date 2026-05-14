@@ -46,7 +46,9 @@ typedef struct collected_kv {
     char section[128];
     char key[64];
     lle_theme_value_type_t type;
-    char string_value[256];
+    /* Match LLE_THEME_PARSER_STRING_MAX so memcpy of an upstream
+     * theme-parser string cannot truncate at this hop. */
+    char string_value[LLE_THEME_PARSER_STRING_MAX];
     int64_t int_value;
     bool bool_value;
 } collected_kv_t;
@@ -73,8 +75,12 @@ static lle_result_t collect_callback(const char *section, const char *key,
     item->type = value->type;
     switch (value->type) {
     case LLE_THEME_VALUE_STRING:
-        snprintf(item->string_value, sizeof(item->string_value), "%s",
-                 value->data.string);
+        /* string_value is sized to match the parser's string buffer, so
+         * memcpy of the full N bytes (already NUL-terminated upstream)
+         * is exact and avoids both -Wformat-truncation (snprintf path)
+         * and -Wstringop-truncation (strncpy + sizeof-1 path). */
+        memcpy(item->string_value, value->data.string,
+               sizeof(item->string_value));
         break;
     case LLE_THEME_VALUE_INTEGER:
         item->int_value = value->data.integer;

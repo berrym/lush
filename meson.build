@@ -2,7 +2,8 @@ project('lush',
         'c',
         default_options: ['c_std=c11',
                           'optimization=3',
-                          'warning_level=2'
+                          'warning_level=2',
+                          'werror=true'
                          ],
         version: '1.5.0',
         license: 'MIT')

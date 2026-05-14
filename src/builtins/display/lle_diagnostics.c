@@ -15,6 +15,10 @@
 #include "lle/lle_watchdog.h"
 
 int display_lle_diagnostics(int argc, char **argv) {
+    /* Diagnostics dump takes no arguments. */
+    (void)argc;
+    (void)argv;
+
     /* Show LLE diagnostics */
     lle_editor_t *editor = lle_get_global_editor();
 

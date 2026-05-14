@@ -53,6 +53,10 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
         return -1;
     fx->home = strdup(dir);
 
+    /* ssh_dir holds "${home}/.ssh"; config_path holds "${ssh_dir}/config".
+     * Buffers are sized so the chained snprintfs cannot truncate when
+     * home is a normal tmpdir path -- silences gcc -Wformat-truncation
+     * over the worst-case length estimate. */
     char ssh_dir[1024];
     snprintf(ssh_dir, sizeof(ssh_dir), "%s/.ssh", fx->home);
     if (mkdir(ssh_dir, 0700) != 0) {
@@ -60,7 +64,7 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
         return -1;
     }
 
-    char config_path[1024];
+    char config_path[1040];
     snprintf(config_path, sizeof(config_path), "%s/config", ssh_dir);
     FILE *fp = fopen(config_path, "w");
     if (!fp) {
@@ -89,7 +93,8 @@ static void ssh_test_teardown(ssh_test_fixture_t *fx) {
     ssh_hosts_cleanup();
 
     if (fx->home) {
-        char ssh_dir[1024], config_path[1024];
+        char ssh_dir[1024];
+        char config_path[1040]; /* see ssh_test_setup sizing rationale */
         snprintf(ssh_dir, sizeof(ssh_dir), "%s/.ssh", fx->home);
         snprintf(config_path, sizeof(config_path), "%s/config", ssh_dir);
         unlink(config_path);

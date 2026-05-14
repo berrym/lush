@@ -11553,15 +11553,16 @@ static char *parse_parameter_expansion(executor_t *executor,
         array_value_t *array = symtable_get_array(var_name);
         if (array) {
             shell_mode_t mode = shell_mode_get();
-            char *result = malloc(16);
+            /* size_t can render up to 20 digits on 64-bit + null. */
+            char *result = malloc(24);
             if (!result) {
                 return strdup("0");
             }
             if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
                 const char *first = symtable_array_get_index(array, 0);
-                snprintf(result, 16, "%zu", first ? strlen(first) : 0);
+                snprintf(result, 24, "%zu", first ? strlen(first) : 0);
             } else {
-                snprintf(result, 16, "%zu", symtable_array_length(array));
+                snprintf(result, 24, "%zu", symtable_array_length(array));
             }
             return result;
         }
