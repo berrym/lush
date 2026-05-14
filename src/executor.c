@@ -93,6 +93,8 @@ static int execute_logical_or(executor_t *executor, node_t *or_node);
 static int execute_command_list(executor_t *executor, node_t *list);
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc);
+static bool try_expand_vector_arg(executor_t *executor, node_t *node,
+                                  char ***out_vec, int *out_count);
 static bool is_stdout_captured(void);
 static bool has_stdout_redirections(node_t *command);
 static bool builtin_can_fork(const char *name);
@@ -2426,6 +2428,41 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                         }
                     }
                 } else {
+                    /* Vector-yielding expansions in for-loop word lists:
+                     * `$@`, `"$@"`, `${arr[@]}`, `"${arr[@]}"`,
+                     * `${!arr[@]}`, bare `$arr` (zsh/lush mode), and
+                     * slice variants. Each produces N separate iteration
+                     * values regardless of word-split setting -- the
+                     * for-loop semantics are intrinsically per-element
+                     * for these forms in both bash and zsh. Without this
+                     * the FEATURE_WORD_SPLIT_DEFAULT=false path
+                     * (zsh/lush mode default) treats the joined string
+                     * as one iteration. Issue #99. */
+                    char **vec = NULL;
+                    int vcount = 0;
+                    if (try_expand_vector_arg(executor, word, &vec, &vcount)) {
+                        for (int v = 0; v < vcount; v++) {
+                            expanded_words =
+                                realloc(expanded_words,
+                                        (word_count + 1) * sizeof(char *));
+                            if (!expanded_words) {
+                                for (int w = v; w < vcount; w++) {
+                                    free(vec[w]);
+                                }
+                                free(vec);
+                                set_executor_error(
+                                    executor,
+                                    "Memory allocation failed in for loop");
+                                symtable_pop_scope(executor->symtable);
+                                return 1;
+                            }
+                            expanded_words[word_count++] = vec[v];
+                        }
+                        free(vec);
+                        word = word->next_sibling;
+                        continue;
+                    }
+
                     // Normal expansion and splitting for other words
                     char *expanded = expand_if_needed(executor, word->val.str);
                     if (expanded) {
@@ -3669,8 +3706,44 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         (len == 2 && s[0] == '$' && (s[1] == '@' || s[1] == '*'));
     /* ${...} braced forms. */
     bool braced = (len >= 3 && s[0] == '$' && s[1] == '{' && s[len - 1] == '}');
+    /* Bare `$NAME` where NAME is an array. zsh expands bare array
+     * references to N words in word-list contexts (for-loop iteration,
+     * command argv) regardless of word-split setting. Bash's `$arr`
+     * is the first element only, so only treat this as vector form
+     * in zsh/lush mode. Detected here so execute_for and
+     * build_argv_from_ast both honor it via the same helper.
+     * Issue #99. */
+    bool bare_array = false;
+    if (!positional_at && !braced && len >= 2 && s[0] == '$' &&
+        (isalpha((unsigned char)s[1]) || s[1] == '_')) {
+        bool name_only = true;
+        for (size_t k = 1; k < len; k++) {
+            if (!isalnum((unsigned char)s[k]) && s[k] != '_') {
+                name_only = false;
+                break;
+            }
+        }
+        if (name_only) {
+            char name_buf[256];
+            size_t nlen = len - 1;
+            if (nlen < sizeof(name_buf)) {
+                memcpy(name_buf, s + 1, nlen);
+                name_buf[nlen] = '\0';
+                array_value_t *probe = symtable_get_array(name_buf);
+                if (probe) {
+                    shell_mode_t mode = shell_mode_get();
+                    /* Curated: zsh + lush explode bare $arr; bash + posix
+                     * keep it scalar (first element via the existing
+                     * expand_array_unsubscripted path). */
+                    if (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) {
+                        bare_array = true;
+                    }
+                }
+            }
+        }
+    }
 
-    if (!positional_at && !braced) {
+    if (!positional_at && !braced && !bare_array) {
         return false;
     }
 
@@ -3693,6 +3766,12 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
 
     if (positional_at) {
         subscript = s[1];
+    } else if (bare_array) {
+        /* Bare $NAME: name is s+1, length is len-1. Treat as if it
+         * were ${NAME[@]} -- produce all elements as separate words. */
+        name_start = s + 1;
+        name_len = len - 1;
+        subscript = '@';
     } else {
         /* inner content between { and } */
         const char *p = s + 2;
@@ -4734,7 +4813,37 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             }
             return strdup(text);
         } else if (strncmp(text, "$((", 3) == 0) {
-            return expand_arithmetic(executor, text);
+            /* Disambiguate `$((` between arithmetic and command-sub
+             * of an anonymous function `$(() {...})`. Same shape as
+             * the tokenizer and expand_variables_in_string detectors
+             * (issue #99): if the lookahead from after $(( finds {,
+             * }, ;, or \n before matched )), route to command-sub. */
+            bool looks_arith = true;
+            {
+                size_t tlen = strlen(text);
+                size_t s = 3;
+                int d = 2;
+                while (s < tlen && d > 0) {
+                    char sc = text[s];
+                    if (sc == '(') {
+                        d++;
+                    } else if (sc == ')') {
+                        d--;
+                        if (d == 0) {
+                            break;
+                        }
+                    } else if (sc == '{' || sc == '}' || sc == ';' ||
+                               sc == '\n') {
+                        looks_arith = false;
+                        break;
+                    }
+                    s++;
+                }
+            }
+            if (looks_arith) {
+                return expand_arithmetic(executor, text);
+            }
+            return expand_command_substitution(executor, text);
         } else if (strncmp(text, "$(", 2) == 0) {
             return expand_command_substitution(executor, text);
         } else if (strncmp(text, "${", 2) == 0) {
@@ -9540,6 +9649,48 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
         if (str[i] == '$') {
             // Check for arithmetic expansion $((...)
             if (i + 2 < len && str[i + 1] == '(' && str[i + 2] == '(') {
+                /* $(( is ambiguous: arithmetic expansion or command
+                 * substitution of an anonymous function `$(() {...})`.
+                 * Same disambiguation rule as the tokenizer (issue #99):
+                 * if the lookahead from after $(( finds `{`, `}`, `;`,
+                 * or `\n` before matched `))`, the input is command
+                 * substitution and must be routed through the next-
+                 * branch's $(...) handler instead. Walk the lookahead;
+                 * if it doesn't pass the arithmetic shape check, fall
+                 * through to the $(...) handler below. */
+                bool looks_arith = true;
+                {
+                    size_t s = i + 3;
+                    int d = 2;
+                    while (s < len && d > 0) {
+                        char sc = str[s];
+                        if (sc == '(') {
+                            d++;
+                        } else if (sc == ')') {
+                            d--;
+                            if (d == 0) {
+                                break;
+                            }
+                        } else if (sc == '{' || sc == '}' || sc == ';' ||
+                                   sc == '\n') {
+                            looks_arith = false;
+                            break;
+                        }
+                        s++;
+                    }
+                }
+                if (!looks_arith) {
+                    /* Re-route into the $(...) command-sub handler at
+                     * the next branch (else-if on str[i + 1] == '('),
+                     * which fires when str[i+2] != '(' OR when we
+                     * intentionally skip the arithmetic path. To
+                     * trigger it cleanly, just fall through to the
+                     * next condition test by NOT entering the arith
+                     * block. The post-block `i = arith_end - 1`
+                     * advancement is skipped because we don't `continue`
+                     * here. */
+                    goto try_cmd_sub_path;
+                }
                 // This is arithmetic expansion $((expr))
                 size_t arith_start = i;
                 size_t arith_end = i + 3;
@@ -9596,6 +9747,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
             }
             // Check for command substitution $(...)
             else if (i + 1 < len && str[i + 1] == '(') {
+            try_cmd_sub_path:;
                 // Find matching closing parenthesis using find_closing_brace
                 char *temp_str =
                     (char *)&str[i + 1]; // Start from the opening parenthesis
@@ -10660,6 +10812,32 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             return result ? result : strdup("0");
         }
+        /* Scalar lookup missed; check if var_name is an array. Mode-
+         * aware semantics for ${#arr} on a bare array name:
+         *   zsh:  number of elements
+         *   bash: length of arr[0] (treats $arr as ${arr[0]})
+         *   lush: number of elements (curated zsh idiom; bash users
+         *         should use ${#arr[@]} for the element count and
+         *         ${#arr[0]} for length-of-first explicitly)
+         *   posix: arrays do not exist; if one happens to be defined
+         *          (mode carryover) match bash's first-element rule.
+         * Issue #99.
+         */
+        array_value_t *array = symtable_get_array(var_name);
+        if (array) {
+            shell_mode_t mode = shell_mode_get();
+            char *result = malloc(16);
+            if (!result) {
+                return strdup("0");
+            }
+            if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
+                const char *first = symtable_array_get_index(array, 0);
+                snprintf(result, 16, "%zu", first ? strlen(first) : 0);
+            } else {
+                snprintf(result, 16, "%zu", symtable_array_length(array));
+            }
+            return result;
+        }
         return strdup("0");
     }
 
@@ -10813,6 +10991,48 @@ static char *parse_parameter_expansion(executor_t *executor,
                                strcmp(subscript, "*") == 0) {
                         // ${arr[@]} or ${arr[*]} - all elements
                         result = symtable_array_expand(array, " ");
+                    } else if ((strncmp(subscript, "(i)", 3) == 0 ||
+                                strncmp(subscript, "(I)", 3) == 0) &&
+                               !array->is_associative) {
+                        /* zsh subscript flags ${arr[(i)pat]} / ${arr[(I)pat]}:
+                         * return the 1-based index of the first / last
+                         * element matching pat, or N+1 / 0 if no match.
+                         * pat is fnmatch-style. Issue #99. */
+                        bool last_index = (subscript[1] == 'I');
+                        const char *pat = subscript + 3;
+                        size_t total = symtable_array_length(array);
+                        int found = last_index ? 0 : (int)(total + 1);
+                        bool any_match = false;
+                        bool is_glob = (strchr(pat, '*') || strchr(pat, '?') ||
+                                        strchr(pat, '['));
+                        for (size_t k = 0; k < total; k++) {
+                            const char *elem =
+                                symtable_array_get_index(array, (int)k);
+                            if (!elem) {
+                                continue;
+                            }
+                            bool match;
+                            if (is_glob) {
+                                match = (fnmatch(pat, elem, 0) == 0);
+                            } else {
+                                match = (strcmp(elem, pat) == 0);
+                            }
+                            if (match) {
+                                int idx_1based = (int)k + 1;
+                                if (last_index) {
+                                    found = idx_1based;
+                                } else if (!any_match) {
+                                    found = idx_1based;
+                                }
+                                any_match = true;
+                                if (!last_index) {
+                                    break;
+                                }
+                            }
+                        }
+                        char buf[32];
+                        snprintf(buf, sizeof(buf), "%d", found);
+                        result = strdup(buf);
                     } else if (strchr(subscript, ',') &&
                                !array->is_associative) {
                         /* zsh-style range subscript ${arr[N,M]} / $arr[N,M]
@@ -13003,6 +13223,42 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
 
             // Check for arithmetic expansion $((...))
             if (str[i + 1] == '(' && i + 2 < len && str[i + 2] == '(') {
+                /* $(( disambiguation: arithmetic vs command-sub of
+                 * anonymous function. Same shape as tokenizer +
+                 * expand_variables_in_string + expand_if_needed
+                 * (issue #99). */
+                bool qs_looks_arith = true;
+                {
+                    size_t s = i + 3;
+                    int d = 2;
+                    while (s < len && d > 0) {
+                        char sc = str[s];
+                        if (sc == '(') {
+                            d++;
+                        } else if (sc == ')') {
+                            d--;
+                            if (d == 0) {
+                                break;
+                            }
+                        } else if (sc == '{' || sc == '}' || sc == ';' ||
+                                   sc == '\n') {
+                            qs_looks_arith = false;
+                            break;
+                        }
+                        s++;
+                    }
+                }
+                if (!qs_looks_arith) {
+                    /* Fall through to the $(...) command-sub handler
+                     * later in this function -- which is exactly the
+                     * else-if test on str[i+1] == '(' that doesn't
+                     * require str[i+2] == '('. To avoid restructuring
+                     * the giant conditional chain, mark this branch
+                     * as "not arithmetic" by setting paren_depth so
+                     * the post-check fails through. Simplest path:
+                     * just skip and let the next branch handle it. */
+                    goto qs_try_cmd_sub;
+                }
                 // This is arithmetic expansion $((expr))
                 size_t arith_start = i;
                 size_t arith_end = i + 3;
@@ -13058,6 +13314,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
             }
             // Check for command substitution $(...)
             else if (str[i + 1] == '(') {
+            qs_try_cmd_sub:;
                 // Use the robust find_closing_brace function to handle nested
                 // quotes
                 size_t cmd_start = i;

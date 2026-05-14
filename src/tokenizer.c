@@ -1088,39 +1088,82 @@ static token_t *tokenize_next(tokenizer_t *tokenizer) {
 
                 if (tokenizer->position < tokenizer->input_length &&
                     tokenizer->input[tokenizer->position] == '(') {
-                    // Arithmetic expansion $((expr))
-                    tokenizer->position++;
-                    tokenizer->column++;
-
-                    int paren_count = 2;
-                    while (tokenizer->position < tokenizer->input_length &&
-                           paren_count > 0) {
-                        char curr = tokenizer->input[tokenizer->position];
-                        if (curr == '(') {
-                            paren_count++;
-                        } else if (curr == ')') {
-                            paren_count--;
-                        } else if (curr == '\n') {
-                            tokenizer->line++;
-                            tokenizer->column = 0;
+                    /* `$((` is ambiguous: it could begin arithmetic
+                     * expansion `$((expr))` OR command substitution of
+                     * an anonymous function `$(() { body; } args)`.
+                     * Arithmetic content cannot contain braces, semicolons,
+                     * or newlines at the top level, so if a lookahead
+                     * scan finds any of those before the matched `))`,
+                     * the input is really `$(` followed by a `(` -- back
+                     * up the second `(` and reparse as command sub.
+                     * Issue #99. */
+                    size_t scan = tokenizer->position + 1;
+                    int depth = 2; /* counting the two outer `(` */
+                    bool looks_arith = true;
+                    while (scan < tokenizer->input_length && depth > 0) {
+                        char sc = tokenizer->input[scan];
+                        if (sc == '(') {
+                            depth++;
+                        } else if (sc == ')') {
+                            depth--;
+                            if (depth == 0) {
+                                /* Verify the closing is actually `))`
+                                 * by checking we came down from 2 with
+                                 * the immediately preceding char also
+                                 * being `)` (i.e. the inner closes
+                                 * before the outer). Walking the depth
+                                 * counter has already ensured this. */
+                                break;
+                            }
+                        } else if (sc == '{' || sc == '}' || sc == ';' ||
+                                   sc == '\n') {
+                            looks_arith = false;
+                            break;
                         }
+                        scan++;
+                    }
+
+                    if (looks_arith) {
+                        // Arithmetic expansion $((expr))
                         tokenizer->position++;
                         tokenizer->column++;
-                    }
 
-                    // Check for unclosed arithmetic expansion
-                    if (paren_count > 0) {
+                        int paren_count = 2;
+                        while (tokenizer->position < tokenizer->input_length &&
+                               paren_count > 0) {
+                            char curr = tokenizer->input[tokenizer->position];
+                            if (curr == '(') {
+                                paren_count++;
+                            } else if (curr == ')') {
+                                paren_count--;
+                            } else if (curr == '\n') {
+                                tokenizer->line++;
+                                tokenizer->column = 0;
+                            }
+                            tokenizer->position++;
+                            tokenizer->column++;
+                        }
+
+                        // Check for unclosed arithmetic expansion
+                        if (paren_count > 0) {
+                            size_t length = tokenizer->position - start;
+                            return token_new(
+                                TOK_ERROR, &tokenizer->input[start], length,
+                                start_line, start_column, start_pos);
+                        }
+
                         size_t length = tokenizer->position - start;
-                        return token_new(TOK_ERROR, &tokenizer->input[start],
-                                         length, start_line, start_column,
-                                         start_pos);
+                        return token_new(TOK_ARITH_EXP,
+                                         &tokenizer->input[start], length,
+                                         start_line, start_column, start_pos);
                     }
-
-                    size_t length = tokenizer->position - start;
-                    return token_new(TOK_ARITH_EXP, &tokenizer->input[start],
-                                     length, start_line, start_column,
-                                     start_pos);
-                } else {
+                    /* Fall through to command-sub handling below.
+                     * Position is currently at the second `(` of `$((`,
+                     * which is the start of the inner subshell or
+                     * anonymous function body that the command-sub
+                     * paren-counter will track. */
+                }
+                {
                     // Command substitution $(cmd)
                     int paren_count = 1;
                     while (tokenizer->position < tokenizer->input_length &&
