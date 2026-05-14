@@ -12,7 +12,9 @@
 #include "symtable.h"
 
 #include <errno.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 /**
  * @brief Execute command bypassing shell functions and builtins
