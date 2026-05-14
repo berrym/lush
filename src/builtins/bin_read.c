@@ -181,13 +181,35 @@ int bin_read(int argc, char **argv) {
         return 1;
     }
 
-    // Validate variable name
-    char *varname = argv[opt_index];
+    /* POSIX read accepts one or more variable names. With N names,
+     * the input line is split on IFS into the first N-1 fields
+     * (whitespace coalesced for default IFS) and the remainder
+     * (including any internal IFS chars) is assigned to the Nth
+     * variable. If fewer than N words are present, trailing
+     * variables get the empty string. Issue #101. */
+    int n_varnames = argc - opt_index;
+    if (n_varnames <= 0) {
+        executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                              builtin_get_source_location(),
+                              "at least one variable name required");
+        return 1;
+    }
+    char *varname = argv[opt_index]; /* first name; kept for the
+                                      * single-var fast paths below */
     if (!is_valid_identifier(varname)) {
         executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                               builtin_get_source_location(),
                               "'%s' not a valid identifier", varname);
         return 1;
+    }
+    for (int i = 1; i < n_varnames; i++) {
+        if (!is_valid_identifier(argv[opt_index + i])) {
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "'%s' not a valid identifier",
+                                  argv[opt_index + i]);
+            return 1;
+        }
     }
 
     // Display prompt if specified
@@ -369,8 +391,55 @@ int bin_read(int argc, char **argv) {
         }
     }
 
-    // Set the variable using modern API
-    symtable_set_global(varname, line ? line : "");
+    /* Assign the line to one or more variables. Single-name fast
+     * path matches POSIX read's default behavior (entire line ->
+     * the one variable). For N>1 names, split on IFS into N-1
+     * leading fields and assign the remainder (preserving internal
+     * IFS chars) to the last variable. */
+    if (n_varnames == 1) {
+        symtable_set_global(varname, line ? line : "");
+    } else {
+        const char *src = line ? line : "";
+        /* POSIX IFS default is space, tab, newline. Honor a user-set
+         * IFS if present in the symbol table. Read IFS as the SET
+         * of delimiter chars; consecutive whitespace IFS chars are
+         * collapsed by POSIX field-splitting semantics, but
+         * non-whitespace IFS chars produce empty fields. For the
+         * canonical read-line case (default IFS), the whitespace-
+         * coalescing behavior is what real scripts depend on. */
+        char *ifs_val = symtable_get_var(current_executor->symtable, "IFS");
+        const char *ifs = ifs_val ? ifs_val : " \t\n";
+
+        for (int i = 0; i < n_varnames - 1; i++) {
+            /* Skip leading IFS whitespace before each field. */
+            while (*src && strchr(ifs, *src)) {
+                src++;
+            }
+            const char *field_start = src;
+            while (*src && !strchr(ifs, *src)) {
+                src++;
+            }
+            size_t flen = (size_t)(src - field_start);
+            char *field = malloc(flen + 1);
+            if (!field) {
+                free(ifs_val);
+                free(line);
+                return 1;
+            }
+            memcpy(field, field_start, flen);
+            field[flen] = '\0';
+            symtable_set_global(argv[opt_index + i], field);
+            free(field);
+        }
+        /* Last variable: skip one leading IFS-whitespace run then
+         * take everything else verbatim (including internal IFS
+         * chars). */
+        while (*src && strchr(ifs, *src)) {
+            src++;
+        }
+        symtable_set_global(argv[opt_index + n_varnames - 1], src);
+        free(ifs_val);
+    }
 
     if (line)
         free(line);

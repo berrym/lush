@@ -28,6 +28,40 @@ int bin_unset(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         const char *var_name = argv[i];
 
+        /* Array-element form: `unset arr[N]` or `unset assoc[key]`
+         * removes just the matching element, not the whole array.
+         * Bash semantics; without this lush ignored the subscript
+         * and either no-op'd or tried to unset a scalar named
+         * "arr[N]" (issue #101). Detect a `[` in the name; if
+         * followed by a matching `]`, route through the array
+         * element-unset API. */
+        const char *bracket = strchr(var_name, '[');
+        if (bracket && bracket > var_name) {
+            const char *close = strrchr(bracket, ']');
+            if (close && close > bracket + 1) {
+                size_t name_len = (size_t)(bracket - var_name);
+                size_t sub_len = (size_t)(close - bracket - 1);
+                char name_buf[256];
+                char sub_buf[256];
+                if (name_len < sizeof(name_buf) && sub_len < sizeof(sub_buf)) {
+                    memcpy(name_buf, var_name, name_len);
+                    name_buf[name_len] = '\0';
+                    memcpy(sub_buf, bracket + 1, sub_len);
+                    sub_buf[sub_len] = '\0';
+                    array_value_t *array = symtable_get_array(name_buf);
+                    if (array) {
+                        if (array->is_associative) {
+                            symtable_array_unset_assoc(array, sub_buf);
+                        } else {
+                            int idx = (int)strtol(sub_buf, NULL, 10);
+                            symtable_array_unset_index(array, idx);
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+
         // Resolve nameref if applicable - unset the target, not the nameref
         // itself
         symtable_manager_t *mgr = symtable_get_global_manager();

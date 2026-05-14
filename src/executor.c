@@ -3954,13 +3954,24 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 }
                 free(keys);
             } else {
-                /* Indexed array: keys are numeric indices 0..N-1. */
-                size_t total = symtable_array_length(array);
-                int start = 0, end_idx = (int)total - 1;
+                /* Indexed array: keys are the ACTUAL stored indices.
+                 * For dense arrays these are 0..N-1; for sparse arrays
+                 * they are the explicit indices assigned. The prior
+                 * implementation generated 0..N-1 dense, which
+                 * silently turned sparse arrays into dense ones and
+                 * broke `for k in "${!arr[@]}"; do echo arr[$k]` on
+                 * sparse data (issue #101). symtable_array_get_keys
+                 * returns the real indices via array->indices[]. */
+                size_t kcount = 0;
+                char **keys = symtable_array_get_keys(array, &kcount);
+                if (!keys) {
+                    return false;
+                }
+                int start = 0, end_idx = (int)kcount - 1;
                 if (has_slice) {
                     start = slice_offset;
                     if (start < 0) {
-                        start = (int)total + start;
+                        start = (int)kcount + start;
                         if (start < 0) {
                             start = 0;
                         }
@@ -3968,24 +3979,30 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     if (slice_length >= 0) {
                         end_idx = start + slice_length - 1;
                     } else {
-                        end_idx = (int)total - 1;
+                        end_idx = (int)kcount - 1;
                     }
-                    if (end_idx >= (int)total) {
-                        end_idx = (int)total - 1;
+                    if (end_idx >= (int)kcount) {
+                        end_idx = (int)kcount - 1;
                     }
                 }
                 for (int k = start; k <= end_idx; k++) {
-                    char idx_str[16];
-                    snprintf(idx_str, sizeof(idx_str), "%d", k);
                     if (!add_to_argv_list(&vec, &vcount, &vcap,
-                                          strdup(idx_str))) {
+                                          strdup(keys[k]))) {
                         for (int j = 0; j < vcount; j++) {
                             free(vec[j]);
                         }
                         free(vec);
+                        for (size_t j = 0; j < kcount; j++) {
+                            free(keys[j]);
+                        }
+                        free(keys);
                         return false;
                     }
                 }
+                for (size_t j = 0; j < kcount; j++) {
+                    free(keys[j]);
+                }
+                free(keys);
             }
         } else {
             /* Produce values. Honor slicing. */
