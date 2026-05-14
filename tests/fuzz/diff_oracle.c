@@ -81,11 +81,22 @@ static const char *const DASH_CANDIDATES[] = {
     "/opt/homebrew/bin/dash", /* macOS Homebrew (Apple Silicon) */
     NULL,
 };
+/* Homebrew prefixes first so macOS prefers modern bash over the
+ * Apple-shipped /bin/bash, which is GPLv2-pinned at 3.2.57 (May 2014)
+ * and lacks associative arrays, case-modification expansions, [[ -v ]],
+ * negative substring offsets, ${arr[@]:N:M} slicing, and most of the
+ * surface this corpus exercises. /bin/bash and /usr/bin/bash are the
+ * common Linux locations and stay in the list as a fallback for hosts
+ * without Homebrew, but they are reached only if Homebrew is absent.
+ * The MODE_BASH path additionally rejects bash < 4.0 via the version
+ * filter in oracle_candidate_acceptable(), so even if /bin/bash is
+ * picked on macOS without Homebrew, the harness will warn and skip it
+ * rather than producing a flood of false-positive divergences. */
 static const char *const BASH_CANDIDATES[] = {
-    "/bin/bash",              /* most Linux */
-    "/usr/bin/bash",          /* Fedora/Arch */
     "/usr/local/bin/bash",    /* macOS Homebrew (Intel) */
     "/opt/homebrew/bin/bash", /* macOS Homebrew (Apple Silicon) */
+    "/bin/bash",              /* most Linux distros */
+    "/usr/bin/bash",          /* Fedora/Arch */
     NULL,
 };
 static const char *const ZSH_CANDIDATES[] = {
@@ -173,6 +184,97 @@ static bool path_executable(const char *path) {
     return path && path[0] && access(path, X_OK) == 0;
 }
 
+/* Read major version from `binary --version` output. Returns the
+ * major-version integer (e.g. 5 for bash 5.3.9) or -1 if the version
+ * cannot be determined. The function spawns a short-lived child via
+ * fork+exec and captures the first 256 bytes of stdout. Parses the
+ * pattern "version N." (used by bash, dash, zsh, ksh, ...) since the
+ * leading text and exact format differ across shells but all of them
+ * embed "version X.Y" early in the --version output.
+ *
+ * Used by the bash modernity filter below; benign for the other modes
+ * if they ever need it. */
+static int read_major_version(const char *binary) {
+    if (!path_executable(binary)) {
+        return -1;
+    }
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        return -1;
+    }
+    pid_t pid = lush_fork();
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return -1;
+    }
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        dup2(pipefd[1], STDERR_FILENO);
+        close(pipefd[1]);
+        execl(binary, binary, "--version", (char *)NULL);
+        _exit(127);
+    }
+    close(pipefd[1]);
+    char buf[256];
+    ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
+    /* Drain anything remaining so the child does not block on pipe. */
+    char scratch[64];
+    while (read(pipefd[0], scratch, sizeof(scratch)) > 0) {
+        /* discard */
+    }
+    close(pipefd[0]);
+    int status = 0;
+    waitpid(pid, &status, 0);
+    if (n <= 0) {
+        return -1;
+    }
+    buf[n] = '\0';
+    const char *v = strstr(buf, "version ");
+    if (!v) {
+        return -1;
+    }
+    v += 8;
+    if (!isdigit((unsigned char)*v)) {
+        return -1;
+    }
+    return atoi(v);
+}
+
+/* Modernity filter for oracle candidates. For MODE_BASH the corpus
+ * exercises features (associative arrays, ${var^^}, [[ -v ]], -- you
+ * name it) that bash 3.2.57 -- the Apple-shipped /bin/bash -- does not
+ * support. A 3.x bash silently exits non-zero and produces unrelated
+ * diagnostics on every test in the bash corpus, so allowing it as an
+ * oracle generates a flood of false-positive divergences that obscure
+ * any real bugs. Reject < 4.0 with a stderr warning so the user knows
+ * why the candidate was skipped. Version probing fails open: if
+ * --version output cannot be parsed, the candidate is accepted and
+ * any incompatibilities surface as ordinary divergences. */
+static bool oracle_candidate_acceptable(mode_t_ mode, const char *path) {
+    if (!path_executable(path)) {
+        return false;
+    }
+    if (mode != MODE_BASH) {
+        return true;
+    }
+    int major = read_major_version(path);
+    if (major < 0) {
+        return true; /* version unknown -- accept */
+    }
+    if (major < 4) {
+        fprintf(stderr,
+                "diff_oracle: skipping %s (bash %d.x; need >= 4.0 for "
+                "full feature coverage). Install GNU bash via Homebrew "
+                "(brew install bash) or set LUSH_ORACLE_BASH to a "
+                "modern binary.\n",
+                path, major);
+        return false;
+    }
+    return true;
+}
+
 /* PATH lookup. Returns true and fills out_buf if found. out_buf must
  * be at least PATH_MAX bytes. */
 static bool resolve_via_path(const char *name, char *out_buf, size_t out_cap) {
@@ -208,25 +310,34 @@ static const char *resolve_oracle(mode_t_ mode) {
     }
     const oracle_config_t *cfg = &ORACLES[mode];
 
-    /* 1. Env override */
+    /* 1. Env override. The user-set override is honored even if it
+     * fails the modernity filter -- they asked for it explicitly --
+     * but we still warn so the false-positive divergences are
+     * attributable. */
     if (cfg->env_var) {
         const char *env_val = getenv(cfg->env_var);
         if (path_executable(env_val)) {
+            (void)oracle_candidate_acceptable(mode, env_val); /* warns */
             return env_val;
         }
     }
 
-    /* 2. PATH lookup */
+    /* 2. PATH lookup. resolve_via_path returns the FIRST PATH-resolved
+     * binary; for MODE_BASH the modernity filter rejects an old binary
+     * here so the harness falls through to the candidate list if PATH
+     * points at /bin/bash 3.2.57 (macOS without Homebrew in PATH). */
     static char path_buf[MODE_LUSH + 1][4096];
     if (resolve_via_path(cfg->binary_name, path_buf[mode],
                          sizeof(path_buf[mode]))) {
-        return path_buf[mode];
+        if (oracle_candidate_acceptable(mode, path_buf[mode])) {
+            return path_buf[mode];
+        }
     }
 
     /* 3. Candidate list */
     if (cfg->candidates) {
         for (const char *const *c = cfg->candidates; *c; c++) {
-            if (path_executable(*c)) {
+            if (oracle_candidate_acceptable(mode, *c)) {
                 return *c;
             }
         }
