@@ -367,6 +367,22 @@ void lle_history_search_results_sort(lle_history_search_results_t *results) {
     results->sorted = true;
 }
 
+/*
+ * Microseconds elapsed since `start` on CLOCK_MONOTONIC, floored at 1.
+ * A completed search always took a non-zero amount of wall time at this
+ * metric's microsecond resolution; on a fast machine a small search can
+ * run in well under 1us, which would otherwise truncate to 0 and make
+ * search_time_us a useless metric (and trip the
+ * history_phase3_day8 "search time should be recorded" assertion).
+ */
+static uint64_t search_elapsed_us(const struct timespec *start) {
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    int64_t us = (int64_t)(end.tv_sec - start->tv_sec) * 1000000 +
+                 (int64_t)(end.tv_nsec - start->tv_nsec) / 1000;
+    return us > 0 ? (uint64_t)us : 1;
+}
+
 /* ============================================================================
  * PUBLIC API - SEARCH OPERATIONS
  * ============================================================================
@@ -448,11 +464,7 @@ lle_history_search_exact(lle_history_core_t *history_core, const char *query,
     lle_history_search_results_sort(results);
 
     /* Record search time */
-    struct timespec end_time;
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    results->search_time_us =
-        (uint64_t)((end_time.tv_sec - start_time.tv_sec) * 1000000 +
-                   (end_time.tv_nsec - start_time.tv_nsec) / 1000);
+    results->search_time_us = search_elapsed_us(&start_time);
 
     return results;
 }
@@ -533,11 +545,7 @@ lle_history_search_prefix(lle_history_core_t *history_core, const char *prefix,
     lle_history_search_results_sort(results);
 
     /* Record search time */
-    struct timespec end_time;
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    results->search_time_us =
-        (uint64_t)((end_time.tv_sec - start_time.tv_sec) * 1000000 +
-                   (end_time.tv_nsec - start_time.tv_nsec) / 1000);
+    results->search_time_us = search_elapsed_us(&start_time);
 
     return results;
 }
@@ -621,11 +629,7 @@ lle_history_search_substring(lle_history_core_t *history_core,
     lle_history_search_results_sort(results);
 
     /* Record search time */
-    struct timespec end_time;
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    results->search_time_us =
-        (uint64_t)((end_time.tv_sec - start_time.tv_sec) * 1000000 +
-                   (end_time.tv_nsec - start_time.tv_nsec) / 1000);
+    results->search_time_us = search_elapsed_us(&start_time);
 
     return results;
 }
@@ -715,11 +719,7 @@ lle_history_search_fuzzy(lle_history_core_t *history_core, const char *query,
     lle_history_search_results_sort(results);
 
     /* Record search time */
-    struct timespec end_time;
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    results->search_time_us =
-        (uint64_t)((end_time.tv_sec - start_time.tv_sec) * 1000000 +
-                   (end_time.tv_nsec - start_time.tv_nsec) / 1000);
+    results->search_time_us = search_elapsed_us(&start_time);
 
     return results;
 }
