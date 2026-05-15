@@ -21,6 +21,7 @@
 
 typedef enum {
     NODE_COMMAND,
+    NODE_ASSIGN, // cmd_prefix assignment: val.str = "var=value" / "var+=value"
     NODE_VAR,
     NODE_STRING_LITERAL,    // Single-quoted string - no expansion
     NODE_STRING_EXPANDABLE, // Double-quoted string - variable expansion

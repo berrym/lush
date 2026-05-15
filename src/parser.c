@@ -25,6 +25,11 @@
 static node_t *parse_command_list(parser_t *parser);
 static node_t *parse_pipeline(parser_t *parser);
 static node_t *parse_simple_command(parser_t *parser);
+static bool parse_command_suffix(parser_t *parser, node_t *command);
+static char *parse_scalar_assignment_string(parser_t *parser,
+                                            node_t **out_array_node);
+static node_t *finish_assignment_or_prefix(parser_t *parser,
+                                           node_t *first_assignment);
 
 static node_t *parse_brace_group(parser_t *parser);
 static node_t *parse_subshell(parser_t *parser);
@@ -1454,219 +1459,27 @@ static node_t *parse_simple_command(parser_t *parser) {
 
         if (next &&
             (next->type == TOK_ASSIGN || next->type == TOK_PLUS_ASSIGN)) {
-            bool is_append = (next->type == TOK_PLUS_ASSIGN);
-
-            // Save variable name BEFORE advancing tokenizer
-            char *var_name = strdup(current->text);
-            if (!var_name) {
+            node_t *array_node = NULL;
+            char *assignment =
+                parse_scalar_assignment_string(parser, &array_node);
+            if (array_node) {
+                // arr=(a b c) / arr+=(a b c) -- standalone array
+                // assignment (not a valid POSIX cmd_prefix word).
+                return array_node;
+            }
+            if (!assignment) {
+                return NULL; // hard parse/allocation error
+            }
+            node_t *acmd = new_node(NODE_COMMAND);
+            if (!acmd) {
+                free(assignment);
                 return NULL;
             }
-
-            tokenizer_advance(parser->tokenizer); // consume variable name
-            tokenizer_advance(parser->tokenizer); // consume '=' or '+='
-
-            token_t *value = tokenizer_current(parser->tokenizer);
-
-            // Check for array literal assignment: arr=(a b c) or arr+=(a b c)
-            if (value && value->type == TOK_LPAREN &&
-                shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
-                node_t *array_node = parse_array_literal(parser);
-                if (!array_node) {
-                    free(var_name);
-                    return NULL;
-                }
-                // Create array assignment or append node
-                node_t *assign_node =
-                    new_node(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN);
-                if (!assign_node) {
-                    free(var_name);
-                    free_node_tree(array_node);
-                    return NULL;
-                }
-                assign_node->val.str = var_name; // Transfer ownership
-                assign_node->val_type = VAL_STR;
-                add_child_node(assign_node, array_node);
-                return assign_node;
-            }
-
-            // Regular scalar assignment: variable=value
-            node_t *command = new_node(NODE_COMMAND);
-            if (!command) {
-                free(var_name);
-                return NULL;
-            }
-
-            // Collect all consecutive value tokens (handles ${A}_${B} etc.)
-            // Value tokens include words, variables, command subs, etc.
-            // Stop at whitespace, semicolon, newline, or other separators
-            if (value &&
-                (token_is_word_like(value->type) ||
-                 value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
-                 value->type == TOK_COMMAND_SUB ||
-                 value->type == TOK_BACKQUOTE)) {
-
-                // Build complete value by concatenating adjacent tokens
-                size_t value_capacity = 256;
-                size_t value_len = 0;
-                char *full_value = malloc(value_capacity);
-                if (!full_value) {
-                    free(var_name);
-                    free_node_tree(command);
-                    return NULL;
-                }
-                full_value[0] = '\0';
-
-                while (value && (token_is_word_like(value->type) ||
-                                 value->type == TOK_VARIABLE ||
-                                 value->type == TOK_ARITH_EXP ||
-                                 value->type == TOK_COMMAND_SUB ||
-                                 value->type == TOK_BACKQUOTE)) {
-
-                    // Check if this word is followed by = (making it a new
-                    // assignment) If so, stop - this word belongs to the next
-                    // assignment
-                    if (token_is_word_like(value->type)) {
-                        token_t *peek = tokenizer_peek(parser->tokenizer);
-                        if (peek && (peek->type == TOK_ASSIGN ||
-                                     peek->type == TOK_PLUS_ASSIGN)) {
-                            break; // This word starts a new assignment
-                        }
-                    }
-
-                    size_t token_len = strlen(value->text);
-                    /* Quote re-wrapping policy for assignment-value
-                     * tokens. expand_if_needed inspects the value
-                     * string for quote markers; the parser must
-                     * preserve enough of the original quoting so
-                     * that:
-                     *   TOK_STRING (single-quoted '...'):
-                     *     re-wrap with ' so expand_if_needed's
-                     *     no-expansion path fires (issue #98).
-                     *   TOK_STRING (ANSI-C $'...'):
-                     *     tokenizer text already includes $' and ';
-                     *     do NOT re-wrap.
-                     *   TOK_EXPANDABLE_STRING ("..."):
-                     *     text already had outer " stripped by the
-                     *     tokenizer; pass through verbatim. The
-                     *     embedded-quote bug (a="hello 'world'"
-                     *     losing the quote) is solved at the
-                     *     expand_if_needed layer: it only enters
-                     *     the single-quote-handling block when
-                     *     there is a matched pair of ' in the text
-                     *     (issue #102 -- see expand_if_needed
-                     *     comment near the strchr check).
-                     */
-                    bool is_ansi_c =
-                        (value->type == TOK_STRING && token_len >= 2 &&
-                         value->text[0] == '$' && value->text[1] == '\'');
-                    bool wrap_single =
-                        (value->type == TOK_STRING && !is_ansi_c);
-                    size_t extra_len = wrap_single ? 2 : 0;
-
-                    // Grow buffer if needed
-                    if (value_len + token_len + extra_len + 1 >
-                        value_capacity) {
-                        value_capacity =
-                            (value_len + token_len + extra_len + 1) * 2;
-                        char *new_value = realloc(full_value, value_capacity);
-                        if (!new_value) {
-                            free(full_value);
-                            free(var_name);
-                            free_node_tree(command);
-                            return NULL;
-                        }
-                        full_value = new_value;
-                    }
-
-                    // Add token with appropriate quoting
-                    // Only single quotes need to be preserved to prevent
-                    // expansion Double quotes: expand variables but don't keep
-                    // quotes
-                    if (wrap_single) {
-                        // Regular single-quoted: re-wrap with quotes to
-                        // preserve no-expansion semantics through
-                        // expand_if_needed.
-                        strcat(full_value, "'");
-                        strcat(full_value, value->text);
-                        strcat(full_value, "'");
-                        value_len += token_len + 2;
-                    } else if (value->type == TOK_EXPANDABLE_STRING) {
-                        /* Double-quoted content: the outer "..." was
-                         * stripped by the tokenizer. Any embedded
-                         * single quotes in this content were literal
-                         * characters in the source, but
-                         * expand_if_needed would later misinterpret
-                         * them as POSIX single-quote openers and
-                         * eat them (issue #102). Pre-escape literal
-                         * single quotes as \' so the downstream
-                         * POSIX-unquoted backslash rule preserves
-                         * them as literal characters. Other chars
-                         * pass through; double-quote-specific
-                         * escapes like \$ \" \\ \` were already
-                         * preserved by the tokenizer. Grow the
-                         * buffer to account for the worst case (every
-                         * char doubles). */
-                        size_t worst = value_len + token_len * 2 + 1;
-                        if (worst >= value_capacity) {
-                            value_capacity = worst * 2;
-                            char *nv = realloc(full_value, value_capacity);
-                            if (!nv) {
-                                free(full_value);
-                                free(var_name);
-                                free_node_tree(command);
-                                return NULL;
-                            }
-                            full_value = nv;
-                        }
-                        for (size_t k = 0; k < token_len; k++) {
-                            char ch = value->text[k];
-                            if (ch == '\'') {
-                                full_value[value_len++] = '\\';
-                                full_value[value_len++] = '\'';
-                            } else {
-                                full_value[value_len++] = ch;
-                            }
-                        }
-                        full_value[value_len] = '\0';
-                    } else {
-                        /* All other types (including ANSI-C $'...'
-                         * whose tokenizer text already carries the
-                         * $' and ' markers): append the text
-                         * verbatim. */
-                        strcat(full_value, value->text);
-                        value_len += token_len;
-                    }
-
-                    tokenizer_advance(parser->tokenizer); // consume this token
-                    value = tokenizer_current(parser->tokenizer);
-                }
-
-                // Build final assignment string: var=value or var+=value
-                size_t var_len = strlen(var_name);
-                char *assignment =
-                    malloc(var_len + (is_append ? 2 : 1) + value_len + 1);
-                if (assignment) {
-                    strcpy(assignment, var_name);
-                    strcat(assignment, is_append ? "+=" : "=");
-                    strcat(assignment, full_value);
-                    command->val.str = assignment;
-                    command->val_type = VAL_STR;
-                }
-                free(full_value);
-            } else {
-                // Assignment with empty value: variable=
-                size_t var_len = strlen(var_name);
-                char *assignment = malloc(var_len + 2);
-                if (assignment) {
-                    strcpy(assignment, var_name);
-                    strcat(assignment, "=");
-                    command->val.str = assignment;
-                    command->val_type = VAL_STR;
-                }
-            }
-
-            free(var_name);
-            return command;
+            acmd->val.str = assignment;
+            acmd->val_type = VAL_STR;
+            // Decide standalone-assignment vs cmd_prefix based on what
+            // follows on the same simple command.
+            return finish_assignment_or_prefix(parser, acmd);
         }
     }
 
@@ -1730,6 +1543,29 @@ static node_t *parse_simple_command(parser_t *parser) {
     command->val_type = VAL_STR;
     tokenizer_advance(parser->tokenizer);
 
+    if (!parse_command_suffix(parser, command)) {
+        free_node_tree(command);
+        return NULL;
+    }
+
+    return command;
+}
+
+/**
+ * @brief Parse a command's cmd_suffix: arguments, redirections, process
+ *        substitutions, and array-literal arguments.
+ *
+ * Shared by the regular-command path and the cmd_prefix path
+ * (finish_assignment_or_prefix) so the POSIX
+ * `cmd_prefix cmd_word cmd_suffix` grammar has exactly one suffix
+ * implementation. On failure returns false WITHOUT freeing `command`
+ * (the caller owns it and frees on false).
+ *
+ * @param parser  Parser instance
+ * @param command Command node to attach arguments/redirections to
+ * @return true on success, false on parse error
+ */
+static bool parse_command_suffix(parser_t *parser, node_t *command) {
     // Parse arguments and redirections
     while (!tokenizer_match(parser->tokenizer, TOK_EOF) &&
            !tokenizer_match(parser->tokenizer, TOK_SEMICOLON) &&
@@ -1761,8 +1597,7 @@ static node_t *parse_simple_command(parser_t *parser) {
 
             node_t *redir_node = parse_redirection(parser);
             if (!redir_node) {
-                free_node_tree(command);
-                return NULL;
+                return false;
             }
 
             add_child_node(command, redir_node);
@@ -1773,8 +1608,7 @@ static node_t *parse_simple_command(parser_t *parser) {
                  arg_token->type == TOK_PROC_SUB_OUT) {
             node_t *proc_sub_node = parse_process_substitution(parser);
             if (!proc_sub_node) {
-                free_node_tree(command);
-                return NULL;
+                return false;
             }
             add_child_node(command, proc_sub_node);
             continue; // Continue to check for more arguments
@@ -1812,8 +1646,7 @@ static node_t *parse_simple_command(parser_t *parser) {
                         node_t *array_node = parse_array_literal(parser);
                         if (!array_node) {
                             free(var_name);
-                            free_node_tree(command);
-                            return NULL;
+                            return false;
                         }
 
                         // Build a string representation for the argument:
@@ -1875,14 +1708,389 @@ static node_t *parse_simple_command(parser_t *parser) {
         // creates the appropriately-classified node attached to command.
         if (!collect_word_argument(parser, command)) {
             if (parser->has_error) {
-                free_node_tree(command);
-                return NULL;
+                return false;
             }
             break; // Not an arg-like token; stop parsing arguments.
         }
     }
 
-    return command;
+    return true;
+}
+
+/**
+ * @brief Parse `WORD (= | +=) value...` into a malloc'd assignment string.
+ *
+ * Precondition: the caller has verified the current token is word-like
+ * and the lookahead token is TOK_ASSIGN / TOK_PLUS_ASSIGN. Consumes the
+ * variable-name token, the assignment operator, and all adjacent value
+ * tokens (applying the issue #98 / #102 quote-rewrap policy).
+ *
+ * If the value is an array literal `(...)`, no string is produced:
+ * *out_array_node is set to the NODE_ARRAY_ASSIGN / NODE_ARRAY_APPEND
+ * node and NULL is returned (the caller returns that node standalone).
+ *
+ * @param parser         Parser instance
+ * @param out_array_node Out: set to an array node for arr=(...) forms
+ * @return malloc'd "var=value" / "var+=value" string, or NULL (either a
+ *         hard error, or an array literal -- distinguished by whether
+ *         *out_array_node was set)
+ */
+static char *parse_scalar_assignment_string(parser_t *parser,
+                                            node_t **out_array_node) {
+    *out_array_node = NULL;
+
+    token_t *current = tokenizer_current(parser->tokenizer);
+    token_t *next = tokenizer_peek(parser->tokenizer);
+    bool is_append = (next && next->type == TOK_PLUS_ASSIGN);
+
+    // Save variable name BEFORE advancing tokenizer
+    char *var_name = strdup(current->text);
+    if (!var_name) {
+        return NULL;
+    }
+
+    tokenizer_advance(parser->tokenizer); // consume variable name
+    tokenizer_advance(parser->tokenizer); // consume '=' or '+='
+
+    token_t *value = tokenizer_current(parser->tokenizer);
+
+    // Check for array literal assignment: arr=(a b c) or arr+=(a b c)
+    if (value && value->type == TOK_LPAREN &&
+        shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
+        node_t *array_node = parse_array_literal(parser);
+        if (!array_node) {
+            free(var_name);
+            return NULL;
+        }
+        node_t *assign_node =
+            new_node(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN);
+        if (!assign_node) {
+            free(var_name);
+            free_node_tree(array_node);
+            return NULL;
+        }
+        assign_node->val.str = var_name; // Transfer ownership
+        assign_node->val_type = VAL_STR;
+        add_child_node(assign_node, array_node);
+        *out_array_node = assign_node;
+        return NULL;
+    }
+
+    char *assignment = NULL;
+
+    // Collect all consecutive value tokens (handles ${A}_${B} etc.)
+    // Value tokens include words, variables, command subs, etc.
+    // Stop at whitespace, semicolon, newline, or other separators
+    if (value &&
+        (token_is_word_like(value->type) || value->type == TOK_VARIABLE ||
+         value->type == TOK_ARITH_EXP || value->type == TOK_COMMAND_SUB ||
+         value->type == TOK_BACKQUOTE)) {
+
+        // Build complete value by concatenating adjacent tokens
+        size_t value_capacity = 256;
+        size_t value_len = 0;
+        char *full_value = malloc(value_capacity);
+        if (!full_value) {
+            free(var_name);
+            return NULL;
+        }
+        full_value[0] = '\0';
+
+        while (value &&
+               (token_is_word_like(value->type) ||
+                value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
+                value->type == TOK_COMMAND_SUB ||
+                value->type == TOK_BACKQUOTE)) {
+
+            // Check if this word is followed by = (making it a new
+            // assignment) If so, stop - this word belongs to the next
+            // assignment
+            if (token_is_word_like(value->type)) {
+                token_t *peek = tokenizer_peek(parser->tokenizer);
+                if (peek && (peek->type == TOK_ASSIGN ||
+                             peek->type == TOK_PLUS_ASSIGN)) {
+                    break; // This word starts a new assignment
+                }
+            }
+
+            size_t token_len = strlen(value->text);
+            /* Quote re-wrapping policy for assignment-value
+             * tokens. expand_if_needed inspects the value
+             * string for quote markers; the parser must
+             * preserve enough of the original quoting so
+             * that:
+             *   TOK_STRING (single-quoted '...'):
+             *     re-wrap with ' so expand_if_needed's
+             *     no-expansion path fires (issue #98).
+             *   TOK_STRING (ANSI-C $'...'):
+             *     tokenizer text already includes $' and ';
+             *     do NOT re-wrap.
+             *   TOK_EXPANDABLE_STRING ("..."):
+             *     text already had outer " stripped by the
+             *     tokenizer; pass through verbatim. The
+             *     embedded-quote bug (a="hello 'world'"
+             *     losing the quote) is solved at the
+             *     expand_if_needed layer: it only enters
+             *     the single-quote-handling block when
+             *     there is a matched pair of ' in the text
+             *     (issue #102 -- see expand_if_needed
+             *     comment near the strchr check).
+             */
+            bool is_ansi_c = (value->type == TOK_STRING && token_len >= 2 &&
+                              value->text[0] == '$' && value->text[1] == '\'');
+            bool wrap_single = (value->type == TOK_STRING && !is_ansi_c);
+            size_t extra_len = wrap_single ? 2 : 0;
+
+            // Grow buffer if needed
+            if (value_len + token_len + extra_len + 1 > value_capacity) {
+                value_capacity = (value_len + token_len + extra_len + 1) * 2;
+                char *new_value = realloc(full_value, value_capacity);
+                if (!new_value) {
+                    free(full_value);
+                    free(var_name);
+                    return NULL;
+                }
+                full_value = new_value;
+            }
+
+            // Add token with appropriate quoting
+            // Only single quotes need to be preserved to prevent
+            // expansion Double quotes: expand variables but don't keep
+            // quotes
+            if (wrap_single) {
+                // Regular single-quoted: re-wrap with quotes to
+                // preserve no-expansion semantics through
+                // expand_if_needed.
+                strcat(full_value, "'");
+                strcat(full_value, value->text);
+                strcat(full_value, "'");
+                value_len += token_len + 2;
+            } else if (value->type == TOK_EXPANDABLE_STRING) {
+                /* Double-quoted content: the outer "..." was
+                 * stripped by the tokenizer. Any embedded
+                 * single quotes in this content were literal
+                 * characters in the source, but
+                 * expand_if_needed would later misinterpret
+                 * them as POSIX single-quote openers and
+                 * eat them (issue #102). Pre-escape literal
+                 * single quotes as \' so the downstream
+                 * POSIX-unquoted backslash rule preserves
+                 * them as literal characters. Other chars
+                 * pass through; double-quote-specific
+                 * escapes like \$ \" \\ \` were already
+                 * preserved by the tokenizer. Grow the
+                 * buffer to account for the worst case (every
+                 * char doubles). */
+                size_t worst = value_len + token_len * 2 + 1;
+                if (worst >= value_capacity) {
+                    value_capacity = worst * 2;
+                    char *nv = realloc(full_value, value_capacity);
+                    if (!nv) {
+                        free(full_value);
+                        free(var_name);
+                        return NULL;
+                    }
+                    full_value = nv;
+                }
+                for (size_t k = 0; k < token_len; k++) {
+                    char ch = value->text[k];
+                    if (ch == '\'') {
+                        full_value[value_len++] = '\\';
+                        full_value[value_len++] = '\'';
+                    } else {
+                        full_value[value_len++] = ch;
+                    }
+                }
+                full_value[value_len] = '\0';
+            } else {
+                /* All other types (including ANSI-C $'...'
+                 * whose tokenizer text already carries the
+                 * $' and ' markers): append the text
+                 * verbatim. */
+                strcat(full_value, value->text);
+                value_len += token_len;
+            }
+
+            /* Only adjacent tokens (no intervening whitespace) belong to
+             * the same assignment value: `a=foo"bar"` -> foobar, but
+             * `a=foo bar` -> value `foo` and `bar` is the command word /
+             * next prefix. Mirrors the adjacency rule in
+             * collect_word_argument (same strlen(text) convention and
+             * the same quoted-then-adjacent edge case). */
+            size_t last_end_pos = value->position + strlen(value->text);
+            tokenizer_advance(parser->tokenizer); // consume this token
+            value = tokenizer_current(parser->tokenizer);
+            if (value && value->position != last_end_pos) {
+                break; // whitespace gap: value ends here
+            }
+        }
+
+        // Build final assignment string: var=value or var+=value
+        size_t var_len = strlen(var_name);
+        assignment = malloc(var_len + (is_append ? 2 : 1) + value_len + 1);
+        if (assignment) {
+            strcpy(assignment, var_name);
+            strcat(assignment, is_append ? "+=" : "=");
+            strcat(assignment, full_value);
+        }
+        free(full_value);
+    } else {
+        // Assignment with empty value: variable=
+        size_t var_len = strlen(var_name);
+        assignment = malloc(var_len + 2);
+        if (assignment) {
+            strcpy(assignment, var_name);
+            strcat(assignment, "=");
+        }
+    }
+
+    free(var_name);
+    return assignment;
+}
+
+/**
+ * @brief Decide standalone-assignment vs POSIX cmd_prefix.
+ *
+ * `first_assignment` is a NODE_COMMAND whose val.str is the first
+ * "var=value" the caller already parsed. If the next token ends the
+ * simple command, this is a lone assignment and the node is returned
+ * unchanged (preserving the legacy representation the executor's
+ * is_assignment() fast-path expects).
+ *
+ * Otherwise the simple command has a cmd_prefix: the assignment(s) and
+ * any redirections are collected as NODE_ASSIGN / redirection children
+ * of a NODE_COMMAND. If a command word follows it becomes the command
+ * name (val.str) and cmd_suffix is parsed; otherwise val.str stays NULL
+ * (a pure assignment+redirection command, e.g. `x=1 2>/dev/null`).
+ *
+ * @param parser           Parser instance
+ * @param first_assignment NODE_COMMAND carrying the first var=value
+ * @return the simple-command AST node, or NULL on error
+ */
+static node_t *finish_assignment_or_prefix(parser_t *parser,
+                                           node_t *first_assignment) {
+    token_t *cur = tokenizer_current(parser->tokenizer);
+    bool ends_command =
+        (!cur || cur->type == TOK_EOF || cur->type == TOK_SEMICOLON ||
+         cur->type == TOK_NEWLINE || cur->type == TOK_PIPE ||
+         cur->type == TOK_AND || cur->type == TOK_LOGICAL_AND ||
+         cur->type == TOK_LOGICAL_OR);
+    if (ends_command) {
+        // Lone assignment: keep the legacy NODE_COMMAND val.str shape.
+        return first_assignment;
+    }
+
+    // cmd_prefix form. Build a NODE_COMMAND whose children are the
+    // prefix assignments (NODE_ASSIGN), then redirections, and whose
+    // val.str is the command word (or NULL if there is no command).
+    node_t *cmd = new_node(NODE_COMMAND);
+    if (!cmd) {
+        free_node_tree(first_assignment);
+        return NULL;
+    }
+    cmd->val.str = NULL;
+    cmd->val_type = VAL_STR;
+
+    // Convert the already-parsed first assignment into a NODE_ASSIGN
+    // child (move the string; discard the throwaway command shell).
+    node_t *first = new_node(NODE_ASSIGN);
+    if (!first) {
+        free_node_tree(first_assignment);
+        free_node_tree(cmd);
+        return NULL;
+    }
+    first->val.str = first_assignment->val.str;
+    first->val_type = VAL_STR;
+    first_assignment->val.str = NULL;
+    free_node_tree(first_assignment);
+    add_child_node(cmd, first);
+
+    // Collect the rest of the cmd_prefix: further scalar assignments
+    // and redirections, in any order, until a command word or a
+    // command terminator.
+    for (;;) {
+        token_t *t = tokenizer_current(parser->tokenizer);
+        if (!t || t->type == TOK_EOF || t->type == TOK_SEMICOLON ||
+            t->type == TOK_NEWLINE || t->type == TOK_PIPE ||
+            t->type == TOK_AND || t->type == TOK_LOGICAL_AND ||
+            t->type == TOK_LOGICAL_OR) {
+            break;
+        }
+
+        // Redirection in the prefix (e.g. `x=1 2>/dev/null cmd`).
+        if (t->type == TOK_REDIRECT_OUT || t->type == TOK_REDIRECT_IN ||
+            t->type == TOK_APPEND || t->type == TOK_HEREDOC ||
+            t->type == TOK_HEREDOC_STRIP || t->type == TOK_HERESTRING ||
+            t->type == TOK_REDIRECT_ERR || t->type == TOK_REDIRECT_IN_FD ||
+            t->type == TOK_REDIRECT_BOTH || t->type == TOK_APPEND_ERR ||
+            t->type == TOK_REDIRECT_FD || t->type == TOK_REDIRECT_FD_ALLOC ||
+            t->type == TOK_REDIRECT_CLOBBER || t->type == TOK_APPEND_BOTH) {
+            node_t *redir = parse_redirection(parser);
+            if (!redir) {
+                free_node_tree(cmd);
+                return NULL;
+            }
+            add_child_node(cmd, redir);
+            continue;
+        }
+
+        // Another scalar assignment in the prefix? Only plain `name=`
+        // (no `[` subscript) qualifies; array element / literal forms
+        // are not POSIX cmd_prefix words.
+        token_t *p = tokenizer_peek(parser->tokenizer);
+        if (token_is_word_like(t->type) && p &&
+            (p->type == TOK_ASSIGN || p->type == TOK_PLUS_ASSIGN) && t->text &&
+            !strchr(t->text, '[')) {
+            node_t *arr = NULL;
+            char *s = parse_scalar_assignment_string(parser, &arr);
+            if (arr) {
+                // `a=(...)` is not valid as a cmd_prefix word.
+                free_node_tree(arr);
+                free_node_tree(cmd);
+                parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                                 "array assignment is not valid as a "
+                                 "command prefix");
+                return NULL;
+            }
+            if (!s) {
+                free_node_tree(cmd);
+                return NULL;
+            }
+            node_t *a = new_node(NODE_ASSIGN);
+            if (!a) {
+                free(s);
+                free_node_tree(cmd);
+                return NULL;
+            }
+            a->val.str = s;
+            a->val_type = VAL_STR;
+            add_child_node(cmd, a);
+            continue;
+        }
+
+        // Anything else ends the prefix: it must be the command word.
+        break;
+    }
+
+    // Optional command word + cmd_suffix.
+    token_t *w = tokenizer_current(parser->tokenizer);
+    if (w && (token_is_word_like(w->type) || w->type == TOK_LBRACKET)) {
+        source_location_t loc =
+            token_to_source_location(w, parser->source_name);
+        cmd->loc = loc;
+        cmd->val.str = strdup(w->text);
+        cmd->val_type = VAL_STR;
+        tokenizer_advance(parser->tokenizer);
+        if (!parse_command_suffix(parser, cmd)) {
+            free_node_tree(cmd);
+            return NULL;
+        }
+    }
+    // else: pure assignment(s)+redirection(s), no command word. val.str
+    // stays NULL; the executor applies the assignments persistently and
+    // performs the redirections (POSIX: `x=1 >f`).
+
+    return cmd;
 }
 
 /**

@@ -1257,6 +1257,167 @@ static int execute_command_list(executor_t *executor, node_t *list) {
  * @param command Command node to execute
  * @return Exit status of the command
  */
+static int execute_command_dispatch(executor_t *executor, node_t *command);
+
+/* ============================================================================
+ * POSIX cmd_prefix: temporary-environment assignments
+ * ============================================================================
+ * A simple command may carry NODE_ASSIGN children (`VAR=value` parsed as a
+ * cmd_prefix). For a command word these are transient (visible to the
+ * command, including a function body, but restored afterward); bash-default
+ * and zsh both treat them transient even for special builtins, so lush's
+ * default follows that consensus. For a pure prefix (no command word) the
+ * assignments persist, matching `VAR=value` / `VAR=value >file`.
+ */
+
+typedef struct {
+    char *name;
+    bool existed;
+    char *old_value; /* strdup of prior value when existed */
+    bool was_exported;
+} prefix_save_t;
+
+/* Extract the variable name from a NODE_ASSIGN string ("name=v" or
+ * "name+=v"). Returns a malloc'd name, or NULL. */
+static char *prefix_assign_name(const char *s) {
+    if (!s) {
+        return NULL;
+    }
+    const char *eq = strchr(s, '=');
+    if (!eq || eq == s) {
+        return NULL;
+    }
+    size_t n = (size_t)(eq - s);
+    if (n > 0 && s[n - 1] == '+') {
+        n--; /* += append */
+    }
+    if (n == 0) {
+        return NULL;
+    }
+    char *name = malloc(n + 1);
+    if (!name) {
+        return NULL;
+    }
+    memcpy(name, s, n);
+    name[n] = '\0';
+    return name;
+}
+
+/* Apply every NODE_ASSIGN prefix child of `command`. When `transient`,
+ * prior variable state is snapshotted into *out_saves (count *out_n) so
+ * prefix_restore_and_free() can undo it; otherwise the assignments
+ * persist and *out_saves is left NULL. Each assignment is applied via
+ * execute_assignment() (so +=, declare -i arithmetic, and value
+ * expansion all behave identically to a standalone assignment) and then
+ * exported, so a forked external child and env-reading builtins observe
+ * it. Returns 0 on success, non-zero on the first failing assignment. */
+static int prefix_apply(executor_t *executor, node_t *command, bool transient,
+                        prefix_save_t **out_saves, int *out_n) {
+    if (out_saves) {
+        *out_saves = NULL;
+    }
+    if (out_n) {
+        *out_n = 0;
+    }
+
+    int count = 0;
+    for (node_t *c = command->first_child; c; c = c->next_sibling) {
+        if (c->type == NODE_ASSIGN) {
+            count++;
+        }
+    }
+    if (count == 0) {
+        return 0;
+    }
+
+    prefix_save_t *saves = NULL;
+    if (transient) {
+        saves = calloc((size_t)count, sizeof(*saves));
+        if (!saves) {
+            return 1;
+        }
+    }
+
+    symtable_manager_t *mgr = symtable_get_global_manager();
+    int idx = 0;
+    for (node_t *c = command->first_child; c; c = c->next_sibling) {
+        if (c->type != NODE_ASSIGN || !c->val.str) {
+            continue;
+        }
+        char *name = prefix_assign_name(c->val.str);
+        if (!name) {
+            continue;
+        }
+
+        if (transient) {
+            bool existed = mgr ? symtable_var_exists(mgr, name) : false;
+            char *old = existed ? symtable_get_global(name) : NULL;
+            symvar_flags_t fl =
+                mgr ? symtable_get_flags(mgr, name) : SYMVAR_NONE;
+            saves[idx].name = name; /* ownership moves to saves */
+            saves[idx].existed = existed;
+            saves[idx].old_value = old;
+            saves[idx].was_exported = (fl & SYMVAR_EXPORTED) != 0;
+        }
+
+        int st = execute_assignment(executor, c->val.str, command->loc);
+        if (st != 0) {
+            if (!transient) {
+                free(name);
+            }
+            /* On failure idx-th save (if transient) holds this name;
+             * include it so restore undoes any partial apply. */
+            if (transient) {
+                idx++;
+                *out_saves = saves;
+                *out_n = idx;
+            }
+            return st;
+        }
+        symtable_export_global(name); /* setenv: child/env-readers see it */
+
+        if (transient) {
+            idx++;
+        } else {
+            free(name);
+        }
+    }
+
+    if (transient) {
+        *out_saves = saves;
+        *out_n = idx;
+    }
+    return 0;
+}
+
+/* Undo a transient prefix_apply() and free the snapshot array. */
+static void prefix_restore_and_free(prefix_save_t *saves, int n) {
+    if (!saves) {
+        return;
+    }
+    for (int i = n - 1; i >= 0; i--) {
+        const char *name = saves[i].name;
+        if (!name) {
+            continue;
+        }
+        if (saves[i].existed) {
+            symtable_set_global(name,
+                                saves[i].old_value ? saves[i].old_value : "");
+            if (saves[i].was_exported) {
+                setenv(name, saves[i].old_value ? saves[i].old_value : "", 1);
+            } else {
+                unsetenv(name);
+            }
+        } else {
+            symtable_unset_global(name);
+            unsetenv(name);
+        }
+        free(saves[i].name);
+        free(saves[i].old_value);
+    }
+    free(saves);
+}
+
 static int execute_command(executor_t *executor, node_t *command) {
     if (!command || command->type != NODE_COMMAND) {
         return 1;
@@ -1266,10 +1427,64 @@ static int execute_command(executor_t *executor, node_t *command) {
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
 
-    // Check for assignment
+    // Check for assignment (legacy lone-assignment shape: val.str is
+    // "var=value" with no NODE_ASSIGN children).
     if (command->val.str && is_assignment(command->val.str)) {
         return execute_assignment(executor, command->val.str, command->loc);
     }
+
+    // POSIX cmd_prefix: NODE_ASSIGN children precede the command word.
+    int n_prefix = 0;
+    for (node_t *c = command->first_child; c; c = c->next_sibling) {
+        if (c->type == NODE_ASSIGN) {
+            n_prefix++;
+        }
+    }
+
+    if (n_prefix > 0 && command->val.str == NULL) {
+        // Pure prefix, no command word: `x=1`, `x=1 >file`. POSIX:
+        // redirections are performed, then assignments persist.
+        bool have_redir = count_redirections(command) > 0;
+        redirection_state_t rs;
+        if (have_redir) {
+            save_file_descriptors(&rs);
+            if (setup_redirections(executor, command) != 0) {
+                restore_file_descriptors(&rs);
+                return 1;
+            }
+        }
+        int st =
+            prefix_apply(executor, command, /*transient=*/false, NULL, NULL);
+        if (have_redir) {
+            restore_file_descriptors(&rs);
+        }
+        set_exit_status(st);
+        return st;
+    }
+
+    if (n_prefix > 0) {
+        // Command word present: apply prefix transiently, dispatch, then
+        // restore. An external command forks (its child inherits the
+        // exported vars via environ); the parent-side restore reverts the
+        // shell's own view for all command kinds.
+        prefix_save_t *saves = NULL;
+        int nsaves = 0;
+        int st = prefix_apply(executor, command, /*transient=*/true, &saves,
+                              &nsaves);
+        if (st != 0) {
+            prefix_restore_and_free(saves, nsaves);
+            set_exit_status(st);
+            return st;
+        }
+        int r = execute_command_dispatch(executor, command);
+        prefix_restore_and_free(saves, nsaves);
+        return r;
+    }
+
+    return execute_command_dispatch(executor, command);
+}
+
+static int execute_command_dispatch(executor_t *executor, node_t *command) {
 
     // Note: Parameter expansions like ${CMD} in command position are handled
     // by build_argv_from_ast() which calls expand_if_needed() on the command
@@ -4410,8 +4625,10 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
     // Process arguments with glob expansion
     child = command->first_child;
     while (child) {
-        // Skip redirection nodes
-        if (!is_redirection_node(child)) {
+        // Skip redirection nodes and cmd_prefix assignments (NODE_ASSIGN
+        // children are applied as the command's temporary environment,
+        // not passed as argv words).
+        if (!is_redirection_node(child) && child->type != NODE_ASSIGN) {
             if (child->val.str) {
                 // Check if this is a here document delimiter
                 bool is_delimiter = false;
