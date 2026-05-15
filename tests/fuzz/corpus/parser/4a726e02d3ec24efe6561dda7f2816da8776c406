@@ -1,3 +1,0 @@
-arr=(one two three)
-echo$? $! $# $@ rr[1]hen $$ $? $!in#@ $* echo "$line"
-done

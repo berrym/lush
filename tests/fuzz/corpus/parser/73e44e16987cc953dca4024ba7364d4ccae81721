@@ -1,2 +1,0 @@
-echo test > file*t 2>&1
-cat < put.txt >> output.txt

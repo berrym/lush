@@ -1,7 +1,0 @@
-{:{case "$1"t)
- ((x = 1 2 * 3))yecho $$ $? $! 
-$2=((1x / 3) * 2 * 3)choz starting
-   ;(x / 2);
-    stop)
-      n
-    e$ÿ# $@ $**$coh 0 $s

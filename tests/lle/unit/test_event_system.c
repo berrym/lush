@@ -19,7 +19,8 @@
 #include "lle/error_handling.h"
 #include "lle/event_system.h"
 #include "lle/memory_management.h"
-#include <assert.h>
+#include "test_framework.h"
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,52 +30,11 @@
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Test result tracking */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
 /* Test event handler state */
 static int handler_call_count = 0;
 static lle_event_t *last_handled_event = NULL;
 static void *last_handler_user_data = NULL;
 static lle_result_t handler_return_value = LLE_SUCCESS;
-
-/* ========================================================================== */
-/*                            TEST FRAMEWORK                                  */
-/* ========================================================================== */
-
-#define TEST(name)                                                             \
-    static void test_##name(void);                                             \
-    static void run_test_##name(void) {                                        \
-        printf("Running test: %s\n", #name);                                   \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-        tests_passed++;                                                        \
-        printf("  ✓ PASSED\n");                                                \
-    }                                                                          \
-    static void test_##name(void)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("  ✗ ASSERTION FAILED: %s\n", message);                     \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr, message) ASSERT((ptr) != NULL, message)
-
-#define ASSERT_NULL(ptr, message) ASSERT((ptr) == NULL, message)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    ASSERT((actual) == (expected), message)
-
-#define ASSERT_TRUE(condition, message) ASSERT((condition), message)
-
-#define ASSERT_FALSE(condition, message) ASSERT(!(condition), message)
 
 /* ========================================================================== */
 /*                          TEST HELPER FUNCTIONS                             */
@@ -687,66 +647,54 @@ TEST(event_type_name_unknown) {
 /* ========================================================================== */
 
 int main(void) {
-    printf("\n");
-    printf("========================================\n");
-    printf("  LLE Event System Phase 1 Tests\n");
-    printf("========================================\n\n");
+    printf("=== LLE Event System Phase 1 Tests ===\n\n");
 
-    /* Lifecycle tests */
-    run_test_event_system_init_success();
-    run_test_event_system_init_null_system();
-    run_test_event_system_init_null_pool();
-    run_test_event_system_stop_success();
-    run_test_event_system_stop_null_system();
+    printf("--- Lifecycle ---\n");
+    RUN_TEST(event_system_init_success);
+    RUN_TEST(event_system_init_null_system);
+    RUN_TEST(event_system_init_null_pool);
+    RUN_TEST(event_system_stop_success);
+    RUN_TEST(event_system_stop_null_system);
 
-    /* Event creation tests */
-    run_test_event_create_success_no_data();
-    run_test_event_create_success_with_data();
-    run_test_event_create_sequence_numbers();
-    run_test_event_create_null_system();
-    run_test_event_create_null_event_ptr();
-    run_test_event_clone_success();
+    printf("\n--- Event creation ---\n");
+    RUN_TEST(event_create_success_no_data);
+    RUN_TEST(event_create_success_with_data);
+    RUN_TEST(event_create_sequence_numbers);
+    RUN_TEST(event_create_null_system);
+    RUN_TEST(event_create_null_event_ptr);
+    RUN_TEST(event_clone_success);
 
-    /* Queue tests */
-    run_test_event_enqueue_success();
-    run_test_event_enqueue_multiple();
-    run_test_event_enqueue_null_system();
-    run_test_event_enqueue_null_event();
-    run_test_event_dequeue_success();
-    run_test_event_dequeue_fifo_order();
-    run_test_event_dequeue_empty_queue();
-    run_test_event_queue_size();
-    run_test_event_queue_empty_check();
+    printf("\n--- Queue ---\n");
+    RUN_TEST(event_enqueue_success);
+    RUN_TEST(event_enqueue_multiple);
+    RUN_TEST(event_enqueue_null_system);
+    RUN_TEST(event_enqueue_null_event);
+    RUN_TEST(event_dequeue_success);
+    RUN_TEST(event_dequeue_fifo_order);
+    RUN_TEST(event_dequeue_empty_queue);
+    RUN_TEST(event_queue_size);
+    RUN_TEST(event_queue_empty_check);
 
-    /* Handler tests */
-    run_test_handler_register_success();
-    run_test_handler_register_multiple_types();
-    run_test_handler_register_null_system();
-    run_test_handler_register_null_function();
-    run_test_handler_dispatch_success();
-    run_test_handler_dispatch_no_matching_handler();
-    run_test_handler_dispatch_user_data();
-    run_test_handler_unregister_by_name();
-    run_test_handler_unregister_not_found();
-    run_test_event_process_queue_success();
-    run_test_event_process_queue_max_events();
+    printf("\n--- Handlers ---\n");
+    RUN_TEST(handler_register_success);
+    RUN_TEST(handler_register_multiple_types);
+    RUN_TEST(handler_register_null_system);
+    RUN_TEST(handler_register_null_function);
+    RUN_TEST(handler_dispatch_success);
+    RUN_TEST(handler_dispatch_no_matching_handler);
+    RUN_TEST(handler_dispatch_user_data);
+    RUN_TEST(handler_unregister_by_name);
+    RUN_TEST(handler_unregister_not_found);
+    RUN_TEST(event_process_queue_success);
+    RUN_TEST(event_process_queue_max_events);
 
-    /* Statistics tests */
-    run_test_statistics_events_created();
-    run_test_statistics_events_dispatched();
+    printf("\n--- Statistics ---\n");
+    RUN_TEST(statistics_events_created);
+    RUN_TEST(statistics_events_dispatched);
 
-    /* Utility tests */
-    run_test_event_type_name_returns_valid();
-    run_test_event_type_name_unknown();
+    printf("\n--- Utility ---\n");
+    RUN_TEST(event_type_name_returns_valid);
+    RUN_TEST(event_type_name_unknown);
 
-    printf("\n");
-    printf("========================================\n");
-    printf("  Test Results\n");
-    printf("========================================\n");
-    printf("  Total:  %d\n", tests_run);
-    printf("  Passed: %d\n", tests_passed);
-    printf("  Failed: %d\n", tests_failed);
-    printf("========================================\n\n");
-
-    return (tests_failed == 0) ? 0 : 1;
+    return TEST_RESULT();
 }

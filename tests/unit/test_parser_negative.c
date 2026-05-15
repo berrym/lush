@@ -32,15 +32,13 @@
 
 #include "node.h"
 #include "parser.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
 
 /* Category counters for summary */
 static int category_tests = 0;
@@ -56,22 +54,6 @@ static void print_category_summary(const char *name) {
 }
 
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
-
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        category_tests++;                                                      \
-        int _prev_failed = tests_failed;                                       \
-        printf("  %s...", #name);                                              \
-        fflush(stdout);                                                        \
-        test_##name();                                                         \
-        if (tests_failed == _prev_failed) {                                    \
-            printf(" PASSED\n");                                               \
-            tests_passed++;                                                    \
-            category_passed++;                                                 \
-        }                                                                      \
-    } while (0)
 
 /**
  * Assert that parsing the given input produces an error.
@@ -89,13 +71,9 @@ static void print_category_summary(const char *name) {
         node_t *_n = parser_parse(_p);                                         \
         int _has_error = parser_has_error(_p);                                 \
         if (!_has_error && _n != NULL) {                                       \
-            printf(" FAILED\n");                                               \
-            printf("      Expected parse error for: %s\n", input);             \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            tests_failed++;                                                    \
             free_node_tree(_n);                                                \
             parser_free(_p);                                                   \
-            return;                                                            \
+            TEST_FAIL_FMT("expected parse error for: %s", input);              \
         }                                                                      \
         if (_n)                                                                \
             free_node_tree(_n);                                                \
@@ -564,14 +542,11 @@ TEST(recursion_depth_limit) {
     int has_error = parser_has_error(parser);
 
     if (!has_error && ast != NULL) {
-        printf(" FAILED\n");
-        printf("      Expected recursion depth error for %d-deep nesting\n",
-               depth);
-        tests_failed++;
         free_node_tree(ast);
         parser_free(parser);
         free(input);
-        return;
+        TEST_FAIL_FMT("expected recursion depth error for %d-deep nesting",
+                      depth);
     }
 
     /* Success - parser correctly rejected deeply nested input */
@@ -592,6 +567,72 @@ TEST(control_chars_in_input) {
  */
 
 TEST(coproc_no_command) { ASSERT_PARSE_FAILS("coproc"); }
+
+/* ============================================================================
+ * REGRESSION
+ * ============================================================================
+ */
+
+/* Issue #51: two heredocs in the same input sharing a delimiter caused
+ * collect_heredoc_content's input scan-from-zero to always re-find the
+ * FIRST `<<` operator and reset tokenizer->position backwards, making
+ * the parser re-parse the second heredoc forever. The fix anchors the
+ * search at the operator's own source position (op_position).
+ *
+ * Pre-fix wall-clock on the 29-byte trigger: ~8 seconds at 99% CPU.
+ * Post-fix: well under 100ms; this assertion budgets 1 second to
+ * tolerate slow CI machines. If the loop regression returns this
+ * test will time out at the meson default and fail loudly.
+ *
+ * The behavioural assertion is that the parse fails with an
+ * unterminated-heredoc error (the second `c << 'END'` has no body or
+ * terminator after it). */
+TEST(heredoc_repeated_delimiter_no_loop) {
+    const char *input = "cat << 'END'\ntu\nEND\nc<< 'END'";
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    ASSERT_PARSE_FAILS(input);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long elapsed_ms = (end.tv_sec - start.tv_sec) * 1000 +
+                      (end.tv_nsec - start.tv_nsec) / 1000000;
+    if (elapsed_ms > 1000) {
+        TEST_FAIL_FMT("parse took %ld ms (budget 1000 ms); the issue #51 "
+                      "infinite-loop regression has returned",
+                      elapsed_ms);
+    }
+}
+
+/* Issue #52: case-arm body with heredoc whose delimiter spec includes
+ * shell quote-concatenation (`<< ''ai`, where `''` is empty quoted
+ * concatenated with `ai` to form delimiter "ai"). The parser correctly
+ * resolves the delimiter to "ai", but collect_heredoc_content's old
+ * input scan-from-zero couldn't find the literal `<< 'ai'` substring
+ * (the input has `<< ''ai`), defaulted content_start to 0, and then
+ * body collection from byte 0 found a spurious "ai" terminator and
+ * reset tokenizer->position back into the live parse — triggering
+ * O(N^2) command-list growth in the case-arm body parser. The fix
+ * computes content_start from the operator's source_location_t
+ * directly, eliminating the input scan entirely.
+ *
+ * Pre-fix wall-clock on the 37-byte trigger: ~4 seconds at 99% CPU.
+ * Post-fix: under 50 ms; budget 1 second to tolerate slow CI. */
+TEST(heredoc_empty_quoted_concat_in_case_no_loop) {
+    /* 37 bytes: case + heredoc with empty-quote-concat delimiter,
+     * unterminated. */
+    const char *input = "case \"$1\" in\n   t)\nai\no[<< ''ai\n \nwac\n";
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    ASSERT_PARSE_FAILS(input);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long elapsed_ms = (end.tv_sec - start.tv_sec) * 1000 +
+                      (end.tv_nsec - start.tv_nsec) / 1000000;
+    if (elapsed_ms > 1000) {
+        TEST_FAIL_FMT("parse took %ld ms (budget 1000 ms); the issue #52 "
+                      "case-arm-heredoc-empty-delimiter regression has "
+                      "returned",
+                      elapsed_ms);
+    }
+}
 
 /* ============================================================================
  * MAIN
@@ -801,21 +842,11 @@ int main(void) {
     RUN_TEST(coproc_no_command);
     print_category_summary("Coproc");
 
-    printf("\n========================================\n");
-    printf("NEGATIVE TEST RESULTS\n");
-    printf("========================================\n");
-    printf("Tests run:    %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_failed);
-    printf("========================================\n");
+    printf("Regression:\n");
+    reset_category();
+    RUN_TEST(heredoc_repeated_delimiter_no_loop);
+    RUN_TEST(heredoc_empty_quoted_concat_in_case_no_loop);
+    print_category_summary("Regression");
 
-    if (tests_failed > 0) {
-        printf("\nWARNING: %d test(s) failed!\n", tests_failed);
-        printf("The parser may be accepting invalid syntax.\n");
-    } else {
-        printf("\nAll negative tests passed!\n");
-        printf("Parser correctly rejects invalid syntax.\n");
-    }
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

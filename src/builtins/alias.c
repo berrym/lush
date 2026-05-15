@@ -13,13 +13,16 @@
 
 #include "builtins.h"
 #include "errors.h"
+#include "executor.h"
 #include "ht.h"
+#include "shell_error.h"
 #include "tokenizer.h"
 
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 ht_strstr_t *aliases = NULL; // alias hash table
 ht_enum_t *aliases_e = NULL; // alias enumeration object
@@ -717,7 +720,10 @@ int bin_alias(int argc, char **argv) {
         if (parse_alias_assignment(argv[i], &name, &value)) {
             // Check if name is valid
             if (!valid_alias_name(name)) {
-                error_message("alias: invalid alias name: %s", name);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "invalid alias name: %s", name);
                 free(name);
                 free(value);
                 exit_status = 1;
@@ -726,7 +732,10 @@ int bin_alias(int argc, char **argv) {
 
             // Can't alias builtin commands or keywords
             if (is_builtin(name)) {
-                error_message("alias: cannot alias shell keyword: %s", name);
+                executor_error_report(current_executor,
+                                      SHELL_ERR_INVALID_ARGUMENT,
+                                      builtin_get_source_location(),
+                                      "cannot alias shell keyword: %s", name);
                 free(name);
                 free(value);
                 exit_status = 1;
@@ -735,7 +744,9 @@ int bin_alias(int argc, char **argv) {
 
             // Set the alias
             if (!set_alias(name, value)) {
-                error_message("alias: failed to create alias: %s", name);
+                executor_error_report(current_executor, SHELL_ERR_ALIAS_ERROR,
+                                      builtin_get_source_location(),
+                                      "failed to create alias: %s", name);
                 exit_status = 1;
             }
 
@@ -747,7 +758,9 @@ int bin_alias(int argc, char **argv) {
             if (alias_value) {
                 printf("alias %s='%s'\n", argv[i], alias_value);
             } else {
-                error_message("alias: %s: not found", argv[i]);
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(), "%s: not found", argv[i]);
                 exit_status = 1;
             }
         }
@@ -786,7 +799,39 @@ int bin_unalias(int argc, char **argv) {
     // Process each name argument
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-a") == 0) {
-            error_message("unalias: -a must be used alone");
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(SHELL_ERR_INVALID_OPTION,
+                                                    SHELL_SEVERITY_ERROR, loc,
+                                                    "-a must be used alone");
+            if (err) {
+                if (current_executor && SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line, loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                if (current_executor) {
+                    for (size_t k = 0; k < current_executor->context_depth &&
+                                       k < SHELL_ERROR_CONTEXT_MAX;
+                         k++) {
+                        if (current_executor->context_stack[k]) {
+                            shell_error_push_context(
+                                err, "%s", current_executor->context_stack[k]);
+                        }
+                    }
+                }
+                shell_error_set_suggestion(
+                    err,
+                    "use 'unalias -a' to remove all aliases, or list names "
+                    "without -a");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr, "lush: unalias: -a must be used alone\n");
+            }
             exit_status = 1;
             continue;
         }
@@ -794,7 +839,9 @@ int bin_unalias(int argc, char **argv) {
         if (lookup_alias(argv[i])) {
             unset_alias(argv[i]);
         } else {
-            error_message("unalias: %s: not found", argv[i]);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                                  builtin_get_source_location(),
+                                  "%s: not found", argv[i]);
             exit_status = 1;
         }
     }

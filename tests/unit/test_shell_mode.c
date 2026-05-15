@@ -14,50 +14,18 @@
  */
 
 #include "shell_mode.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
+ * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
+ * the framework's ASSERT_TRUE(cond, msg) which has matching semantics. */
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Running: %s...\n", #name);                                   \
-        test_##name();                                                         \
-        printf("    PASSED\n");                                                \
-    } while (0)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    do {                                                                       \
-        if ((actual) != (expected)) {                                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: %d, Got: %d\n", (int)(expected),           \
-                   (int)(actual));                                             \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(actual, expected, message)                               \
-    do {                                                                       \
-        if (strcmp((actual), (expected)) != 0) {                               \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: \"%s\", Got: \"%s\"\n", (expected),        \
-                   (actual));                                                  \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -340,18 +308,38 @@ TEST(feature_names) {
 
 TEST(feature_parse) {
     shell_feature_t feature;
+    bool invert = true; /* seed non-default to verify reset */
 
     /* Parse valid feature names */
-    ASSERT(shell_feature_parse("indexed_arrays", &feature),
+    ASSERT(shell_feature_parse("indexed_arrays", &feature, &invert),
            "Should parse 'indexed_arrays'");
     ASSERT_EQ(feature, FEATURE_INDEXED_ARRAYS, "Parsed feature should match");
+    ASSERT(!invert, "Canonical name should not be inverted");
 
-    ASSERT(shell_feature_parse("extended_test", &feature),
+    ASSERT(shell_feature_parse("extended_test", &feature, &invert),
            "Should parse 'extended_test'");
     ASSERT_EQ(feature, FEATURE_EXTENDED_TEST, "Parsed feature should match");
+    ASSERT(!invert, "Canonical name should not be inverted");
+
+    /* Inverted alias: bsd_echo bridges to xpg_echo with inverted semantic */
+    ASSERT(shell_feature_parse("bsd_echo", &feature, &invert),
+           "Should parse zsh's 'bsd_echo' alias");
+    ASSERT_EQ(feature, FEATURE_XPG_ECHO,
+              "bsd_echo should map to FEATURE_XPG_ECHO");
+    ASSERT(invert, "bsd_echo is the inverted alias for xpg_echo");
+
+    /* xpg_echo (canonical) is not inverted */
+    ASSERT(shell_feature_parse("xpg_echo", &feature, &invert),
+           "Should parse 'xpg_echo'");
+    ASSERT_EQ(feature, FEATURE_XPG_ECHO, "Parsed feature should match");
+    ASSERT(!invert, "xpg_echo is the canonical (non-inverted) name");
+
+    /* NULL invert pointer is allowed (callers that don't care) */
+    ASSERT(shell_feature_parse("indexed_arrays", &feature, NULL),
+           "Should accept NULL invert out-param");
 
     /* Invalid feature name should fail */
-    ASSERT(!shell_feature_parse("not_a_real_feature", &feature),
+    ASSERT(!shell_feature_parse("not_a_real_feature", &feature, NULL),
            "Should fail to parse invalid feature name");
 }
 
@@ -485,6 +473,5 @@ int main(void) {
     printf("\nMode Bounds Tests:\n");
     RUN_TEST(mode_bounds);
 
-    printf("\n=== All Shell Mode Tests PASSED ===\n\n");
-    return 0;
+    return TEST_RESULT();
 }

@@ -23,6 +23,7 @@
 #include "lle/display_integration.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
+#include "test_framework.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,43 +36,8 @@
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Test result tracking */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-/* Test macros */
-#define TEST(name)                                                             \
-    static void test_##name(void);                                             \
-    static void run_test_##name(void) {                                        \
-        printf("Running test: %s\n", #name);                                   \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-        tests_passed++;                                                        \
-        printf("  ✓ PASSED\n");                                                \
-    }                                                                          \
-    static void test_##name(void)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("  ✗ ASSERTION FAILED: %s\n", message);                     \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr, message) ASSERT((ptr) != NULL, message)
-
-#define ASSERT_NULL(ptr, message) ASSERT((ptr) == NULL, message)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    ASSERT((actual) == (expected), message)
-
-#define ASSERT_TRUE(condition, message) ASSERT((condition), message)
-
-#define ASSERT_FALSE(condition, message) ASSERT(!(condition), message)
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* ========================================================================== */
 /*                            MOCK OBJECTS                                    */
@@ -335,35 +301,25 @@ int main(void) {
     printf("Initialization Tests:\n");
     printf(
         "-----------------------------------------------------------------\n");
-    run_test_bridge_init_success();
-    run_test_bridge_init_null_bridge_pointer();
-    run_test_bridge_init_null_editor();
-    run_test_bridge_init_null_display();
-    run_test_bridge_init_null_memory_pool();
-    run_test_bridge_init_invalid_display_no_compositor();
+    RUN_TEST(bridge_init_success);
+    RUN_TEST(bridge_init_null_bridge_pointer);
+    RUN_TEST(bridge_init_null_editor);
+    RUN_TEST(bridge_init_null_display);
+    RUN_TEST(bridge_init_null_memory_pool);
+    RUN_TEST(bridge_init_invalid_display_no_compositor);
 
     /* Cleanup tests */
     printf("\nCleanup Tests:\n");
     printf(
         "-----------------------------------------------------------------\n");
-    run_test_bridge_cleanup_success();
-    run_test_bridge_cleanup_null_bridge();
+    RUN_TEST(bridge_cleanup_success);
+    RUN_TEST(bridge_cleanup_null_bridge);
 
     /* Convenience wrapper tests */
     printf("\nConvenience Wrapper Tests:\n");
     printf(
         "-----------------------------------------------------------------\n");
-    run_test_bridge_create_wrapper();
+    RUN_TEST(bridge_create_wrapper);
 
-    /* Print summary */
-    printf("\n================================================================="
-           "\n");
-    printf("Test Summary:\n");
-    printf("  Total:  %d\n", tests_run);
-    printf("  Passed: %d\n", tests_passed);
-    printf("  Failed: %d\n", tests_failed);
-    printf(
-        "=================================================================\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

@@ -230,9 +230,36 @@ string_ansic = "#B58900"       # ANSI-C quoting $'...' (yellow)
 variable = "#6C71C4"           # Variable reference $var, ${var} (violet)
 variable_special = "#D33682"   # Special variables $?, $#, $@, $$, $! (magenta)
 
-# Paths
-path_valid = "#859900"         # Valid file/directory path (green)
-path_invalid = "#DC322F"       # Non-existent path (red)
+# Paths -- two-axis classification (shape × kind) with kind-only fallbacks.
+#
+# At highlight time each path-shaped argument is classified by:
+#   shape: absolute (`/...`), relative (`./`, `../`, bare), home (`~/...`)
+#   kind:  regular file vs. directory (per stat S_ISDIR), or invalid if missing
+#
+# The 6 shape × kind keys give power-user themes per-bucket control.
+# Most themes only need the 2-3 base keys below: kind-only fallbacks for
+# `path_file` and `path_dir`, plus `path_invalid` (no fallback chain).
+# Resolution at color-application time: shape-specific knob -> kind-only
+# knob -> default text (no highlight) for files/dirs; `path_invalid`
+# always renders red.
+#
+# OMIT a key to leave it unset and fall through. Default highlighting:
+# regular files inherit `argument` color (no emphasis), directories get
+# `path_dir` (green, underlined), missing paths get `path_invalid` (red).
+
+# Common case (2 base keys + invalid):
+# path_file = "#859900"        # uncomment to give valid files a color
+path_dir = "#859900"           # Valid directories (green, underlined by default)
+path_invalid = "#DC322F"       # Non-existent paths (red)
+
+# Power-user shape variants -- override only the slots you care about;
+# the rest fall through to the kind-only knob above. Examples (commented):
+# path_file_absolute = "#268BD2"   # /usr/bin/grep
+# path_file_relative = "#839496"   # ./script.sh
+# path_file_home     = "#268BD2"   # ~/notes.md
+# path_dir_absolute  = "#859900"   # /etc
+# path_dir_relative  = "#B58900"   # ./src
+# path_dir_home      = "#268BD2"   # ~/Documents
 
 # Operators
 pipe = "#268BD2"               # Pipe | (blue)

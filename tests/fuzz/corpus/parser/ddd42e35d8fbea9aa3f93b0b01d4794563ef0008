@@ -1,5 +1,0 @@
-echoo ${vo $ ${var:-default}
-echo ${var:=assign}
-echo ${vo ${var%patt%%pattern}
-echo ${var#pattern}
-echo ${var##pattern}

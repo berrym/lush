@@ -1,6 +1,0 @@
-ech00000000000000000000000000o ${var:-default}
-echo ${var:=acsign}
-echo ${vo ${var%pattnr}
-eecho ${var%%pattern}
-echo ${var#pattern}
-echo ${var##pattern}

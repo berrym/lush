@@ -174,7 +174,7 @@ set
 set -o
 ```
 
-See [SHELL_OPTIONS.md](SHELL_OPTIONS.md) for all options.
+See [CONFIGURATION.md](CONFIGURATION.md) for all options.
 
 ### `shift`
 
@@ -771,6 +771,6 @@ wait
 ## See Also
 
 - [USER_GUIDE.md](USER_GUIDE.md) - Complete shell reference
-- [SHELL_OPTIONS.md](SHELL_OPTIONS.md) - Shell option reference
+- [CONFIGURATION.md](CONFIGURATION.md) - Shell option reference
 - [COMPLETION_SYSTEM.md](COMPLETION_SYSTEM.md) - Context-aware completions
 - [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) - Debugging reference

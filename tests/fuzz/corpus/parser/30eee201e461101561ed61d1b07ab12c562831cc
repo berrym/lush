@@ -1,2 +1,0 @@
-[[ -f file && $x in "ttest" ]]
-[[ str =~ ^[0-9]+$ ]$s

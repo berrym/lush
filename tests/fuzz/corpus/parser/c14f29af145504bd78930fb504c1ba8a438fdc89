@@ -1,0 +1,36 @@
+if [ -f esacfile ]; then
+    echo xists
+el=if [ -d dir ]; then
+    echo directory
+elists
+el=i,l=if [ -d dir ]; then
+    edrch oiectory exists
+el=if else dir ]; thew
+    echo directory.
+el
+glists
+eists
+el=if [ -d dir ]; then
+    e=if [ -d dir ]; then
+    echo directory
+ oiectory exists
+el=if else dir ]; thew
+    echo directorelists
+el=i,l=if [ -d dir ]; then
+    edrch oiectory exists
+el=if else dir ]; thew
+    echo directory
+el
+elists
+eists
+el=if [ -d dir ]; then
+    echo directo directory
+el
+glists
+eists
+el=if [ -d dir ]; then
+    e=if [ -d dir ]; then
+    echo directoryelists
+el=i,l=if [ -d dir ]; then
+    erectory
+el

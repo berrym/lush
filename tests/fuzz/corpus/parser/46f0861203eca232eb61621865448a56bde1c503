@@ -1,4 +1,0 @@
-echo test > filecho $$ $? $! $# $@ $* <$input.t.txt 2>&1
-catecho $$ $t 2>&1
-capecho $$ $? $! $# $@ $*  <$ist > filecho $$ $? $! $# $@ $* <$input.t.txt 2>&1
-catec

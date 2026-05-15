@@ -97,6 +97,18 @@ typedef struct executor {
     bool expansion_error;      // True if error occurred during expansion
     int expansion_exit_status; // Exit status from expansion errors
 
+    /* POSIX-required shell-level exit. A handful of error sites are
+     * defined by IEEE 1003.1 to cause a non-interactive shell to exit
+     * (e.g. ${var:?word} on null-or-unset, ${var?word} on unset, set -u
+     * unbound-variable references). The trigger sites set
+     * shell_exit_requested=true and stash the status here; every loop
+     * body, command-list, and the top-level REPL honors the flag by
+     * short-circuiting. Interactive shells never set the flag -- they
+     * print the diagnostic and continue at the next prompt, per spec.
+     * Set via executor_request_posix_exit(); never written directly. */
+    bool shell_exit_requested;
+    int shell_exit_status;
+
     // Error context stack (Phase 3: context-aware error management)
     char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; // "while executing X"
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
@@ -106,6 +118,19 @@ typedef struct executor {
     int procsub_fds[32];    // File descriptors from process substitutions
     pid_t procsub_pids[32]; // Child PIDs from process substitutions
     int procsub_fd_count;   // Number of tracked fds/pids
+
+    /* Source-text retention for the structured-error system. The
+     * executor stashes the input text (and its file-relative starting
+     * line) for the current parse/execute batch so any error site —
+     * builtin, expansion, redirection, runtime — can attach the
+     * original source line via shell_error_set_source_line() and
+     * produce the full rust-style `--> file:line:col / N | ... / ^~~~`
+     * snippet. Both fields are owned by the caller (executor_execute_
+     * command_line stashes pointers; nothing is copied) and are reset
+     * to NULL/0 on entry/exit of each batch. Read via the accessor
+     * executor_get_source_line(executor, file_line). */
+    const char *source_text;
+    size_t source_starting_line;
 
 } executor_t;
 
@@ -156,11 +181,45 @@ int executor_execute(executor_t *executor, node_t *ast);
 /**
  * @brief Parse and execute a command line string
  *
- * @param executor Executor context
- * @param input Command line to execute
+ * The starting_line parameter seeds source-location tracking so errors
+ * emitted during parsing or execution carry file-relative line numbers
+ * even when `input` is a slice of a larger script.
+ *
+ * @param executor      Executor context
+ * @param input         Command line to execute
+ * @param starting_line Line number of the first character of `input`
+ *                      within the original source file (1-based; pass 1
+ *                      if input is the entire source or origin is
+ *                      unknown)
  * @return Exit status of executed command
  */
-int executor_execute_command_line(executor_t *executor, const char *input);
+int executor_execute_command_line(executor_t *executor, const char *input,
+                                  size_t starting_line);
+
+/**
+ * @brief Fetch the text of a single source line for diagnostic display
+ *
+ * Returns a freshly-allocated copy of the requested line from the
+ * executor's currently-stashed source text. Translates a file-relative
+ * line number (as carried in source_location_t fields throughout the
+ * AST) into a batch-relative offset using the executor's
+ * source_starting_line, then walks the source text counting newlines
+ * to extract the line content.
+ *
+ * Use site: any error emitter that calls shell_error_create() and
+ * wants the full rust-style `N | source line / ^~~~` snippet block.
+ * Pair with shell_error_set_source_line(error, line, col_start, col_end).
+ *
+ * Returns NULL if no source text is stashed, the requested line is
+ * outside the batch's range, allocation fails, or the executor pointer
+ * is NULL. Caller owns the returned string and must free() it.
+ *
+ * @param executor   Executor context (NULL returns NULL)
+ * @param file_line  File-relative 1-based line number (typically
+ *                   `loc.line` from a source_location_t)
+ * @return Allocated source line text without trailing newline, or NULL
+ */
+char *executor_get_source_line(executor_t *executor, size_t file_line);
 
 /* ============================================================================
  * Configuration
@@ -272,6 +331,28 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
  * @return Expanded string (caller must free) or NULL on error
  */
 char *expand_if_needed(executor_t *executor, const char *text);
+
+/**
+ * @brief Expand a brace pattern into its enumerated branches
+ *
+ * Given a pattern such as `{a,b,c}/Doc` or `{1..3}-tail`, returns a
+ * NULL-terminated heap-allocated array of branch strings. Range
+ * expansion (`{1..10}`) and list expansion (`{a,b,c}`) are both
+ * supported. When the input contains no brace pattern the returned
+ * array has a single element equal to a copy of the input.
+ *
+ * Caller owns each returned string and the array; both must be freed
+ * with free(). The terminating NULL slot is included in the
+ * allocation.
+ *
+ * @param pattern Pattern text (no quote/escape processing performed)
+ * @param expanded_count Output for the number of branches produced.
+ *        Set to 0 on failure.
+ * @return Heap-allocated array of branch strings or NULL on
+ *         allocation failure. Single-element array (length-1) on
+ *         input with no brace.
+ */
+char **expand_brace_pattern(const char *pattern, int *expanded_count);
 
 /**
  * @brief Expand a process substitution node

@@ -1,0 +1,6 @@
+echo *(.)
+echo *(/)
+echo *(N)
+echo *(.L+1k)
+echo *(om[1])
+echo **/*.c(.)

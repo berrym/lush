@@ -16,7 +16,7 @@
 #define LLE_BUILTIN_COMPLETIONS_H
 
 #include "lle/completion/completion_types.h"
-#include "lle/completion/context_analyzer.h"
+#include "lle/completion/word_context.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 
@@ -125,7 +125,7 @@ lle_builtin_get_spec(const char *builtin_name);
  * @param context Completion context
  * @return true if builtin completions should be generated
  */
-bool lle_builtin_completions_applicable(const lle_context_analyzer_t *context);
+bool lle_builtin_completions_applicable(const lle_word_context_t *context);
 
 /**
  * @brief Generate builtin argument completions
@@ -134,14 +134,14 @@ bool lle_builtin_completions_applicable(const lle_context_analyzer_t *context);
  * then generates appropriate completions (options, subcommands, or dynamic).
  *
  * @param pool Memory pool for allocations
- * @param context Completion context with command info
- * @param prefix Prefix to match
+ * @param context Word context with command info; the prefix is read
+ *                from context->dequoted_filename_prefix
  * @param result Result structure to append completions to
  * @return LLE_SUCCESS or error code
  */
-lle_result_t lle_builtin_completions_generate(
-    lle_memory_pool_t *pool, const lle_context_analyzer_t *context,
-    const char *prefix, lle_completion_result_t *result);
+lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
+                                              const lle_word_context_t *context,
+                                              lle_completion_result_t *result);
 
 /**
  * @brief Get all defined signal names for trap completion

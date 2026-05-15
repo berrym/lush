@@ -17,7 +17,7 @@
 
 #include "../../../include/lle/error_handling.h"
 #include "../../../include/lle/input_parsing.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -26,25 +26,8 @@
 extern void *lle_pool_alloc(size_t size);
 extern void lle_pool_free(void *ptr);
 
-/* Test counter */
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-/* Test result macros */
-#define TEST_ASSERT(condition, message)                                        \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            fprintf(stderr, "FAIL: %s\n", message);                            \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define TEST_PASS(name)                                                        \
-    do {                                                                       \
-        printf("PASS: %s\n", name);                                            \
-        tests_passed++;                                                        \
-    } while (0)
+#define TEST_ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+#define TEST_PASS(name) ((void)0)
 
 /*
  * Test: Initialize and destroy state machine
@@ -454,25 +437,19 @@ int main(void) {
     printf("=== LLE Parser State Machine Unit Tests ===\n\n");
 
     /* Run tests */
-    test_init_destroy();
-    test_state_transitions();
-    test_transition_count();
-    test_process_escape();
-    test_process_csi();
-    test_process_mouse();
-    test_process_sgr_mouse();
-    test_process_osc();
-    test_process_key_ss3();
-    test_error_recovery();
-    test_time_in_state();
-    test_reset();
-    test_process_dcs();
-    test_process_normal_text();
-
-    /* Print results */
-    printf("\n=== Test Results ===\n");
-    printf("Passed: %d\n", tests_passed);
-    printf("Failed: %d\n", tests_failed);
-
-    return (tests_failed == 0) ? 0 : 1;
+    RUN_TEST(init_destroy);
+    RUN_TEST(state_transitions);
+    RUN_TEST(transition_count);
+    RUN_TEST(process_escape);
+    RUN_TEST(process_csi);
+    RUN_TEST(process_mouse);
+    RUN_TEST(process_sgr_mouse);
+    RUN_TEST(process_osc);
+    RUN_TEST(process_key_ss3);
+    RUN_TEST(error_recovery);
+    RUN_TEST(time_in_state);
+    RUN_TEST(reset);
+    RUN_TEST(process_dcs);
+    RUN_TEST(process_normal_text);
+    return TEST_RESULT();
 }

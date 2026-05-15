@@ -11,57 +11,26 @@
 #include "lle/unicode_case.h"
 #include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
+#include "test_framework.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name)                                                             \
-    do {                                                                       \
-        printf("  Testing: %s ... ", name);                                    \
-        fflush(stdout);                                                        \
-        tests_run++;                                                           \
-    } while (0)
-
-#define PASS()                                                                 \
-    do {                                                                       \
-        printf("PASS\n");                                                      \
-        tests_passed++;                                                        \
-    } while (0)
-
-#define FAIL(msg)                                                              \
-    do {                                                                       \
-        printf("FAIL: %s\n", msg);                                             \
-        tests_failed++;                                                        \
-    } while (0)
-
-#define ASSERT_EQ(a, b, msg)                                                   \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            FAIL(msg);                                                         \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_TRUE(cond, msg)                                                 \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            FAIL(msg);                                                         \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(a, b, msg)                                               \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("expected '%s', got '%s' - ", (b), (a));                    \
-            FAIL(msg);                                                         \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
+/* This file uses an unusual test pattern: each test function manually
+ * declares itself static void test_X(void) and calls TEST("string"),
+ * PASS(), FAIL(...) inside its body. The framework's TEST(name)
+ * macro defines a function — incompatible with the in-body usage —
+ * so it is undef'd and the in-body calls are made no-ops. The
+ * framework's RUN_TEST(name) still calls test_##name(), which
+ * matches the function naming convention here, so the runner works.
+ *
+ * ASSERT_EQ/TRUE/STR_EQ match the framework's 3-arg signatures
+ * exactly and the framework's versions take over via #undef. */
+#undef TEST
+#define TEST(name_str) ((void)0)
+#define PASS() ((void)0)
+#define FAIL(msg) TEST_FAIL_MSG(msg)
 
 /* ============================================================================
  * UNICODE CASE CONVERSION TESTS
@@ -361,60 +330,43 @@ static void test_is_combining(void) {
  */
 
 int main(void) {
-    printf("\n");
-    printf("=====================================================\n");
-    printf("LLE Unicode Case Conversion and Comparison Tests\n");
-    printf("=====================================================\n\n");
+    printf("=== LLE Unicode Case Conversion and Comparison Tests ===\n");
 
-    /* Case Conversion Tests */
-    printf("Unicode Case Conversion Tests:\n");
-    test_case_ascii_upper();
-    test_case_ascii_lower();
-    test_case_mixed_ascii();
-    test_case_latin1_upper();
-    test_case_latin1_lower();
-    test_case_codepoint_upper();
-    test_case_codepoint_lower();
-    test_case_is_upper_lower();
-    test_case_first_upper();
-    test_case_first_lower();
-    test_case_empty_string();
-    test_case_buffer_too_small();
+    printf("Unicode Case Conversion:\n");
+    RUN_TEST(case_ascii_upper);
+    RUN_TEST(case_ascii_lower);
+    RUN_TEST(case_mixed_ascii);
+    RUN_TEST(case_latin1_upper);
+    RUN_TEST(case_latin1_lower);
+    RUN_TEST(case_codepoint_upper);
+    RUN_TEST(case_codepoint_lower);
+    RUN_TEST(case_is_upper_lower);
+    RUN_TEST(case_first_upper);
+    RUN_TEST(case_first_lower);
+    RUN_TEST(case_empty_string);
+    RUN_TEST(case_buffer_too_small);
 
-    /* String Comparison Tests */
-    printf("\nUnicode String Comparison Tests:\n");
-    test_compare_equal_ascii();
-    test_compare_case_sensitive();
-    test_compare_case_insensitive();
-    test_compare_with_length();
-    test_compare_unicode_strings();
+    printf("Unicode String Comparison:\n");
+    RUN_TEST(compare_equal_ascii);
+    RUN_TEST(compare_case_sensitive);
+    RUN_TEST(compare_case_insensitive);
+    RUN_TEST(compare_with_length);
+    RUN_TEST(compare_unicode_strings);
 
-    /* Prefix Matching Tests */
-    printf("\nUnicode Prefix Matching Tests:\n");
-    test_prefix_ascii();
-    test_prefix_empty();
-    test_prefix_longer_than_string();
-    test_prefix_null_terminated();
-    test_prefix_case_insensitive();
+    printf("Unicode Prefix Matching:\n");
+    RUN_TEST(prefix_ascii);
+    RUN_TEST(prefix_empty);
+    RUN_TEST(prefix_longer_than_string);
+    RUN_TEST(prefix_null_terminated);
+    RUN_TEST(prefix_case_insensitive);
 
-    /* NFC Normalization Tests */
-    printf("\nNFC Normalization Tests:\n");
-    test_nfc_ascii_passthrough();
-    test_nfc_precomposed();
+    printf("NFC Normalization:\n");
+    RUN_TEST(nfc_ascii_passthrough);
+    RUN_TEST(nfc_precomposed);
 
-    /* Combining Character Tests */
-    printf("\nCombining Character Tests:\n");
-    test_combining_class();
-    test_is_combining();
+    printf("Combining Characters:\n");
+    RUN_TEST(combining_class);
+    RUN_TEST(is_combining);
 
-    /* Summary */
-    printf("\n");
-    printf("=====================================================\n");
-    printf("Test Summary:\n");
-    printf("  Total:  %d\n", tests_run);
-    printf("  Passed: %d\n", tests_passed);
-    printf("  Failed: %d\n", tests_failed);
-    printf("=====================================================\n");
-
-    return (tests_failed == 0) ? 0 : 1;
+    return TEST_RESULT();
 }

@@ -1,3 +1,0 @@
-if [ -f file /; then
-   ‹fo -r i in $(cat file); do
-    

@@ -8,47 +8,21 @@
 
 #include "posix_history.h"
 
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+/* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
+ * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
+ * the framework's ASSERT_TRUE(cond, msg) which has matching semantics. */
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+
 // ============================================================================
 // Test Framework
 // ============================================================================
-
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name) static void test_##name(void)
-
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        printf("  Running %s...", #name);                                      \
-        fflush(stdout);                                                        \
-        test_##name();                                                         \
-        printf(" PASSED\n");                                                   \
-        tests_passed++;                                                        \
-    } while (0)
-
-#define ASSERT(cond, msg)                                                      \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf(" FAILED: %s\n", msg);                                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr, msg) ASSERT((ptr) != NULL, msg)
-#define ASSERT_NULL(ptr, msg) ASSERT((ptr) == NULL, msg)
-#define ASSERT_TRUE(val, msg) ASSERT((val) == true, msg)
-#define ASSERT_FALSE(val, msg) ASSERT((val) == false, msg)
-#define ASSERT_EQ(a, b, msg) ASSERT((a) == (b), msg)
-#define ASSERT_NE(a, b, msg) ASSERT((a) != (b), msg)
-#define ASSERT_STR_EQ(a, b, msg) ASSERT(strcmp((a), (b)) == 0, msg)
 
 // ============================================================================
 // Creation and Destruction Tests
@@ -864,10 +838,5 @@ int main(void) {
     RUN_TEST(entry_has_timestamp);
     RUN_TEST(entry_has_length);
 
-    printf("\n========================================\n");
-    printf("Tests run: %d, Passed: %d, Failed: %d\n", tests_run, tests_passed,
-           tests_failed);
-    printf("========================================\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

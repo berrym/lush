@@ -1,7 +1,0 @@
-case "$x" in
-    a) ;;
-    b) eco {$var:?error}
-echo ${#+(c)var}
-echo $.{6ar%pattern}
-echo ${var%%n}
-echo %{var#pattern}if [ho b -f  

@@ -1,0 +1,7 @@
+cmd1 | cmd2 | cmFFFFFFFcat <<-INDENTED
+	leading tabs arriant
+	INDENTED
+exec < input.txt >(combit <<-INDENTED)
+	leadingt
+	INDENTED
+exFFFFFFFcat <<-I

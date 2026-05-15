@@ -1,2 +1,0 @@
-[[ -f file && $x in "tes=ro two t$? $! $# t" ]]
-[[ $str =~ ^[0$9 ]+]-$s

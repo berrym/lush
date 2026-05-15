@@ -8,7 +8,7 @@
 
 The previous branch produced a written grammar of what the parser accepts. Step 2 of `docs/development/PARSER_GRAMMAR_PLAN.md` is grammar-driven fuzzing — using that grammar to systematically prove (or disprove) correctness across the shell.
 
-The bugs surfaced during the previous branch's manual reading (#43, #44, #45, #46, #47, #48) are evidence that more bugs exist. Two of them — #47 (local-variable assignment silently dropped) and #48 (function-level redirections silently ignored) — would never be found by crash-fuzzing, because they produce the wrong answer rather than crashing. Finding that bug class systematically requires *differential testing* against a reference implementation (bash).
+The bugs surfaced during the previous branch's manual reading (#43, #44, #45, #46, #47, #48) are evidence that more bugs exist. Two of them — #47 (local-variable assignment silently dropped) and #48 (function-level redirections silently ignored) — would never be found by crash-fuzzing, because they produce the wrong answer rather than crashing. Finding that bug class systematically requires *differential testing* against the appropriate reference implementation per lush mode (POSIX → `dash`, bash mode → `bash`, zsh mode → `zsh`; lush mode is tested by intersection across the available oracles, not against any single shell).
 
 This branch is the toolkit for that.
 
@@ -28,7 +28,7 @@ The infrastructure fits the project ethos: pure C, no Python or Rust deps, singl
 ## Scope discipline
 
 - **No new runtime dependencies.** Whatever generators or harnesses we build are C, or shell scripts using tools already in the project's expected dev environment.
-- **bash + zsh polyglot only.** Differential testing targets bash for the bash-compatible subset of `LUSH_GRAMMAR.ebnf`. Fish, ksh, tcsh, csh remain out of scope.
+- **POSIX, bash, and zsh are first-class.** Differential testing per lush mode targets the matching oracle (`dash`/`bash --posix`, `bash`, `zsh`). Fish, ksh, tcsh, csh remain out of scope. Lush mode itself is the polyglot superset and has no single oracle.
 - **Crashes vs correctness are different problems.** Phases 1, 2, 4 find crashes. Phase 3 finds wrong-answer bugs. Both matter; do both.
 
 ## Phased plan
@@ -53,22 +53,39 @@ This is mechanical translation work, not invention — the grammar already exist
 
 **Done when:** every production in `LUSH_GRAMMAR.ebnf` has at least one seed input that exercises it.
 
-### Phase 3 — Differential test harness against bash (2-3 days, the architectural piece)
+### Phase 3 — Mode-aware differential test harness (2-3 days, the architectural piece)
 
-This is the tool that would have caught #47 and #48 on the first run. Architecture:
+This is the tool that would have caught #47 and #48 on the first run.
 
-1. **Generator** — consumes `LUSH_GRAMMAR.ebnf`, produces inputs that conform to the bash-compatible subset. Either grammar-walking with random choices, or mutation-based on existing corpus, or both.
-2. **Runner** — for each input, executes `lush -c <input>` and `bash -c <input>` in parallel with timeouts. Captures exit code, stdout, stderr.
-3. **Comparator** — compares the two results. Mismatches go in a bug queue. Filters out known divergences (lush is intentionally polyglot in places — those need a curated allow-list).
-4. **Minimizer** — for each divergence, shrinks the input to the smallest form that still triggers it. Critical for bug filing.
-5. **Persistent corpus** — known-divergent inputs and known-clean inputs both cached so reruns don't re-discover the same bugs.
+Lush is a polyglot superset of POSIX, bash, and zsh — none of those is "the" reference. Differential testing must respect that: each lush mode has its own oracle, and lush mode (the default polyglot superset) has none and is tested by intersection. Architecture:
+
+1. **Generator** — consumes `LUSH_GRAMMAR.ebnf` plus per-mode subset filters; produces inputs tagged with the mode they target. Three subsets are first-class:
+   - **POSIX** subset (productions also in IEEE 1003.1)
+   - **bash-compatible** subset (POSIX ∪ documented bash extensions)
+   - **zsh-compatible** subset (POSIX ∪ documented zsh extensions)
+   - **Lush-only extensions** (anything in LUSH_GRAMMAR.ebnf marked as not in either reference shell — no oracle for these; they are tested for crash/correctness against lush's own spec).
+
+2. **Runner** — for each tagged input, executes `lush -c <input>` plus the appropriate oracle in parallel with timeouts. Oracles per mode:
+   - POSIX-tagged input: oracle is `dash` (or `bash --posix` as fallback)
+   - bash-tagged input: oracle is `bash`
+   - zsh-tagged input: oracle is `zsh`
+   - lush-only-tagged input: no oracle (record lush's behavior; verify no crash/timeout/UB)
+   - Lush is run in a matching mode for each (e.g., `set -o posix` for POSIX inputs) so the comparison is apples-to-apples.
+
+3. **Comparator** — compares lush's result to the oracle's. Mismatches go in a bug queue. Filters out known divergences via a curated allow-list (lush deliberately extends some constructs; those go in `tests/fuzz/differential/known_divergences/`). For lush-only inputs there is no comparison; they exercise crash/timeout/UB detection only.
+
+4. **Minimizer** — for each divergence, shrinks the input to the smallest form that still triggers it.
+
+5. **Persistent corpus** — known-divergent inputs and known-clean inputs cached so reruns don't re-discover the same bugs. Per-mode corpus directories.
+
+Oracle availability: `dash`, `bash`, and `zsh` are runtime-detected; missing oracles cause the matching subset to be skipped with a notice (not a hard failure). On Linux with the project's expected dev environment all three are typically present.
 
 This is C plus shell scripting; no new deps.
 
 **Cost:** 2-3 days for a robust harness
-**Deliverable:** `tests/fuzz/differential/` with the harness and a runnable target (`./build/fuzz_differential` or similar). CI integration as a separate follow-up.
+**Deliverable:** `tests/fuzz/differential/` with the harness, mode-tagged corpus subdirs, and a runnable target (`./build/fuzz_differential` or similar). CI integration as a separate follow-up.
 
-**Done when:** harness runs continuously on a clean corpus and finds zero new divergences over a multi-hour budget.
+**Done when:** harness runs continuously on a clean per-mode corpus and finds zero new divergences over a multi-hour budget for every mode whose oracle is available.
 
 ### Phase 4 — Executor fuzz target (≈ 1 day)
 
@@ -95,7 +112,7 @@ If a phase produces something with independent value (e.g. the grammar-derived c
 ## What this enables when complete
 
 - **Crash-free guarantee** for the inputs the corpus and grammar describe.
-- **Behavioral parity oracle** — every change to the parser or executor is auto-checked against bash for the bash-compatible subset. Regressions like #47 / #48 become impossible to ship without warning.
+- **Behavioral parity oracles per mode** — every change to the parser or executor is auto-checked against the matching reference (`dash` for POSIX, `bash` for bash mode, `zsh` for zsh mode). Lush mode is checked against the intersection where oracles agree. Regressions like #47 / #48 become impossible to ship without warning.
 - **Continuous fuzzing in CI** as a final follow-up — every PR / commit gets a fuzzing budget. Not in this plan but the natural next step.
 
 ## Pointers to related work

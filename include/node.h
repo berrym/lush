@@ -21,6 +21,7 @@
 
 typedef enum {
     NODE_COMMAND,
+    NODE_ASSIGN, // cmd_prefix assignment: val.str = "var=value" / "var+=value"
     NODE_VAR,
     NODE_STRING_LITERAL,    // Single-quoted string - no expansion
     NODE_STRING_EXPANDABLE, // Double-quoted string - variable expansion
@@ -50,6 +51,7 @@ typedef enum {
     NODE_FOR_ARITH,   // C-style for loop: for ((init; test; update))
     NODE_WHILE,       // while loop
     NODE_UNTIL,       // until loop
+    NODE_REPEAT,      // zsh repeat N loop: repeat N do/done OR repeat N {...}
     NODE_CASE,        // case statement
     NODE_FUNCTION,    // function definition
     NODE_BRACE_GROUP, // brace group { commands; }

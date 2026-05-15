@@ -12,7 +12,7 @@
 #define LLE_SOURCE_MANAGER_H
 
 #include "lle/completion/completion_types.h"
-#include "lle/completion/context_analyzer.h"
+#include "lle/completion/word_context.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 
@@ -33,6 +33,7 @@ typedef enum {
     LLE_SOURCE_HISTORY,           /**< Command history */
     LLE_SOURCE_ALIASES,           /**< Shell aliases (future) */
     LLE_SOURCE_FUNCTIONS,         /**< Shell functions (future) */
+    LLE_SOURCE_SSH_HOSTS,         /**< Hosts from ~/.ssh/{config,known_hosts} */
     LLE_SOURCE_CUSTOM,            /**< User-registered custom sources */
 } lle_source_type_t;
 
@@ -43,23 +44,44 @@ typedef struct lle_source_manager lle_source_manager_t;
 /**
  * @brief Source generation function signature
  *
+ * Sources receive the full word context produced by
+ * lle_word_context_analyze. The dequoted (NFC-normalized) prefix the
+ * user has typed is in context->dequoted_filename_prefix; the
+ * resolved directory to scan (for file/directory sources) is in
+ * context->expanded_directory; the surrounding command name and
+ * argument index are in context->command_name and context->arg_index.
+ *
+ * Sources MUST emit candidates as literals -- no path-prefix
+ * preservation, no quote machinery, no escaping. The engine handles
+ * splicing and rendering.
+ *
+ * For multi-value brace expansions (context->branch_count > 0), the
+ * engine fans out by calling sources once per branch with a
+ * synthetic word context whose expanded_directory and
+ * dequoted_filename_prefix point at the branch's resolved values.
+ * Sources never see branches[] directly.
+ *
  * @param pool Memory pool for allocations
- * @param context Completion context
- * @param prefix Prefix to match
+ * @param context Word context produced by lle_word_context_analyze
  * @param result Result structure to append completions to
  * @return LLE_SUCCESS or error code
  */
 typedef lle_result_t (*lle_source_generate_fn)(
-    lle_memory_pool_t *pool, const lle_context_analyzer_t *context,
-    const char *prefix, lle_completion_result_t *result);
+    lle_memory_pool_t *pool, const lle_word_context_t *context,
+    lle_completion_result_t *result);
 
 /**
  * @brief Source applicability function signature
  *
- * @param context Completion context
+ * Inspects the word context to decide whether this source should be
+ * queried for the current completion. Common checks include
+ * context->context_type, context->command_name, and the presence of
+ * a path-style prefix.
+ *
+ * @param context Word context
  * @return true if source is applicable for this context
  */
-typedef bool (*lle_source_applicable_fn)(const lle_context_analyzer_t *context);
+typedef bool (*lle_source_applicable_fn)(const lle_word_context_t *context);
 
 /**
  * @brief Single completion source
@@ -121,15 +143,20 @@ lle_result_t lle_source_manager_register(
 /**
  * @brief Query all applicable sources for completions
  *
+ * For brace-expansion contexts (context->branch_count > 0), this
+ * function fans out: each registered source is called once per
+ * branch with a synthetic single-directory word context, and the
+ * results are intersected (default), unioned, or replaced per the
+ * configured brace_expansion_mode. Single-value contexts dispatch
+ * each source exactly once.
+ *
  * @param manager Source manager
- * @param context Completion context
- * @param prefix Prefix to match
+ * @param context Word context
  * @param result Result structure to append to
  * @return LLE_SUCCESS or error code
  */
 lle_result_t lle_source_manager_query(lle_source_manager_t *manager,
-                                      const lle_context_analyzer_t *context,
-                                      const char *prefix,
+                                      const lle_word_context_t *context,
                                       lle_completion_result_t *result);
 
 #ifdef __cplusplus

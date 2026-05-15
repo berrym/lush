@@ -1,2 +1,0 @@
-diff <(ca| file1Q) <(cat)
-cat < <(echo helloï

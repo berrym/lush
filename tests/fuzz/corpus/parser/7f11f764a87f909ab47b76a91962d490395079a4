@@ -1,0 +1,9 @@
+x=2
+if [ $x -eq 1 ]; then
+  2
+if [ $x -eq 1 ]; then
+       exhree
+else
+   er
+fi     e
+fi)

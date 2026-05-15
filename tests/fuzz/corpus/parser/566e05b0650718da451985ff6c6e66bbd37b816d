@@ -1,0 +1,8 @@
+echo $'h)llo\nworld'
+echo $'\t\ttabs'
+eho $'h)llo\nworld'
+echo $'\t\ttabs'
+echo $'\x41'
+printf '%s\n' $$'é'
+cho $'\x41'
+printf '%s\n' $$'é'

@@ -271,7 +271,7 @@ These are achievable next steps, ordered by priority and dependency.
 - ✅ Custom completion source API (`include/lle/completion/custom_source.h`)
 - ✅ Config-based completion sources (`~/.config/lush/completions.toml`)
 - ✅ Shell command execution with caching for completions
-- ✅ Display commands: `display lle completions [list|reload|help]`
+- ✅ Display commands: `display lle completion sources [list|reload|help]`
 
 **Remaining Work:**
 

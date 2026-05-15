@@ -12,10 +12,62 @@
 #ifndef BUILTINS_H
 #define BUILTINS_H
 
+/* Universal builtin contract.
+ *
+ * Every src/builtins/bin_<name>.c includes this header. The headers
+ * pulled in here are the ones every builtin needs: structured-error
+ * reporting, the executor + current_executor + executor_error_report
+ * surface, and the C stdlib basics that ~every builtin uses. Per-file
+ * includes in bin_<name>.c list only their own non-universal
+ * dependencies (lush.h, symtable.h, <errno.h>, etc.).
+ *
+ * Threshold for inclusion here was ~50/56 usage across the bin_*.c
+ * files at split time. Headers used by smaller subsets stay per-file. */
+#include "executor.h"
 #include "libhashtable/ht.h"
+#include "shell_error.h"
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+/**
+ * @brief Atomically replace the stashed builtin call-site source location
+ *
+ * Called by the executor's builtin dispatch path on entry (with the new
+ * call site's loc) and again on exit (with the previous loc returned
+ * here on entry) so re-entrant builtin dispatch — e.g. `eval` invoking
+ * another builtin — preserves the outer caller's loc when the inner
+ * call returns. The stashed location is read by the builtin error
+ * helpers so structured-error output gets a real `--> file:line:col`
+ * line and source-snippet caret span.
+ *
+ * Usage idiom in the dispatcher:
+ *   source_location_t saved = builtin_swap_source_location(command_loc);
+ *   int result = <dispatch builtin>;
+ *   (void)builtin_swap_source_location(saved);
+ *   return result;
+ *
+ * @param loc New source location to stash
+ * @return Previous stashed source location
+ */
+source_location_t builtin_swap_source_location(source_location_t loc);
+
+/**
+ * @brief Read the current builtin call-site source location
+ *
+ * Returns the location stashed by builtin_swap_source_location (the
+ * dispatcher's entry path). When no stash is active, falls back to the
+ * topmost frame on the executor's context-location stack, then to
+ * SOURCE_LOC_UNKNOWN. Use this from a builtin's error sites to obtain
+ * the loc to pass into shell_error_create / executor_error_report.
+ *
+ * @return Current source_location_t for the active builtin invocation
+ */
+source_location_t builtin_get_source_location(void);
 
 /** Builtin command entry */
 typedef struct builtin_s {
@@ -138,6 +190,14 @@ int bin_echo(int argc, char **argv);
  * @return 0 on success, non-zero on error
  */
 int bin_printf(int argc, char **argv);
+
+/**
+ * @brief Zsh-style print: -l/-n/-r/-u/-f/-P
+ * @param argc Argument count
+ * @param argv Argument vector
+ * @return 0 on success, non-zero on error
+ */
+int bin_print(int argc, char **argv);
 
 /**
  * @brief Export variables to environment
@@ -413,6 +473,45 @@ int bin_popd(int argc, char **argv);
 int bin_dirs(int argc, char **argv);
 
 /* ============================================================================
+ * Additional builtin declarations
+ * ============================================================================
+ *
+ * These declarations are public so each builtin can live in its own
+ * `src/builtins/bin_<name>.c` file and the registry table in
+ * `src/builtins/builtins.c` can reference them without per-file forward
+ * declarations.
+ */
+
+int bin_jobs(int argc, char **argv);
+int bin_fg(int argc, char **argv);
+int bin_bg(int argc, char **argv);
+int bin_colon(int argc, char **argv);
+int bin_readonly(int argc, char **argv);
+int bin_config(int argc, char **argv);
+int bin_setopt(int argc, char **argv);
+int bin_unsetopt(int argc, char **argv);
+int bin_shopt(int argc, char **argv);
+int bin_mode(int argc, char **argv);
+int bin_display(int argc, char **argv);
+int bin_network(int argc, char **argv);
+int bin_mapfile(int argc, char **argv);
+int bin_env(int argc, char **argv);
+int bin_analyze(int argc, char **argv);
+int bin_lint(int argc, char **argv);
+int bin_disown(int argc, char **argv);
+int bin_let(int argc, char **argv);
+
+/**
+ * @brief Validate a string as a shell variable identifier.
+ *
+ * Returns 1 if `name` is non-NULL, non-empty, starts with letter or
+ * underscore, and contains only alphanumerics or underscores after.
+ * Otherwise 0. Shared by every builtin that accepts identifier
+ * arguments (declare, local, export, readonly, unset, ...).
+ */
+int is_valid_identifier(const char *name);
+
+/* ============================================================================
  * Command Hash Table
  * ============================================================================
  */
@@ -422,6 +521,17 @@ void init_command_hash(void);
 
 /** @brief Free the command hash table */
 void free_command_hash(void);
+
+/**
+ * @brief Clear the negative PATH-search cache.
+ *
+ * The negative cache short-circuits repeated find_command_in_path()
+ * lookups for missing commands within a TTL window
+ * (behavior.path_negative_cache_ttl_ms). `hash -r` clears it alongside
+ * the positive command_hash so a freshly-installed binary is picked up
+ * immediately instead of waiting for the TTL to expire.
+ */
+void path_negative_cache_clear(void);
 
 /**
  * @brief Check if a command is a builtin

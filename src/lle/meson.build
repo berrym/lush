@@ -35,6 +35,7 @@ lle_sources += files(
   libhashtable_root + '/ht_fnv1a.c',
   libhashtable_root + '/ht_strdouble.c',
   libhashtable_root + '/ht_strfloat.c',
+  libhashtable_root + '/ht_strblob.c',
   libhashtable_root + '/ht_strint.c',
   libhashtable_root + '/ht_strstr.c',
 )
@@ -216,11 +217,9 @@ lle_sources += files(
 lle_sources += files(
   'completion/completion_types.c',
   'completion/completion_sources.c',
-  'completion/completion_generator.c',
   'completion/completion_menu_state.c',
   'completion/completion_menu_logic.c',
   'completion/completion_menu_renderer.c',
-  'completion/context_analyzer.c',
   'completion/source_manager.c',
   'completion/completion_state.c',
   'completion/completion_system.c',
@@ -228,6 +227,8 @@ lle_sources += files(
   'completion/completion_config.c',
   'completion/ssh_hosts.c',
   'completion/builtin_completions.c',
+  'completion/word_context.c',
+  'completion/splicer.c',
 )
 
 # ============================================================================

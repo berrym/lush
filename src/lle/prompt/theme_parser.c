@@ -1267,8 +1267,22 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
             target = &theme->syntax_colors.variable;
         else if (strcmp(key, "variable_special") == 0)
             target = &theme->syntax_colors.variable_special;
-        else if (strcmp(key, "path_valid") == 0)
-            target = &theme->syntax_colors.path_valid;
+        else if (strcmp(key, "path_file_absolute") == 0)
+            target = &theme->syntax_colors.path_file_absolute;
+        else if (strcmp(key, "path_file_relative") == 0)
+            target = &theme->syntax_colors.path_file_relative;
+        else if (strcmp(key, "path_file_home") == 0)
+            target = &theme->syntax_colors.path_file_home;
+        else if (strcmp(key, "path_dir_absolute") == 0)
+            target = &theme->syntax_colors.path_dir_absolute;
+        else if (strcmp(key, "path_dir_relative") == 0)
+            target = &theme->syntax_colors.path_dir_relative;
+        else if (strcmp(key, "path_dir_home") == 0)
+            target = &theme->syntax_colors.path_dir_home;
+        else if (strcmp(key, "path_file") == 0)
+            target = &theme->syntax_colors.path_file;
+        else if (strcmp(key, "path_dir") == 0)
+            target = &theme->syntax_colors.path_dir;
         else if (strcmp(key, "path_invalid") == 0)
             target = &theme->syntax_colors.path_invalid;
         else if (strcmp(key, "pipe") == 0)

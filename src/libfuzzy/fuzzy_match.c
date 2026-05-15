@@ -297,7 +297,7 @@ static int damerau_levenshtein_codepoints(const codepoint_array_t *s1,
         return len1 + len2;
 
     for (int i = 0; i <= len1; i++) {
-        d[i] = malloc((len2 + 1) * sizeof(int));
+        d[i] = malloc((size_t)(len2 + 1) * sizeof(int));
         if (!d[i]) {
             for (int j = 0; j < i; j++)
                 free(d[j]);
@@ -312,7 +312,12 @@ static int damerau_levenshtein_codepoints(const codepoint_array_t *s1,
     for (int j = 0; j <= len2; j++)
         d[0][j] = j;
 
-    /* Fill matrix */
+    /* Fill matrix. The result lives in d[len1][len2]; track it directly
+     * in a local so gcc -Wmaybe-uninitialized can see the write
+     * dominates the read. The early returns above already guarantee
+     * len1 >= 1 && len2 >= 1, but gcc's data-flow only watches scalars,
+     * not memory cells. */
+    int result = 0;
     for (int i = 1; i <= len1; i++) {
         for (int j = 1; j <= len2; j++) {
             int cost = (s1->codepoints[i - 1] == s2->codepoints[j - 1]) ? 0 : 1;
@@ -328,10 +333,12 @@ static int damerau_levenshtein_codepoints(const codepoint_array_t *s1,
                 s1->codepoints[i - 2] == s2->codepoints[j - 1]) {
                 d[i][j] = min2(d[i][j], d[i - 2][j - 2] + cost);
             }
+
+            if (i == len1 && j == len2) {
+                result = d[i][j];
+            }
         }
     }
-
-    int result = d[len1][len2];
 
     /* Cleanup */
     for (int i = 0; i <= len1; i++)

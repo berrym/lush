@@ -8,32 +8,19 @@
 
 #include "lle/adaptive_terminal_integration.h"
 #include "lle/error_handling.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Test counter */
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST_ASSERT(condition, message)                                        \
-    do {                                                                       \
-        tests_run++;                                                           \
-        if (condition) {                                                       \
-            tests_passed++;                                                    \
-            printf("  [PASS] %s\n", message);                                  \
-        } else {                                                               \
-            printf("  [FAIL] %s\n", message);                                  \
-        }                                                                      \
-    } while (0)
+#define TEST_ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* ============================================================================
  * SIGNATURE DATABASE TESTS
  * ============================================================================
  */
 
-static void test_signature_database(void) {
+TEST(signature_database) {
     printf("\nSignature Database Tests:\n");
 
     size_t count = 0;
@@ -72,7 +59,7 @@ static void test_signature_database(void) {
  * ============================================================================
  */
 
-static void test_basic_detection(void) {
+TEST(basic_detection) {
     printf("\nBasic Detection Tests:\n");
 
     lle_terminal_detection_result_t *result = NULL;
@@ -109,7 +96,7 @@ static void test_basic_detection(void) {
     }
 }
 
-static void test_optimized_detection(void) {
+TEST(optimized_detection) {
     printf("\nOptimized Detection Tests:\n");
 
     /* First call - should be cache miss */
@@ -143,7 +130,7 @@ static void test_optimized_detection(void) {
  * ============================================================================
  */
 
-static void test_utility_functions(void) {
+TEST(utility_functions) {
     printf("\nUtility Function Tests:\n");
 
     /* Test mode to string */
@@ -175,26 +162,10 @@ static void test_utility_functions(void) {
  */
 
 int main(void) {
-    printf("\n");
-    printf("==================================================================="
-           "=============\n");
-    printf("Adaptive Terminal Detection Tests (Spec 26 Phase 1)\n");
-    printf("==================================================================="
-           "=============\n");
-
-    test_signature_database();
-    test_basic_detection();
-    test_optimized_detection();
-    test_utility_functions();
-
-    printf("\n");
-    printf("==================================================================="
-           "=============\n");
-    printf("Test Results: %d/%d passed (%.1f%%)\n", tests_passed, tests_run,
-           tests_run > 0 ? (100.0 * tests_passed / tests_run) : 0.0);
-    printf("==================================================================="
-           "=============\n");
-    printf("\n");
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    printf("=== Adaptive Terminal Detection Tests (Spec 26 Phase 1) ===\n");
+    RUN_TEST(signature_database);
+    RUN_TEST(basic_detection);
+    RUN_TEST(optimized_detection);
+    RUN_TEST(utility_functions);
+    return TEST_RESULT();
 }

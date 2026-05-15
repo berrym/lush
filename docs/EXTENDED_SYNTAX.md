@@ -857,5 +857,5 @@ set -o posix     # Strict POSIX
 ## See Also
 
 - [USER_GUIDE.md](USER_GUIDE.md) - Complete feature overview
-- [SHELL_MODES.md](SHELL_MODES.md) - Mode documentation
+- [CONFIGURATION.md](CONFIGURATION.md) - Mode documentation
 - [ADVANCED_SCRIPTING_GUIDE.md](ADVANCED_SCRIPTING_GUIDE.md) - Scripting techniques

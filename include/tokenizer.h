@@ -102,6 +102,7 @@ typedef enum {
     TOK_SELECT, // select keyword for select loop
     TOK_TIME,   // time keyword for timing pipelines
     TOK_COPROC, // coproc keyword for coprocesses
+    TOK_REPEAT, // zsh repeat keyword (#103)
 
     // Special
     TOK_NEWLINE,    // \n (significant in shell)
@@ -142,10 +143,32 @@ typedef struct tokenizer {
 /**
  * @brief Create a new tokenizer for input string
  *
+ * Equivalent to tokenizer_new_at(input, 1). Use tokenizer_new_at when
+ * the input is a slice from a larger source file and the first character
+ * of `input` corresponds to a line other than 1, so that error reporting
+ * and AST source-location tracking carry the correct file line.
+ *
  * @param input Shell command string to tokenize
  * @return New tokenizer instance or NULL on failure
  */
 tokenizer_t *tokenizer_new(const char *input);
+
+/**
+ * @brief Create a new tokenizer with an explicit starting line number
+ *
+ * The starting_line value seeds tokenizer->line so that tokens produced
+ * for `input` carry source line numbers relative to the original source
+ * file rather than the per-statement slice the shell main loop hands to
+ * the parser. The tokenizer still increments the line counter on each
+ * newline within `input` as normal.
+ *
+ * @param input         Shell command string to tokenize
+ * @param starting_line Line number of the first character of `input`
+ *                      within the source file (1-based; pass 1 if input
+ *                      is the entire source or origin is unknown)
+ * @return New tokenizer instance or NULL on failure
+ */
+tokenizer_t *tokenizer_new_at(const char *input, size_t starting_line);
 
 /**
  * @brief Free a tokenizer and associated resources

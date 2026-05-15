@@ -25,12 +25,18 @@
 static node_t *parse_command_list(parser_t *parser);
 static node_t *parse_pipeline(parser_t *parser);
 static node_t *parse_simple_command(parser_t *parser);
+static bool parse_command_suffix(parser_t *parser, node_t *command);
+static char *parse_scalar_assignment_string(parser_t *parser,
+                                            node_t **out_array_node);
+static node_t *finish_assignment_or_prefix(parser_t *parser,
+                                           node_t *first_assignment);
 
 static node_t *parse_brace_group(parser_t *parser);
 static node_t *parse_subshell(parser_t *parser);
 static node_t *parse_if_statement(parser_t *parser);
 static node_t *parse_while_statement(parser_t *parser);
 static node_t *parse_until_statement(parser_t *parser);
+static node_t *parse_repeat_statement(parser_t *parser);
 static node_t *parse_for_statement(parser_t *parser);
 static node_t *parse_case_statement(parser_t *parser);
 static node_t *parse_function_definition(parser_t *parser);
@@ -62,7 +68,8 @@ static node_t *parse_anonymous_function(parser_t *parser);
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
 static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
-                                     bool strip_tabs, bool expand_variables);
+                                     bool strip_tabs, bool expand_variables,
+                                     source_location_t op_loc);
 static void set_parser_error(parser_t *parser, const char *message);
 static bool expect_token(parser_t *parser, token_type_t expected);
 
@@ -76,10 +83,11 @@ static bool expect_token(parser_t *parser, token_type_t expected);
  * @return New parser instance, or NULL on failure
  */
 parser_t *parser_new(const char *input) {
-    return parser_new_with_source(input, "<stdin>");
+    return parser_new_with_source(input, "<stdin>", 1);
 }
 
-parser_t *parser_new_with_source(const char *input, const char *source_name) {
+parser_t *parser_new_with_source(const char *input, const char *source_name,
+                                 size_t starting_line) {
     if (!input) {
         return NULL;
     }
@@ -89,7 +97,7 @@ parser_t *parser_new_with_source(const char *input, const char *source_name) {
         return NULL;
     }
 
-    parser->tokenizer = tokenizer_new(input);
+    parser->tokenizer = tokenizer_new_at(input, starting_line);
     if (!parser->tokenizer) {
         free(parser);
         return NULL;
@@ -383,21 +391,80 @@ size_t parser_get_recursion_depth(parser_t *parser) {
     return parser ? parser->recursion_depth : 0;
 }
 
+/* Parser loop-progress guard.
+ *
+ * Defense against parser-loop livelock: every body-parsing loop must
+ * consume tokens or it will spin forever, allocating per iteration. See
+ * #82 for the original incident -- a 1.6 GB / 89% CPU interactive shell
+ * stuck for 3 days inside parse_case_statement, with 100% of CPU samples
+ * concentrated on one while-condition. The triggering input was lost
+ * (typed interactively into a now-dead PID), so static analysis could
+ * not pinpoint the offending no-advance path. This guard is the
+ * defensive measure the issue itself recommended: track the start
+ * position of the current token across iterations and abort with a
+ * structured error if it does not advance for N consecutive iterations.
+ *
+ * The bound is small because every parse-body iteration MUST consume
+ * at least one token; even one no-advance iteration is a bug. We allow
+ * a small handful in case of edge-case interactions, but anything past
+ * that is a livelock and we fail loudly rather than burn memory.
+ */
+#define PARSER_LOOP_MAX_NO_PROGRESS 16
+
+typedef struct parser_loop_guard {
+    size_t last_pos;    /* current token's start position last iteration */
+    size_t no_progress; /* iterations seen at the same position */
+} parser_loop_guard_t;
+
+#define PARSER_LOOP_GUARD_INIT {.last_pos = SIZE_MAX, .no_progress = 0}
+
+/* Check whether the parse loop is making forward progress.
+ * Returns true if the loop should continue, false if the guard has
+ * detected livelock (in which case a structured error has been added
+ * to the parser and the caller must clean up and return NULL).
+ *
+ * @param parser    Parser context
+ * @param guard     Per-loop guard state (stack-allocated)
+ * @param loop_name Human-readable loop identifier for the error message
+ */
+static bool parser_loop_check_progress(parser_t *parser,
+                                       parser_loop_guard_t *guard,
+                                       const char *loop_name) {
+    if (!parser || !parser->tokenizer || !guard) {
+        return false;
+    }
+    size_t pos = parser->tokenizer->current
+                     ? parser->tokenizer->current->position
+                     : parser->tokenizer->position;
+    if (pos == guard->last_pos) {
+        guard->no_progress++;
+        if (guard->no_progress > PARSER_LOOP_MAX_NO_PROGRESS) {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_RESOURCE_LIMIT,
+                "this is a parser bug -- please report with a reproducer",
+                "parser loop '%s' made no progress for %d iterations "
+                "(stuck on token at position %zu)",
+                loop_name, PARSER_LOOP_MAX_NO_PROGRESS, pos);
+            return false;
+        }
+    } else {
+        guard->last_pos = pos;
+        guard->no_progress = 0;
+    }
+    return true;
+}
+
 /**
  * @brief Add a structured error with context and help hint
  */
-void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
-                                const char *help, const char *fmt, ...) {
+void parser_error_add_with_help_at(parser_t *parser, shell_error_code_t code,
+                                   source_location_t loc, const char *help,
+                                   const char *fmt, ...) {
     if (!parser) {
         return;
     }
 
-    /* Get current token for location */
-    token_t *current = tokenizer_current(parser->tokenizer);
-    source_location_t loc =
-        token_to_source_location(current, parser->source_name);
-
-    /* Create the error */
+    /* Create the error at the caller-supplied location */
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -444,6 +511,31 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
 
     /* Also set legacy error flag for compatibility */
     parser->has_error = true;
+}
+
+void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
+                                const char *help, const char *fmt, ...) {
+    if (!parser) {
+        return;
+    }
+
+    /* Default location: current token's position. Delegate the rest
+     * to the _at variant so the two paths share one implementation. */
+    token_t *current = tokenizer_current(parser->tokenizer);
+    source_location_t loc =
+        token_to_source_location(current, parser->source_name);
+
+    va_list args;
+    va_start(args, fmt);
+    /* Convert variadic args into a fixed string then forward — the
+     * _at variant takes its own variadic. shell_error already handles
+     * vsnprintf internally; here we just need to hand off the formatted
+     * message. Simplest: format here, pass as a literal "%s" + buffer. */
+    char message_buf[1024];
+    vsnprintf(message_buf, sizeof(message_buf), fmt, args);
+    va_end(args);
+
+    parser_error_add_with_help_at(parser, code, loc, help, "%s", message_buf);
 }
 
 /**
@@ -560,9 +652,15 @@ static void skip_separators(parser_t *parser) {
 static node_t *parse_command_body(parser_t *parser, token_type_t terminator) {
     node_t *first_command = NULL;
     node_t *current = NULL;
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
 
     while (!tokenizer_match(parser->tokenizer, terminator) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_command_body")) {
+            free_node_tree(first_command);
+            return NULL;
+        }
 
         // Skip separators between commands
         skip_separators(parser);
@@ -610,10 +708,16 @@ static node_t *parse_if_body(parser_t *parser) {
         return NULL;
     }
 
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_ELSE) &&
            !tokenizer_match(parser->tokenizer, TOK_ELIF) &&
            !tokenizer_match(parser->tokenizer, TOK_FI) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_if_body")) {
+            free_node_tree(command_list);
+            return NULL;
+        }
 
         // Skip separators between commands
         skip_separators(parser);
@@ -714,7 +818,13 @@ static node_t *parse_command_list(parser_t *parser) {
     node_t *first_command = NULL;
     node_t *current = NULL;
 
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+        if (!parser_loop_check_progress(parser, &guard, "parse_command_list")) {
+            free_node_tree(first_command);
+            return NULL;
+        }
+
         // Skip separators, newlines, and comments
         while (tokenizer_match(parser->tokenizer, TOK_SEMICOLON) ||
                tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
@@ -860,6 +970,279 @@ static node_t *parse_pipeline(parser_t *parser) {
 }
 
 /**
+ * @brief Strip POSIX-unquoted backslash escapes from a word token's text.
+ *
+ * The tokenizer's word-context scanner keeps `\X` pairs in the token text
+ * verbatim — escape interpretation is deferred. For tokens that did NOT
+ * come from a quoted run, POSIX quote-removal says any `\X` (other than
+ * `\<newline>`, which the tokenizer already eats as line continuation)
+ * collapses to a literal X. Quote-removal happens after parameter
+ * expansion in POSIX, but for backslashes that originated outside any
+ * quote in the shell source we can collapse them here at parse time —
+ * those backslashes never ride along inside variable values, so doing
+ * it now does not corrupt later expansion. Tokens from `"..."` are NOT
+ * touched: their backslashes (kept as `\$`, `\\`, etc. by the
+ * double-quote scanner) follow double-quote escape rules and are
+ * resolved later by the executor's expand_quoted_string.
+ *
+ * Returns a freshly malloc'd string the caller owns.
+ */
+static char *posix_unquoted_dequote(const char *text) {
+    if (!text) {
+        return NULL;
+    }
+    size_t len = strlen(text);
+    char *out = malloc(len + 1);
+    if (!out) {
+        return NULL;
+    }
+    size_t w = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (text[i] == '\\' && i + 1 < len) {
+            /* `\<newline>` was already removed by the tokenizer's word
+             * scanner; no special case needed here. Any other `\X`
+             * collapses to a literal X. */
+            out[w++] = text[i + 1];
+            i++;
+            continue;
+        }
+        out[w++] = text[i];
+    }
+    out[w] = '\0';
+    return out;
+}
+
+/**
+ * @brief Try to consume one shell-style word argument from the current token.
+ *
+ * Tests whether the current token is "argument-like" (any of TOK_STRING,
+ * TOK_EXPANDABLE_STRING, TOK_ARITH_EXP, TOK_COMMAND_SUB, TOK_BACKQUOTE,
+ * word-like tokens, keyword tokens, TOK_VARIABLE, TOK_RBRACKET,
+ * TOK_ASSIGN, TOK_GLOB, TOK_QUESTION, TOK_NOT_EQUAL). If so, runs the
+ * adjacent-token concatenation loop (consecutive tokens with no
+ * intervening whitespace fold into one logical argument), classifies
+ * the result into the appropriate node type (NODE_STRING_LITERAL for
+ * single-quoted, NODE_STRING_EXPANDABLE for double-quoted or any
+ * multi-token concatenation, NODE_ARITH_EXP for arithmetic expansion,
+ * NODE_COMMAND_SUB for $(...) / `...`, NODE_VAR otherwise), and adds
+ * the resulting child node to `parent`. Advances the tokenizer past
+ * every consumed token.
+ *
+ * On allocation failure, sets parser->has_error and returns false; the
+ * caller is responsible for cleaning up `parent` and propagating.
+ *
+ * Used by parse_simple_command (regular command arguments) and
+ * parse_anonymous_function (trailing positional args after `() { body }`).
+ * Single source of truth for argument-collection semantics across the
+ * parser; both call sites get identical acceptance, concatenation, and
+ * classification behavior.
+ *
+ * @param parser Parser instance
+ * @param parent Node to append the collected argument as a child of
+ * @return true if an argument was consumed and added (caller can loop);
+ *         false if the current token is not argument-like (caller stops)
+ *         or allocation failed (parser->has_error is set)
+ */
+static bool collect_word_argument(parser_t *parser, node_t *parent) {
+    token_t *arg_token = tokenizer_current(parser->tokenizer);
+    if (!arg_token) {
+        return false;
+    }
+
+    /* Acceptance test — same set parse_simple_command has used since the
+     * unified-concatenation logic was introduced. */
+    bool accepted =
+        (arg_token->type == TOK_STRING ||
+         arg_token->type == TOK_EXPANDABLE_STRING ||
+         arg_token->type == TOK_ARITH_EXP ||
+         arg_token->type == TOK_COMMAND_SUB ||
+         arg_token->type == TOK_BACKQUOTE ||
+         token_is_word_like(arg_token->type) ||
+         token_is_keyword(arg_token->type) || arg_token->type == TOK_VARIABLE ||
+         arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+         arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
+         arg_token->type == TOK_NOT_EQUAL);
+    if (!accepted) {
+        return false;
+    }
+
+    /* Adjacency-collection: gather consecutive arg-like tokens that have
+     * no whitespace between them. `pre$VAR` becomes one logical arg
+     * instead of two. */
+    typedef struct {
+        token_type_t type;
+        char *text;
+    } token_info_t;
+
+    token_info_t *collected_tokens = NULL;
+    int token_count = 0;
+    size_t last_end_pos = arg_token->position + strlen(arg_token->text);
+
+    while (arg_token &&
+           (arg_token->type == TOK_STRING ||
+            arg_token->type == TOK_EXPANDABLE_STRING ||
+            arg_token->type == TOK_ARITH_EXP ||
+            arg_token->type == TOK_COMMAND_SUB ||
+            arg_token->type == TOK_BACKQUOTE ||
+            token_is_word_like(arg_token->type) ||
+            token_is_keyword(arg_token->type) ||
+            arg_token->type == TOK_VARIABLE ||
+            arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+            arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
+            arg_token->type == TOK_NOT_EQUAL)) {
+
+        token_info_t *new_tokens =
+            realloc(collected_tokens, (token_count + 1) * sizeof(token_info_t));
+        if (!new_tokens) {
+            for (int i = 0; i < token_count; i++) {
+                free(collected_tokens[i].text);
+            }
+            free(collected_tokens);
+            parser->has_error = true;
+            return false;
+        }
+        collected_tokens = new_tokens;
+
+        collected_tokens[token_count].type = arg_token->type;
+        collected_tokens[token_count].text = strdup(arg_token->text);
+        token_count++;
+
+        last_end_pos = arg_token->position + strlen(arg_token->text);
+        tokenizer_advance(parser->tokenizer);
+        token_t *next_token = tokenizer_current(parser->tokenizer);
+
+        /* Stop collecting if next token has whitespace before it. */
+        if (next_token && next_token->position != last_end_pos) {
+            break;
+        }
+        arg_token = next_token;
+    }
+
+    /* Build a single arg node from collected tokens. */
+    if (token_count == 1) {
+        node_t *arg_node = NULL;
+        switch (collected_tokens[0].type) {
+        case TOK_STRING:
+            arg_node = new_node(NODE_STRING_LITERAL);
+            break;
+        case TOK_EXPANDABLE_STRING:
+            arg_node = new_node(NODE_STRING_EXPANDABLE);
+            break;
+        case TOK_ARITH_EXP:
+            arg_node = new_node(NODE_ARITH_EXP);
+            break;
+        case TOK_COMMAND_SUB:
+        case TOK_BACKQUOTE:
+            arg_node = new_node(NODE_COMMAND_SUB);
+            break;
+        default:
+            arg_node = new_node(NODE_VAR);
+            break;
+        }
+        if (arg_node) {
+            arg_node->val.str = strdup(collected_tokens[0].text);
+            arg_node->val_type = VAL_STR;
+            add_child_node(parent, arg_node);
+        }
+    } else if (token_count > 1) {
+        /* Multi-token concatenation: build a single NODE_STRING_EXPANDABLE
+         * with the concatenated text (matches the existing semantics in
+         * parse_simple_command).
+         *
+         * Word-context tokens (TOK_WORD, keywords-as-words, etc.) carry
+         * raw `\X` pairs because the tokenizer defers escape resolution.
+         * For unquoted shell input, POSIX-unquoted quote-removal collapses
+         * any such `\X` to literal X. Doing that here, before
+         * concatenation, has two effects: (1) the `$DIR/a\ b` family of
+         * inputs no longer ships backslashes through to argv, fixing #90
+         * for the multi-token case; (2) any backslashes that survive into
+         * the concatenated string came from a quoted segment
+         * (TOK_EXPANDABLE_STRING kept its `\X` for the four DQ-meaningful
+         * escapes), so the executor can apply double-quote rules safely
+         * in `expand_quoted_string` without a quote-context flag.
+         *
+         * Tokens that already had escape semantics applied (or that are
+         * sub-expressions evaluated later) pass through untouched:
+         *   TOK_STRING               — single-quoted, no escapes ever
+         *   TOK_EXPANDABLE_STRING    — double-quoted, DQ rules later
+         *   TOK_ARITH_EXP            — `$((...))`, evaluated as arith
+         *   TOK_COMMAND_SUB          — `$(...)`, evaluated as cmd
+         *   TOK_BACKQUOTE            — `` `...` ``, evaluated as cmd
+         *   TOK_VARIABLE             — `$VAR`, no escapes by construction
+         */
+        char **dequoted = malloc((size_t)token_count * sizeof(char *));
+        if (!dequoted) {
+            for (int i = 0; i < token_count; i++) {
+                free(collected_tokens[i].text);
+            }
+            free(collected_tokens);
+            parser->has_error = true;
+            return false;
+        }
+        size_t total_len = 0;
+        bool ok = true;
+        for (int i = 0; i < token_count; i++) {
+            switch (collected_tokens[i].type) {
+            case TOK_STRING:
+            case TOK_EXPANDABLE_STRING:
+            case TOK_ARITH_EXP:
+            case TOK_COMMAND_SUB:
+            case TOK_BACKQUOTE:
+            case TOK_VARIABLE:
+                dequoted[i] = strdup(collected_tokens[i].text);
+                break;
+            default:
+                /* Word-like tokens: word-context backslashes collapse. */
+                dequoted[i] = posix_unquoted_dequote(collected_tokens[i].text);
+                break;
+            }
+            if (!dequoted[i]) {
+                ok = false;
+                break;
+            }
+            total_len += strlen(dequoted[i]);
+        }
+        if (!ok) {
+            for (int i = 0; i < token_count; i++) {
+                free(dequoted[i]);
+            }
+            free(dequoted);
+            for (int i = 0; i < token_count; i++) {
+                free(collected_tokens[i].text);
+            }
+            free(collected_tokens);
+            parser->has_error = true;
+            return false;
+        }
+        char *concatenated = malloc(total_len + 1);
+        if (concatenated) {
+            concatenated[0] = '\0';
+            for (int i = 0; i < token_count; i++) {
+                strcat(concatenated, dequoted[i]);
+            }
+            node_t *arg_node = new_node(NODE_STRING_EXPANDABLE);
+            if (arg_node) {
+                arg_node->val.str = concatenated;
+                arg_node->val_type = VAL_STR;
+                add_child_node(parent, arg_node);
+            } else {
+                free(concatenated);
+            }
+        }
+        for (int i = 0; i < token_count; i++) {
+            free(dequoted[i]);
+        }
+        free(dequoted);
+    }
+
+    for (int i = 0; i < token_count; i++) {
+        free(collected_tokens[i].text);
+    }
+    free(collected_tokens);
+    return true;
+}
+
+/**
  * @brief Parse a simple command or control structure
  *
  * Dispatches to appropriate parser based on current token:
@@ -951,6 +1334,8 @@ static node_t *parse_simple_command(parser_t *parser) {
             return parse_time_command(parser);
         case TOK_COPROC:
             return parse_coproc(parser);
+        case TOK_REPEAT:
+            return parse_repeat_statement(parser);
         default:
             // Other keywords (like ESAC, FI, DONE, etc.) are handled by their
             // parent constructs - returning NULL here lets the parent detect
@@ -1074,150 +1459,27 @@ static node_t *parse_simple_command(parser_t *parser) {
 
         if (next &&
             (next->type == TOK_ASSIGN || next->type == TOK_PLUS_ASSIGN)) {
-            bool is_append = (next->type == TOK_PLUS_ASSIGN);
-
-            // Save variable name BEFORE advancing tokenizer
-            char *var_name = strdup(current->text);
-            if (!var_name) {
+            node_t *array_node = NULL;
+            char *assignment =
+                parse_scalar_assignment_string(parser, &array_node);
+            if (array_node) {
+                // arr=(a b c) / arr+=(a b c) -- standalone array
+                // assignment (not a valid POSIX cmd_prefix word).
+                return array_node;
+            }
+            if (!assignment) {
+                return NULL; // hard parse/allocation error
+            }
+            node_t *acmd = new_node(NODE_COMMAND);
+            if (!acmd) {
+                free(assignment);
                 return NULL;
             }
-
-            tokenizer_advance(parser->tokenizer); // consume variable name
-            tokenizer_advance(parser->tokenizer); // consume '=' or '+='
-
-            token_t *value = tokenizer_current(parser->tokenizer);
-
-            // Check for array literal assignment: arr=(a b c) or arr+=(a b c)
-            if (value && value->type == TOK_LPAREN &&
-                shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
-                node_t *array_node = parse_array_literal(parser);
-                if (!array_node) {
-                    free(var_name);
-                    return NULL;
-                }
-                // Create array assignment or append node
-                node_t *assign_node =
-                    new_node(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN);
-                if (!assign_node) {
-                    free(var_name);
-                    free_node_tree(array_node);
-                    return NULL;
-                }
-                assign_node->val.str = var_name; // Transfer ownership
-                assign_node->val_type = VAL_STR;
-                add_child_node(assign_node, array_node);
-                return assign_node;
-            }
-
-            // Regular scalar assignment: variable=value
-            node_t *command = new_node(NODE_COMMAND);
-            if (!command) {
-                free(var_name);
-                return NULL;
-            }
-
-            // Collect all consecutive value tokens (handles ${A}_${B} etc.)
-            // Value tokens include words, variables, command subs, etc.
-            // Stop at whitespace, semicolon, newline, or other separators
-            if (value &&
-                (token_is_word_like(value->type) ||
-                 value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
-                 value->type == TOK_COMMAND_SUB ||
-                 value->type == TOK_BACKQUOTE)) {
-
-                // Build complete value by concatenating adjacent tokens
-                size_t value_capacity = 256;
-                size_t value_len = 0;
-                char *full_value = malloc(value_capacity);
-                if (!full_value) {
-                    free(var_name);
-                    free_node_tree(command);
-                    return NULL;
-                }
-                full_value[0] = '\0';
-
-                while (value && (token_is_word_like(value->type) ||
-                                 value->type == TOK_VARIABLE ||
-                                 value->type == TOK_ARITH_EXP ||
-                                 value->type == TOK_COMMAND_SUB ||
-                                 value->type == TOK_BACKQUOTE)) {
-
-                    // Check if this word is followed by = (making it a new
-                    // assignment) If so, stop - this word belongs to the next
-                    // assignment
-                    if (token_is_word_like(value->type)) {
-                        token_t *peek = tokenizer_peek(parser->tokenizer);
-                        if (peek && (peek->type == TOK_ASSIGN ||
-                                     peek->type == TOK_PLUS_ASSIGN)) {
-                            break; // This word starts a new assignment
-                        }
-                    }
-
-                    size_t token_len = strlen(value->text);
-                    // For single-quoted strings, add 2 for surrounding quotes
-                    size_t extra_len = (value->type == TOK_STRING) ? 2 : 0;
-
-                    // Grow buffer if needed
-                    if (value_len + token_len + extra_len + 1 >
-                        value_capacity) {
-                        value_capacity =
-                            (value_len + token_len + extra_len + 1) * 2;
-                        char *new_value = realloc(full_value, value_capacity);
-                        if (!new_value) {
-                            free(full_value);
-                            free(var_name);
-                            free_node_tree(command);
-                            return NULL;
-                        }
-                        full_value = new_value;
-                    }
-
-                    // Add token with appropriate quoting
-                    // Only single quotes need to be preserved to prevent
-                    // expansion Double quotes: expand variables but don't keep
-                    // quotes
-                    if (value->type == TOK_STRING) {
-                        // Single-quoted: preserve quotes to prevent expansion
-                        strcat(full_value, "'");
-                        strcat(full_value, value->text);
-                        strcat(full_value, "'");
-                        value_len += token_len + 2;
-                    } else {
-                        // All other types: just append the text
-                        strcat(full_value, value->text);
-                        value_len += token_len;
-                    }
-
-                    tokenizer_advance(parser->tokenizer); // consume this token
-                    value = tokenizer_current(parser->tokenizer);
-                }
-
-                // Build final assignment string: var=value or var+=value
-                size_t var_len = strlen(var_name);
-                char *assignment =
-                    malloc(var_len + (is_append ? 2 : 1) + value_len + 1);
-                if (assignment) {
-                    strcpy(assignment, var_name);
-                    strcat(assignment, is_append ? "+=" : "=");
-                    strcat(assignment, full_value);
-                    command->val.str = assignment;
-                    command->val_type = VAL_STR;
-                }
-                free(full_value);
-            } else {
-                // Assignment with empty value: variable=
-                size_t var_len = strlen(var_name);
-                char *assignment = malloc(var_len + 2);
-                if (assignment) {
-                    strcpy(assignment, var_name);
-                    strcat(assignment, "=");
-                    command->val.str = assignment;
-                    command->val_type = VAL_STR;
-                }
-            }
-
-            free(var_name);
-            return command;
+            acmd->val.str = assignment;
+            acmd->val_type = VAL_STR;
+            // Decide standalone-assignment vs cmd_prefix based on what
+            // follows on the same simple command.
+            return finish_assignment_or_prefix(parser, acmd);
         }
     }
 
@@ -1281,6 +1543,29 @@ static node_t *parse_simple_command(parser_t *parser) {
     command->val_type = VAL_STR;
     tokenizer_advance(parser->tokenizer);
 
+    if (!parse_command_suffix(parser, command)) {
+        free_node_tree(command);
+        return NULL;
+    }
+
+    return command;
+}
+
+/**
+ * @brief Parse a command's cmd_suffix: arguments, redirections, process
+ *        substitutions, and array-literal arguments.
+ *
+ * Shared by the regular-command path and the cmd_prefix path
+ * (finish_assignment_or_prefix) so the POSIX
+ * `cmd_prefix cmd_word cmd_suffix` grammar has exactly one suffix
+ * implementation. On failure returns false WITHOUT freeing `command`
+ * (the caller owns it and frees on false).
+ *
+ * @param parser  Parser instance
+ * @param command Command node to attach arguments/redirections to
+ * @return true on success, false on parse error
+ */
+static bool parse_command_suffix(parser_t *parser, node_t *command) {
     // Parse arguments and redirections
     while (!tokenizer_match(parser->tokenizer, TOK_EOF) &&
            !tokenizer_match(parser->tokenizer, TOK_SEMICOLON) &&
@@ -1312,8 +1597,7 @@ static node_t *parse_simple_command(parser_t *parser) {
 
             node_t *redir_node = parse_redirection(parser);
             if (!redir_node) {
-                free_node_tree(command);
-                return NULL;
+                return false;
             }
 
             add_child_node(command, redir_node);
@@ -1324,8 +1608,7 @@ static node_t *parse_simple_command(parser_t *parser) {
                  arg_token->type == TOK_PROC_SUB_OUT) {
             node_t *proc_sub_node = parse_process_substitution(parser);
             if (!proc_sub_node) {
-                free_node_tree(command);
-                return NULL;
+                return false;
             }
             add_child_node(command, proc_sub_node);
             continue; // Continue to check for more arguments
@@ -1363,8 +1646,7 @@ static node_t *parse_simple_command(parser_t *parser) {
                         node_t *array_node = parse_array_literal(parser);
                         if (!array_node) {
                             free(var_name);
-                            free_node_tree(command);
-                            return NULL;
+                            return false;
                         }
 
                         // Build a string representation for the argument:
@@ -1421,138 +1703,394 @@ static node_t *parse_simple_command(parser_t *parser) {
             }
             // Not an array literal, fall through to regular argument handling
         }
-        // Handle all argument tokens with unified concatenation logic
-        if (arg_token->type == TOK_STRING ||
-            arg_token->type == TOK_EXPANDABLE_STRING ||
-            arg_token->type == TOK_ARITH_EXP ||
-            arg_token->type == TOK_COMMAND_SUB ||
-            arg_token->type == TOK_BACKQUOTE ||
-            token_is_word_like(arg_token->type) ||
-            token_is_keyword(arg_token->type) ||
-            arg_token->type == TOK_VARIABLE ||
-            arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
-            arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
-            arg_token->type == TOK_NOT_EQUAL) {
-
-            // Check for consecutive tokens that should be concatenated
-            typedef struct {
-                token_type_t type;
-                char *text;
-            } token_info_t;
-
-            token_info_t *collected_tokens = NULL;
-            int token_count = 0;
-            size_t last_end_pos = arg_token->position + strlen(arg_token->text);
-
-            // Collect all consecutive tokens without whitespace
-            while (arg_token && (arg_token->type == TOK_STRING ||
-                                 arg_token->type == TOK_EXPANDABLE_STRING ||
-                                 arg_token->type == TOK_ARITH_EXP ||
-                                 arg_token->type == TOK_COMMAND_SUB ||
-                                 arg_token->type == TOK_BACKQUOTE ||
-                                 token_is_word_like(arg_token->type) ||
-                                 token_is_keyword(arg_token->type) ||
-                                 arg_token->type == TOK_VARIABLE ||
-                                 arg_token->type == TOK_RBRACKET ||
-                                 arg_token->type == TOK_ASSIGN ||
-                                 arg_token->type == TOK_GLOB ||
-                                 arg_token->type == TOK_QUESTION ||
-                                 arg_token->type == TOK_NOT_EQUAL)) {
-
-                // Expand collected_tokens array
-                token_info_t *new_tokens = realloc(
-                    collected_tokens, (token_count + 1) * sizeof(token_info_t));
-                if (!new_tokens) {
-                    for (int i = 0; i < token_count; i++) {
-                        free(collected_tokens[i].text);
-                    }
-                    free(collected_tokens);
-                    free_node_tree(command);
-                    return NULL;
-                }
-                collected_tokens = new_tokens;
-
-                // Store token information
-                collected_tokens[token_count].type = arg_token->type;
-                collected_tokens[token_count].text = strdup(arg_token->text);
-                token_count++;
-
-                last_end_pos = arg_token->position + strlen(arg_token->text);
-                tokenizer_advance(parser->tokenizer);
-                token_t *next_token = tokenizer_current(parser->tokenizer);
-
-                // Check if the next token is adjacent (no whitespace between)
-                if (next_token && next_token->position != last_end_pos) {
-                    break; // There's whitespace between tokens
-                }
-
-                arg_token = next_token;
+        // Handle all argument tokens via the shared helper. The helper
+        // tests acceptance, runs the adjacency-concatenation loop, and
+        // creates the appropriately-classified node attached to command.
+        if (!collect_word_argument(parser, command)) {
+            if (parser->has_error) {
+                return false;
             }
-
-            // Create nodes based on what we collected
-            if (token_count == 1) {
-                // Single token - create appropriate node type
-                node_t *arg_node = NULL;
-                switch (collected_tokens[0].type) {
-                case TOK_STRING:
-                    arg_node = new_node(NODE_STRING_LITERAL);
-                    break;
-                case TOK_EXPANDABLE_STRING:
-                    arg_node = new_node(NODE_STRING_EXPANDABLE);
-                    break;
-                case TOK_ARITH_EXP:
-                    arg_node = new_node(NODE_ARITH_EXP);
-                    break;
-                case TOK_COMMAND_SUB:
-                case TOK_BACKQUOTE:
-                    arg_node = new_node(NODE_COMMAND_SUB);
-                    break;
-                default:
-                    arg_node = new_node(NODE_VAR);
-                    break;
-                }
-
-                if (arg_node) {
-                    arg_node->val.str = strdup(collected_tokens[0].text);
-                    arg_node->val_type = VAL_STR;
-                    add_child_node(command, arg_node);
-                }
-            } else if (token_count > 1) {
-                // Multiple tokens - create concatenated string
-                size_t total_len = 0;
-                for (int i = 0; i < token_count; i++) {
-                    total_len += strlen(collected_tokens[i].text);
-                }
-
-                char *concatenated = malloc(total_len + 1);
-                if (concatenated) {
-                    concatenated[0] = '\0';
-                    for (int i = 0; i < token_count; i++) {
-                        strcat(concatenated, collected_tokens[i].text);
-                    }
-
-                    node_t *arg_node = new_node(NODE_STRING_EXPANDABLE);
-                    if (arg_node) {
-                        arg_node->val.str = concatenated;
-                        arg_node->val_type = VAL_STR;
-                        add_child_node(command, arg_node);
-                    } else {
-                        free(concatenated);
-                    }
-                }
-            }
-
-            // Clean up collected tokens
-            for (int i = 0; i < token_count; i++) {
-                free(collected_tokens[i].text);
-            }
-            free(collected_tokens);
-        } else {
-            break; // Stop parsing arguments
+            break; // Not an arg-like token; stop parsing arguments.
         }
     }
 
-    return command;
+    return true;
+}
+
+/**
+ * @brief Parse `WORD (= | +=) value...` into a malloc'd assignment string.
+ *
+ * Precondition: the caller has verified the current token is word-like
+ * and the lookahead token is TOK_ASSIGN / TOK_PLUS_ASSIGN. Consumes the
+ * variable-name token, the assignment operator, and all adjacent value
+ * tokens (applying the issue #98 / #102 quote-rewrap policy).
+ *
+ * If the value is an array literal `(...)`, no string is produced:
+ * *out_array_node is set to the NODE_ARRAY_ASSIGN / NODE_ARRAY_APPEND
+ * node and NULL is returned (the caller returns that node standalone).
+ *
+ * @param parser         Parser instance
+ * @param out_array_node Out: set to an array node for arr=(...) forms
+ * @return malloc'd "var=value" / "var+=value" string, or NULL (either a
+ *         hard error, or an array literal -- distinguished by whether
+ *         *out_array_node was set)
+ */
+static char *parse_scalar_assignment_string(parser_t *parser,
+                                            node_t **out_array_node) {
+    *out_array_node = NULL;
+
+    token_t *current = tokenizer_current(parser->tokenizer);
+    token_t *next = tokenizer_peek(parser->tokenizer);
+    bool is_append = (next && next->type == TOK_PLUS_ASSIGN);
+
+    // Save variable name BEFORE advancing tokenizer
+    char *var_name = strdup(current->text);
+    if (!var_name) {
+        return NULL;
+    }
+
+    tokenizer_advance(parser->tokenizer); // consume variable name
+    tokenizer_advance(parser->tokenizer); // consume '=' or '+='
+
+    token_t *value = tokenizer_current(parser->tokenizer);
+
+    // Check for array literal assignment: arr=(a b c) or arr+=(a b c)
+    if (value && value->type == TOK_LPAREN &&
+        shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
+        node_t *array_node = parse_array_literal(parser);
+        if (!array_node) {
+            free(var_name);
+            return NULL;
+        }
+        node_t *assign_node =
+            new_node(is_append ? NODE_ARRAY_APPEND : NODE_ARRAY_ASSIGN);
+        if (!assign_node) {
+            free(var_name);
+            free_node_tree(array_node);
+            return NULL;
+        }
+        assign_node->val.str = var_name; // Transfer ownership
+        assign_node->val_type = VAL_STR;
+        add_child_node(assign_node, array_node);
+        *out_array_node = assign_node;
+        return NULL;
+    }
+
+    char *assignment = NULL;
+
+    // Collect all consecutive value tokens (handles ${A}_${B} etc.)
+    // Value tokens include words, variables, command subs, etc.
+    // Stop at whitespace, semicolon, newline, or other separators
+    if (value &&
+        (token_is_word_like(value->type) || value->type == TOK_VARIABLE ||
+         value->type == TOK_ARITH_EXP || value->type == TOK_COMMAND_SUB ||
+         value->type == TOK_BACKQUOTE)) {
+
+        // Build complete value by concatenating adjacent tokens
+        size_t value_capacity = 256;
+        size_t value_len = 0;
+        char *full_value = malloc(value_capacity);
+        if (!full_value) {
+            free(var_name);
+            return NULL;
+        }
+        full_value[0] = '\0';
+
+        while (value &&
+               (token_is_word_like(value->type) ||
+                value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
+                value->type == TOK_COMMAND_SUB ||
+                value->type == TOK_BACKQUOTE)) {
+
+            // Check if this word is followed by = (making it a new
+            // assignment) If so, stop - this word belongs to the next
+            // assignment
+            if (token_is_word_like(value->type)) {
+                token_t *peek = tokenizer_peek(parser->tokenizer);
+                if (peek && (peek->type == TOK_ASSIGN ||
+                             peek->type == TOK_PLUS_ASSIGN)) {
+                    break; // This word starts a new assignment
+                }
+            }
+
+            size_t token_len = strlen(value->text);
+            /* Quote re-wrapping policy for assignment-value
+             * tokens. expand_if_needed inspects the value
+             * string for quote markers; the parser must
+             * preserve enough of the original quoting so
+             * that:
+             *   TOK_STRING (single-quoted '...'):
+             *     re-wrap with ' so expand_if_needed's
+             *     no-expansion path fires (issue #98).
+             *   TOK_STRING (ANSI-C $'...'):
+             *     tokenizer text already includes $' and ';
+             *     do NOT re-wrap.
+             *   TOK_EXPANDABLE_STRING ("..."):
+             *     text already had outer " stripped by the
+             *     tokenizer; pass through verbatim. The
+             *     embedded-quote bug (a="hello 'world'"
+             *     losing the quote) is solved at the
+             *     expand_if_needed layer: it only enters
+             *     the single-quote-handling block when
+             *     there is a matched pair of ' in the text
+             *     (issue #102 -- see expand_if_needed
+             *     comment near the strchr check).
+             */
+            bool is_ansi_c = (value->type == TOK_STRING && token_len >= 2 &&
+                              value->text[0] == '$' && value->text[1] == '\'');
+            bool wrap_single = (value->type == TOK_STRING && !is_ansi_c);
+            size_t extra_len = wrap_single ? 2 : 0;
+
+            // Grow buffer if needed
+            if (value_len + token_len + extra_len + 1 > value_capacity) {
+                value_capacity = (value_len + token_len + extra_len + 1) * 2;
+                char *new_value = realloc(full_value, value_capacity);
+                if (!new_value) {
+                    free(full_value);
+                    free(var_name);
+                    return NULL;
+                }
+                full_value = new_value;
+            }
+
+            // Add token with appropriate quoting
+            // Only single quotes need to be preserved to prevent
+            // expansion Double quotes: expand variables but don't keep
+            // quotes
+            if (wrap_single) {
+                // Regular single-quoted: re-wrap with quotes to
+                // preserve no-expansion semantics through
+                // expand_if_needed.
+                strcat(full_value, "'");
+                strcat(full_value, value->text);
+                strcat(full_value, "'");
+                value_len += token_len + 2;
+            } else if (value->type == TOK_EXPANDABLE_STRING) {
+                /* Double-quoted content: the outer "..." was
+                 * stripped by the tokenizer. Any embedded
+                 * single quotes in this content were literal
+                 * characters in the source, but
+                 * expand_if_needed would later misinterpret
+                 * them as POSIX single-quote openers and
+                 * eat them (issue #102). Pre-escape literal
+                 * single quotes as \' so the downstream
+                 * POSIX-unquoted backslash rule preserves
+                 * them as literal characters. Other chars
+                 * pass through; double-quote-specific
+                 * escapes like \$ \" \\ \` were already
+                 * preserved by the tokenizer. Grow the
+                 * buffer to account for the worst case (every
+                 * char doubles). */
+                size_t worst = value_len + token_len * 2 + 1;
+                if (worst >= value_capacity) {
+                    value_capacity = worst * 2;
+                    char *nv = realloc(full_value, value_capacity);
+                    if (!nv) {
+                        free(full_value);
+                        free(var_name);
+                        return NULL;
+                    }
+                    full_value = nv;
+                }
+                for (size_t k = 0; k < token_len; k++) {
+                    char ch = value->text[k];
+                    if (ch == '\'') {
+                        full_value[value_len++] = '\\';
+                        full_value[value_len++] = '\'';
+                    } else {
+                        full_value[value_len++] = ch;
+                    }
+                }
+                full_value[value_len] = '\0';
+            } else {
+                /* All other types (including ANSI-C $'...'
+                 * whose tokenizer text already carries the
+                 * $' and ' markers): append the text
+                 * verbatim. */
+                strcat(full_value, value->text);
+                value_len += token_len;
+            }
+
+            /* Only adjacent tokens (no intervening whitespace) belong to
+             * the same assignment value: `a=foo"bar"` -> foobar, but
+             * `a=foo bar` -> value `foo` and `bar` is the command word /
+             * next prefix. Mirrors the adjacency rule in
+             * collect_word_argument (same strlen(text) convention and
+             * the same quoted-then-adjacent edge case). */
+            size_t last_end_pos = value->position + strlen(value->text);
+            tokenizer_advance(parser->tokenizer); // consume this token
+            value = tokenizer_current(parser->tokenizer);
+            if (value && value->position != last_end_pos) {
+                break; // whitespace gap: value ends here
+            }
+        }
+
+        // Build final assignment string: var=value or var+=value
+        size_t var_len = strlen(var_name);
+        assignment = malloc(var_len + (is_append ? 2 : 1) + value_len + 1);
+        if (assignment) {
+            strcpy(assignment, var_name);
+            strcat(assignment, is_append ? "+=" : "=");
+            strcat(assignment, full_value);
+        }
+        free(full_value);
+    } else {
+        // Assignment with empty value: variable=
+        size_t var_len = strlen(var_name);
+        assignment = malloc(var_len + 2);
+        if (assignment) {
+            strcpy(assignment, var_name);
+            strcat(assignment, "=");
+        }
+    }
+
+    free(var_name);
+    return assignment;
+}
+
+/**
+ * @brief Decide standalone-assignment vs POSIX cmd_prefix.
+ *
+ * `first_assignment` is a NODE_COMMAND whose val.str is the first
+ * "var=value" the caller already parsed. If the next token ends the
+ * simple command, this is a lone assignment and the node is returned
+ * unchanged (preserving the legacy representation the executor's
+ * is_assignment() fast-path expects).
+ *
+ * Otherwise the simple command has a cmd_prefix: the assignment(s) and
+ * any redirections are collected as NODE_ASSIGN / redirection children
+ * of a NODE_COMMAND. If a command word follows it becomes the command
+ * name (val.str) and cmd_suffix is parsed; otherwise val.str stays NULL
+ * (a pure assignment+redirection command, e.g. `x=1 2>/dev/null`).
+ *
+ * @param parser           Parser instance
+ * @param first_assignment NODE_COMMAND carrying the first var=value
+ * @return the simple-command AST node, or NULL on error
+ */
+static node_t *finish_assignment_or_prefix(parser_t *parser,
+                                           node_t *first_assignment) {
+    token_t *cur = tokenizer_current(parser->tokenizer);
+    bool ends_command =
+        (!cur || cur->type == TOK_EOF || cur->type == TOK_SEMICOLON ||
+         cur->type == TOK_NEWLINE || cur->type == TOK_PIPE ||
+         cur->type == TOK_AND || cur->type == TOK_LOGICAL_AND ||
+         cur->type == TOK_LOGICAL_OR);
+    if (ends_command) {
+        // Lone assignment: keep the legacy NODE_COMMAND val.str shape.
+        return first_assignment;
+    }
+
+    // cmd_prefix form. Build a NODE_COMMAND whose children are the
+    // prefix assignments (NODE_ASSIGN), then redirections, and whose
+    // val.str is the command word (or NULL if there is no command).
+    node_t *cmd = new_node(NODE_COMMAND);
+    if (!cmd) {
+        free_node_tree(first_assignment);
+        return NULL;
+    }
+    cmd->val.str = NULL;
+    cmd->val_type = VAL_STR;
+
+    // Convert the already-parsed first assignment into a NODE_ASSIGN
+    // child (move the string; discard the throwaway command shell).
+    node_t *first = new_node(NODE_ASSIGN);
+    if (!first) {
+        free_node_tree(first_assignment);
+        free_node_tree(cmd);
+        return NULL;
+    }
+    first->val.str = first_assignment->val.str;
+    first->val_type = VAL_STR;
+    first_assignment->val.str = NULL;
+    free_node_tree(first_assignment);
+    add_child_node(cmd, first);
+
+    // Collect the rest of the cmd_prefix: further scalar assignments
+    // and redirections, in any order, until a command word or a
+    // command terminator.
+    for (;;) {
+        token_t *t = tokenizer_current(parser->tokenizer);
+        if (!t || t->type == TOK_EOF || t->type == TOK_SEMICOLON ||
+            t->type == TOK_NEWLINE || t->type == TOK_PIPE ||
+            t->type == TOK_AND || t->type == TOK_LOGICAL_AND ||
+            t->type == TOK_LOGICAL_OR) {
+            break;
+        }
+
+        // Redirection in the prefix (e.g. `x=1 2>/dev/null cmd`).
+        if (t->type == TOK_REDIRECT_OUT || t->type == TOK_REDIRECT_IN ||
+            t->type == TOK_APPEND || t->type == TOK_HEREDOC ||
+            t->type == TOK_HEREDOC_STRIP || t->type == TOK_HERESTRING ||
+            t->type == TOK_REDIRECT_ERR || t->type == TOK_REDIRECT_IN_FD ||
+            t->type == TOK_REDIRECT_BOTH || t->type == TOK_APPEND_ERR ||
+            t->type == TOK_REDIRECT_FD || t->type == TOK_REDIRECT_FD_ALLOC ||
+            t->type == TOK_REDIRECT_CLOBBER || t->type == TOK_APPEND_BOTH) {
+            node_t *redir = parse_redirection(parser);
+            if (!redir) {
+                free_node_tree(cmd);
+                return NULL;
+            }
+            add_child_node(cmd, redir);
+            continue;
+        }
+
+        // Another scalar assignment in the prefix? Only plain `name=`
+        // (no `[` subscript) qualifies; array element / literal forms
+        // are not POSIX cmd_prefix words.
+        token_t *p = tokenizer_peek(parser->tokenizer);
+        if (token_is_word_like(t->type) && p &&
+            (p->type == TOK_ASSIGN || p->type == TOK_PLUS_ASSIGN) && t->text &&
+            !strchr(t->text, '[')) {
+            node_t *arr = NULL;
+            char *s = parse_scalar_assignment_string(parser, &arr);
+            if (arr) {
+                // `a=(...)` is not valid as a cmd_prefix word.
+                free_node_tree(arr);
+                free_node_tree(cmd);
+                parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                                 "array assignment is not valid as a "
+                                 "command prefix");
+                return NULL;
+            }
+            if (!s) {
+                free_node_tree(cmd);
+                return NULL;
+            }
+            node_t *a = new_node(NODE_ASSIGN);
+            if (!a) {
+                free(s);
+                free_node_tree(cmd);
+                return NULL;
+            }
+            a->val.str = s;
+            a->val_type = VAL_STR;
+            add_child_node(cmd, a);
+            continue;
+        }
+
+        // Anything else ends the prefix: it must be the command word.
+        break;
+    }
+
+    // Optional command word + cmd_suffix.
+    token_t *w = tokenizer_current(parser->tokenizer);
+    if (w && (token_is_word_like(w->type) || w->type == TOK_LBRACKET)) {
+        source_location_t loc =
+            token_to_source_location(w, parser->source_name);
+        cmd->loc = loc;
+        cmd->val.str = strdup(w->text);
+        cmd->val_type = VAL_STR;
+        tokenizer_advance(parser->tokenizer);
+        if (!parse_command_suffix(parser, cmd)) {
+            free_node_tree(cmd);
+            return NULL;
+        }
+    }
+    // else: pure assignment(s)+redirection(s), no command word. val.str
+    // stays NULL; the executor applies the assignments persistently and
+    // performs the redirections (POSIX: `x=1 >f`).
+
+    return cmd;
 }
 
 /**
@@ -1601,8 +2139,16 @@ static node_t *parse_brace_group(parser_t *parser) {
     skip_separators(parser);
 
     // Parse commands until '}'
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_RBRACE) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_brace_group")) {
+            free_node_tree(group_node);
+            parser_pop_context(parser);
+            parser_exit_recursion(parser);
+            return NULL;
+        }
 
         node_t *command = parse_logical_expression(parser);
         if (!command) {
@@ -1688,8 +2234,16 @@ static node_t *parse_subshell(parser_t *parser) {
     skip_separators(parser);
 
     // Parse commands until ')'
+    parser_loop_guard_t guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_RPAREN) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF) && !parser->has_error) {
+
+        if (!parser_loop_check_progress(parser, &guard, "parse_subshell")) {
+            free_node_tree(subshell_node);
+            parser_pop_context(parser);
+            parser_exit_recursion(parser);
+            return NULL;
+        }
 
         node_t *command = parse_logical_expression(parser);
         if (!command) {
@@ -1791,6 +2345,17 @@ static node_t *parse_redirection(parser_t *parser) {
     if (!redir_token) {
         return NULL;
     }
+
+    /* Capture the operator's full source_location_t before any
+     * tokenizer_advance — that call frees the current token, so
+     * dereferencing redir_token later would be use-after-free.
+     * source_location_t is the project's unified position primitive
+     * (shell_error.h:33-39); using it here keeps the heredoc body
+     * search consistent with how every other parser path tracks
+     * positions, and lets the unterminated-heredoc error point at
+     * the actual operator rather than at SOURCE_LOC_UNKNOWN. */
+    source_location_t op_loc =
+        token_to_source_location(redir_token, parser->source_name);
 
     node_type_t node_type;
     switch (redir_token->type) {
@@ -1950,7 +2515,7 @@ static node_t *parse_redirection(parser_t *parser) {
         // Collect the here document content (this will advance the tokenizer
         // further)
         char *content = collect_heredoc_content(parser, delimiter, strip_tabs,
-                                                expand_variables);
+                                                expand_variables, op_loc);
         if (!content) {
             free(delimiter);
             free_node_tree(redir_node);
@@ -2058,7 +2623,8 @@ static node_t *parse_redirection(parser_t *parser) {
  * @return Collected content string (caller must free)
  */
 static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
-                                     bool strip_tabs, bool expand_variables) {
+                                     bool strip_tabs, bool expand_variables,
+                                     source_location_t op_loc) {
     (void)expand_variables; /* Expansion handled during execution phase */
     if (!parser || !delimiter) {
         return NULL;
@@ -2066,12 +2632,11 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 
     tokenizer_t *tokenizer = parser->tokenizer;
 
-    // Find the start of the here document content by searching for << delimiter
-    // in input
-    size_t content_start = 0;
-
-    // Look for "<<" followed by the delimiter in the input
-    // For quoted delimiters, we need to match without quotes
+    /* Strip outer quotes from the delimiter if present so body lines
+     * compare against the user-visible terminator text (`'END'` →
+     * `END`, `"EOF"` → `EOF`). Used only for the line-by-line
+     * terminator match below; the delimiter SPEC in the input is not
+     * re-parsed (see content_start computation). */
     const char *match_delimiter = delimiter;
     char *unquoted_delimiter = NULL;
     if ((delimiter[0] == '"' || delimiter[0] == '\'') &&
@@ -2086,78 +2651,45 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
         }
     }
 
-    (void)strlen(match_delimiter); /* Delimiter matching uses strcmp */
-
-    for (size_t i = 0; i < tokenizer->input_length - 1; i++) {
-        if (tokenizer->input[i] == '<' && tokenizer->input[i + 1] == '<') {
-            // Found <<, now check if delimiter follows
-            size_t delimiter_pos = i + 2;
-
-            // Skip optional '-' for <<-
-            if (delimiter_pos < tokenizer->input_length &&
-                tokenizer->input[delimiter_pos] == '-') {
-                delimiter_pos++;
-            }
-
-            // Skip whitespace
-            while (delimiter_pos < tokenizer->input_length &&
-                   (tokenizer->input[delimiter_pos] == ' ' ||
-                    tokenizer->input[delimiter_pos] == '\t')) {
-                delimiter_pos++;
-            }
-
-            // Try to match delimiter - first check if it's quoted in the input
-            bool found_delimiter = false;
-            size_t delim_end_pos = delimiter_pos;
-
-            // Check for quoted delimiter in input (like 'EOF' or "EOF")
-            if (delimiter_pos < tokenizer->input_length &&
-                (tokenizer->input[delimiter_pos] == '\'' ||
-                 tokenizer->input[delimiter_pos] == '"')) {
-                char quote = tokenizer->input[delimiter_pos];
-                delim_end_pos = delimiter_pos + 1;
-
-                // Find matching quote
-                while (delim_end_pos < tokenizer->input_length &&
-                       tokenizer->input[delim_end_pos] != quote) {
-                    delim_end_pos++;
-                }
-
-                if (delim_end_pos < tokenizer->input_length &&
-                    tokenizer->input[delim_end_pos] == quote) {
-                    // Extract the quoted delimiter content
-                    size_t quoted_len = delim_end_pos - delimiter_pos - 1;
-                    if (quoted_len == strlen(match_delimiter) &&
-                        strncmp(&tokenizer->input[delimiter_pos + 1],
-                                match_delimiter, quoted_len) == 0) {
-                        found_delimiter = true;
-                        delim_end_pos++; // Include the closing quote
-                    }
-                }
-            } else {
-                // Check for unquoted delimiter
-                size_t match_len = strlen(match_delimiter);
-                if (delimiter_pos + match_len <= tokenizer->input_length &&
-                    strncmp(&tokenizer->input[delimiter_pos], match_delimiter,
-                            match_len) == 0) {
-                    found_delimiter = true;
-                    delim_end_pos = delimiter_pos + match_len;
-                }
-            }
-
-            if (found_delimiter) {
-                // Found our << delimiter, find the end of this line
-                content_start = delim_end_pos;
-                while (content_start < tokenizer->input_length &&
-                       tokenizer->input[content_start] != '\n') {
-                    content_start++;
-                }
-                if (content_start < tokenizer->input_length) {
-                    content_start++; // Skip the newline
-                }
-                break;
-            }
-        }
+    /* The heredoc body always begins on the line AFTER the operator's
+     * line. The parser captured the operator's source_location_t into
+     * op_loc before any tokenizer_advance freed the operator token,
+     * so op_loc.offset is a reliable absolute byte position of the
+     * `<<` operator. Scan from just past `<<` to the next newline;
+     * the byte after that newline is content_start.
+     *
+     * The previous implementation searched the entire input from byte
+     * 0 for a literal `<< delimiter` substring match, which had two
+     * unfixable defects:
+     *
+     *   - Issue #51: when two heredocs in the same input shared a
+     *     delimiter, the search for the second always found the first
+     *     and reset tokenizer->position backwards, causing the parser
+     *     to re-parse the second heredoc forever. Anchoring the
+     *     search at op_loc.offset (the previous fix) avoided one
+     *     backward jump but kept the search.
+     *
+     *   - Issue #52: the search couldn't handle shell quote-
+     *     concatenation in the delimiter spec (e.g. `<< ''ai`, where
+     *     the parser correctly resolves the delimiter to "ai" but the
+     *     input bytes show `''ai`). The literal-substring match
+     *     failed, content_start defaulted to the initial value of 0,
+     *     and body collection started at byte 0 of the input — finding
+     *     spurious terminator lines and resetting tokenizer->position
+     *     to inside the live parse, triggering O(N^2) command-list
+     *     growth in the case-arm body parser.
+     *
+     * Both classes are eliminated by computing content_start from
+     * op_loc.offset directly. The delimiter spec text in the input is
+     * not used for content_start; only for the terminator-line match
+     * below. */
+    size_t content_start = op_loc.offset + 2; /* past `<<` */
+    while (content_start < tokenizer->input_length &&
+           tokenizer->input[content_start] != '\n') {
+        content_start++;
+    }
+    if (content_start < tokenizer->input_length) {
+        content_start++; /* skip the newline */
     }
 
     // Collect lines until we find the delimiter
@@ -2239,12 +2771,20 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
     // partial body. Bash warns at parse time; lush -n needs an error
     // because exit code is the only signal available to tooling.
     if (!found_delimiter_line) {
-        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_EOF,
-                                   "the delimiter must appear alone on a "
-                                   "line; for <<- it may be preceded by tabs",
-                                   "unterminated here-document: expected "
-                                   "delimiter '%s' but reached end of input",
-                                   match_delimiter);
+        /* Use the OPERATOR's source location (op_loc), not the parser's
+         * current position (which by now is at end-of-input). Pointing
+         * the diagnostic at the `<<` operator is far more useful than
+         * pointing at EOF. parser_error_add_with_help_at() routes the
+         * error through the same context-stack / source-line / legacy-
+         * compatibility plumbing as parser_error_add_with_help, just
+         * with an explicit location. */
+        parser_error_add_with_help_at(
+            parser, SHELL_ERR_UNEXPECTED_EOF, op_loc,
+            "the delimiter must appear alone on a line; for <<- it may "
+            "be preceded by tabs",
+            "unterminated here-document: expected delimiter '%s' but "
+            "reached end of input",
+            match_delimiter);
         free(content);
         if (unquoted_delimiter) {
             free(unquoted_delimiter);
@@ -2514,6 +3054,109 @@ static node_t *parse_while_statement(parser_t *parser) {
     }
 
     return while_node;
+}
+
+/**
+ * @brief Parse a zsh repeat loop
+ *
+ * Accepts both:
+ *   repeat N; do BODY; done    (do/done form)
+ *   repeat N { BODY }          (brace form)
+ *
+ * N is a single word (number or variable reference) -- not a full
+ * arithmetic expression here, matching zsh's accepted syntax;
+ * arithmetic count is supported via `repeat $((expr))`. The body
+ * runs N times in a fresh loop scope. Issue #103.
+ *
+ * @param parser Parser instance
+ * @return NODE_REPEAT AST node
+ */
+static node_t *parse_repeat_statement(parser_t *parser) {
+    token_t *kw = tokenizer_current(parser->tokenizer);
+    source_location_t kw_loc =
+        token_to_source_location(kw, parser->source_name);
+
+    if (!expect_token(parser, TOK_REPEAT)) {
+        return NULL;
+    }
+    parser_push_context(parser, "parsing repeat loop");
+
+    node_t *repeat_node = new_node_at(NODE_REPEAT, kw_loc);
+    if (!repeat_node) {
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    /* Parse count as a single word using the shared argument
+     * collector so $var / $((..)) / `(cmd)` all work. */
+    if (!collect_word_argument(parser, repeat_node)) {
+        free_node_tree(repeat_node);
+        parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                                   "'repeat' requires a count expression",
+                                   "invalid repeat loop count");
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    skip_separators(parser);
+
+    /* Body: either `do ... done` or `{ ... }`. */
+    token_t *body_open = tokenizer_current(parser->tokenizer);
+    node_t *body = NULL;
+
+    if (body_open && body_open->type == TOK_DO) {
+        tokenizer_advance(parser->tokenizer);
+        skip_separators(parser);
+        body = parse_command_body(parser, TOK_DONE);
+        if (!body) {
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        skip_separators(parser);
+        if (!expect_token_with_help(parser, TOK_DONE,
+                                    "'repeat ...; do' must end with 'done'")) {
+            free_node_tree(body);
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+    } else if (body_open && body_open->type == TOK_LBRACE) {
+        tokenizer_advance(parser->tokenizer);
+        skip_separators(parser);
+        body = parse_command_body(parser, TOK_RBRACE);
+        if (!body) {
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        skip_separators(parser);
+        if (!expect_token_with_help(parser, TOK_RBRACE,
+                                    "'repeat ... {' must end with '}'")) {
+            free_node_tree(body);
+            free_node_tree(repeat_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+    } else {
+        free_node_tree(repeat_node);
+        parser_error_add_with_help(
+            parser, SHELL_ERR_UNEXPECTED_TOKEN,
+            "'repeat N' must be followed by '; do ... done' or '{ ... }'",
+            "invalid repeat loop body");
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    add_child_node(repeat_node, body);
+
+    parser_pop_context(parser);
+
+    if (!parse_trailing_redirections(parser, repeat_node)) {
+        free_node_tree(repeat_node);
+        return NULL;
+    }
+    return repeat_node;
 }
 
 /**
@@ -3469,6 +4112,23 @@ static node_t *parse_anonymous_function(parser_t *parser) {
     }
 
     add_child_node(anon_node, body);
+
+    /* Collect trailing positional arguments after the closing '}'.
+     * Zsh's anonymous-function form is `() { body } ARG1 ARG2 ...`,
+     * where the args become $1, $2, ... within the body. Uses the
+     * shared collect_word_argument helper so anon-function args have
+     * the same acceptance, adjacency-concatenation, and node-type
+     * classification semantics as regular command arguments. The
+     * helper stops naturally at non-arg tokens (NEWLINE, SEMI, EOF,
+     * AMP, PIPE, redirection tokens, etc.). */
+    while (collect_word_argument(parser, anon_node)) {
+        /* Loop until helper returns false (non-arg token or alloc failure). */
+    }
+    if (parser->has_error) {
+        free_node_tree(anon_node);
+        return NULL;
+    }
+
     return anon_node;
 }
 
@@ -3563,8 +4223,16 @@ static node_t *parse_case_statement(parser_t *parser) {
     skip_separators(parser);
 
     // Parse case items until 'esac'
+    parser_loop_guard_t items_guard = PARSER_LOOP_GUARD_INIT;
     while (!tokenizer_match(parser->tokenizer, TOK_ESAC) &&
            !tokenizer_match(parser->tokenizer, TOK_EOF)) {
+
+        if (!parser_loop_check_progress(parser, &items_guard,
+                                        "parse_case_statement items")) {
+            free_node_tree(case_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
 
         // Parse pattern(s)
         node_t *case_item = new_node(NODE_CASE_ITEM);
@@ -3692,8 +4360,20 @@ static node_t *parse_case_statement(parser_t *parser) {
 
         // Parse commands until case terminator (;;, ;&, ;;&) or esac
         node_t *commands = NULL;
+        parser_loop_guard_t body_guard = PARSER_LOOP_GUARD_INIT;
         while (!tokenizer_match(parser->tokenizer, TOK_ESAC) &&
                !tokenizer_match(parser->tokenizer, TOK_EOF)) {
+
+            if (!parser_loop_check_progress(parser, &body_guard,
+                                            "parse_case_statement body")) {
+                free_node_tree(case_item);
+                free_node_tree(case_node);
+                if (commands) {
+                    free_node_tree(commands);
+                }
+                parser_pop_context(parser);
+                return NULL;
+            }
 
             // Check for terminators before processing command
             if (tokenizer_match(parser->tokenizer, TOK_ESAC) ||
@@ -4609,6 +5289,7 @@ static node_t *parse_extended_test(parser_t *parser) {
     size_t expr_len = 0;
     size_t expr_capacity = 256;
     int paren_depth = 0;
+    int bracket_depth = 0; // Track [...] for glob char classes (#104)
     bool in_regex = false; // Track if we're parsing a regex pattern after =~
 
     expr = malloc(expr_capacity);
@@ -4647,6 +5328,13 @@ static node_t *parse_extended_test(parser_t *parser) {
             }
         }
 
+        // Track [...] bracket depth so a glob char-class is preserved
+        // intact in the expression buffer; otherwise [a-z]* would arrive
+        // at the matcher as "[ a-z ] *" and never match.  Issue #104.
+        if (current->type == TOK_LBRACKET) {
+            bracket_depth++;
+        }
+
         // Append token text to expression
         size_t token_len = strlen(current->text);
         if (expr_len + token_len + 2 > expr_capacity) {
@@ -4666,6 +5354,12 @@ static node_t *parse_extended_test(parser_t *parser) {
         if (in_regex) {
             // In regex mode: don't add spaces between regex tokens
             // This keeps ^hello$ as one unit instead of ^ hello $
+            skip_space = true;
+        } else if (bracket_depth > 0 ||
+                   (expr_len > 0 && expr[expr_len - 1] == ']' &&
+                    !token_is_operator(current->type))) {
+            // Inside a glob char-class or immediately after one: no spaces
+            // so [a-z]* stays glued. Issue #104.
             skip_space = true;
         } else {
             // Normal mode: add spaces between tokens with some exceptions
@@ -4702,6 +5396,12 @@ static node_t *parse_extended_test(parser_t *parser) {
         // Check if we just added the =~ operator - next tokens are regex
         if (current->type == TOK_REGEX_MATCH) {
             in_regex = true;
+        }
+
+        // Close bracket AFTER append so the ']' itself doesn't get a leading
+        // space from the bracket_depth>0 rule.
+        if (current->type == TOK_RBRACKET && bracket_depth > 0) {
+            bracket_depth--;
         }
 
         tokenizer_advance(parser->tokenizer);

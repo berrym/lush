@@ -24,6 +24,7 @@
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lush_memory_pool.h"
+#include "test_framework.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,43 +53,8 @@ static void test_setup(void) {
 
 static void test_teardown(void) { lush_pool_shutdown(); }
 
-/* Test result tracking */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-/* Test macros */
-#define TEST(name)                                                             \
-    static void test_##name(void);                                             \
-    static void run_test_##name(void) {                                        \
-        printf("Running test: %s\n", #name);                                   \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-        tests_passed++;                                                        \
-        printf("  ✓ PASSED\n");                                                \
-    }                                                                          \
-    static void test_##name(void)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("  ✗ ASSERTION FAILED: %s\n", message);                     \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr, message) ASSERT((ptr) != NULL, message)
-
-#define ASSERT_NULL(ptr, message) ASSERT((ptr) == NULL, message)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    ASSERT((actual) == (expected), message)
-
-#define ASSERT_TRUE(condition, message) ASSERT((condition), message)
-
-#define ASSERT_FALSE(condition, message) ASSERT(!(condition), message)
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 #define SKIP_IF_NO_MEMORY_POOL()                                               \
     do {                                                                       \
@@ -1113,69 +1079,56 @@ int main(void) {
     test_setup();
 
     /* Initialization tests */
-    run_test_render_controller_init_success();
-    run_test_render_controller_init_null_controller();
-    run_test_render_controller_init_null_bridge();
-    run_test_render_controller_init_null_memory_pool();
+    RUN_TEST(render_controller_init_success);
+    RUN_TEST(render_controller_init_null_controller);
+    RUN_TEST(render_controller_init_null_bridge);
+    RUN_TEST(render_controller_init_null_memory_pool);
 
     /* Cleanup tests */
-    run_test_render_controller_cleanup_success();
-    run_test_render_controller_cleanup_null_controller();
-    run_test_render_controller_double_cleanup();
+    RUN_TEST(render_controller_cleanup_success);
+    RUN_TEST(render_controller_cleanup_null_controller);
+    RUN_TEST(render_controller_double_cleanup);
 
     /* Sub-component tests */
-    run_test_render_controller_buffer_renderer_initialized();
-    run_test_render_controller_cursor_renderer_initialized();
-    run_test_render_controller_frame_scheduler_initialized();
-    run_test_render_controller_render_cache_initialized();
-    run_test_render_controller_render_metrics_initialized();
+    RUN_TEST(render_controller_buffer_renderer_initialized);
+    RUN_TEST(render_controller_cursor_renderer_initialized);
+    RUN_TEST(render_controller_frame_scheduler_initialized);
+    RUN_TEST(render_controller_render_cache_initialized);
+    RUN_TEST(render_controller_render_metrics_initialized);
 
     /* Rendering output tests */
-    run_test_render_buffer_content_success();
-    run_test_render_buffer_content_empty_buffer();
-    run_test_render_buffer_content_null_params();
-    run_test_render_cursor_position_success();
-    run_test_render_cursor_position_hidden();
-    run_test_render_output_free_success();
-    run_test_render_output_free_null();
+    RUN_TEST(render_buffer_content_success);
+    RUN_TEST(render_buffer_content_empty_buffer);
+    RUN_TEST(render_buffer_content_null_params);
+    RUN_TEST(render_cursor_position_success);
+    RUN_TEST(render_cursor_position_hidden);
+    RUN_TEST(render_output_free_success);
+    RUN_TEST(render_output_free_null);
 
     /* Pipeline stage tests */
-    run_test_pipeline_init_success();
-    run_test_pipeline_init_null_params();
-    run_test_pipeline_execute_success();
-    run_test_pipeline_execute_null_params();
-    run_test_pipeline_cleanup_null();
+    RUN_TEST(pipeline_init_success);
+    RUN_TEST(pipeline_init_null_params);
+    RUN_TEST(pipeline_execute_success);
+    RUN_TEST(pipeline_execute_null_params);
+    RUN_TEST(pipeline_cleanup_null);
 
     /* Cache system tests (libhashtable integration) */
-    run_test_cache_init_success();
-    run_test_cache_init_null_params();
-    run_test_cache_store_and_lookup_success();
-    run_test_cache_lookup_miss();
-    run_test_cache_hit_count();
-    run_test_cache_miss_count();
-    run_test_render_cache_init_success();
-    run_test_render_cache_init_null_params();
+    RUN_TEST(cache_init_success);
+    RUN_TEST(cache_init_null_params);
+    RUN_TEST(cache_store_and_lookup_success);
+    RUN_TEST(cache_lookup_miss);
+    RUN_TEST(cache_hit_count);
+    RUN_TEST(cache_miss_count);
+    RUN_TEST(render_cache_init_success);
+    RUN_TEST(render_cache_init_null_params);
 
     /* Cache policy and invalidation tests */
-    run_test_cache_invalidate_entry();
-    run_test_cache_invalidate_all();
-    run_test_cache_hit_rate_calculation();
-    run_test_cache_policy_initialized();
+    RUN_TEST(cache_invalidate_entry);
+    RUN_TEST(cache_invalidate_all);
+    RUN_TEST(cache_hit_rate_calculation);
+    RUN_TEST(cache_policy_initialized);
 
-    /* Print summary */
-    printf("\n================================================================="
-           "\n");
-    printf("  Test Summary\n");
-    printf(
-        "=================================================================\n");
-    printf("  Tests run:    %d\n", tests_run);
-    printf("  Tests passed: %d\n", tests_passed);
-    printf("  Tests failed: %d\n", tests_failed);
-    printf(
-        "=================================================================\n");
-
-    /* Cleanup memory pool */
+    int rc = TEST_RESULT();
     test_teardown();
-
-    return (tests_failed == 0) ? 0 : 1;
+    return rc;
 }

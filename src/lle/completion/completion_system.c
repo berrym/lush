@@ -214,10 +214,10 @@ lle_completion_system_generate(lle_completion_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Step 1: Analyze context */
-    lle_context_analyzer_t *context = NULL;
+    /* Step 1: Analyze the word context at the cursor. */
+    lle_word_context_t *context = NULL;
     lle_result_t res =
-        lle_context_analyze(buffer, cursor_pos, system->pool, &context);
+        lle_word_context_analyze(buffer, cursor_pos, system->pool, &context);
     if (res != LLE_SUCCESS) {
         return res;
     }
@@ -226,25 +226,23 @@ lle_completion_system_generate(lle_completion_system_t *system,
     lle_completion_result_t *result = NULL;
     res = lle_completion_result_create(system->pool, 64, &result);
     if (res != LLE_SUCCESS) {
-        lle_context_analyzer_free(context);
+        lle_word_context_free(context);
         return res;
     }
 
     /* Step 3: Query all applicable sources */
-    const char *prefix = context->partial_word ? context->partial_word : "";
-    res = lle_source_manager_query(system->source_manager, context, prefix,
-                                   result);
+    res = lle_source_manager_query(system->source_manager, context, result);
     if (res != LLE_SUCCESS) {
         lle_completion_result_free(result);
-        lle_context_analyzer_free(context);
+        lle_word_context_free(context);
         return res;
     }
 
-    /* Step 4: Deduplicate results - FIXES THE DUPLICATE BUG */
+    /* Step 4: Deduplicate results */
     res = deduplicate_results(result);
     if (res != LLE_SUCCESS) {
         lle_completion_result_free(result);
-        lle_context_analyzer_free(context);
+        lle_word_context_free(context);
         return res;
     }
 
@@ -252,7 +250,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
     res = sort_results(result);
     if (res != LLE_SUCCESS) {
         lle_completion_result_free(result);
-        lle_context_analyzer_free(context);
+        lle_word_context_free(context);
         return res;
     }
 
@@ -262,7 +260,7 @@ lle_completion_system_generate(lle_completion_system_t *system,
                                       result, &state);
     if (res != LLE_SUCCESS) {
         lle_completion_result_free(result);
-        lle_context_analyzer_free(context);
+        lle_word_context_free(context);
         return res;
     }
 

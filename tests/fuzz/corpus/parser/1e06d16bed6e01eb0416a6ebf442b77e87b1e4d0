@@ -1,4 +1,0 @@
-while read line; do
-    e_ho "$line"
-e_ho "$line"
-done < done < file

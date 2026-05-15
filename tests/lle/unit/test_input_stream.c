@@ -8,13 +8,15 @@
 #include "lle/error_handling.h"
 #include "lle/input_parsing.h"
 #include "lle/memory_management.h"
-#include <assert.h>
+#include "test_framework.h"
+
+#undef TEST
+#define TEST(name_str) ((void)0)
+#define TEST_END ((void)0)
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 #include <stdio.h>
 #include <string.h>
-
-/* Test counter */
-static int tests_run = 0;
-static int tests_passed = 0;
 
 /* Mock terminal system and memory pool (opaque pointers for testing) */
 /* We use dummy non-NULL pointers since the functions check for NULL */
@@ -23,27 +25,6 @@ static int mock_pool_dummy = 43;
 static lle_terminal_system_t *mock_terminal =
     (lle_terminal_system_t *)&mock_terminal_dummy;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
-
-#define TEST(name)                                                             \
-    do {                                                                       \
-        tests_run++;                                                           \
-        printf("  Testing %s...", name);                                       \
-        fflush(stdout);
-
-#define TEST_END                                                               \
-    tests_passed++;                                                            \
-    printf(" PASSED\n");                                                       \
-    }                                                                          \
-    while (0)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("\n    FAILED: %s\n", message);                             \
-            printf("    Line %d in %s\n", __LINE__, __FILE__);                 \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * Test: Initialization and Destruction
@@ -571,50 +552,42 @@ int main(void) {
 
     /* Lifecycle tests */
     printf("Lifecycle Tests:\n");
-    test_init_destroy();
-    test_init_invalid_params();
+    RUN_TEST(init_destroy);
+    RUN_TEST(init_invalid_params);
     printf("\n");
 
     /* Buffer management tests */
     printf("Buffer Management Tests:\n");
-    test_buffer_data();
-    test_buffer_data_multiple();
-    test_get_buffered();
-    test_get_buffered_empty();
+    RUN_TEST(buffer_data);
+    RUN_TEST(buffer_data_multiple);
+    RUN_TEST(get_buffered);
+    RUN_TEST(get_buffered_empty);
     printf("\n");
 
     /* Consume tests */
     printf("Consume Tests:\n");
-    test_consume();
-    test_consume_invalid();
+    RUN_TEST(consume);
+    RUN_TEST(consume_invalid);
     printf("\n");
 
     /* Peek tests */
     printf("Peek Tests:\n");
-    test_peek();
-    test_peek_out_of_bounds();
+    RUN_TEST(peek);
+    RUN_TEST(peek_out_of_bounds);
     printf("\n");
 
     /* Utility tests */
     printf("Utility Tests:\n");
-    test_statistics();
-    test_reset();
-    test_get_available();
+    RUN_TEST(statistics);
+    RUN_TEST(reset);
+    RUN_TEST(get_available);
     printf("\n");
 
     /* Edge case tests */
     printf("Edge Case Tests:\n");
-    test_buffer_overflow();
-    test_buffer_compaction();
+    RUN_TEST(buffer_overflow);
+    RUN_TEST(buffer_compaction);
     printf("\n");
 
-    /* Summary */
-    printf("==================================================================="
-           "==========\n");
-    printf("Test Results: %d/%d tests passed\n", tests_passed, tests_run);
-    printf("==================================================================="
-           "==========\n");
-    printf("\n");
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

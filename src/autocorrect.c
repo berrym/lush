@@ -15,6 +15,7 @@
 
 #include "builtins.h"
 #include "executor.h"
+#include "init.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -123,12 +124,37 @@ bool autocorrect_is_enabled(void) { return autocorrect_config.enabled; }
  */
 int autocorrect_find_suggestions(executor_t *executor, const char *command,
                                  correction_results_t *results) {
-    if (!command || !results || !autocorrect_config.enabled) {
+    if (!command || !results) {
         return 0;
     }
 
-    // Initialize results
+    /* Always zero the results struct before any further early return
+     * so callers can safely call autocorrect_free_results() on it
+     * regardless of whether we found suggestions, ran at all, or
+     * bailed because autocorrect is disabled. The previous code
+     * exited on the !enabled check before the memset, leaving the
+     * caller with an uninitialised stack struct that free_results
+     * then passed to free() on the next "command not found" event
+     * (issue #60: bad-free in autocorrect_free_results). */
     memset(results, 0, sizeof(correction_results_t));
+
+    if (!autocorrect_config.enabled) {
+        return 0;
+    }
+
+    /* Skip autocorrect in non-interactive shells. The "did you mean ...?"
+     * suggestions are useful only when the user reads them; in scripts
+     * and tight command-not-found loops they are wasted CPU. Per #84
+     * sample profile, autocorrect_suggest_path_commands accounts for
+     * ~95% of per-iteration cost in a `for ((;;)); do bad; done` loop
+     * because every iteration walks $PATH, stat()s every binary, and
+     * runs Damerau-Levenshtein fuzzy matching. Skipping in non-
+     * interactive mode eliminates the amplifier entirely; interactive
+     * users still get suggestions on real misspellings. */
+    if (!is_interactive_shell()) {
+        return 0;
+    }
+
     results->original_command = strdup(command);
 
     // Temporary array to collect all suggestions from all sources

@@ -78,6 +78,20 @@ typedef struct {
 } subscriber_t;
 
 /**
+ * @brief Per-mode default override entry
+ *
+ * Each entry binds an option's full key to a specific mode and the
+ * default value for that (key, mode) pair. apply_mode_defaults walks
+ * this table when a mode change happens.
+ */
+typedef struct {
+    char key[CREG_KEY_MAX];
+    shell_mode_t mode;
+    creg_value_t value;
+    bool active;
+} mode_default_t;
+
+/**
  * @brief Global registry state
  */
 typedef struct {
@@ -86,6 +100,8 @@ typedef struct {
     size_t section_count;
     subscriber_t subscribers[CREG_SUBSCRIBERS_MAX];
     size_t subscriber_count;
+    mode_default_t mode_defaults[CREG_MODE_DEFAULTS_MAX];
+    size_t mode_default_count;
 } registry_state_t;
 
 static registry_state_t g_registry = {0};
@@ -788,6 +804,78 @@ void config_registry_reset_all(void) {
     for (size_t i = 0; i < g_registry.section_count; i++) {
         config_registry_reset_section(g_registry.sections[i].section.name);
     }
+}
+
+/* ============================================================================
+ * Mode-Aware Defaults
+ * ============================================================================
+ */
+
+creg_result_t config_registry_set_mode_default(const char *key,
+                                               shell_mode_t mode,
+                                               const creg_value_t *value) {
+    if (!key || !value || mode >= SHELL_MODE_COUNT) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    if (!g_registry.initialized) {
+        return CREG_ERROR_NOT_FOUND;
+    }
+    if (strlen(key) >= CREG_KEY_MAX) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+
+    /* Verify the option exists and that the type matches. */
+    creg_value_t probe;
+    creg_result_t probe_result = config_registry_get_default(key, &probe);
+    if (probe_result != CREG_SUCCESS) {
+        return probe_result;
+    }
+    if (probe.type != value->type) {
+        return CREG_ERROR_TYPE_MISMATCH;
+    }
+
+    /* Replace if a (key, mode) entry already exists. */
+    for (size_t i = 0; i < g_registry.mode_default_count; i++) {
+        mode_default_t *md = &g_registry.mode_defaults[i];
+        if (md->active && md->mode == mode && unicode_streq(md->key, key)) {
+            md->value = *value;
+            return CREG_SUCCESS;
+        }
+    }
+
+    if (g_registry.mode_default_count >= CREG_MODE_DEFAULTS_MAX) {
+        return CREG_ERROR_OPTION_FULL;
+    }
+
+    mode_default_t *slot =
+        &g_registry.mode_defaults[g_registry.mode_default_count++];
+    strncpy(slot->key, key, CREG_KEY_MAX - 1);
+    slot->key[CREG_KEY_MAX - 1] = '\0';
+    slot->mode = mode;
+    slot->value = *value;
+    slot->active = true;
+    return CREG_SUCCESS;
+}
+
+creg_result_t config_registry_apply_mode_defaults(shell_mode_t mode) {
+    if (mode >= SHELL_MODE_COUNT) {
+        return CREG_ERROR_INVALID_PARAM;
+    }
+    if (!g_registry.initialized) {
+        return CREG_SUCCESS; /* nothing to do */
+    }
+
+    for (size_t i = 0; i < g_registry.mode_default_count; i++) {
+        const mode_default_t *md = &g_registry.mode_defaults[i];
+        if (!md->active || md->mode != mode) {
+            continue;
+        }
+        /* Best-effort apply; a single failure should not abort the
+         * whole walk. The error case is rare (e.g. type mismatch
+         * caught at registration time), but defensive. */
+        (void)config_registry_set(md->key, &md->value);
+    }
+    return CREG_SUCCESS;
 }
 
 creg_result_t config_registry_get_default(const char *key,

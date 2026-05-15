@@ -9,31 +9,19 @@
 
 #include "../../../include/lle/error_handling.h"
 #include "../../../include/lle/input_parsing.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 
-/* Test framework macros */
-#define TEST(name)                                                             \
-    printf("  Testing: %s...", name);                                          \
-    fflush(stdout)
-#define TEST_END printf(" PASS\n")
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("\n    FAILED: %s\n", message);                             \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
+#undef TEST
+#define TEST(name_str) ((void)0)
+#define TEST_END ((void)0)
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* Mock memory pool (same as test_input_stream.c) */
 static int mock_pool_dummy = 43;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
-
-/* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
 
 /*
  * Test: Initialize and destroy UTF-8 processor
@@ -51,7 +39,6 @@ void test_init_destroy(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -72,7 +59,6 @@ void test_init_invalid_params(void) {
            "Init with NULL pool should fail");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -98,7 +84,6 @@ void test_process_ascii_byte(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -130,7 +115,6 @@ void test_process_two_byte_utf8(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -167,7 +151,6 @@ void test_process_three_byte_utf8(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -206,7 +189,6 @@ void test_process_four_byte_utf8(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -231,7 +213,6 @@ void test_invalid_start_byte(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -262,7 +243,6 @@ void test_invalid_continuation_byte(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -304,7 +284,6 @@ void test_process_buffer(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -351,7 +330,6 @@ void test_partial_sequence(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -387,7 +365,6 @@ void test_reset(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -427,7 +404,6 @@ void test_get_statistics(void) {
     lle_input_utf8_processor_destroy(processor);
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -448,7 +424,6 @@ void test_validate_string(void) {
     ASSERT(valid == false, "Invalid UTF-8 should fail");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -466,7 +441,6 @@ void test_count_codepoints(void) {
     ASSERT(count == 4, "UTF-8 should have 4 codepoints");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -484,7 +458,6 @@ void test_count_graphemes(void) {
     ASSERT(count == 4, "Simple UTF-8 should have 4 graphemes");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -504,7 +477,6 @@ void test_get_display_width(void) {
     ASSERT(width == 2, "Emoji should have width 2");
 
     TEST_END;
-    tests_passed++;
 }
 
 /*
@@ -513,42 +485,22 @@ void test_get_display_width(void) {
 int main(void) {
     printf("\n=== LLE Input UTF-8 Processor Unit Tests ===\n\n");
 
-    tests_run = 0;
-    tests_passed = 0;
+    RUN_TEST(init_destroy);
+    RUN_TEST(init_invalid_params);
+    RUN_TEST(process_ascii_byte);
+    RUN_TEST(process_two_byte_utf8);
+    RUN_TEST(process_three_byte_utf8);
+    RUN_TEST(process_four_byte_utf8);
+    RUN_TEST(invalid_start_byte);
+    RUN_TEST(invalid_continuation_byte);
+    RUN_TEST(process_buffer);
+    RUN_TEST(partial_sequence);
+    RUN_TEST(reset);
+    RUN_TEST(get_statistics);
+    RUN_TEST(validate_string);
+    RUN_TEST(count_codepoints);
+    RUN_TEST(count_graphemes);
+    RUN_TEST(get_display_width);
 
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        test();                                                                \
-    } while (0)
-
-    RUN_TEST(test_init_destroy);
-    RUN_TEST(test_init_invalid_params);
-    RUN_TEST(test_process_ascii_byte);
-    RUN_TEST(test_process_two_byte_utf8);
-    RUN_TEST(test_process_three_byte_utf8);
-    RUN_TEST(test_process_four_byte_utf8);
-    RUN_TEST(test_invalid_start_byte);
-    RUN_TEST(test_invalid_continuation_byte);
-    RUN_TEST(test_process_buffer);
-    RUN_TEST(test_partial_sequence);
-    RUN_TEST(test_reset);
-    RUN_TEST(test_get_statistics);
-    RUN_TEST(test_validate_string);
-    RUN_TEST(test_count_codepoints);
-    RUN_TEST(test_count_graphemes);
-    RUN_TEST(test_get_display_width);
-
-    printf("\n=== Test Summary ===\n");
-    printf("Tests run:    %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_run - tests_passed);
-
-    if (tests_passed == tests_run) {
-        printf("\n✓ All tests passed!\n\n");
-        return 0;
-    } else {
-        printf("\n✗ Some tests failed!\n\n");
-        return 1;
-    }
+    return TEST_RESULT();
 }

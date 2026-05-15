@@ -10,7 +10,7 @@
 
 #include "lle/completion/completion_state.h"
 #include "lle/completion/completion_types.h"
-#include "lle/completion/context_analyzer.h"
+#include "lle/completion/word_context.h"
 #include <string.h>
 
 // ============================================================================
@@ -29,7 +29,7 @@
  */
 lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
                                          const char *buffer, size_t cursor_pos,
-                                         lle_context_analyzer_t *context,
+                                         lle_word_context_t *context,
                                          lle_completion_result_t *results,
                                          lle_completion_state_t **out_state) {
     if (!pool || !buffer || !context || !results || !out_state) {
@@ -49,14 +49,15 @@ lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
     }
     memcpy(state->buffer_snapshot, buffer, buf_len + 1);
 
-    /* Copy original partial word */
-    if (context->partial_word) {
-        size_t word_len = strlen(context->partial_word);
+    /* Copy original partial word from the context's dequoted prefix. */
+    if (context->dequoted_filename_prefix) {
+        size_t word_len = strlen(context->dequoted_filename_prefix);
         state->original_word = lle_pool_alloc(word_len + 1);
         if (!state->original_word) {
             return LLE_ERROR_OUT_OF_MEMORY;
         }
-        memcpy(state->original_word, context->partial_word, word_len + 1);
+        memcpy(state->original_word, context->dequoted_filename_prefix,
+               word_len + 1);
     } else {
         state->original_word = lle_pool_alloc(1);
         if (!state->original_word) {
@@ -93,9 +94,10 @@ void lle_completion_state_free(lle_completion_state_t *state) {
         state->results = NULL;
     }
 
-    /* Free the context analyzer */
+    /* Release the word context (pool-backed; this is largely a
+     * no-op kept for symmetry). */
     if (state->context) {
-        lle_context_analyzer_free(state->context);
+        lle_word_context_free(state->context);
         state->context = NULL;
     }
 

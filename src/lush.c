@@ -130,8 +130,9 @@ int main(int argc, char **argv) {
             lle_fire_pre_command(shell_opts.command_string, is_bg);
         }
 
-        // Execute the command string and exit
-        int exit_status = parse_and_execute(shell_opts.command_string);
+        // Execute the command string and exit. -c is a single logical
+        // input with no surrounding source file, so line 1.
+        int exit_status = parse_and_execute(shell_opts.command_string, 1);
 
         /**
          * @brief Fire post-command event for command mode (Spec 26)
@@ -284,6 +285,17 @@ int main(int argc, char **argv) {
         exit(exit_status);
     }
 
+    /* Cumulative line counter for non-interactive (file) mode. Tracks
+     * the file-line of the FIRST character of the next batch the read
+     * loop hands to parse_and_execute. After each batch we advance by
+     * the number of source lines that batch consumed (counted by
+     * get_unified_input via its lines_consumed out-pointer) so multi-
+     * statement scripts produce file-relative source locations in
+     * structured-error output. Interactive REPL leaves this at 1
+     * always: each prompt batch is its own logical context.
+     */
+    size_t current_file_line = 1;
+
     // Read input (buffering complete syntactic units) until user exits
     // or EOF is read from either stdin or input file
     while (!exit_flag) {
@@ -295,7 +307,8 @@ int main(int argc, char **argv) {
         // Read complete command(s) using unified input system
         // This ensures consistent parsing behavior between interactive and
         // non-interactive modes
-        line = get_unified_input(in);
+        size_t batch_lines = 0;
+        line = get_unified_input_at(in, &batch_lines);
 
         if (line == NULL) {
             // Check if this was due to SIGINT (Ctrl+C) rather than real EOF
@@ -334,10 +347,33 @@ int main(int argc, char **argv) {
             lle_fire_pre_command(line, is_bg);
         }
 
-        // Execute using unified modern parser and store exit status
-        int exit_status = parse_and_execute(line);
+        // Execute using unified modern parser and store exit status.
+        // For non-interactive (file) mode we pass the cumulative file
+        // line so error reporting tracks the original script position;
+        // interactive mode passes 1 (each batch is its own context).
+        size_t batch_starting_line =
+            is_interactive_shell() ? 1 : current_file_line;
+        int exit_status = parse_and_execute(line, batch_starting_line);
         last_exit_status = exit_status;
         set_exit_status(exit_status);
+
+        /* POSIX-required shell abort (e.g. ${var:?word} on a null-or-
+         * unset parameter in a non-interactive shell). The trigger
+         * sites raise this flag via executor_request_posix_exit() and
+         * every loop body / command list short-circuits up to here.
+         * Honor it before consuming any more script input. */
+        if (global_executor && global_executor->shell_exit_requested) {
+            last_exit_status = global_executor->shell_exit_status;
+            set_exit_status(last_exit_status);
+            exit_flag = true;
+        }
+
+        /* Advance cumulative line counter by the number of source
+         * lines consumed by this batch. Interactive mode skips this
+         * since the counter stays at 1. */
+        if (!is_interactive_shell()) {
+            current_file_line += batch_lines;
+        }
 
         /* Fire post-command event for LLE shell integration (Spec 26)
          * Provides exit code and execution duration for prompt and history.
@@ -414,7 +450,7 @@ int main(int argc, char **argv) {
  * @return Exit status of the executed command (0 for success, non-zero for
  * failure)
  */
-int parse_and_execute(const char *command) {
+int parse_and_execute(const char *command, size_t starting_line) {
     // Use global persistent executor for all commands to maintain function
     // definitions
     if (!global_executor) {
@@ -434,7 +470,8 @@ int parse_and_execute(const char *command) {
         }
     }
 
-    int exit_status = executor_execute_command_line(global_executor, command);
+    int exit_status =
+        executor_execute_command_line(global_executor, command, starting_line);
 
     // Flush output streams after command execution
     // This ensures output appears immediately, especially under valgrind/piping

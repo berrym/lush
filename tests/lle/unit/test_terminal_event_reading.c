@@ -13,7 +13,7 @@
  */
 
 #include "lle/terminal_abstraction.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -21,22 +21,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
-
-/* Test counter */
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name)                                                             \
-    static void name(void);                                                    \
-    static void run_##name(void) {                                             \
-        tests_run++;                                                           \
-        printf("  Running %s...", #name);                                      \
-        fflush(stdout);                                                        \
-        name();                                                                \
-        tests_passed++;                                                        \
-        printf(" PASS\n");                                                     \
-    }                                                                          \
-    static void name(void)
 
 /* Helper to create a pipe with data */
 static int create_pipe_with_data(const void *data, size_t len, int *write_fd) {
@@ -71,15 +55,15 @@ static int create_pipe_with_data(const void *data, size_t len, int *write_fd) {
  * ============================================================================
  */
 
-TEST(test_timeout_zero_nonblocking) {
+TEST(timeout_zero_nonblocking) {
     /* Create empty pipe (no data, but keep write end open) */
     int write_fd;
     int pipe_fd = create_pipe_with_data(NULL, 0, &write_fd);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     /* Temporarily replace stdin with pipe */
     int saved_stdin = dup(STDIN_FILENO);
@@ -90,8 +74,8 @@ TEST(test_timeout_zero_nonblocking) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 0);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_TIMEOUT);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_TIMEOUT);
 
     /* Restore stdin */
     dup2(saved_stdin, STDIN_FILENO);
@@ -101,15 +85,15 @@ TEST(test_timeout_zero_nonblocking) {
     lle_unix_interface_destroy(interface);
 }
 
-TEST(test_timeout_short) {
+TEST(timeout_short) {
     /* Create empty pipe (keep write end open) */
     int write_fd;
     int pipe_fd = create_pipe_with_data(NULL, 0, &write_fd);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -119,9 +103,9 @@ TEST(test_timeout_short) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 100);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_TIMEOUT);
-    assert(event.timestamp > 0);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_TIMEOUT);
+    ASSERT(event.timestamp > 0);
 
     /* Note: We don't check exact timing as it can vary in test environments
      * The important thing is that it returns a timeout event */
@@ -138,15 +122,15 @@ TEST(test_timeout_short) {
  * ============================================================================
  */
 
-TEST(test_read_ascii_character) {
+TEST(read_ascii_character) {
     /* Create pipe with ASCII 'A' */
     unsigned char data[] = {'A'};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -155,12 +139,12 @@ TEST(test_read_ascii_character) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-    assert(event.data.character.codepoint == 'A');
-    assert(event.data.character.byte_count == 1);
-    assert(event.data.character.utf8_bytes[0] == 'A');
-    assert(event.timestamp > 0);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(event.data.character.codepoint == 'A');
+    ASSERT(event.data.character.byte_count == 1);
+    ASSERT(event.data.character.utf8_bytes[0] == 'A');
+    ASSERT(event.timestamp > 0);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -168,15 +152,15 @@ TEST(test_read_ascii_character) {
     lle_unix_interface_destroy(interface);
 }
 
-TEST(test_read_utf8_2byte) {
+TEST(read_utf8_2byte) {
     /* UTF-8 for 'é' (U+00E9) = C3 A9 */
     unsigned char data[] = {0xC3, 0xA9};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -185,12 +169,12 @@ TEST(test_read_utf8_2byte) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-    assert(event.data.character.codepoint == 0x00E9); /* é */
-    assert(event.data.character.byte_count == 2);
-    assert((unsigned char)event.data.character.utf8_bytes[0] == 0xC3);
-    assert((unsigned char)event.data.character.utf8_bytes[1] == 0xA9);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(event.data.character.codepoint == 0x00E9); /* é */
+    ASSERT(event.data.character.byte_count == 2);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[0] == 0xC3);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[1] == 0xA9);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -198,15 +182,15 @@ TEST(test_read_utf8_2byte) {
     lle_unix_interface_destroy(interface);
 }
 
-TEST(test_read_utf8_3byte) {
+TEST(read_utf8_3byte) {
     /* UTF-8 for '€' (U+20AC) = E2 82 AC */
     unsigned char data[] = {0xE2, 0x82, 0xAC};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -215,13 +199,13 @@ TEST(test_read_utf8_3byte) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-    assert(event.data.character.codepoint == 0x20AC); /* € */
-    assert(event.data.character.byte_count == 3);
-    assert((unsigned char)event.data.character.utf8_bytes[0] == 0xE2);
-    assert((unsigned char)event.data.character.utf8_bytes[1] == 0x82);
-    assert((unsigned char)event.data.character.utf8_bytes[2] == 0xAC);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(event.data.character.codepoint == 0x20AC); /* € */
+    ASSERT(event.data.character.byte_count == 3);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[0] == 0xE2);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[1] == 0x82);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[2] == 0xAC);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -229,15 +213,15 @@ TEST(test_read_utf8_3byte) {
     lle_unix_interface_destroy(interface);
 }
 
-TEST(test_read_utf8_4byte) {
+TEST(read_utf8_4byte) {
     /* UTF-8 for '𝄞' (U+1D11E) = F0 9D 84 9E */
     unsigned char data[] = {0xF0, 0x9D, 0x84, 0x9E};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -246,14 +230,14 @@ TEST(test_read_utf8_4byte) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-    assert(event.data.character.codepoint == 0x1D11E); /* 𝄞 */
-    assert(event.data.character.byte_count == 4);
-    assert((unsigned char)event.data.character.utf8_bytes[0] == 0xF0);
-    assert((unsigned char)event.data.character.utf8_bytes[1] == 0x9D);
-    assert((unsigned char)event.data.character.utf8_bytes[2] == 0x84);
-    assert((unsigned char)event.data.character.utf8_bytes[3] == 0x9E);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(event.data.character.codepoint == 0x1D11E); /* 𝄞 */
+    ASSERT(event.data.character.byte_count == 4);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[0] == 0xF0);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[1] == 0x9D);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[2] == 0x84);
+    ASSERT((unsigned char)event.data.character.utf8_bytes[3] == 0x9E);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -261,15 +245,15 @@ TEST(test_read_utf8_4byte) {
     lle_unix_interface_destroy(interface);
 }
 
-TEST(test_read_invalid_utf8) {
+TEST(read_invalid_utf8) {
     /* Invalid UTF-8 sequence - should get replacement character */
     unsigned char data[] = {0xFF}; /* Invalid first byte */
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -278,11 +262,11 @@ TEST(test_read_invalid_utf8) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-    assert(event.data.character.codepoint ==
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(event.data.character.codepoint ==
            0xFFFD); /* Replacement character */
-    assert(event.data.character.byte_count == 1);
+    ASSERT(event.data.character.byte_count == 1);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -295,15 +279,15 @@ TEST(test_read_invalid_utf8) {
  * ============================================================================
  */
 
-TEST(test_resize_event_priority) {
+TEST(resize_event_priority) {
     /* Create pipe with data */
     unsigned char data[] = {'A'};
     int pipe_fd = create_pipe_with_data(data, sizeof(data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -316,18 +300,18 @@ TEST(test_resize_event_priority) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_WINDOW_RESIZE);
-    assert(event.data.resize.new_width > 0);
-    assert(event.data.resize.new_height > 0);
-    assert(interface->size_changed == true);
-    assert(interface->sigwinch_received == false); /* Flag cleared */
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_WINDOW_RESIZE);
+    ASSERT(event.data.resize.new_width > 0);
+    ASSERT(event.data.resize.new_height > 0);
+    ASSERT(interface->size_changed == true);
+    ASSERT(interface->sigwinch_received == false); /* Flag cleared */
 
     /* Next read should get the character */
     result = lle_unix_interface_read_event(interface, &event, 1000);
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-    assert(event.data.character.codepoint == 'A');
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(event.data.character.codepoint == 'A');
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -340,16 +324,16 @@ TEST(test_resize_event_priority) {
  * ============================================================================
  */
 
-TEST(test_function_keys_f1_f4) {
+TEST(function_keys_f1_f4) {
     /* Test F1-F4 keys using SS3 sequences (ESC O P/Q/R/S) */
     /* F1: ESC O P */
     unsigned char f1_data[] = {0x1B, 'O', 'P'};
     int pipe_fd = create_pipe_with_data(f1_data, sizeof(f1_data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -364,7 +348,7 @@ TEST(test_function_keys_f1_f4) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
     /* Event type could be CHARACTER (ESC), SPECIAL_KEY, or TIMEOUT depending on
      * parser */
 
@@ -374,15 +358,15 @@ TEST(test_function_keys_f1_f4) {
     lle_unix_interface_destroy(interface);
 }
 
-TEST(test_function_keys_f5_f12) {
+TEST(function_keys_f5_f12) {
     /* Test F5 key using CSI sequence (ESC [ 1 5 ~) */
     unsigned char f5_data[] = {0x1B, '[', '1', '5', '~'};
     int pipe_fd = create_pipe_with_data(f5_data, sizeof(f5_data), NULL);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -392,7 +376,7 @@ TEST(test_function_keys_f5_f12) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
     /* Without full parser integration, exact behavior varies */
 
     dup2(saved_stdin, STDIN_FILENO);
@@ -406,15 +390,15 @@ TEST(test_function_keys_f5_f12) {
  * ============================================================================
  */
 
-TEST(test_eof_detection) {
+TEST(eof_detection) {
     /* Create pipe and immediately close write end */
     int pipefd[2];
-    assert(pipe(pipefd) == 0);
+    ASSERT(pipe(pipefd) == 0);
     close(pipefd[1]); /* Close write end -> EOF on read */
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipefd[0], STDIN_FILENO);
@@ -423,9 +407,9 @@ TEST(test_eof_detection) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_EOF);
-    assert(event.timestamp > 0);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_EOF);
+    ASSERT(event.timestamp > 0);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -438,20 +422,20 @@ TEST(test_eof_detection) {
  * ============================================================================
  */
 
-TEST(test_null_parameter_validation) {
+TEST(null_parameter_validation) {
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     lle_input_event_t event;
 
     /* Null interface */
     result = lle_unix_interface_read_event(NULL, &event, 100);
-    assert(result == LLE_ERROR_INVALID_PARAMETER);
+    ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
     /* Null event */
     result = lle_unix_interface_read_event(interface, NULL, 100);
-    assert(result == LLE_ERROR_INVALID_PARAMETER);
+    ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
     lle_unix_interface_destroy(interface);
 }
@@ -461,16 +445,16 @@ TEST(test_null_parameter_validation) {
  * ============================================================================
  */
 
-TEST(test_multiple_events_sequence) {
+TEST(multiple_events_sequence) {
     /* Create pipe with multiple characters (keep write end open) */
     unsigned char data[] = {'A', 'B', 'C'};
     int write_fd;
     int pipe_fd = create_pipe_with_data(data, sizeof(data), &write_fd);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -481,15 +465,15 @@ TEST(test_multiple_events_sequence) {
         lle_input_event_t event;
         result = lle_unix_interface_read_event(interface, &event, 1000);
 
-        assert(result == LLE_SUCCESS);
-        assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-        assert(event.data.character.codepoint == (uint32_t)('A' + i));
+        ASSERT(result == LLE_SUCCESS);
+        ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+        ASSERT(event.data.character.codepoint == (uint32_t)('A' + i));
     }
 
     /* Fourth read should timeout (no more data, but write end still open) */
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 100);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
     if (event.type != LLE_INPUT_TYPE_TIMEOUT) {
         fprintf(stderr, "\nExpected TIMEOUT (5), got event type: %d\n",
                 event.type);
@@ -502,7 +486,7 @@ TEST(test_multiple_events_sequence) {
                         : '?');
         }
     }
-    assert(event.type == LLE_INPUT_TYPE_TIMEOUT);
+    ASSERT(event.type == LLE_INPUT_TYPE_TIMEOUT);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -511,16 +495,16 @@ TEST(test_multiple_events_sequence) {
     lle_unix_interface_destroy(interface);
 }
 
-TEST(test_mixed_event_types) {
+TEST(mixed_event_types) {
     /* Test interleaved resize and character events */
     unsigned char data[] = {'X'};
     int write_fd;
     int pipe_fd = create_pipe_with_data(data, sizeof(data), &write_fd);
-    assert(pipe_fd >= 0);
+    ASSERT(pipe_fd >= 0);
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
-    assert(result == LLE_SUCCESS);
+    ASSERT(result == LLE_SUCCESS);
 
     int saved_stdin = dup(STDIN_FILENO);
     dup2(pipe_fd, STDIN_FILENO);
@@ -532,19 +516,19 @@ TEST(test_mixed_event_types) {
     /* Should get resize first */
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_WINDOW_RESIZE);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_WINDOW_RESIZE);
 
     /* Then character */
     result = lle_unix_interface_read_event(interface, &event, 1000);
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_CHARACTER);
-    assert(event.data.character.codepoint == 'X');
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_CHARACTER);
+    ASSERT(event.data.character.codepoint == 'X');
 
     /* Then timeout (write end still open) */
     result = lle_unix_interface_read_event(interface, &event, 0);
-    assert(result == LLE_SUCCESS);
-    assert(event.type == LLE_INPUT_TYPE_TIMEOUT);
+    ASSERT(result == LLE_SUCCESS);
+    ASSERT(event.type == LLE_INPUT_TYPE_TIMEOUT);
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -563,35 +547,32 @@ int main(void) {
     printf("========================================================\n\n");
 
     printf("Timeout Tests:\n");
-    run_test_timeout_zero_nonblocking();
-    run_test_timeout_short();
+    RUN_TEST(timeout_zero_nonblocking);
+    RUN_TEST(timeout_short);
 
     printf("\nCharacter Reading Tests:\n");
-    run_test_read_ascii_character();
-    run_test_read_utf8_2byte();
-    run_test_read_utf8_3byte();
-    run_test_read_utf8_4byte();
-    run_test_read_invalid_utf8();
+    RUN_TEST(read_ascii_character);
+    RUN_TEST(read_utf8_2byte);
+    RUN_TEST(read_utf8_3byte);
+    RUN_TEST(read_utf8_4byte);
+    RUN_TEST(read_invalid_utf8);
 
     printf("\nWindow Resize Tests:\n");
-    run_test_resize_event_priority();
+    RUN_TEST(resize_event_priority);
 
     printf("\nFunction Key Tests:\n");
-    run_test_function_keys_f1_f4();
-    run_test_function_keys_f5_f12();
+    RUN_TEST(function_keys_f1_f4);
+    RUN_TEST(function_keys_f5_f12);
 
     printf("\nEOF Detection Tests:\n");
-    run_test_eof_detection();
+    RUN_TEST(eof_detection);
 
     printf("\nError Handling Tests:\n");
-    run_test_null_parameter_validation();
+    RUN_TEST(null_parameter_validation);
 
     printf("\nIntegration Tests:\n");
-    run_test_multiple_events_sequence();
-    run_test_mixed_event_types();
+    RUN_TEST(multiple_events_sequence);
+    RUN_TEST(mixed_event_types);
 
-    printf("\n========================================================\n");
-    printf("Test Results: %d/%d tests passed\n", tests_passed, tests_run);
-
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

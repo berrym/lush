@@ -9,6 +9,7 @@
 
 #include "debug.h"
 
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,39 +18,6 @@
 // ============================================================================
 // Test Framework
 // ============================================================================
-
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name) static void test_##name(void)
-
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        printf("  Running %s...", #name);                                      \
-        fflush(stdout);                                                        \
-        test_##name();                                                         \
-        printf(" PASSED\n");                                                   \
-        tests_passed++;                                                        \
-    } while (0)
-
-#define ASSERT(cond, msg)                                                      \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf(" FAILED: %s\n", msg);                                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr, msg) ASSERT((ptr) != NULL, msg)
-#define ASSERT_NULL(ptr, msg) ASSERT((ptr) == NULL, msg)
-#define ASSERT_TRUE(val, msg) ASSERT((val) == true, msg)
-#define ASSERT_FALSE(val, msg) ASSERT((val) == false, msg)
-#define ASSERT_EQ(a, b, msg) ASSERT((a) == (b), msg)
-#define ASSERT_NE(a, b, msg) ASSERT((a) != (b), msg)
-#define ASSERT_STR_EQ(a, b, msg) ASSERT(strcmp((a), (b)) == 0, msg)
 
 // ============================================================================
 // Test Helper Functions
@@ -60,13 +28,16 @@ static const char *test_script_dir = "/tmp/lush_test_scripts";
 static void setup_test_dir(void) {
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "mkdir -p %s", test_script_dir);
-    system(cmd);
+    if (system(cmd) != 0) {
+        fprintf(stderr, "test setup: mkdir failed for %s\n", test_script_dir);
+        exit(EXIT_FAILURE);
+    }
 }
 
 static void cleanup_test_dir(void) {
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "rm -rf %s", test_script_dir);
-    system(cmd);
+    (void)!system(cmd);
 }
 
 static char *create_test_script(const char *name, const char *content) {
@@ -633,8 +604,8 @@ TEST(lint_with_dry_run) {
     FILE *f = fopen(path, "r");
     ASSERT_NOT_NULL(f, "File should still exist");
     char buf[256];
-    fgets(buf, sizeof(buf), f);
-    fgets(buf, sizeof(buf), f); // Second line
+    ASSERT_NOT_NULL(fgets(buf, sizeof(buf), f), "read first line");
+    ASSERT_NOT_NULL(fgets(buf, sizeof(buf), f), "read second line");
     fclose(f);
 
     // File should still have "source" not "."
@@ -723,10 +694,5 @@ int main(void) {
     RUN_TEST(lint_with_dry_run);
     RUN_TEST(lint_actionable_only);
 
-    printf("\n========================================\n");
-    printf("Tests run: %d, Passed: %d, Failed: %d\n", tests_run, tests_passed,
-           tests_failed);
-    printf("========================================\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

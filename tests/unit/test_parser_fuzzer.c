@@ -20,41 +20,20 @@
 
 #include "node.h"
 #include "parser.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
+ * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
+ * the framework's ASSERT_TRUE(cond, msg) which has matching semantics. */
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+
 /* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
 
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
-
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        tests_run++;                                                           \
-        int _prev_failed = tests_failed;                                       \
-        printf("  Running: %s...", #name);                                     \
-        fflush(stdout);                                                        \
-        test_##name();                                                         \
-        if (tests_failed == _prev_failed) {                                    \
-            printf(" PASSED\n");                                               \
-            tests_passed++;                                                    \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf(" FAILED: %s\n", message);                                  \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
 #define ASSERT_PARSES(input)                                                   \
     do {                                                                       \
@@ -64,10 +43,8 @@ static int tests_failed = 0;
         if (parser_has_error(_p)) {                                            \
             printf(" FAILED: parse error for: %s\n", input);                   \
             printf("      Error: %s\n", parser_error(_p));                     \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            tests_failed++;                                                    \
             parser_free(_p);                                                   \
-            return;                                                            \
+            TEST_FAIL_FMT("parse error for: %s", input);                       \
         }                                                                      \
         ASSERT(_n != NULL, "parser returned NULL for: " input);                \
         free_node_tree(_n);                                                    \
@@ -80,12 +57,9 @@ static int tests_failed = 0;
         ASSERT(_p != NULL, "parser_new failed");                               \
         node_t *_n = parser_parse(_p);                                         \
         if (!parser_has_error(_p) && _n != NULL) {                             \
-            printf(" FAILED: expected parse error for: %s\n", input);          \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            tests_failed++;                                                    \
             free_node_tree(_n);                                                \
             parser_free(_p);                                                   \
-            return;                                                            \
+            TEST_FAIL_FMT("expected parse error for: %s", input);              \
         }                                                                      \
         if (_n)                                                                \
             free_node_tree(_n);                                                \
@@ -1013,10 +987,5 @@ int main(void) {
     RUN_TEST(error_stray_done);
     RUN_TEST(error_stray_esac);
 
-    printf("\n=== Results ===\n");
-    printf("Tests run:    %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_failed);
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

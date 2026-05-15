@@ -1,7 +1,0 @@
-{:{case "$1" in
-    start)
-        echoez startingcho $$ $? $
-   ±  # ;;
-    sthen
-     Úß echo stoppi!ng $# $@ $
-*

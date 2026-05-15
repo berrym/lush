@@ -1,0 +1,9 @@
+; e{recho!"got: @$line"; }
+echo "input" >&${reader e{recho!"got: @$line"; }
+echo line"; }
+echo "input" >&${reader e{recho!"got: @$line"; }
+echo "input" >&${reader[1"inpline"; }
+echo "input" >&${reader e{recho!"got: @$line"; }
+echo line"; }
+eut" >&${reader[0]}
+[1]}

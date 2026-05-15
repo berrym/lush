@@ -825,6 +825,6 @@ rm /tmp/out1 /tmp/out2
 ## See Also
 
 - [EXTENDED_SYNTAX.md](EXTENDED_SYNTAX.md) - Extended language features
-- [SHELL_MODES.md](SHELL_MODES.md) - Portability modes
+- [CONFIGURATION.md](CONFIGURATION.md) - Portability modes
 - [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) - Complete debugging reference
 - [HOOKS_AND_PLUGINS.md](HOOKS_AND_PLUGINS.md) - Hook system

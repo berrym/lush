@@ -1,6 +1,0 @@
-if [ do-f file  do
-      do 
-            *pattern*)
-                echo "found: $i"
-                ;;
-        e

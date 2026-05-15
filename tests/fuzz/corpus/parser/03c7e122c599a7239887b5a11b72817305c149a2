@@ -1,0 +1,4 @@
+select item in; do
+    e"$item"
+ 
+done

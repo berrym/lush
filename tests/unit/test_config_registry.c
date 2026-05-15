@@ -14,68 +14,48 @@
 
 #include "config_registry.h"
 
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+/* This file's pre-existing helpers used 2-arg variants of ASSERT_EQ
+ * and ASSERT_STR_EQ (no message). Bridge them to the framework's
+ * 3-arg versions by synthesizing a message. The bare 1-arg ASSERT
+ * already matches the framework's signature exactly. */
+#undef ASSERT_EQ
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#undef ASSERT_STR_EQ
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+
+/* These tests assume a fresh registry per test. The pre-existing local
+ * RUN_TEST wrapped every call with cleanup+init; preserve that here by
+ * overriding RUN_TEST and deferring to the framework's internal state
+ * for accounting and failure isolation. */
+#undef RUN_TEST
+#define RUN_TEST(name)                                                         \
+    do {                                                                       \
+        test_framework_run++;                                                  \
+        test_framework_current_name = #name;                                   \
+        printf("  %s ... ", #name);                                            \
+        fflush(stdout);                                                        \
+        config_registry_cleanup();                                             \
+        config_registry_init();                                                \
+        if (setjmp(test_framework_jmpbuf) == 0) {                              \
+            test_##name();                                                     \
+            test_framework_passed++;                                           \
+            printf("PASS\n");                                                  \
+        } else {                                                               \
+            test_framework_failed++;                                           \
+        }                                                                      \
+        config_registry_cleanup();                                             \
+    } while (0)
+
 /* ============================================================================
  * Test Framework
  * ============================================================================
  */
-
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Testing: %s ... ", #name);                                   \
-        fflush(stdout);                                                        \
-        tests_run++;                                                           \
-        config_registry_cleanup();                                             \
-        config_registry_init();                                                \
-        test_##name();                                                         \
-        config_registry_cleanup();                                             \
-        printf("PASSED\n");                                                    \
-        tests_passed++;                                                        \
-    } while (0)
-
-#define ASSERT(cond)                                                           \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            printf("FAILED\n");                                                \
-            printf("    Assertion failed: %s\n", #cond);                       \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("FAILED\n");                                                \
-            printf("    Expected: %s == %s\n", #a, #b);                        \
-            printf("    Got: %lld vs %lld\n", (long long)(a), (long long)(b)); \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("FAILED\n");                                                \
-            printf("    Expected: \"%s\"\n", (b));                             \
-            printf("    Got: \"%s\"\n", (a));                                  \
-            printf("    At: %s:%d\n", __FILE__, __LINE__);                     \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * Test Section Definitions
@@ -651,7 +631,7 @@ TEST(on_load_hook) {
     char tmpfile[] = "/tmp/lush_test_config_XXXXXX";
     int fd = mkstemp(tmpfile);
     ASSERT(fd >= 0);
-    write(fd, "[test]\ntest = true\n", 19);
+    ASSERT_EQ((int)write(fd, "[test]\ntest = true\n", 19), 19);
     close(fd);
 
     on_load_called = 0;
@@ -686,6 +666,117 @@ TEST(sync_hooks) {
 
     config_registry_sync_from_runtime();
     ASSERT_EQ(sync_from_runtime_called, 1);
+}
+
+/* ============================================================================
+ * Per-Mode Default Tests
+ * ============================================================================
+ */
+
+TEST(mode_default_unregistered_option_fails) {
+    creg_value_t v = creg_value_boolean(true);
+    creg_result_t r = config_registry_set_mode_default("shell.does_not_exist",
+                                                       SHELL_MODE_LUSH, &v);
+    ASSERT(r != CREG_SUCCESS);
+}
+
+TEST(mode_default_type_mismatch_fails) {
+    config_registry_register_section(&shell_section);
+    /* errexit is BOOLEAN; passing INTEGER should fail */
+    creg_value_t v = creg_value_integer(42);
+    creg_result_t r =
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_LUSH, &v);
+    ASSERT(r == CREG_ERROR_TYPE_MISMATCH);
+}
+
+TEST(mode_default_applies_for_registered_mode) {
+    config_registry_register_section(&shell_section);
+
+    /* Register a per-mode default: errexit=true under POSIX, false elsewhere
+     * (default). */
+    creg_value_t posix_default = creg_value_boolean(true);
+    ASSERT_EQ(config_registry_set_mode_default(
+                  "shell.errexit", SHELL_MODE_POSIX, &posix_default),
+              CREG_SUCCESS);
+
+    /* Apply POSIX defaults: errexit should now be true. */
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_POSIX),
+              CREG_SUCCESS);
+    bool got = false;
+    ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
+    ASSERT(got == true);
+
+    /* Apply LUSH defaults: errexit has no per-mode default for LUSH, so
+     * the value persists from the prior apply. */
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_LUSH),
+              CREG_SUCCESS);
+    got = false;
+    ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
+    ASSERT(got == true); /* unchanged because LUSH has no override */
+}
+
+TEST(mode_default_replaces_prior_value_for_same_mode) {
+    config_registry_register_section(&shell_section);
+
+    creg_value_t v1 = creg_value_boolean(true);
+    creg_value_t v2 = creg_value_boolean(false);
+
+    ASSERT_EQ(
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_BASH, &v1),
+        CREG_SUCCESS);
+    ASSERT_EQ(
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_BASH, &v2),
+        CREG_SUCCESS);
+
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_BASH),
+              CREG_SUCCESS);
+    bool got = true;
+    ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
+    ASSERT(got == false); /* second registration won */
+}
+
+TEST(mode_default_independent_per_mode) {
+    config_registry_register_section(&shell_section);
+
+    creg_value_t bash_v = creg_value_boolean(true);
+    creg_value_t posix_v = creg_value_boolean(false);
+
+    ASSERT_EQ(config_registry_set_mode_default("shell.errexit", SHELL_MODE_BASH,
+                                               &bash_v),
+              CREG_SUCCESS);
+    ASSERT_EQ(config_registry_set_mode_default("shell.errexit",
+                                               SHELL_MODE_POSIX, &posix_v),
+              CREG_SUCCESS);
+
+    /* Apply BASH defaults: errexit -> true */
+    config_registry_apply_mode_defaults(SHELL_MODE_BASH);
+    bool got;
+    config_registry_get_boolean("shell.errexit", &got);
+    ASSERT(got == true);
+
+    /* Apply POSIX defaults: errexit -> false */
+    config_registry_apply_mode_defaults(SHELL_MODE_POSIX);
+    config_registry_get_boolean("shell.errexit", &got);
+    ASSERT(got == false);
+
+    /* Back to BASH: errexit -> true again (re-seed-every-time). */
+    config_registry_apply_mode_defaults(SHELL_MODE_BASH);
+    config_registry_get_boolean("shell.errexit", &got);
+    ASSERT(got == true);
+}
+
+TEST(mode_default_invalid_mode_fails) {
+    config_registry_register_section(&shell_section);
+    creg_value_t v = creg_value_boolean(true);
+    creg_result_t r =
+        config_registry_set_mode_default("shell.errexit", SHELL_MODE_COUNT, &v);
+    ASSERT(r == CREG_ERROR_INVALID_PARAM);
+}
+
+TEST(mode_default_apply_invalid_mode_fails) {
+    config_registry_register_section(&shell_section);
+    ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_COUNT),
+              CREG_ERROR_INVALID_PARAM);
 }
 
 /* ============================================================================
@@ -747,10 +838,14 @@ int main(void) {
     RUN_TEST(on_load_hook);
     RUN_TEST(sync_hooks);
 
-    printf("\n=== Results ===\n");
-    printf("Tests run: %d\n", tests_run);
-    printf("Tests passed: %d\n", tests_passed);
-    printf("Tests failed: %d\n", tests_failed);
+    printf("\nPer-Mode Default Tests:\n");
+    RUN_TEST(mode_default_unregistered_option_fails);
+    RUN_TEST(mode_default_type_mismatch_fails);
+    RUN_TEST(mode_default_applies_for_registered_mode);
+    RUN_TEST(mode_default_replaces_prior_value_for_same_mode);
+    RUN_TEST(mode_default_independent_per_mode);
+    RUN_TEST(mode_default_invalid_mode_fails);
+    RUN_TEST(mode_default_apply_invalid_mode_fails);
 
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

@@ -16,61 +16,20 @@
 
 #include "lle/async_worker.h"
 #include "lle/error_handling.h"
+#include "test_framework.h"
 
-#include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-/* Test result tracking */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-/* Callback state tracking */
+/* Callback state tracking — shared by completion-callback tests */
 static pthread_mutex_t callback_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t callback_cond = PTHREAD_COND_INITIALIZER;
 static int callback_count = 0;
 static lle_async_response_t last_response;
 static bool response_received = false;
-
-/* ========================================================================== */
-/*                            TEST FRAMEWORK                                  */
-/* ========================================================================== */
-
-#define TEST(name)                                                             \
-    static void test_##name(void);                                             \
-    static void run_test_##name(void) {                                        \
-        printf("Running test: %s\n", #name);                                   \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-        tests_passed++;                                                        \
-        printf("  PASSED\n");                                                  \
-    }                                                                          \
-    static void test_##name(void)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("  ASSERTION FAILED: %s\n", message);                       \
-            printf("    at %s:%d\n", __FILE__, __LINE__);                      \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    ASSERT((actual) == (expected), message)
-
-#define ASSERT_TRUE(condition, message) ASSERT((condition), message)
-
-#define ASSERT_FALSE(condition, message) ASSERT(!(condition), message)
-
-#define ASSERT_NOT_NULL(ptr, message) ASSERT((ptr) != NULL, message)
-
-#define ASSERT_NULL(ptr, message) ASSERT((ptr) == NULL, message)
 
 /* ========================================================================== */
 /*                          TEST HELPER FUNCTIONS                             */
@@ -258,7 +217,7 @@ TEST(callback_invoked_on_completion) {
 
     /* Get current directory for the request */
     char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
+    ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
     lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
     snprintf(req->cwd, sizeof(req->cwd), "%s", cwd);
@@ -289,7 +248,7 @@ TEST(git_status_detects_repo) {
 
     /* Use parent of build directory (should be the git repo) */
     char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
+    ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
     /* If we're in builddir, go up one level to the repo root */
     char *builddir = strstr(cwd, "/build");
@@ -368,7 +327,7 @@ TEST(statistics_tracking) {
 
     /* Submit a request */
     char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
+    ASSERT_NOT_NULL(getcwd(cwd, sizeof(cwd)), "getcwd for test request");
 
     lle_async_request_t *req = lle_async_request_create(LLE_ASYNC_GIT_STATUS);
     snprintf(req->cwd, sizeof(req->cwd), "%s", cwd);
@@ -402,39 +361,30 @@ TEST(pending_count) {
 /* ========================================================================== */
 
 int main(void) {
-    printf("\n");
-    printf("===========================================\n");
-    printf("    LLE Async Worker Unit Tests\n");
-    printf("===========================================\n\n");
+    printf("=== LLE Async Worker Unit Tests ===\n\n");
 
-    /* Lifecycle tests */
-    run_test_worker_init_null_output();
-    run_test_worker_init_success();
-    run_test_worker_start_success();
-    run_test_worker_double_start_fails();
-    run_test_worker_shutdown_and_wait();
-    run_test_worker_destroy_null_safe();
+    printf("--- Lifecycle ---\n");
+    RUN_TEST(worker_init_null_output);
+    RUN_TEST(worker_init_success);
+    RUN_TEST(worker_start_success);
+    RUN_TEST(worker_double_start_fails);
+    RUN_TEST(worker_shutdown_and_wait);
+    RUN_TEST(worker_destroy_null_safe);
 
-    /* Request tests */
-    run_test_request_create_git_status();
-    run_test_request_free_null_safe();
-    run_test_submit_to_stopped_worker_fails();
-    run_test_submit_after_shutdown_fails();
+    printf("\n--- Request ---\n");
+    RUN_TEST(request_create_git_status);
+    RUN_TEST(request_free_null_safe);
+    RUN_TEST(submit_to_stopped_worker_fails);
+    RUN_TEST(submit_after_shutdown_fails);
 
-    /* Callback tests */
-    run_test_callback_invoked_on_completion();
-    run_test_git_status_detects_repo();
-    run_test_git_status_non_repo();
+    printf("\n--- Callbacks (real task submission + result delivery) ---\n");
+    RUN_TEST(callback_invoked_on_completion);
+    RUN_TEST(git_status_detects_repo);
+    RUN_TEST(git_status_non_repo);
 
-    /* Statistics tests */
-    run_test_statistics_tracking();
-    run_test_pending_count();
+    printf("\n--- Statistics ---\n");
+    RUN_TEST(statistics_tracking);
+    RUN_TEST(pending_count);
 
-    /* Summary */
-    printf("\n===========================================\n");
-    printf("Test Results: %d passed, %d failed, %d total\n", tests_passed,
-           tests_failed, tests_run);
-    printf("===========================================\n\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

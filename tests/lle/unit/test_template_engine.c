@@ -7,54 +7,28 @@
 
 #include "lle/error_handling.h"
 #include "lle/prompt/template.h"
+#include "test_framework.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* Test counters */
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("Running test: %s\n", #name);                                   \
-        test_##name();                                                         \
-    } while (0)
-
+/* Test bodies in this file use the older 2-arg / no-arg ASSERT forms.
+ * Override them to call the shared framework so each test still gets
+ * setjmp/longjmp failure isolation without editing every test body.
+ * PASS() becomes a no-op since the framework auto-counts on TEST exit. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
 #define ASSERT(cond)                                                           \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            printf("  FAILED: %s (line %d)\n", #cond, __LINE__);               \
-            tests_failed++;                                                    \
-            return;                                                            \
+            TEST_FAIL_MSG(#cond);                                              \
         }                                                                      \
     } while (0)
-
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAILED: %s == %s (line %d)\n", #a, #b, __LINE__);        \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("  FAILED: '%s' == '%s' (line %d)\n", (a), (b), __LINE__);  \
-            tests_failed++;                                                    \
-            return;                                                            \
-        }                                                                      \
-    } while (0)
-
-#define PASS()                                                                 \
-    do {                                                                       \
-        printf("  PASSED\n");                                                  \
-        tests_passed++;                                                        \
-    } while (0)
+#define ASSERT_EQ(a, b) ASSERT((a) == (b))
+#define ASSERT_STR_EQ(a, b) ASSERT(strcmp((a), (b)) == 0)
+#define PASS() ((void)0)
 
 /* ========================================================================== */
 /* Mock render context callbacks                                              */
@@ -553,10 +527,5 @@ int main(void) {
     RUN_TEST(render_complex_template);
     RUN_TEST(render_missing_segment);
 
-    printf("\n===========================================\n");
-    printf("Test Results: %d passed, %d failed, %d total\n", tests_passed,
-           tests_failed, tests_passed + tests_failed);
-    printf("===========================================\n");
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

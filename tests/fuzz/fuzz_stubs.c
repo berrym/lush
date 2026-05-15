@@ -60,53 +60,15 @@ void free_function_params(function_param_t *params) {
 bool is_posix_mode_enabled(void) { return false; }
 
 /* ============================================================================
- * UTF-8 Support Stubs (from LLE)
+ * UTF-8 Support
  * ============================================================================
- */
-
-/**
- * @brief Decode a UTF-8 codepoint from a byte sequence
  *
- * Minimal implementation for fuzzing - just handles basic decoding.
+ * Real implementations now come from src/lle/unicode/utf8_support.c and
+ * src/lle/unicode/unicode_grapheme.c, which are linked into the fuzz
+ * binaries directly (issue #50). The local stub of
+ * lle_utf8_decode_codepoint that lived here was removed to avoid a
+ * duplicate-symbol link error.
  */
-int lle_utf8_decode_codepoint(const char *str, size_t len,
-                              uint32_t *codepoint) {
-    if (!str || len == 0 || !codepoint) {
-        return 0;
-    }
-
-    unsigned char c = (unsigned char)str[0];
-
-    /* ASCII (single byte) */
-    if (c < 0x80) {
-        *codepoint = c;
-        return 1;
-    }
-
-    /* 2-byte sequence */
-    if ((c & 0xE0) == 0xC0 && len >= 2) {
-        *codepoint = ((c & 0x1F) << 6) | (str[1] & 0x3F);
-        return 2;
-    }
-
-    /* 3-byte sequence */
-    if ((c & 0xF0) == 0xE0 && len >= 3) {
-        *codepoint =
-            ((c & 0x0F) << 12) | ((str[1] & 0x3F) << 6) | (str[2] & 0x3F);
-        return 3;
-    }
-
-    /* 4-byte sequence */
-    if ((c & 0xF8) == 0xF0 && len >= 4) {
-        *codepoint = ((c & 0x07) << 18) | ((str[1] & 0x3F) << 12) |
-                     ((str[2] & 0x3F) << 6) | (str[3] & 0x3F);
-        return 4;
-    }
-
-    /* Invalid - treat as single byte */
-    *codepoint = c;
-    return 1;
-}
 
 /* ============================================================================
  * Error Function Stubs (from errors.c)

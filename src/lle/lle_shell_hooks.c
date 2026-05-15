@@ -251,8 +251,9 @@ static void execute_prompt_command(void) {
         if (commands && count > 0) {
             for (size_t i = 0; i < count; i++) {
                 if (commands[i] && commands[i][0] != '\0') {
-                    // Execute each command in the array
-                    executor_execute_command_line(executor, commands[i]);
+                    /* PROMPT_COMMAND entries are independent logical
+                     * commands; line 1 of their own context. */
+                    executor_execute_command_line(executor, commands[i], 1);
                 }
             }
             // Free the commands array
@@ -267,7 +268,7 @@ static void execute_prompt_command(void) {
     // Fall back to string form (traditional Bash style)
     char *cmd_str = symtable_get_global("PROMPT_COMMAND");
     if (cmd_str && cmd_str[0] != '\0') {
-        executor_execute_command_line(executor, cmd_str);
+        executor_execute_command_line(executor, cmd_str, 1);
         free(cmd_str);
     }
 }

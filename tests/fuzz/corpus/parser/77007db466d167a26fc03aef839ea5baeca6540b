@@ -1,0 +1,8 @@
+cmd1 d.log
+cat <<-INDENTED
+	leading tabpped
+	byMthe dash variant
+	INDENTED
+exec < input.txt <<-INDENTED
+	l}eáding i:ntöðINDENTED
+exec < )nput.txt

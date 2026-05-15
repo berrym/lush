@@ -23,9 +23,9 @@
 #include "config.h"
 #include "dirstack.h"
 #include "errors.h"
-#include "history.h"
 #include "input.h"
 #include "posix_history.h"
+#include "shell_error.h"
 #include "shell_mode.h"
 
 #include "lle/completion/ssh_hosts.h"
@@ -199,10 +199,62 @@ static void ensure_bottom_margin(void) {
     char cmd[64];
     int len = snprintf(cmd, sizeof(cmd), "\x1b[s\x1b[%d;1H\n\x1b[u", rows);
     if (len > 0 && (size_t)len < sizeof(cmd)) {
-        (void)write(STDOUT_FILENO, cmd, (size_t)len);
+        /* (void)! is the portable suppression idiom; plain (void)cast
+         * does not silence gcc -Wunused-result on functions decorated
+         * with warn_unused_result. */
+        (void)!write(STDOUT_FILENO, cmd, (size_t)len);
     }
 
     margin_created = true;
+}
+
+/**
+ * @brief Resolve the initial shell mode at startup.
+ *
+ * Priority order:
+ *   1. CLI flag (--posix, --bash, --zsh, --lush) -- most explicit.
+ *   2. Shebang of the script being run (peeked early; consumed later
+ *      by process_shebang during script execution).
+ *   3. Default to SHELL_MODE_LUSH.
+ *
+ * Resolved before config_init() so the user's lushrc layers on top of
+ * the right preset rather than being overwritten by a later mode
+ * change.
+ *
+ * @param argc   argv count from main
+ * @param argv   argv from main
+ * @param optind Index of the first non-option argument (script file
+ *               candidate), as returned by parse_opts.
+ * @return Initial shell mode.
+ */
+static shell_mode_t detect_initial_mode(int argc, char **argv, size_t optind) {
+    /* CLI flag: highest priority. */
+    if (shell_opts.cli_mode_override_set) {
+        return (shell_mode_t)shell_opts.cli_mode_override;
+    }
+
+    /* Script file: peek at shebang. process_shebang() will fire later
+     * when the script is actually opened for execution; this peek is
+     * just for early mode resolution. */
+    if (optind < (size_t)argc && argv[optind] && argv[optind][0] != '\0' &&
+        argv[optind][0] != '-') {
+        FILE *f = fopen(argv[optind], "r");
+        if (f) {
+            char line[256];
+            if (fgets(line, sizeof(line), f) != NULL &&
+                strncmp(line, "#!", 2) == 0) {
+                shell_mode_t detected;
+                if (shell_mode_detect_from_shebang(line, &detected)) {
+                    fclose(f);
+                    return detected;
+                }
+            }
+            fclose(f);
+        }
+    }
+
+    /* Default. */
+    return SHELL_MODE_LUSH;
 }
 
 /**
@@ -362,6 +414,17 @@ int init(int argc, char **argv, FILE **in) {
     // Parse command line options EARLY - needed for login/interactive detection
     size_t optind = parse_opts(argc, argv);
 
+    // Resolve initial shell mode BEFORE config_init so the user's
+    // lushrc layers on top of the right preset. Priority: CLI flag
+    // (--posix/--bash/--zsh/--lush) -> shebang of script argument ->
+    // default lush. The registry isn't initialized yet, so
+    // apply_mode_preset() only flips the feature matrix and the legacy
+    // posix_mode mirror; config_registry_apply_mode_defaults fires
+    // inside config_init() after section registration but before user
+    // config load.
+    shell_mode_t initial_mode = detect_initial_mode(argc, argv, optind);
+    apply_mode_preset(initial_mode);
+
     // POSIX-compliant shell type determination - must happen before config
     // scripts
     // 1. Determine if this is a login shell
@@ -500,8 +563,18 @@ int init(int argc, char **argv, FILE **in) {
         // Check that the script file is valid
         stat(argv[optind], &st);
         if (!(S_ISREG(st.st_mode))) {
-            error_message("error: `init`: %s is not a regular file",
-                          argv[optind]);
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
+                SOURCE_LOC_UNKNOWN, "%s is not a regular file", argv[optind]);
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "pass a regular file as the script argument");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                fprintf(stderr, "lush: %s is not a regular file\n",
+                        argv[optind]);
+            }
             // Fall back to interactive mode
             IS_INTERACTIVE_SHELL = true;
             SHELL_TYPE = SHELL_INTERACTIVE;
@@ -827,6 +900,18 @@ static int parse_opts(int argc, char **argv) {
             } else if (strcmp(arg, "--strict") == 0) {
                 // Enable strict compatibility mode - warnings become errors
                 compat_set_strict(true);
+            } else if (strcmp(arg, "--lush") == 0) {
+                shell_opts.cli_mode_override = (int)SHELL_MODE_LUSH;
+                shell_opts.cli_mode_override_set = true;
+            } else if (strcmp(arg, "--posix") == 0) {
+                shell_opts.cli_mode_override = (int)SHELL_MODE_POSIX;
+                shell_opts.cli_mode_override_set = true;
+            } else if (strcmp(arg, "--bash") == 0) {
+                shell_opts.cli_mode_override = (int)SHELL_MODE_BASH;
+                shell_opts.cli_mode_override_set = true;
+            } else if (strcmp(arg, "--zsh") == 0) {
+                shell_opts.cli_mode_override = (int)SHELL_MODE_ZSH;
+                shell_opts.cli_mode_override_set = true;
             } else if (strncmp(arg, "--target=", 9) == 0) {
                 // Set target shell for compatibility checking (stored as
                 // string)

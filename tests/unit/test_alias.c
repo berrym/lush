@@ -14,79 +14,18 @@
  */
 
 #include "alias.h"
-#include <assert.h>
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
+ * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
+ * the framework's ASSERT_TRUE(cond, msg) which has matching semantics. */
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Running: %s...\n", #name);                                   \
-        test_##name();                                                         \
-        printf("    PASSED\n");                                                \
-    } while (0)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    do {                                                                       \
-        if ((actual) != (expected)) {                                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: %d, Got: %d\n", (int)(expected),           \
-                   (int)(actual));                                             \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(actual, expected, message)                               \
-    do {                                                                       \
-        const char *_actual = (actual);                                        \
-        const char *_expected = (expected);                                    \
-        if (_actual == NULL || _expected == NULL) {                            \
-            if (_actual != _expected) {                                        \
-                printf("    FAILED: %s\n", message);                           \
-                printf("      Expected: %s, Got: %s\n",                        \
-                       _expected ? _expected : "NULL",                         \
-                       _actual ? _actual : "NULL");                            \
-                printf("      at %s:%d\n", __FILE__, __LINE__);                \
-                exit(1);                                                       \
-            }                                                                  \
-        } else if (strcmp(_actual, _expected) != 0) {                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: \"%s\", Got: \"%s\"\n", _expected,         \
-                   _actual);                                                   \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr, message)                                          \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("    FAILED: %s (got NULL)\n", message);                    \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NULL(ptr, message)                                              \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("    FAILED: %s (expected NULL)\n", message);               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
 /* Helper to setup and teardown aliases for each test */
 static void setup_aliases(void) { init_aliases(); }
@@ -684,6 +623,5 @@ int main(void) {
     RUN_TEST(alias_empty_value);
     RUN_TEST(many_aliases);
 
-    printf("\n=== All alias.c tests passed! ===\n");
-    return 0;
+    return TEST_RESULT();
 }

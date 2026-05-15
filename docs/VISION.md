@@ -67,4 +67,15 @@ Lush respects the old while embracing new paths. It does not mind breaking norms
 
 ---
 
+## See also
+
+- [PHILOSOPHY.md](PHILOSOPHY.md) -- the founding principles that
+  govern day-to-day design decisions: identity vs polyglot, surface
+  separation, POSIX as baseline not restriction, architectural
+  correctness over expediency.
+- [CONFIGURATION.md](CONFIGURATION.md) -- the four configuration
+  surfaces and how they relate.
+
+---
+
 *This document defines what lush is. All development decisions should align with this vision. Changes to this vision require explicit executive decision by the project owner.*

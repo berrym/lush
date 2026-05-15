@@ -1,6 +1,0 @@
-if [ ho exists
-elif [ -d dir ]; then
-    echo directory
-else
-    echo neither
-fi

@@ -76,9 +76,16 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
         return;
     }
 
-    fread(script_content, 1, file_size, file);
-    script_content[file_size] = '\0';
+    size_t bytes_read = fread(script_content, 1, (size_t)file_size, file);
     fclose(file);
+    if (bytes_read != (size_t)file_size) {
+        debug_printf(ctx,
+                     "ERROR: Short read on %s (expected %ld, got %zu)\n",
+                     script_path, file_size, bytes_read);
+        free(script_content);
+        return;
+    }
+    script_content[file_size] = '\0';
 
     // Clear previous analysis results
     debug_clear_analysis_issues(ctx);
@@ -148,8 +155,9 @@ static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
         return NULL;
     }
 
-    // Try to parse the script
-    parser_t *parser = parser_new_with_source(content, file);
+    // Try to parse the script — content is the entire script body, so
+    // its first character is line 1 of the source file.
+    parser_t *parser = parser_new_with_source(content, file, 1);
     if (!parser) {
         debug_add_analysis_issue(ctx, file, 1, "error", "syntax",
                                  "Failed to create parser",
@@ -374,15 +382,16 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
         return;
     }
 
-    // Get target shell for portability checking (before potential init reset)
-    const char *target_str = compat_get_target();
-
-    // Initialize compat system if not already done
+    // Initialize compat system if not already done. compat_init() already
+    // preserves any pre-set target across the reset, so no caller-side
+    // save/restore is needed — and attempting one (passing the buffer
+    // pointer returned by compat_get_target() back into compat_set_target())
+    // produces a strncpy src/dst overlap.
     if (compat_get_entry_count() == 0) {
         compat_init(NULL);
-        // Restore target that was set before init
-        compat_set_target(target_str);
     }
+
+    const char *target_str = compat_get_target();
 
     // Convert string target to enum for API functions that still use
     // shell_mode_t
@@ -795,9 +804,16 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
         return -1;
     }
 
-    fread(script_content, 1, file_size, file);
-    script_content[file_size] = '\0';
+    size_t bytes_read = fread(script_content, 1, (size_t)file_size, file);
     fclose(file);
+    if (bytes_read != (size_t)file_size) {
+        debug_printf(ctx,
+                     "ERROR: Short read on %s (expected %ld, got %zu)\n",
+                     script_path, file_size, bytes_read);
+        free(script_content);
+        return -1;
+    }
+    script_content[file_size] = '\0';
 
     // Clear previous analysis results
     debug_clear_analysis_issues(ctx);

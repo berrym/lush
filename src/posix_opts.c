@@ -12,11 +12,14 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "builtins.h"
 #include "config.h"
 #include "config_registry.h"
 #include "errors.h"
+#include "executor.h"
 #include "lle/lle_shell_integration.h"
 #include "lush.h"
+#include "shell_error.h"
 #include "shell_mode.h"
 #include "symtable.h"
 
@@ -29,37 +32,45 @@
 shell_options_t shell_opts = {0};
 
 /**
- * @brief Sync shell mode change with config system
+ * @brief Apply a mode preset across all configuration surfaces
  *
- * Updates config.shell_mode when set -o changes shell mode.
- * This ensures config save captures the current state.
+ * Canonical entry point for switching the active shell mode. Performs a
+ * full re-seed: sets the active mode, drops per-feature overrides,
+ * updates the legacy posix_mode mirror, and persists the canonical mode
+ * label to the central registry. Per-mode registry default re-seeding is
+ * layered on top of this in commit 4 of the configuration cleanup.
  *
- * @param mode The new shell mode
+ * @param mode New mode preset to apply
+ * @return true on success, false if mode change is disallowed (strict
+ *         mode lock or invalid mode value)
  */
-static void sync_shell_mode_to_config(shell_mode_t mode) {
-    config.shell_mode = (int)mode;
-
-    /* Also update registry if initialized */
-    if (config_registry_is_initialized()) {
-        const char *mode_str = "lush";
-        switch (mode) {
-        case SHELL_MODE_POSIX:
-            mode_str = "posix";
-            break;
-        case SHELL_MODE_BASH:
-            mode_str = "bash";
-            break;
-        case SHELL_MODE_ZSH:
-            mode_str = "zsh";
-            break;
-        case SHELL_MODE_LUSH:
-            mode_str = "lush";
-            break;
-        case SHELL_MODE_COUNT:
-            break; /* Not a real mode */
-        }
-        config_registry_set_string("shell.mode", mode_str);
+bool apply_mode_preset(shell_mode_t mode) {
+    if (!shell_mode_set(mode)) {
+        return false;
     }
+
+    /* Mode change is a clean re-seed: drop any per-feature overrides so
+     * the new mode's matrix defaults take effect. Picking a preset means
+     * asking for it. */
+    shell_feature_reset_all();
+
+    /* Legacy POSIX bookkeeping mirror. shell_opts.posix_mode predates
+     * the mode system; keep it in sync so call sites that still consult
+     * it see the right value. */
+    shell_opts.posix_mode = (mode == SHELL_MODE_POSIX);
+
+    /* Persist the canonical mode label in the central registry. */
+    config.shell_mode = (int)mode;
+    if (config_registry_is_initialized()) {
+        config_registry_set_string("shell.mode", shell_mode_name(mode));
+        /* Re-seed any registered per-mode default overrides. Options
+         * without per-mode defaults are unaffected. Re-seed-every-time
+         * semantic: mid-session mode changes overwrite user tweaks to
+         * mode-aware options (picking a preset means asking for it). */
+        config_registry_apply_mode_defaults(mode);
+    }
+
+    return true;
 }
 
 /**
@@ -401,8 +412,9 @@ static void print_all_shell_variables(void) {
 int builtin_set(char **args) {
     // Privileged mode security check - block all set operations
     if (shell_opts.privileged_mode && args[1]) {
-        fprintf(stderr,
-                "set: cannot modify shell options in privileged mode\n");
+        executor_error_report(current_executor, SHELL_ERR_PERMISSION_DENIED,
+                              builtin_get_source_location(),
+                              "cannot modify shell options in privileged mode");
         return 1;
     }
 
@@ -422,39 +434,34 @@ int builtin_set(char **args) {
                 // Set named option
                 i++; // consume the option name
 
-                // Check for shell mode options first (mutually exclusive modes)
+                /* `set -o posix` is preserved as a recognized
+                 * bash-bridge alias for `mode posix`: it's bash's
+                 * canonical spelling for entering POSIX mode and a
+                 * common bash-script idiom. The lush-native spelling
+                 * is `mode posix`; both route through the same
+                 * apply_mode_preset() entry point.
+                 *
+                 * `set -o {bash,zsh,lush}` are no longer recognized:
+                 * modes are a discriminated enum, not toggles. Use
+                 * the `mode` builtin instead. */
                 if (strcmp(args[i], "posix") == 0) {
-                    if (!shell_mode_set(SHELL_MODE_POSIX)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
+                    if (!apply_mode_preset(SHELL_MODE_POSIX)) {
+                        executor_error_report(
+                            current_executor, SHELL_ERR_FEATURE_DISABLED,
+                            builtin_get_source_location(),
+                            "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
-                    sync_shell_mode_to_config(SHELL_MODE_POSIX);
-                    shell_opts.posix_mode = true;
-                } else if (strcmp(args[i], "bash") == 0) {
-                    if (!shell_mode_set(SHELL_MODE_BASH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
-                        return 1;
-                    }
-                    sync_shell_mode_to_config(SHELL_MODE_BASH);
-                    shell_opts.posix_mode = false;
-                } else if (strcmp(args[i], "zsh") == 0) {
-                    if (!shell_mode_set(SHELL_MODE_ZSH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
-                        return 1;
-                    }
-                    sync_shell_mode_to_config(SHELL_MODE_ZSH);
-                    shell_opts.posix_mode = false;
-                } else if (strcmp(args[i], "lush") == 0) {
-                    if (!shell_mode_set(SHELL_MODE_LUSH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
-                        return 1;
-                    }
-                    sync_shell_mode_to_config(SHELL_MODE_LUSH);
-                    shell_opts.posix_mode = false;
+                } else if (strcmp(args[i], "bash") == 0 ||
+                           strcmp(args[i], "zsh") == 0 ||
+                           strcmp(args[i], "lush") == 0) {
+                    executor_error_report(
+                        current_executor, SHELL_ERR_INVALID_OPTION,
+                        builtin_get_source_location(),
+                        "set -o %s: shell modes are not toggles; "
+                        "use `mode %s` instead",
+                        args[i], args[i]);
+                    return 1;
                 } else {
                     option_mapping_t *opt = find_option_by_name(args[i]);
                     if (opt) {
@@ -473,7 +480,10 @@ int builtin_set(char **args) {
                             lush_update_editing_mode();
                         }
                     } else {
-                        error_message("set: invalid option name: %s", args[i]);
+                        executor_error_report(
+                            current_executor, SHELL_ERR_INVALID_OPTION,
+                            builtin_get_source_location(),
+                            "invalid option name: %s", args[i]);
                         return 1;
                     }
                 }
@@ -484,8 +494,9 @@ int builtin_set(char **args) {
                     printf("set %co %s\n", *(option_map[j].flag) ? '-' : '+',
                            option_map[j].name);
                 }
-                // Also show current shell mode
-                printf("set -o %s  (shell mode)\n",
+                // Also show current shell mode (use the `mode` builtin to
+                // change it; `set -o posix` is the bash-bridge alias).
+                printf("(shell mode: %s -- use `mode` builtin to change)\n",
                        shell_mode_name(shell_mode_get()));
                 return 0;
             }
@@ -494,20 +505,28 @@ int builtin_set(char **args) {
                 // Unset named option
                 i++; // consume the option name
 
-                // Shell mode options - +o switches back to lush (default)
-                if (strcmp(args[i], "posix") == 0 ||
-                    strcmp(args[i], "bash") == 0 ||
-                    strcmp(args[i], "zsh") == 0) {
-                    if (!shell_mode_set(SHELL_MODE_LUSH)) {
-                        error_message("set: cannot change shell mode (strict "
-                                      "mode enabled)");
+                /* `set +o posix` is the bash-bridge counterpart to
+                 * `set -o posix`: it lifts the POSIX preset and
+                 * returns to lush. `set +o {bash,zsh,lush}` are
+                 * rejected -- modes aren't toggles. */
+                if (strcmp(args[i], "posix") == 0) {
+                    if (!apply_mode_preset(SHELL_MODE_LUSH)) {
+                        executor_error_report(
+                            current_executor, SHELL_ERR_FEATURE_DISABLED,
+                            builtin_get_source_location(),
+                            "cannot change shell mode (strict mode enabled)");
                         return 1;
                     }
-                    sync_shell_mode_to_config(SHELL_MODE_LUSH);
-                    shell_opts.posix_mode = false;
-                } else if (strcmp(args[i], "lush") == 0) {
-                    // +o lush is a no-op (can't disable default mode)
-                    // Do nothing
+                } else if (strcmp(args[i], "bash") == 0 ||
+                           strcmp(args[i], "zsh") == 0 ||
+                           strcmp(args[i], "lush") == 0) {
+                    executor_error_report(
+                        current_executor, SHELL_ERR_INVALID_OPTION,
+                        builtin_get_source_location(),
+                        "set +o %s: shell modes are not toggles; "
+                        "use `mode <name>` to switch presets",
+                        args[i]);
+                    return 1;
                 } else {
                     option_mapping_t *opt = find_option_by_name(args[i]);
                     if (opt) {
@@ -526,7 +545,10 @@ int builtin_set(char **args) {
                             lush_update_editing_mode();
                         }
                     } else {
-                        error_message("set: invalid option name: %s", args[i]);
+                        executor_error_report(
+                            current_executor, SHELL_ERR_INVALID_OPTION,
+                            builtin_get_source_location(),
+                            "invalid option name: %s", args[i]);
                         return 1;
                     }
                 }
@@ -538,8 +560,9 @@ int builtin_set(char **args) {
                     printf("set %co %s\n", *(option_map[j].flag) ? '-' : '+',
                            option_map[j].name);
                 }
-                // Also show current shell mode
-                printf("set -o %s  (shell mode)\n",
+                // Also show current shell mode (use the `mode` builtin to
+                // change it; `set -o posix` is the bash-bridge alias).
+                printf("(shell mode: %s -- use `mode` builtin to change)\n",
                        shell_mode_name(shell_mode_get()));
                 return 0;
             }
@@ -610,7 +633,10 @@ int builtin_set(char **args) {
                     *(opt->flag) = true;
                     sync_shell_option_to_registry(opt->name, true);
                 } else {
-                    error_message("set: invalid option: -%c", arg[j]);
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_INVALID_OPTION,
+                                          builtin_get_source_location(),
+                                          "invalid option: -%c", arg[j]);
                     return 1;
                 }
             }
@@ -622,13 +648,18 @@ int builtin_set(char **args) {
                     *(opt->flag) = false;
                     sync_shell_option_to_registry(opt->name, false);
                 } else {
-                    error_message("set: invalid option: +%c", arg[j]);
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_INVALID_OPTION,
+                                          builtin_get_source_location(),
+                                          "invalid option: +%c", arg[j]);
                     return 1;
                 }
             }
         } else {
             // Regular positional parameters without -- prefix
-            error_message("set: invalid option: %s", arg);
+            executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
+                                  builtin_get_source_location(),
+                                  "invalid option: %s", arg);
             return 1;
         }
     }

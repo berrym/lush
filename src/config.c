@@ -357,6 +357,32 @@ static config_option_t config_options[] = {
     {"behavior.multiline_mode", CONFIG_TYPE_BOOL, CONFIG_SECTION_BEHAVIOR,
      &config.multiline_mode, "Enable multiline editing mode",
      config_validate_bool, NULL},
+    {"behavior.brace_expansion_max", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
+     &config.brace_expansion_max,
+     "Max brace expansion result count (0 = unbounded)", config_validate_int,
+     NULL},
+    {"behavior.regex_pattern_max", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
+     &config.regex_pattern_max,
+     "Max regex pattern length before rejection (0 = unbounded). Bounds "
+     "compile time on pathological patterns fed to platform regcomp from "
+     "[[ =~ ]] and extglob translation paths.",
+     config_validate_int, NULL},
+    {"behavior.path_negative_cache_ttl_ms", CONFIG_TYPE_INT,
+     CONFIG_SECTION_BEHAVIOR, &config.path_negative_cache_ttl_ms,
+     "TTL in milliseconds for negative PATH-search cache. Bounds the "
+     "syscall cost of repeated lookups of a missing command in tight "
+     "loops to O(1) instead of O(PATH_dirs). Short enough that newly "
+     "installed binaries appear quickly. (0 = disabled)",
+     config_validate_int, NULL},
+    {"behavior.loop_failure_streak", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
+     &config.loop_failure_streak,
+     "Consecutive non-zero body iterations before runaway-loop trip (0 = "
+     "disable)",
+     config_validate_int, NULL},
+    {"behavior.loop_failure_seconds", CONFIG_TYPE_INT, CONFIG_SECTION_BEHAVIOR,
+     &config.loop_failure_seconds,
+     "Min wall-clock seconds streak must last before tripping",
+     config_validate_int, NULL},
 
     // Color settings
     {"behavior.color_scheme", CONFIG_TYPE_STRING, CONFIG_SECTION_BEHAVIOR,
@@ -653,6 +679,12 @@ static const creg_option_t completion_options[] = {
      {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
      "Case-sensitive completion",
      true},
+    {"chain_directories",
+     CREG_VALUE_BOOLEAN,
+     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Re-trigger completion after accepting a directory (per-mode "
+     "default: lush=true, others=false)",
+     true},
 };
 
 static const creg_section_t completion_section = {
@@ -931,6 +963,36 @@ static void config_register_sections(void) {
 }
 
 /**
+ * @brief Register per-mode default overrides for mode-aware options.
+ *
+ * Most config options use a single default that's right across all
+ * modes. The handful that legitimately diverge per mode register
+ * per-mode defaults here. apply_mode_preset() applies these on every
+ * mode change.
+ *
+ * Called from config_init() right after config_register_sections() so
+ * the registered options exist by the time we attach mode defaults to
+ * them.
+ */
+static void config_register_per_mode_defaults(void) {
+    /* completion.chain_directories: lush curates the fish-style
+     * auto-recurse-into-directory experience as a discoverability
+     * default; bash/zsh/posix all stop after one tab (script users
+     * expect a single insertion per keypress). */
+    creg_value_t bool_true = creg_value_boolean(true);
+    creg_value_t bool_false = creg_value_boolean(false);
+
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_LUSH, &bool_true);
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_BASH, &bool_false);
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_ZSH, &bool_false);
+    config_registry_set_mode_default("completion.chain_directories",
+                                     SHELL_MODE_POSIX, &bool_false);
+}
+
+/**
  * @brief Handle legacy configuration keys that were removed or renamed
  *
  * This prevents warnings for deprecated configuration options in existing
@@ -1044,6 +1106,11 @@ static legacy_option_mapping_t legacy_mappings[] = {
     {"tab_width", "behavior.tab_width"},
     {"no_word_expand", "behavior.no_word_expand"},
     {"multiline_mode", "behavior.multiline_mode"},
+    {"brace_expansion_max", "behavior.brace_expansion_max"},
+    {"regex_pattern_max", "behavior.regex_pattern_max"},
+    {"path_negative_cache_ttl_ms", "behavior.path_negative_cache_ttl_ms"},
+    {"loop_failure_streak", "behavior.loop_failure_streak"},
+    {"loop_failure_seconds", "behavior.loop_failure_seconds"},
     {"color_scheme", "behavior.color_scheme"},
     {"colors_enabled", "behavior.colors_enabled"},
     {"verbose_errors", "behavior.verbose_errors"},
@@ -1421,8 +1488,13 @@ int config_execute_script_file(const char *path) {
             executor_set_script_context(executor, path, construct_number);
         }
 
-        // Parse and execute the complete construct
-        int construct_result = parse_and_execute(complete_input);
+        /* Parse and execute the complete construct. construct_number
+         * tracks 1-based logical-construct order within the sourced
+         * file, not source line number; passing 1 here preserves the
+         * pre-2026-04 behaviour. Future work may thread the actual
+         * source line of the construct's first character through here
+         * for accurate multi-line script-source diagnostics. */
+        int construct_result = parse_and_execute(complete_input, 1);
 
         // Check for return from sourced script (exit code 200+)
         // This matches how bin_source handles the special return code
@@ -1864,6 +1936,26 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Enable multiline editing mode\n"
     "behavior.multiline_mode = true\n"
     "\n"
+    "# Max brace expansion result count (0 = unbounded)\n"
+    "behavior.brace_expansion_max = 65536\n"
+    "\n"
+    "# Max regex pattern length before rejection (0 = unbounded). Bounds "
+    "compile time on pathological patterns fed to platform regcomp from "
+    "[[ =~ ]] and extglob translation paths.\n"
+    "behavior.regex_pattern_max = 1024\n"
+    "\n"
+    "# TTL in milliseconds for negative PATH-search cache (0 = disabled). "
+    "Bounds syscall cost of tight loops calling a missing command to O(1) "
+    "instead of O(PATH_dirs).\n"
+    "behavior.path_negative_cache_ttl_ms = 1000\n"
+    "\n"
+    "# Consecutive non-zero body iterations before runaway-loop trip (0 = "
+    "disable)\n"
+    "behavior.loop_failure_streak = 1000\n"
+    "\n"
+    "# Min wall-clock seconds streak must last before tripping\n"
+    "behavior.loop_failure_seconds = 5\n"
+    "\n"
     "# Color scheme name: default, dark, light, solarized\n"
     "behavior.color_scheme = default\n"
     "\n"
@@ -2000,6 +2092,26 @@ int config_init(void) {
 
     // Initialize config registry and register all sections
     config_register_sections();
+
+    // Register per-mode default overrides. Must come after section
+    // registration (the options must exist before per-mode defaults
+    // can attach to them), and before the per-mode defaults apply
+    // call below.
+    config_register_per_mode_defaults();
+
+    // The registry's section defaults include shell.mode = "lush". The
+    // active mode (set earlier by apply_mode_preset() from CLI flag /
+    // shebang peek / default lush) may differ from "lush". Write the
+    // active mode into the registry now so subsequent sync_to_runtime
+    // calls (after user-config load) see the right value -- otherwise
+    // the registry's section default would clobber a CLI-flag mode
+    // when sync runs.
+    config_registry_set_string("shell.mode", shell_mode_name(shell_mode_get()));
+
+    // Apply per-mode default overrides for the active shell mode before
+    // loading user config, so any user lushrc settings layer on top of
+    // the right preset.
+    config_registry_apply_mode_defaults(shell_mode_get());
 
     // Get XDG directory path
     char xdg_dir[CONFIG_PATH_MAX];
@@ -2159,6 +2271,11 @@ void config_set_defaults(void) {
     config.tab_width = 4;
     config.no_word_expand = false;
     config.multiline_mode = true;
+    config.brace_expansion_max = 65536;
+    config.regex_pattern_max = 1024;
+    config.path_negative_cache_ttl_ms = 1000;
+    config.loop_failure_streak = 1000;
+    config.loop_failure_seconds = 5;
 
     // Auto-correction defaults
     config.autocorrect_max_suggestions = 3;
@@ -2202,9 +2319,12 @@ void config_set_defaults(void) {
     // Script execution defaults
     config.script_execution = true;
 
-    // Shell mode defaults (Phase 0: Extended Language Support)
-    config.shell_mode = SHELL_MODE_LUSH; // Curated best of Bash/Zsh
-    config.shell_mode_strict = false;    // Allow runtime mode changes
+    // Shell mode defaults: config.shell_mode is owned by
+    // apply_mode_preset() (called at startup before config_init from
+    // CLI flag / shebang peek / default lush; called at runtime by the
+    // `mode` builtin and the `set -o posix` bridge). Do NOT reset it
+    // here -- doing so would clobber the early-init mode resolution.
+    config.shell_mode_strict = false; // Allow runtime mode changes
 
     // Line editor - LLE is always enabled (sole line editor)
     // LLE is the only line editor - no config option needed
@@ -3539,14 +3659,16 @@ void config_get_value(const char *key) {
     if (strncmp(key, "shell.feature.", 14) == 0) {
         const char *feature_name = key + 14; // Skip "shell.feature."
         shell_feature_t feature;
+        bool invert = false;
 
-        if (!shell_feature_parse(feature_name, &feature)) {
+        if (!shell_feature_parse(feature_name, &feature, &invert)) {
             printf("Unknown feature: %s\n", feature_name);
             printf("Use 'debug features' to see available features\n");
             return;
         }
 
-        printf("%s\n", shell_mode_allows(feature) ? "true" : "false");
+        bool effective = shell_mode_allows(feature) ^ invert;
+        printf("%s\n", effective ? "true" : "false");
         return;
     }
 
@@ -3635,8 +3757,9 @@ void config_set_value(const char *key, const char *value) {
     if (strncmp(key, "shell.feature.", 14) == 0) {
         const char *feature_name = key + 14; // Skip "shell.feature."
         shell_feature_t feature;
+        bool invert = false;
 
-        if (!shell_feature_parse(feature_name, &feature)) {
+        if (!shell_feature_parse(feature_name, &feature, &invert)) {
             printf("Unknown feature: %s\n", feature_name);
             printf("Use 'debug features' to see available features\n");
             return;
@@ -3655,7 +3778,10 @@ void config_set_value(const char *key, const char *value) {
             return;
         }
 
-        if (enable) {
+        /* `enable` is the user's intent in alias terms; flip onto the
+         * underlying feature when the alias is inverted. */
+        bool target = enable ^ invert;
+        if (target) {
             shell_feature_enable(feature);
         } else {
             shell_feature_disable(feature);

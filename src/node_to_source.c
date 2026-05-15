@@ -162,21 +162,35 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
 
     switch (node->type) {
     case NODE_COMMAND: {
-        /* Command name is in val.str, children are arguments and redirections
-         */
-        strbuf_append(buf, str); /* Command name */
+        /* val.str is the command name, or NULL for a pure cmd_prefix
+         * (assignments/redirs with no command word). Children are
+         * cmd_prefix NODE_ASSIGN nodes, arguments, and redirections. */
+        bool emitted = false;
+        if (str && str[0]) {
+            strbuf_append(buf, str); /* Command name */
+            emitted = true;
+        }
         node_t *child = node->first_child;
         while (child) {
-            strbuf_append(buf, " ");
+            if (emitted) {
+                strbuf_append(buf, " ");
+            }
             if (is_redirection(child)) {
                 redir_to_source(child, buf);
             } else {
                 node_to_source_impl(child, buf, depth);
             }
+            emitted = true;
             child = child->next_sibling;
         }
         break;
     }
+
+    case NODE_ASSIGN:
+        /* cmd_prefix assignment: emit "var=value" verbatim (val.str
+         * already carries the var=, +=, and value text). */
+        strbuf_append(buf, str);
+        break;
 
     case NODE_VAR:
         strbuf_append(buf, str);

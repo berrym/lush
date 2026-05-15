@@ -221,6 +221,13 @@ LLE highlights your input in real-time:
 - **Variables**: `$var`, `${var}`, `$(...)`
 - **Operators**: Pipes, redirections, logic operators
 - **Comments**: `# comment`
+- **Paths**: Path-shaped arguments are classified by *shape* (absolute
+  `/...`, relative `./...`, home `~/...`) and *kind* (regular file vs.
+  directory vs. missing). Defaults: directories underlined green,
+  missing paths red, regular files unhighlighted (let the line itself
+  speak). Themes can colour every shape × kind slot independently or
+  override the kind-only `path_file` / `path_dir` fallbacks. See the
+  `[syntax]` section in `examples/theme.toml`.
 - **Errors**: Syntax errors indicated before execution
 
 ### Multi-Line Editing
@@ -1082,9 +1089,7 @@ debug profile off
 |----------|-------------|
 | [LLE_GUIDE.md](LLE_GUIDE.md) | Complete LLE documentation |
 | [EXTENDED_SYNTAX.md](EXTENDED_SYNTAX.md) | Detailed syntax reference |
-| [SHELL_MODES.md](SHELL_MODES.md) | Mode documentation |
+| [CONFIGURATION.md](CONFIGURATION.md) | Modes, options, registry -- all four configuration surfaces |
 | [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) | Debugging reference |
 | [BUILTIN_COMMANDS.md](BUILTIN_COMMANDS.md) | All 50 builtins |
 | [HOOKS_AND_PLUGINS.md](HOOKS_AND_PLUGINS.md) | Hook system |
-| [CONFIG_SYSTEM.md](CONFIG_SYSTEM.md) | Configuration reference |
-| [SHELL_OPTIONS.md](SHELL_OPTIONS.md) | All shell options |

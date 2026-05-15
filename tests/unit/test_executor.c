@@ -11,71 +11,19 @@
 
 #include "executor.h"
 #include "symtable.h"
-#include <assert.h>
+#include "test_shell_harness.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+/* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
+ * that conflicts with the framework's 1-arg ASSERT(cond). Alias it to
+ * the framework's ASSERT_TRUE(cond, msg) which has matching semantics. */
+#undef ASSERT
+#define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
+
 /* Test framework macros */
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  Running: %s...\n", #name);                                   \
-        test_##name();                                                         \
-        printf("    PASSED\n");                                                \
-    } while (0)
-
-#define ASSERT(condition, message)                                             \
-    do {                                                                       \
-        if (!(condition)) {                                                    \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_EQ(actual, expected, message)                                   \
-    do {                                                                       \
-        if ((actual) != (expected)) {                                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: %d, Got: %d\n", (int)(expected),           \
-                   (int)(actual));                                             \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(actual, expected, message)                               \
-    do {                                                                       \
-        const char *_actual = (actual);                                        \
-        const char *_expected = (expected);                                    \
-        if (_actual == NULL || _expected == NULL) {                            \
-            if (_actual != _expected) {                                        \
-                printf("    FAILED: %s\n", message);                           \
-                printf("      Expected: %s, Got: %s\n",                        \
-                       _expected ? _expected : "NULL",                         \
-                       _actual ? _actual : "NULL");                            \
-                printf("      at %s:%d\n", __FILE__, __LINE__);                \
-                exit(1);                                                       \
-            }                                                                  \
-        } else if (strcmp(_actual, _expected) != 0) {                          \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      Expected: \"%s\", Got: \"%s\"\n", _expected,         \
-                   _actual);                                                   \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr, message)                                          \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("    FAILED: %s\n", message);                               \
-            printf("      at %s:%d\n", __FILE__, __LINE__);                    \
-            exit(1);                                                           \
-        }                                                                      \
-    } while (0)
 
 /* ============================================================================
  * LIFECYCLE TESTS
@@ -111,8 +59,8 @@ TEST(execute_true) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "true");
-    ASSERT_EQ(status, 0, "true should return 0");
+    run_result_t r = run_shell_with_executor(exec, "true");
+    ASSERT_EXIT_STATUS(r, 0);
     ASSERT_EQ(exec->exit_status, 0, "Exit status should be 0");
 
     executor_free(exec);
@@ -122,8 +70,8 @@ TEST(execute_false) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "false");
-    ASSERT_EQ(status, 1, "false should return 1");
+    run_result_t r = run_shell_with_executor(exec, "false");
+    ASSERT_EXIT_STATUS(r, 1);
     ASSERT_EQ(exec->exit_status, 1, "Exit status should be 1");
 
     executor_free(exec);
@@ -133,8 +81,8 @@ TEST(execute_colon) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, ":");
-    ASSERT_EQ(status, 0, ": (colon) should return 0");
+    run_result_t r = run_shell_with_executor(exec, ":");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -143,8 +91,8 @@ TEST(execute_exit_status) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "true");
-    (void)executor_execute_command_line(exec, "echo $?");
+    executor_execute_command_line(exec, "true", 1);
+    (void)executor_execute_command_line(exec, "echo $?", 1);
     ASSERT_EQ(exec->exit_status, 0, "echo should succeed");
 
     executor_free(exec);
@@ -159,8 +107,8 @@ TEST(variable_assignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "FOO=bar");
-    ASSERT_EQ(status, 0, "Assignment should succeed");
+    run_result_t r = run_shell_with_executor(exec, "FOO=bar");
+    ASSERT_EXIT_STATUS(r, 0);
 
     /* Verify variable was set */
     char *value = symtable_get_var(exec->symtable, "FOO");
@@ -175,7 +123,7 @@ TEST(variable_expansion) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "MYVAR=hello");
+    executor_execute_command_line(exec, "MYVAR=hello", 1);
 
     /* Test that variable exists */
     char *value = symtable_get_var(exec->symtable, "MYVAR");
@@ -190,9 +138,9 @@ TEST(multiple_assignments) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "A=1");
-    executor_execute_command_line(exec, "B=2");
-    executor_execute_command_line(exec, "C=3");
+    executor_execute_command_line(exec, "A=1", 1);
+    executor_execute_command_line(exec, "B=2", 1);
+    executor_execute_command_line(exec, "C=3", 1);
 
     char *a = symtable_get_var(exec->symtable, "A");
     char *b = symtable_get_var(exec->symtable, "B");
@@ -217,9 +165,9 @@ TEST(if_true_branch) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "if true; then RESULT=yes; else RESULT=no; fi");
-    ASSERT_EQ(status, 0, "if statement should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -233,9 +181,9 @@ TEST(if_false_branch) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "if false; then RESULT=yes; else RESULT=no; fi");
-    ASSERT_EQ(status, 0, "if statement should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -249,9 +197,9 @@ TEST(for_loop_basic) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "COUNT=0; for i in 1 2 3; do COUNT=$((COUNT+1)); done");
-    ASSERT_EQ(status, 0, "for loop should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *count = symtable_get_var(exec->symtable, "COUNT");
     ASSERT_NOT_NULL(count, "COUNT should be set");
@@ -267,9 +215,9 @@ TEST(for_loop_no_in) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Set positional parameters and iterate */
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "set -- a b c; COUNT=0; for arg; do COUNT=$((COUNT+1)); done");
-    ASSERT_EQ(status, 0, "for loop without 'in' should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *count = symtable_get_var(exec->symtable, "COUNT");
     ASSERT_NOT_NULL(count, "COUNT should be set");
@@ -283,9 +231,9 @@ TEST(while_loop) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "N=0; while [ $N -lt 5 ]; do N=$((N+1)); done");
-    ASSERT_EQ(status, 0, "while loop should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *n = symtable_get_var(exec->symtable, "N");
     ASSERT_NOT_NULL(n, "N should be set");
@@ -299,9 +247,9 @@ TEST(until_loop) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "N=0; until [ $N -ge 3 ]; do N=$((N+1)); done");
-    ASSERT_EQ(status, 0, "until loop should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *n = symtable_get_var(exec->symtable, "N");
     ASSERT_NOT_NULL(n, "N should be set");
@@ -315,9 +263,9 @@ TEST(case_statement) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "X=foo; case $X in foo) RESULT=matched;; bar) RESULT=bar;; esac");
-    ASSERT_EQ(status, 0, "case statement should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -331,10 +279,10 @@ TEST(case_wildcard) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec,
         "X=unknown; case $X in foo) RESULT=foo;; *) RESULT=default;; esac");
-    ASSERT_EQ(status, 0, "case statement should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -353,8 +301,8 @@ TEST(and_operator_success) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "true && RESULT=yes");
-    ASSERT_EQ(status, 0, "&& with true should succeed");
+    run_result_t r = run_shell_with_executor(exec, "true && RESULT=yes");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -369,9 +317,9 @@ TEST(and_operator_fail) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Set RESULT first, then verify it's NOT changed */
-    executor_execute_command_line(exec, "RESULT=initial");
-    int status = executor_execute_command_line(exec, "false && RESULT=changed");
-    ASSERT_EQ(status, 1, "&& with false should fail");
+    executor_execute_command_line(exec, "RESULT=initial", 1);
+    run_result_t r = run_shell_with_executor(exec, "false && RESULT=changed");
+    ASSERT_EXIT_STATUS(r, 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should still be set");
@@ -386,9 +334,9 @@ TEST(or_operator_success) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* First succeeds, second should not run */
-    executor_execute_command_line(exec, "RESULT=initial");
-    int status = executor_execute_command_line(exec, "true || RESULT=changed");
-    ASSERT_EQ(status, 0, "|| with true should succeed");
+    executor_execute_command_line(exec, "RESULT=initial", 1);
+    run_result_t r = run_shell_with_executor(exec, "true || RESULT=changed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -402,8 +350,8 @@ TEST(or_operator_fail) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "false || RESULT=yes");
-    ASSERT_EQ(status, 0, "|| should run second after first fails");
+    run_result_t r = run_shell_with_executor(exec, "false || RESULT=yes");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -422,12 +370,11 @@ TEST(function_definition_posix) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "myfunc() { CALLED=yes; }");
-    ASSERT_EQ(status, 0, "Function definition should succeed");
+    run_result_t r = run_shell_with_executor(exec, "myfunc() { CALLED=yes; }");
+    ASSERT_EXIT_STATUS(r, 0);
 
-    status = executor_execute_command_line(exec, "myfunc");
-    ASSERT_EQ(status, 0, "Function call should succeed");
+    r = run_shell_with_executor(exec, "myfunc");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *called = symtable_get_var(exec->symtable, "CALLED");
     ASSERT_NOT_NULL(called, "CALLED should be set");
@@ -442,12 +389,12 @@ TEST(function_definition_ksh) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "function myfunc { CALLED=yes; }");
-    ASSERT_EQ(status, 0, "ksh-style function definition should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "function myfunc { CALLED=yes; }");
+    ASSERT_EXIT_STATUS(r, 0);
 
-    status = executor_execute_command_line(exec, "myfunc");
-    ASSERT_EQ(status, 0, "Function call should succeed");
+    r = run_shell_with_executor(exec, "myfunc");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *called = symtable_get_var(exec->symtable, "CALLED");
     ASSERT_NOT_NULL(called, "CALLED should be set");
@@ -461,9 +408,9 @@ TEST(function_with_args) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "setarg() { ARG1=$1; ARG2=$2; }");
-    int status = executor_execute_command_line(exec, "setarg hello world");
-    ASSERT_EQ(status, 0, "Function call should succeed");
+    executor_execute_command_line(exec, "setarg() { ARG1=$1; ARG2=$2; }", 1);
+    run_result_t r = run_shell_with_executor(exec, "setarg hello world");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *arg1 = symtable_get_var(exec->symtable, "ARG1");
     char *arg2 = symtable_get_var(exec->symtable, "ARG2");
@@ -479,9 +426,9 @@ TEST(function_return) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "retfunc() { return 42; }");
-    int status = executor_execute_command_line(exec, "retfunc");
-    ASSERT_EQ(status, 42, "Function should return 42");
+    executor_execute_command_line(exec, "retfunc() { return 42; }", 1);
+    run_result_t r = run_shell_with_executor(exec, "retfunc");
+    ASSERT_EXIT_STATUS(r, 42);
 
     executor_free(exec);
 }
@@ -507,8 +454,8 @@ TEST(local_plain_string_reassignment) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(
-        exec, "f() { local x=initial; x=updated; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local x=initial; x=updated; RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "updated",
@@ -521,8 +468,9 @@ TEST(local_integer_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local x=0; x=42; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f() { local x=0; x=42; RESULT=$x; }",
+                                  1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -536,9 +484,9 @@ TEST(local_arith_substitution) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec,
-                                  "f() { local x=0; x=$((1+1)); RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(
+        exec, "f() { local x=0; x=$((1+1)); RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -553,8 +501,8 @@ TEST(local_command_substitution) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(
-        exec, "f() { local x=initial; x=$(echo updated); RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local x=initial; x=$(echo updated); RESULT=$x; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -568,9 +516,9 @@ TEST(declare_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec,
-                                  "f() { declare x=0; x=42; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f() { declare x=0; x=42; RESULT=$x; }",
+                                  1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -584,9 +532,9 @@ TEST(typeset_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec,
-                                  "f() { typeset x=0; x=42; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f() { typeset x=0; x=42; RESULT=$x; }",
+                                  1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "42",
@@ -599,8 +547,9 @@ TEST(local_two_step_no_initial) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local x; x=hello; RESULT=$x; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "f() { local x; x=hello; RESULT=$x; }",
+                                  1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
@@ -614,10 +563,10 @@ TEST(local_does_not_leak_to_global) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "X_LEAK=outside-initial");
+    executor_execute_command_line(exec, "X_LEAK=outside-initial", 1);
     executor_execute_command_line(
-        exec, "f() { local X_LEAK=inside-local; X_LEAK=inside-updated; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local X_LEAK=inside-local; X_LEAK=inside-updated; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *outside = symtable_get_var(exec->symtable, "X_LEAK");
     ASSERT_STR_EQ(
@@ -634,8 +583,8 @@ TEST(local_for_loop_variable) {
 
     executor_execute_command_line(
         exec,
-        "f() { local i=startval; for i in 1 2 3; do :; done; RESULT=$i; }");
-    executor_execute_command_line(exec, "f");
+        "f() { local i=startval; for i in 1 2 3; do :; done; RESULT=$i; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "3",
@@ -650,8 +599,8 @@ TEST(local_plus_equals_append) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(
-        exec, "f() { local s=hello; s+=\" world\"; RESULT=$s; }");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { local s=hello; s+=\" world\"; RESULT=$s; }", 1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "hello world",
@@ -670,9 +619,11 @@ TEST(local_while_loop_counter) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "f() { local i=0; while [ $i -lt 3 ]; "
-                                        "do i=$((i+1)); done; RESULT=$i; }");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec,
+                                  "f() { local i=0; while [ $i -lt 3 ]; "
+                                  "do i=$((i+1)); done; RESULT=$i; }",
+                                  1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "3",
@@ -698,19 +649,19 @@ TEST(function_redir_out_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(exec,
-                                  "f() { echo HELLO; } > /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+                                  "f() { echo HELLO; } > /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "HELLO",
         "function trailing > redirect must write body output to the file");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -718,19 +669,19 @@ TEST(function_redir_stderr_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(
-        exec, "f() { echo OOPS 1>&2; } 2> /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+        exec, "f() { echo OOPS 1>&2; } 2> /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "OOPS",
         "function trailing 2> redirect must write body stderr to the file");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -738,20 +689,20 @@ TEST(function_redir_append_accumulates_across_calls) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(exec,
-                                  "f() { echo line; } >> /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
-    executor_execute_command_line(exec, "f");
-    executor_execute_command_line(exec, "f");
+                                  "f() { echo line; } >> /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
+    executor_execute_command_line(exec, "f", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "line\nline\nline",
                   "function trailing >> redirect must append on every call");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -759,19 +710,19 @@ TEST(function_redir_keyword_form_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_execute_command_line(
-        exec, "function f { echo from-keyword; } > /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+        exec, "function f { echo from-keyword; } > /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "from-keyword",
         "function-keyword form trailing > redirect must apply at call");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -782,20 +733,21 @@ TEST(function_redir_input_applied_at_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in", 1);
     executor_execute_command_line(exec,
-                                  "echo hello-input > /tmp/lush_test_48_in");
+                                  "echo hello-input > /tmp/lush_test_48_in", 1);
     executor_execute_command_line(
         exec,
-        "f() { read line; CAPTURED=\"got: $line\"; } < /tmp/lush_test_48_in");
-    executor_execute_command_line(exec, "f");
+        "f() { read line; CAPTURED=\"got: $line\"; } < /tmp/lush_test_48_in",
+        1);
+    executor_execute_command_line(exec, "f", 1);
 
     char *result = symtable_get_var(exec->symtable, "CAPTURED");
     ASSERT_STR_EQ(
         result, "got: hello-input",
         "function trailing < redirect must feed body stdin from the file");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48_in", 1);
     executor_free(exec);
 }
 
@@ -805,22 +757,22 @@ TEST(function_redir_does_not_break_normal_call) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
-    executor_execute_command_line(exec,
-                                  "f() { echo from-f; } > /tmp/lush_test_48");
-    executor_execute_command_line(exec, "f");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
+    executor_execute_command_line(
+        exec, "f() { echo from-f; } > /tmp/lush_test_48", 1);
+    executor_execute_command_line(exec, "f", 1);
     /* This echo must NOT also be captured by f's redirect — its output
      * should be discarded as normal (we don't capture stdout here). */
-    executor_execute_command_line(exec, "echo from-second-call");
+    executor_execute_command_line(exec, "echo from-second-call", 1);
     executor_execute_command_line(
-        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)");
+        exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(
         result, "from-f",
         "function trailing redirect must not leak to subsequent commands");
     free(result);
-    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48");
+    executor_execute_command_line(exec, "rm -f /tmp/lush_test_48", 1);
     executor_free(exec);
 }
 
@@ -833,7 +785,7 @@ TEST(arithmetic_basic) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "RESULT=$((2 + 3))");
+    executor_execute_command_line(exec, "RESULT=$((2 + 3))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -847,7 +799,7 @@ TEST(arithmetic_multiply) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "RESULT=$((4 * 5))");
+    executor_execute_command_line(exec, "RESULT=$((4 * 5))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -861,9 +813,9 @@ TEST(arithmetic_variable) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "X=10");
-    executor_execute_command_line(exec, "Y=20");
-    executor_execute_command_line(exec, "RESULT=$((X + Y))");
+    executor_execute_command_line(exec, "X=10", 1);
+    executor_execute_command_line(exec, "Y=20", 1);
+    executor_execute_command_line(exec, "RESULT=$((X + Y))", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
@@ -877,8 +829,8 @@ TEST(arithmetic_increment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "N=5");
-    executor_execute_command_line(exec, "N=$((N + 1))");
+    executor_execute_command_line(exec, "N=5", 1);
+    executor_execute_command_line(exec, "N=$((N + 1))", 1);
 
     char *n = symtable_get_var(exec->symtable, "N");
     ASSERT_NOT_NULL(n, "N should be set");
@@ -897,9 +849,9 @@ TEST(subshell_isolation) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "OUTER=yes");
+    executor_execute_command_line(exec, "OUTER=yes", 1);
     /* Variable set in subshell should not affect parent */
-    executor_execute_command_line(exec, "(INNER=subshell)");
+    executor_execute_command_line(exec, "(INNER=subshell)", 1);
 
     char *outer = symtable_get_var(exec->symtable, "OUTER");
     ASSERT_NOT_NULL(outer, "OUTER should be set");
@@ -918,8 +870,8 @@ TEST(brace_group) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Brace group runs in current shell */
-    int status = executor_execute_command_line(exec, "{ A=1; B=2; }");
-    ASSERT_EQ(status, 0, "Brace group should succeed");
+    run_result_t r = run_shell_with_executor(exec, "{ A=1; B=2; }");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *a = symtable_get_var(exec->symtable, "A");
     char *b = symtable_get_var(exec->symtable, "B");
@@ -940,11 +892,11 @@ TEST(test_string_equal) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[ foo = foo ]");
-    ASSERT_EQ(status, 0, "[ foo = foo ] should be true");
+    run_result_t r = run_shell_with_executor(exec, "[ foo = foo ]");
+    ASSERT_EXIT_STATUS(r, 0);
 
-    status = executor_execute_command_line(exec, "[ foo = bar ]");
-    ASSERT_EQ(status, 1, "[ foo = bar ] should be false");
+    r = run_shell_with_executor(exec, "[ foo = bar ]");
+    ASSERT_EXIT_STATUS(r, 1);
 
     executor_free(exec);
 }
@@ -953,11 +905,11 @@ TEST(test_string_not_equal) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[ foo != bar ]");
-    ASSERT_EQ(status, 0, "[ foo != bar ] should be true");
+    run_result_t r = run_shell_with_executor(exec, "[ foo != bar ]");
+    ASSERT_EXIT_STATUS(r, 0);
 
-    status = executor_execute_command_line(exec, "[ foo != foo ]");
-    ASSERT_EQ(status, 1, "[ foo != foo ] should be false");
+    r = run_shell_with_executor(exec, "[ foo != foo ]");
+    ASSERT_EXIT_STATUS(r, 1);
 
     executor_free(exec);
 }
@@ -966,18 +918,12 @@ TEST(test_numeric_compare) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    ASSERT_EQ(executor_execute_command_line(exec, "[ 5 -eq 5 ]"), 0,
-              "-eq should work");
-    ASSERT_EQ(executor_execute_command_line(exec, "[ 5 -ne 3 ]"), 0,
-              "-ne should work");
-    ASSERT_EQ(executor_execute_command_line(exec, "[ 5 -gt 3 ]"), 0,
-              "-gt should work");
-    ASSERT_EQ(executor_execute_command_line(exec, "[ 5 -ge 5 ]"), 0,
-              "-ge should work");
-    ASSERT_EQ(executor_execute_command_line(exec, "[ 3 -lt 5 ]"), 0,
-              "-lt should work");
-    ASSERT_EQ(executor_execute_command_line(exec, "[ 3 -le 3 ]"), 0,
-              "-le should work");
+    ASSERT_EXIT_STATUS(run_shell_with_executor(exec, "[ 5 -eq 5 ]"), 0);
+    ASSERT_EXIT_STATUS(run_shell_with_executor(exec, "[ 5 -ne 3 ]"), 0);
+    ASSERT_EXIT_STATUS(run_shell_with_executor(exec, "[ 5 -gt 3 ]"), 0);
+    ASSERT_EXIT_STATUS(run_shell_with_executor(exec, "[ 5 -ge 5 ]"), 0);
+    ASSERT_EXIT_STATUS(run_shell_with_executor(exec, "[ 3 -lt 5 ]"), 0);
+    ASSERT_EXIT_STATUS(run_shell_with_executor(exec, "[ 3 -le 3 ]"), 0);
 
     executor_free(exec);
 }
@@ -986,14 +932,14 @@ TEST(test_string_empty) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[ -z '' ]");
-    ASSERT_EQ(status, 0, "[ -z '' ] should be true");
+    run_result_t r = run_shell_with_executor(exec, "[ -z '' ]");
+    ASSERT_EXIT_STATUS(r, 0);
 
-    status = executor_execute_command_line(exec, "[ -z 'notempty' ]");
-    ASSERT_EQ(status, 1, "[ -z 'notempty' ] should be false");
+    r = run_shell_with_executor(exec, "[ -z 'notempty' ]");
+    ASSERT_EXIT_STATUS(r, 1);
 
-    status = executor_execute_command_line(exec, "[ -n 'notempty' ]");
-    ASSERT_EQ(status, 0, "[ -n 'notempty' ] should be true");
+    r = run_shell_with_executor(exec, "[ -n 'notempty' ]");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1007,8 +953,8 @@ TEST(builtin_export) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "export MYEXPORT=value");
-    ASSERT_EQ(status, 0, "export should succeed");
+    run_result_t r = run_shell_with_executor(exec, "export MYEXPORT=value");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *value = symtable_get_var(exec->symtable, "MYEXPORT");
     ASSERT_NOT_NULL(value, "MYEXPORT should be set");
@@ -1022,12 +968,12 @@ TEST(builtin_unset) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "TOUNSET=exists");
+    executor_execute_command_line(exec, "TOUNSET=exists", 1);
     char *before = symtable_get_var(exec->symtable, "TOUNSET");
     ASSERT_NOT_NULL(before, "Variable should exist before unset");
     free(before);
 
-    executor_execute_command_line(exec, "unset TOUNSET");
+    executor_execute_command_line(exec, "unset TOUNSET", 1);
     char *after = symtable_get_var(exec->symtable, "TOUNSET");
     ASSERT(after == NULL, "Variable should not exist after unset");
 
@@ -1038,9 +984,8 @@ TEST(builtin_readonly) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "readonly MYCONST=constant");
-    ASSERT_EQ(status, 0, "readonly should succeed");
+    run_result_t r = run_shell_with_executor(exec, "readonly MYCONST=constant");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *value = symtable_get_var(exec->symtable, "MYCONST");
     ASSERT_NOT_NULL(value, "MYCONST should be set");
@@ -1054,8 +999,8 @@ TEST(builtin_eval) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "eval 'EVALED=yes'");
-    ASSERT_EQ(status, 0, "eval should succeed");
+    run_result_t r = run_shell_with_executor(exec, "eval 'EVALED=yes'");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *value = symtable_get_var(exec->symtable, "EVALED");
     ASSERT_NOT_NULL(value, "EVALED should be set");
@@ -1070,10 +1015,10 @@ TEST(builtin_shift) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Test shift with positional parameters */
-    executor_execute_command_line(exec, "set -- a b c d e");
-    executor_execute_command_line(exec, "FIRST=$1");
-    executor_execute_command_line(exec, "shift");
-    executor_execute_command_line(exec, "AFTER=$1");
+    executor_execute_command_line(exec, "set -- a b c d e", 1);
+    executor_execute_command_line(exec, "FIRST=$1", 1);
+    executor_execute_command_line(exec, "shift", 1);
+    executor_execute_command_line(exec, "AFTER=$1", 1);
 
     char *first = symtable_get_var(exec->symtable, "FIRST");
     char *after = symtable_get_var(exec->symtable, "AFTER");
@@ -1090,8 +1035,8 @@ TEST(builtin_set_positional) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "set -- one two three");
-    executor_execute_command_line(exec, "P1=$1; P2=$2; P3=$3");
+    executor_execute_command_line(exec, "set -- one two three", 1);
+    executor_execute_command_line(exec, "P1=$1; P2=$2; P3=$3", 1);
 
     char *p1 = symtable_get_var(exec->symtable, "P1");
     char *p2 = symtable_get_var(exec->symtable, "P2");
@@ -1116,8 +1061,8 @@ TEST(command_list_semicolon) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "A=1; B=2; C=3");
-    ASSERT_EQ(status, 0, "Command list should succeed");
+    run_result_t r = run_shell_with_executor(exec, "A=1; B=2; C=3");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *a = symtable_get_var(exec->symtable, "A");
     char *b = symtable_get_var(exec->symtable, "B");
@@ -1142,10 +1087,10 @@ TEST(loop_break) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "N=0; for i in 1 2 3 4 5; do N=$((N+1)); if [ $N -eq 3 ]; then "
               "break; fi; done");
-    ASSERT_EQ(status, 0, "Loop with break should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *n = symtable_get_var(exec->symtable, "N");
     ASSERT_NOT_NULL(n, "N should be set");
@@ -1160,11 +1105,11 @@ TEST(loop_continue) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Count only odd numbers: skip even iterations */
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "SUM=0; for i in 1 2 3 4 5; do "
               "if [ $((i % 2)) -eq 0 ]; then continue; fi; "
               "SUM=$((SUM + i)); done");
-    ASSERT_EQ(status, 0, "Loop with continue should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *sum = symtable_get_var(exec->symtable, "SUM");
     ASSERT_NOT_NULL(sum, "SUM should be set");
@@ -1184,8 +1129,8 @@ TEST(pipeline_simple) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Simple pipeline - echo piped to cat */
-    int status = executor_execute_command_line(exec, "true | true");
-    ASSERT_EQ(status, 0, "Pipeline of true commands should succeed");
+    run_result_t r = run_shell_with_executor(exec, "true | true");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1195,8 +1140,8 @@ TEST(pipeline_exit_status) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Pipeline exit status is last command's status */
-    int status = executor_execute_command_line(exec, "true | false");
-    ASSERT_EQ(status, 1, "Pipeline should return last command's exit status");
+    run_result_t r = run_shell_with_executor(exec, "true | false");
+    ASSERT_EXIT_STATUS(r, 1);
 
     executor_free(exec);
 }
@@ -1206,8 +1151,8 @@ TEST(pipeline_three_commands) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Three-stage pipeline */
-    int status = executor_execute_command_line(exec, "true | true | true");
-    ASSERT_EQ(status, 0, "Three-stage pipeline should succeed");
+    run_result_t r = run_shell_with_executor(exec, "true | true | true");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1221,8 +1166,8 @@ TEST(extended_test_string_equal) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[[ hello == hello ]]");
-    ASSERT_EQ(status, 0, "Extended test string equality should succeed");
+    run_result_t r = run_shell_with_executor(exec, "[[ hello == hello ]]");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1231,8 +1176,8 @@ TEST(extended_test_string_not_equal) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[[ hello != world ]]");
-    ASSERT_EQ(status, 0, "Extended test string inequality should succeed");
+    run_result_t r = run_shell_with_executor(exec, "[[ hello != world ]]");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1241,9 +1186,9 @@ TEST(extended_test_regex_match) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "[[ hello123 =~ ^hello[0-9]+$ ]]");
-    ASSERT_EQ(status, 0, "Extended test regex match should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "[[ hello123 =~ ^hello[0-9]+$ ]]");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1252,8 +1197,8 @@ TEST(extended_test_and) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[[ -n foo && -n bar ]]");
-    ASSERT_EQ(status, 0, "Extended test AND should succeed");
+    run_result_t r = run_shell_with_executor(exec, "[[ -n foo && -n bar ]]");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1262,8 +1207,8 @@ TEST(extended_test_or) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[[ -z '' || -n foo ]]");
-    ASSERT_EQ(status, 0, "Extended test OR should succeed");
+    run_result_t r = run_shell_with_executor(exec, "[[ -z '' || -n foo ]]");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1272,8 +1217,8 @@ TEST(extended_test_pattern_match) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "[[ foobar == foo* ]]");
-    ASSERT_EQ(status, 0, "Extended test pattern match should succeed");
+    run_result_t r = run_shell_with_executor(exec, "[[ foobar == foo* ]]");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1287,9 +1232,9 @@ TEST(param_default_value) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "RESULT=${UNDEFINED:-default}");
-    ASSERT_EQ(status, 0, "Default value expansion should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "RESULT=${UNDEFINED:-default}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "default",
@@ -1303,9 +1248,9 @@ TEST(param_alternate_value) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
-        exec, "VAR=set; RESULT=${VAR:+alternate}");
-    ASSERT_EQ(status, 0, "Alternate value expansion should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "VAR=set; RESULT=${VAR:+alternate}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "alternate", "Should use alternate when var is set");
@@ -1318,8 +1263,8 @@ TEST(param_string_length) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "VAR=hello; LEN=${#VAR}");
-    ASSERT_EQ(status, 0, "String length expansion should succeed");
+    run_result_t r = run_shell_with_executor(exec, "VAR=hello; LEN=${#VAR}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *len = symtable_get_var(exec->symtable, "LEN");
     ASSERT_STR_EQ(len, "5", "Length of 'hello' should be 5");
@@ -1332,9 +1277,9 @@ TEST(param_substring_removal_prefix) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "VAR=foobar; RESULT=${VAR#foo}");
-    ASSERT_EQ(status, 0, "Prefix removal should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "VAR=foobar; RESULT=${VAR#foo}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "bar", "Should remove 'foo' prefix");
@@ -1347,9 +1292,9 @@ TEST(param_substring_removal_suffix) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "VAR=foobar; RESULT=${VAR%bar}");
-    ASSERT_EQ(status, 0, "Suffix removal should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "VAR=foobar; RESULT=${VAR%bar}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "foo", "Should remove 'bar' suffix");
@@ -1362,9 +1307,9 @@ TEST(param_pattern_substitution) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "VAR=hello; RESULT=${VAR/l/L}");
-    ASSERT_EQ(status, 0, "Pattern substitution should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "VAR=hello; RESULT=${VAR/l/L}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "heLlo", "Should replace first 'l' with 'L'");
@@ -1377,9 +1322,9 @@ TEST(param_global_substitution) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "VAR=hello; RESULT=${VAR//l/L}");
-    ASSERT_EQ(status, 0, "Global substitution should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "VAR=hello; RESULT=${VAR//l/L}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "heLLo", "Should replace all 'l' with 'L'");
@@ -1397,8 +1342,8 @@ TEST(array_indexed_assignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "arr=(one two three)");
-    ASSERT_EQ(status, 0, "Array assignment should succeed");
+    run_result_t r = run_shell_with_executor(exec, "arr=(one two three)");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1407,9 +1352,9 @@ TEST(array_element_access) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "arr=(a b c); ELEM=${arr[1]}");
-    ASSERT_EQ(status, 0, "Array element access should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "arr=(a b c); ELEM=${arr[1]}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *elem = symtable_get_var(exec->symtable, "ELEM");
     ASSERT_STR_EQ(elem, "b", "arr[1] should be 'b'");
@@ -1422,9 +1367,9 @@ TEST(array_length) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "arr=(a b c d); LEN=${#arr[@]}");
-    ASSERT_EQ(status, 0, "Array length should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "arr=(a b c d); LEN=${#arr[@]}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *len = symtable_get_var(exec->symtable, "LEN");
     ASSERT_STR_EQ(len, "4", "Array should have 4 elements");
@@ -1437,9 +1382,9 @@ TEST(array_append) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
-        exec, "arr=(a b); arr+=(c d); LEN=${#arr[@]}");
-    ASSERT_EQ(status, 0, "Array append should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "arr=(a b); arr+=(c d); LEN=${#arr[@]}");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *len = symtable_get_var(exec->symtable, "LEN");
     ASSERT_STR_EQ(len, "4", "Array should have 4 elements after append");
@@ -1461,8 +1406,8 @@ TEST(command_substitution_syntax) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Verify command substitution parses and executes without error */
-    int status = executor_execute_command_line(exec, "X=$(true)");
-    ASSERT_EQ(status, 0, "Command substitution syntax should work");
+    run_result_t r = run_shell_with_executor(exec, "X=$(true)");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1477,11 +1422,11 @@ TEST(command_substitution_exit_status) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* For now, just test that the syntax works */
-    int status = executor_execute_command_line(exec, "X=$(true)");
-    ASSERT_EQ(status, 0, "Command substitution should succeed");
+    run_result_t r = run_shell_with_executor(exec, "X=$(true)");
+    ASSERT_EXIT_STATUS(r, 0);
 
     /* TODO: Re-enable when bug is fixed:
-     * status = executor_execute_command_line(exec, "X=$(false); Y=$?");
+     * status = executor_execute_command_line(exec, "X=$(false); Y=$?", 1);
      * ASSERT_EQ(status, 0, "Assignment after substitution should succeed");
      * char *y = symtable_get_var(exec->symtable, "Y");
      * ASSERT_STR_EQ(y, "1", "$? should capture exit status from $(false)");
@@ -1500,9 +1445,9 @@ TEST(special_var_question_mark) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    executor_execute_command_line(exec, "true");
-    int status = executor_execute_command_line(exec, "STATUS=$?");
-    ASSERT_EQ(status, 0, "Capturing $? should succeed");
+    executor_execute_command_line(exec, "true", 1);
+    run_result_t r = run_shell_with_executor(exec, "STATUS=$?");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "STATUS");
     ASSERT_STR_EQ(result, "0", "$? after true should be 0");
@@ -1515,8 +1460,8 @@ TEST(special_var_dollar_dollar) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "PID=$$");
-    ASSERT_EQ(status, 0, "Capturing $$ should succeed");
+    run_result_t r = run_shell_with_executor(exec, "PID=$$");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *pid = symtable_get_var(exec->symtable, "PID");
     ASSERT_NOT_NULL(pid, "$$ should be set");
@@ -1533,8 +1478,8 @@ TEST(special_var_argc) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "set -- a b c; COUNT=$#");
-    ASSERT_EQ(status, 0, "Capturing $# should succeed");
+    run_result_t r = run_shell_with_executor(exec, "set -- a b c; COUNT=$#");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *count = symtable_get_var(exec->symtable, "COUNT");
     ASSERT_STR_EQ(count, "3", "$# should be 3");
@@ -1552,11 +1497,11 @@ TEST(nested_if) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "X=5; if [ $X -gt 0 ]; then "
               "  if [ $X -lt 10 ]; then RESULT=between; fi; "
               "fi");
-    ASSERT_EQ(status, 0, "Nested if should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "between", "Nested condition should set RESULT");
@@ -1569,11 +1514,11 @@ TEST(nested_loops) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
+    run_result_t r = run_shell_with_executor(
         exec, "COUNT=0; for i in 1 2; do "
               "  for j in a b; do COUNT=$((COUNT+1)); done; "
               "done");
-    ASSERT_EQ(status, 0, "Nested loops should succeed");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *count = symtable_get_var(exec->symtable, "COUNT");
     ASSERT_STR_EQ(count, "4", "Should iterate 2*2=4 times");
@@ -1591,13 +1536,13 @@ TEST(elif_chain) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(
-        exec, "X=2; "
-              "if [ $X -eq 1 ]; then RESULT=one; "
-              "elif [ $X -eq 2 ]; then RESULT=two; "
-              "elif [ $X -eq 3 ]; then RESULT=three; "
-              "else RESULT=other; fi");
-    ASSERT_EQ(status, 0, "elif chain should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "X=2; "
+                                      "if [ $X -eq 1 ]; then RESULT=one; "
+                                      "elif [ $X -eq 2 ]; then RESULT=two; "
+                                      "elif [ $X -eq 3 ]; then RESULT=three; "
+                                      "else RESULT=other; fi");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "two", "Should match second elif");
@@ -1621,15 +1566,15 @@ TEST(negation_command) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     /* Skip actual negation test until bug is fixed */
-    /* int status = executor_execute_command_line(exec, "! false"); */
+    /* int status = executor_execute_command_line(exec, "! false", 1); */
     /* ASSERT_EQ(status, 0, "Negated false should return 0"); */
 
-    /* status = executor_execute_command_line(exec, "! true"); */
+    /* status = executor_execute_command_line(exec, "! true", 1); */
     /* ASSERT_EQ(status, 1, "Negated true should return 1"); */
 
     /* For now, just verify executor works without negation */
-    int status = executor_execute_command_line(exec, "true");
-    ASSERT_EQ(status, 0, "Basic command should work");
+    run_result_t r = run_shell_with_executor(exec, "true");
+    ASSERT_EXIT_STATUS(r, 0);
 
     executor_free(exec);
 }
@@ -1643,9 +1588,8 @@ TEST(here_string) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "RESULT=$(cat <<< 'hello')");
-    ASSERT_EQ(status, 0, "Here string should succeed");
+    run_result_t r = run_shell_with_executor(exec, "RESULT=$(cat <<< 'hello')");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     /* cat outputs with trailing newline, command substitution may preserve it
@@ -1668,11 +1612,11 @@ TEST(arithmetic_comparison) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "(( 5 > 3 ))");
-    ASSERT_EQ(status, 0, "5 > 3 should be true (exit 0)");
+    run_result_t r = run_shell_with_executor(exec, "(( 5 > 3 ))");
+    ASSERT_EXIT_STATUS(r, 0);
 
-    status = executor_execute_command_line(exec, "(( 3 > 5 ))");
-    ASSERT_EQ(status, 1, "3 > 5 should be false (exit 1)");
+    r = run_shell_with_executor(exec, "(( 3 > 5 ))");
+    ASSERT_EXIT_STATUS(r, 1);
 
     executor_free(exec);
 }
@@ -1681,8 +1625,8 @@ TEST(arithmetic_assignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status = executor_execute_command_line(exec, "(( X = 5 + 3 ))");
-    ASSERT_EQ(status, 0, "Arithmetic assignment should succeed");
+    run_result_t r = run_shell_with_executor(exec, "(( X = 5 + 3 ))");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *x = symtable_get_var(exec->symtable, "X");
     ASSERT_STR_EQ(x, "8", "X should be 8");
@@ -1695,9 +1639,9 @@ TEST(arithmetic_ternary) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "X=5; RESULT=$((X > 3 ? 1 : 0))");
-    ASSERT_EQ(status, 0, "Ternary operator should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "X=5; RESULT=$((X > 3 ? 1 : 0))");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_STR_EQ(result, "1", "Ternary should return 1 when true");
@@ -1715,11 +1659,11 @@ TEST(local_variable_in_function) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    int status =
-        executor_execute_command_line(exec, "GLOBAL=outer; "
-                                            "f() { local GLOBAL=inner; }; "
-                                            "f");
-    ASSERT_EQ(status, 0, "Function with local should succeed");
+    run_result_t r =
+        run_shell_with_executor(exec, "GLOBAL=outer; "
+                                      "f() { local GLOBAL=inner; }; "
+                                      "f");
+    ASSERT_EXIT_STATUS(r, 0);
 
     char *global = symtable_get_var(exec->symtable, "GLOBAL");
     ASSERT_STR_EQ(global, "outer",

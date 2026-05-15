@@ -1,9 +1,0 @@
-sleefor i ƒin 1 sleefor i ƒin 1 2 3; p 10 &
-waido
-time t
-   echo $ifor i ƒin 2 3; p 10 &
-waido
-time t
-   echoi
-
-done

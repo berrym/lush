@@ -23,6 +23,8 @@
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
+#include "lle/unicode_grapheme.h"
+#include "lle/utf8_support.h"
 #include "lush.h"
 #include "lush_fork.h"
 #include "node.h"
@@ -63,7 +65,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline);
 static int execute_function_definition(executor_t *executor, node_t *function);
 static int execute_function_call(executor_t *executor,
                                  const char *function_name, char **argv,
-                                 int argc);
+                                 int argc, source_location_t loc);
 static bool is_function_defined(executor_t *executor,
                                 const char *function_name);
 static function_def_t *find_function(executor_t *executor,
@@ -71,13 +73,15 @@ static function_def_t *find_function(executor_t *executor,
 static int store_function(executor_t *executor, const char *function_name,
                           node_t *body, function_param_t *params,
                           int param_count);
-static int validate_function_parameters(function_def_t *func, char **argv,
-                                        int argc);
+static int validate_function_parameters(executor_t *executor,
+                                        function_def_t *func, char **argv,
+                                        int argc, source_location_t loc);
 static node_t *copy_ast_node(node_t *node);
 static node_t *copy_ast_chain(node_t *node);
 static int execute_if(executor_t *executor, node_t *if_node);
 static int execute_while(executor_t *executor, node_t *while_node);
 static int execute_until(executor_t *executor, node_t *until_node);
+static int execute_repeat(executor_t *executor, node_t *repeat_node);
 static int execute_for(executor_t *executor, node_t *for_node);
 static int execute_for_arith(executor_t *executor, node_t *for_arith_node);
 static int execute_select(executor_t *executor, node_t *select_node);
@@ -90,10 +94,43 @@ static int execute_logical_or(executor_t *executor, node_t *or_node);
 static int execute_command_list(executor_t *executor, node_t *list);
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc);
-static int execute_external_command(executor_t *executor, char **argv);
-static int execute_external_command_with_redirection(executor_t *executor,
-                                                     char **argv,
-                                                     bool redirect_stderr);
+static bool try_expand_vector_arg(executor_t *executor, node_t *node,
+                                  char ***out_vec, int *out_count);
+
+/* Context for ${!prefix*} / ${!prefix@} name collection. Callback
+ * appends every variable whose name starts with `prefix` into a
+ * growable string array. Defined at file scope (rather than nested
+ * in the use site) because C lacks nested functions. Issue #102. */
+typedef struct {
+    char **names;
+    size_t count;
+    size_t capacity;
+    const char *prefix;
+    size_t prefix_len;
+} prefix_collect_ctx_t;
+
+static void prefix_collect_cb(const char *key, const char *value,
+                              void *userdata) {
+    (void)value;
+    prefix_collect_ctx_t *c = (prefix_collect_ctx_t *)userdata;
+    if (strncmp(key, c->prefix, c->prefix_len) != 0) {
+        return;
+    }
+    if (c->count >= c->capacity) {
+        size_t newcap = c->capacity ? c->capacity * 2 : 16;
+        char **nn = realloc(c->names, newcap * sizeof(char *));
+        if (!nn) {
+            return;
+        }
+        c->names = nn;
+        c->capacity = newcap;
+    }
+    c->names[c->count++] = strdup(key);
+}
+
+static int strptr_cmp(const void *a, const void *b) {
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
 static bool is_stdout_captured(void);
 static bool has_stdout_redirections(node_t *command);
 static bool builtin_can_fork(const char *name);
@@ -112,7 +149,8 @@ static int execute_external_command_with_setup(executor_t *executor,
                                                char **argv,
                                                bool redirect_stderr,
                                                node_t *command);
-static int execute_builtin_command(executor_t *executor, char **argv);
+static int execute_builtin_command(executor_t *executor, char **argv,
+                                   source_location_t loc);
 static int execute_brace_group(executor_t *executor, node_t *group);
 static int execute_subshell(executor_t *executor, node_t *subshell);
 static int execute_negate(executor_t *executor, node_t *negate_node);
@@ -133,8 +171,17 @@ static char *expand_variable(executor_t *executor, const char *var_text);
 static char *expand_tilde(const char *text);
 static char **expand_glob_pattern(const char *pattern, int *expanded_count);
 static bool needs_glob_expansion(const char *str);
-static char **expand_brace_pattern(const char *pattern, int *expanded_count);
+/* expand_brace_pattern is declared in include/executor.h so the
+ * completion analyzer can enumerate per-branch directory targets for
+ * brace expressions in path-prefix bytes. The forward declaration
+ * here is preserved so existing static callers within this
+ * translation unit don't need to be reordered. */
 static bool needs_brace_expansion(const char *str);
+/* Sentinel returned in *expanded_count when brace expansion exceeds the
+ * configured cap (behavior.brace_expansion_max). Top-level callers detect
+ * this and emit an expansion error rather than treating it as a malloc
+ * failure. */
+#define BRACE_EXPANSION_LIMIT_SENTINEL (-1)
 static void initialize_job_control(executor_t *executor);
 static char *expand_arithmetic(executor_t *executor, const char *arith_text);
 static char *expand_command_substitution(executor_t *executor,
@@ -142,10 +189,17 @@ static char *expand_command_substitution(executor_t *executor,
 static node_t *copy_node_simple(node_t *original);
 static void copy_function_definitions(executor_t *dest, executor_t *src);
 char *expand_if_needed(executor_t *executor, const char *text);
-static char *expand_quoted_string(executor_t *executor, const char *str);
+static char *expand_quoted_string(executor_t *executor, const char *str,
+                                  bool in_double_quotes);
+static char *expand_arg_node(executor_t *executor, node_t *node);
+static char *expand_array_unsubscripted(executor_t *executor,
+                                        array_value_t *array);
+static char *slice_string_graphemes(const char *str, size_t str_len,
+                                    int start_grapheme, int count);
 static char *expand_ansi_c_string(const char *str, size_t len);
 static bool is_assignment(const char *text);
-static int execute_assignment(executor_t *executor, const char *assignment);
+static int execute_assignment(executor_t *executor, const char *assignment,
+                              source_location_t loc);
 static bool match_pattern(const char *str, const char *pattern);
 
 /**
@@ -276,9 +330,12 @@ executor_t *executor_new(void) {
     executor->in_script_execution = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
+    executor->shell_exit_requested = false;
+    executor->shell_exit_status = 0;
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
+    executor->source_return = false;
 
     /* Initialize error context stack (Phase 3) */
     executor->context_depth = 0;
@@ -291,6 +348,11 @@ executor_t *executor_new(void) {
     executor->procsub_fd_count = 0;
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
+
+    /* Source-text retention starts empty; populated per-batch by
+     * executor_execute_command_line. */
+    executor->source_text = NULL;
+    executor->source_starting_line = 0;
 
     initialize_job_control(executor);
 
@@ -323,9 +385,12 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->in_script_execution = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
+    executor->shell_exit_requested = false;
+    executor->shell_exit_status = 0;
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
+    executor->source_return = false;
 
     /* Initialize error context stack (Phase 3) */
     executor->context_depth = 0;
@@ -338,6 +403,11 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->procsub_fd_count = 0;
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
+
+    /* Source-text retention starts empty; populated per-batch by
+     * executor_execute_command_line. */
+    executor->source_text = NULL;
+    executor->source_starting_line = 0;
 
     initialize_job_control(executor);
 
@@ -587,6 +657,17 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         return;
     }
 
+    /* Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
+     * Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up. */
+    if (SOURCE_LOC_VALID(loc)) {
+        char *src_line = executor_get_source_line(executor, loc.line);
+        if (src_line) {
+            shell_error_set_source_line(error, src_line, loc.column,
+                                        loc.column + loc.length);
+            free(src_line);
+        }
+    }
+
     /* Add context stack to error */
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
@@ -631,6 +712,17 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         /* Fallback to legacy error system */
         set_executor_error(executor, "runtime error");
         return;
+    }
+
+    /* Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
+     * Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up. */
+    if (SOURCE_LOC_VALID(loc)) {
+        char *src_line = executor_get_source_line(executor, loc.line);
+        if (src_line) {
+            shell_error_set_source_line(error, src_line, loc.column,
+                                        loc.column + loc.length);
+            free(src_line);
+        }
     }
 
     /* Add context stack to error */
@@ -681,6 +773,16 @@ static void report_command_not_found(executor_t *executor, const char *command,
         /* Fallback to simple error message */
         fprintf(stderr, "lush: %s: command not found\n", command);
         return;
+    }
+
+    /* Attach source line for the rust-style snippet block */
+    if (SOURCE_LOC_VALID(loc)) {
+        char *src_line = executor_get_source_line(executor, loc.line);
+        if (src_line) {
+            shell_error_set_source_line(error, src_line, loc.column,
+                                        loc.column + loc.length);
+            free(src_line);
+        }
     }
 
     /* Add context stack to error */
@@ -781,10 +883,27 @@ int executor_execute(executor_t *executor, node_t *ast) {
  * @param input Shell command string to parse and execute
  * @return Exit status of executed command, or error code
  */
-int executor_execute_command_line(executor_t *executor, const char *input) {
+int executor_execute_command_line(executor_t *executor, const char *input,
+                                  size_t starting_line) {
     if (!executor || !input) {
         return 1;
     }
+    if (starting_line == 0) {
+        starting_line = 1;
+    }
+
+    /* Stash source text for the structured-error system. Any error
+     * site emitting via shell_error_create() can pull the actual
+     * source line via executor_get_source_line() and attach it via
+     * shell_error_set_source_line() to produce the full rust-style
+     * snippet block (`N | source line / ^~~~~`). The stash is set to
+     * the input we're about to parse and restored on exit so re-entrant
+     * dispatch (e.g. command substitution running its own batch
+     * recursively) doesn't leak text from one batch into another. */
+    const char *saved_source_text = executor->source_text;
+    size_t saved_source_starting_line = executor->source_starting_line;
+    executor->source_text = input;
+    executor->source_starting_line = starting_line;
 
     // Preprocess input to handle line continuation (backslash-newline)
     // This is needed for -c option where the string comes directly without
@@ -816,11 +935,13 @@ int executor_execute_command_line(executor_t *executor, const char *input) {
     const char *source_name = executor->current_script_file
                                   ? executor->current_script_file
                                   : "<stdin>";
-    parser_t *parser = parser_new_with_source(parse_input, source_name);
+    int result = 0;
+    parser_t *parser =
+        parser_new_with_source(parse_input, source_name, starting_line);
     if (!parser) {
         set_executor_error(executor, "Failed to create parser");
-        free(processed_input);
-        return 1;
+        result = 1;
+        goto cleanup;
     }
 
     node_t *ast = parser_parse(parser);
@@ -836,13 +957,12 @@ int executor_execute_command_line(executor_t *executor, const char *input) {
             if (legacy_err) {
                 set_executor_error(executor, legacy_err);
             }
-            parser_free(parser);
-            free(processed_input);
-            return 2; // Syntax error
+            result = 2; // Syntax error
+        } else {
+            result = 0; // Syntax check successful
         }
         parser_free(parser);
-        free(processed_input);
-        return 0; // Syntax check successful
+        goto cleanup;
     }
 
     if (parser_has_error(parser)) {
@@ -855,22 +975,72 @@ int executor_execute_command_line(executor_t *executor, const char *input) {
             set_executor_error(executor, legacy_err);
         }
         parser_free(parser);
-        free(processed_input);
-        return 1;
+        result = 1;
+        goto cleanup;
     }
 
     if (!ast) {
         parser_free(parser);
-        free(processed_input);
-        return 0; // Empty command
+        result = 0; // Empty command
+        goto cleanup;
     }
 
-    int result = executor_execute(executor, ast);
+    result = executor_execute(executor, ast);
 
     free_node_tree(ast);
     parser_free(parser);
-    free(processed_input);
 
+cleanup:
+    free(processed_input);
+    /* Restore previous source-text stash so re-entrant batches don't
+     * leak text from one batch into another. */
+    executor->source_text = saved_source_text;
+    executor->source_starting_line = saved_source_starting_line;
+    return result;
+}
+
+char *executor_get_source_line(executor_t *executor, size_t file_line) {
+    if (!executor || !executor->source_text || file_line == 0 ||
+        executor->source_starting_line == 0 ||
+        file_line < executor->source_starting_line) {
+        return NULL;
+    }
+
+    /* Translate file-relative line number into batch-relative line
+     * number. The batch's first line is executor->source_starting_line
+     * in the original file; that's batch line 1. */
+    size_t batch_line = file_line - executor->source_starting_line + 1;
+
+    const char *src = executor->source_text;
+    size_t current_line = 1;
+    size_t line_start = 0;
+    size_t i = 0;
+
+    /* Walk to the start of the requested batch-relative line. */
+    while (src[i] != '\0' && current_line < batch_line) {
+        if (src[i] == '\n') {
+            current_line++;
+            line_start = i + 1;
+        }
+        i++;
+    }
+    if (current_line != batch_line) {
+        return NULL; /* Requested line is past end of batch text. */
+    }
+
+    /* Find the end of the line (newline or end-of-string). */
+    size_t line_end = line_start;
+    while (src[line_end] != '\0' && src[line_end] != '\n') {
+        line_end++;
+    }
+
+    size_t line_len = line_end - line_start;
+    char *result = malloc(line_len + 1);
+    if (!result) {
+        return NULL;
+    }
+    memcpy(result, src + line_start, line_len);
+    result[line_len] = '\0';
     return result;
 }
 
@@ -944,6 +1114,8 @@ static int execute_node(executor_t *executor, node_t *node) {
         return execute_while(executor, node);
     case NODE_UNTIL:
         return execute_until(executor, node);
+    case NODE_REPEAT:
+        return execute_repeat(executor, node);
     case NODE_FOR:
         return execute_for(executor, node);
     case NODE_FOR_ARITH:
@@ -1038,6 +1210,14 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return last_result;
         }
 
+        /* POSIX-required shell abort (set by executor_request_posix_exit
+         * from sites like ${var:?word}). Subsequent statements in this
+         * batch must not run; the REPL terminates the shell with
+         * shell_exit_status after we return. */
+        if (executor->shell_exit_requested) {
+            return executor->shell_exit_status;
+        }
+
         // Flush stdout to prevent pipeline from picking up residual output
         fflush(stdout);
 
@@ -1077,6 +1257,167 @@ static int execute_command_list(executor_t *executor, node_t *list) {
  * @param command Command node to execute
  * @return Exit status of the command
  */
+static int execute_command_dispatch(executor_t *executor, node_t *command);
+
+/* ============================================================================
+ * POSIX cmd_prefix: temporary-environment assignments
+ * ============================================================================
+ * A simple command may carry NODE_ASSIGN children (`VAR=value` parsed as a
+ * cmd_prefix). For a command word these are transient (visible to the
+ * command, including a function body, but restored afterward); bash-default
+ * and zsh both treat them transient even for special builtins, so lush's
+ * default follows that consensus. For a pure prefix (no command word) the
+ * assignments persist, matching `VAR=value` / `VAR=value >file`.
+ */
+
+typedef struct {
+    char *name;
+    bool existed;
+    char *old_value; /* strdup of prior value when existed */
+    bool was_exported;
+} prefix_save_t;
+
+/* Extract the variable name from a NODE_ASSIGN string ("name=v" or
+ * "name+=v"). Returns a malloc'd name, or NULL. */
+static char *prefix_assign_name(const char *s) {
+    if (!s) {
+        return NULL;
+    }
+    const char *eq = strchr(s, '=');
+    if (!eq || eq == s) {
+        return NULL;
+    }
+    size_t n = (size_t)(eq - s);
+    if (n > 0 && s[n - 1] == '+') {
+        n--; /* += append */
+    }
+    if (n == 0) {
+        return NULL;
+    }
+    char *name = malloc(n + 1);
+    if (!name) {
+        return NULL;
+    }
+    memcpy(name, s, n);
+    name[n] = '\0';
+    return name;
+}
+
+/* Apply every NODE_ASSIGN prefix child of `command`. When `transient`,
+ * prior variable state is snapshotted into *out_saves (count *out_n) so
+ * prefix_restore_and_free() can undo it; otherwise the assignments
+ * persist and *out_saves is left NULL. Each assignment is applied via
+ * execute_assignment() (so +=, declare -i arithmetic, and value
+ * expansion all behave identically to a standalone assignment) and then
+ * exported, so a forked external child and env-reading builtins observe
+ * it. Returns 0 on success, non-zero on the first failing assignment. */
+static int prefix_apply(executor_t *executor, node_t *command, bool transient,
+                        prefix_save_t **out_saves, int *out_n) {
+    if (out_saves) {
+        *out_saves = NULL;
+    }
+    if (out_n) {
+        *out_n = 0;
+    }
+
+    int count = 0;
+    for (node_t *c = command->first_child; c; c = c->next_sibling) {
+        if (c->type == NODE_ASSIGN) {
+            count++;
+        }
+    }
+    if (count == 0) {
+        return 0;
+    }
+
+    prefix_save_t *saves = NULL;
+    if (transient) {
+        saves = calloc((size_t)count, sizeof(*saves));
+        if (!saves) {
+            return 1;
+        }
+    }
+
+    symtable_manager_t *mgr = symtable_get_global_manager();
+    int idx = 0;
+    for (node_t *c = command->first_child; c; c = c->next_sibling) {
+        if (c->type != NODE_ASSIGN || !c->val.str) {
+            continue;
+        }
+        char *name = prefix_assign_name(c->val.str);
+        if (!name) {
+            continue;
+        }
+
+        if (transient) {
+            bool existed = mgr ? symtable_var_exists(mgr, name) : false;
+            char *old = existed ? symtable_get_global(name) : NULL;
+            symvar_flags_t fl =
+                mgr ? symtable_get_flags(mgr, name) : SYMVAR_NONE;
+            saves[idx].name = name; /* ownership moves to saves */
+            saves[idx].existed = existed;
+            saves[idx].old_value = old;
+            saves[idx].was_exported = (fl & SYMVAR_EXPORTED) != 0;
+        }
+
+        int st = execute_assignment(executor, c->val.str, command->loc);
+        if (st != 0) {
+            if (!transient) {
+                free(name);
+            }
+            /* On failure idx-th save (if transient) holds this name;
+             * include it so restore undoes any partial apply. */
+            if (transient) {
+                idx++;
+                *out_saves = saves;
+                *out_n = idx;
+            }
+            return st;
+        }
+        symtable_export_global(name); /* setenv: child/env-readers see it */
+
+        if (transient) {
+            idx++;
+        } else {
+            free(name);
+        }
+    }
+
+    if (transient) {
+        *out_saves = saves;
+        *out_n = idx;
+    }
+    return 0;
+}
+
+/* Undo a transient prefix_apply() and free the snapshot array. */
+static void prefix_restore_and_free(prefix_save_t *saves, int n) {
+    if (!saves) {
+        return;
+    }
+    for (int i = n - 1; i >= 0; i--) {
+        const char *name = saves[i].name;
+        if (!name) {
+            continue;
+        }
+        if (saves[i].existed) {
+            symtable_set_global(name,
+                                saves[i].old_value ? saves[i].old_value : "");
+            if (saves[i].was_exported) {
+                setenv(name, saves[i].old_value ? saves[i].old_value : "", 1);
+            } else {
+                unsetenv(name);
+            }
+        } else {
+            symtable_unset_global(name);
+            unsetenv(name);
+        }
+        free(saves[i].name);
+        free(saves[i].old_value);
+    }
+    free(saves);
+}
+
 static int execute_command(executor_t *executor, node_t *command) {
     if (!command || command->type != NODE_COMMAND) {
         return 1;
@@ -1086,10 +1427,64 @@ static int execute_command(executor_t *executor, node_t *command) {
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
 
-    // Check for assignment
+    // Check for assignment (legacy lone-assignment shape: val.str is
+    // "var=value" with no NODE_ASSIGN children).
     if (command->val.str && is_assignment(command->val.str)) {
-        return execute_assignment(executor, command->val.str);
+        return execute_assignment(executor, command->val.str, command->loc);
     }
+
+    // POSIX cmd_prefix: NODE_ASSIGN children precede the command word.
+    int n_prefix = 0;
+    for (node_t *c = command->first_child; c; c = c->next_sibling) {
+        if (c->type == NODE_ASSIGN) {
+            n_prefix++;
+        }
+    }
+
+    if (n_prefix > 0 && command->val.str == NULL) {
+        // Pure prefix, no command word: `x=1`, `x=1 >file`. POSIX:
+        // redirections are performed, then assignments persist.
+        bool have_redir = count_redirections(command) > 0;
+        redirection_state_t rs;
+        if (have_redir) {
+            save_file_descriptors(&rs);
+            if (setup_redirections(executor, command) != 0) {
+                restore_file_descriptors(&rs);
+                return 1;
+            }
+        }
+        int st =
+            prefix_apply(executor, command, /*transient=*/false, NULL, NULL);
+        if (have_redir) {
+            restore_file_descriptors(&rs);
+        }
+        set_exit_status(st);
+        return st;
+    }
+
+    if (n_prefix > 0) {
+        // Command word present: apply prefix transiently, dispatch, then
+        // restore. An external command forks (its child inherits the
+        // exported vars via environ); the parent-side restore reverts the
+        // shell's own view for all command kinds.
+        prefix_save_t *saves = NULL;
+        int nsaves = 0;
+        int st = prefix_apply(executor, command, /*transient=*/true, &saves,
+                              &nsaves);
+        if (st != 0) {
+            prefix_restore_and_free(saves, nsaves);
+            set_exit_status(st);
+            return st;
+        }
+        int r = execute_command_dispatch(executor, command);
+        prefix_restore_and_free(saves, nsaves);
+        return r;
+    }
+
+    return execute_command_dispatch(executor, command);
+}
+
+static int execute_command_dispatch(executor_t *executor, node_t *command) {
 
     // Note: Parameter expansions like ${CMD} in command position are handled
     // by build_argv_from_ast() which calls expand_if_needed() on the command
@@ -1109,8 +1504,9 @@ static int execute_command(executor_t *executor, node_t *command) {
 
     // Privileged mode security check
     if (argc > 0 && !is_privileged_command_allowed(argv[0])) {
-        fprintf(stderr, "lush: %s: restricted command in privileged mode\n",
-                argv[0]);
+        executor_error_report(
+            executor, SHELL_ERR_PERMISSION_DENIED, command->loc,
+            "%s: restricted command in privileged mode", argv[0]);
         for (int i = 0; i < argc; i++) {
             free(argv[i]);
         }
@@ -1307,8 +1703,9 @@ static int execute_command(executor_t *executor, node_t *command) {
     }
 
     if (is_function_defined(executor, filtered_argv[0])) {
-        result = execute_function_call(executor, filtered_argv[0],
-                                       filtered_argv, filtered_argc);
+        result =
+            execute_function_call(executor, filtered_argv[0], filtered_argv,
+                                  filtered_argc, command->loc);
     } else if (is_builtin_command(filtered_argv[0])) {
         // For builtin commands with stdout redirections, check if stdout is
         // captured. Only fork for "pure" builtins that don't modify shell
@@ -1344,7 +1741,8 @@ static int execute_command(executor_t *executor, node_t *command) {
                 }
             }
 
-            result = execute_builtin_command(executor, filtered_argv);
+            result =
+                execute_builtin_command(executor, filtered_argv, command->loc);
 
             // Flush output streams after builtin execution
             // This ensures output appears immediately, especially under
@@ -1447,15 +1845,15 @@ static int execute_command(executor_t *executor, node_t *command) {
                             // Re-check if it's a builtin or function after
                             // correction
                             if (is_builtin_command(filtered_argv[0])) {
-                                result = execute_builtin_command(executor,
-                                                                 filtered_argv);
+                                result = execute_builtin_command(
+                                    executor, filtered_argv, command->loc);
                                 fflush(stdout);
                                 fflush(stderr);
                             } else if (is_function_defined(executor,
                                                            filtered_argv[0])) {
                                 result = execute_function_call(
                                     executor, filtered_argv[0], filtered_argv,
-                                    filtered_argc);
+                                    filtered_argc, command->loc);
                             } else {
                                 // Execute the corrected external command
                                 result = execute_external_command_with_setup(
@@ -1635,13 +2033,19 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
     // Pop error context before returning
     executor_pop_context(executor);
 
-    // Pipefail behavior: return failure if ANY command in pipeline fails
+    /* Pipefail behavior: pipeline status is the LAST (rightmost)
+     * non-zero exit status. Bash docs: "Exit status of a pipeline
+     * is the value of the LAST (rightmost) command to exit with a
+     * non-zero status, or zero if all exit successfully." Checking
+     * the right side first preserves this even for the nested 3-stage
+     * case where the inner pipeline's pipefail result becomes the
+     * outer's left_exit. Issue #100. */
     if (is_pipefail_enabled()) {
-        if (left_exit != 0) {
-            return left_exit;
-        }
         if (right_exit != 0) {
             return right_exit;
+        }
+        if (left_exit != 0) {
+            return left_exit;
         }
         return 0;
     }
@@ -1674,6 +2078,12 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
         // Check for loop control (break/continue) - stop executing chain
         if (executor->loop_control != LOOP_NORMAL) {
             return last_result;
+        }
+
+        /* POSIX-required shell abort: short-circuit the chain so the
+         * abort propagates up to execute_command_list and the REPL. */
+        if (executor->shell_exit_requested) {
+            return executor->shell_exit_status;
         }
 
         // Handle set -e (exit_on_error): exit if command failed and not part of
@@ -1809,11 +2219,80 @@ cleanup:
     return result;
 }
 
+/* Runaway-loop safety: detect a loop body that fails with non-zero exit
+ * status N consecutive times across at least T seconds. The "consecutive
+ * non-zero" signal cleanly separates stuck-on-failure loops from any
+ * legitimate idiom — counter loops, daemons (`while true; do work; done`),
+ * read-line loops, retry-with-backoff that intermixes failures with
+ * successes — none of which produce a long stretch of consecutive
+ * non-zero body exits. The wall-clock floor prevents tripping on
+ * legitimate fast-fail-many-times-then-succeed retry patterns where the
+ * full streak fits inside hundreds of milliseconds.
+ *
+ * Tracking ANY non-zero (rather than the same status repeated) makes
+ * the heuristic robust against a body that varies its error code per
+ * iteration. Set behavior.loop_failure_streak = 0 to disable entirely
+ * and match bash/zsh exactly.
+ */
+typedef struct {
+    int streak;            /* consecutive non-zero body exits */
+    int last_status;       /* last non-zero status seen */
+    struct timespec start; /* monotonic clock at first non-zero of streak */
+    bool armed;            /* streak start time captured */
+} loop_monitor_t;
+
+static void loop_monitor_init(loop_monitor_t *m) {
+    m->streak = 0;
+    m->last_status = 0;
+    m->armed = false;
+}
+
+/* errexit_in_loops: when FEATURE_ERREXIT_IN_LOOPS is enabled (curated
+ * lush-mode default; off in POSIX/bash/zsh for polyglot parity), the
+ * first non-zero body exit aborts the loop. Caller should report
+ * SHELL_ERR_LOOP_LIMIT with iteration context and break out. */
+static bool loop_errexit_tripped(int body_status) {
+    return body_status != 0 && shell_mode_allows(FEATURE_ERREXIT_IN_LOOPS);
+}
+
+/* Returns true when the streak satisfies both N and T thresholds.
+ * Caller should report SHELL_ERR_LOOP_LIMIT and break out. */
+static bool loop_monitor_check(loop_monitor_t *m, int body_status) {
+    int n_threshold = config.loop_failure_streak;
+    int t_threshold = config.loop_failure_seconds;
+    if (n_threshold <= 0) {
+        /* heuristic disabled */
+        return false;
+    }
+    if (body_status == 0) {
+        m->streak = 0;
+        m->armed = false;
+        return false;
+    }
+    m->last_status = body_status;
+    m->streak++;
+    if (!m->armed) {
+        clock_gettime(CLOCK_MONOTONIC, &m->start);
+        m->armed = true;
+    }
+    if (m->streak < n_threshold) {
+        return false;
+    }
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long elapsed_sec = now.tv_sec - m->start.tv_sec;
+    if (elapsed_sec < t_threshold) {
+        return false;
+    }
+    return true;
+}
+
 /**
  * @brief Execute a while loop
  *
  * Executes body while condition returns success (0).
- * Supports break/continue and has a safety limit of 10000 iterations.
+ * Supports break/continue with runaway-loop failure-streak detection
+ * (behavior.loop_failure_streak / behavior.loop_failure_seconds).
  *
  * @param executor Executor context
  * @param while_node While loop node
@@ -1844,8 +2323,11 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     }
 
     int last_result = 0;
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
+    bool errexit_tripped = false;
     int iteration = 0;
-    const int max_iterations = 10000; // Safety limit
 
     /* Push loop context for error reporting (Phase 3) */
     executor_push_context(executor, while_node->loc, "in while loop");
@@ -1867,13 +2349,12 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     // Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
-    while (iteration < max_iterations) {
+    for (;;) {
         // Execute condition
         int condition_result = execute_node(executor, condition);
 
         if (executor->debug) {
-            printf("DEBUG: WHILE iteration %d, condition result: %d\n",
-                   iteration, condition_result);
+            printf("DEBUG: WHILE condition result: %d\n", condition_result);
         }
 
         // If condition fails, exit loop
@@ -1883,6 +2364,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
 
         // Execute body
         last_result = execute_command_chain(executor, body);
+        iteration++;
 
         // Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
@@ -1893,7 +2375,20 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             // Continue to next iteration (just reset and loop again)
         }
 
-        iteration++;
+        if (loop_errexit_tripped(last_result)) {
+            errexit_tripped = true;
+            break;
+        }
+
+        if (loop_monitor_check(&monitor, last_result)) {
+            runaway_tripped = true;
+            break;
+        }
+
+        /* POSIX-required shell abort fired from inside the body. */
+        if (executor->shell_exit_requested) {
+            break;
+        }
     }
 
     // Decrement loop depth before returning
@@ -1907,10 +2402,23 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     /* Pop loop context */
     executor_pop_context(executor);
 
-    if (iteration >= max_iterations) {
-        executor_error_add(executor, SHELL_ERR_LOOP_LIMIT, while_node->loc,
-                           "while loop exceeded maximum iterations (%d)",
-                           max_iterations);
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, while_node->loc,
+            "while loop body failed with status %d in iteration %d "
+            "(errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
+
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, while_node->loc,
+            "while loop body failed with status %d for %d consecutive "
+            "iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
     }
 
@@ -1943,8 +2451,11 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     }
 
     int last_result = 0;
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
+    bool errexit_tripped = false;
     int iteration = 0;
-    const int max_iterations = 10000; // Safety limit
 
     // Check for trailing redirections on the until loop
     bool has_redirections = count_redirections(until_node) > 0;
@@ -1962,13 +2473,12 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     // Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
-    while (iteration < max_iterations) {
+    for (;;) {
         // Execute condition
         int condition_result = execute_node(executor, condition);
 
         if (executor->debug) {
-            printf("DEBUG: UNTIL iteration %d, condition result: %d\n",
-                   iteration, condition_result);
+            printf("DEBUG: UNTIL condition result: %d\n", condition_result);
         }
 
         // If condition succeeds (returns 0), exit loop
@@ -1979,6 +2489,7 @@ static int execute_until(executor_t *executor, node_t *until_node) {
 
         // Execute body
         last_result = execute_command_chain(executor, body);
+        iteration++;
 
         // Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
@@ -1989,7 +2500,20 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             // Continue to next iteration
         }
 
-        iteration++;
+        if (loop_errexit_tripped(last_result)) {
+            errexit_tripped = true;
+            break;
+        }
+
+        if (loop_monitor_check(&monitor, last_result)) {
+            runaway_tripped = true;
+            break;
+        }
+
+        /* POSIX-required shell abort fired from inside the body. */
+        if (executor->shell_exit_requested) {
+            break;
+        }
     }
 
     // Decrement loop depth before returning
@@ -2003,13 +2527,102 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     // Pop error context
     executor_pop_context(executor);
 
-    if (iteration >= max_iterations) {
-        executor_error_add(executor, SHELL_ERR_LOOP_LIMIT, until_node->loc,
-                           "until loop exceeded maximum iterations (%d)",
-                           max_iterations);
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, until_node->loc,
+            "until loop body failed with status %d in iteration %d "
+            "(errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
+
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, until_node->loc,
+            "until loop body failed with status %d for %d consecutive "
+            "iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
         return 1;
     }
 
+    return last_result;
+}
+
+/**
+ * @brief Execute a zsh repeat loop
+ *
+ * Runs the body N times. The count expression is the first child
+ * (a NODE_VAR / NODE_COMMAND_SUB / NODE_ARITH_EXP / etc.) and the
+ * body is the second child (a NODE_COMMAND_LIST or similar). The
+ * count is arithmetic-evaluated so `repeat $((expr))` and
+ * `repeat $var` both work. Non-positive counts are no-ops (zsh
+ * compat). Honors break/continue/shell_exit_requested. Issue #103.
+ *
+ * @param executor Executor context
+ * @param repeat_node NODE_REPEAT with [count, body] children
+ * @return Exit status of last executed body command, or 0 if body
+ *         never ran
+ */
+static int execute_repeat(executor_t *executor, node_t *repeat_node) {
+    if (!repeat_node || repeat_node->type != NODE_REPEAT) {
+        return 1;
+    }
+
+    node_t *count_node = repeat_node->first_child;
+    node_t *body = count_node ? count_node->next_sibling : NULL;
+    if (!count_node || !body) {
+        executor_error_add(executor, SHELL_ERR_MALFORMED_CONSTRUCT,
+                           repeat_node->loc, "malformed repeat loop");
+        return 1;
+    }
+
+    /* Evaluate count via the standard arg-expansion path (handles
+     * $var, $(cmd), $((expr)), literal numbers) and then parse as
+     * an integer. zsh accepts a negative or zero count as "do
+     * nothing"; match that. */
+    char *count_text = expand_arg_node(executor, count_node);
+    if (!count_text) {
+        return 1;
+    }
+    char *count_eval = arithm_expand_with_executor(executor, count_text);
+    long count = count_eval ? strtol(count_eval, NULL, 10) : 0;
+    free(count_text);
+    free(count_eval);
+
+    if (count <= 0) {
+        return 0;
+    }
+
+    if (symtable_push_scope(executor->symtable, SCOPE_LOOP, "repeat-loop") !=
+        0) {
+        executor_error_add(executor, SHELL_ERR_SCOPE_ERROR, repeat_node->loc,
+                           "failed to create loop scope");
+        return 1;
+    }
+    executor->loop_depth++;
+    executor_push_context(executor, repeat_node->loc, "in repeat loop");
+
+    int last_result = 0;
+    for (long i = 0; i < count; i++) {
+        last_result = execute_command_chain(executor, body);
+
+        if (executor->loop_control == LOOP_BREAK) {
+            executor->loop_control = LOOP_NORMAL;
+            break;
+        } else if (executor->loop_control == LOOP_CONTINUE) {
+            executor->loop_control = LOOP_NORMAL;
+            continue;
+        }
+        if (executor->shell_exit_requested) {
+            break;
+        }
+    }
+
+    executor->loop_depth--;
+    executor_pop_context(executor);
+    symtable_pop_scope(executor->symtable);
     return last_result;
 }
 
@@ -2078,6 +2691,11 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                           var_name);
 
     int last_result = 0;
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
+    bool errexit_tripped = false;
+    int iteration = 0;
 
     // Build expanded word list for iteration
     char **expanded_words = NULL;
@@ -2145,6 +2763,41 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                         }
                     }
                 } else {
+                    /* Vector-yielding expansions in for-loop word lists:
+                     * `$@`, `"$@"`, `${arr[@]}`, `"${arr[@]}"`,
+                     * `${!arr[@]}`, bare `$arr` (zsh/lush mode), and
+                     * slice variants. Each produces N separate iteration
+                     * values regardless of word-split setting -- the
+                     * for-loop semantics are intrinsically per-element
+                     * for these forms in both bash and zsh. Without this
+                     * the FEATURE_WORD_SPLIT_DEFAULT=false path
+                     * (zsh/lush mode default) treats the joined string
+                     * as one iteration. Issue #99. */
+                    char **vec = NULL;
+                    int vcount = 0;
+                    if (try_expand_vector_arg(executor, word, &vec, &vcount)) {
+                        for (int v = 0; v < vcount; v++) {
+                            expanded_words =
+                                realloc(expanded_words,
+                                        (word_count + 1) * sizeof(char *));
+                            if (!expanded_words) {
+                                for (int w = v; w < vcount; w++) {
+                                    free(vec[w]);
+                                }
+                                free(vec);
+                                set_executor_error(
+                                    executor,
+                                    "Memory allocation failed in for loop");
+                                symtable_pop_scope(executor->symtable);
+                                return 1;
+                            }
+                            expanded_words[word_count++] = vec[v];
+                        }
+                        free(vec);
+                        word = word->next_sibling;
+                        continue;
+                    }
+
                     // Normal expansion and splitting for other words
                     char *expanded = expand_if_needed(executor, word->val.str);
                     if (expanded) {
@@ -2153,6 +2806,17 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                             int brace_count;
                             char **brace_results =
                                 expand_brace_pattern(expanded, &brace_count);
+                            if (brace_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
+                                set_executor_error(
+                                    executor,
+                                    "brace expansion exceeds configured "
+                                    "limit (behavior.brace_expansion_max)");
+                                executor->expansion_error = true;
+                                executor->expansion_exit_status = 1;
+                                free(expanded);
+                                symtable_pop_scope(executor->symtable);
+                                return 1;
+                            }
                             if (brace_results) {
                                 // Add each brace expansion result
                                 for (int b = 0; b < brace_count; b++) {
@@ -2296,6 +2960,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
 
             // Execute body
             last_result = execute_command_chain(executor, body);
+            iteration++;
 
             // Check for break/continue
             if (executor->loop_control == LOOP_BREAK) {
@@ -2305,6 +2970,26 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                 executor->loop_control = LOOP_NORMAL;
                 // Continue to next iteration
             }
+
+            if (loop_errexit_tripped(last_result)) {
+                errexit_tripped = true;
+                break;
+            }
+
+            if (loop_monitor_check(&monitor, last_result)) {
+                runaway_tripped = true;
+                break;
+            }
+
+            /* POSIX-required shell abort fired from inside the body. */
+            if (executor->shell_exit_requested) {
+                break;
+            }
+        }
+
+        /* Honor abort across the outer iteration as well. */
+        if (executor->shell_exit_requested) {
+            break;
         }
     }
 
@@ -2332,6 +3017,26 @@ static int execute_for(executor_t *executor, node_t *for_node) {
 
     // Pop error context
     executor_pop_context(executor);
+
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_node->loc,
+            "for loop body failed with status %d in iteration %d "
+            "(errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
+
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_node->loc,
+            "for loop body failed with status %d for %d consecutive "
+            "iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
+        return 1;
+    }
 
     return last_result;
 }
@@ -2401,6 +3106,11 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
     executor_push_context(executor, for_arith_node->loc, "in C-style for loop");
 
     int last_result = 0;
+    loop_monitor_t monitor;
+    loop_monitor_init(&monitor);
+    bool runaway_tripped = false;
+    bool errexit_tripped = false;
+    int iteration = 0;
 
     // Execute init expression (once at the start)
     if (init_node && init_node->val.str && init_node->val.str[0] != '\0') {
@@ -2412,7 +3122,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
             if (result_str) {
                 free(result_str);
             }
-            if (arithm_error_flag && executor->debug) {
+            if (arithm_error_is_flagged() && executor->debug) {
                 fprintf(stderr, "DEBUG: C-style for init failed: %s\n",
                         init_expanded);
             }
@@ -2430,7 +3140,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 arithm_clear_error();
                 char *result_str =
                     arithm_expand_with_executor(executor, test_expanded);
-                if (!result_str || arithm_error_flag) {
+                if (!result_str || arithm_error_is_flagged()) {
                     // Arithmetic error
                     free(result_str);
                     free(test_expanded);
@@ -2453,6 +3163,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
 
         // Execute body
         last_result = execute_command_chain(executor, body);
+        iteration++;
 
         // Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
@@ -2461,6 +3172,17 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             // Fall through to update expression
+        }
+
+        if (loop_errexit_tripped(last_result)) {
+            errexit_tripped = true;
+            break;
+        }
+
+        /* POSIX-required shell abort fired from inside the body --
+         * skip the update expression and exit the loop. */
+        if (executor->shell_exit_requested) {
+            break;
         }
 
         // Execute update expression
@@ -2475,12 +3197,17 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 if (result_str) {
                     free(result_str);
                 }
-                if (arithm_error_flag && executor->debug) {
+                if (arithm_error_is_flagged() && executor->debug) {
                     fprintf(stderr, "DEBUG: C-style for update failed: %s\n",
                             update_expanded);
                 }
                 free(update_expanded);
             }
+        }
+
+        if (loop_monitor_check(&monitor, last_result)) {
+            runaway_tripped = true;
+            break;
         }
     }
 
@@ -2502,6 +3229,26 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
 
     // Pop error context
     executor_pop_context(executor);
+
+    if (errexit_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_arith_node->loc,
+            "C-style for loop body failed with status %d in iteration "
+            "%d (errexit_in_loops); use `unsetopt errexit_in_loops` to "
+            "allow continued execution after a body failure",
+            last_result, iteration);
+        return last_result;
+    }
+
+    if (runaway_tripped) {
+        executor_error_add(
+            executor, SHELL_ERR_LOOP_LIMIT, for_arith_node->loc,
+            "C-style for loop body failed with status %d for %d "
+            "consecutive iterations over %d+ seconds — likely stuck "
+            "(set behavior.loop_failure_streak = 0 to disable this check)",
+            monitor.last_status, monitor.streak, config.loop_failure_seconds);
+        return 1;
+    }
 
     return last_result;
 }
@@ -2691,6 +3438,11 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                 break;
             }
 
+            /* POSIX-required shell abort: drop out of the select body. */
+            if (executor->shell_exit_requested) {
+                break;
+            }
+
             cmd = cmd->next_sibling;
         }
 
@@ -2701,6 +3453,11 @@ static int execute_select(executor_t *executor, node_t *select_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             continue;
+        }
+
+        /* POSIX-required shell abort: stop the outer select loop. */
+        if (executor->shell_exit_requested) {
+            break;
         }
     }
 
@@ -2922,16 +3679,67 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
         return 0; // Empty anonymous function
     }
 
+    /* Collect and expand trailing arguments BEFORE pushing the
+     * function scope. Arg expressions (e.g. $vars inside double-quoted
+     * args) must resolve in the caller's scope, mirroring how
+     * build_argv_from_ast / execute_function_call do for regular
+     * function calls. The expanded strings are then set as positional
+     * parameters once the new scope is active. */
+    int argc = 0;
+    for (node_t *arg = body->next_sibling; arg; arg = arg->next_sibling) {
+        argc++;
+    }
+
+    char **argv = NULL;
+    if (argc > 0) {
+        argv = calloc((size_t)argc, sizeof(char *));
+        if (!argv) {
+            set_executor_error(executor,
+                               "Failed to allocate anonymous function args");
+            return 1;
+        }
+        int i = 0;
+        for (node_t *arg = body->next_sibling; arg; arg = arg->next_sibling) {
+            /* Use the shared type-aware expansion helper so anon-function
+             * args follow the same per-node-type semantics as regular
+             * command arguments — single-quoted stays literal, double-
+             * quoted expands variables, arith / command substitution /
+             * process substitution all dispatch correctly. */
+            argv[i++] = expand_arg_node(executor, arg);
+            if (!argv[i - 1]) {
+                argv[i - 1] = strdup("");
+            }
+        }
+    }
+
     // Create a new scope for the anonymous function
     if (symtable_push_scope(executor->symtable, SCOPE_FUNCTION,
                             "<anonymous>") != 0) {
+        for (int i = 0; i < argc; i++) {
+            free(argv[i]);
+        }
+        free(argv);
         set_executor_error(executor,
                            "Failed to create anonymous function scope");
         return 1;
     }
 
-    // Set positional parameters ($# = 0, no arguments)
-    symtable_set_local_var(executor->symtable, "#", "0");
+    // Set positional parameters $1..$N from the pre-expanded args.
+    for (int i = 0; i < argc; i++) {
+        char param_name[16];
+        snprintf(param_name, sizeof(param_name), "%d", i + 1);
+        symtable_set_local_var(executor->symtable, param_name,
+                               argv[i] ? argv[i] : "");
+    }
+    char argc_str[16];
+    snprintf(argc_str, sizeof(argc_str), "%d", argc);
+    symtable_set_local_var(executor->symtable, "#", argc_str);
+
+    // Free the expanded arg strings; symtable owns its own copies.
+    for (int i = 0; i < argc; i++) {
+        free(argv[i]);
+    }
+    free(argv);
 
     // Execute the body
     int result = execute_node(executor, body);
@@ -3143,6 +3951,640 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
  * @param argc Output: argument count
  * @return NULL-terminated argv array (caller must free), or NULL on error
  */
+/**
+ * @brief Expand a single argument AST node to its string value.
+ *
+ * Dispatches by node type to the correct expansion routine:
+ *   - NODE_STRING_LITERAL: no expansion (single-quoted; literal). If the
+ *     content opens with $' and FEATURE_ANSI_QUOTING is enabled, decode
+ *     it as an ANSI-C $'...' string instead.
+ *   - NODE_STRING_EXPANDABLE: expand_quoted_string (double-quoted; vars
+ *     expanded, glob/brace preserved by caller policy)
+ *   - NODE_ARITH_EXP: expand_arithmetic ($((...)))
+ *   - NODE_COMMAND_SUB: expand_command_substitution ($(...) or `...`)
+ *   - NODE_PROC_SUB_IN / NODE_PROC_SUB_OUT: expand_process_substitution
+ *   - anything else: expand_if_needed (general variable/expansion path)
+ *
+ * Used by build_argv_from_ast for command arguments and by
+ * execute_anonymous_function for trailing positional args. Single
+ * source of truth for per-node-type argument expansion across the
+ * executor; callers needing a different post-expansion policy
+ * (glob/brace/word-split) layer that on top of the value returned here.
+ *
+ * @param executor Executor context
+ * @param node Argument node (must have val.str non-NULL)
+ * @return Newly malloc'd expanded string, or NULL only if the
+ *         underlying expansion fails (notably process substitution).
+ */
+/**
+ * @brief Detect a "vector-yielding" argument and expand it to N words
+ *
+ * Several parameter-expansion shapes produce a sequence of words that,
+ * when used in argv position, must occupy N separate slots rather than
+ * one concatenated slot. This is the bash special-case that makes
+ * `"$@"` / `"${arr[@]}"` / `"${!arr[@]}"` and their `[*]:N:M` slice
+ * variants behave correctly: in unquoted context IFS-split happens on
+ * the joined string, in quoted context the original element boundaries
+ * are preserved.
+ *
+ * lush's parser strips outer quotes from the node's val.str, so we
+ * can't distinguish `"${arr[@]}"` from `${arr[@]}` by punctuation
+ * alone. Instead this helper matches by structure: if val.str is
+ * exactly a single vector-yielding form (no surrounding text), we
+ * explode it; otherwise we return false and let the caller fall back
+ * to scalar expansion. The structural restriction is what bash uses
+ * too -- `"prefix${arr[@]}suffix"` does NOT preserve word boundaries
+ * (it becomes one concatenated string), only the bare form does.
+ *
+ * Recognized forms (after trimming surrounding whitespace):
+ *   $@                       positional params
+ *   $*                       positional params
+ *   ${@}, ${*}               braced positional params
+ *   ${NAME[@]}, ${NAME[*]}   array all-elements
+ *   ${!NAME[@]}              array keys (assoc) / indices (indexed)
+ *   ${NAME[@]:N},  ${NAME[@]:N:M}, ${NAME[*]:N:M}  array slice
+ *
+ * @param executor Executor context
+ * @param node     Argument node
+ * @param out_vec  Output: array of N newly-malloc'd strings (caller
+ *                 frees each element AND the array). Untouched on false.
+ * @param out_count Output: N (number of words produced). 0 is valid.
+ * @return true if the node was a vector form and out_vec/out_count were
+ *         populated; false otherwise.
+ */
+static bool try_expand_vector_arg(executor_t *executor, node_t *node,
+                                  char ***out_vec, int *out_count) {
+    if (!node || !node->val.str) {
+        return false;
+    }
+    /* Only quoted-string and string-expandable shapes carry a single
+     * parameter-expansion as their entire payload. Other node types
+     * (command sub, arith, etc.) are not vector candidates. */
+    if (node->type != NODE_STRING_EXPANDABLE && node->type != NODE_VAR) {
+        return false;
+    }
+
+    const char *s = node->val.str;
+    while (*s && isspace((unsigned char)*s)) {
+        s++;
+    }
+    size_t len = strlen(s);
+    while (len > 0 && isspace((unsigned char)s[len - 1])) {
+        len--;
+    }
+    if (len == 0) {
+        return false;
+    }
+
+    /* $@ / $* (unbraced). */
+    bool positional_at =
+        (len == 2 && s[0] == '$' && (s[1] == '@' || s[1] == '*'));
+    /* ${...} braced forms. */
+    bool braced = (len >= 3 && s[0] == '$' && s[1] == '{' && s[len - 1] == '}');
+    /* Bare `$NAME` where NAME is an array. zsh expands bare array
+     * references to N words in word-list contexts (for-loop iteration,
+     * command argv) regardless of word-split setting. Bash's `$arr`
+     * is the first element only, so only treat this as vector form
+     * in zsh/lush mode. Detected here so execute_for and
+     * build_argv_from_ast both honor it via the same helper.
+     * Issue #99. */
+    bool bare_array = false;
+    if (!positional_at && !braced && len >= 2 && s[0] == '$' &&
+        (isalpha((unsigned char)s[1]) || s[1] == '_')) {
+        bool name_only = true;
+        for (size_t k = 1; k < len; k++) {
+            if (!isalnum((unsigned char)s[k]) && s[k] != '_') {
+                name_only = false;
+                break;
+            }
+        }
+        if (name_only) {
+            char name_buf[256];
+            size_t nlen = len - 1;
+            if (nlen < sizeof(name_buf)) {
+                memcpy(name_buf, s + 1, nlen);
+                name_buf[nlen] = '\0';
+                array_value_t *probe = symtable_get_array(name_buf);
+                if (probe) {
+                    shell_mode_t mode = shell_mode_get();
+                    /* Curated: zsh + lush explode bare $arr; bash + posix
+                     * keep it scalar (first element via the existing
+                     * expand_array_unsubscripted path). */
+                    if (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) {
+                        bare_array = true;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!positional_at && !braced && !bare_array) {
+        return false;
+    }
+
+    /* Distinguish what's inside the braces. For positional_at the
+     * "name" is `@` / `*`; subscript is implied. For braced forms:
+     * - `${@}` / `${*}` -> positional, same as $@/$*
+     * - `${NAME[@]}` / `${NAME[*]}` -> array all
+     * - `${!NAME[@]}` -> array keys
+     * - any of the above with `:N` or `:N:M` slicing suffix
+     * - anything else -> not a vector form
+     */
+    bool keys_form = false;
+    const char *name_start = NULL;
+    size_t name_len = 0;
+    char subscript = '@'; /* @ vs *; only matters for joining policy */
+    int slice_offset = 0;
+    int slice_length = -1; /* -1 = "to end" */
+    bool has_slice = false;
+    bool is_positional = positional_at;
+
+    if (positional_at) {
+        subscript = s[1];
+    } else if (bare_array) {
+        /* Bare $NAME: name is s+1, length is len-1. Treat as if it
+         * were ${NAME[@]} -- produce all elements as separate words. */
+        name_start = s + 1;
+        name_len = len - 1;
+        subscript = '@';
+    } else {
+        /* inner content between { and } */
+        const char *p = s + 2;
+        const char *end = s + len - 1;
+        if (p == end) {
+            return false;
+        }
+        /* ${(FLAGS)NAME} -- zsh parameter-flag vector form. Recognised
+         * flag chars: k (keys), v (values, default), o (sort ascending),
+         * O (sort descending), a (array-order, no sort), u (unique).
+         * Builds the vector directly and short-circuits the rest of
+         * try_expand_vector_arg. Issue #104. */
+        if (*p == '(') {
+            const char *flag_start = p + 1;
+            const char *flag_end = flag_start;
+            while (flag_end < end && *flag_end != ')') {
+                flag_end++;
+            }
+            if (flag_end < end && *flag_end == ')') {
+                bool flag_k = false, flag_o = false, flag_O = false;
+                bool flag_u = false;
+                bool ok_flags = true;
+                for (const char *f = flag_start; f < flag_end; f++) {
+                    switch (*f) {
+                    case 'k':
+                        flag_k = true;
+                        break;
+                    case 'v':
+                        flag_k = false;
+                        break;
+                    case 'o':
+                        flag_o = true;
+                        break;
+                    case 'O':
+                        flag_O = true;
+                        break;
+                    case 'a':
+                        /* array order, no sort -- default */
+                        flag_o = false;
+                        flag_O = false;
+                        break;
+                    case 'u':
+                        flag_u = true;
+                        break;
+                    default:
+                        ok_flags = false;
+                        break;
+                    }
+                }
+                const char *np = flag_end + 1;
+                const char *nstart = np;
+                while (np < end &&
+                       (isalnum((unsigned char)*np) || *np == '_')) {
+                    np++;
+                }
+                if (ok_flags && np == end && np > nstart) {
+                    char nbuf[256];
+                    size_t nlen = (size_t)(np - nstart);
+                    if (nlen < sizeof(nbuf)) {
+                        memcpy(nbuf, nstart, nlen);
+                        nbuf[nlen] = '\0';
+                        array_value_t *arr = symtable_get_array(nbuf);
+                        if (arr) {
+                            size_t kc = 0;
+                            char **items = NULL;
+                            if (flag_k) {
+                                items = symtable_array_get_keys(arr, &kc);
+                            } else {
+                                size_t total = symtable_array_length(arr);
+                                items = malloc(sizeof(char *) * (total + 1));
+                                if (items) {
+                                    for (size_t i = 0; i < total; i++) {
+                                        const char *e =
+                                            symtable_array_get_index(arr,
+                                                                     (int)i);
+                                        items[i] = strdup(e ? e : "");
+                                    }
+                                    kc = total;
+                                }
+                            }
+                            if (items) {
+                                if (flag_u) {
+                                    size_t w = 0;
+                                    for (size_t i = 0; i < kc; i++) {
+                                        bool dup = false;
+                                        for (size_t j = 0; j < w; j++) {
+                                            if (strcmp(items[i], items[j]) ==
+                                                0) {
+                                                dup = true;
+                                                break;
+                                            }
+                                        }
+                                        if (dup) {
+                                            free(items[i]);
+                                        } else {
+                                            items[w++] = items[i];
+                                        }
+                                    }
+                                    kc = w;
+                                }
+                                if (flag_o || flag_O) {
+                                    for (size_t i = 0; i + 1 < kc; i++) {
+                                        for (size_t j = i + 1; j < kc; j++) {
+                                            int cmp =
+                                                strcmp(items[i], items[j]);
+                                            if ((flag_O && cmp < 0) ||
+                                                (!flag_O && cmp > 0)) {
+                                                char *tmp = items[i];
+                                                items[i] = items[j];
+                                                items[j] = tmp;
+                                            }
+                                        }
+                                    }
+                                }
+                                char **vec = NULL;
+                                int vcount = 0, vcap = 0;
+                                bool ok = true;
+                                for (size_t i = 0; i < kc; i++) {
+                                    if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                                          items[i])) {
+                                        ok = false;
+                                        break;
+                                    }
+                                }
+                                free(items);
+                                if (!ok) {
+                                    for (int j = 0; j < vcount; j++) {
+                                        free(vec[j]);
+                                    }
+                                    free(vec);
+                                    return false;
+                                }
+                                *out_vec = vec;
+                                *out_count = vcount;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            /* Not our shape -- not a vector form. */
+            return false;
+        }
+        if (*p == '!') {
+            keys_form = true;
+            p++;
+        }
+        if (p == end) {
+            return false;
+        }
+        /* Special-cased ${@} / ${*}: positional, no subscript. */
+        if (!keys_form && (end - p) == 1 && (*p == '@' || *p == '*')) {
+            is_positional = true;
+            subscript = *p;
+        } else {
+            /* Must be NAME[@] / NAME[*] optionally followed by :N or :N:M */
+            name_start = p;
+            while (p < end && (isalnum((unsigned char)*p) || *p == '_')) {
+                p++;
+            }
+            name_len = (size_t)(p - name_start);
+            if (name_len == 0) {
+                return false;
+            }
+            if (p >= end || *p != '[') {
+                return false;
+            }
+            p++;
+            if (p >= end || (*p != '@' && *p != '*')) {
+                return false;
+            }
+            subscript = *p;
+            p++;
+            if (p >= end || *p != ']') {
+                return false;
+            }
+            p++;
+            /* Optional slicing :N or :N:M. */
+            if (p < end && *p == ':') {
+                has_slice = true;
+                p++;
+                if (p >= end) {
+                    return false;
+                }
+                char *endp = NULL;
+                /* end is past the trailing `}`; we need a NUL-terminated
+                 * span. Copy the slice spec into a scratch buffer. */
+                size_t spec_len = (size_t)(end - p);
+                char spec[64];
+                if (spec_len >= sizeof(spec)) {
+                    return false;
+                }
+                memcpy(spec, p, spec_len);
+                spec[spec_len] = '\0';
+                slice_offset = (int)strtol(spec, &endp, 10);
+                if (!endp) {
+                    return false;
+                }
+                if (*endp == ':') {
+                    slice_length = (int)strtol(endp + 1, NULL, 10);
+                } else if (*endp != '\0') {
+                    return false;
+                }
+            } else if (p != end) {
+                /* Junk between `]` and `}`. Not a recognised vector form. */
+                return false;
+            }
+        }
+    }
+
+    /* Now produce the element vector. */
+    char **vec = NULL;
+    int vcount = 0;
+    int vcap = 0;
+
+    if (is_positional) {
+        /* Iterate $1..$N from positional params. Match the existing
+         * "$@" loop in execute_for: in function scope use symtable
+         * "1".."N"; otherwise use shell_argv. */
+        int total;
+        if (symtable_in_function_scope(executor->symtable)) {
+            char *argc_str = symtable_get_var(executor->symtable, "#");
+            total = argc_str ? atoi(argc_str) : 0;
+            free(argc_str);
+            for (int i = 1; i <= total; i++) {
+                char name[16];
+                snprintf(name, sizeof(name), "%d", i);
+                char *val = symtable_get_var(executor->symtable, name);
+                if (!val) {
+                    val = strdup("");
+                }
+                if (!add_to_argv_list(&vec, &vcount, &vcap, val)) {
+                    for (int k = 0; k < vcount; k++) {
+                        free(vec[k]);
+                    }
+                    free(vec);
+                    return false;
+                }
+            }
+        } else {
+            for (int i = 1; i < shell_argc; i++) {
+                char *val = strdup(shell_argv[i] ? shell_argv[i] : "");
+                if (!add_to_argv_list(&vec, &vcount, &vcap, val)) {
+                    free(val);
+                    for (int k = 0; k < vcount; k++) {
+                        free(vec[k]);
+                    }
+                    free(vec);
+                    return false;
+                }
+            }
+        }
+    } else {
+        /* Array name lookup. Need a NUL-terminated name. */
+        char name_buf[256];
+        if (name_len >= sizeof(name_buf)) {
+            return false;
+        }
+        memcpy(name_buf, name_start, name_len);
+        name_buf[name_len] = '\0';
+
+        array_value_t *array = symtable_get_array(name_buf);
+        if (!array) {
+            /* Not actually an array -- not our case; fall back. */
+            return false;
+        }
+
+        if (keys_form) {
+            /* Produce keys (assoc) or indices (indexed). Honor slicing. */
+            if (array->is_associative) {
+                size_t kcount = 0;
+                char **keys = symtable_array_get_keys(array, &kcount);
+                if (!keys) {
+                    return false;
+                }
+                int start = 0, end_idx = (int)kcount - 1;
+                if (has_slice) {
+                    start = slice_offset;
+                    if (start < 0) {
+                        start = (int)kcount + start;
+                        if (start < 0) {
+                            start = 0;
+                        }
+                    }
+                    if (slice_length >= 0) {
+                        end_idx = start + slice_length - 1;
+                    } else {
+                        end_idx = (int)kcount - 1;
+                    }
+                    if (end_idx >= (int)kcount) {
+                        end_idx = (int)kcount - 1;
+                    }
+                }
+                for (int k = start; k <= end_idx; k++) {
+                    if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                          strdup(keys[k]))) {
+                        for (int j = 0; j < vcount; j++) {
+                            free(vec[j]);
+                        }
+                        free(vec);
+                        for (size_t j = 0; j < kcount; j++) {
+                            free(keys[j]);
+                        }
+                        free(keys);
+                        return false;
+                    }
+                }
+                for (size_t j = 0; j < kcount; j++) {
+                    free(keys[j]);
+                }
+                free(keys);
+            } else {
+                /* Indexed array: keys are the ACTUAL stored indices.
+                 * For dense arrays these are 0..N-1; for sparse arrays
+                 * they are the explicit indices assigned. The prior
+                 * implementation generated 0..N-1 dense, which
+                 * silently turned sparse arrays into dense ones and
+                 * broke `for k in "${!arr[@]}"; do echo arr[$k]` on
+                 * sparse data (issue #101). symtable_array_get_keys
+                 * returns the real indices via array->indices[]. */
+                size_t kcount = 0;
+                char **keys = symtable_array_get_keys(array, &kcount);
+                if (!keys) {
+                    return false;
+                }
+                int start = 0, end_idx = (int)kcount - 1;
+                if (has_slice) {
+                    start = slice_offset;
+                    if (start < 0) {
+                        start = (int)kcount + start;
+                        if (start < 0) {
+                            start = 0;
+                        }
+                    }
+                    if (slice_length >= 0) {
+                        end_idx = start + slice_length - 1;
+                    } else {
+                        end_idx = (int)kcount - 1;
+                    }
+                    if (end_idx >= (int)kcount) {
+                        end_idx = (int)kcount - 1;
+                    }
+                }
+                for (int k = start; k <= end_idx; k++) {
+                    if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                          strdup(keys[k]))) {
+                        for (int j = 0; j < vcount; j++) {
+                            free(vec[j]);
+                        }
+                        free(vec);
+                        for (size_t j = 0; j < kcount; j++) {
+                            free(keys[j]);
+                        }
+                        free(keys);
+                        return false;
+                    }
+                }
+                for (size_t j = 0; j < kcount; j++) {
+                    free(keys[j]);
+                }
+                free(keys);
+            }
+        } else {
+            /* Produce values. Honor slicing. */
+            size_t total = symtable_array_length(array);
+            int start = 0, end_idx = (int)total - 1;
+            if (has_slice) {
+                start = slice_offset;
+                if (start < 0) {
+                    start = (int)total + start;
+                    if (start < 0) {
+                        start = 0;
+                    }
+                }
+                if (slice_length >= 0) {
+                    end_idx = start + slice_length - 1;
+                } else {
+                    end_idx = (int)total - 1;
+                }
+                if (end_idx >= (int)total) {
+                    end_idx = (int)total - 1;
+                }
+            }
+            for (int k = start; k <= end_idx; k++) {
+                const char *elem = symtable_array_get_index(array, k);
+                if (!add_to_argv_list(&vec, &vcount, &vcap,
+                                      strdup(elem ? elem : ""))) {
+                    for (int j = 0; j < vcount; j++) {
+                        free(vec[j]);
+                    }
+                    free(vec);
+                    return false;
+                }
+            }
+        }
+    }
+
+    (void)subscript; /* @ vs * matters only for joining; vector form
+                        is the same for both. */
+
+    *out_vec = vec;
+    *out_count = vcount;
+    return true;
+}
+
+static char *expand_arg_node(executor_t *executor, node_t *node) {
+    if (!node || !node->val.str) {
+        return strdup("");
+    }
+    switch (node->type) {
+    case NODE_STRING_LITERAL:
+        if (node->val.str[0] == '$' && node->val.str[1] == '\'' &&
+            shell_mode_allows(FEATURE_ANSI_QUOTING)) {
+            size_t len = strlen(node->val.str);
+            if (len >= 3 && node->val.str[len - 1] == '\'') {
+                return expand_ansi_c_string(node->val.str + 2, len - 3);
+            }
+        }
+        return strdup(node->val.str);
+    case NODE_STRING_EXPANDABLE:
+        /* Per parser.c collect_word_argument: word-context backslashes
+         * have been pre-stripped during multi-token concat, so any `\X`
+         * still present in node->val.str came from a `"..."` segment and
+         * must be resolved with double-quote rules. */
+        return expand_quoted_string(executor, node->val.str, true);
+    case NODE_ARITH_EXP:
+        return expand_arithmetic(executor, node->val.str);
+    case NODE_COMMAND_SUB:
+        return expand_command_substitution(executor, node->val.str);
+    case NODE_PROC_SUB_IN:
+    case NODE_PROC_SUB_OUT:
+        return expand_process_substitution(executor, node);
+    default:
+        return expand_if_needed(executor, node->val.str);
+    }
+}
+
+/**
+ * @brief Expand an array reference with no subscript ($arr or ${arr}).
+ *
+ * Mode-aware semantics — matches what each shell's $arr / ${arr} form
+ * actually produces:
+ *   - bash:  first element only (equivalent to ${arr[0]})
+ *   - zsh:   all elements joined by space (default IFS behavior)
+ *   - lush:  all elements joined by space (curated pick: explicit
+ *            ${arr[0]} is available for bash-style first-element
+ *            semantics; the joined form matches the common zsh idiom
+ *            of `for x in $arr; do ...`)
+ *   - POSIX: arrays don't exist in POSIX; if one happens to be defined
+ *            (because lush carries the array across mode switches),
+ *            fall back to first-element semantics (matches zsh's POSIX
+ *            and ksh emulations and is least surprising for bash-leaning
+ *            POSIX users)
+ *
+ * Single source of truth for "$a / ${a} on an unsubscripted array" so
+ * bare and brace forms agree, and both honor the active shell mode.
+ *
+ * @param executor Executor context (currently unused but kept for
+ *                 API uniformity with other expansion helpers)
+ * @param array Array value to expand (may be NULL)
+ * @return Newly malloc'd string (caller frees), empty on NULL/error
+ */
+static char *expand_array_unsubscripted(executor_t *executor,
+                                        array_value_t *array) {
+    (void)executor;
+    if (!array) {
+        return strdup("");
+    }
+    shell_mode_t mode = shell_mode_get();
+    if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
+        const char *first = symtable_array_get_index(array, 0);
+        return strdup(first ? first : "");
+    }
+    /* zsh and lush: joined-by-space */
+    char *result = symtable_array_expand(array, " ");
+    return result ? result : strdup("");
+}
+
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                   int *argc) {
     if (!executor || !command || !argc) {
@@ -3183,8 +4625,10 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
     // Process arguments with glob expansion
     child = command->first_child;
     while (child) {
-        // Skip redirection nodes
-        if (!is_redirection_node(child)) {
+        // Skip redirection nodes and cmd_prefix assignments (NODE_ASSIGN
+        // children are applied as the command's temporary environment,
+        // not passed as argv words).
+        if (!is_redirection_node(child) && child->type != NODE_ASSIGN) {
             if (child->val.str) {
                 // Check if this is a here document delimiter
                 bool is_delimiter = false;
@@ -3197,51 +4641,38 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                 }
 
                 if (!is_delimiter) {
-                    char *expanded_arg;
-
-                    // Handle different node types appropriately
-                    if (child->type == NODE_STRING_LITERAL) {
-                        // Check for ANSI-C quoting $'...'
-                        if (child->val.str[0] == '$' &&
-                            child->val.str[1] == '\'' &&
-                            shell_mode_allows(FEATURE_ANSI_QUOTING)) {
-                            // Find closing quote and expand
-                            size_t len = strlen(child->val.str);
-                            if (len >= 3 && child->val.str[len - 1] == '\'') {
-                                expanded_arg = expand_ansi_c_string(
-                                    child->val.str + 2, len - 3);
-                            } else {
-                                expanded_arg = strdup(child->val.str);
+                    /* Vector-yielding expansion: `"$@"`, `"${arr[@]}"`,
+                     * `"${!arr[@]}"` and their slice variants must
+                     * produce N separate argv slots, not one
+                     * concatenated slot. Detect before scalar
+                     * expansion so the original element boundaries
+                     * survive (issue #97). */
+                    char **vec = NULL;
+                    int vcount = 0;
+                    if (try_expand_vector_arg(executor, child, &vec, &vcount)) {
+                        for (int j = 0; j < vcount; j++) {
+                            if (!add_to_argv_list(&argv_list, &argv_count,
+                                                  &argv_capacity, vec[j])) {
+                                for (int k = j; k < vcount; k++) {
+                                    free(vec[k]);
+                                }
+                                free(vec);
+                                goto cleanup_and_fail;
                             }
-                        } else {
-                            // Regular single-quoted strings: no expansion at
-                            // all
-                            expanded_arg = strdup(child->val.str);
                         }
-                    } else if (child->type == NODE_STRING_EXPANDABLE) {
-                        // Double-quoted strings: expand variables but not globs
-                        expanded_arg =
-                            expand_quoted_string(executor, child->val.str);
-                    } else if (child->type == NODE_ARITH_EXP) {
-                        // Arithmetic expansion: $((expr))
-                        expanded_arg =
-                            expand_arithmetic(executor, child->val.str);
-                    } else if (child->type == NODE_COMMAND_SUB) {
-                        // Command substitution: $(cmd) or `cmd`
-                        expanded_arg = expand_command_substitution(
-                            executor, child->val.str);
-                    } else if (child->type == NODE_PROC_SUB_IN ||
-                               child->type == NODE_PROC_SUB_OUT) {
-                        // Process substitution: <(cmd) or >(cmd)
-                        expanded_arg =
-                            expand_process_substitution(executor, child);
-                        if (!expanded_arg) {
-                            goto cleanup_and_fail;
-                        }
-                    } else {
-                        // Regular variables and other expandable content
-                        expanded_arg =
-                            expand_if_needed(executor, child->val.str);
+                        free(vec);
+                        child = child->next_sibling;
+                        continue;
+                    }
+
+                    /* Type-aware expansion via the shared helper.
+                     * Process substitution is the only path that
+                     * propagates failure as NULL — everything else
+                     * either succeeds or returns "". */
+                    char *expanded_arg = expand_arg_node(executor, child);
+                    if (!expanded_arg && (child->type == NODE_PROC_SUB_IN ||
+                                          child->type == NODE_PROC_SUB_OUT)) {
+                        goto cleanup_and_fail;
                     }
 
                     if (getenv("NEW_PARSER_DEBUG")) {
@@ -3259,6 +4690,16 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                         char **brace_results =
                             expand_brace_pattern(expanded_arg, &brace_count);
 
+                        if (brace_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
+                            set_executor_error(
+                                executor,
+                                "brace expansion exceeds configured limit "
+                                "(behavior.brace_expansion_max)");
+                            executor->expansion_error = true;
+                            executor->expansion_exit_status = 1;
+                            free(expanded_arg);
+                            goto cleanup_and_fail;
+                        }
                         if (brace_results) {
                             // Process each brace expansion result for potential
                             // glob expansion
@@ -3574,7 +5015,31 @@ char *expand_if_needed(executor_t *executor, const char *text) {
     // Single-quoted content should not be expanded (POSIX requirement)
     // BUT: Don't enter this path for command substitution $(...) or `...`
     // which may contain quotes internally
-    if (strchr(text, '\'') && !(text[0] == '$' && text[1] == '(') &&
+    /* Enter the single-quote-handling block only when the text has
+     * at least one MATCHED pair of UNESCAPED single quotes. The
+     * parser pre-escapes `'` chars inside TOK_EXPANDABLE_STRING
+     * content (issue #102) so they appear here as `\'` and must
+     * not count toward the pair check -- those are literal
+     * characters that the POSIX-unquoted backslash rule resolves
+     * downstream. */
+    bool has_paired_single_quote = false;
+    {
+        size_t unescaped = 0;
+        for (const char *p = text; *p; p++) {
+            if (*p == '\\' && p[1]) {
+                p++;
+                continue;
+            }
+            if (*p == '\'') {
+                unescaped++;
+                if (unescaped >= 2) {
+                    has_paired_single_quote = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (has_paired_single_quote && !(text[0] == '$' && text[1] == '(') &&
         !(text[0] == '`')) {
         size_t len = strlen(text);
         size_t result_capacity = len + 1;
@@ -3675,7 +5140,9 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                 if (dq_content) {
                     strncpy(dq_content, &text[dq_start], dq_len);
                     dq_content[dq_len] = '\0';
-                    char *expanded = expand_quoted_string(executor, dq_content);
+                    /* Content inside `"..."` -- DQ rules apply. */
+                    char *expanded =
+                        expand_quoted_string(executor, dq_content, true);
                     free(dq_content);
                     if (expanded) {
                         size_t exp_len = strlen(expanded);
@@ -3781,8 +5248,10 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             // Tilde was expanded, now check if result needs variable expansion
             const char *first_dollar = strchr(tilde_expanded, '$');
             if (first_dollar) {
+                /* Unquoted text post-tilde-expansion: POSIX-unquoted
+                 * escape rules apply to any surviving backslashes. */
                 char *final_result =
-                    expand_quoted_string(executor, tilde_expanded);
+                    expand_quoted_string(executor, tilde_expanded, false);
                 free(tilde_expanded);
                 return final_result;
             }
@@ -3806,9 +5275,12 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         }
 
         // If we have multiple dollar signs or the first dollar is not at
-        // position 0, treat as quoted string with multiple expansions
+        // position 0, treat as quoted string with multiple expansions.
+        // This branch is reached from unquoted contexts (NODE_VAR with
+        // embedded $ etc.); pass in_double_quotes=false so any surviving
+        // `\X` follows POSIX-unquoted rules.
         if (dollar_count > 1 || first_dollar != text) {
-            return expand_quoted_string(executor, text);
+            return expand_quoted_string(executor, text, false);
         }
 
         // Single expansion starting at position 0
@@ -3855,15 +5327,45 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             }
             return strdup(text);
         } else if (strncmp(text, "$((", 3) == 0) {
-            return expand_arithmetic(executor, text);
+            /* Disambiguate `$((` between arithmetic and command-sub
+             * of an anonymous function `$(() {...})`. Same shape as
+             * the tokenizer and expand_variables_in_string detectors
+             * (issue #99): if the lookahead from after $(( finds {,
+             * }, ;, or \n before matched )), route to command-sub. */
+            bool looks_arith = true;
+            {
+                size_t tlen = strlen(text);
+                size_t s = 3;
+                int d = 2;
+                while (s < tlen && d > 0) {
+                    char sc = text[s];
+                    if (sc == '(') {
+                        d++;
+                    } else if (sc == ')') {
+                        d--;
+                        if (d == 0) {
+                            break;
+                        }
+                    } else if (sc == '{' || sc == '}' || sc == ';' ||
+                               sc == '\n') {
+                        looks_arith = false;
+                        break;
+                    }
+                    s++;
+                }
+            }
+            if (looks_arith) {
+                return expand_arithmetic(executor, text);
+            }
+            return expand_command_substitution(executor, text);
         } else if (strncmp(text, "$(", 2) == 0) {
             return expand_command_substitution(executor, text);
         } else if (strncmp(text, "${", 2) == 0) {
             // ${var} format - check if there's more text after }
             const char *close_brace = strchr(text, '}');
             if (close_brace && close_brace[1] != '\0') {
-                // Text continues after ${var}, use quoted string expansion
-                return expand_quoted_string(executor, text);
+                // Text continues after ${var}; unquoted context.
+                return expand_quoted_string(executor, text, false);
             }
             return expand_variable(executor, text);
         } else {
@@ -3878,10 +5380,9 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     p++;
                 }
             }
-            // If there's more text after the variable, use quoted string
-            // expansion
+            // Trailing text after the variable; unquoted context.
             if (*p != '\0') {
-                return expand_quoted_string(executor, text);
+                return expand_quoted_string(executor, text, false);
             }
             return expand_variable(executor, text);
         }
@@ -3892,151 +5393,43 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         return expand_command_substitution(executor, text);
     }
 
-    // Regular text - just duplicate
-    return strdup(text);
-}
-
-/**
- * @brief Execute an external command
- *
- * Forks and executes an external command using execvp.
- * Handles command hashing for faster subsequent lookups.
- *
- * @param executor Executor context
- * @param argv NULL-terminated argument vector
- * @return Exit status of command (127 for not found, 126 for permission denied)
- */
-MAYBE_UNUSED
-static int execute_external_command(executor_t *executor, char **argv) {
-    return execute_external_command_with_redirection(executor, argv, false);
-}
-
-/**
- * @brief Execute external command with optional stderr redirection
- *
- * Forks and executes an external command, optionally redirecting
- * stderr to /dev/null. Handles command hashing and proper signal handling.
- *
- * @param executor Executor context
- * @param argv NULL-terminated argument vector
- * @param redirect_stderr If true, redirect stderr to /dev/null
- * @return Exit status of command
- */
-static int execute_external_command_with_redirection(executor_t *executor,
-                                                     char **argv,
-                                                     bool redirect_stderr) {
-    if (!argv || !argv[0]) {
-        return 1;
-    }
-
-    // Check if command exists before forking (for better error messages)
-    // Skip this check for path-based commands (containing '/')
-    char *full_path = NULL;
-    if (!strchr(argv[0], '/')) {
-        full_path = find_command_in_path(argv[0]);
-        if (!full_path) {
-            // Command not found - report with suggestions from parent process
-            report_command_not_found(executor, argv[0], SOURCE_LOC_UNKNOWN);
-            return 127;
-        }
-
-        // If hashall is enabled, remember this command's location
-        if (shell_opts.hash_commands) {
-            init_command_hash();
-            if (command_hash) {
-                ht_strstr_insert(command_hash, argv[0], full_path);
-            }
-        }
-        free(full_path);
-    }
-
-    // Reset terminal state before forking for external commands
-    // This ensures git and other commands get proper TTY behavior
-    if (is_interactive_shell()) {
-        fflush(stdout);
-        fflush(stderr);
-    }
-
-    pid_t pid = lush_fork();
-    if (pid == -1) {
-        set_executor_error(executor, "Failed to fork");
-        return 1;
-    }
-
-    if (pid == 0) {
-        // Child process
-        if (redirect_stderr) {
-            // Redirect stderr to /dev/null
-            int null_fd = open("/dev/null", O_WRONLY);
-            if (null_fd != -1) {
-                dup2(null_fd, STDERR_FILENO);
-                close(null_fd);
-            }
-        }
-
-        execvp(argv[0], argv);
-        // Check errno to determine appropriate exit code
-        int exit_code = 127; // Default: command not found
-        if (errno == EACCES) {
-            exit_code = 126; // Permission denied
-        } else if (errno == ENOENT) {
-            exit_code = 127; // Command not found
-        }
-        if (!redirect_stderr) {
-            fprintf(stderr, "lush: %s: %s\n", argv[0], strerror(errno));
-        }
-        exit(exit_code);
-    } else {
-        // Parent process
-        set_current_child_pid(pid);
-
-        // Print trace for external command if -x is enabled
-        if (should_trace_execution()) {
-            // Build command string from argv for tracing
-            size_t cmd_len = 1; // for null terminator
-            for (int j = 0; argv[j]; j++) {
-                cmd_len += strlen(argv[j]) + (j > 0 ? 1 : 0); // +1 for space
-            }
-
-            char *cmd_str = malloc(cmd_len);
-            if (cmd_str) {
-                strcpy(cmd_str, argv[0]);
-                for (int j = 1; argv[j]; j++) {
-                    strcat(cmd_str, " ");
-                    strcat(cmd_str, argv[j]);
+    /* Regular text reaching this path has no quote machinery and no
+     * expansion markers ($, ~, `, ') -- only possibly backslash
+     * escapes. Per POSIX, `\X` outside any quote produces a literal X
+     * (with `\<newline>` removed entirely as line continuation). The
+     * older code was returning strdup(text) here, which left the
+     * backslashes in the argument and produced bug #90 (a typed
+     * `rm a\ test\ file.txt` shipped the literal backslash through
+     * to rm). The fix walks the text removing the escape backslashes;
+     * the post-walk string is the dequoted form the executor will
+     * eventually pass through field splitting and into argv. */
+    {
+        size_t len = strlen(text);
+        char *result = malloc(len + 1);
+        if (!result)
+            return strdup(text); /* OOM fallback */
+        size_t out = 0;
+        for (size_t i = 0; i < len; i++) {
+            if (text[i] == '\\' && i + 1 < len) {
+                char next = text[i + 1];
+                if (next == '\n') {
+                    /* Line continuation: drop both bytes. */
+                    i++;
+                    continue;
                 }
-                print_command_trace(cmd_str);
-                free(cmd_str);
+                /* Strip the backslash; emit the escaped character.
+                 * Multi-byte UTF-8 escapees survive because their
+                 * continuation bytes are >= 0x80 and are not '\\'
+                 * themselves; the next loop iteration sees them as
+                 * regular bytes and copies them through. */
+                result[out++] = next;
+                i++;
+                continue;
             }
+            result[out++] = text[i];
         }
-
-        // Enhanced debug tracing for external commands
-        DEBUG_TRACE_COMMAND(argv[0], argv, 0);
-        DEBUG_PROFILE_ENTER(argv[0]);
-
-        int status;
-        // Wait for child, retrying on EINTR (signal interruption)
-        while (waitpid(pid, &status, 0) == -1) {
-            if (errno != EINTR) {
-                // Real error - child may have already been reaped
-                clear_current_child_pid();
-                return 1;
-            }
-            // EINTR - signal interrupted wait, continue waiting
-        }
-        clear_current_child_pid();
-
-        DEBUG_PROFILE_EXIT(argv[0]);
-
-        // Handle exit status properly - child may have exited or been signaled
-        if (WIFEXITED(status)) {
-            return WEXITSTATUS(status);
-        } else if (WIFSIGNALED(status)) {
-            // Child was killed by signal - return 128 + signal number (bash
-            // convention)
-            return 128 + WTERMSIG(status);
-        }
-        return 1;
+        result[out] = '\0';
+        return result;
     }
 }
 
@@ -4132,6 +5525,12 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             break;
         }
 
+        /* POSIX-required shell abort: drop out of the brace group so
+         * the request propagates to the surrounding command list. */
+        if (executor->shell_exit_requested) {
+            break;
+        }
+
         command = command->next_sibling;
     }
 
@@ -4194,6 +5593,37 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
                 continue;
             }
             last_result = execute_node(executor, command);
+
+            /* Update $? between subshell commands so subsequent
+             * argv expansions see the correct exit status. NODE_PIPE
+             * and NODE_BUILTIN paths set last_exit_status via
+             * set_exit_status() inside execute_command, but the
+             * pipeline executor itself returns directly without
+             * updating it. The outer execute_command_list does this
+             * after each command; the subshell loop was missing the
+             * same update. Issue #100. */
+            set_exit_status(last_result);
+
+            /* Honor set -e inside the subshell: if a command fails
+             * (non-zero exit) and the option is on, abort the rest
+             * of the subshell body. The existing exit_on_error check
+             * lives in execute_command_list / execute_command_chain
+             * which the subshell loop bypasses. The standard
+             * exceptions for if-conditions and ||/&& chains are
+             * already handled by their respective execute_* paths
+             * not propagating last_result to here. Issue #100. */
+            if (shell_opts.exit_on_error && last_result != 0) {
+                break;
+            }
+
+            /* POSIX-required shell abort -- same flag the outer
+             * walker honors; if the subshell hit a ${var:?} or
+             * similar, terminate. */
+            if (executor->shell_exit_requested) {
+                last_result = executor->shell_exit_status;
+                break;
+            }
+
             command = command->next_sibling;
         }
 
@@ -4603,10 +6033,41 @@ static char *zsh_extglob_to_regex(const char *pattern) {
 }
 
 /**
+ * @brief Reject regex patterns that exceed behavior.regex_pattern_max length.
+ *
+ * Platform regcomp implementations (TRE on macOS, glibc regex on Linux)
+ * exhibit catastrophic compile-time on pathological patterns -- deeply
+ * nested alternations with quantifiers, very long alternation lists,
+ * specific bounded-repetition shapes. Fuzz mutation generates such
+ * inputs trivially; real users essentially never type them.
+ *
+ * Pre-validation by length is the simplest defense that bounds worst-
+ * case compile time without rejecting human input. The default cap of
+ * 1024 chars is ~10x larger than any realistic shell regex; setting
+ * the cap to 0 disables the check entirely (parity with bash/zsh which
+ * have no cap).
+ *
+ * @param pattern Regex pattern about to be passed to regcomp.
+ * @return true if pattern is OK to compile, false if it exceeds the cap.
+ */
+static bool regex_pattern_is_safe(const char *pattern) {
+    if (!pattern) {
+        return false;
+    }
+    if (config.regex_pattern_max <= 0) {
+        return true; /* explicitly unbounded */
+    }
+    return strlen(pattern) <= (size_t)config.regex_pattern_max;
+}
+
+/**
  * @brief Match filename against zsh extglob pattern
  */
 static bool match_zsh_extglob(const char *filename, const char *pattern,
                               bool is_negated) {
+    if (!regex_pattern_is_safe(pattern)) {
+        return false;
+    }
     char *regex_pattern = zsh_extglob_to_regex(pattern);
     if (!regex_pattern) {
         return false;
@@ -4917,6 +6378,9 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
  * @return true if matches
  */
 static bool match_extglob(const char *filename, const char *pattern) {
+    if (!regex_pattern_is_safe(pattern)) {
+        return false;
+    }
     bool is_negated = false;
     char *regex_pattern = extglob_to_regex(pattern, &is_negated);
     if (!regex_pattern) {
@@ -5665,6 +7129,13 @@ static bool needs_brace_expansion(const char *str) {
  * @param expanded_count Output: number of expansions
  * @return Array of expanded strings (caller must free), or NULL on error
  */
+/* Returns the configured brace expansion result-count cap.
+ * 0 means unbounded (matches bash/zsh — caller skips the limit check). */
+static int brace_expansion_cap(void) {
+    int cap = config.brace_expansion_max;
+    return cap > 0 ? cap : 0;
+}
+
 static char **expand_brace_range(const char *prefix, const char *content,
                                  const char *suffix, int *expanded_count) {
     *expanded_count = 0;
@@ -5774,8 +7245,17 @@ static char **expand_brace_range(const char *prefix, const char *content,
     long range = reverse ? (start_val - end_val) : (end_val - start_val);
     int count = (int)(range / step) + 1;
 
-    if (count <= 0 || count > 10000) {
-        // Sanity check - don't expand absurdly large ranges
+    int cap = brace_expansion_cap();
+    if (count <= 0 || (cap > 0 && count > cap)) {
+        /* Range exceeds configured cap (or is degenerate). Signal
+         * limit-exceeded distinctly from malloc/parse failure so the
+         * top-level caller can produce a real diagnostic. The cap path
+         * relies on the sentinel; the count<=0 path keeps prior
+         * "fall back to original pattern" behaviour by returning NULL
+         * with *expanded_count = 0 unchanged. */
+        if (cap > 0 && count > cap) {
+            *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
+        }
         free(start_str);
         free(end_str);
         free(step_str);
@@ -5838,13 +7318,33 @@ static char **expand_brace_range(const char *prefix, const char *content,
     if (strchr(suffix, '{')) {
         char **final_results = NULL;
         int final_count = 0;
+        int cap = brace_expansion_cap();
+        bool limit_hit = false;
 
         for (int i = 0; i < count; i++) {
+            if (limit_hit) {
+                free(result[i]);
+                continue;
+            }
             if (needs_brace_expansion(result[i])) {
                 int sub_count;
                 char **sub_results =
                     expand_brace_pattern(result[i], &sub_count);
+                if (sub_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 if (sub_results) {
+                    if (cap > 0 && (long)final_count + sub_count > cap) {
+                        for (int j = 0; j < sub_count; j++) {
+                            free(sub_results[j]);
+                        }
+                        free(sub_results);
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     // Add all sub-results to final
                     char **new_final =
                         realloc(final_results,
@@ -5863,24 +7363,47 @@ static char **expand_brace_range(const char *prefix, const char *content,
                     }
                     free(result[i]);
                 } else {
+                    if (cap > 0 && final_count + 1 > cap) {
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     char **new_final = realloc(
                         final_results, (final_count + 1) * sizeof(char *));
                     if (new_final) {
                         final_results = new_final;
                         final_results[final_count++] = result[i];
+                    } else {
+                        free(result[i]);
                     }
                 }
             } else {
+                if (cap > 0 && final_count + 1 > cap) {
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 char **new_final =
                     realloc(final_results, (final_count + 1) * sizeof(char *));
                 if (new_final) {
                     final_results = new_final;
                     final_results[final_count++] = result[i];
+                } else {
+                    free(result[i]);
                 }
             }
         }
 
         free(result);
+
+        if (limit_hit) {
+            for (int j = 0; j < final_count; j++) {
+                free(final_results[j]);
+            }
+            free(final_results);
+            *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
+            return NULL;
+        }
 
         char **terminated =
             realloc(final_results, (final_count + 1) * sizeof(char *));
@@ -5908,7 +7431,7 @@ static char **expand_brace_range(const char *prefix, const char *content,
  * @param expanded_count Output: number of expansions
  * @return Array of expanded strings (caller must free), or NULL on error
  */
-static char **expand_brace_pattern(const char *pattern, int *expanded_count) {
+char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     if (!pattern || !expanded_count) {
         *expanded_count = 0;
         return NULL;
@@ -6067,13 +7590,36 @@ static char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     if (strchr(suffix, '{')) {
         char **final_results = NULL;
         int final_count = 0;
+        int cap = brace_expansion_cap();
+        bool limit_hit = false;
 
         for (int i = 0; i < item_count; i++) {
+            if (limit_hit) {
+                /* Already over cap — drain remaining originals
+                 * cleanly to avoid leaks. */
+                free(result[i]);
+                continue;
+            }
             if (needs_brace_expansion(result[i])) {
                 int sub_count;
                 char **sub_results =
                     expand_brace_pattern(result[i], &sub_count);
+                if (sub_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
+                    /* Recursive cap propagation. */
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 if (sub_results) {
+                    if (cap > 0 && (long)final_count + sub_count > cap) {
+                        for (int j = 0; j < sub_count; j++) {
+                            free(sub_results[j]);
+                        }
+                        free(sub_results);
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     // Add all sub-results to final
                     char **new_final =
                         realloc(final_results,
@@ -6094,25 +7640,53 @@ static char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                     free(result[i]); // Free original since we expanded it
                 } else {
                     // Sub-expansion failed, keep original
+                    if (cap > 0 && final_count + 1 > cap) {
+                        free(result[i]);
+                        limit_hit = true;
+                        continue;
+                    }
                     char **new_final = realloc(
                         final_results, (final_count + 1) * sizeof(char *));
                     if (new_final) {
                         final_results = new_final;
                         final_results[final_count++] = result[i];
+                    } else {
+                        /* realloc failed — original was unmodified, but
+                         * result[i] is now orphaned; free it to avoid
+                         * a leak under malloc pressure. */
+                        free(result[i]);
                     }
                 }
             } else {
                 // No more braces, keep as-is
+                if (cap > 0 && final_count + 1 > cap) {
+                    free(result[i]);
+                    limit_hit = true;
+                    continue;
+                }
                 char **new_final =
                     realloc(final_results, (final_count + 1) * sizeof(char *));
                 if (new_final) {
                     final_results = new_final;
                     final_results[final_count++] = result[i];
+                } else {
+                    free(result[i]);
                 }
             }
         }
 
         free(result); // Free original array
+
+        if (limit_hit) {
+            /* Cap exceeded — release the partial accumulation cleanly
+             * and return the limit sentinel for the top-level caller. */
+            for (int j = 0; j < final_count; j++) {
+                free(final_results[j]);
+            }
+            free(final_results);
+            *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
+            return NULL;
+        }
 
         // Add NULL terminator
         char **terminated =
@@ -6210,7 +7784,10 @@ static int execute_external_command_with_setup(executor_t *executor,
             exit_code = 127; // Command not found
         }
         if (!redirect_stderr) {
-            fprintf(stderr, "lush: %s: %s\n", argv[0], strerror(errno));
+            int saved_errno = errno;
+            executor_error_report(executor, SHELL_ERR_EXEC_FAILED,
+                                  command ? command->loc : SOURCE_LOC_UNKNOWN,
+                                  "%s: %s", argv[0], strerror(saved_errno));
         }
         exit(exit_code);
     } else {
@@ -6280,13 +7857,23 @@ static int execute_test_builtin(executor_t *executor, char **argv);
  * @param argv NULL-terminated argument vector
  * @return Exit status of builtin command
  */
-static int execute_builtin_command(executor_t *executor, char **argv) {
+static int execute_builtin_command(executor_t *executor, char **argv,
+                                   source_location_t loc) {
     if (!argv || !argv[0]) {
         return 1;
     }
 
     // Set global executor for job control builtins
     current_executor = executor;
+
+    /* Stash the call-site source location for the duration of this
+     * builtin invocation so builtin error helpers can produce a real
+     * `--> file:line:col` line and source-snippet caret. The swap
+     * returns the previously-stashed loc, which we restore on every
+     * exit path so a re-entrant builtin (e.g. `eval` invoking another
+     * builtin) doesn't clobber the outer caller's location when the
+     * inner call returns. */
+    source_location_t saved_loc = builtin_swap_source_location(loc);
 
     // Find the builtin function in the builtin table
     for (size_t i = 0; i < builtins_count; i++) {
@@ -6318,16 +7905,28 @@ static int execute_builtin_command(executor_t *executor, char **argv) {
                 argc++;
             }
 
+            /* Push "in builtin '<name>'" onto the executor's context
+             * stack for the duration of this builtin invocation.
+             * executor_error_report() (the canonical wrapper) walks
+             * the context stack at display time, so any error a
+             * builtin emits — directly or via the wrapper — picks up
+             * this context frame automatically. Per-builtin sites no
+             * longer need to push it themselves. */
+            executor_push_context(executor, loc, "in builtin '%s'", argv[0]);
+
             int result = builtins[i].func(argc, argv);
 
-            // Clear global executor
+            // Restore previous loc + clear builtin context + global executor
+            executor_pop_context(executor);
+            (void)builtin_swap_source_location(saved_loc);
             current_executor = NULL;
 
             return result;
         }
     }
 
-    // Clear global executor
+    // Restore previous loc + clear global executor
+    (void)builtin_swap_source_location(saved_loc);
     current_executor = NULL;
 
     return 1; // Command not found
@@ -6499,7 +8098,8 @@ static bool is_assignment(const char *text) {
  * @param assignment Assignment string (VAR=value)
  * @return 0 on success, 1 on failure
  */
-static int execute_assignment(executor_t *executor, const char *assignment) {
+static int execute_assignment(executor_t *executor, const char *assignment,
+                              source_location_t loc) {
     if (!executor || !assignment) {
         return 1;
     }
@@ -6528,10 +8128,10 @@ static int execute_assignment(executor_t *executor, const char *assignment) {
 
     // Privileged mode security check for environment variable modifications
     if (!is_privileged_path_modification_allowed(var_name)) {
-        fprintf(stderr,
-                "lush: %s: cannot modify restricted variable in privileged "
-                "mode\n",
-                var_name);
+        executor_error_report(
+            executor, SHELL_ERR_PERMISSION_DENIED, loc,
+            "%s: cannot modify restricted variable in privileged mode",
+            var_name);
         free(var_name);
         return 1;
     }
@@ -6554,6 +8154,37 @@ static int execute_assignment(executor_t *executor, const char *assignment) {
     // commands should return the exit status of the last command substitution)
     char *value = expand_if_needed(executor, eq + 1);
     int cmd_sub_exit_status = executor->exit_status;
+
+    /* Propagate expansion failure. ${var:?word} and friends set
+     * expansion_error during expand_if_needed; without this check
+     * execute_assignment silently stores the empty fallback and
+     * returns 0, masking the failure from the caller (execute_command
+     * does check this flag in the command-not-assignment path, but
+     * assignment-only commands bypassed that check). Free what was
+     * allocated and surface expansion_exit_status. shell_exit_requested,
+     * if set, has already been raised by executor_request_posix_exit
+     * and will short-circuit the surrounding command list / loop /
+     * function body. */
+    if (executor->expansion_error) {
+        free(value);
+        free(var_name);
+        return executor->expansion_exit_status;
+    }
+
+    /* Integer attribute (declare -i): subsequent assignments to the
+     * variable arith-evaluate the RHS rather than storing the literal
+     * string. `declare -i n; n=5+3` stores "8", not "5+3". Same for
+     * `n=other_var+1` -- the RHS is evaluated as an arithmetic
+     * expression which resolves identifiers as variables. Issue #102. */
+    if (symtable_get_flags(executor->symtable, var_name) &
+        SYMVAR_INTEGER_ATTR) {
+        char *evaluated =
+            arithm_expand_with_executor(executor, value ? value : "");
+        if (evaluated) {
+            free(value);
+            value = evaluated;
+        }
+    }
 
     // Resolve nameref if the variable is a nameref (max depth 10)
     const char *target_name = var_name;
@@ -6709,16 +8340,27 @@ static int execute_case(executor_t *executor, node_t *node) {
         bool matched = execute_next; // If fall-through, execute without testing
 
         if (!matched) {
-            // Split patterns by | and test each one
-            char *pattern_copy = strdup(patterns);
-            if (!pattern_copy) {
-                free(test_word);
-                return 1;
-            }
+            /* Split patterns by `|` and test each. strtok cannot be
+             * used here because it skips empty tokens -- POSIX `case`
+             * accepts an empty pattern (`''` matches the empty word),
+             * and a multi-pattern arm may legitimately contain an
+             * empty alternative (`case x in ''|a) ...`). strtok would
+             * silently drop those, falling through to the default
+             * `*)` and producing a POSIX-violating result (issue #95).
+             *
+             * Use strchr-based splitting that emits empty tokens. */
+            const char *p = patterns;
+            while (p && !matched) {
+                const char *bar = strchr(p, '|');
+                size_t plen = bar ? (size_t)(bar - p) : strlen(p);
+                char *pattern = malloc(plen + 1);
+                if (!pattern) {
+                    free(test_word);
+                    return 1;
+                }
+                memcpy(pattern, p, plen);
+                pattern[plen] = '\0';
 
-            char *pattern = strtok(pattern_copy, "|");
-            while (pattern && !matched) {
-                // Expand variables in pattern
                 char *expanded_pattern = expand_if_needed(executor, pattern);
                 if (expanded_pattern) {
                     if (match_pattern(test_word, expanded_pattern)) {
@@ -6726,10 +8368,13 @@ static int execute_case(executor_t *executor, node_t *node) {
                     }
                     free(expanded_pattern);
                 }
-                pattern = strtok(NULL, "|");
-            }
+                free(pattern);
 
-            free(pattern_copy);
+                if (!bar) {
+                    break;
+                }
+                p = bar + 1;
+            }
         }
 
         if (matched) {
@@ -6912,7 +8557,7 @@ static bool is_function_defined(executor_t *executor,
  */
 static int execute_function_call(executor_t *executor,
                                  const char *function_name, char **argv,
-                                 int argc) {
+                                 int argc, source_location_t loc) {
     if (!executor || !function_name) {
         return 1;
     }
@@ -6923,9 +8568,8 @@ static int execute_function_call(executor_t *executor,
         return 1;
     }
 
-    // Validate function parameters
-    if (validate_function_parameters(func, argv, argc) != 0) {
-        set_executor_error(executor, "Function parameter validation failed");
+    // Validate function parameters (errors already displayed structurally)
+    if (validate_function_parameters(executor, func, argv, argc, loc) != 0) {
         return 1;
     }
 
@@ -7130,8 +8774,9 @@ void free_function_params(function_param_t *params) {
  * @param argc Argument count (reserved for arity checking)
  * @return 0 on success, 1 on validation failure
  */
-static int validate_function_parameters(function_def_t *func, char **argv,
-                                        int argc) {
+static int validate_function_parameters(executor_t *executor,
+                                        function_def_t *func, char **argv,
+                                        int argc, source_location_t loc) {
     (void)argv; /* Reserved for argument type validation */
     (void)argc; /* Reserved for arity checking */
     if (!func) {
@@ -7157,8 +8802,9 @@ static int validate_function_parameters(function_def_t *func, char **argv,
             arg_index++;
         } else if (param->is_required) {
             // Required parameter missing
-            fprintf(stderr, "Error: Function '%s' requires parameter '%s'\n",
-                    func->name, param->name);
+            executor_error_report(executor, SHELL_ERR_FUNCTION_ERROR, loc,
+                                  "function '%s' requires parameter '%s'",
+                                  func->name, param->name);
             return 1;
         }
         // Optional parameter without argument - will use default
@@ -7167,10 +8813,10 @@ static int validate_function_parameters(function_def_t *func, char **argv,
 
     // Check for too many arguments
     if (arg_index < argc) {
-        fprintf(stderr,
-                "Error: Function '%s' called with %d arguments but only "
-                "accepts %d\n",
-                func->name, argc - 1, func->param_count);
+        executor_error_report(
+            executor, SHELL_ERR_FUNCTION_ERROR, loc,
+            "function '%s' called with %d arguments but only accepts %d",
+            func->name, argc - 1, func->param_count);
         return 1;
     }
 
@@ -7366,51 +9012,47 @@ static node_t *copy_ast_chain(node_t *node) {
 static bool is_empty_or_null(const char *str) { return !str || str[0] == '\0'; }
 
 /**
- * @brief Extract a substring with offset and length
+ * @brief Extract a substring with offset and length (TR#29 grapheme-aware)
  *
- * Supports negative offsets (from end of string).
- * Handles bounds checking and returns empty string for invalid ranges.
+ * Implements ${var:offset:length} substring expansion. Offsets and
+ * lengths are measured in Unicode grapheme clusters (TR#29), not bytes,
+ * so multi-byte UTF-8 sequences are never split mid-character. Negative
+ * offsets count from the end of the string in graphemes; length of -1
+ * means "to end".
  *
- * @param str Source string
- * @param offset Starting position (negative for from-end)
- * @param length Number of characters (-1 for rest of string)
- * @return Extracted substring (caller must free)
+ * Uses the project's TR#29 primitives (lle_utf8_count_graphemes +
+ * slice_string_graphemes) so user content with combining marks, emoji
+ * sequences, regional indicators, ZWJ joins, and other multi-codepoint
+ * graphemes is handled correctly.
+ *
+ * @param str Source string (UTF-8)
+ * @param offset Starting grapheme position (negative for from-end)
+ * @param length Number of graphemes to extract (-1 for rest of string)
+ * @return Newly malloc'd substring (caller must free)
  */
 static char *extract_substring(const char *str, int offset, int length) {
     if (!str) {
         return strdup("");
     }
 
-    int str_len = strlen(str);
+    size_t byte_len = strlen(str);
+    int total = (int)lle_utf8_count_graphemes(str, byte_len);
 
-    // Handle negative offset (from end)
     if (offset < 0) {
-        offset = str_len + offset;
+        offset = total + offset;
         if (offset < 0) {
             offset = 0;
         }
     }
-
-    // Bounds check
-    if (offset >= str_len) {
+    if (offset >= total) {
         return strdup("");
     }
-
-    // Calculate actual length
-    int remaining = str_len - offset;
+    int remaining = total - offset;
     if (length < 0 || length > remaining) {
         length = remaining;
     }
-
-    char *result = malloc(length + 1);
-    if (!result) {
-        return strdup("");
-    }
-
-    strncpy(result, str + offset, length);
-    result[length] = '\0';
-
-    return result;
+    char *result = slice_string_graphemes(str, byte_len, offset, length);
+    return result ? result : strdup("");
 }
 
 /**
@@ -7674,6 +9316,63 @@ static char *convert_case_first_lower(const char *str) {
  * @param str String to convert
  * @return Converted string (caller must free)
  */
+/**
+ * @brief Pattern-restricted case modification
+ *
+ * Bash `${var^^[pat]}` / `${var,,[pat]}` / `${var^[pat]}` / `${var,[pat]}`
+ * apply case conversion only to characters that match `pattern`.
+ * `pattern` is fnmatch-style and matched single-character against each
+ * byte. If `first_only` is true, only the first matching character is
+ * converted (the `^` / `,` operators); otherwise all matches convert
+ * (`^^` / `,,`).
+ *
+ * Pattern restriction operates byte-by-byte; bash itself documents the
+ * feature as glob-pattern based and does not support Unicode-aware
+ * pattern matching here. Issue #96.
+ *
+ * @param str Input string
+ * @param pattern Glob pattern (may be NULL/empty -- treated as "any char")
+ * @param to_upper true for uppercase conversion, false for lowercase
+ * @param first_only true for `^` / `,`, false for `^^` / `,,`
+ * @return Newly malloc'd converted string
+ */
+static char *convert_case_pattern(const char *str, const char *pattern,
+                                  bool to_upper, bool first_only) {
+    if (!str) {
+        return strdup("");
+    }
+    size_t len = strlen(str);
+    char *result = malloc(len + 1);
+    if (!result) {
+        return strdup("");
+    }
+    bool any_pattern = (pattern && pattern[0]);
+    for (size_t i = 0; i < len; i++) {
+        char c = str[i];
+        bool should_convert;
+        if (first_only && i > 0) {
+            /* Per bash spec: `^pat` / `,pat` only inspect the first
+             * character of the expanded value; subsequent characters
+             * are copied unchanged regardless of whether they would
+             * match the pattern. */
+            should_convert = false;
+        } else if (!any_pattern) {
+            should_convert = true;
+        } else {
+            char buf[2] = {c, '\0'};
+            should_convert = (fnmatch(pattern, buf, 0) == 0);
+        }
+        if (should_convert) {
+            result[i] = to_upper ? (char)toupper((unsigned char)c)
+                                 : (char)tolower((unsigned char)c);
+        } else {
+            result[i] = c;
+        }
+    }
+    result[len] = '\0';
+    return result;
+}
+
 static char *convert_case_all_upper(const char *str) {
     if (!str) {
         return strdup("");
@@ -7847,9 +9546,142 @@ static char *pattern_substitute(const char *str, const char *pattern,
         replacement = "";
     }
 
+    /* Bash anchored-substitution prefixes:
+     *   ${var/#pat/repl}  match pat at the START of str only
+     *   ${var/%pat/repl}  match pat at the END of str only
+     * Detect and strip the marker; the remainder is the real pattern.
+     * Anchored substitution implies a single replacement -- there is
+     * only one start and one end -- so global is ignored when anchored.
+     * Issue #96.
+     */
+    bool anchor_start = false;
+    bool anchor_end = false;
+    if (pattern[0] == '#') {
+        anchor_start = true;
+        pattern++;
+    } else if (pattern[0] == '%') {
+        anchor_end = true;
+        pattern++;
+    }
+    if (!pattern[0]) {
+        return strdup(str);
+    }
+
     size_t str_len = strlen(str);
     size_t pattern_len = strlen(pattern);
     size_t replacement_len = strlen(replacement);
+
+    /* Detect glob metacharacters that route through fnmatch. The
+     * original check missed `[` (character class) and treated `[bd]`
+     * patterns as exact-substring matches, which never matched
+     * because the literal string never contained `[bd]`. fnmatch
+     * supports character classes natively. */
+    bool is_glob =
+        (strchr(pattern, '*') || strchr(pattern, '?') || strchr(pattern, '['));
+
+    /* Anchored-start: match pattern once at position 0, then copy the
+     * remainder. Anchored-end: match pattern once at the suffix, copy
+     * the prefix then the replacement. Both are simpler one-shot
+     * cases than the general scanner below. */
+    if (anchor_start) {
+        size_t match_len = 0;
+        bool matched = false;
+        if (is_glob) {
+            for (size_t try_len = 1; try_len <= str_len; try_len++) {
+                char *substr = malloc(try_len + 1);
+                if (!substr) {
+                    break;
+                }
+                memcpy(substr, str, try_len);
+                substr[try_len] = '\0';
+                if (fnmatch(pattern, substr, 0) == 0) {
+                    matched = true;
+                    match_len = try_len;
+                    /* For glob with *, prefer longest match. */
+                    if (strchr(pattern, '*')) {
+                        for (size_t longer = try_len + 1; longer <= str_len;
+                             longer++) {
+                            char *l = malloc(longer + 1);
+                            if (!l) {
+                                break;
+                            }
+                            memcpy(l, str, longer);
+                            l[longer] = '\0';
+                            if (fnmatch(pattern, l, 0) == 0) {
+                                match_len = longer;
+                            }
+                            free(l);
+                        }
+                    }
+                    free(substr);
+                    break;
+                }
+                free(substr);
+            }
+        } else {
+            if (str_len >= pattern_len &&
+                strncmp(str, pattern, pattern_len) == 0) {
+                matched = true;
+                match_len = pattern_len;
+            }
+        }
+        if (!matched) {
+            return strdup(str);
+        }
+        size_t tail_len = str_len - match_len;
+        char *result = malloc(replacement_len + tail_len + 1);
+        if (!result) {
+            return strdup(str);
+        }
+        memcpy(result, replacement, replacement_len);
+        memcpy(result + replacement_len, str + match_len, tail_len);
+        result[replacement_len + tail_len] = '\0';
+        return result;
+    }
+
+    if (anchor_end) {
+        size_t match_len = 0;
+        bool matched = false;
+        if (is_glob) {
+            /* Try suffixes from longest to shortest. For * patterns we
+             * want longest; for fixed-length patterns either order is
+             * fine. Longest-first matches bash. */
+            for (size_t try_len = str_len; try_len >= 1; try_len--) {
+                size_t start = str_len - try_len;
+                char *substr = malloc(try_len + 1);
+                if (!substr) {
+                    break;
+                }
+                memcpy(substr, str + start, try_len);
+                substr[try_len] = '\0';
+                if (fnmatch(pattern, substr, 0) == 0) {
+                    matched = true;
+                    match_len = try_len;
+                    free(substr);
+                    break;
+                }
+                free(substr);
+            }
+        } else {
+            if (str_len >= pattern_len && strncmp(str + str_len - pattern_len,
+                                                  pattern, pattern_len) == 0) {
+                matched = true;
+                match_len = pattern_len;
+            }
+        }
+        if (!matched) {
+            return strdup(str);
+        }
+        size_t head_len = str_len - match_len;
+        char *result = malloc(head_len + replacement_len + 1);
+        if (!result) {
+            return strdup(str);
+        }
+        memcpy(result, str, head_len);
+        memcpy(result + head_len, replacement, replacement_len);
+        result[head_len + replacement_len] = '\0';
+        return result;
+    }
 
     // Allocate result buffer - estimate size
     size_t result_size = str_len * 2 + 1;
@@ -7869,7 +9701,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
         size_t match_len = 0;
 
         // Simple pattern matching - check for exact match or glob
-        if (strchr(pattern, '*') || strchr(pattern, '?')) {
+        if (is_glob) {
             // Use fnmatch for glob patterns
             // Try increasing lengths to find the match
             for (size_t try_len = 1; try_len <= str_len - i; try_len++) {
@@ -7959,19 +9791,29 @@ static char *transform_quote(const char *str) {
         return strdup("''");
     }
 
-    // Use $'...' quoting for strings with special characters
     size_t len = strlen(str);
-    bool needs_special = false;
 
+    /* ${var@Q} produces a quoted representation safe to re-eval.
+     * bash uses two output forms:
+     *   - For printable strings without control chars: 'content'
+     *     with embedded single quotes escaped as '\'' (close quote,
+     *     literal '\'', reopen quote).
+     *   - For strings containing control chars (\n, \t, etc): $'...'
+     *     ANSI-C quoting with \n / \t / \xNN escapes.
+     * Match bash's choice so diff_oracle can byte-compare against
+     * the corpus. Issue #102.
+     */
+    bool has_control = false;
     for (size_t i = 0; i < len; i++) {
-        if (str[i] < 32 || str[i] == '\'' || str[i] == '\\') {
-            needs_special = true;
+        unsigned char c = (unsigned char)str[i];
+        if (c < 32) {
+            has_control = true;
             break;
         }
     }
 
-    if (needs_special) {
-        // Use $'...' format with escape sequences
+    if (has_control) {
+        /* $'...' ANSI-C form for strings with control chars. */
         size_t result_size = len * 4 + 4;
         char *result = malloc(result_size);
         if (!result) {
@@ -8010,13 +9852,34 @@ static char *transform_quote(const char *str) {
         result[pos] = '\0';
         return result;
     } else {
-        // Simple single quotes
-        size_t result_size = len + 3;
+        /* Single-quoted form with bash's close-escape-reopen idiom
+         * for embedded single quotes. Each `'` in str becomes
+         * `'\''`: close the open quote (`'`), emit a literal-quoted
+         * single quote (`\'`), then reopen (`'`). For a string
+         * with no embedded quotes this collapses to the simple
+         * `'content'` form. Each `'` worst-case expands to 4 chars,
+         * so worst-case output size is len*4 + 3. */
+        size_t result_size = len * 4 + 3;
         char *result = malloc(result_size);
         if (!result) {
             return strdup("''");
         }
-        snprintf(result, result_size, "'%s'", str);
+        size_t pos = 0;
+        result[pos++] = '\'';
+        for (size_t i = 0; i < len; i++) {
+            unsigned char c = (unsigned char)str[i];
+            if (c == '\'') {
+                /* Emit `'\''`: close, escape, reopen. */
+                result[pos++] = '\'';
+                result[pos++] = '\\';
+                result[pos++] = '\'';
+                result[pos++] = '\'';
+            } else {
+                result[pos++] = c;
+            }
+        }
+        result[pos++] = '\'';
+        result[pos] = '\0';
         return result;
     }
 }
@@ -8323,6 +10186,14 @@ static char *get_variable_attributes(const char *name) {
     // Get variable flags
     symvar_flags_t flags = symtable_get_flags(mgr, name);
 
+    /* Bash ${var@a} attribute-string ordering: bash emits `irx` form
+     * (integer, readonly, exported) and 'a' / 'A' for indexed /
+     * associative arrays. Order matters only for stylistic match
+     * with bash output; bash's actual order is by attribute introduction
+     * date. Issue #102. */
+    if (flags & SYMVAR_INTEGER_ATTR) {
+        attrs[idx++] = 'i';
+    }
     if (flags & SYMVAR_READONLY) {
         attrs[idx++] = 'r';
     }
@@ -8377,6 +10248,48 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
         if (str[i] == '$') {
             // Check for arithmetic expansion $((...)
             if (i + 2 < len && str[i + 1] == '(' && str[i + 2] == '(') {
+                /* $(( is ambiguous: arithmetic expansion or command
+                 * substitution of an anonymous function `$(() {...})`.
+                 * Same disambiguation rule as the tokenizer (issue #99):
+                 * if the lookahead from after $(( finds `{`, `}`, `;`,
+                 * or `\n` before matched `))`, the input is command
+                 * substitution and must be routed through the next-
+                 * branch's $(...) handler instead. Walk the lookahead;
+                 * if it doesn't pass the arithmetic shape check, fall
+                 * through to the $(...) handler below. */
+                bool looks_arith = true;
+                {
+                    size_t s = i + 3;
+                    int d = 2;
+                    while (s < len && d > 0) {
+                        char sc = str[s];
+                        if (sc == '(') {
+                            d++;
+                        } else if (sc == ')') {
+                            d--;
+                            if (d == 0) {
+                                break;
+                            }
+                        } else if (sc == '{' || sc == '}' || sc == ';' ||
+                                   sc == '\n') {
+                            looks_arith = false;
+                            break;
+                        }
+                        s++;
+                    }
+                }
+                if (!looks_arith) {
+                    /* Re-route into the $(...) command-sub handler at
+                     * the next branch (else-if on str[i + 1] == '('),
+                     * which fires when str[i+2] != '(' OR when we
+                     * intentionally skip the arithmetic path. To
+                     * trigger it cleanly, just fall through to the
+                     * next condition test by NOT entering the arith
+                     * block. The post-block `i = arith_end - 1`
+                     * advancement is skipped because we don't `continue`
+                     * here. */
+                    goto try_cmd_sub_path;
+                }
                 // This is arithmetic expansion $((expr))
                 size_t arith_start = i;
                 size_t arith_end = i + 3;
@@ -8433,6 +10346,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
             }
             // Check for command substitution $(...)
             else if (i + 1 < len && str[i + 1] == '(') {
+            try_cmd_sub_path:;
                 // Find matching closing parenthesis using find_closing_brace
                 char *temp_str =
                     (char *)&str[i + 1]; // Start from the opening parenthesis
@@ -8532,6 +10446,22 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                            (isalnum(str[var_end]) || str[var_end] == '_')) {
                         var_end++;
                     }
+                    /* Zsh bare-subscript form: $var[N] / $var[N,M].
+                     * Consume the bracket span so var_expr becomes
+                     * "$var[N]" rather than "$var" + literal "[N]".
+                     * Gated on FEATURE_ZSH_BARE_SUBSCRIPT — bash mode
+                     * keeps the literal-[N]-after-$var semantic. */
+                    if (var_end > var_start && var_end < len &&
+                        str[var_end] == '[' &&
+                        shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+                        size_t scan = var_end + 1;
+                        while (scan < len && str[scan] != ']') {
+                            scan++;
+                        }
+                        if (scan < len && str[scan] == ']') {
+                            var_end = scan + 1;
+                        }
+                    }
                 }
             }
 
@@ -8609,6 +10539,152 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
  * @param expansion Content inside ${...} (without braces)
  * @return Expanded value (caller must free)
  */
+/**
+ * @brief Queue a POSIX-required shell-level exit
+ *
+ * IEEE 1003.1 defines several conditions under which a non-interactive
+ * shell shall exit immediately: ${var:?word} on a null-or-unset
+ * parameter, ${var?word} on an unset parameter, and (when `set -u` is
+ * active) any reference to an unbound variable, among others. This
+ * helper centralizes the trigger:
+ *
+ *  - Always sets expansion_error + expansion_exit_status so the
+ *    current expansion bails and the immediate command surfaces a
+ *    non-zero exit. This is the existing behavior for these sites.
+ *  - In non-interactive shells, additionally raises
+ *    shell_exit_requested with shell_exit_status. Every command-list
+ *    walker, loop body, function-call dispatcher, and the top-level
+ *    REPL honors that flag by short-circuiting up to the run loop,
+ *    which terminates the shell with shell_exit_status. The flag
+ *    persists across statements within the batch -- this is the
+ *    point: subsequent statements in the script must NOT run.
+ *  - Interactive shells never set shell_exit_requested. They emit
+ *    the diagnostic and continue at the next prompt, per spec.
+ *
+ * is_interactive_shell() is the canonical query used elsewhere in the
+ * executor for the same exit-on-error distinction (see executor.c
+ * around line 10598 where the symmetric query gates an exit() call
+ * for SHELL_ERR_UNBOUND_VARIABLE inside command-builtin paths).
+ *
+ * @param executor Executor context (must be non-NULL)
+ * @param status Status the shell exits with
+ */
+static void executor_request_posix_exit(executor_t *executor, int status) {
+    executor->expansion_error = true;
+    executor->expansion_exit_status = status;
+    if (!is_interactive_shell()) {
+        executor->shell_exit_requested = true;
+        executor->shell_exit_status = status;
+    }
+}
+
+/**
+ * @brief Emit a "parameter null or unset" error for ${var:?word} / ${var?word}
+ *
+ * Both POSIX required-parameter forms share identical reporting shape:
+ * write "var: word" (or a default message if word is empty) via the
+ * structured error system, mark the executor's expansion-error state so
+ * the caller can react, and return an empty string. The split between
+ * "null or unset" and "unset only" is the trigger condition (handled at
+ * the call site); the reporting code is the same.
+ *
+ * Routes through executor_request_posix_exit() so the shell-level
+ * abort fires in non-interactive shells per POSIX -- the prior
+ * implementation only marked expansion_error, which made the current
+ * command fail but allowed subsequent script statements to run.
+ *
+ * @param executor Executor context (for error_report and expansion flags)
+ * @param var_name Name of the unset/null parameter
+ * @param word User-supplied error word (may be NULL/empty)
+ * @param default_msg Default message used when word is NULL/empty
+ * @return strdup("") (caller takes ownership)
+ */
+static char *handle_required_param_error(executor_t *executor,
+                                         const char *var_name, const char *word,
+                                         const char *default_msg) {
+    const char *msg = (word && *word) ? word : default_msg;
+    executor_error_report(executor, SHELL_ERR_PARAMETER_NULL_OR_UNSET,
+                          SOURCE_LOC_UNKNOWN, "%s: %s", var_name, msg);
+    executor_request_posix_exit(executor, 1);
+    return strdup("");
+}
+
+/**
+ * @brief Slice a string by grapheme cluster positions (TR#29 correct)
+ *
+ * Used by ${var[N]} / ${var[N,M]} string subscripts on scalar (non-array)
+ * variables. The bracket operators here are grapheme-indexed, not byte-
+ * indexed.
+ *
+ * Iterates by *codepoint* using lle_utf8_decode_codepoint (the canonical
+ * pattern used elsewhere in the shell — see src/tokenizer.c:2075). At
+ * each codepoint boundary, lle_is_grapheme_boundary determines whether
+ * the codepoint also starts a new *grapheme cluster*. A multi-codepoint
+ * grapheme (emoji+ZWJ+emoji, base+combining-mark, etc.) increments the
+ * grapheme counter only at its first codepoint, so all internal
+ * codepoints are correctly grouped under one grapheme index.
+ *
+ * Indexing is 0-based at this layer; the caller is responsible for
+ * converting from 1-based (zsh-style) where applicable.
+ *
+ * @param str Source string (UTF-8)
+ * @param str_len Length in bytes
+ * @param start_grapheme 0-based grapheme index to start at
+ * @param count Number of graphemes to extract (-1 for "to end")
+ * @return Newly malloc'd substring, or strdup("") on out-of-range / OOM
+ */
+static char *slice_string_graphemes(const char *str, size_t str_len,
+                                    int start_grapheme, int count) {
+    if (!str || str_len == 0 || start_grapheme < 0) {
+        return strdup("");
+    }
+
+    int grapheme_idx = 0;
+    size_t byte_start = SIZE_MAX;
+    size_t byte_end = str_len;
+    int target_end = (count < 0) ? -1 : start_grapheme + count;
+
+    size_t i = 0;
+    while (i < str_len) {
+        /* Check grapheme boundary at this codepoint start (not at every
+         * byte — continuation bytes would falsely register as boundaries
+         * because lle_is_grapheme_boundary treats invalid UTF-8 as a
+         * boundary, and continuation bytes alone are invalid as a
+         * standalone codepoint). */
+        if (lle_is_grapheme_boundary(str + i, str, str + str_len)) {
+            if (grapheme_idx == start_grapheme) {
+                byte_start = i;
+            }
+            if (target_end >= 0 && grapheme_idx == target_end) {
+                byte_end = i;
+                break;
+            }
+            grapheme_idx++;
+        }
+
+        /* Advance by one codepoint. */
+        uint32_t cp;
+        int cp_len = lle_utf8_decode_codepoint(str + i, str_len - i, &cp);
+        if (cp_len <= 0) {
+            i++; /* Skip invalid byte to avoid infinite loop. */
+        } else {
+            i += (size_t)cp_len;
+        }
+    }
+
+    if (byte_start == SIZE_MAX) {
+        return strdup("");
+    }
+    size_t slice_len = byte_end - byte_start;
+    char *result = malloc(slice_len + 1);
+    if (!result) {
+        return strdup("");
+    }
+    memcpy(result, str + byte_start, slice_len);
+    result[slice_len] = '\0';
+    return result;
+}
+
 static char *parse_parameter_expansion(executor_t *executor,
                                        const char *expansion) {
     if (!expansion) {
@@ -8634,13 +10710,82 @@ static char *parse_parameter_expansion(executor_t *executor,
             // Rest of expansion after )
             const char *rest = close_paren + 1;
 
-            // Check for 'k' flag (return keys instead of values)
-            // This must be handled before inner expansion
+            // Check for 'k' / 'v' flags (return keys / values for arrays).
+            // The combination 'kv' (or 'vk') asks for interleaved key/value
+            // pairs and must be detected before the keys-only branch — see
+            // the (want_keys && want_values) handler below.
             bool want_keys = (strchr(flags, 'k') != NULL);
+            bool want_values = (strchr(flags, 'v') != NULL);
 
             char *inner_result = NULL;
 
-            if (want_keys) {
+            if (want_keys && want_values) {
+                // Handle (kv)/(vk): emit interleaved "k1 v1 k2 v2 ..."
+                // Both symtable_array_get_keys() and
+                // symtable_array_get_values() iterate the same source data
+                // (hashtable for assoc, indices array for indexed) in the
+                // same order, so keys[i] pairs with values[i].
+                char *arr_name = NULL;
+                const char *bracket = strchr(rest, '[');
+                if (bracket) {
+                    arr_name = strndup(rest, bracket - rest);
+                } else {
+                    arr_name = strdup(rest);
+                }
+
+                if (arr_name) {
+                    array_value_t *array = symtable_get_array(arr_name);
+                    if (array && shell_mode_get() == SHELL_MODE_ZSH &&
+                        !array->is_associative) {
+                        /* zsh-mode special case: ${(kv)indexed_array}
+                         * emits values only — zsh treats indexed arrays
+                         * as having no meaningful "keys" so (kv) collapses
+                         * to (v). lush mode keeps the interleaved
+                         * indices+values form (curated pick: internally
+                         * consistent with lush's (k)/(v) semantics). */
+                        inner_result = symtable_array_expand(array, " ");
+                    } else if (array) {
+                        size_t kc = 0, vc = 0;
+                        char **keys = symtable_array_get_keys(array, &kc);
+                        char **values = symtable_array_get_values(array, &vc);
+                        size_t pairs = (kc < vc) ? kc : vc;
+                        if (keys && values && pairs > 0) {
+                            size_t total_len = 0;
+                            for (size_t i = 0; i < pairs; i++) {
+                                total_len +=
+                                    strlen(keys[i]) + 1 + strlen(values[i]) + 1;
+                            }
+                            inner_result = malloc(total_len + 1);
+                            if (inner_result) {
+                                inner_result[0] = '\0';
+                                for (size_t i = 0; i < pairs; i++) {
+                                    if (i > 0)
+                                        strcat(inner_result, " ");
+                                    strcat(inner_result, keys[i]);
+                                    strcat(inner_result, " ");
+                                    strcat(inner_result, values[i]);
+                                }
+                            }
+                        }
+                        if (keys) {
+                            for (size_t i = 0; i < kc; i++) {
+                                free(keys[i]);
+                            }
+                            free(keys);
+                        }
+                        if (values) {
+                            for (size_t i = 0; i < vc; i++) {
+                                free(values[i]);
+                            }
+                            free(values);
+                        }
+                    }
+                    free(arr_name);
+                }
+                if (!inner_result) {
+                    inner_result = strdup("");
+                }
+            } else if (want_keys) {
                 // Handle (k) flag: return array keys instead of values
                 // Parse array name from rest (e.g., "arr[@]" -> "arr")
                 char *arr_name = NULL;
@@ -8653,7 +10798,17 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
-                    if (array) {
+                    if (array && shell_mode_get() == SHELL_MODE_ZSH &&
+                        !array->is_associative) {
+                        /* zsh-mode special case: ${(k)indexed_array} emits
+                         * values only (zsh treats indexed-array indices as
+                         * not meaningfully "keys" — `(k)` collapses to
+                         * `(v)`). lush mode keeps the existing 0-based
+                         * indices behavior (curated pick: more useful for
+                         * iteration / debugging than redundantly emitting
+                         * values which `(v)` and `${arr[@]}` already give). */
+                        inner_result = symtable_array_expand(array, " ");
+                    } else if (array) {
                         // Get all keys from array (works for both indexed and
                         // associative)
                         size_t count;
@@ -8708,8 +10863,25 @@ static char *parse_parameter_expansion(executor_t *executor,
                     inner_result = strdup("0");
                 }
             } else {
-                // Normal expansion
-                inner_result = parse_parameter_expansion(executor, rest);
+                /* Normal expansion. `rest` is what comes after the
+                 * flag-paren group: typically a variable name like
+                 * `var`, but in nested form it can be a full
+                 * parameter expansion like `${(s/,/)csv}` -- the zsh
+                 * idiom ${(flag)${INNER}} applies the outer flag to
+                 * the inner expansion's result.
+                 *
+                 * If `rest` starts with `${` route it through the
+                 * variable-reference path (expand_variable) which
+                 * understands the full ${...} form and recursively
+                 * invokes parse_parameter_expansion on the inner
+                 * content. Otherwise treat rest as a bare name and
+                 * call parse_parameter_expansion directly (existing
+                 * behavior). Issue #98. */
+                if (rest[0] == '$' && rest[1] == '{') {
+                    inner_result = expand_variable(executor, rest);
+                } else {
+                    inner_result = parse_parameter_expansion(executor, rest);
+                }
             }
 
             if (!inner_result) {
@@ -8771,12 +10943,15 @@ static char *parse_parameter_expansion(executor_t *executor,
                     p++;
                     break;
 
-                case 'j':
-                    // Join with separator: j:X:
-                    if (p[1] == ':') {
-                        // Find closing :
+                case 'j': {
+                    // Join with separator: j<DELIM>X<DELIM>
+                    // zsh accepts any non-')' character after 'j' as the
+                    // delimiter; the same character closes the argument.
+                    char delim = p[1];
+                    if (delim && delim != ')') {
+                        // Find closing delim
                         const char *sep_start = p + 2;
-                        const char *sep_end = strchr(sep_start, ':');
+                        const char *sep_end = strchr(sep_start, delim);
                         if (sep_end) {
                             size_t sep_len = sep_end - sep_start;
                             char *sep = malloc(sep_len + 1);
@@ -8818,12 +10993,16 @@ static char *parse_parameter_expansion(executor_t *executor,
                         p++; // No separator specified
                     }
                     break;
+                }
 
-                case 's':
-                    // Split on separator: s:X: - replace X with space
-                    if (p[1] == ':') {
+                case 's': {
+                    // Split on separator: s<DELIM>X<DELIM> - replace X with
+                    // space. zsh accepts any non-')' character after 's' as
+                    // the delimiter; the same character closes the argument.
+                    char delim = p[1];
+                    if (delim && delim != ')') {
                         const char *sep_start = p + 2;
-                        const char *sep_end = strchr(sep_start, ':');
+                        const char *sep_end = strchr(sep_start, delim);
                         if (sep_end) {
                             size_t sep_len = sep_end - sep_start;
                             char *sep = malloc(sep_len + 1);
@@ -8865,6 +11044,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         p++;
                     }
                     break;
+                }
 
                 case 'o':
                     // Sort ascending - split on spaces, sort, rejoin
@@ -9025,6 +11205,317 @@ static char *parse_parameter_expansion(executor_t *executor,
                     p++;
                     break;
 
+                case 'u': {
+                    /* Unique: dedupe consecutive (and non-consecutive)
+                     * elements after splitting on spaces. zsh's (u)
+                     * removes ALL duplicates, not just adjacent ones.
+                     * Combine with (o) or (O) for sort+unique. Issue
+                     * #103. */
+                    size_t word_count = 0;
+                    bool in_word = false;
+                    for (const char *c = result; *c; c++) {
+                        if (*c == ' ') {
+                            in_word = false;
+                        } else if (!in_word) {
+                            word_count++;
+                            in_word = true;
+                        }
+                    }
+                    if (word_count > 1) {
+                        char **words = malloc(word_count * sizeof(char *));
+                        if (words) {
+                            char *copy = strdup(result);
+                            if (copy) {
+                                size_t idx = 0;
+                                char *tok = strtok(copy, " ");
+                                while (tok && idx < word_count) {
+                                    /* Skip if already seen. O(N^2)
+                                     * is fine for typical zsh array
+                                     * sizes; switching to a hash set
+                                     * would be premature. */
+                                    bool seen = false;
+                                    for (size_t k = 0; k < idx; k++) {
+                                        if (strcmp(words[k], tok) == 0) {
+                                            seen = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!seen) {
+                                        words[idx++] = strdup(tok);
+                                    }
+                                    tok = strtok(NULL, " ");
+                                }
+                                size_t unique_count = idx;
+                                size_t total_len = 0;
+                                for (size_t k = 0; k < unique_count; k++) {
+                                    total_len += strlen(words[k]) + 1;
+                                }
+                                new_result = malloc(total_len + 1);
+                                if (new_result) {
+                                    new_result[0] = '\0';
+                                    for (size_t k = 0; k < unique_count; k++) {
+                                        if (k > 0) {
+                                            strcat(new_result, " ");
+                                        }
+                                        strcat(new_result, words[k]);
+                                    }
+                                }
+                                for (size_t k = 0; k < unique_count; k++) {
+                                    free(words[k]);
+                                }
+                                free(copy);
+                            }
+                            free(words);
+                        }
+                        if (new_result) {
+                            if (result != inner_result) {
+                                free(result);
+                            }
+                            result = new_result;
+                        }
+                    }
+                    p++;
+                    break;
+                }
+
+                case 'l':
+                case 'r': {
+                    /* Padding flags. zsh syntax:
+                     *   (l:N:)              -- left-pad to width N w/ spaces
+                     *   (l:N::FILL:)        -- left-pad with FILL string
+                     *   (r:N:) / (r:N::FILL:) -- right-pad analogously
+                     * If the value is wider than N, zsh truncates the
+                     * value to N chars (left-pad keeps the rightmost
+                     * N; right-pad keeps the leftmost N). The N
+                     * argument is bracketed by `:` chars (zsh accepts
+                     * any non-`)` delimiter; we accept `:` to match
+                     * the common form the corpus uses). Issue #103. */
+                    bool pad_left = (*p == 'l');
+                    char open = p[1];
+                    if (!open || open == ')') {
+                        p++;
+                        break;
+                    }
+                    const char *spec = p + 2;
+                    const char *width_end = strchr(spec, open);
+                    if (!width_end) {
+                        p++;
+                        break;
+                    }
+                    size_t width_str_len = (size_t)(width_end - spec);
+                    char width_buf[32];
+                    if (width_str_len >= sizeof(width_buf)) {
+                        p++;
+                        break;
+                    }
+                    memcpy(width_buf, spec, width_str_len);
+                    width_buf[width_str_len] = '\0';
+                    int width = atoi(width_buf);
+
+                    /* Optional fill: another :FILL: after the width. */
+                    char *fill = NULL;
+                    const char *after_width = width_end + 1;
+                    const char *closing = after_width;
+                    if (*after_width == ':') {
+                        const char *fill_start = after_width + 1;
+                        const char *fill_end = strchr(fill_start, ':');
+                        if (fill_end) {
+                            size_t fill_len = (size_t)(fill_end - fill_start);
+                            fill = malloc(fill_len + 1);
+                            if (fill) {
+                                memcpy(fill, fill_start, fill_len);
+                                fill[fill_len] = '\0';
+                            }
+                            closing = fill_end + 1;
+                        } else {
+                            closing = after_width + 1;
+                        }
+                    }
+
+                    /* Advance p past the entire (l:N::FILL:) span,
+                     * up to but not including the closing `)` of the
+                     * flag group -- the outer while loop is iterating
+                     * `flags` which is the content between `(` and `)`
+                     * already, so `closing` is the position right
+                     * after the trailing `:`. */
+                    p = closing;
+
+                    const char *fill_str = (fill && fill[0]) ? fill : " ";
+                    size_t fill_len = strlen(fill_str);
+                    size_t result_len = strlen(result);
+
+                    if (width <= 0) {
+                        free(fill);
+                        break;
+                    }
+                    if ((int)result_len >= width) {
+                        /* Truncate. For left-pad, keep last N chars;
+                         * for right-pad, keep first N chars. */
+                        new_result = malloc((size_t)width + 1);
+                        if (new_result) {
+                            if (pad_left) {
+                                memcpy(new_result,
+                                       result + (result_len - (size_t)width),
+                                       (size_t)width);
+                            } else {
+                                memcpy(new_result, result, (size_t)width);
+                            }
+                            new_result[width] = '\0';
+                        }
+                    } else {
+                        size_t pad_count = (size_t)width - result_len;
+                        new_result = malloc((size_t)width + 1);
+                        if (new_result) {
+                            if (pad_left) {
+                                for (size_t k = 0; k < pad_count; k++) {
+                                    new_result[k] = fill_str[k % fill_len];
+                                }
+                                memcpy(new_result + pad_count, result,
+                                       result_len);
+                            } else {
+                                memcpy(new_result, result, result_len);
+                                for (size_t k = 0; k < pad_count; k++) {
+                                    new_result[result_len + k] =
+                                        fill_str[k % fill_len];
+                                }
+                            }
+                            new_result[width] = '\0';
+                        }
+                    }
+                    free(fill);
+                    if (new_result) {
+                        if (result != inner_result) {
+                            free(result);
+                        }
+                        result = new_result;
+                    }
+                    break;
+                }
+
+                case 'Q': {
+                    /* (Q) flag: strip one level of quoting from the
+                     * value. zsh accepts `'a b c'` -> `a b c` and
+                     * `"a b c"` -> `a b c`. If the value isn't wrapped
+                     * in matching quotes, return unchanged.
+                     * Issue #103. */
+                    size_t result_len = strlen(result);
+                    if (result_len >= 2 &&
+                        ((result[0] == '\'' &&
+                          result[result_len - 1] == '\'') ||
+                         (result[0] == '"' && result[result_len - 1] == '"'))) {
+                        new_result = malloc(result_len - 1);
+                        if (new_result) {
+                            memcpy(new_result, result + 1, result_len - 2);
+                            new_result[result_len - 2] = '\0';
+                        }
+                    } else {
+                        new_result = strdup(result);
+                    }
+                    p++;
+                    if (new_result) {
+                        if (result != inner_result) {
+                            free(result);
+                        }
+                        result = new_result;
+                    }
+                    break;
+                }
+
+                case 'q': {
+                    /* Quote-family flags (issue #103):
+                     *   (q)   -- backslash-escape shell metacharacters
+                     *   (qq)  -- single-quote the entire value
+                     *   (qqq) -- double-quote the entire value
+                     * Count consecutive 'q' chars to pick the variant.
+                     */
+                    int q_count = 0;
+                    while (p[q_count] == 'q') {
+                        q_count++;
+                    }
+
+                    size_t result_len = strlen(result);
+                    if (q_count == 2) {
+                        /* Single-quote: wrap with ' and escape any
+                         * embedded ' using bash's '\\'' idiom (zsh
+                         * accepts the same form). */
+                        size_t cap = result_len * 4 + 3;
+                        new_result = malloc(cap);
+                        if (new_result) {
+                            size_t pos = 0;
+                            new_result[pos++] = '\'';
+                            for (size_t k = 0; k < result_len; k++) {
+                                if (result[k] == '\'') {
+                                    new_result[pos++] = '\'';
+                                    new_result[pos++] = '\\';
+                                    new_result[pos++] = '\'';
+                                    new_result[pos++] = '\'';
+                                } else {
+                                    new_result[pos++] = result[k];
+                                }
+                            }
+                            new_result[pos++] = '\'';
+                            new_result[pos] = '\0';
+                        }
+                    } else if (q_count == 3) {
+                        /* Double-quote: wrap with " and escape `"` `$`
+                         * `` ` `` `\` chars. */
+                        size_t cap = result_len * 2 + 3;
+                        new_result = malloc(cap);
+                        if (new_result) {
+                            size_t pos = 0;
+                            new_result[pos++] = '"';
+                            for (size_t k = 0; k < result_len; k++) {
+                                char c = result[k];
+                                if (c == '"' || c == '$' || c == '`' ||
+                                    c == '\\') {
+                                    new_result[pos++] = '\\';
+                                }
+                                new_result[pos++] = c;
+                            }
+                            new_result[pos++] = '"';
+                            new_result[pos] = '\0';
+                        }
+                    } else {
+                        /* (q): backslash-escape shell-meta chars. zsh's
+                         * (q) escapes characters that would be
+                         * special in any shell context -- space, tab,
+                         * newline, and shell metacharacters
+                         * (; & | < > ( ) { } [ ] $ ` " ' \ * ? ~ # !
+                         * = % ^). */
+                        size_t cap = result_len * 2 + 1;
+                        new_result = malloc(cap);
+                        if (new_result) {
+                            size_t pos = 0;
+                            for (size_t k = 0; k < result_len; k++) {
+                                unsigned char c = (unsigned char)result[k];
+                                bool meta =
+                                    (c == ' ' || c == '\t' || c == '\n' ||
+                                     c == ';' || c == '&' || c == '|' ||
+                                     c == '<' || c == '>' || c == '(' ||
+                                     c == ')' || c == '{' || c == '}' ||
+                                     c == '[' || c == ']' || c == '$' ||
+                                     c == '`' || c == '"' || c == '\'' ||
+                                     c == '\\' || c == '*' || c == '?' ||
+                                     c == '~' || c == '#' || c == '!' ||
+                                     c == '=');
+                                if (meta) {
+                                    new_result[pos++] = '\\';
+                                }
+                                new_result[pos++] = (char)c;
+                            }
+                            new_result[pos] = '\0';
+                        }
+                    }
+                    p += q_count;
+                    if (new_result) {
+                        if (result != inner_result) {
+                            free(result);
+                        }
+                        result = new_result;
+                    }
+                    break;
+                }
+
                 default:
                     // Unknown flag, skip
                     p++;
@@ -9057,46 +11548,48 @@ static char *parse_parameter_expansion(executor_t *executor,
             strncpy(prefix, var_name, name_len - 1);
             prefix[name_len - 1] = '\0';
 
-            // Get all variable names matching prefix from environment
-            // For now, scan environment variables
-            size_t prefix_len = strlen(prefix);
-            size_t result_size = 256;
-            char *result = malloc(result_size);
-            if (!result) {
-                free(prefix);
-                return strdup("");
-            }
-            result[0] = '\0';
-            size_t result_pos = 0;
+            /* Enumerate the symbol table for matching names. The prior
+             * implementation only scanned `environ` (exported vars
+             * only); most shell-local variables never reach environ.
+             * Collect into a dynamic array via the symtable enumerator,
+             * sort alphabetically for determinism (bash documents the
+             * order as unspecified but the corpus depends on a stable
+             * order for byte-for-byte diff_oracle comparison).
+             * Issue #102. The callback and qsort comparator are
+             * file-scope helpers because C lacks nested functions. */
+            prefix_collect_ctx_t ctx = {NULL, 0, 0, prefix, strlen(prefix)};
+            symtable_enumerate_global_vars(prefix_collect_cb, &ctx);
 
-            extern char **environ;
-            for (char **env = environ; *env; env++) {
-                if (strncmp(*env, prefix, prefix_len) == 0) {
-                    char *eq = strchr(*env, '=');
-                    if (eq) {
-                        size_t var_len = eq - *env;
-                        if (result_pos + var_len + 2 >= result_size) {
-                            result_size *= 2;
-                            char *new_result = realloc(result, result_size);
-                            if (!new_result) {
-                                free(result);
-                                free(prefix);
-                                return strdup("");
-                            }
-                            result = new_result;
-                        }
-                        if (result_pos > 0) {
-                            result[result_pos++] = ' ';
-                        }
-                        strncpy(result + result_pos, *env, var_len);
-                        result_pos += var_len;
-                        result[result_pos] = '\0';
+            if (ctx.count > 1) {
+                qsort(ctx.names, ctx.count, sizeof(char *), strptr_cmp);
+            }
+
+            /* Build space-separated result. */
+            size_t total_len = 0;
+            for (size_t i = 0; i < ctx.count; i++) {
+                total_len += strlen(ctx.names[i]) + 1;
+            }
+            char *result = malloc(total_len + 1);
+            if (result) {
+                result[0] = '\0';
+                size_t pos = 0;
+                for (size_t i = 0; i < ctx.count; i++) {
+                    if (i > 0) {
+                        result[pos++] = ' ';
                     }
+                    size_t l = strlen(ctx.names[i]);
+                    memcpy(result + pos, ctx.names[i], l);
+                    pos += l;
+                    result[pos] = '\0';
                 }
             }
 
+            for (size_t i = 0; i < ctx.count; i++) {
+                free(ctx.names[i]);
+            }
+            free(ctx.names);
             free(prefix);
-            return result;
+            return result ? result : strdup("");
         }
 
         // Check for ${!arr[@]} or ${!arr[*]} - array keys
@@ -9153,6 +11646,21 @@ static char *parse_parameter_expansion(executor_t *executor,
     if (expansion[0] == '#') {
         const char *var_name = expansion + 1;
 
+        /* Nested form ${#${INNER}}: count the length of the inner
+         * expansion's result. expand_variable handles the full ${...}
+         * form. Issue #98. */
+        if (var_name[0] == '$' && var_name[1] == '{') {
+            char *inner = expand_variable(executor, var_name);
+            if (inner) {
+                size_t inner_len = strlen(inner);
+                free(inner);
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%zu", inner_len);
+                return strdup(buf);
+            }
+            return strdup("0");
+        }
+
         // Check for array subscript
         const char *bracket = strchr(var_name, '[');
         if (bracket) {
@@ -9187,18 +11695,24 @@ static char *parse_parameter_expansion(executor_t *executor,
                             // ${#arr[n]} - length of element at index n
                             arithm_clear_error();
                             char *idx_result = arithm_expand(subscript);
-                            if (idx_result && !arithm_error_flag) {
+                            if (idx_result && !arithm_error_is_flagged()) {
                                 int idx = (int)strtoll(idx_result, NULL, 10);
                                 free(idx_result);
 
-                                // Adjust for 1-indexed arrays (zsh mode)
+                                /* Same indexing convention as ${arr[n]}:
+                                 * zsh-mode rejects 0, decrements positives,
+                                 * passes negatives through to the symtable
+                                 * helper's "from-end" handler. Lush/bash
+                                 * pass through directly. (Issue #68.) */
                                 if (!shell_mode_allows(
                                         FEATURE_ARRAY_ZERO_INDEXED)) {
-                                    if (idx <= 0) {
+                                    if (idx == 0) {
                                         snprintf(result_buf, sizeof(result_buf),
                                                  "0");
                                     } else {
-                                        idx--; // Convert 1-indexed to 0-indexed
+                                        if (idx > 0) {
+                                            idx--; /* 1-based -> 0-based */
+                                        }
                                         const char *elem =
                                             symtable_array_get_index(array,
                                                                      idx);
@@ -9242,11 +11756,67 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             return result ? result : strdup("0");
         }
+        /* Scalar lookup missed; check if var_name is an array. Mode-
+         * aware semantics for ${#arr} on a bare array name:
+         *   zsh:  number of elements
+         *   bash: length of arr[0] (treats $arr as ${arr[0]})
+         *   lush: number of elements (curated zsh idiom; bash users
+         *         should use ${#arr[@]} for the element count and
+         *         ${#arr[0]} for length-of-first explicitly)
+         *   posix: arrays do not exist; if one happens to be defined
+         *          (mode carryover) match bash's first-element rule.
+         * Issue #99.
+         */
+        array_value_t *array = symtable_get_array(var_name);
+        if (array) {
+            shell_mode_t mode = shell_mode_get();
+            /* size_t can render up to 20 digits on 64-bit + null. */
+            char *result = malloc(24);
+            if (!result) {
+                return strdup("0");
+            }
+            if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
+                const char *first = symtable_array_get_index(array, 0);
+                snprintf(result, 24, "%zu", first ? strlen(first) : 0);
+            } else {
+                snprintf(result, 24, "%zu", symtable_array_length(array));
+            }
+            return result;
+        }
         return strdup("0");
     }
 
-    // Handle array element access: ${arr[n]}, ${arr[@]}, ${arr[*]}
+    /* Handle array element access: ${arr[n]}, ${arr[@]}, ${arr[*]}.
+     * Only routes through this branch when the prefix before `[` is a
+     * valid shell identifier; otherwise the `[` belongs to something
+     * else (e.g. the character-class pattern inside a substitution
+     * `${var/[abc]/X}`) and must not be consumed here. The prior
+     * unconditional `strchr(expansion, '[')` matched any `[` and
+     * silently emptied substitutions whose patterns happened to
+     * contain a bracket. Issue #96. */
     const char *bracket = strchr(expansion, '[');
+    if (bracket && bracket > expansion) {
+        size_t name_len = bracket - expansion;
+        bool valid_name = true;
+        if (!isalpha((unsigned char)expansion[0]) && expansion[0] != '_') {
+            valid_name = false;
+        } else {
+            for (size_t i = 1; i < name_len; i++) {
+                if (!isalnum((unsigned char)expansion[i]) &&
+                    expansion[i] != '_') {
+                    valid_name = false;
+                    break;
+                }
+            }
+        }
+        if (!valid_name) {
+            bracket = NULL;
+        }
+    } else if (bracket && bracket == expansion) {
+        /* `[` at the very start means there is no name -- not an
+         * array access. */
+        bracket = NULL;
+    }
     if (bracket) {
         size_t name_len = bracket - expansion;
         char *arr_name = malloc(name_len + 1);
@@ -9279,10 +11849,254 @@ static char *parse_parameter_expansion(executor_t *executor,
                 if (array) {
                     char *result = NULL;
 
-                    if (strcmp(subscript, "@") == 0 ||
-                        strcmp(subscript, "*") == 0) {
+                    /* Detect a bash slicing suffix `:N` / `:N:M` after
+                     * the closing `]`. ${arr[@]:N}, ${arr[@]:N:M},
+                     * ${arr[*]:N:M} are element-wise slices on the
+                     * array, not byte-wise on the joined string -- the
+                     * generic substring case (parse_parameter_expansion
+                     * case 14) would silently drop these because it
+                     * couldn't resolve `arr[@]` as a scalar var, and
+                     * even with a resolution it would byte-slice the
+                     * joined string instead of picking elements. Issue
+                     * #97. */
+                    int slice_offset = 0;
+                    int slice_length = -1; /* -1 = "to end" */
+                    bool has_slice = (close[1] == ':' &&
+                                      (strcmp(subscript, "@") == 0 ||
+                                       strcmp(subscript, "*") == 0) &&
+                                      !array->is_associative);
+                    if (has_slice) {
+                        const char *spec = close + 2;
+                        char *endp = NULL;
+                        slice_offset = (int)strtol(spec, &endp, 10);
+                        if (endp && *endp == ':') {
+                            slice_length = (int)strtol(endp + 1, NULL, 10);
+                        }
+                    }
+
+                    if (has_slice) {
+                        size_t total = symtable_array_length(array);
+                        /* Negative offset counts from end (bash). */
+                        if (slice_offset < 0) {
+                            slice_offset = (int)total + slice_offset;
+                            if (slice_offset < 0) {
+                                slice_offset = 0;
+                            }
+                        }
+                        int end_idx;
+                        if (slice_length < 0) {
+                            end_idx = (int)total - 1;
+                        } else {
+                            end_idx = slice_offset + slice_length - 1;
+                        }
+                        if (end_idx >= (int)total) {
+                            end_idx = (int)total - 1;
+                        }
+                        if (slice_offset >= (int)total ||
+                            end_idx < slice_offset) {
+                            result = strdup("");
+                        } else {
+                            size_t cap = 64;
+                            size_t pos = 0;
+                            result = malloc(cap);
+                            if (result) {
+                                result[0] = '\0';
+                                for (int k = slice_offset; k <= end_idx; k++) {
+                                    const char *elem =
+                                        symtable_array_get_index(array, k);
+                                    if (!elem) {
+                                        continue;
+                                    }
+                                    size_t elen = strlen(elem);
+                                    size_t need =
+                                        pos + elen + (pos > 0 ? 1 : 0) + 1;
+                                    while (need > cap) {
+                                        cap *= 2;
+                                        char *nr = realloc(result, cap);
+                                        if (!nr) {
+                                            free(result);
+                                            result = NULL;
+                                            break;
+                                        }
+                                        result = nr;
+                                    }
+                                    if (!result) {
+                                        break;
+                                    }
+                                    if (pos > 0) {
+                                        result[pos++] = ' ';
+                                    }
+                                    memcpy(result + pos, elem, elen);
+                                    pos += elen;
+                                    result[pos] = '\0';
+                                }
+                            }
+                        }
+                    } else if (strcmp(subscript, "@") == 0 ||
+                               strcmp(subscript, "*") == 0) {
                         // ${arr[@]} or ${arr[*]} - all elements
                         result = symtable_array_expand(array, " ");
+                    } else if ((strncmp(subscript, "(r)", 3) == 0 ||
+                                strncmp(subscript, "(R)", 3) == 0) &&
+                               !array->is_associative) {
+                        /* zsh subscript flags ${arr[(r)pat]} / ${arr[(R)pat]}:
+                         * return the VALUE of the first / last element
+                         * matching pat, or empty string on no match.
+                         * pat is fnmatch-style. Issue #104. */
+                        bool last_match = (subscript[1] == 'R');
+                        const char *pat = subscript + 3;
+                        size_t total = symtable_array_length(array);
+                        const char *found = NULL;
+                        bool is_glob = (strchr(pat, '*') || strchr(pat, '?') ||
+                                        strchr(pat, '['));
+                        for (size_t k = 0; k < total; k++) {
+                            const char *elem =
+                                symtable_array_get_index(array, (int)k);
+                            if (!elem) {
+                                continue;
+                            }
+                            bool match;
+                            if (is_glob) {
+                                match = (fnmatch(pat, elem, 0) == 0);
+                            } else {
+                                match = (strcmp(elem, pat) == 0);
+                            }
+                            if (match) {
+                                found = elem;
+                                if (!last_match) {
+                                    break;
+                                }
+                            }
+                        }
+                        result = strdup(found ? found : "");
+                    } else if ((strncmp(subscript, "(i)", 3) == 0 ||
+                                strncmp(subscript, "(I)", 3) == 0) &&
+                               !array->is_associative) {
+                        /* zsh subscript flags ${arr[(i)pat]} / ${arr[(I)pat]}:
+                         * return the 1-based index of the first / last
+                         * element matching pat, or N+1 / 0 if no match.
+                         * pat is fnmatch-style. Issue #99. */
+                        bool last_index = (subscript[1] == 'I');
+                        const char *pat = subscript + 3;
+                        size_t total = symtable_array_length(array);
+                        int found = last_index ? 0 : (int)(total + 1);
+                        bool any_match = false;
+                        bool is_glob = (strchr(pat, '*') || strchr(pat, '?') ||
+                                        strchr(pat, '['));
+                        for (size_t k = 0; k < total; k++) {
+                            const char *elem =
+                                symtable_array_get_index(array, (int)k);
+                            if (!elem) {
+                                continue;
+                            }
+                            bool match;
+                            if (is_glob) {
+                                match = (fnmatch(pat, elem, 0) == 0);
+                            } else {
+                                match = (strcmp(elem, pat) == 0);
+                            }
+                            if (match) {
+                                int idx_1based = (int)k + 1;
+                                if (last_index) {
+                                    found = idx_1based;
+                                } else if (!any_match) {
+                                    found = idx_1based;
+                                }
+                                any_match = true;
+                                if (!last_index) {
+                                    break;
+                                }
+                            }
+                        }
+                        char buf[32];
+                        snprintf(buf, sizeof(buf), "%d", found);
+                        result = strdup(buf);
+                    } else if (strchr(subscript, ',') &&
+                               !array->is_associative) {
+                        /* zsh-style range subscript ${arr[N,M]} / $arr[N,M]
+                         * on an indexed array: join elements N..M with a
+                         * single space, matching zsh's default output of
+                         * `$arr[N,M]`. The arithmetic expander interprets
+                         * `N,M` as the C comma operator and returns M --
+                         * which without this branch silently selected the
+                         * M-th element instead of slicing. Supports
+                         * negative indices (zsh: -1 = last); honors
+                         * FEATURE_ARRAY_ZERO_INDEXED for the 1-based vs
+                         * 0-based decision (same shape as the string-
+                         * slicing fallback further down). Comma in
+                         * associative-array subscripts has no range
+                         * meaning -- those keep the C-comma key path. */
+                        char *comma = strchr(subscript, ',');
+                        *comma = '\0';
+                        int start_idx = atoi(subscript);
+                        int end_idx = atoi(comma + 1);
+                        *comma = ',';
+                        size_t total = symtable_array_length(array);
+                        bool one_based =
+                            !shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED);
+                        if (start_idx < 0) {
+                            start_idx =
+                                (int)total + start_idx + (one_based ? 1 : 0);
+                        }
+                        if (end_idx < 0) {
+                            end_idx =
+                                (int)total + end_idx + (one_based ? 1 : 0);
+                        }
+                        if (one_based) {
+                            if (start_idx > 0) {
+                                start_idx--;
+                            }
+                            if (end_idx > 0) {
+                                end_idx--;
+                            }
+                        }
+                        if (start_idx < 0) {
+                            start_idx = 0;
+                        }
+                        if (end_idx >= (int)total) {
+                            end_idx = (int)total - 1;
+                        }
+                        if (end_idx < start_idx || (int)total == 0) {
+                            result = strdup("");
+                        } else {
+                            /* Concatenate elements [start_idx..end_idx]
+                             * with single-space separator. */
+                            size_t cap = 64;
+                            size_t pos = 0;
+                            result = malloc(cap);
+                            if (result) {
+                                result[0] = '\0';
+                                for (int k = start_idx; k <= end_idx; k++) {
+                                    const char *elem =
+                                        symtable_array_get_index(array, k);
+                                    if (!elem) {
+                                        continue;
+                                    }
+                                    size_t elen = strlen(elem);
+                                    size_t need =
+                                        pos + elen + (pos > 0 ? 1 : 0) + 1;
+                                    while (need > cap) {
+                                        cap *= 2;
+                                        char *nr = realloc(result, cap);
+                                        if (!nr) {
+                                            free(result);
+                                            result = NULL;
+                                            break;
+                                        }
+                                        result = nr;
+                                    }
+                                    if (!result) {
+                                        break;
+                                    }
+                                    if (pos > 0) {
+                                        result[pos++] = ' ';
+                                    }
+                                    memcpy(result + pos, elem, elen);
+                                    pos += elen;
+                                    result[pos] = '\0';
+                                }
+                            }
+                        }
                     } else if (array->is_associative) {
                         // Associative array - use subscript as string key
                         char *expanded_subscript =
@@ -9297,17 +12111,25 @@ static char *parse_parameter_expansion(executor_t *executor,
                         // Indexed array - ${arr[n]} - specific element
                         arithm_clear_error();
                         char *idx_result = arithm_expand(subscript);
-                        if (idx_result && !arithm_error_flag) {
+                        if (idx_result && !arithm_error_is_flagged()) {
                             int idx = (int)strtoll(idx_result, NULL, 10);
                             free(idx_result);
 
-                            // Adjust for 1-indexed arrays (zsh mode)
+                            /* zsh-mode (1-based): 0 is invalid (returns
+                             * empty); positive indices need
+                             * decrement-to-0-based; negative indices pass
+                             * through unchanged so the symtable helper's
+                             * built-in "from-end" handling fires.
+                             * lush/bash-mode (0-based): pass through
+                             * directly. (Issue #68 — array half.) */
                             if (!shell_mode_allows(
                                     FEATURE_ARRAY_ZERO_INDEXED)) {
-                                if (idx <= 0) {
+                                if (idx == 0) {
                                     result = strdup("");
                                 } else {
-                                    idx--; // Convert 1-indexed to 0-indexed
+                                    if (idx > 0) {
+                                        idx--; /* 1-based -> 0-based */
+                                    }
                                     const char *elem =
                                         symtable_array_get_index(array, idx);
                                     result = strdup(elem ? elem : "");
@@ -9339,6 +12161,83 @@ static char *parse_parameter_expansion(executor_t *executor,
                     // empty.
                 }
 
+                // String-slicing fallback: ${var[N]} / ${var[N,M]} on a
+                // scalar string slices grapheme clusters (TR#29 boundaries).
+                // Honors FEATURE_ARRAY_ZERO_INDEXED: 1-based for zsh-mode,
+                // 0-based for bash/lush-mode. Subscript "@" / "*" are
+                // array-only and have already been handled above.
+                if (strcmp(subscript, "@") != 0 &&
+                    strcmp(subscript, "*") != 0) {
+                    char *str_value =
+                        symtable_get_var(executor->symtable, arr_name);
+                    if (str_value) {
+                        int start_idx = 0, end_idx = -1;
+                        char *comma = strchr(subscript, ',');
+                        if (comma) {
+                            *comma = '\0';
+                            start_idx = atoi(subscript);
+                            end_idx = atoi(comma + 1);
+                            *comma = ',';
+                        } else {
+                            start_idx = atoi(subscript);
+                            end_idx = start_idx; // single grapheme
+                        }
+                        size_t value_len = strlen(str_value);
+
+                        /* Negative-index handling: ${str[-N]} counts from
+                         * the end. zsh-mode (1-based): -1 = last grapheme
+                         * (position total). lush/bash-mode (0-based):
+                         * -1 = last (position total-1). Computes the
+                         * grapheme count via lle_utf8_count_graphemes
+                         * (TR#29-correct, same primitive
+                         * slice_string_graphemes uses internally).
+                         * (Issue #68.) */
+                        if (start_idx < 0 || end_idx < 0) {
+                            int total = (int)lle_utf8_count_graphemes(
+                                str_value, value_len);
+                            bool one_based =
+                                !shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED);
+                            if (start_idx < 0) {
+                                start_idx =
+                                    total + start_idx + (one_based ? 1 : 0);
+                            }
+                            if (end_idx < 0) {
+                                end_idx = total + end_idx + (one_based ? 1 : 0);
+                            }
+                        }
+
+                        // Convert from 1-based (zsh) to 0-based if needed
+                        if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
+                            if (start_idx <= 0 || end_idx <= 0) {
+                                free(str_value);
+                                free(subscript);
+                                free(arr_name);
+                                return strdup("");
+                            }
+                            start_idx--;
+                            end_idx--;
+                        }
+
+                        /* Inverted range yields empty (catches both user-
+                         * written ${str[3,1]} and post-conversion
+                         * overshoots in 0-based mode). */
+                        if (end_idx < start_idx) {
+                            free(str_value);
+                            free(subscript);
+                            free(arr_name);
+                            return strdup("");
+                        }
+
+                        int count = end_idx - start_idx + 1;
+                        char *result = slice_string_graphemes(
+                            str_value, value_len, start_idx, count);
+                        free(str_value);
+                        free(subscript);
+                        free(arr_name);
+                        return result ? result : strdup("");
+                    }
+                }
+
                 free(subscript);
             }
         }
@@ -9368,24 +12267,47 @@ static char *parse_parameter_expansion(executor_t *executor,
                                "//", // 15: replace all occurrences
                                "/",  // 16: replace first occurrence
                                "@",  // 17: transformations
+                               ":?", // 18: error if unset or null (POSIX)
+                               "?",  // 19: error if unset (POSIX)
                                NULL};
     int op_type = -1;
+
+    /* Special-parameter names at position 0 (@, *, #, ?, !, $, -, 0..9)
+     * are variable names, not operators. Without this guard ${@^}
+     * gets parsed as the `@` transformation operator (op_type 17)
+     * applied to an empty var_name, instead of `@` as the variable
+     * with the `^` case-mod operator. Same for ${*^}, ${#:-default}
+     * variants on the special params, etc. Issue #96. */
+    bool first_is_special_param = false;
+    if (expansion[0]) {
+        char c0 = expansion[0];
+        if (c0 == '@' || c0 == '*' || c0 == '#' || c0 == '?' || c0 == '!' ||
+            c0 == '$' || c0 == '-' || (c0 >= '0' && c0 <= '9')) {
+            first_is_special_param = true;
+        }
+    }
 
     // Find the first valid operator - prioritize longer operators first
     for (int i = 0; operators[i]; i++) {
         const char *found = strstr(expansion, operators[i]);
+        /* If the operator matches at position 0 and the first char is
+         * a special-param name, search again starting after it -- the
+         * apparent operator at position 0 is really the variable. */
+        if (found == expansion && first_is_special_param) {
+            found = strstr(expansion + 1, operators[i]);
+        }
         if (found) {
             // Skip single-character operators that are part of longer ones
             if (strlen(operators[i]) == 1) {
                 // Check if this single char is part of a longer operator
                 bool part_of_longer = false;
 
-                // Check for :- and :+ before processing single :
+                // Check for :- :+ := :? before processing single :
                 if (strcmp(operators[i], ":") == 0) {
                     if ((found > expansion &&
                          (found[-1] == '-' || found[-1] == '+')) ||
                         (found[1] == '-' || found[1] == '+' ||
-                         found[1] == '=')) {
+                         found[1] == '=' || found[1] == '?')) {
                         part_of_longer = true;
                     }
                 }
@@ -9399,6 +12321,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
                 // Check for // before processing single /
                 if (strcmp(operators[i], "/") == 0 && found[1] == '/') {
+                    part_of_longer = true;
+                }
+                // Check for :? before processing single ?
+                if (strcmp(operators[i], "?") == 0 && found > expansion &&
+                    found[-1] == ':') {
                     part_of_longer = true;
                 }
 
@@ -9451,6 +12378,131 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         char *result = NULL;
 
+        /* Per-element dispatch for vector-yielding var names with case-
+         * modification operators. ${@^}, ${@^^[pat]}, ${@,}, ${@,,[pat]}
+         * and the analogous ${arr[@]^^[pat]} family apply the operator
+         * to each positional parameter or array element independently,
+         * then join with space. Bash semantics; scope intentionally
+         * narrowed to case-mod ops for issue #96 (other operators on
+         * vector names -- substitution, trim, substring -- are
+         * separate work). */
+        bool case_mod_op =
+            (op_type == 4 || op_type == 5 || op_type == 8 || op_type == 9);
+        bool is_at_or_star =
+            (strcmp(var_name, "@") == 0 || strcmp(var_name, "*") == 0);
+        size_t vn_len = strlen(var_name);
+        bool is_arr_at_or_star =
+            (vn_len >= 4 &&
+             ((var_name[vn_len - 3] == '[' &&
+               (var_name[vn_len - 2] == '@' || var_name[vn_len - 2] == '*') &&
+               var_name[vn_len - 1] == ']')));
+        if (case_mod_op && (is_at_or_star || is_arr_at_or_star)) {
+            char **elems = NULL;
+            int n_elems = 0;
+            int cap = 0;
+
+            if (is_at_or_star) {
+                int total;
+                if (symtable_in_function_scope(executor->symtable)) {
+                    char *argc_str = symtable_get_var(executor->symtable, "#");
+                    total = argc_str ? atoi(argc_str) : 0;
+                    free(argc_str);
+                    for (int i = 1; i <= total; i++) {
+                        char name[16];
+                        snprintf(name, sizeof(name), "%d", i);
+                        char *v = symtable_get_var(executor->symtable, name);
+                        if (!v) {
+                            v = strdup("");
+                        }
+                        add_to_argv_list(&elems, &n_elems, &cap, v);
+                    }
+                } else {
+                    for (int i = 1; i < shell_argc; i++) {
+                        add_to_argv_list(
+                            &elems, &n_elems, &cap,
+                            strdup(shell_argv[i] ? shell_argv[i] : ""));
+                    }
+                }
+            } else {
+                /* arr[@] / arr[*] */
+                char arr_name[256];
+                size_t name_len = vn_len - 3;
+                if (name_len < sizeof(arr_name)) {
+                    memcpy(arr_name, var_name, name_len);
+                    arr_name[name_len] = '\0';
+                    array_value_t *array = symtable_get_array(arr_name);
+                    if (array) {
+                        size_t total = symtable_array_length(array);
+                        for (size_t i = 0; i < total; i++) {
+                            const char *e =
+                                symtable_array_get_index(array, (int)i);
+                            add_to_argv_list(&elems, &n_elems, &cap,
+                                             strdup(e ? e : ""));
+                        }
+                    }
+                }
+            }
+
+            /* Apply the case-mod op to each element. */
+            size_t out_cap = 64;
+            size_t out_pos = 0;
+            char *joined = malloc(out_cap);
+            if (joined) {
+                joined[0] = '\0';
+                for (int i = 0; i < n_elems; i++) {
+                    char *converted = NULL;
+                    bool to_upper = (op_type == 4 || op_type == 8);
+                    bool first_only = (op_type == 8 || op_type == 9);
+                    if (expanded_default && expanded_default[0]) {
+                        converted = convert_case_pattern(
+                            elems[i], expanded_default, to_upper, first_only);
+                    } else if (first_only) {
+                        converted = to_upper
+                                        ? convert_case_first_upper(elems[i])
+                                        : convert_case_first_lower(elems[i]);
+                    } else {
+                        converted = to_upper ? convert_case_all_upper(elems[i])
+                                             : convert_case_all_lower(elems[i]);
+                    }
+                    if (!converted) {
+                        converted = strdup("");
+                    }
+                    size_t clen = strlen(converted);
+                    size_t need = out_pos + (out_pos > 0 ? 1 : 0) + clen + 1;
+                    while (need > out_cap) {
+                        out_cap *= 2;
+                        char *nb = realloc(joined, out_cap);
+                        if (!nb) {
+                            free(joined);
+                            joined = NULL;
+                            break;
+                        }
+                        joined = nb;
+                    }
+                    if (!joined) {
+                        free(converted);
+                        break;
+                    }
+                    if (out_pos > 0) {
+                        joined[out_pos++] = ' ';
+                    }
+                    memcpy(joined + out_pos, converted, clen);
+                    out_pos += clen;
+                    joined[out_pos] = '\0';
+                    free(converted);
+                }
+            }
+            result = joined ? joined : strdup("");
+            for (int i = 0; i < n_elems; i++) {
+                free(elems[i]);
+            }
+            free(elems);
+            free(var_name);
+            free(var_value);
+            free(expanded_default);
+            return result;
+        }
+
         switch (op_type) {
         case 0: // ${var:-default} - use default if var is unset or empty
             if (is_empty_or_null(var_value)) {
@@ -9498,17 +12550,31 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 4: // ${var^^} - convert all characters to uppercase
+        case 4: // ${var^^[pat]} - convert all characters to uppercase
             if (var_value) {
-                result = convert_case_all_upper(var_value);
+                /* Pattern restriction (issue #96): ${var^^[abc]} converts
+                 * only characters matching the glob pattern. Empty
+                 * pattern falls through to the UTF-8-aware path so
+                 * non-ASCII content is upper-cased correctly. */
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  true, false);
+                } else {
+                    result = convert_case_all_upper(var_value);
+                }
             } else {
                 result = strdup("");
             }
             break;
 
-        case 5: // ${var,,} - convert all characters to lowercase
+        case 5: // ${var,,[pat]} - convert all characters to lowercase
             if (var_value) {
-                result = convert_case_all_lower(var_value);
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  false, false);
+                } else {
+                    result = convert_case_all_lower(var_value);
+                }
             } else {
                 result = strdup("");
             }
@@ -9543,17 +12609,27 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 8: // ${var^} - convert first character to uppercase
+        case 8: // ${var^[pat]} - convert first matching character to uppercase
             if (var_value) {
-                result = convert_case_first_upper(var_value);
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  true, true);
+                } else {
+                    result = convert_case_first_upper(var_value);
+                }
             } else {
                 result = strdup("");
             }
             break;
 
-        case 9: // ${var,} - convert first character to lowercase
+        case 9: // ${var,[pat]} - convert first matching character to lowercase
             if (var_value) {
-                result = convert_case_first_lower(var_value);
+                if (expanded_default && expanded_default[0]) {
+                    result = convert_case_pattern(var_value, expanded_default,
+                                                  false, true);
+                } else {
+                    result = convert_case_first_lower(var_value);
+                }
             } else {
                 result = strdup("");
             }
@@ -9620,54 +12696,79 @@ static char *parse_parameter_expansion(executor_t *executor,
             break;
 
         case 15: // ${var//pattern/replacement} - replace all occurrences
-            if (var_value) {
-                // expanded_default contains "pattern/replacement"
-                // Find the separator between pattern and replacement
-                char *sep = strchr(expanded_default, '/');
-                if (sep) {
-                    size_t pattern_len = sep - expanded_default;
-                    char *pattern = malloc(pattern_len + 1);
-                    if (pattern) {
-                        strncpy(pattern, expanded_default, pattern_len);
-                        pattern[pattern_len] = '\0';
-                        const char *replacement = sep + 1;
-                        result = pattern_substitute(var_value, pattern,
-                                                    replacement, true);
-                        free(pattern);
-                    } else {
-                        result = strdup(var_value);
-                    }
-                } else {
-                    // No replacement, just remove pattern
-                    result = pattern_substitute(var_value, expanded_default, "",
-                                                true);
-                }
-            } else {
-                result = strdup("");
-            }
-            break;
-
         case 16: // ${var/pattern/replacement} - replace first occurrence
+            /* Pattern/replacement split honoring backslash-escaped
+             * slashes. ${path//\//.} has pattern `\/` (literal slash)
+             * and replacement `.`; the prior strchr-based split took
+             * the FIRST `/` as the separator even when it was preceded
+             * by `\`, splitting pattern as `\` (nothing) and replacement
+             * as `/.` -- silently producing the original string back.
+             * Walk the spec and break at the first unescaped `/`.
+             * Backslash-escapes other than `\/` pass through to
+             * fnmatch which handles them per glob spec. Issue #96. */
             if (var_value) {
-                // expanded_default contains "pattern/replacement"
-                char *sep = strchr(expanded_default, '/');
+                char *sep = NULL;
+                for (char *p = expanded_default; *p; p++) {
+                    if (*p == '\\' && p[1] == '/') {
+                        p++;
+                        continue;
+                    }
+                    if (*p == '/') {
+                        sep = p;
+                        break;
+                    }
+                }
+                bool global = (op_type == 15);
                 if (sep) {
                     size_t pattern_len = sep - expanded_default;
                     char *pattern = malloc(pattern_len + 1);
                     if (pattern) {
-                        strncpy(pattern, expanded_default, pattern_len);
-                        pattern[pattern_len] = '\0';
+                        /* Strip `\/` -> `/` in the extracted pattern
+                         * so downstream matchers see the canonical
+                         * literal slash. Other backslash sequences
+                         * pass through. */
+                        size_t pj = 0;
+                        for (size_t pi = 0; pi < pattern_len; pi++) {
+                            if (expanded_default[pi] == '\\' &&
+                                pi + 1 < pattern_len &&
+                                expanded_default[pi + 1] == '/') {
+                                pattern[pj++] = '/';
+                                pi++;
+                            } else {
+                                pattern[pj++] = expanded_default[pi];
+                            }
+                        }
+                        pattern[pj] = '\0';
                         const char *replacement = sep + 1;
                         result = pattern_substitute(var_value, pattern,
-                                                    replacement, false);
+                                                    replacement, global);
                         free(pattern);
                     } else {
                         result = strdup(var_value);
                     }
                 } else {
-                    // No replacement, just remove pattern
-                    result = pattern_substitute(var_value, expanded_default, "",
-                                                false);
+                    /* No replacement, just remove pattern. Same `\/`
+                     * canonicalization as the pattern half. */
+                    size_t plen = strlen(expanded_default);
+                    char *pattern = malloc(plen + 1);
+                    if (pattern) {
+                        size_t pj = 0;
+                        for (size_t pi = 0; pi < plen; pi++) {
+                            if (expanded_default[pi] == '\\' && pi + 1 < plen &&
+                                expanded_default[pi + 1] == '/') {
+                                pattern[pj++] = '/';
+                                pi++;
+                            } else {
+                                pattern[pj++] = expanded_default[pi];
+                            }
+                        }
+                        pattern[pj] = '\0';
+                        result =
+                            pattern_substitute(var_value, pattern, "", global);
+                        free(pattern);
+                    } else {
+                        result = strdup(var_value);
+                    }
                 }
             } else {
                 result = strdup("");
@@ -9675,8 +12776,24 @@ static char *parse_parameter_expansion(executor_t *executor,
             break;
 
         case 17: // ${var@op} - transformations
-            if (var_value && expanded_default[0]) {
+            if (expanded_default[0]) {
                 char op = expanded_default[0];
+                /* The @a (attribute query) variant only inspects the
+                 * variable's metadata and doesn't need var_value to
+                 * be set. Arrays specifically have NULL var_value
+                 * (scalar lookup misses them), so the prior
+                 * `if (var_value && ...)` guard hid the attribute
+                 * for `declare -A arr; echo "${arr@a}"`. Issue #102.
+                 * Other @op flavors do still need a value; for those
+                 * fall through to the empty-result path. */
+                if (op == 'a') {
+                    result = get_variable_attributes(var_name);
+                    break;
+                }
+                if (!var_value) {
+                    result = strdup("");
+                    break;
+                }
                 switch (op) {
                 case 'Q': // Quote value for reuse as input
                     result = transform_quote(var_value);
@@ -9689,9 +12806,6 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
                 case 'A': // Assignment statement form
                     result = transform_assignment(var_name, var_value);
-                    break;
-                case 'a': // Attribute flags
-                    result = get_variable_attributes(var_name);
                     break;
                 case 'U': // Uppercase all
                     result = convert_case_all_upper(var_value);
@@ -9708,6 +12822,25 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
             } else {
                 result = strdup("");
+            }
+            break;
+
+        case 18: // ${var:?word} - error if var unset or null (POSIX)
+            if (is_empty_or_null(var_value)) {
+                result = handle_required_param_error(
+                    executor, var_name, expanded_default,
+                    "parameter null or not set");
+            } else {
+                result = strdup(var_value);
+            }
+            break;
+
+        case 19: // ${var?word} - error if var unset (null permitted) (POSIX)
+            if (!var_value) {
+                result = handle_required_param_error(
+                    executor, var_name, expanded_default, "parameter not set");
+            } else {
+                result = strdup(var_value);
             }
             break;
         }
@@ -9875,13 +13008,12 @@ static char *parse_parameter_expansion(executor_t *executor,
     // Fall back to symbol table lookup for regular variables
     // Note: symtable_get_var returns a strdup'd value, caller must free
 
-    // In zsh mode, ${arr} without subscript expands to all elements
-    // Check if this is an array first
+    // ${arr} without subscript: mode-aware expansion via the shared
+    // helper. bash gives first element; zsh and lush give all elements
+    // joined. Matches the bare-$arr form behavior in expand_variable.
     array_value_t *array = symtable_get_array(expansion);
     if (array) {
-        // Array exists - expand all elements
-        char *result = symtable_array_expand(array, " ");
-        return result ? result : strdup("");
+        return expand_array_unsubscripted(executor, array);
     }
 
     char *value = symtable_get_var(executor->symtable, expansion);
@@ -9955,7 +13087,15 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
     // Handle ${var} format with advanced parameter expansion
     if (var_name[0] == '{') {
 
-        char *close = strchr(var_name, '}');
+        /* Find the matching closing brace, not the first one. Nested
+         * parameter expansion ${(flag)${INNER}} has an inner `}` that
+         * the outer brace match must skip past. strchr would stop at
+         * the inner brace and leave the outer expansion truncated.
+         * find_closing_brace counts depth and returns the matched
+         * close. Issue #98. */
+        size_t close_offset = find_closing_brace((char *)var_name);
+        char *close = close_offset > 0 ? (char *)(var_name + close_offset)
+                                       : strchr(var_name, '}');
         if (close) {
             size_t len = close - var_name - 1;
             char *expansion = malloc(len + 1);
@@ -9986,6 +13126,30 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
             }
         }
 
+        /* Zsh bare-subscript form: $var[N] / $var[N,M]. The caller in
+         * expand_variables_in_string already consumed the bracket span
+         * into var_text when FEATURE_ZSH_BARE_SUBSCRIPT is enabled, so
+         * if we see '[' after the name we route through
+         * parse_parameter_expansion("var[N]") — same backend as the
+         * brace form ${var[N]}. Gating here is a defensive double-check;
+         * the primary gate is at the caller. */
+        if (name_len > 0 && var_name[name_len] == '[' &&
+            shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+            const char *bracket_end = strchr(var_name + name_len + 1, ']');
+            if (bracket_end) {
+                size_t total_len = (bracket_end + 1) - var_name;
+                char *expansion = malloc(total_len + 1);
+                if (expansion) {
+                    strncpy(expansion, var_name, total_len);
+                    expansion[total_len] = '\0';
+                    char *result =
+                        parse_parameter_expansion(executor, expansion);
+                    free(expansion);
+                    return result;
+                }
+            }
+        }
+
         if (name_len > 0) {
             char *name = malloc(name_len + 1);
             if (name) {
@@ -10002,6 +13166,22 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                         resolved_name = target;
                         resolved_to_free = (char *)target;
                     }
+                }
+
+                // Bare $arr on an array: mode-aware expansion via the
+                // shared helper. Matches the brace-form ${arr} behavior
+                // in parse_parameter_expansion. bash gives first element;
+                // zsh and lush give all elements joined. (Issue #65.)
+                array_value_t *array = symtable_get_array(resolved_name);
+                if (array) {
+                    char *result = expand_array_unsubscripted(executor, array);
+                    if (resolved_to_free) {
+                        free(resolved_to_free);
+                    }
+                    free(name);
+                    /* Caller (expand_variables_in_string) appends any
+                     * trailing literal text after the variable name. */
+                    return result ? result : strdup("");
                 }
 
                 // Look up in modern symbol table using resolved name
@@ -10405,12 +13585,45 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
         return result;
     }
 
-    // If arithm_expand returns NULL, there was an error (like division by zero)
-    // Report structured error for arithmetic failure
-    if (arithm_error_flag && arithm_error_message) {
-        executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX,
-                              SOURCE_LOC_UNKNOWN, "arithmetic: %s",
-                              arithm_error_message);
+    /* Drain the typed error state from arithmetic.c and emit a fully
+     * structured shell error: specific code (one per failure mode rather
+     * than the old blanket SHELL_ERR_ARITHMETIC_SYNTAX), site-specific
+     * `while:` context, and site-specific `help:` suggestion. The
+     * arithmetic module owns the error semantics; the executor owns
+     * displaying them.
+     */
+    if (arithm_error_is_flagged()) {
+        const char *msg = arithm_error_message();
+        const char *while_ctx = arithm_error_while();
+        const char *help = arithm_error_help();
+        shell_error_t *err = shell_error_create(
+            arithm_error_code(), SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
+            "arithmetic: %s", msg ? msg : "evaluation error");
+        if (err) {
+            if (while_ctx) {
+                shell_error_push_context(err, "%s", while_ctx);
+            }
+            for (size_t i = 0;
+                 i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
+                 i++) {
+                if (executor->context_stack[i]) {
+                    shell_error_push_context(err, "%s",
+                                             executor->context_stack[i]);
+                }
+            }
+            if (help) {
+                shell_error_set_suggestion(err, help);
+            }
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+            executor->has_error = true;
+            executor->error_message = NULL;
+        } else {
+            /* Fallback if shell_error_create failed (e.g. OOM) */
+            executor_error_report(executor, arithm_error_code(),
+                                  SOURCE_LOC_UNKNOWN, "arithmetic: %s",
+                                  msg ? msg : "evaluation error");
+        }
     } else {
         executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX,
                               SOURCE_LOC_UNKNOWN,
@@ -10469,13 +13682,17 @@ static char *expand_command_substitution(executor_t *executor,
         }
     }
 
-    // Expand variables in the command before executing it
-    char *expanded_command = expand_variables_in_string(executor, command);
-    free(command);
-    if (!expanded_command) {
-        return strdup("");
-    }
-    command = expanded_command;
+    /* Pre-fork variable expansion of the command text was removed in
+     * the #97 fix: it collapsed array values ("${!arr[@]}", "${arr[@]}")
+     * into space-joined scalars before the child parser ever saw them,
+     * which destroyed the per-element word boundaries the child would
+     * otherwise have honored via the vector-expansion path in
+     * build_argv_from_ast. The child inherits parent state through
+     * fork() (full memory copy, including non-exported locals), so it
+     * can parse and expand the raw command text natively -- which is
+     * also what bash/dash/zsh do for $(...) -- and produce correctly
+     * separated arguments. Pre-expansion was an architectural layering
+     * violation that masked array semantics. */
 
     // Create a pipe to capture command output
     int pipefd[2];
@@ -10503,7 +13720,9 @@ static char *expand_command_substitution(executor_t *executor,
         const char *src_name = executor->current_script_file
                                    ? executor->current_script_file
                                    : "<command substitution>";
-        parser_t *parser = parser_new_with_source(command, src_name);
+        /* Command substitution context: input is its own logical
+         * source slice, line 1 of that slice. */
+        parser_t *parser = parser_new_with_source(command, src_name, 1);
         int result = 127;
 
         if (parser) {
@@ -10974,7 +14193,8 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
  * @param str Double-quoted string content
  * @return Expanded string (caller must free)
  */
-static char *expand_quoted_string(executor_t *executor, const char *str) {
+static char *expand_quoted_string(executor_t *executor, const char *str,
+                                  bool in_double_quotes) {
     if (!executor || !str) {
         return strdup("");
     }
@@ -11002,6 +14222,42 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
 
             // Check for arithmetic expansion $((...))
             if (str[i + 1] == '(' && i + 2 < len && str[i + 2] == '(') {
+                /* $(( disambiguation: arithmetic vs command-sub of
+                 * anonymous function. Same shape as tokenizer +
+                 * expand_variables_in_string + expand_if_needed
+                 * (issue #99). */
+                bool qs_looks_arith = true;
+                {
+                    size_t s = i + 3;
+                    int d = 2;
+                    while (s < len && d > 0) {
+                        char sc = str[s];
+                        if (sc == '(') {
+                            d++;
+                        } else if (sc == ')') {
+                            d--;
+                            if (d == 0) {
+                                break;
+                            }
+                        } else if (sc == '{' || sc == '}' || sc == ';' ||
+                                   sc == '\n') {
+                            qs_looks_arith = false;
+                            break;
+                        }
+                        s++;
+                    }
+                }
+                if (!qs_looks_arith) {
+                    /* Fall through to the $(...) command-sub handler
+                     * later in this function -- which is exactly the
+                     * else-if test on str[i+1] == '(' that doesn't
+                     * require str[i+2] == '('. To avoid restructuring
+                     * the giant conditional chain, mark this branch
+                     * as "not arithmetic" by setting paren_depth so
+                     * the post-check fails through. Simplest path:
+                     * just skip and let the next branch handle it. */
+                    goto qs_try_cmd_sub;
+                }
                 // This is arithmetic expansion $((expr))
                 size_t arith_start = i;
                 size_t arith_end = i + 3;
@@ -11057,6 +14313,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
             }
             // Check for command substitution $(...)
             else if (str[i + 1] == '(') {
+            qs_try_cmd_sub:;
                 // Use the robust find_closing_brace function to handle nested
                 // quotes
                 size_t cmd_start = i;
@@ -11191,6 +14448,25 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
                             str[var_start + var_name_len] == '_')) {
                         var_name_len++;
                     }
+                    /* Zsh bare-subscript form: $var[N] / $var[N,M] inside
+                     * a double-quoted string. Extend var_name_len through
+                     * the bracket span so we pass "$var[N]" to
+                     * expand_variable, which routes it through
+                     * parse_parameter_expansion. Gated on
+                     * FEATURE_ZSH_BARE_SUBSCRIPT — bash mode keeps the
+                     * literal-[N]-after-$var semantic. Mirrors the
+                     * unquoted path in expand_variables_in_string. */
+                    if (var_name_len > 0 && var_start + var_name_len < len &&
+                        str[var_start + var_name_len] == '[' &&
+                        shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+                        size_t scan = var_start + var_name_len + 1;
+                        while (scan < len && str[scan] != ']') {
+                            scan++;
+                        }
+                        if (scan < len && str[scan] == ']') {
+                            var_name_len = (scan + 1) - var_start;
+                        }
+                    }
                 }
 
                 if (var_name_len > 0) {
@@ -11287,33 +14563,25 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
             // If we get here, no matching backtick found, treat as literal
             result[result_pos++] = str[i++];
         } else if (str[i] == '\\' && i + 1 < len) {
-            // Handle escape sequences
+            /* Two escape regimes share this loop:
+             *  in_double_quotes=true  -- POSIX double-quote: only \\, \",
+             *      \$, \` are meaningful; all other `\X` is kept literally
+             *      as `\X` so the consumer (e.g. echo with XPG escape
+             *      interp) can still process it.
+             *  in_double_quotes=false -- POSIX unquoted: any `\X` (other
+             *      than `\<newline>` already eaten by the tokenizer)
+             *      collapses to literal X, including suppressing the
+             *      special meaning of `$` and `` ` `` so that `\$VAR`
+             *      yields literal `$VAR` with no parameter expansion.
+             *      Single-pass interleaving with variable expansion
+             *      relies on emitting the literal byte and skipping past
+             *      it, so we never re-enter the var-scan on the escaped
+             *      character. */
             char next_char = str[i + 1];
-            char escape_char;
+            bool is_dq_meta = (next_char == '\\' || next_char == '"' ||
+                               next_char == '$' || next_char == '`');
 
-            switch (next_char) {
-            case '\\':
-                escape_char = '\\';
-                break;
-            case '"':
-                escape_char = '"';
-                break;
-            case '$':
-                escape_char = '$';
-                break;
-            case '`':
-                escape_char = '`';
-                break;
-            default:
-                // POSIX: only \, ", $, ` are valid escapes in double quotes
-                // All other backslash sequences are literal
-                escape_char = '\\';
-                break;
-            }
-
-            if (next_char == '\\' || next_char == '"' || next_char == '$' ||
-                next_char == '`') {
-                // Valid escape sequence, skip both backslash and next char
+            if (!in_double_quotes || is_dq_meta) {
                 if (result_pos >= buffer_size - 1) {
                     buffer_size *= 2;
                     result = realloc(result, buffer_size);
@@ -11321,11 +14589,10 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
                         return strdup("");
                     }
                 }
-                result[result_pos++] = escape_char;
-                i += 2; // Skip both backslash and next character
+                result[result_pos++] = next_char;
+                i += 2;
             } else {
-                // Invalid escape sequence, include backslash and next char
-                // literally
+                /* DQ + non-meta: keep the backslash and char literally. */
                 if (result_pos >= buffer_size - 2) {
                     buffer_size *= 2;
                     result = realloc(result, buffer_size);
@@ -11333,9 +14600,9 @@ static char *expand_quoted_string(executor_t *executor, const char *str) {
                         return strdup("");
                     }
                 }
-                result[result_pos++] = '\\';       // Add backslash
-                result[result_pos++] = str[i + 1]; // Add following character
-                i += 2; // Skip both backslash and next character
+                result[result_pos++] = '\\';
+                result[result_pos++] = next_char;
+                i += 2;
             }
         } else {
             // Regular character
@@ -11379,6 +14646,20 @@ static void initialize_job_control(executor_t *executor) {
 
     executor->jobs = NULL;
     executor->next_job_id = 1;
+
+#ifdef LUSH_FUZZ_SANDBOX
+    /* Fuzz harness must not perform tty job-control operations.
+     * executor_new() runs per fuzz iteration; tcgetpgrp / tcsetpgrp /
+     * kill(-pgid, SIGTTIN) inside this function send signals to the
+     * fuzzer's process group every iteration when stdin is a TTY,
+     * causing eventual SIGABRT after many iterations as accumulated
+     * signal state corrupts the process. The fuzz binary never needs
+     * to take terminal control — it does not run external commands
+     * (LUSH_FUZZ_SANDBOX makes lush_fork() return -1) and has no
+     * interactive prompt. (Issue #75.) */
+    executor->shell_pgid = getpgrp();
+    return;
+#endif
 
     // For interactive login shells, take control of the terminal
     if (isatty(STDIN_FILENO)) {
@@ -11619,7 +14900,10 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         // tracking
         pid_t pid = lush_fork();
         if (pid == -1) {
-            fprintf(stderr, "Failed to fork for background process\n");
+            int saved_errno = errno;
+            executor_error_report(executor, SHELL_ERR_FORK_FAILED, command->loc,
+                                  "failed to fork for background process: %s",
+                                  strerror(saved_errno));
             return 1;
         }
 
@@ -11645,7 +14929,10 @@ int executor_execute_background(executor_t *executor, node_t *command) {
 
     pid_t pid = lush_fork();
     if (pid == -1) {
-        fprintf(stderr, "Failed to fork for background job\n");
+        int saved_errno = errno;
+        executor_error_report(executor, SHELL_ERR_FORK_FAILED, command->loc,
+                              "failed to fork for background job: %s",
+                              strerror(saved_errno));
         return 1;
     }
 
@@ -11749,12 +15036,16 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
 
     job_t *job = executor_find_job(executor, job_id);
     if (!job) {
-        fprintf(stderr, "fg: %d: no such job\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(), "%d: no such job",
+                              job_id);
         return 1;
     }
 
     if (job->state == JOB_DONE) {
-        fprintf(stderr, "fg: %d: job has terminated\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(),
+                              "%d: job has terminated", job_id);
         return 1;
     }
 
@@ -11814,12 +15105,16 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
 
     job_t *job = executor_find_job(executor, job_id);
     if (!job) {
-        fprintf(stderr, "bg: %d: no such job\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(), "%d: no such job",
+                              job_id);
         return 1;
     }
 
     if (job->state != JOB_STOPPED) {
-        fprintf(stderr, "bg: %d: job already in background\n", job_id);
+        executor_error_report(executor, SHELL_ERR_JOB_NOT_FOUND,
+                              builtin_get_source_location(),
+                              "%d: job already in background", job_id);
         return 1;
     }
 
@@ -11947,7 +15242,7 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
         }
 
         // Execute the builtin command
-        int result = execute_builtin_command(executor, argv);
+        int result = execute_builtin_command(executor, argv, command->loc);
 
         // Flush stdio buffers before _exit() - critical for file redirections
         // Without this, output redirected to files would be lost because
@@ -12022,7 +15317,7 @@ static int execute_arithmetic_command(executor_t *executor,
     arithm_clear_error();
     char *result_str = arithm_expand_with_executor(executor, expr);
 
-    if (!result_str || arithm_error_flag) {
+    if (!result_str || arithm_error_is_flagged()) {
         // Arithmetic error - could be syntax error or division by zero
         // Create structured error with help suggestion
         shell_error_t *error = shell_error_create(
@@ -12115,6 +15410,14 @@ static bool extended_test_pattern_match(const char *str, const char *pattern) {
 static bool extended_test_regex_match(executor_t *executor, const char *str,
                                       const char *pattern) {
     if (!str || !pattern) {
+        return false;
+    }
+
+    if (!regex_pattern_is_safe(pattern)) {
+        executor_error_report(
+            executor, SHELL_ERR_INVALID_ARGUMENT, builtin_get_source_location(),
+            "regex pattern exceeds behavior.regex_pattern_max (%d)",
+            config.regex_pattern_max);
         return false;
     }
 
@@ -12408,6 +15711,47 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
             result = (*p == '\0');
         } else if (strcmp(op, "-n") == 0) {
             result = (*p != '\0');
+        } else if (strcmp(op, "-v") == 0) {
+            /* -v NAME -- true if scalar variable NAME is set.
+             * -v NAME[KEY] / NAME[N] -- true if the array element
+             * is set (associative key present, indexed slot has a
+             * value). Bash semantics: -v on an unset arr[k] returns
+             * false; on an unset scalar also false. Issue #97. */
+            char *arg = strdup(p);
+            if (arg) {
+                char *end = arg + strlen(arg) - 1;
+                while (end > arg && isspace(*end)) {
+                    *end-- = '\0';
+                }
+                char *bracket = strchr(arg, '[');
+                if (bracket) {
+                    *bracket = '\0';
+                    char *close = strchr(bracket + 1, ']');
+                    if (close) {
+                        *close = '\0';
+                        const char *key = bracket + 1;
+                        array_value_t *array = symtable_get_array(arg);
+                        if (array) {
+                            if (array->is_associative) {
+                                result = symtable_array_get_assoc(array, key) !=
+                                         NULL;
+                            } else {
+                                char *endp = NULL;
+                                long idx = strtol(key, &endp, 10);
+                                if (endp && *endp == '\0') {
+                                    result = symtable_array_get_index(
+                                                 array, (int)idx) != NULL;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    char *val = symtable_get_var(executor->symtable, arg);
+                    result = (val != NULL);
+                    free(val);
+                }
+                free(arg);
+            }
         } else {
             // File tests - get the path (rest of line, trimmed)
             char *path = strdup(p);
@@ -12717,7 +16061,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                                 arithm_clear_error();
                                 char *idx_result = arithm_expand(idx_str);
 
-                                if (idx_result && !arithm_error_flag) {
+                                if (idx_result && !arithm_error_is_flagged()) {
                                     long long idx_val =
                                         strtoll(idx_result, NULL, 10);
                                     if (idx_val >= 0) {
@@ -12910,7 +16254,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         arithm_clear_error();
         char *idx_result = arithm_expand(subscript);
 
-        if (!idx_result || arithm_error_flag) {
+        if (!idx_result || arithm_error_is_flagged()) {
             if (idx_result)
                 free(idx_result);
             if (expanded_value)
@@ -13264,8 +16608,9 @@ int executor_call_hook(executor_t *executor, const char *hook_name,
         argc = 1;
     }
 
-    // Call the function
-    int result = execute_function_call(executor, hook_name, argv, argc);
+    // Call the function (no AST node for hook invocations)
+    int result = execute_function_call(executor, hook_name, argv, argc,
+                                       SOURCE_LOC_UNKNOWN);
 
     // Handle return code translation (200-455 range is internal return signal)
     if (result >= 200 && result <= 455) {

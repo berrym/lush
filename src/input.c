@@ -956,6 +956,14 @@ char *ln_gets(void) {
  * @return Allocated complete command string, or NULL on EOF or error
  */
 char *get_input_complete(FILE *in) {
+    return get_input_complete_counted(in, NULL);
+}
+
+char *get_input_complete_counted(FILE *in, size_t *lines_consumed) {
+    if (lines_consumed) {
+        *lines_consumed = 0;
+    }
+
     // For non-interactive mode, accumulate lines for complete constructs
     if (!in)
         in = stdin;
@@ -963,12 +971,18 @@ char *get_input_complete(FILE *in) {
     char *accumulated = NULL;
     size_t accumulated_len = 0;
     input_state_t state = {0};
+    /* Count of source lines this batch consumed. Includes lines joined
+     * via backslash continuation since they still advance the file's
+     * cumulative line counter even though they don't appear as
+     * newlines in the returned string. */
+    size_t source_lines = 0;
 
     char *line = NULL;
     size_t len = 0;
     ssize_t read;
 
     while ((read = getline(&line, &len, in)) != -1) {
+        source_lines++;
         // Remove trailing newline for analysis
         if (read > 0 && line[read - 1] == '\n') {
             line[read - 1] = '\0';
@@ -1053,6 +1067,9 @@ char *get_input_complete(FILE *in) {
     }
 
     free(line);
+    if (lines_consumed) {
+        *lines_consumed = source_lines;
+    }
     return accumulated;
 }
 
@@ -1066,14 +1083,24 @@ char *get_input_complete(FILE *in) {
  * @param in File stream for non-interactive mode, or NULL for stdin
  * @return Allocated complete command string, or NULL on EOF or error
  */
-char *get_unified_input(FILE *in) {
+char *get_unified_input(FILE *in) { return get_unified_input_at(in, NULL); }
+
+char *get_unified_input_at(FILE *in, size_t *lines_consumed) {
     if (is_interactive_shell()) {
-        // Interactive mode - use readline-based input with multiline support
+        /* Each readline batch is one logical input; for source-location
+         * tracking purposes treat it as a single line of an implicit
+         * <stdin> source. The cumulative file-line counter in the main
+         * loop stays at 1 for interactive mode regardless of this
+         * value, so even multi-line constructs entered interactively
+         * always display as line-1 relative — matching bash. */
+        if (lines_consumed) {
+            *lines_consumed = 1;
+        }
         return ln_gets();
     } else {
         // Non-interactive mode - use file input with multiline support for here
-        // documents
-        return get_input_complete(in);
+        // documents. Counts actual source lines for cumulative tracking.
+        return get_input_complete_counted(in, lines_consumed);
     }
 }
 

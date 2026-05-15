@@ -1,0 +1,5 @@
+echo $'hello\nworld'
+echo $'\ttf '%s\n' $' $'\x41'
+printf 'd'
+echo $'\ttf '%s\n' $' $'\x41'
+printf '%¥s\n' $'%¥s\n' $'Ã©'

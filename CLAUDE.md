@@ -200,7 +200,10 @@ meson test -C build -v test_history_phase1
 ## Important Documentation
 
 - `docs/VISION.md` - Project philosophy (read first)
+- `docs/PHILOSOPHY.md` - Founding principles governing day-to-day design decisions (identity vs polyglot, surface separation, architectural correctness over expediency)
+- `docs/CONFIGURATION.md` - The four configuration surfaces (`mode`, `set`, `setopt`/`shopt`, `config`) -- authoritative reference replacing the prior SHELL_MODES / CONFIG_SYSTEM / SHELL_OPTIONS docs
 - `docs/development/ARCHITECTURE-SYNTAX-BRIDGING.md` - Syntax bridging design
+- `docs/development/COMPLETION_ARCHITECTURE.md` - Completion subsystem reference (analyzer, sources, splicer, menu, how to add a source). Authoritative; supersedes spec 12
 - `docs/development/SPEC-COMPATIBILITY.md` - Compatibility targets
 - `docs/lle_specification/LLE_DESIGN_DOCUMENT.md` - LLE architecture
 - `docs/development/SCREEN_BUFFER_SPECIFICATION.md` - Screen buffer details

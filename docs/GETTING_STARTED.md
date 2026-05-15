@@ -541,7 +541,7 @@ You now have a working Lush installation with:
 | [USER_GUIDE.md](USER_GUIDE.md) | Complete feature reference |
 | [LLE_GUIDE.md](LLE_GUIDE.md) | Full LLE documentation |
 | [EXTENDED_SYNTAX.md](EXTENDED_SYNTAX.md) | Arrays, `[[]]`, process substitution |
-| [SHELL_MODES.md](SHELL_MODES.md) | Detailed mode documentation |
+| [CONFIGURATION.md](CONFIGURATION.md) | Detailed mode documentation |
 | [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) | Complete debugging reference |
 | [BUILTIN_COMMANDS.md](BUILTIN_COMMANDS.md) | All 48 builtin commands |
 | [HOOKS_AND_PLUGINS.md](HOOKS_AND_PLUGINS.md) | Hook system and plugins |

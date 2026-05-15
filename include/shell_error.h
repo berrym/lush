@@ -85,13 +85,22 @@ typedef enum shell_error_code {
 
     /* Runtime errors (1100-1199) */
     SHELL_ERR_RUNTIME_BASE = 1100,
-    SHELL_ERR_COMMAND_NOT_FOUND,   /**< Command not in PATH */
-    SHELL_ERR_PERMISSION_DENIED,   /**< Permission denied */
-    SHELL_ERR_FILE_NOT_FOUND,      /**< File does not exist */
-    SHELL_ERR_NOT_EXECUTABLE,      /**< File is not executable */
-    SHELL_ERR_DIVISION_BY_ZERO,    /**< Arithmetic division by zero */
-    SHELL_ERR_INTEGER_OVERFLOW,    /**< Arithmetic overflow */
-    SHELL_ERR_INVALID_SUBSCRIPT,   /**< Invalid array subscript */
+    SHELL_ERR_COMMAND_NOT_FOUND,           /**< Command not in PATH */
+    SHELL_ERR_PERMISSION_DENIED,           /**< Permission denied */
+    SHELL_ERR_FILE_NOT_FOUND,              /**< File does not exist */
+    SHELL_ERR_NOT_EXECUTABLE,              /**< File is not executable */
+    SHELL_ERR_DIVISION_BY_ZERO,            /**< Arithmetic division by zero */
+    SHELL_ERR_MODULO_BY_ZERO,              /**< Arithmetic modulo by zero */
+    SHELL_ERR_ARITH_INVALID_ASSIGN_TARGET, /**< Assignment to non-lvalue */
+    SHELL_ERR_ARITH_INVALID_INCREMENT_TARGET, /**< ++ on non-lvalue */
+    SHELL_ERR_ARITH_INVALID_DECREMENT_TARGET, /**< -- on non-lvalue */
+    SHELL_ERR_ARITH_NEGATIVE_EXPONENT,        /**< ** with negative exponent */
+    SHELL_ERR_ARITH_STACK_OVERFLOW,     /**< Operator/operand stack full */
+    SHELL_ERR_ARITH_STACK_UNDERFLOW,    /**< Operator/operand stack empty */
+    SHELL_ERR_ARITH_MISMATCHED_TERNARY, /**< Unmatched ? : */
+    SHELL_ERR_ARITH_MISMATCHED_PARENS,  /**< Unmatched ( ) */
+    SHELL_ERR_INTEGER_OVERFLOW,         /**< Arithmetic overflow */
+    SHELL_ERR_INVALID_SUBSCRIPT,        /**< Invalid array subscript */
     SHELL_ERR_READONLY_VAR,        /**< Attempt to modify readonly variable */
     SHELL_ERR_LOOP_CONTROL,        /**< break/continue outside loop */
     SHELL_ERR_RETURN_OUTSIDE_FUNC, /**< return outside function */
@@ -125,12 +134,15 @@ typedef enum shell_error_code {
 
     /* Expansion errors (1300-1399) */
     SHELL_ERR_EXPANSION_BASE = 1300,
-    SHELL_ERR_BAD_PATTERN,       /**< Invalid glob pattern */
-    SHELL_ERR_NO_MATCH,          /**< No glob matches (with failglob) */
-    SHELL_ERR_BRACE_EXPANSION,   /**< Invalid brace expansion */
-    SHELL_ERR_ARITHMETIC_SYNTAX, /**< Invalid arithmetic expression */
-    SHELL_ERR_REGEX_SYNTAX,      /**< Invalid regex in [[ =~ ]] */
-    SHELL_ERR_PROCESS_SUBST,     /**< Process substitution failed */
+    SHELL_ERR_BAD_PATTERN,             /**< Invalid glob pattern */
+    SHELL_ERR_NO_MATCH,                /**< No glob matches (with failglob) */
+    SHELL_ERR_BRACE_EXPANSION,         /**< Invalid brace expansion */
+    SHELL_ERR_ARITHMETIC_SYNTAX,       /**< Invalid arithmetic expression */
+    SHELL_ERR_REGEX_SYNTAX,            /**< Invalid regex in [[ =~ ]] */
+    SHELL_ERR_PROCESS_SUBST,           /**< Process substitution failed */
+    SHELL_ERR_PARAMETER_NULL_OR_UNSET, /**< ${var:?} or ${var?} on null/unset
+                                          parameter (POSIX required-parameter
+                                          check) */
     SHELL_ERR_EXPANSION_MAX = 1399,
 
     /* System errors (1400-1499) */

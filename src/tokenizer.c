@@ -31,7 +31,8 @@ static const struct {
     {"case", TOK_CASE},     {"esac", TOK_ESAC},
     {"until", TOK_UNTIL},   {"function", TOK_FUNCTION},
     {"select", TOK_SELECT}, {"time", TOK_TIME},
-    {"coproc", TOK_COPROC}, {NULL, TOK_WORD} // Sentinel
+    {"coproc", TOK_COPROC}, {"repeat", TOK_REPEAT},
+    {NULL, TOK_WORD} // Sentinel
 };
 
 // Helper functions
@@ -55,8 +56,15 @@ static void skip_whitespace(tokenizer_t *tokenizer);
  * @return New tokenizer instance, or NULL on failure
  */
 tokenizer_t *tokenizer_new(const char *input) {
+    return tokenizer_new_at(input, 1);
+}
+
+tokenizer_t *tokenizer_new_at(const char *input, size_t starting_line) {
     if (!input) {
         return NULL;
+    }
+    if (starting_line == 0) {
+        starting_line = 1; /* defensive: 0 is unknown; 1-based per source */
     }
 
     tokenizer_t *tokenizer = malloc(sizeof(tokenizer_t));
@@ -67,14 +75,15 @@ tokenizer_t *tokenizer_new(const char *input) {
     tokenizer->input = input;
     tokenizer->input_length = strlen(input);
     tokenizer->position = 0;
-    tokenizer->line = 1;
+    tokenizer->line = starting_line;
     tokenizer->column = 1;
     tokenizer->current = NULL;
     tokenizer->lookahead = NULL;
     tokenizer->enable_keywords = true;
     tokenizer->arith_cmd_depth = 0;
 
-    // Initialize by getting the first two tokens
+    /* Initialize by getting the first two tokens. The line number must
+     * be set BEFORE tokenize_next, since lookahead pre-tokenizes too. */
     tokenizer->current = tokenize_next(tokenizer);
     tokenizer->lookahead = tokenize_next(tokenizer);
 
@@ -305,6 +314,8 @@ const char *token_type_name(token_type_t type) {
         return "SELECT";
     case TOK_TIME:
         return "TIME";
+    case TOK_REPEAT:
+        return "REPEAT";
     case TOK_IF:
         return "IF";
     case TOK_THEN:
@@ -356,7 +367,7 @@ const char *token_type_name(token_type_t type) {
  * @return true if token is a keyword
  */
 bool token_is_keyword(token_type_t type) {
-    return type >= TOK_IF && type <= TOK_COPROC;
+    return type >= TOK_IF && type <= TOK_REPEAT;
 }
 
 /**
@@ -1080,39 +1091,82 @@ static token_t *tokenize_next(tokenizer_t *tokenizer) {
 
                 if (tokenizer->position < tokenizer->input_length &&
                     tokenizer->input[tokenizer->position] == '(') {
-                    // Arithmetic expansion $((expr))
-                    tokenizer->position++;
-                    tokenizer->column++;
-
-                    int paren_count = 2;
-                    while (tokenizer->position < tokenizer->input_length &&
-                           paren_count > 0) {
-                        char curr = tokenizer->input[tokenizer->position];
-                        if (curr == '(') {
-                            paren_count++;
-                        } else if (curr == ')') {
-                            paren_count--;
-                        } else if (curr == '\n') {
-                            tokenizer->line++;
-                            tokenizer->column = 0;
+                    /* `$((` is ambiguous: it could begin arithmetic
+                     * expansion `$((expr))` OR command substitution of
+                     * an anonymous function `$(() { body; } args)`.
+                     * Arithmetic content cannot contain braces, semicolons,
+                     * or newlines at the top level, so if a lookahead
+                     * scan finds any of those before the matched `))`,
+                     * the input is really `$(` followed by a `(` -- back
+                     * up the second `(` and reparse as command sub.
+                     * Issue #99. */
+                    size_t scan = tokenizer->position + 1;
+                    int depth = 2; /* counting the two outer `(` */
+                    bool looks_arith = true;
+                    while (scan < tokenizer->input_length && depth > 0) {
+                        char sc = tokenizer->input[scan];
+                        if (sc == '(') {
+                            depth++;
+                        } else if (sc == ')') {
+                            depth--;
+                            if (depth == 0) {
+                                /* Verify the closing is actually `))`
+                                 * by checking we came down from 2 with
+                                 * the immediately preceding char also
+                                 * being `)` (i.e. the inner closes
+                                 * before the outer). Walking the depth
+                                 * counter has already ensured this. */
+                                break;
+                            }
+                        } else if (sc == '{' || sc == '}' || sc == ';' ||
+                                   sc == '\n') {
+                            looks_arith = false;
+                            break;
                         }
+                        scan++;
+                    }
+
+                    if (looks_arith) {
+                        // Arithmetic expansion $((expr))
                         tokenizer->position++;
                         tokenizer->column++;
-                    }
 
-                    // Check for unclosed arithmetic expansion
-                    if (paren_count > 0) {
+                        int paren_count = 2;
+                        while (tokenizer->position < tokenizer->input_length &&
+                               paren_count > 0) {
+                            char curr = tokenizer->input[tokenizer->position];
+                            if (curr == '(') {
+                                paren_count++;
+                            } else if (curr == ')') {
+                                paren_count--;
+                            } else if (curr == '\n') {
+                                tokenizer->line++;
+                                tokenizer->column = 0;
+                            }
+                            tokenizer->position++;
+                            tokenizer->column++;
+                        }
+
+                        // Check for unclosed arithmetic expansion
+                        if (paren_count > 0) {
+                            size_t length = tokenizer->position - start;
+                            return token_new(
+                                TOK_ERROR, &tokenizer->input[start], length,
+                                start_line, start_column, start_pos);
+                        }
+
                         size_t length = tokenizer->position - start;
-                        return token_new(TOK_ERROR, &tokenizer->input[start],
-                                         length, start_line, start_column,
-                                         start_pos);
+                        return token_new(TOK_ARITH_EXP,
+                                         &tokenizer->input[start], length,
+                                         start_line, start_column, start_pos);
                     }
-
-                    size_t length = tokenizer->position - start;
-                    return token_new(TOK_ARITH_EXP, &tokenizer->input[start],
-                                     length, start_line, start_column,
-                                     start_pos);
-                } else {
+                    /* Fall through to command-sub handling below.
+                     * Position is currently at the second `(` of `$((`,
+                     * which is the start of the inner subshell or
+                     * anonymous function body that the command-sub
+                     * paren-counter will track. */
+                }
+                {
                     // Command substitution $(cmd)
                     int paren_count = 1;
                     while (tokenizer->position < tokenizer->input_length &&
@@ -1223,6 +1277,59 @@ static token_t *tokenize_next(tokenizer_t *tokenizer) {
                             tokenizer->column++;
                         } else {
                             break;
+                        }
+                    }
+
+                    /* Zsh bare-form subscript: $var[N] / $var[N,M] in
+                     * unquoted context. Without this, the tokenizer
+                     * emits TOK_VARIABLE($var) + TOK_LBRACKET([) + ...
+                     * and the parser dispatches `[1]` as the `[` test
+                     * builtin (issue #58). When FEATURE_ZSH_BARE_SUBSCRIPT
+                     * is enabled, absorb the entire [...] into the
+                     * TOK_VARIABLE so parse_parameter_expansion sees
+                     * `$var[N]` as one unit -- same shape as the brace
+                     * form ${var[N]} and the quoted bare form "$var[N]"
+                     * which both already work.
+                     *
+                     * The subscript is scanned by balanced-bracket
+                     * counter so nested brackets in expressions like
+                     * $arr[$other[i]] or $a[$((b[c]+1))] absorb
+                     * correctly. A bracket without a matching close is
+                     * left for the parser to surface as a normal error;
+                     * we don't advance position in that case. The flag
+                     * is curated true in zsh+lush modes, false in
+                     * posix+bash (see src/shell_mode.c). */
+                    if (tokenizer->position < tokenizer->input_length &&
+                        tokenizer->input[tokenizer->position] == '[' &&
+                        shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
+                        size_t scan = tokenizer->position;
+                        size_t scan_col = tokenizer->column;
+                        size_t scan_line = tokenizer->line;
+                        int depth = 0;
+                        bool closed = false;
+                        while (scan < tokenizer->input_length) {
+                            char sc = tokenizer->input[scan];
+                            if (sc == '[') {
+                                depth++;
+                            } else if (sc == ']') {
+                                depth--;
+                                if (depth == 0) {
+                                    scan++;
+                                    scan_col++;
+                                    closed = true;
+                                    break;
+                                }
+                            } else if (sc == '\n') {
+                                scan_line++;
+                                scan_col = 0;
+                            }
+                            scan++;
+                            scan_col++;
+                        }
+                        if (closed) {
+                            tokenizer->position = scan;
+                            tokenizer->column = scan_col;
+                            tokenizer->line = scan_line;
                         }
                     }
                 }
@@ -1795,15 +1902,22 @@ static token_t *tokenize_next(tokenizer_t *tokenizer) {
                             strchr("_.-/~:@*?+%!", sc) != NULL) {
                             scan_pos++;
                         } else if ((unsigned char)sc >= 0x80) {
-                            // UTF-8 continuation - skip entire sequence
-                            int seq_len = 1;
-                            if ((sc & 0xE0) == 0xC0)
-                                seq_len = 2;
-                            else if ((sc & 0xF0) == 0xE0)
-                                seq_len = 3;
-                            else if ((sc & 0xF8) == 0xF0)
-                                seq_len = 4;
-                            scan_pos += seq_len;
+                            /* Skip the rest of this UTF-8 sequence. Use the
+                             * shared LLE primitive so the byte-pattern logic
+                             * lives in exactly one place (issue #50). The
+                             * primitive reports what the lead byte CLAIMS;
+                             * the caller is responsible for clamping against
+                             * the input length so a partial sequence at the
+                             * end of the buffer cannot walk past it. */
+                            int seq_len =
+                                lle_utf8_sequence_length((unsigned char)sc);
+                            if (seq_len <= 0) {
+                                seq_len = 1;
+                            }
+                            scan_pos += (size_t)seq_len;
+                            if (scan_pos > tokenizer->input_length) {
+                                scan_pos = tokenizer->input_length;
+                            }
                         } else if (sc == '{') {
                             // Another brace pattern - scan for its closing }
                             // to support Cartesian products like {1..2}{a..b}

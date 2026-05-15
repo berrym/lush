@@ -17,61 +17,29 @@
 #include <string.h>
 
 #include "display/display_controller.h"
+#include "test_framework.h"
 
-/* Test framework macros */
-static int tests_run = 0;
-static int tests_passed = 0;
-
+/* Local 1-arg / 2-arg ASSERT_* helpers (no message) bridge to the
+ * framework's variants by synthesizing a stringified-expression
+ * message. Replaces the historical exit(1) failure path with
+ * longjmp-based isolation per RUN_TEST. */
+#undef ASSERT
+#undef ASSERT_EQ
+#undef ASSERT_STR_EQ
+#undef ASSERT_NULL
+#undef ASSERT_NOT_NULL
 #define ASSERT(cond)                                                           \
     do {                                                                       \
         if (!(cond)) {                                                         \
-            printf("  FAIL: %s (line %d)\n", #cond, __LINE__);                 \
-            return 0;                                                          \
+            TEST_FAIL_MSG(#cond);                                              \
         }                                                                      \
     } while (0)
+#define ASSERT_EQ(a, b) ASSERT_TRUE((a) == (b), #a " == " #b)
+#define ASSERT_STR_EQ(a, b) ASSERT_TRUE(strcmp((a), (b)) == 0, "strings equal")
+#define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
+#define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
-#define ASSERT_EQ(a, b)                                                        \
-    do {                                                                       \
-        if ((a) != (b)) {                                                      \
-            printf("  FAIL: %s != %s (line %d)\n", #a, #b, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_STR_EQ(a, b)                                                    \
-    do {                                                                       \
-        if (strcmp((a), (b)) != 0) {                                           \
-            printf("  FAIL: \"%s\" != \"%s\" (line %d)\n", (a), (b),           \
-                   __LINE__);                                                  \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NOT_NULL(ptr)                                                   \
-    do {                                                                       \
-        if ((ptr) == NULL) {                                                   \
-            printf("  FAIL: %s is NULL (line %d)\n", #ptr, __LINE__);          \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
-
-#define ASSERT_NULL(ptr)                                                       \
-    do {                                                                       \
-        if ((ptr) != NULL) {                                                   \
-            printf("  FAIL: %s is not NULL (line %d)\n", #ptr, __LINE__);      \
-            return 0;                                                          \
-        }                                                                      \
-    } while (0)
-
-#define RUN_TEST(test)                                                         \
-    do {                                                                       \
-        printf("  Running %s...\n", #test);                                    \
-        tests_run++;                                                           \
-        if (test()) {                                                          \
-            tests_passed++;                                                    \
-            printf("  PASS: %s\n", #test);                                     \
-        }                                                                      \
-    } while (0)
+/* Test framework macros */
 
 /* ============================================================
  * CREATE/DESTROY TESTS
@@ -995,147 +963,146 @@ int main(void) {
     printf("Running display controller tests...\n\n");
 
     printf("=== Create/Destroy Tests ===\n");
-    RUN_TEST(test_create_returns_non_null);
-    RUN_TEST(test_create_initializes_config_defaults);
-    RUN_TEST(test_destroy_null_safe);
-    RUN_TEST(test_destroy_uninitialized);
+    RUN_TEST(create_returns_non_null);
+    RUN_TEST(create_initializes_config_defaults);
+    RUN_TEST(destroy_null_safe);
+    RUN_TEST(destroy_uninitialized);
 
     printf("\n=== Is Initialized Tests ===\n");
-    RUN_TEST(test_is_initialized_null_context);
-    RUN_TEST(test_is_initialized_before_init);
+    RUN_TEST(is_initialized_null_context);
+    RUN_TEST(is_initialized_before_init);
 
     printf("\n=== Default Config Tests ===\n");
-    RUN_TEST(test_create_default_config_null_param);
-    RUN_TEST(test_create_default_config_sets_values);
+    RUN_TEST(create_default_config_null_param);
+    RUN_TEST(create_default_config_sets_values);
 
     printf("\n=== Error String Tests ===\n");
-    RUN_TEST(test_error_string_success);
-    RUN_TEST(test_error_string_invalid_param);
-    RUN_TEST(test_error_string_null_pointer);
-    RUN_TEST(test_error_string_memory_allocation);
-    RUN_TEST(test_error_string_not_initialized);
-    RUN_TEST(test_error_string_composition_failed);
-    RUN_TEST(test_error_string_cache_full);
-    RUN_TEST(test_error_string_buffer_too_small);
-    RUN_TEST(test_error_string_unknown_error);
-    RUN_TEST(test_error_strings_are_different);
+    RUN_TEST(error_string_success);
+    RUN_TEST(error_string_invalid_param);
+    RUN_TEST(error_string_null_pointer);
+    RUN_TEST(error_string_memory_allocation);
+    RUN_TEST(error_string_not_initialized);
+    RUN_TEST(error_string_composition_failed);
+    RUN_TEST(error_string_cache_full);
+    RUN_TEST(error_string_buffer_too_small);
+    RUN_TEST(error_string_unknown_error);
+    RUN_TEST(error_strings_are_different);
 
     printf("\n=== Init Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_init_null_controller);
+    RUN_TEST(init_null_controller);
 
     printf("\n=== Display Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_display_null_controller);
-    RUN_TEST(test_display_null_output);
-    RUN_TEST(test_display_zero_size);
-    RUN_TEST(test_display_not_initialized);
+    RUN_TEST(display_null_controller);
+    RUN_TEST(display_null_output);
+    RUN_TEST(display_zero_size);
+    RUN_TEST(display_not_initialized);
 
     printf("\n=== Display With Cursor Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_display_with_cursor_null_controller);
-    RUN_TEST(test_display_with_cursor_null_output);
-    RUN_TEST(test_display_with_cursor_not_initialized);
+    RUN_TEST(display_with_cursor_null_controller);
+    RUN_TEST(display_with_cursor_null_output);
+    RUN_TEST(display_with_cursor_not_initialized);
 
     printf("\n=== Update Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_update_null_controller);
-    RUN_TEST(test_update_null_output);
-    RUN_TEST(test_update_not_initialized);
+    RUN_TEST(update_null_controller);
+    RUN_TEST(update_null_output);
+    RUN_TEST(update_not_initialized);
 
     printf("\n=== Refresh Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_refresh_null_controller);
+    RUN_TEST(refresh_null_controller);
 
     printf("\n=== Cleanup Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_cleanup_null_controller);
-    RUN_TEST(test_cleanup_uninitialized_controller);
+    RUN_TEST(cleanup_null_controller);
+    RUN_TEST(cleanup_uninitialized_controller);
 
     printf("\n=== Clear Screen Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_clear_screen_null_controller);
-    RUN_TEST(test_clear_screen_not_initialized);
+    RUN_TEST(clear_screen_null_controller);
+    RUN_TEST(clear_screen_not_initialized);
 
     printf("\n=== Completion Menu Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_set_completion_menu_null_controller);
-    RUN_TEST(test_set_completion_menu_not_initialized);
-    RUN_TEST(test_clear_completion_menu_null_controller);
-    RUN_TEST(test_clear_completion_menu_not_initialized);
-    RUN_TEST(test_has_completion_menu_null_controller);
-    RUN_TEST(test_has_completion_menu_not_initialized);
-    RUN_TEST(test_get_completion_menu_null_controller);
-    RUN_TEST(test_get_completion_menu_not_initialized);
-    RUN_TEST(test_check_and_clear_menu_changed_null_controller);
+    RUN_TEST(set_completion_menu_null_controller);
+    RUN_TEST(set_completion_menu_not_initialized);
+    RUN_TEST(clear_completion_menu_null_controller);
+    RUN_TEST(clear_completion_menu_not_initialized);
+    RUN_TEST(has_completion_menu_null_controller);
+    RUN_TEST(has_completion_menu_not_initialized);
+    RUN_TEST(get_completion_menu_null_controller);
+    RUN_TEST(get_completion_menu_not_initialized);
+    RUN_TEST(check_and_clear_menu_changed_null_controller);
 
     printf("\n=== Autosuggestion Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_update_autosuggestion_null_controller);
-    RUN_TEST(test_set_autosuggestion_null_controller);
-    RUN_TEST(test_get_autosuggestion_null_controller);
-    RUN_TEST(test_accept_autosuggestion_null_controller);
-    RUN_TEST(test_has_autosuggestion_null_controller);
-    RUN_TEST(test_clear_autosuggestion_null_controller);
-    RUN_TEST(test_set_autosuggestions_enabled_null_controller);
+    RUN_TEST(update_autosuggestion_null_controller);
+    RUN_TEST(set_autosuggestion_null_controller);
+    RUN_TEST(get_autosuggestion_null_controller);
+    RUN_TEST(accept_autosuggestion_null_controller);
+    RUN_TEST(has_autosuggestion_null_controller);
+    RUN_TEST(clear_autosuggestion_null_controller);
+    RUN_TEST(set_autosuggestions_enabled_null_controller);
 
     printf("\n=== Performance Monitoring Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_get_performance_null_controller);
-    RUN_TEST(test_get_performance_null_output);
+    RUN_TEST(get_performance_null_controller);
+    RUN_TEST(get_performance_null_output);
     /* NOTE: test_update_performance_monitoring_null_controller skipped -
      * function not implemented */
-    RUN_TEST(test_reset_performance_metrics_null_controller);
+    RUN_TEST(reset_performance_metrics_null_controller);
 
     printf("\n=== Optimization Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_set_optimization_level_null_controller);
-    RUN_TEST(test_set_adaptive_optimization_null_controller);
+    RUN_TEST(set_optimization_level_null_controller);
+    RUN_TEST(set_adaptive_optimization_null_controller);
 
     printf("\n=== Cache Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_clear_cache_null_controller);
-    RUN_TEST(test_validate_cache_null_controller);
-    RUN_TEST(test_optimize_cache_null_controller);
+    RUN_TEST(clear_cache_null_controller);
+    RUN_TEST(validate_cache_null_controller);
+    RUN_TEST(optimize_cache_null_controller);
 
     printf("\n=== Config Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_get_config_null_controller);
-    RUN_TEST(test_get_config_null_output);
-    RUN_TEST(test_set_config_null_controller);
-    RUN_TEST(test_set_config_null_config);
+    RUN_TEST(get_config_null_controller);
+    RUN_TEST(get_config_null_output);
+    RUN_TEST(set_config_null_controller);
+    RUN_TEST(set_config_null_config);
 
     printf("\n=== Integration Mode Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_set_integration_mode_null_controller);
+    RUN_TEST(set_integration_mode_null_controller);
 
     printf("\n=== Theme Context Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_set_theme_context_null_controller);
+    RUN_TEST(set_theme_context_null_controller);
 
     printf("\n=== Version Null/Invalid Param Tests ===\n");
-    RUN_TEST(test_get_version_null_controller);
-    RUN_TEST(test_get_version_null_buffer);
-    RUN_TEST(test_get_version_zero_size);
+    RUN_TEST(get_version_null_controller);
+    RUN_TEST(get_version_null_buffer);
+    RUN_TEST(get_version_zero_size);
 
     printf("\n=== Accessor Function Null Tests ===\n");
-    RUN_TEST(test_get_terminal_control_null_controller);
-    RUN_TEST(test_get_terminal_control_not_initialized);
-    RUN_TEST(test_get_event_system_null_controller);
-    RUN_TEST(test_get_event_system_not_initialized);
+    RUN_TEST(get_terminal_control_null_controller);
+    RUN_TEST(get_terminal_control_not_initialized);
+    RUN_TEST(get_event_system_null_controller);
+    RUN_TEST(get_event_system_not_initialized);
 
     printf("\n=== Integration/Diagnostic Null Tests ===\n");
-    RUN_TEST(test_prepare_shell_integration_null_controller);
-    RUN_TEST(test_get_integration_interface_null_controller);
-    RUN_TEST(test_generate_diagnostic_report_null_controller);
-    RUN_TEST(test_generate_diagnostic_report_null_buffer);
+    RUN_TEST(prepare_shell_integration_null_controller);
+    RUN_TEST(get_integration_interface_null_controller);
+    RUN_TEST(generate_diagnostic_report_null_controller);
+    RUN_TEST(generate_diagnostic_report_null_buffer);
 
     printf("\n=== Global Function Tests ===\n");
-    RUN_TEST(test_reset_prompt_display_state_no_crash);
-    RUN_TEST(test_finalize_input_no_crash);
-    RUN_TEST(test_get_prompt_metrics_null_params);
-    RUN_TEST(test_get_prompt_metrics_with_params);
-    RUN_TEST(test_apply_transient_prompt_null_prompt);
+    RUN_TEST(reset_prompt_display_state_no_crash);
+    RUN_TEST(finalize_input_no_crash);
+    RUN_TEST(get_prompt_metrics_null_params);
+    RUN_TEST(get_prompt_metrics_with_params);
+    RUN_TEST(apply_transient_prompt_null_prompt);
 
     printf("\n=== Enum Value Tests ===\n");
-    RUN_TEST(test_optimization_level_values);
-    RUN_TEST(test_state_change_values);
-    RUN_TEST(test_error_code_values);
-    RUN_TEST(test_symbol_mode_values);
+    RUN_TEST(optimization_level_values);
+    RUN_TEST(state_change_values);
+    RUN_TEST(error_code_values);
+    RUN_TEST(symbol_mode_values);
 
     printf("\n=== Constant Definition Tests ===\n");
-    RUN_TEST(test_version_constants_positive);
-    RUN_TEST(test_cache_constants_reasonable);
-    RUN_TEST(test_threshold_constants_reasonable);
+    RUN_TEST(version_constants_positive);
+    RUN_TEST(cache_constants_reasonable);
+    RUN_TEST(threshold_constants_reasonable);
 
     printf("\n========================================\n");
-    printf("Tests passed: %d/%d\n", tests_passed, tests_run);
     printf("========================================\n");
 
-    return (tests_passed == tests_run) ? 0 : 1;
+    return TEST_RESULT();
 }

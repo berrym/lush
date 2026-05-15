@@ -45,7 +45,7 @@
 #define LLE_CUSTOM_SOURCE_H
 
 #include "lle/completion/completion_types.h"
-#include "lle/completion/context_analyzer.h"
+#include "lle/completion/word_context.h"
 #include "lle/error_handling.h"
 
 #include <stdbool.h>
@@ -98,9 +98,7 @@ typedef struct lle_custom_completion_source {
      * @param result Result structure to add completions to
      * @return LLE_SUCCESS or error code
      */
-    lle_result_t (*generate)(void *user_data,
-                             const lle_context_analyzer_t *context,
-                             const char *prefix,
+    lle_result_t (*generate)(void *user_data, const lle_word_context_t *context,
                              lle_completion_result_t *result);
 
     /**
@@ -113,8 +111,7 @@ typedef struct lle_custom_completion_source {
      * @param context Completion context with command info
      * @return true if source should be queried, false otherwise
      */
-    bool (*is_applicable)(void *user_data,
-                          const lle_context_analyzer_t *context);
+    bool (*is_applicable)(void *user_data, const lle_word_context_t *context);
 
     /**
      * @brief Cleanup function called on unregistration (optional)

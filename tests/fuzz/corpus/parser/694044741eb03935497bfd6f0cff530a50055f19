@@ -1,2 +1,0 @@
-echo test > file.txt 2>&1
-cat < input.txFFFFFFFFFFFFFFFFFFFFFFFFFFFt >> output.txt

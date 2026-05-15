@@ -15,8 +15,8 @@
 #   suffix = " "                                    # Append after completion
 #   cache_seconds = 5                               # Cache duration (0 = no cache)
 #
-# Use 'display lle completions list' to see active sources
-# Use 'display lle completions reload' to reload this file
+# Use 'display lle completion sources list' to see active sources
+# Use 'display lle completion sources reload' to reload this file
 
 # =============================================================================
 # GIT COMPLETIONS

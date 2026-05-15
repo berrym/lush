@@ -101,9 +101,18 @@ typedef enum {
 
     /* Behavior Defaults */
     FEATURE_WORD_SPLIT_DEFAULT, /**< Word splitting on by default (Bash) */
-    FEATURE_AUTO_CD,     /**< Auto-cd to directories without cd command */
-    FEATURE_AUTO_PUSHD,  /**< Auto-push directories to stack on cd */
-    FEATURE_CDABLE_VARS, /**< Treat unset vars as directory names for cd */
+    FEATURE_AUTO_CD,          /**< Auto-cd to directories without cd command */
+    FEATURE_AUTO_PUSHD,       /**< Auto-push directories to stack on cd */
+    FEATURE_CDABLE_VARS,      /**< Treat unset vars as directory names for cd */
+    FEATURE_ERREXIT_IN_LOOPS, /**< Loop body's first non-zero exit aborts the
+                                 loop. Curated lush-mode default; off in
+                                 POSIX/bash/zsh modes for polyglot parity.
+                                 Toggleable per-script via setopt/unsetopt. */
+    FEATURE_XPG_ECHO, /**< echo interprets \n, \t, etc. by default (XSI/zsh
+                         behavior); when false, echo prints args literally
+                         unless `-e` is given (bash default). Bridged via
+                         `xpg_echo` (bash shopt name) and inverted alias
+                         `bsd_echo` (zsh setopt name). */
 
     /* History Behavior */
     FEATURE_HISTAPPEND, /**< Append to history file instead of overwrite */
@@ -125,6 +134,9 @@ typedef enum {
                                    precmd_functions+=(fn) */
     FEATURE_PROMPT_COMMAND,     /**< Bash PROMPT_COMMAND (string and array) */
     FEATURE_ZSH_PARAM_FLAGS,    /**< Zsh-style parameter flags */
+    FEATURE_ZSH_BARE_SUBSCRIPT, /**< Zsh bare-$var[N] subscript (vs ${var[N]})
+                                 */
+    FEATURE_ZSH_PRINT_BUILTIN,  /**< Zsh `print` builtin (-l/-n/-r/-u/-f) */
     FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
 
     /* Sentinel - must be last */
@@ -197,6 +209,27 @@ shell_mode_t shell_mode_get(void);
  * @return true on success, false if mode change is disallowed
  */
 bool shell_mode_set(shell_mode_t mode);
+
+/**
+ * @brief Apply a mode preset across all configuration surfaces
+ *
+ * The canonical entry point for switching the active shell mode. Performs
+ * a full re-seed:
+ *   - Sets the active mode via shell_mode_set().
+ *   - Clears any per-feature overrides (mode-change is a clean reset).
+ *   - Updates legacy POSIX bookkeeping (shell_opts.posix_mode).
+ *   - Writes the canonical mode label to the central registry
+ *     (shell.mode key).
+ *
+ * Per-mode registry default re-seeding is layered on top of this in
+ * commit 4 of the configuration cleanup; for now the surface is the
+ * feature matrix + POSIX bookkeeping + the shell.mode label.
+ *
+ * @param mode Mode preset to apply
+ * @return true on success, false if mode change is disallowed (strict mode)
+ *         or the mode value is invalid
+ */
+bool apply_mode_preset(shell_mode_t mode);
 
 /* ============================================================================
  * Feature Override Functions
@@ -301,11 +334,22 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode);
  * Converts a feature name string to the corresponding shell_feature_t value.
  * Accepts both full names ("indexed_arrays") and short names ("arrays").
  *
+ * Some aliases are *inverted*: `setopt <inverted-alias>` is semantically
+ * equivalent to `unsetopt <canonical>`. For example, `bsd_echo` (zsh
+ * setopt name) is an inverted alias for the canonical `xpg_echo` —
+ * `setopt bsd_echo` disables XSI escape interpretation; `setopt xpg_echo`
+ * enables it. Pass a non-NULL `invert` to receive that flag; callers that
+ * don't care (e.g. test code, config readers that already know the
+ * canonical name) may pass NULL.
+ *
  * @param name Feature name to parse
  * @param feature Output parameter for parsed feature
+ * @param invert Optional output: true if name semantically inverts the
+ *               feature (caller should flip enable/disable). May be NULL.
  * @return true on success, false if name is not recognized
  */
-bool shell_feature_parse(const char *name, shell_feature_t *feature);
+bool shell_feature_parse(const char *name, shell_feature_t *feature,
+                         bool *invert);
 
 /* ============================================================================
  * Initialization and Lifecycle

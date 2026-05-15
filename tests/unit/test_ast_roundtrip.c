@@ -12,34 +12,18 @@
 #include "node.h"
 #include "node_to_source.h"
 #include "parser.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* This file's pre-existing PASS()/FAIL(msg) helpers are stubbed: PASS
+ * is a no-op (RUN_TEST already prints PASS) and FAIL routes through
+ * the framework's longjmp failure path. */
+#define PASS() ((void)0)
+#define FAIL(msg) TEST_FAIL_MSG(msg)
+
 /* Test counters */
-static int tests_run = 0;
-static int tests_passed = 0;
-static int tests_failed = 0;
-
-#define TEST(name) static void test_##name(void)
-#define RUN_TEST(name)                                                         \
-    do {                                                                       \
-        printf("  %s... ", #name);                                             \
-        fflush(stdout);                                                        \
-        tests_run++;                                                           \
-        test_##name();                                                         \
-    } while (0)
-
-#define PASS()                                                                 \
-    do {                                                                       \
-        tests_passed++;                                                        \
-        printf("PASS\n");                                                      \
-    } while (0)
-#define FAIL(msg)                                                              \
-    do {                                                                       \
-        tests_failed++;                                                        \
-        printf("FAIL: %s\n", msg);                                             \
-    } while (0)
 
 /**
  * @brief Perform round-trip test on shell input
@@ -427,9 +411,5 @@ int main(void) {
     RUN_TEST(nested_loops);
     RUN_TEST(complex_pipeline);
 
-    printf("\n====================\n");
-    printf("Results: %d passed, %d failed (of %d)\n", tests_passed,
-           tests_failed, tests_run);
-
-    return tests_failed > 0 ? 1 : 0;
+    return TEST_RESULT();
 }

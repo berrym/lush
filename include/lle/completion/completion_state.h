@@ -12,7 +12,7 @@
 #define LLE_COMPLETION_STATE_H
 
 #include "lle/completion/completion_types.h"
-#include "lle/completion/context_analyzer.h"
+#include "lle/completion/word_context.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 
@@ -33,7 +33,7 @@ typedef struct lle_completion_state {
     size_t cursor_position; /**< Cursor at completion start */
 
     /* Context */
-    lle_context_analyzer_t *context; /**< Analyzed context */
+    lle_word_context_t *context; /**< Analyzed context */
 
     /* Results */
     lle_completion_result_t *results; /**< Generated completions */
@@ -66,7 +66,7 @@ typedef struct lle_completion_state {
  */
 lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
                                          const char *buffer, size_t cursor_pos,
-                                         lle_context_analyzer_t *context,
+                                         lle_word_context_t *context,
                                          lle_completion_result_t *results,
                                          lle_completion_state_t **out_state);
 

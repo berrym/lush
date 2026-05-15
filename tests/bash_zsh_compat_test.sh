@@ -100,9 +100,11 @@ case "$SHELL_NAME" in
 esac
 
 # Mode prefix to add to scripts when testing lush in a specific mode
+# Uses the `mode` builtin (lush-native canonical) rather than the
+# bash-bridge `set -o posix`, so all four mode names work uniformly.
 MODE_PREFIX=""
 if [[ -n "$LUSH_MODE" ]]; then
-    MODE_PREFIX="set -o $LUSH_MODE"$'\n'
+    MODE_PREFIX="mode $LUSH_MODE"$'\n'
 fi
 
 # Colors

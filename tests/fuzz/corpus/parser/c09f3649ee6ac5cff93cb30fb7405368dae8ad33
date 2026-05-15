@@ -1,4 +1,0 @@
-echole.txt 2>&1
-cat <  test -dn
-  >2>&1
-cat < input.txt >> output.txt

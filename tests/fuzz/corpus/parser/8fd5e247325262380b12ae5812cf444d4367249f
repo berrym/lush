@@ -1,2 +1,0 @@
-then $$ $? $!in#@ $* echo "$line"
-done <$0 0 $1

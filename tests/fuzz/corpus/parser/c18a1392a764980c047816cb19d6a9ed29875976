@@ -1,2 +1,0 @@
-echole.txt 2>$(cat filez); do
-     

@@ -13,6 +13,8 @@
 #ifndef ARITHMETIC_H
 #define ARITHMETIC_H
 
+#include "shell_error.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <sys/types.h>
@@ -72,31 +74,53 @@ void arithm_init(void);
  */
 void arithm_cleanup(void);
 
-/** @brief Flag indicating an arithmetic error occurred */
-extern bool arithm_error_flag;
-
-/** @brief Last arithmetic error message */
-extern char *arithm_error_message;
+/* ============================================================================
+ * Error reporting
+ * ============================================================================
+ *
+ * Arithmetic evaluation can fail in many specific ways (division by zero,
+ * invalid assignment target, stack overflow, mismatched parens, etc.).
+ * Each failure mode reports a specific shell_error_code_t along with a
+ * `while:` context string and a `help:` suggestion. Callers (the executor
+ * arithmetic-expansion path) drain the typed error state and emit a
+ * structured shell error via shell_error_create() / shell_error_display().
+ *
+ * The state is file-scope inside arithmetic.c and accessed only through
+ * the accessors below. The pre-2026-04 bare globals
+ * (`arithm_error_flag` / `arithm_error_message`) were deleted as part
+ * of the error-system migration.
+ */
 
 /**
- * @brief Get the last arithmetic error message
+ * @brief Set the arithmetic error state with a structured code, while:
+ * context, help: suggestion, and a printf-style message.
  *
- * @return Error message string, or NULL if no error
+ * @param code Specific shell_error_code_t for this failure mode
+ * @param while_context Short phrase for the `while:` line
+ *                      (e.g. "evaluating / operator"). May be NULL.
+ * @param help Short phrase for the `help:` line
+ *             (e.g. "divisor must be non-zero"). May be NULL.
+ * @param fmt printf-style format for the error message text
  */
-const char *arithm_get_last_error(void);
+void arithm_set_error(shell_error_code_t code, const char *while_context,
+                      const char *help, const char *fmt, ...);
 
-/**
- * @brief Set an arithmetic error message
- *
- * @param message Error message to set
- */
-void arithm_set_error(const char *message);
-
-/**
- * @brief Clear the current arithmetic error state
- *
- * Resets the error flag and clears the error message.
- */
+/** @brief Clear arithmetic error state. */
 void arithm_clear_error(void);
+
+/** @brief Returns true if the arithmetic error flag is set. */
+bool arithm_error_is_flagged(void);
+
+/** @brief Returns the structured code for the current error. */
+shell_error_code_t arithm_error_code(void);
+
+/** @brief Returns the message text for the current error. May be NULL. */
+const char *arithm_error_message(void);
+
+/** @brief Returns the `while:` context for the current error. May be NULL. */
+const char *arithm_error_while(void);
+
+/** @brief Returns the `help:` suggestion for the current error. May be NULL. */
+const char *arithm_error_help(void);
 
 #endif /* ARITHMETIC_H */

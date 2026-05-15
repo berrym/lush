@@ -57,6 +57,7 @@
  */
 
 #include "config.h" /* For config_values_t and history config options */
+#include "config_registry.h" /* For completion.chain_directories */
 #include "display/display_controller.h"
 #include "display/prompt_layer.h"
 #include "display_integration.h" /* Lush display integration */
@@ -64,6 +65,8 @@
 #include "lle/arena.h" /* Hierarchical arena allocator */
 #include "lle/buffer_management.h"
 #include "lle/completion/completion_system.h" /* Completion system for menu visibility */
+#include "lle/completion/splicer.h"
+#include "lle/completion/word_context.h"
 #include "lle/display_integration.h" /* Spec 08: Complete display integration */
 #include "lle/error_handling.h"
 #include "lle/event_system.h"
@@ -1200,36 +1203,81 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* If completion menu is active, accept the selected completion instead of
-     * the line */
-    if (ctx->editor) {
-        /* Check completion system first */
-        if (ctx->editor->completion_system &&
-            lle_completion_system_is_menu_visible(
-                ctx->editor->completion_system)) {
+    /* If completion menu is active, finalize the cycled selection
+     * before accepting the line. The preview phase placed the
+     * candidate's literal text in the buffer (no close-quote, no
+     * trailing space, no slash); accept-phase appends the type-
+     * driven suffix -- "/" for directories, the matching close-
+     * quote (when a quote is open) plus a space for everything
+     * else. After the splice we clear the menu and continue with
+     * the rest of the accept-line flow so the now-finalized buffer
+     * is what gets submitted (or extended on a follow-up TAB
+     * inside a directory). */
+    if (ctx->editor && ctx->editor->completion_system &&
+        lle_completion_system_is_menu_visible(ctx->editor->completion_system)) {
 
-            /* NOTE: The inline preview has already updated the buffer with the
-             * selected completion text. When navigating completions
-             * (UP/DOWN/TAB), update_inline_completion() replaces the current
-             * word with each selected item. So the buffer already contains the
-             * correct text.
-             *
-             * We just need to clear the menu and NOT modify the buffer further.
-             * The old code tried to replace based on stale context, causing
-             * duplicates.
-             */
+        lle_completion_state_t *state =
+            lle_completion_system_get_state(ctx->editor->completion_system);
+        lle_completion_menu_state_t *menu =
+            lle_completion_system_get_menu(ctx->editor->completion_system);
 
-            /* Clear the completion menu */
-            lle_completion_system_clear(ctx->editor->completion_system);
-            display_controller_t *dc = display_integration_get_controller();
-            if (dc) {
-                display_controller_clear_completion_menu(dc);
+        bool selected_was_directory = false;
+        if (state && menu) {
+            const lle_completion_item_t *selected =
+                lle_completion_menu_get_selected(menu);
+            if (selected) {
+                lle_completion_item_t synthetic_item = *selected;
+                if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
+                    selected->description != NULL) {
+                    synthetic_item.text = (char *)selected->description;
+                }
+
+                lle_word_context_t *splice_context = NULL;
+                lle_result_t ctx_result = lle_word_context_analyze(
+                    ctx->buffer->data, ctx->buffer->cursor.byte_offset,
+                    ctx->editor->lle_pool, &splice_context);
+                if (ctx_result == LLE_SUCCESS && splice_context) {
+                    (void)lle_splicer_apply_accept(
+                        ctx->buffer, ctx->editor->cursor_manager,
+                        splice_context, &synthetic_item, ctx->editor->lle_pool);
+                    lle_word_context_free(splice_context);
+                    selected_was_directory =
+                        (synthetic_item.type == LLE_COMPLETION_TYPE_DIRECTORY);
+                }
             }
-
-            /* Refresh display and return - don't accept line yet */
-            refresh_display(ctx);
-            return LLE_SUCCESS;
         }
+
+        /* Clear the completion menu now that the selection is
+         * finalized. */
+        lle_completion_system_clear(ctx->editor->completion_system);
+        display_controller_t *dc = display_integration_get_controller();
+        if (dc) {
+            display_controller_clear_completion_menu(dc);
+        }
+
+        /* Directory-chain (issue #85): if the accepted item was a
+         * directory and completion.chain_directories is on, re-trigger
+         * completion at the new cursor position so the next-level menu
+         * opens immediately. Mirrors the same gate at the TAB
+         * single-match site in keybinding_actions.c. */
+        bool chain = false;
+        (void)config_registry_get_boolean("completion.chain_directories",
+                                          &chain);
+        if (selected_was_directory && chain && ctx->editor) {
+            (void)lle_complete(ctx->editor);
+        }
+
+        /* Directory selections leave the cursor inside an open
+         * quote with a trailing "/" and the user generally wants to
+         * keep typing; non-directory selections terminate the
+         * argument with a close-quote (if needed) and a trailing
+         * space. Either way, the user's first ENTER finalizes the
+         * cycle but does NOT submit the line -- a second ENTER
+         * submits the now-finalized buffer. This matches the
+         * existing readline behavior; only the buffer-finalization
+         * step is new. */
+        refresh_display(ctx);
+        return LLE_SUCCESS;
     }
 
     /* Check for incomplete input using shared continuation parser */
@@ -2371,18 +2419,20 @@ static void refresh_search_display(readline_context_t *ctx) {
     const char *current_match =
         lle_history_interactive_search_get_current_command();
 
-    /* Clear line and move to beginning */
-    /* \r = carriage return, \033[K = clear to end of line */
-    write(STDOUT_FILENO, "\r\033[K", 4);
+    /* Clear line and move to beginning.
+     * \r = carriage return, \033[K = clear to end of line.
+     * (void)! suppresses -Wunused-result; terminal output failures here
+     * have no recoverable path in the search-display refresh. */
+    (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
     /* Write the search prompt */
     if (search_prompt && *search_prompt) {
-        write(STDOUT_FILENO, search_prompt, strlen(search_prompt));
+        (void)!write(STDOUT_FILENO, search_prompt, strlen(search_prompt));
     }
 
     /* Write the matched command */
     if (current_match && *current_match) {
-        write(STDOUT_FILENO, current_match, strlen(current_match));
+        (void)!write(STDOUT_FILENO, current_match, strlen(current_match));
     }
 }
 
@@ -2397,7 +2447,7 @@ static void exit_search_mode_and_refresh(readline_context_t *ctx) {
         return;
 
     /* Clear the search line */
-    write(STDOUT_FILENO, "\r\033[K", 4);
+    (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
     /* Clear autosuggestion to prevent ghost text */
     display_controller_t *dc = display_integration_get_controller();
@@ -3115,7 +3165,7 @@ char *lle_readline(const char *prompt) {
          * displays a fresh prompt, rather than exiting the shell. */
         if (check_and_clear_sigint_flag()) {
             /* Echo ^C to show user that Ctrl+C was pressed */
-            write(STDOUT_FILENO, "^C\n", 3);
+            (void)!write(STDOUT_FILENO, "^C\n", 3);
 
             /* Clear any completion menu or autosuggestion */
             if (ctx.editor && ctx.editor->completion_system) {
@@ -3148,8 +3198,23 @@ char *lle_readline(const char *prompt) {
         /* Read next input event */
         lle_input_event_t *event = NULL;
 
+        /* Idle-poll cadence: 1 second.
+         *
+         * The previous 100ms value (10 Hz polling) burned ~87% of one
+         * CPU core on idle prompts -- every 100ms the loop ran
+         * clock_gettime, allocated an arena event, called select() and
+         * returned, accumulating to substantial CPU overhead per #83.
+         *
+         * 1 second is the sweet spot: still well within the 10-second
+         * watchdog budget (lle_watchdog_pet at the top of the loop
+         * resets a 10s alarm), still well within the 2-second
+         * theme-hot-reload polling granularity, and reduces idle CPU
+         * by ~10x. Signals (SIGINT, SIGWINCH, SIGALRM) interrupt
+         * select() via EINTR immediately, so user responsiveness is
+         * unaffected.
+         */
         result = lle_input_processor_read_next_event(
-            term->input_processor, &event, 100 /* 100ms timeout */
+            term->input_processor, &event, 1000 /* 1s idle-poll timeout */
         );
 
         /* WATCHDOG: Check if watchdog fired during processing.
@@ -3219,7 +3284,7 @@ char *lle_readline(const char *prompt) {
          * check and the read would be delayed until the next iteration.
          */
         if (check_and_clear_sigint_flag()) {
-            write(STDOUT_FILENO, "^C\n", 3);
+            (void)!write(STDOUT_FILENO, "^C\n", 3);
             if (ctx.editor && ctx.editor->completion_system) {
                 lle_completion_system_clear(ctx.editor->completion_system);
             }

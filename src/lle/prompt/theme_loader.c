@@ -1074,7 +1074,14 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
         EXPORT_SYNTAX_COLOR("string_escape", string_escape);
         EXPORT_SYNTAX_COLOR("variable", variable);
         EXPORT_SYNTAX_COLOR("variable_special", variable_special);
-        EXPORT_SYNTAX_COLOR("path_valid", path_valid);
+        EXPORT_SYNTAX_COLOR("path_file_absolute", path_file_absolute);
+        EXPORT_SYNTAX_COLOR("path_file_relative", path_file_relative);
+        EXPORT_SYNTAX_COLOR("path_file_home", path_file_home);
+        EXPORT_SYNTAX_COLOR("path_dir_absolute", path_dir_absolute);
+        EXPORT_SYNTAX_COLOR("path_dir_relative", path_dir_relative);
+        EXPORT_SYNTAX_COLOR("path_dir_home", path_dir_home);
+        EXPORT_SYNTAX_COLOR("path_file", path_file);
+        EXPORT_SYNTAX_COLOR("path_dir", path_dir);
         EXPORT_SYNTAX_COLOR("path_invalid", path_invalid);
         EXPORT_SYNTAX_COLOR("pipe", pipe);
         EXPORT_SYNTAX_COLOR("redirect", redirect);

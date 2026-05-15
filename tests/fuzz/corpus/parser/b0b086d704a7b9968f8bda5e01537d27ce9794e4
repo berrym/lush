@@ -1,7 +1,0 @@
-exec 3>&1
-echo test 5&3
-exec 3>&1
-echo tÿÿesdiff <(ct 5&3
-exa| file1Qfile2)
-cat <ec  ,(echo h&oï
--
