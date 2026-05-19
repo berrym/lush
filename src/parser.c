@@ -1076,7 +1076,11 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
 
     token_info_t *collected_tokens = NULL;
     int token_count = 0;
-    size_t last_end_pos = arg_token->position + strlen(arg_token->text);
+    /* Shell-word adjacency uses the consumed input span (end_position),
+     * not strlen(text): quoted strings strip their delimiters from text
+     * but their end_position covers the entire `"..."` span. POSIX 2.10.2
+     * word concatenation depends on this being correct. */
+    size_t last_end_pos = arg_token->end_position;
 
     while (arg_token &&
            (arg_token->type == TOK_STRING ||
@@ -1107,7 +1111,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         collected_tokens[token_count].text = strdup(arg_token->text);
         token_count++;
 
-        last_end_pos = arg_token->position + strlen(arg_token->text);
+        last_end_pos = arg_token->end_position;
         tokenizer_advance(parser->tokenizer);
         token_t *next_token = tokenizer_current(parser->tokenizer);
 
@@ -1625,11 +1629,11 @@ static bool parse_command_suffix(parser_t *parser, node_t *command) {
             if (peek1 &&
                 (peek1->type == TOK_ASSIGN || peek1->type == TOK_PLUS_ASSIGN)) {
                 // Check if = or += is immediately adjacent (no whitespace)
-                size_t word_end = arg_token->position + strlen(arg_token->text);
+                size_t word_end = arg_token->end_position;
                 if (peek1->position == word_end) {
                     // They're adjacent. Now check if ( follows the =
                     // To check this, we need to look at what comes after peek1
-                    size_t assign_end = peek1->position + strlen(peek1->text);
+                    size_t assign_end = peek1->end_position;
                     // Peek at the input directly to see if ( follows
                     if (assign_end < parser->tokenizer->input_length &&
                         parser->tokenizer->input[assign_end] == '(') {
@@ -1749,13 +1753,24 @@ static char *parse_scalar_assignment_string(parser_t *parser,
         return NULL;
     }
 
+    // Save end-of-operator position so the value-collection paths below
+    // can enforce the POSIX adjacency rule: `var= word` is an empty
+    // assignment followed by a separate word (the command word or a new
+    // prefix), not `var=word`. Without this check the parser greedily
+    // glues the next word-like token onto the empty value, mis-parsing
+    // `X= /bin/echo hi` as command `hi` with X="/bin/echo".
+    size_t assign_op_end = next ? next->end_position : 0;
+
     tokenizer_advance(parser->tokenizer); // consume variable name
     tokenizer_advance(parser->tokenizer); // consume '=' or '+='
 
     token_t *value = tokenizer_current(parser->tokenizer);
+    bool value_adjacent = (value && value->position == assign_op_end);
 
-    // Check for array literal assignment: arr=(a b c) or arr+=(a b c)
-    if (value && value->type == TOK_LPAREN &&
+    // Check for array literal assignment: arr=(a b c) or arr+=(a b c).
+    // `arr= (sub shell)` (whitespace before the paren) is not an array
+    // literal; fall through to the empty-assignment path.
+    if (value_adjacent && value->type == TOK_LPAREN &&
         shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
         node_t *array_node = parse_array_literal(parser);
         if (!array_node) {
@@ -1780,11 +1795,17 @@ static char *parse_scalar_assignment_string(parser_t *parser,
 
     // Collect all consecutive value tokens (handles ${A}_${B} etc.)
     // Value tokens include words, variables, command subs, etc.
-    // Stop at whitespace, semicolon, newline, or other separators
-    if (value &&
+    // Stop at whitespace, semicolon, newline, or other separators.
+    // The first value token must be positionally adjacent to '=' (no
+    // whitespace gap) or this is an empty-value assignment. TOK_ASSIGN
+    // and TOK_PLUS_ASSIGN are valid first tokens because POSIX
+    // ASSIGNMENT_WORD only delimits at the FIRST '='; `X===` has value
+    // `==`.
+    if (value_adjacent &&
         (token_is_word_like(value->type) || value->type == TOK_VARIABLE ||
          value->type == TOK_ARITH_EXP || value->type == TOK_COMMAND_SUB ||
-         value->type == TOK_BACKQUOTE)) {
+         value->type == TOK_BACKQUOTE || value->type == TOK_ASSIGN ||
+         value->type == TOK_PLUS_ASSIGN)) {
 
         // Build complete value by concatenating adjacent tokens
         size_t value_capacity = 256;
@@ -1796,22 +1817,20 @@ static char *parse_scalar_assignment_string(parser_t *parser,
         }
         full_value[0] = '\0';
 
+        // POSIX ASSIGNMENT_WORD: only the first '=' delimits name from
+        // value; subsequent '=' characters within the same shell word are
+        // part of the value. So TOK_ASSIGN and TOK_PLUS_ASSIGN are
+        // continuation tokens here. The adjacency check at the bottom of
+        // the loop is what separates a value from the next prefix word
+        // (a whitespace gap breaks the loop). A peek-ahead "this word
+        // starts a new assignment" check would mis-handle X=a=b by
+        // treating the inner '=' as a new operator.
         while (value &&
                (token_is_word_like(value->type) ||
                 value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
                 value->type == TOK_COMMAND_SUB ||
-                value->type == TOK_BACKQUOTE)) {
-
-            // Check if this word is followed by = (making it a new
-            // assignment) If so, stop - this word belongs to the next
-            // assignment
-            if (token_is_word_like(value->type)) {
-                token_t *peek = tokenizer_peek(parser->tokenizer);
-                if (peek && (peek->type == TOK_ASSIGN ||
-                             peek->type == TOK_PLUS_ASSIGN)) {
-                    break; // This word starts a new assignment
-                }
-            }
+                value->type == TOK_BACKQUOTE || value->type == TOK_ASSIGN ||
+                value->type == TOK_PLUS_ASSIGN)) {
 
             size_t token_len = strlen(value->text);
             /* Quote re-wrapping policy for assignment-value
@@ -1915,9 +1934,9 @@ static char *parse_scalar_assignment_string(parser_t *parser,
              * the same assignment value: `a=foo"bar"` -> foobar, but
              * `a=foo bar` -> value `foo` and `bar` is the command word /
              * next prefix. Mirrors the adjacency rule in
-             * collect_word_argument (same strlen(text) convention and
-             * the same quoted-then-adjacent edge case). */
-            size_t last_end_pos = value->position + strlen(value->text);
+             * collect_word_argument. Uses end_position so quoted strings
+             * count their full `"..."` span, not just the stripped text. */
+            size_t last_end_pos = value->end_position;
             tokenizer_advance(parser->tokenizer); // consume this token
             value = tokenizer_current(parser->tokenizer);
             if (value && value->position != last_end_pos) {
@@ -2552,8 +2571,7 @@ static node_t *parse_redirection(parser_t *parser) {
         // Regular redirection - handle token concatenation for variables
         char *concatenated_target = NULL;
         size_t total_len = 0;
-        size_t last_end_pos =
-            target_token->position + strlen(target_token->text);
+        size_t last_end_pos = target_token->end_position;
 
         // Collect all consecutive tokens without whitespace (like
         // /tmp/file_$VAR)
@@ -2576,7 +2594,7 @@ static node_t *parse_redirection(parser_t *parser) {
 
             strcpy(concatenated_target + total_len, current_token->text);
             total_len += token_len;
-            last_end_pos = current_token->position + token_len;
+            last_end_pos = current_token->end_position;
 
             tokenizer_advance(parser->tokenizer);
             current_token = tokenizer_current(parser->tokenizer);
@@ -3687,8 +3705,12 @@ static node_t *parse_for_statement(parser_t *parser) {
                 free_node_tree(word_list);
                 return NULL;
             }
-            // Track end position of current token for adjacency checks
-            size_t current_end_pos = word_token->position + word_token->length;
+            // Track end position of current token for adjacency checks.
+            // end_position is the consumed input span (includes stripped
+            // quote chars for "..." tokens); token->length is just the
+            // text byte count and would mis-track adjacency for quoted
+            // segments.
+            size_t current_end_pos = word_token->end_position;
             tokenizer_advance(parser->tokenizer);
 
             // Check for WORD=VALUE pattern: if next token is '=' followed by
@@ -3703,8 +3725,7 @@ static node_t *parse_for_statement(parser_t *parser) {
                     // There's whitespace before '=', don't combine
                     break;
                 }
-                size_t assign_end_pos =
-                    assign_token->position + assign_token->length;
+                size_t assign_end_pos = assign_token->end_position;
                 tokenizer_advance(parser->tokenizer); // consume '='
 
                 // Append '=' to combined string
@@ -3744,8 +3765,7 @@ static node_t *parse_for_statement(parser_t *parser) {
                     combined = new_combined;
                     strcat(combined, value_token->text);
                     // Update end position for next iteration's adjacency check
-                    current_end_pos =
-                        value_token->position + value_token->length;
+                    current_end_pos = value_token->end_position;
                     tokenizer_advance(parser->tokenizer);
                     // Continue loop to check for more '=' (handles a=b=c)
                 } else {

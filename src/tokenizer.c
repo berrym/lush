@@ -40,6 +40,7 @@ static token_t *token_new(token_type_t type, const char *text, size_t length,
                           size_t line, size_t column, size_t position);
 static void token_free(token_t *token);
 static token_t *tokenize_next(tokenizer_t *tokenizer);
+static token_t *tokenize_next_inner(tokenizer_t *tokenizer);
 static token_type_t classify_word(const char *text, size_t length,
                                   bool enable_keywords);
 static bool is_operator_char(char c);
@@ -500,6 +501,11 @@ static token_t *token_new(token_type_t type, const char *text, size_t length,
     token->line = line;
     token->column = column;
     token->position = position;
+    /* end_position is provisional here; tokenize_next() stamps the
+     * authoritative post-token input position over this. The default is
+     * the conservative position + length so consumers that bypass the
+     * wrapper still get a usable value for unquoted tokens. */
+    token->end_position = position + length;
     token->next = NULL;
 
     if (text && length > 0) {
@@ -656,7 +662,24 @@ static void skip_whitespace(tokenizer_t *tokenizer) {
  * @param tokenizer Tokenizer instance
  * @return Next token, or TOK_EOF at end of input
  */
+/* Public wrapper: drives the giant token-recognition switch via
+ * tokenize_next_inner() and then stamps the authoritative end_position
+ * (== tokenizer->position immediately after consumption) on the result.
+ * Every adjacency check in the parser reads this field; centralising
+ * the stamping here means none of the 80+ token_new() call sites have
+ * to know about it. POSIX ASSIGNMENT_WORD and word concatenation rely
+ * on this being correct for quoted strings, command substitutions,
+ * expansions, and other tokens whose stored text length differs from
+ * the consumed input span. */
 static token_t *tokenize_next(tokenizer_t *tokenizer) {
+    token_t *tok = tokenize_next_inner(tokenizer);
+    if (tok && tokenizer) {
+        tok->end_position = tokenizer->position;
+    }
+    return tok;
+}
+
+static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
     if (!tokenizer || tokenizer->position >= tokenizer->input_length) {
         return token_new(TOK_EOF, NULL, 0, tokenizer ? tokenizer->line : 1,
                          tokenizer ? tokenizer->column : 1,
