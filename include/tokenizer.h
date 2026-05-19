@@ -114,12 +114,26 @@ typedef enum {
 // Token structure for parser
 typedef struct token {
     token_type_t type;
-    char *text;         // Token text (null-terminated)
-    size_t length;      // Token length
-    size_t line;        // Line number (1-based)
-    size_t column;      // Column number (1-based)
-    size_t position;    // Absolute position in input
-    struct token *next; // For token stream
+    char *text;           // Token text (null-terminated, may differ from
+                          // raw input: quoted strings strip surrounding
+                          // quotes, expansions store inner expression).
+    size_t length;        // strlen(text) -- byte count of the stored
+                          // textual content (NOT the consumed input
+                          // span; use end_position for that).
+    size_t line;          // Line number (1-based)
+    size_t column;        // Column number (1-based)
+    size_t position;      // Byte offset where this token starts in input.
+    size_t end_position;  // Byte offset immediately AFTER the token's
+                          // consumed input span. For unquoted tokens this
+                          // equals position + length; for quoted strings,
+                          // expansions, and command substitutions it
+                          // includes the consumed delimiters/escapes.
+                          // The shell-word adjacency rule (POSIX 2.10.2
+                          // ASSIGNMENT_WORD and word concatenation) uses
+                          // this field: two tokens are part of the same
+                          // shell word iff token2.position ==
+                          // token1.end_position.
+    struct token *next;   // For token stream
 } token_t;
 
 // Tokenizer state for parser
