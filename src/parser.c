@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 
 // Forward declarations
@@ -371,7 +372,16 @@ void parser_exit_recursion(parser_t *parser) {
         /* In debug builds this would be an assertion failure.
          * In release, we just prevent underflow. */
 #ifndef NDEBUG
-        fprintf(stderr, "PARSER BUG: recursion depth underflow\n");
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_ASSERTION, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
+            "parser internal: recursion depth underflow");
+        if (err) {
+            shell_error_set_suggestion(
+                err, "mismatched parser_enter_construct/parser_exit_construct "
+                     "pair -- please report with a reproducer");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
 #endif
         return;
     }
