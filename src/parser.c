@@ -4424,8 +4424,20 @@ static node_t *parse_case_statement(parser_t *parser) {
                 break;
             }
             if (tokenizer_match(parser->tokenizer, TOK_SEMICOLON)) {
+                token_t *current_semi = tokenizer_current(parser->tokenizer);
                 token_t *next = tokenizer_peek(parser->tokenizer);
-                if (next && next->type == TOK_SEMICOLON) {
+                /* `;;` is the case_terminator only when the two
+                 * semicolons are positionally adjacent. `echo b; ;;
+                 * esac` is valid POSIX: a single `;` separator followed
+                 * by the `;;` terminator. Without the adjacency check
+                 * the parser would consume the first standalone `;`
+                 * together with the first `;` of `;;`, leaving the
+                 * trailing `;` to look like the start of a new
+                 * case_item -- which then fails pattern parsing. bash
+                 * and dash both require `;;` to be a single
+                 * unspaced token. */
+                if (next && next->type == TOK_SEMICOLON && current_semi &&
+                    next->position == current_semi->end_position) {
                     // ;; - break (default)
                     terminator = CASE_TERM_BREAK;
                     tokenizer_advance(parser->tokenizer); // First ;

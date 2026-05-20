@@ -1,0 +1,11 @@
+# for_arith with empty / partial expressions
+for ((;;)); do
+    break
+done
+for ((i=0;;)); do
+    [ $i -ge 3 ] && break
+    i=$((i+1))
+done
+for ((;i<5;)); do
+    i=$((i+1))
+done

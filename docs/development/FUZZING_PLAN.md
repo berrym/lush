@@ -1,7 +1,7 @@
 # Fuzzing Plan
 
 **Branch:** `grammar-fuzzing`
-**Status:** Phase 1 baselined 2026-05-19 (clean, see below). Phase 3 differential harness operational (76 mode-tagged seeds, all green). Phases 2 and 4 not started.
+**Status:** Phase 1 baselined and Phase 2 gap-seeds added 2026-05-19. Phase 3 differential harness operational (76 mode-tagged seeds, all green). Phase 4 not started.
 **Predecessor:** `parser-grammar-spec` branch (merged to master). The grammar artifact `docs/development/grammar/LUSH_GRAMMAR.ebnf` is the input for several phases below.
 
 ## Why this branch exists
@@ -61,6 +61,32 @@ This is mechanical translation work, not invention — the grammar already exist
 **Deliverable:** `tests/fuzz/corpus/parser/grammar_seeds/` directory with one file per production, each named after the production it exercises
 
 **Done when:** every production in `LUSH_GRAMMAR.ebnf` has at least one seed input that exercises it.
+
+**Phase 2 seeds added 2026-05-19** (16 inputs, `066_*.sh` through `081_*.sh`, in `tests/fuzz/corpus/parser/`):
+
+| Seed                           | Production / construct exercised                          |
+|--------------------------------|-----------------------------------------------------------|
+| 066_fd_alloc.sh                | fd_alloc_redirection `{name}>file` (bash 4.1+ / zsh)      |
+| 067_clobber_redirect.sh        | file_redir_op `>|` (clobber override)                     |
+| 068_combined_redirect.sh       | file_redir_op `&>` / `&>>`                                |
+| 069_for_arith_empty.sh         | for_arith with empty arith_expr slots                     |
+| 070_for_no_in.sh               | for_posix with `in` omitted (defaults to "$@")            |
+| 071_subshell_redirect.sh       | subshell with trailing_redirections                       |
+| 072_if_redirect.sh             | if_statement with trailing_redirections                   |
+| 073_while_redirect.sh          | while/until with trailing_redirections                    |
+| 074_case_redirect.sh           | case_statement with trailing_redirections                 |
+| 075_proc_sub_redirect.sh       | process_substitution as redirection_target               |
+| 076_fd_var_target.sh           | fd_target = TOK_VARIABLE in fd_dup_op                     |
+| 077_lush_func_params.sh        | parameter with default (single-param form; #107)          |
+| 078_array_mixed.sh             | array_literal mixed positional + indexed array_element    |
+| 079_subscript_assign.sh        | NAME[subscript]=value subscript assignment                |
+| 080_multi_heredoc.sh           | multiple heredoc_redirection on one command + quoted delims |
+| 081_empty_bodies.sh            | empty / minimal command_body across compounds            |
+
+Two real parser bugs were surfaced while constructing the seeds:
+
+- `case x in a) echo b; ;; esac` was rejected because the parser treated a non-adjacent pair of `;` as the `;;` terminator. Fixed in this commit by requiring `;;` to be positionally adjacent via `token->end_position`.
+- `f(a, b) { :; }` (multi-parameter lush functions) is broken because the tokenizer absorbs `,` into the preceding TOK_WORD. Tracked as #107.
 
 ### Phase 3 — Mode-aware differential test harness (2-3 days, the architectural piece)
 
