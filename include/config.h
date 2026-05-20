@@ -793,32 +793,10 @@ bool config_script_exists(const char *path);
  * ============================================================================
  */
 
-/**
- * @brief Report a configuration error
- *
- * Prints a formatted error message with file and line information.
- *
- * @param format printf-style format string
- * @param ... Format arguments
- */
-void config_error(const char *format, ...);
-
-/**
- * @brief Report a configuration warning
- *
- * Prints a formatted warning message with file and line information.
- *
- * @param format printf-style format string
- * @param ... Format arguments
- */
-void config_warning(const char *format, ...);
-
-/**
- * @brief Get the last configuration error message
- *
- * @return Error message string, or NULL if no error
- */
-const char *config_get_last_error(void);
+/* config_error(), config_warning(), and config_get_last_error() were
+ * removed as part of the structured-error migration (#71). Use the
+ * shell_error_create() / shell_error_display() / shell_error_free()
+ * API in include/shell_error.h directly at each error site. */
 
 /* ============================================================================
  * Configuration Display Functions

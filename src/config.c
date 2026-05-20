@@ -20,6 +20,7 @@
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_compare.h"
 #include "lush.h"
+#include "shell_error.h"
 #include "shell_mode.h"
 #include "symtable.h"
 
@@ -44,7 +45,9 @@ config_context_t config_ctx;
 static config_section_t current_section = CONFIG_SECTION_NONE;
 
 // Error handling
-static char last_error[256] = "";
+/* `last_error` and the config_error/warning wrappers were removed as
+ * part of the structured-error migration (#71); their callers now use
+ * shell_error_create() directly. */
 
 // ============================================================================
 // INTERNAL TYPE DEFINITIONS
@@ -1556,9 +1559,15 @@ int config_execute_system_profile(void) {
     // This runs in native lush mode since it's a lush-specific file
     if (config_script_exists("/etc/lushrc")) {
         if (config_execute_script_file("/etc/lushrc") != 0) {
-            // Log warning but continue - system config failure shouldn't block
-            // login
-            fprintf(stderr, "lush: warning: error sourcing /etc/lushrc\n");
+            // Log warning but continue - system config failure shouldn't
+            // block login.
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "error sourcing /etc/lushrc");
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             result = -1;
         }
     }
@@ -1572,7 +1581,13 @@ int config_execute_system_profile(void) {
         int script_result = config_execute_script_file("/etc/profile");
         shell_mode_set(saved_mode);
         if (script_result != 0) {
-            fprintf(stderr, "lush: warning: error sourcing /etc/profile\n");
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "error sourcing /etc/profile");
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             result = -1;
         }
     }
@@ -2529,7 +2544,13 @@ int config_migrate_to_xdg(void) {
 
     /* Ensure XDG directory exists */
     if (ensure_xdg_dir_exists() != 0) {
-        config_error("Failed to create config directory");
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
+            "failed to create XDG config directory");
+        if (err) {
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
         return -1;
     }
 
@@ -2542,7 +2563,13 @@ int config_migrate_to_xdg(void) {
     /* Save current config to XDG location in TOML format */
     /* Note: This will be enhanced once registry is wired up */
     if (config_save_file(xdg_path) != 0) {
-        config_error("Failed to save config to %s", xdg_path);
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
+            "failed to save config to %s", xdg_path);
+        if (err) {
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
         return -1;
     }
 
@@ -2648,8 +2675,16 @@ int config_save_user(void) {
             if (stat(xdg_dir, &st) != 0) {
                 /* Directory doesn't exist, create it */
                 if (mkdir(xdg_dir, 0755) != 0 && errno != EEXIST) {
-                    config_error("Failed to create config directory: %s",
-                                 xdg_dir);
+                    int saved_errno = errno;
+                    shell_error_t *err = shell_error_create(
+                        SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR,
+                        SOURCE_LOC_UNKNOWN,
+                        "failed to create config directory %s: %s", xdg_dir,
+                        strerror(saved_errno));
+                    if (err) {
+                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                        shell_error_free(err);
+                    }
                     /* Fall back to current path */
                     if (config_ctx.user_config_path) {
                         return config_save_file(config_ctx.user_config_path);
@@ -2813,7 +2848,16 @@ int config_load_file(const char *path) {
             return 0;
         }
         /* Fall through to legacy parser on failure */
-        config_warning("TOML parsing failed, trying legacy format");
+        {
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN,
+                "TOML parsing failed, trying legacy format");
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
+        }
     }
 
     /* Legacy INI-style parser */
@@ -2839,8 +2883,18 @@ int config_load_file(const char *path) {
         }
 
         if (config_parse_line(line, config_ctx.line_number, path) != 0) {
-            config_warning("Error parsing line %d in %s",
-                           config_ctx.line_number, path);
+            source_location_t loc = {.filename = path,
+                                     .line = config_ctx.line_number,
+                                     .column = 0,
+                                     .offset = 0,
+                                     .length = 0};
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_WARNING, loc,
+                "error parsing config line");
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
         }
     }
 
@@ -2873,20 +2927,46 @@ int config_parse_line(const char *line, int line_num, const char *filename) {
         return 0;
     }
 
+    /* Helper closure-style scaffolding: each error site below needs a
+     * source_location_t pointing into the config file. Building it
+     * inline keeps the migration symmetric with the executor's error
+     * sites, per feedback-direct-api-error-system. */
+
     // Check for section header
     if (*trimmed == '[') {
         const char *end = strchr(trimmed, ']');
         if (!end) {
-            config_error("Invalid section header at line %d in %s", line_num,
-                         filename);
+            source_location_t loc = {.filename = filename,
+                                     .line = (size_t)line_num,
+                                     .column = 0,
+                                     .offset = 0,
+                                     .length = 0};
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "invalid section header (missing closing ']')");
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return -1;
         }
 
         char section_name[64];
         size_t section_len = end - trimmed - 1;
         if (section_len >= sizeof(section_name)) {
-            config_error("Section name too long at line %d in %s", line_num,
-                         filename);
+            source_location_t loc = {.filename = filename,
+                                     .line = (size_t)line_num,
+                                     .column = 0,
+                                     .offset = 0,
+                                     .length = 0};
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "section name too long (max %zu chars)",
+                sizeof(section_name) - 1);
+            if (err) {
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return -1;
         }
 
@@ -2899,8 +2979,18 @@ int config_parse_line(const char *line, int line_num, const char *filename) {
     // Parse key=value pair
     char *equals = strchr(trimmed, '=');
     if (!equals) {
-        config_error("Invalid configuration line at %d in %s", line_num,
-                     filename);
+        source_location_t loc = {.filename = filename,
+                                 .line = (size_t)line_num,
+                                 .column = 0,
+                                 .offset = 0,
+                                 .length = 0};
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+            "invalid configuration line (expected key=value)");
+        if (err) {
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
         return -1;
     }
 
@@ -2908,8 +2998,18 @@ int config_parse_line(const char *line, int line_num, const char *filename) {
     char key[128];
     size_t key_len = equals - trimmed;
     if (key_len >= sizeof(key)) {
-        config_error("Configuration key too long at line %d in %s", line_num,
-                     filename);
+        source_location_t loc = {.filename = filename,
+                                 .line = (size_t)line_num,
+                                 .column = 0,
+                                 .offset = 0,
+                                 .length = 0};
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+            "configuration key too long (max %zu chars)", sizeof(key) - 1);
+        if (err) {
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
         return -1;
     }
 
@@ -2957,7 +3057,13 @@ int config_parse_section(const char *section_name) {
     } else if (strcmp(section_name, "scripts") == 0) {
         current_section = CONFIG_SECTION_SCRIPTS;
     } else {
-        config_warning("Unknown configuration section: %s", section_name);
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+            "unknown configuration section: %s", section_name);
+        if (err) {
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
         current_section = CONFIG_SECTION_NONE;
         return -1;
     }
@@ -3003,9 +3109,15 @@ int config_parse_option(const char *key, const char *value) {
                            strcmp(value, "no") == 0) {
                     config_set_shell_option(key, false);
                 } else {
-                    config_error(
-                        "Invalid boolean value '%s' for shell option '%s'",
+                    shell_error_t *err = shell_error_create(
+                        SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
+                        SOURCE_LOC_UNKNOWN,
+                        "invalid boolean value '%s' for shell option '%s'",
                         value, key);
+                    if (err) {
+                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                        shell_error_free(err);
+                    }
                     return -1;
                 }
                 return 0;
@@ -3013,7 +3125,14 @@ int config_parse_option(const char *key, const char *value) {
 
             // Validate value if validator exists
             if (opt->validator && !opt->validator(value)) {
-                config_error("Invalid value '%s' for option '%s'", value, key);
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
+                    SOURCE_LOC_UNKNOWN, "invalid value '%s' for option '%s'",
+                    value, key);
+                if (err) {
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                }
                 return -1;
             }
 
@@ -3069,7 +3188,15 @@ int config_parse_option(const char *key, const char *value) {
         return 0;
     }
 
-    config_warning("Unknown configuration option: %s", key);
+    {
+        shell_error_t *err = shell_error_create(
+            SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_WARNING, SOURCE_LOC_UNKNOWN,
+            "unknown configuration option: %s", key);
+        if (err) {
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
+    }
     return -1;
 }
 
@@ -3302,47 +3429,14 @@ bool config_validate_shell_mode(const char *value) {
             strcmp(value, "sh") == 0); /* sh is alias for posix */
 }
 
-/**
- * @brief Report a configuration error
- *
- * Formats and prints an error message to stderr.
- *
- * @param format Printf-style format string
- * @param ... Format arguments
- */
-void config_error(const char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    vsnprintf(last_error, sizeof(last_error), format, args);
-    va_end(args);
-
-    fprintf(stderr, "Config Error: %s\n", last_error);
-}
-
-/**
- * @brief Report a configuration warning
- *
- * Formats and prints a warning message to stderr.
- *
- * @param format Printf-style format string
- * @param ... Format arguments
- */
-void config_warning(const char *format, ...) {
-    char warning[256];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(warning, sizeof(warning), format, args);
-    va_end(args);
-
-    fprintf(stderr, "Config Warning: %s\n", warning);
-}
-
-/**
- * @brief Get the last configuration error message
- *
- * @return Last error message string
- */
-const char *config_get_last_error(void) { return last_error; }
+/* config_error(), config_warning(), and config_get_last_error() removed
+ * 2026-05-20 as part of the structured-error migration (#71). The
+ * domain-specific helpers were a layering violation per
+ * feedback-direct-api-error-system; every former caller now invokes
+ * shell_error_create() directly with the appropriate SHELL_ERR_*
+ * code, severity, and source_location_t (with line+filename when the
+ * caller is inside the config-file parser, SOURCE_LOC_UNKNOWN otherwise).
+ * The static `last_error` buffer is gone with the wrapper that fed it. */
 
 /* ============================================================================
  * Type-Safe Configuration Setters and Getters

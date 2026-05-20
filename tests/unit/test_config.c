@@ -592,17 +592,12 @@ TEST(config_script_execution_control) {
  * ============================================================================
  */
 
-TEST(config_error_message) {
-    config_init();
-
-    /* Trigger an error by parsing invalid option */
-    config_set_bool("nonexistent.option", true);
-
-    /* Get last error should return something */
-    const char *error = config_get_last_error();
-    /* Error may or may not be set depending on implementation */
-    (void)error; /* Suppress unused warning */
-}
+/* config_error_message was removed in the structured-error migration
+ * (#71). The legacy config_get_last_error() / last_error globals it
+ * exercised are gone; config-parsing errors now surface via the
+ * shell_error_display() pipeline directly to stderr, so there is no
+ * "last error" value to query from a follow-up test. The structured
+ * error pipeline itself is exercised by tests/unit/test_shell_error.c. */
 
 /* ============================================================================
  * SCRIPT PATH DETECTION TESTS
@@ -761,7 +756,7 @@ int main(void) {
 
     /* Error handling */
     printf("\n=== Error Handling Tests ===\n");
-    RUN_TEST(config_error_message);
+    /* RUN_TEST(config_error_message) removed -- see #71 migration */
 
     /* Script path detection */
     printf("\n=== Script Path Detection Tests ===\n");
