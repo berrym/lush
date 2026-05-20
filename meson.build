@@ -276,6 +276,12 @@ display_sources = [
   'src/globals.c',
   'src/strings.c',
   'src/errors.c',
+  # display_integration.c reports subsystem-init failures through the
+  # structured error system (#71), so the unit-test display_lib needs
+  # shell_error.c too. The main lush executable picks up shell_error.c
+  # via `src` directly and doesn't link this library, so there are no
+  # duplicate-symbol concerns.
+  'src/shell_error.c',
 ]
 
 display_lib = static_library('display',

@@ -155,9 +155,14 @@ typedef enum shell_error_code {
 
     /* Internal errors (1500-1599) */
     SHELL_ERR_INTERNAL_BASE = 1500,
-    SHELL_ERR_ASSERTION,        /**< Internal assertion failed */
-    SHELL_ERR_STATE_CORRUPTION, /**< Internal state corruption */
-    SHELL_ERR_NOT_IMPLEMENTED,  /**< Feature not implemented */
+    SHELL_ERR_ASSERTION,             /**< Internal assertion failed */
+    SHELL_ERR_STATE_CORRUPTION,      /**< Internal state corruption */
+    SHELL_ERR_NOT_IMPLEMENTED,       /**< Feature not implemented */
+    SHELL_ERR_SUBSYSTEM_INIT_FAILED, /**< A startup-time subsystem (display,
+                                        history, completion, etc.) failed to
+                                        initialise. The message identifies
+                                        the subsystem and any inner error
+                                        code returned by it. */
     SHELL_ERR_INTERNAL_MAX = 1599,
 
 } shell_error_code_t;
