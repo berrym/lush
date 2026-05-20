@@ -227,12 +227,152 @@ TEST(ssh_source_skips_remote_path_syntax) {
     ssh_test_teardown(&fx);
 }
 
+/* /etc/hosts parser tests ------------------------------------------------ */
+
+/* Write `body` to a fresh temp file and return its path (heap-allocated;
+ * caller frees and unlinks). NULL on failure. */
+static char *write_temp_file(const char *body) {
+    char tmpl[] = "/tmp/lush_etc_hosts_XXXXXX";
+    int fd = mkstemp(tmpl);
+    if (fd < 0) {
+        return NULL;
+    }
+    size_t n = strlen(body);
+    if (write(fd, body, n) != (ssize_t)n) {
+        close(fd);
+        unlink(tmpl);
+        return NULL;
+    }
+    close(fd);
+    return strdup(tmpl);
+}
+
+TEST(etc_hosts_parses_primary_and_aliases) {
+    /* Standard /etc/hosts shape: IP, primary, two aliases. All three
+     * names should land in the cache. */
+    const char *body = "127.0.0.1 localhost loopback lo\n"
+                       "192.168.1.5 fileserver fs\n";
+    char *path = write_temp_file(body);
+    if (!path) {
+        TEST_FAIL_MSG("could not write temp /etc/hosts fixture");
+        return;
+    }
+
+    ssh_host_cache_t *cache = ssh_host_cache_create(64);
+    int n = ssh_parse_etc_hosts(path, cache);
+
+    bool got_localhost = ssh_host_cache_find(cache, "localhost") != NULL;
+    bool got_loopback = ssh_host_cache_find(cache, "loopback") != NULL;
+    bool got_lo = ssh_host_cache_find(cache, "lo") != NULL;
+    bool got_fs = ssh_host_cache_find(cache, "fileserver") != NULL;
+    bool got_fs_alias = ssh_host_cache_find(cache, "fs") != NULL;
+
+    ssh_host_cache_destroy(cache);
+    unlink(path);
+    free(path);
+
+    if (n != 5) {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "expected 5 hosts added, got %d", n);
+        TEST_FAIL_MSG(msg);
+        return;
+    }
+    if (!(got_localhost && got_loopback && got_lo && got_fs && got_fs_alias)) {
+        TEST_FAIL_MSG("missing one or more expected aliases from /etc/hosts");
+        return;
+    }
+}
+
+TEST(etc_hosts_skips_comments_and_blanks) {
+    /* `#`-prefixed comment lines, blank lines, and end-of-line comments
+     * must not produce candidates. */
+    const char *body = "# leading comment\n"
+                       "\n"
+                       "10.0.0.1 alpha   # this is the gateway\n"
+                       "   # indented comment\n"
+                       "10.0.0.2 beta\n";
+    char *path = write_temp_file(body);
+    if (!path) {
+        TEST_FAIL_MSG("could not write fixture");
+        return;
+    }
+
+    ssh_host_cache_t *cache = ssh_host_cache_create(64);
+    int n = ssh_parse_etc_hosts(path, cache);
+
+    bool got_alpha = ssh_host_cache_find(cache, "alpha") != NULL;
+    bool got_beta = ssh_host_cache_find(cache, "beta") != NULL;
+    bool got_comment = ssh_host_cache_find(cache, "this") != NULL ||
+                       ssh_host_cache_find(cache, "comment") != NULL;
+
+    ssh_host_cache_destroy(cache);
+    unlink(path);
+    free(path);
+
+    if (n != 2 || !got_alpha || !got_beta || got_comment) {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "expected only alpha+beta, got n=%d (alpha=%d beta=%d "
+                 "comment-as-host=%d)",
+                 n, (int)got_alpha, (int)got_beta, (int)got_comment);
+        TEST_FAIL_MSG(msg);
+        return;
+    }
+}
+
+TEST(etc_hosts_dedupes_against_higher_priority_source) {
+    /* If a host is already in the cache (e.g., from ssh_config) the
+     * /etc/hosts entry is skipped so the higher-priority entry wins. */
+    const char *body = "1.2.3.4 production-host\n";
+    char *path = write_temp_file(body);
+    if (!path) {
+        TEST_FAIL_MSG("could not write fixture");
+        return;
+    }
+
+    ssh_host_cache_t *cache = ssh_host_cache_create(64);
+
+    /* Pre-populate with a fake higher-priority entry. */
+    ssh_host_t existing = {0};
+    strncpy(existing.hostname, "production-host", SSH_MAX_HOSTNAME_LEN - 1);
+    existing.priority = 100;
+    ssh_host_cache_add(cache, &existing);
+
+    int n = ssh_parse_etc_hosts(path, cache);
+
+    ssh_host_t *found = ssh_host_cache_find(cache, "production-host");
+    int priority_after = found ? found->priority : -1;
+
+    ssh_host_cache_destroy(cache);
+    unlink(path);
+    free(path);
+
+    if (n != 0) {
+        char msg[64];
+        snprintf(msg, sizeof(msg),
+                 "expected 0 new hosts (dedupe), got %d", n);
+        TEST_FAIL_MSG(msg);
+        return;
+    }
+    if (priority_after != 100) {
+        char msg[64];
+        snprintf(msg, sizeof(msg),
+                 "expected higher-priority entry preserved, got pri %d",
+                 priority_after);
+        TEST_FAIL_MSG(msg);
+        return;
+    }
+}
+
 int main(void) {
     printf("=== SSH Host Completion Tests ===\n\n");
 
     RUN_TEST(ssh_source_emits_configured_host);
     RUN_TEST(ssh_source_preserves_user_at_prefix);
     RUN_TEST(ssh_source_skips_remote_path_syntax);
+    RUN_TEST(etc_hosts_parses_primary_and_aliases);
+    RUN_TEST(etc_hosts_skips_comments_and_blanks);
+    RUN_TEST(etc_hosts_dedupes_against_higher_priority_source);
 
     return TEST_RESULT();
 }

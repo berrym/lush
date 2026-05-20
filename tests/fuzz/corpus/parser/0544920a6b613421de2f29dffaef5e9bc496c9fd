@@ -1,0 +1,5 @@
+X=1
+Y=2 Z=3
+EMPTY=
+QOTED="h%llo world"
+PATHADDED="$PATHocal/bin"

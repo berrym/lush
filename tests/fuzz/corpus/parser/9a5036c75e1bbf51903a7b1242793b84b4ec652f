@@ -1,0 +1,7 @@
+case "$0" in
+ ;;
+    stop)
+(      case "$x" in
+ hileop)
+(   b;;
+esac

@@ -88,7 +88,10 @@ int bin_display(int argc, char **argv) {
         // Show detailed configuration
         display_integration_config_t config;
         if (!display_integration_get_config(&config)) {
-            fprintf(stderr, "display: Failed to get configuration\n");
+            executor_error_report(current_executor,
+                                  SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                                  builtin_get_source_location(),
+                                  "display: failed to get configuration");
             return 1;
         }
 
@@ -138,7 +141,10 @@ int bin_display(int argc, char **argv) {
         // Show performance statistics
         display_integration_stats_t stats;
         if (!display_integration_get_stats(&stats)) {
-            fprintf(stderr, "display: Failed to get statistics\n");
+            executor_error_report(current_executor,
+                                  SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                                  builtin_get_source_location(),
+                                  "display: failed to get statistics");
             return 1;
         }
 
@@ -237,9 +243,10 @@ int bin_display(int argc, char **argv) {
                 printf("Targets: Cache hit rate >75%%, Display timing <50ms\n");
                 return 0;
             } else {
-                fprintf(
-                    stderr,
-                    "display: Failed to initialize performance monitoring\n");
+                executor_error_report(
+                    current_executor, SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                    builtin_get_source_location(),
+                    "display: failed to initialise performance monitoring");
                 return 1;
             }
 
@@ -248,8 +255,10 @@ int bin_display(int argc, char **argv) {
             if (display_integration_perf_monitor_report(detailed)) {
                 return 0;
             } else {
-                fprintf(stderr,
-                        "display: Failed to generate performance report\n");
+                executor_error_report(
+                    current_executor, SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                    builtin_get_source_location(),
+                    "display: failed to generate performance report");
                 return 1;
             }
 
@@ -266,8 +275,11 @@ int bin_display(int argc, char **argv) {
                 printf("Performance baseline established\n");
                 return 0;
             } else {
-                fprintf(stderr, "display: Failed to establish baseline (need "
-                                "more measurements)\n");
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(),
+                    "display: failed to establish baseline (need more "
+                    "measurements)");
                 return 1;
             }
 
@@ -276,8 +288,10 @@ int bin_display(int argc, char **argv) {
                 printf("Performance metrics reset\n");
                 return 0;
             } else {
-                fprintf(stderr,
-                        "display: Failed to reset performance metrics\n");
+                executor_error_report(
+                    current_executor, SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                    builtin_get_source_location(),
+                    "display: failed to reset performance metrics");
                 return 1;
             }
 
@@ -295,15 +309,19 @@ int bin_display(int argc, char **argv) {
                                               : "! NEEDS OPTIMIZATION");
                 return 0;
             } else {
-                fprintf(stderr,
-                        "display: Failed to check performance targets\n");
+                executor_error_report(
+                    current_executor, SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                    builtin_get_source_location(),
+                    "display: failed to check performance targets");
                 return 1;
             }
 
         } else if (strcmp(perf_cmd, "monitoring") == 0) {
             if (argc < 4) {
-                fprintf(stderr,
-                        "display: 'monitoring' requires 'on' or 'off'\n");
+                executor_error_report(
+                    current_executor, SHELL_ERR_MISSING_ARGUMENT,
+                    builtin_get_source_location(),
+                    "display performance monitoring: requires 'on' or 'off'");
                 return 1;
             }
 
@@ -313,9 +331,10 @@ int bin_display(int argc, char **argv) {
                     printf("Real-time performance monitoring enabled (10Hz)\n");
                     return 0;
                 } else {
-                    fprintf(
-                        stderr,
-                        "display: Failed to enable performance monitoring\n");
+                    executor_error_report(
+                        current_executor, SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                        builtin_get_source_location(),
+                        "display performance monitoring: failed to enable");
                     return 1;
                 }
             } else if (strcmp(state, "off") == 0) {
@@ -323,16 +342,19 @@ int bin_display(int argc, char **argv) {
                     printf("Real-time performance monitoring disabled\n");
                     return 0;
                 } else {
-                    fprintf(
-                        stderr,
-                        "display: Failed to disable performance monitoring\n");
+                    executor_error_report(
+                        current_executor, SHELL_ERR_SUBSYSTEM_INIT_FAILED,
+                        builtin_get_source_location(),
+                        "display performance monitoring: failed to disable");
                     return 1;
                 }
             } else {
-                fprintf(stderr,
-                        "display: Invalid monitoring state '%s' (use 'on' or "
-                        "'off')\n",
-                        state);
+                executor_error_report(
+                    current_executor, SHELL_ERR_INVALID_ARGUMENT,
+                    builtin_get_source_location(),
+                    "display performance monitoring: invalid state '%s' "
+                    "(use 'on' or 'off')",
+                    state);
                 return 1;
             }
 
@@ -379,11 +401,36 @@ int bin_display(int argc, char **argv) {
             return 0;
 
         } else {
-            fprintf(stderr, "display: Unknown performance command '%s'\n",
-                    perf_cmd);
-            fprintf(
-                stderr,
-                "display: Use 'display performance' for available commands\n");
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "display performance: unknown subcommand '%s'", perf_cmd);
+            if (err) {
+                if (current_executor && SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line, loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                if (current_executor) {
+                    for (size_t i = 0; i < current_executor->context_depth &&
+                                       i < SHELL_ERROR_CONTEXT_MAX;
+                         i++) {
+                        if (current_executor->context_stack[i]) {
+                            shell_error_push_context(
+                                err, "%s", current_executor->context_stack[i]);
+                        }
+                    }
+                }
+                shell_error_set_suggestion(
+                    err, "run 'display performance' with no subcommand to "
+                         "see the available commands");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return 1;
         }
 
@@ -463,9 +510,35 @@ int bin_display(int argc, char **argv) {
         } else if (strcmp(lle_cmd, "completion") == 0) {
             return display_lle_completion(argc - 2, argv + 2);
         } else {
-            fprintf(stderr, "display lle: Unknown command '%s'\n", lle_cmd);
-            fprintf(stderr,
-                    "display lle: Use 'display lle' for usage information\n");
+            source_location_t loc = builtin_get_source_location();
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR, loc,
+                "display lle: unknown subcommand '%s'", lle_cmd);
+            if (err) {
+                if (current_executor && SOURCE_LOC_VALID(loc)) {
+                    char *src_line =
+                        executor_get_source_line(current_executor, loc.line);
+                    if (src_line) {
+                        shell_error_set_source_line(err, src_line, loc.column,
+                                                    loc.column + loc.length);
+                        free(src_line);
+                    }
+                }
+                if (current_executor) {
+                    for (size_t i = 0; i < current_executor->context_depth &&
+                                       i < SHELL_ERROR_CONTEXT_MAX;
+                         i++) {
+                        if (current_executor->context_stack[i]) {
+                            shell_error_push_context(
+                                err, "%s", current_executor->context_stack[i]);
+                        }
+                    }
+                }
+                shell_error_set_suggestion(
+                    err, "run 'display lle' with no subcommand to see usage");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             return 1;
         }
 
@@ -507,8 +580,35 @@ int bin_display(int argc, char **argv) {
         return 0;
 
     } else {
-        fprintf(stderr, "display: Unknown command '%s'\n", subcmd);
-        fprintf(stderr, "display: Use 'display help' for usage information\n");
+        source_location_t loc = builtin_get_source_location();
+        shell_error_t *err =
+            shell_error_create(SHELL_ERR_INVALID_ARGUMENT, SHELL_SEVERITY_ERROR,
+                               loc, "display: unknown subcommand '%s'", subcmd);
+        if (err) {
+            if (current_executor && SOURCE_LOC_VALID(loc)) {
+                char *src_line =
+                    executor_get_source_line(current_executor, loc.line);
+                if (src_line) {
+                    shell_error_set_source_line(err, src_line, loc.column,
+                                                loc.column + loc.length);
+                    free(src_line);
+                }
+            }
+            if (current_executor) {
+                for (size_t i = 0; i < current_executor->context_depth &&
+                                   i < SHELL_ERROR_CONTEXT_MAX;
+                     i++) {
+                    if (current_executor->context_stack[i]) {
+                        shell_error_push_context(
+                            err, "%s", current_executor->context_stack[i]);
+                    }
+                }
+            }
+            shell_error_set_suggestion(
+                err, "run 'display help' to see the available subcommands");
+            shell_error_display(err, stderr, isatty(STDERR_FILENO));
+            shell_error_free(err);
+        }
         return 1;
     }
 }

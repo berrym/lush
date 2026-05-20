@@ -343,6 +343,7 @@ executor_t *executor_new(void) {
         executor->context_stack[i] = NULL;
         executor->context_locations[i] = SOURCE_LOC_UNKNOWN;
     }
+    executor->active_loc = SOURCE_LOC_UNKNOWN;
 
     /* Initialize process substitution fd tracking */
     executor->procsub_fd_count = 0;
@@ -398,6 +399,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
         executor->context_stack[i] = NULL;
         executor->context_locations[i] = SOURCE_LOC_UNKNOWN;
     }
+    executor->active_loc = SOURCE_LOC_UNKNOWN;
 
     /* Initialize process substitution fd tracking */
     executor->procsub_fd_count = 0;
@@ -620,6 +622,45 @@ void executor_pop_context(executor_t *executor) {
     free(executor->context_stack[executor->context_depth]);
     executor->context_stack[executor->context_depth] = NULL;
     executor->context_locations[executor->context_depth] = SOURCE_LOC_UNKNOWN;
+}
+
+/**
+ * @brief Best-effort current source location for an error site.
+ *
+ * Resolution order (most-specific first):
+ *   1. Top of `context_locations[]` if any enclosing construct has
+ *      been pushed (pipeline, while/for/until, brace group, subshell,
+ *      case, function call, etc.). Same data that drives the
+ *      `= while: ...` context lines in rendered errors.
+ *   2. `executor->active_loc`, set by execute_command() to the
+ *      currently-executing simple command's location. Covers the
+ *      top-level naked-command case (no enclosing construct) so
+ *      e.g. `lush -c 'x=${unset:?msg}'` still gets `--> file:line:col`.
+ *   3. SOURCE_LOC_UNKNOWN -- only when nothing is executing.
+ *
+ * Mirrors `builtin_get_source_location()`. Used by the expansion
+ * subsystem and by builtin paths that lack a direct AST node
+ * (e.g. cd's CDPATH branch) so user-visible errors carry source-
+ * location info instead of dropping the snippet block entirely.
+ *
+ * Expansion-byte-offset precision (highlighting the specific `${...}`
+ * span within the command) is a precision pass for future work; it
+ * would compose cleanly on top of this baseline by threading a
+ * `source_location_t` through `expand_variable` /
+ * `parse_parameter_expansion` and overriding tier 1/2 at error sites.
+ */
+static source_location_t executor_current_loc(executor_t *executor) {
+    if (!executor) {
+        return SOURCE_LOC_UNKNOWN;
+    }
+    if (executor->context_depth > 0) {
+        return executor->context_locations[executor->context_depth - 1];
+    }
+    if (SOURCE_LOC_VALID(executor->active_loc) ||
+        executor->active_loc.filename != NULL) {
+        return executor->active_loc;
+    }
+    return SOURCE_LOC_UNKNOWN;
 }
 
 /**
@@ -1418,10 +1459,29 @@ static void prefix_restore_and_free(prefix_save_t *saves, int n) {
     free(saves);
 }
 
+static int execute_command_inner(executor_t *executor, node_t *command);
+
+/* Public execute_command(): thin wrapper that stashes the command's
+ * source location on the executor so the expansion subsystem (and
+ * any path that can't reach an AST node directly) can surface
+ * `--> file:line:col` via executor_current_loc(). The inner function
+ * holds the actual ~500-line dispatch body; the save/restore around
+ * it lets nested execute_command calls (function bodies, sourced
+ * scripts, etc.) update active_loc without clobbering an enclosing
+ * caller's location on the way out. */
 static int execute_command(executor_t *executor, node_t *command) {
     if (!command || command->type != NODE_COMMAND) {
         return 1;
     }
+    source_location_t saved_active_loc = executor->active_loc;
+    executor->active_loc = command->loc;
+    int result = execute_command_inner(executor, command);
+    executor->active_loc = saved_active_loc;
+    return result;
+}
+
+static int execute_command_inner(executor_t *executor, node_t *command) {
+    /* command non-null and NODE_COMMAND is guaranteed by the wrapper. */
 
     // Reset expansion error flags for this command
     executor->expansion_error = false;
@@ -1798,7 +1858,7 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                     /* Failed to change directory, show error */
                     shell_error_t *error = shell_error_create(
                         SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
-                        SOURCE_LOC_UNKNOWN, "cd: %s: %s", argv[0],
+                        executor_current_loc(executor), "cd: %s: %s", argv[0],
                         strerror(errno));
                     shell_error_display(error, stderr, isatty(STDERR_FILENO));
                     shell_error_free(error);
@@ -10604,7 +10664,8 @@ static char *handle_required_param_error(executor_t *executor,
                                          const char *default_msg) {
     const char *msg = (word && *word) ? word : default_msg;
     executor_error_report(executor, SHELL_ERR_PARAMETER_NULL_OR_UNSET,
-                          SOURCE_LOC_UNKNOWN, "%s: %s", var_name, msg);
+                          executor_current_loc(executor), "%s: %s", var_name,
+                          msg);
     executor_request_posix_exit(executor, 1);
     return strdup("");
 }
@@ -13028,8 +13089,8 @@ static char *parse_parameter_expansion(executor_t *executor,
              expansion[0] != '-' && expansion[0] != '!')) {
             // Report structured error for unbound variable
             executor_error_report(executor, SHELL_ERR_UNBOUND_VARIABLE,
-                                  SOURCE_LOC_UNKNOWN, "%s: unbound variable",
-                                  expansion);
+                                  executor_current_loc(executor),
+                                  "%s: unbound variable", expansion);
             // Set expansion error instead of exiting to allow || constructs
             executor->expansion_error = true;
             executor->expansion_exit_status = 1;
@@ -13204,7 +13265,8 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                         // Report structured error for unbound variable
                         executor_error_report(
                             executor, SHELL_ERR_UNBOUND_VARIABLE,
-                            SOURCE_LOC_UNKNOWN, "%s: unbound variable", name);
+                            executor_current_loc(executor),
+                            "%s: unbound variable", name);
                         free(name);
                         // Set expansion error instead of exiting to allow ||
                         // constructs
@@ -13597,8 +13659,9 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
         const char *while_ctx = arithm_error_while();
         const char *help = arithm_error_help();
         shell_error_t *err = shell_error_create(
-            arithm_error_code(), SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
-            "arithmetic: %s", msg ? msg : "evaluation error");
+            arithm_error_code(), SHELL_SEVERITY_ERROR,
+            executor_current_loc(executor), "arithmetic: %s",
+            msg ? msg : "evaluation error");
         if (err) {
             if (while_ctx) {
                 shell_error_push_context(err, "%s", while_ctx);
@@ -13621,12 +13684,13 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
         } else {
             /* Fallback if shell_error_create failed (e.g. OOM) */
             executor_error_report(executor, arithm_error_code(),
-                                  SOURCE_LOC_UNKNOWN, "arithmetic: %s",
+                                  executor_current_loc(executor),
+                                  "arithmetic: %s",
                                   msg ? msg : "evaluation error");
         }
     } else {
         executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX,
-                              SOURCE_LOC_UNKNOWN,
+                              executor_current_loc(executor),
                               "arithmetic: evaluation error");
     }
 

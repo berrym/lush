@@ -16,6 +16,7 @@
 
 #include "lle/syntax_highlighting.h"
 #include <ctype.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -656,11 +657,16 @@ static bool dequote_unquoted_path(const char *path, char *out,
  * as path targets in bash and zsh; the highlighter's filesystem-aware
  * classification should follow.
  *
- * Intentionally narrow: `.bashrc`, `..foo`, `~user`, etc. are NOT
- * treated as implicit paths -- they would require stat()ing every bare
- * word (expensive) or per-user home lookups (`getpwnam`, scope creep).
- * Adding `~user` is a tracked follow-up; for now the rule is "exact
- * match on the three single-shape indicators."
+ * Tilde-prefix expansion forms per POSIX 2.6.1 are admitted as path-shaped:
+ * `~` (current user $HOME), `~+` ($PWD), `~-` ($OLDPWD), and `~name`
+ * (another user's home directory, resolved via getpwnam in
+ * classify_path_token). Each of these can be followed by a `/...` suffix
+ * which the slash-bearing branch of the caller catches independently;
+ * this helper is for the bare-prefix case (no slash) so that `~bob`,
+ * `~+`, and `~-` get classified as paths instead of plain arguments.
+ *
+ * `.bashrc`, `..foo`, etc. are still NOT treated as implicit paths --
+ * doing so would force a stat() on every bare word.
  */
 static bool is_implicit_path_word(const char *word, size_t len) {
     if (len == 1 && (word[0] == '.' || word[0] == '~')) {
@@ -668,6 +674,16 @@ static bool is_implicit_path_word(const char *word, size_t len) {
     }
     if (len == 2 && word[0] == '.' && word[1] == '.') {
         return true;
+    }
+    if (len >= 2 && word[0] == '~') {
+        /* ~+ or ~- */
+        if (word[1] == '+' || word[1] == '-') {
+            return true;
+        }
+        /* ~name -- POSIX NAME is [A-Za-z_][A-Za-z0-9_]*, all ASCII */
+        if (isalpha((unsigned char)word[1]) || word[1] == '_') {
+            return true;
+        }
     }
     return false;
 }
@@ -742,13 +758,60 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
     char resolved[4096];
     const char *to_stat = dequoted;
     if (shape == SHAPE_HOME) {
-        const char *home = getenv("HOME");
-        if (home) {
-            snprintf(resolved, sizeof(resolved), "%s%s", home, dequoted + 1);
+        /* POSIX tilde-prefix expansion (2.6.1). The byte after `~`
+         * selects the form:
+         *   `~`        / `~/...`        -> $HOME
+         *   `~+`       / `~+/...`       -> $PWD
+         *   `~-`       / `~-/...`       -> $OLDPWD
+         *   `~name`    / `~name/...`    -> getpwnam(name)->pw_dir
+         * The prefix_len records how many bytes of `dequoted` form the
+         * tilde-prefix; the suffix after that point is concatenated
+         * verbatim onto the resolved base. */
+        const char *base = NULL;
+        size_t prefix_len = 0;
+        if (dequoted[1] == '\0' || dequoted[1] == '/') {
+            base = getenv("HOME");
+            prefix_len = 1;
+        } else if (dequoted[1] == '+' &&
+                   (dequoted[2] == '\0' || dequoted[2] == '/')) {
+            base = getenv("PWD");
+            prefix_len = 2;
+        } else if (dequoted[1] == '-' &&
+                   (dequoted[2] == '\0' || dequoted[2] == '/')) {
+            base = getenv("OLDPWD");
+            prefix_len = 2;
+        } else {
+            /* `~name` or `~name/...` -- read the username up to the
+             * next '/' or end of word, then resolve via getpwnam.
+             * POSIX usernames are pure ASCII so byte-level scanning
+             * is sufficient. */
+            char name[256];
+            size_t i = 1;
+            while (dequoted[i] != '\0' && dequoted[i] != '/' &&
+                   i < sizeof(name)) {
+                name[i - 1] = dequoted[i];
+                i++;
+            }
+            if (i > 1 && i < sizeof(name) &&
+                (dequoted[i] == '\0' || dequoted[i] == '/')) {
+                name[i - 1] = '\0';
+                struct passwd *pw = getpwnam(name);
+                if (pw && pw->pw_dir) {
+                    base = pw->pw_dir;
+                    prefix_len = i;
+                }
+            }
+        }
+
+        if (base) {
+            snprintf(resolved, sizeof(resolved), "%s%s", base,
+                     dequoted + prefix_len);
             to_stat = resolved;
         }
-        /* If HOME is unset we still try the literal `~/...` -- it
-         * almost certainly fails, which yields PATH_INVALID below. */
+        /* If the prefix couldn't be resolved (HOME/PWD/OLDPWD unset or
+         * unknown user) we fall through with to_stat=dequoted; the
+         * stat() call will almost certainly fail and we'll cache the
+         * result as PATH_INVALID. */
     }
 
     struct stat st;

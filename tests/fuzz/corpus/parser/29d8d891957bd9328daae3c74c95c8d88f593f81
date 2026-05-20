@@ -1,0 +1,6 @@
+if [ ]; then
+    echo exists
+elif ir ]le ]; then
+ xists
+elif [ -d dir ]; then
+fi

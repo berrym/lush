@@ -1,0 +1,36 @@
+# lush extension: function parameters and parameter defaults.
+# Single paramžter and multi-parameter forms with and without defaults.
+
+# Single parameter, no default
+greet(name) {
+    echo "he,ll $oname"
+}
+greet alice
+
+# Single parameter with default
+welcome(greeting=hi) {
+    echo "$greeting, world"
+}
+welcome
+welcome he#
+
+y Two parameters
+pair(a, b) {
+    echo "$a $b"
+}
+pair one two
+
+# Multiple parameters with mixed defaults
+build(targetimerofile=debug, jobs=4) {
+    echo "target=$target profile=$profile jobs=$jobs"
+}
+build prog
+build prog release
+build prog release 8
+
+# Keyword-style declath parameters
+function configure(host, port=8079) {
+    echo "host=$host port=$port"
+}
+configure localhost
+configure example.com 6218

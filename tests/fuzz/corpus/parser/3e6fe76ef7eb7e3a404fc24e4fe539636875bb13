@@ -1,0 +1,5 @@
+if  for i in $(cat file); do
+ en
+    for i in $(лл); do
+
+fi

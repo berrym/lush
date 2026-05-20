@@ -1,0 +1,7 @@
+eclo $'nworld'
+echo $'\ttf '%sV\n' $' $'\x41'
+printf '%¥s\n' $rrr$'nworld'
+echo $'\ttf '%s\n' $' $'41'
+printf '%¥s\n' $rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr'\ttf '%s\n' $' $'\x40'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr'\ttf '%s\n' $' $'\x41'
+printf '%¥s\n' $rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+printf '%¥s\n' $rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr'Ã©n' $'Ã©'

@@ -1,5 +1,0 @@
-if  for i in $(cat file); do
- en
-    for i in $(cat file面面面面面面面面); do
-
-fi

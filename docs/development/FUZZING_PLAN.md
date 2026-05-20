@@ -1,7 +1,7 @@
 # Fuzzing Plan
 
 **Branch:** `grammar-fuzzing`
-**Status:** Planning complete; Phase 1 not yet started.
+**Status:** All four phases baselined 2026-05-19 / 2026-05-20. Phase 1 + 4 libfuzzer targets clean (no crashes). Phase 2 grammar gap-seeds covering every production. Phase 3 differential harness operational (76 mode-tagged seeds, all green).
 **Predecessor:** `parser-grammar-spec` branch (merged to master). The grammar artifact `docs/development/grammar/LUSH_GRAMMAR.ebnf` is the input for several phases below.
 
 ## Why this branch exists
@@ -42,6 +42,15 @@ Set up build with `-Denable_fuzzing=true -Dfuzzer=libfuzzer` (requires Clang). R
 
 **Done when:** each fuzzer has run for a planned duration with no new crashes, or every crash found has been triaged.
 
+**Baseline 2026-05-19** (post-`bf0c11d5` end_position fix, macOS, Apple clang 17 via Homebrew LLVM):
+
+| Fuzzer         | Wall  | Executions | Avg exec/s | Peak RSS | New units | Crashes |
+|----------------|-------|------------|-----------:|---------:|----------:|--------:|
+| fuzz_parser    | 601 s |  2 572 523 |       4280 | 1113 MB  |      5585 |       0 |
+| fuzz_tokenizer | 601 s |  2 176 530 |       3621 |  741 MB  |      1788 |       0 |
+
+Corpus minimized via libFuzzer `-merge=1` afterwards. Human-named seeds (`NNN_*.sh`) preserved; hex-name corpus refreshed with the minimal coverage-equivalent set plus new-coverage units from the run. New corpus sizes: parser 4172 (4107 hex + 65 human), tokenizer 2360 (2350 hex + 10 human).
+
 ### Phase 2 — Grammar-derived seed corpus (≈ 1 day, high value)
 
 Translate every production in `docs/development/grammar/LUSH_GRAMMAR.ebnf` into one canonical valid input. Drop those into `tests/fuzz/corpus/parser/`. libFuzzer's coverage-guided mutations work much better with diverse valid starting inputs than with only what previous random fuzzing accidentally produced.
@@ -52,6 +61,32 @@ This is mechanical translation work, not invention — the grammar already exist
 **Deliverable:** `tests/fuzz/corpus/parser/grammar_seeds/` directory with one file per production, each named after the production it exercises
 
 **Done when:** every production in `LUSH_GRAMMAR.ebnf` has at least one seed input that exercises it.
+
+**Phase 2 seeds added 2026-05-19** (16 inputs, `066_*.sh` through `081_*.sh`, in `tests/fuzz/corpus/parser/`):
+
+| Seed                           | Production / construct exercised                          |
+|--------------------------------|-----------------------------------------------------------|
+| 066_fd_alloc.sh                | fd_alloc_redirection `{name}>file` (bash 4.1+ / zsh)      |
+| 067_clobber_redirect.sh        | file_redir_op `>|` (clobber override)                     |
+| 068_combined_redirect.sh       | file_redir_op `&>` / `&>>`                                |
+| 069_for_arith_empty.sh         | for_arith with empty arith_expr slots                     |
+| 070_for_no_in.sh               | for_posix with `in` omitted (defaults to "$@")            |
+| 071_subshell_redirect.sh       | subshell with trailing_redirections                       |
+| 072_if_redirect.sh             | if_statement with trailing_redirections                   |
+| 073_while_redirect.sh          | while/until with trailing_redirections                    |
+| 074_case_redirect.sh           | case_statement with trailing_redirections                 |
+| 075_proc_sub_redirect.sh       | process_substitution as redirection_target               |
+| 076_fd_var_target.sh           | fd_target = TOK_VARIABLE in fd_dup_op                     |
+| 077_lush_func_params.sh        | parameter with default; single and multi-parameter forms  |
+| 078_array_mixed.sh             | array_literal mixed positional + indexed array_element    |
+| 079_subscript_assign.sh        | NAME[subscript]=value subscript assignment                |
+| 080_multi_heredoc.sh           | multiple heredoc_redirection on one command + quoted delims |
+| 081_empty_bodies.sh            | empty / minimal command_body across compounds            |
+
+Two real parser bugs were surfaced while constructing the seeds:
+
+- `case x in a) echo b; ;; esac` was rejected because the parser treated a non-adjacent pair of `;` as the `;;` terminator. Fixed in this commit by requiring `;;` to be positionally adjacent via `token->end_position`.
+- `f(a, b) { :; }` (multi-parameter lush functions) was broken because the tokenizer absorbed `,` into the preceding TOK_WORD; the parameter-list separator was unreachable. Fixed by introducing TOK_COMMA at the tokenizer layer (`,` removed from `is_word_char` / `is_word_codepoint`, added to `is_operator_char`'s dispatch set) and extending parser adjacency-collection paths (`collect_word_argument`, `parse_scalar_assignment_string`, redirection-target collector, for-loop word collector) to glue adjacent TOK_COMMA back into shell words so `noatime,noexec`, `awk -F,`, and `for x in a,b,c` keep working. Closes #107.
 
 ### Phase 3 — Mode-aware differential test harness (2-3 days, the architectural piece)
 
@@ -95,6 +130,35 @@ Add `tests/fuzz/fuzz_executor.c` that parses *and* executes (with sandboxing —
 **Deliverable:** `fuzz_executor` target wired into meson, alongside the existing `fuzz_parser` and `fuzz_tokenizer`
 
 **Done when:** target builds, runs, and has been exercised against the corpus for at least one full session without finding crashes (or every crash found has been filed).
+
+**Phase 4 baseline 2026-05-20** (macOS, Apple clang 17 via Homebrew LLVM, sandboxed via LUSH_FUZZ_SANDBOX):
+
+    Build:    CC=/usr/local/opt/llvm/bin/clang \
+                  meson setup build -Denable_fuzzing=true -Dfuzzer=libfuzzer
+              meson compile -C build fuzz_executor
+
+    Run:      ./build/fuzz_executor tests/fuzz/corpus/parser/*.sh \
+                  -max_total_time=600 -max_len=2048 -timeout=2 \
+                  -close_fd_mask=3 -error_exitcode=0 -timeout_exitcode=0
+
+    Result:   1689+ logged iterations from 81 human-named seeds
+              corpus grew 81 -> 413 (executor-distinct coverage units)
+              9067 coverage edges, 29154 features
+              crashes:        0
+              ASan/UBSan:     0
+              timeouts:       1 (legit user infinite-loop input -- bash
+                                 hangs the same way; not an executor bug)
+
+The single timeout was an until-loop with a malformed `$(` substitution
+in the body; lush correctly raises `errexit_in_loops` and bails after
+iteration 1 in production, but the chain of error reports per iteration
+crossed the fuzzer's 2-second per-input cap. Recorded as a slow path,
+not a crash.
+
+Discovered executor coverage units merged back into
+`tests/fuzz/corpus/parser/` via libfuzzer `-merge=1` so future
+fuzz_parser, fuzz_tokenizer, and fuzz_executor runs all start from
+the union corpus. Human-named seeds preserved verbatim.
 
 ## Order of operations
 

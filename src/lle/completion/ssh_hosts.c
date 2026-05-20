@@ -317,6 +317,96 @@ int ssh_parse_known_hosts(const char *known_hosts_path,
     return hosts_added;
 }
 
+/**
+ * @brief Parse /etc/hosts (or compatible NSS hostname database file).
+ *
+ * Each non-comment line has the form `IP host [alias ...]`. The IP is
+ * skipped; every subsequent whitespace-separated field on the line is
+ * treated as a hostname or alias and added to the cache (deduped
+ * against earlier higher-priority sources). A `#` anywhere on the
+ * line begins a comment and is truncated. Blank lines are skipped.
+ *
+ * Hostnames from this source get priority 20 -- below ssh config
+ * (100) and known_hosts (50) so user-tuned entries appear first.
+ *
+ * @param etc_hosts_path Path to /etc/hosts file
+ * @param cache Cache to populate
+ * @return Number of hosts added, -1 on error
+ */
+int ssh_parse_etc_hosts(const char *etc_hosts_path, ssh_host_cache_t *cache) {
+    if (!etc_hosts_path || !cache) {
+        return -1;
+    }
+
+    FILE *file = fopen(etc_hosts_path, "r");
+    if (!file) {
+        return -1;
+    }
+
+    char line[MAX_CONFIG_LINE_LEN];
+    int hosts_added = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        /* Strip newline and trailing CR. */
+        line[strcspn(line, "\r\n")] = '\0';
+
+        /* Truncate at any '#' (comment to end of line). */
+        char *hash = strchr(line, '#');
+        if (hash) {
+            *hash = '\0';
+        }
+
+        /* Skip the IP address (first whitespace-separated field). */
+        char *p = line;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0') {
+            continue; /* blank or comment-only */
+        }
+        while (*p != '\0' && *p != ' ' && *p != '\t') {
+            p++; /* consume IP */
+        }
+
+        /* Each remaining whitespace-separated token is a hostname/alias. */
+        while (*p != '\0') {
+            while (*p == ' ' || *p == '\t') {
+                p++;
+            }
+            if (*p == '\0') {
+                break;
+            }
+            char *name_start = p;
+            while (*p != '\0' && *p != ' ' && *p != '\t') {
+                p++;
+            }
+            size_t name_len = (size_t)(p - name_start);
+            if (name_len == 0 || name_len >= MAX_HOSTNAME_LEN) {
+                continue;
+            }
+
+            ssh_host_t host = {0};
+            memcpy(host.hostname, name_start, name_len);
+            host.hostname[name_len] = '\0';
+
+            /* Skip duplicates (priority: earlier sources win). */
+            if (ssh_host_cache_find(cache, host.hostname)) {
+                continue;
+            }
+
+            host.from_known_hosts = false;
+            host.priority = 20;
+
+            if (ssh_host_cache_add(cache, &host) == 0) {
+                hosts_added++;
+            }
+        }
+    }
+
+    fclose(file);
+    return hosts_added;
+}
+
 /* ============================================================================
  * GLOBAL CACHE ACCESS
  * ============================================================================
@@ -369,16 +459,35 @@ void ssh_hosts_refresh(void) {
 
     char path[1024];
 
-    /* Parse user SSH config */
+    /* Source list matches docs/COMPLETION_SYSTEM.md §SSH host
+     * completion. Order matters: ssh_host_cache_find dedupes by
+     * hostname and earlier entries win, so higher-priority sources are
+     * read first.
+     *
+     *   1. ~/.ssh/config            -- user-curated Host stanzas (pri 100)
+     *   2. ~/.ssh/known_hosts       -- hosts the user has connected to (pri 50)
+     *   3. /etc/ssh/ssh_known_hosts -- system-wide known hosts (pri 50)
+     *   4. /etc/hosts               -- NSS hostname database (pri 20)
+     *
+     * Note: /etc/ssh/ssh_config (SSH *client* config) is intentionally
+     * NOT a source -- the doc only promises the four files above and
+     * sysadmin-defined Host stanzas in the client config are unusual
+     * enough that they should be opted into by the user copying the
+     * relevant stanzas to ~/.ssh/config. */
+
+    /* User SSH config */
     snprintf(path, sizeof(path), "%s/.ssh/config", home);
     ssh_parse_config(path, g_ssh_host_cache);
 
-    /* Parse system SSH config */
-    ssh_parse_config("/etc/ssh/ssh_config", g_ssh_host_cache);
-
-    /* Parse known_hosts */
+    /* User known_hosts */
     snprintf(path, sizeof(path), "%s/.ssh/known_hosts", home);
     ssh_parse_known_hosts(path, g_ssh_host_cache);
+
+    /* System-wide known_hosts */
+    ssh_parse_known_hosts("/etc/ssh/ssh_known_hosts", g_ssh_host_cache);
+
+    /* NSS hostname database */
+    ssh_parse_etc_hosts("/etc/hosts", g_ssh_host_cache);
 
     g_ssh_host_cache->last_updated = time(NULL);
     g_ssh_host_cache->needs_refresh = false;

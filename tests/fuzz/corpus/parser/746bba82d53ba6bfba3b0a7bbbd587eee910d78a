@@ -1,0 +1,7 @@
+if [ -f f; then
+elif [ -d]; then
+  ec
+else
+  nory
+else
+  nh

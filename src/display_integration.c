@@ -33,6 +33,7 @@
 
 #include "display_integration.h"
 #include "config.h"
+#include "shell_error.h"
 #include "display/autosuggestions_layer.h"
 #include "display/command_layer.h"
 #include "display/composition_engine.h"
@@ -247,8 +248,18 @@ bool display_integration_init(const display_integration_config_t *init_config) {
         // Create layer event system for controller
         layer_event_system_t *event_system = layer_events_create(NULL);
         if (!event_system) {
-            fprintf(stderr,
-                    "display_integration: Failed to create event system\n");
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_ERROR,
+                SOURCE_LOC_UNKNOWN,
+                "display_integration: failed to create event system");
+            if (err) {
+                shell_error_set_suggestion(
+                    err,
+                    "display layer events could not be allocated; the display "
+                    "subsystem is unavailable for this session");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             display_controller_destroy(global_display_controller);
             global_display_controller = NULL;
             return false;
@@ -271,10 +282,20 @@ bool display_integration_init(const display_integration_config_t *init_config) {
         display_controller_error_t error = display_controller_init(
             global_display_controller, &controller_config, event_system);
         if (error != DISPLAY_CONTROLLER_SUCCESS) {
-            fprintf(stderr,
-                    "display_integration: Failed to initialize display "
-                    "controller: %d\n",
-                    error);
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_ERROR,
+                SOURCE_LOC_UNKNOWN,
+                "display_integration: failed to initialise display controller "
+                "(code %d)",
+                error);
+            if (err) {
+                shell_error_set_suggestion(
+                    err,
+                    "the display controller refused to start; this session "
+                    "will fall back to plain output");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             display_controller_destroy(global_display_controller);
             global_display_controller = NULL;
             return false;
@@ -284,10 +305,20 @@ bool display_integration_init(const display_integration_config_t *init_config) {
         error = display_controller_prepare_shell_integration(
             global_display_controller, &current_config);
         if (error != DISPLAY_CONTROLLER_SUCCESS) {
-            fprintf(stderr,
-                    "display_integration: Failed to prepare shell integration: "
-                    "%d\n",
-                    error);
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_ERROR,
+                SOURCE_LOC_UNKNOWN,
+                "display_integration: failed to prepare shell integration "
+                "(code %d)",
+                error);
+            if (err) {
+                shell_error_set_suggestion(
+                    err,
+                    "controller-to-shell wiring failed; display falls back to "
+                    "the legacy renderer for this session");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             display_controller_destroy(global_display_controller);
             global_display_controller = NULL;
             return false;
@@ -314,10 +345,20 @@ bool display_integration_init(const display_integration_config_t *init_config) {
         error = display_controller_set_config(global_display_controller,
                                               &controller_config2);
         if (error != DISPLAY_CONTROLLER_SUCCESS) {
-            fprintf(stderr,
-                    "display_integration: Failed to configure display "
-                    "controller: %d\n",
-                    error);
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_ERROR,
+                SOURCE_LOC_UNKNOWN,
+                "display_integration: failed to apply controller config "
+                "(code %d)",
+                error);
+            if (err) {
+                shell_error_set_suggestion(
+                    err,
+                    "controller initialised but rejected its configuration; "
+                    "session falls back to the legacy renderer");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
             display_controller_destroy(global_display_controller);
             global_display_controller = NULL;
             return false;
@@ -447,10 +488,22 @@ bool display_integration_set_config(
                 layer_events_error_t event_init_error =
                     layer_events_init(event_system);
                 if (event_init_error != LAYER_EVENTS_SUCCESS) {
-                    fprintf(stderr,
-                            "display_integration: Failed to initialize event "
-                            "system: %d\n",
-                            event_init_error);
+                    shell_error_t *err = shell_error_create(
+                        SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_ERROR,
+                        SOURCE_LOC_UNKNOWN,
+                        "display_integration: failed to initialise event "
+                        "system during reconfigure (code %d)",
+                        event_init_error);
+                    if (err) {
+                        shell_error_set_suggestion(
+                            err,
+                            "event-system reinit failed during a runtime "
+                            "config change; rolling back to the previous "
+                            "configuration");
+                        shell_error_display(err, stderr,
+                                            isatty(STDERR_FILENO));
+                        shell_error_free(err);
+                    }
                     layer_events_destroy(event_system);
                     display_controller_destroy(global_display_controller);
                     global_display_controller = NULL;

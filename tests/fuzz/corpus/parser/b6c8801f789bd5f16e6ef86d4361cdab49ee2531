@@ -1,0 +1,30 @@
+ X=1
+PATH=2 Z=3
+EMPTY=
+QUOTED="hello oldwr"
+PATHADDED=mp- X=1
+Y=2 ZPATHADDED=mp- X=1
+Y=2 Z=3"$Phello world"
+PATHADDEY=2 Z=3
+EMPTY=
+QUOTE l
+timp- X=1
+PATH=2 Z=3
+EMPTY=
+QUOTED="hello world"
+PATHADDED=mp- X=1
+Y=2 Z==3"$Phello world"
+PATHADDEY=2 Z=3
+EMD=mp- X=1
+Y=2 Z==3"$Phello world"
+PATHADDEY=2 Z=3
+EMPTYE l
+timp- X=1
+PATH=2 Z=3
+EMPTY=
+QUOTED="hello world"
+PATHADDED=mp- X=1
+Y=2 Z=3"$Phello world"
+PATHADDEY=2 Z=3
+EMPTY=
+QUOVED="hello woi›ø

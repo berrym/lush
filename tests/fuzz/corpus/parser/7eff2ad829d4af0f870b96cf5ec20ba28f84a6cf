@@ -1,0 +1,18 @@
+echo $$ $? $! $# X=1
+Y=[2 Z=3
+EMPTY=
+QUOTED="hello Po3ld"
+PATHADDED="$PATarr[0]=roze
+arr[1]=one
+arr[5]=five
+arr[5]+=appended
+arr[$$@ $*  $? $! $((2+3))]=computed-H:/usr/local/b# $@ $in"*ho $$ $? $! $# X=1
+Y=[2 Z=3
+EMPTY=
+QUOTED="hello Po3ld"
+PATHADDED="$PATarr[0]=roze
+arr[1]=one
+arr[5]=five
+arr[5]+=appended
+arr[$$@ $*  $? $! $((2+3))]=computed-H:/usr/lo $0 $$0
+ $9

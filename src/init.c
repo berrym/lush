@@ -469,7 +469,16 @@ int init(int argc, char **argv, FILE **in) {
     // Initialize SSH host cache for completion
     if (ssh_hosts_init() != 0) {
         if (IS_INTERACTIVE_SHELL) {
-            fprintf(stderr, "Warning: Failed to initialize SSH host cache\n");
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "failed to initialise SSH host cache");
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "SSH host completion will fall back to typed input "
+                         "for this session; check ~/.ssh permissions");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
         }
     }
 
@@ -477,8 +486,17 @@ int init(int argc, char **argv, FILE **in) {
     lle_terminal_detection_result_t *detection = NULL;
     if (lle_detect_terminal_capabilities_optimized(&detection) != LLE_SUCCESS) {
         if (IS_INTERACTIVE_SHELL) {
-            fprintf(stderr,
-                    "Warning: Failed to detect terminal capabilities\n");
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN, "failed to detect terminal capabilities");
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "the line editor will fall back to a conservative "
+                         "terminal profile; set TERM appropriately to enable "
+                         "richer features");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
         }
     } else {
         // Terminal capabilities successfully detected
@@ -706,8 +724,19 @@ int init(int argc, char **argv, FILE **in) {
          */
         lle_result_t lle_result = lle_shell_integration_init();
         if (lle_result != LLE_SUCCESS) {
-            fprintf(stderr, "Warning: Failed to initialize LLE: %d\n",
-                    lle_result);
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
+                SOURCE_LOC_UNKNOWN,
+                "failed to initialise the LLE (code %d)",
+                (int)lle_result);
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "the shell will continue with a minimal line editor; "
+                         "completion and syntax highlighting are unavailable "
+                         "this session");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            }
         }
 
         // Initialize display integration ONLY in interactive mode
@@ -924,8 +953,14 @@ static int parse_opts(int argc, char **argv) {
                     const char *target_name = argv[arg_index];
                     compat_set_target(target_name);
                 } else {
-                    fprintf(stderr, "%s: --target requires an argument\n",
-                            argv[0]);
+                    shell_error_t *err = shell_error_create(
+                        SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                        SOURCE_LOC_UNKNOWN,
+                        "--target requires an argument");
+                    if (err) {
+                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                        shell_error_free(err);
+                    }
                     usage(EXIT_FAILURE);
                 }
             } else if (strcmp(arg, "--analyze") == 0) {
@@ -960,15 +995,27 @@ static int parse_opts(int argc, char **argv) {
                     arg_index++;
                     shell_opts.output_format = strdup(argv[arg_index]);
                 } else {
-                    fprintf(stderr, "%s: --format requires an argument\n",
-                            argv[0]);
+                    shell_error_t *err = shell_error_create(
+                        SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                        SOURCE_LOC_UNKNOWN,
+                        "--format requires an argument");
+                    if (err) {
+                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                        shell_error_free(err);
+                    }
                     usage(EXIT_FAILURE);
                 }
             } else if (strncmp(arg, "--format=", 9) == 0) {
                 // --format=FMT
                 shell_opts.output_format = strdup(arg + 9);
             } else {
-                fprintf(stderr, "%s: invalid option -- '%s'\n", argv[0], arg);
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR,
+                    SOURCE_LOC_UNKNOWN, "invalid option: %s", arg);
+                if (err) {
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                }
                 usage(EXIT_FAILURE);
             }
             arg_index++;
@@ -1012,8 +1059,14 @@ static int parse_opts(int argc, char **argv) {
                     }
                     goto next_arg;
                 } else {
-                    fprintf(stderr, "%s: option requires an argument -- '%c'\n",
-                            argv[0], opt);
+                    shell_error_t *err = shell_error_create(
+                        SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
+                        SOURCE_LOC_UNKNOWN,
+                        "option requires an argument -- '%c'", opt);
+                    if (err) {
+                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                        shell_error_free(err);
+                    }
                     usage(EXIT_FAILURE);
                 }
                 break;
@@ -1059,9 +1112,16 @@ static int parse_opts(int argc, char **argv) {
             case 'C':
                 shell_opts.noclobber = true;
                 break;
-            default:
-                fprintf(stderr, "%s: invalid option -- '%c'\n", argv[0], opt);
+            default: {
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_INVALID_OPTION, SHELL_SEVERITY_ERROR,
+                    SOURCE_LOC_UNKNOWN, "invalid option -- '%c'", opt);
+                if (err) {
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                }
                 usage(EXIT_FAILURE);
+            }
             }
         }
 

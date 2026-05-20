@@ -1,0 +1,7 @@
+() {
+ "args"
+    echo "first: $1"
+} alpha beta ge
+() {
+    local result=$(($1 * 2))sult
+} 21

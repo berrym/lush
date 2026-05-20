@@ -1,0 +1,14 @@
+echo ${var:-datfl}eu
+echo ${va˜gn}
+2cho{#var}
+ucho ${6arattern} ${vater‰nate}
+echo $o ${#var}
+u ${var:+alter‰nate}
+echo $o ${#var}
+ucho ${6arattern} ${vater‰nate}
+echo $o ${#var}
+ucho ${6arattern} ${var%%pat0ern}
+echo ${v}
+echo ${var#pr%%pat0ern}
+echo ${v}
+echo ${var#perú}

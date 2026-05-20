@@ -251,6 +251,8 @@ const char *token_type_name(token_type_t type) {
         return "REDIRECT_CLOBBER";
     case TOK_ASSIGN:
         return "ASSIGN";
+    case TOK_COMMA:
+        return "COMMA";
     case TOK_NOT_EQUAL:
         return "NOT_EQUAL";
     case TOK_PLUS:
@@ -579,7 +581,7 @@ static token_type_t classify_word(const char *text, size_t length,
  * @return true if character is an operator character
  */
 static bool is_operator_char(char c) {
-    return strchr(";|&<>=+*%?(){}[]#!", c) != NULL;
+    return strchr(";|&<>=+*%?(){}[]#!,", c) != NULL;
 }
 
 /**
@@ -591,7 +593,12 @@ static bool is_operator_char(char c) {
  * @return true if character can be part of a word
  */
 static bool is_word_char(char c) {
-    return isalnum(c) || strchr("_.-/~:@*?[]+%!,^#", c) != NULL;
+    /* ',' is intentionally NOT a word char: it is emitted as TOK_COMMA
+     * (parser-level adjacency reassembles `noatime,noexec` into a single
+     * shell word via collect_word_argument). Tokenizer-level brace
+     * expansion scans `,` directly from the input buffer (not via this
+     * helper), so `{a,b,c}` continues to tokenize as one TOK_WORD. */
+    return isalnum(c) || strchr("_.-/~:@*?[]+%!^#", c) != NULL;
 }
 
 /**
@@ -605,10 +612,11 @@ static bool is_word_char(char c) {
  * @return true if codepoint can be part of a word
  */
 static bool is_word_codepoint(uint32_t codepoint) {
-    // ASCII range: Use traditional shell word character logic
+    // ASCII range: Use traditional shell word character logic.
+    // ',' is excluded -- see is_word_char() for rationale.
     if (codepoint < 0x80) {
         char c = (char)codepoint;
-        return isalnum(c) || strchr("_.-/~:@*?[]+%!,^#", c) != NULL;
+        return isalnum(c) || strchr("_.-/~:@*?[]+%!^#", c) != NULL;
     }
 
     // Non-ASCII UTF-8: All non-ASCII codepoints are valid word characters
@@ -1705,6 +1713,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             // Let % be handled as part of words (e.g., +%Y format specifiers)
             // Fall through to word tokenization
             break;
+
+        case ',':
+            tokenizer->position++;
+            tokenizer->column++;
+            return token_new(TOK_COMMA, ",", 1, start_line, start_column,
+                             start_pos);
 
             // case '?':
             //     tokenizer->position++;
