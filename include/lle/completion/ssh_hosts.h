@@ -115,6 +115,19 @@ int ssh_parse_config(const char *config_path, ssh_host_cache_t *cache);
 int ssh_parse_known_hosts(const char *known_hosts_path,
                           ssh_host_cache_t *cache);
 
+/**
+ * Parse /etc/hosts (or compatible NSS hostname database file). Each
+ * non-comment line lists an IP address followed by one or more
+ * hostnames; every hostname becomes a completion candidate. Hostnames
+ * already present in the cache (from higher-priority sources) are
+ * skipped so user files keep their entries.
+ *
+ * @param etc_hosts_path Path to /etc/hosts (or fixture file)
+ * @param cache Cache to add hosts to
+ * @return Number of hosts added, -1 on error
+ */
+int ssh_parse_etc_hosts(const char *etc_hosts_path, ssh_host_cache_t *cache);
+
 /* ============================================================================
  * GLOBAL CACHE
  * ============================================================================

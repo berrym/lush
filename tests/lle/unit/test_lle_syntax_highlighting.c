@@ -4,10 +4,12 @@
  */
 
 #include "lle/syntax_highlighting.h"
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "test_framework.h"
@@ -696,6 +698,152 @@ TEST(path_implicit_tilde_alone) {
     lle_syntax_highlighter_destroy(h);
 }
 
+/* Test: `~+` bare prefix resolves to $PWD and classifies as
+ * PATH_DIR_HOME (the source-shape bucket; resolution target is just
+ * how stat() decides DIR vs FILE vs INVALID). */
+TEST(path_implicit_tilde_plus) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    char *dir = make_test_dir();
+    if (!dir) {
+        TEST_FAIL("could not create test directory");
+        lle_syntax_highlighter_destroy(h);
+        return;
+    }
+
+    const char *saved_pwd = getenv("PWD");
+    char *saved_copy = saved_pwd ? strdup(saved_pwd) : NULL;
+    setenv("PWD", dir, 1);
+
+    const char *input = "ls ~+";
+    lle_syntax_highlight(h, input, strlen(input));
+    lle_syntax_token_type_t type = find_path_token(h);
+
+    if (saved_copy) {
+        setenv("PWD", saved_copy, 1);
+        free(saved_copy);
+    } else {
+        unsetenv("PWD");
+    }
+
+    if (type == LLE_TOKEN_PATH_DIR_HOME) {
+        TEST_PASS();
+    } else {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "expected PATH_DIR_HOME for `~+`, got %d", (int)type);
+        TEST_FAIL(msg);
+    }
+    rmdir(dir);
+    free(dir);
+    lle_syntax_highlighter_destroy(h);
+}
+
+/* Test: `~-` bare prefix resolves to $OLDPWD and classifies as
+ * PATH_DIR_HOME. */
+TEST(path_implicit_tilde_minus) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    char *dir = make_test_dir();
+    if (!dir) {
+        TEST_FAIL("could not create test directory");
+        lle_syntax_highlighter_destroy(h);
+        return;
+    }
+
+    const char *saved_old = getenv("OLDPWD");
+    char *saved_copy = saved_old ? strdup(saved_old) : NULL;
+    setenv("OLDPWD", dir, 1);
+
+    const char *input = "ls ~-";
+    lle_syntax_highlight(h, input, strlen(input));
+    lle_syntax_token_type_t type = find_path_token(h);
+
+    if (saved_copy) {
+        setenv("OLDPWD", saved_copy, 1);
+        free(saved_copy);
+    } else {
+        unsetenv("OLDPWD");
+    }
+
+    if (type == LLE_TOKEN_PATH_DIR_HOME) {
+        TEST_PASS();
+    } else {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "expected PATH_DIR_HOME for `~-`, got %d", (int)type);
+        TEST_FAIL(msg);
+    }
+    rmdir(dir);
+    free(dir);
+    lle_syntax_highlighter_destroy(h);
+}
+
+/* Test: `~user` (current real user, resolved via getpwuid) classifies
+ * as PATH_DIR_HOME because the user's home dir exists and is a
+ * directory. */
+TEST(path_implicit_tilde_user) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    struct passwd *pw = getpwuid(getuid());
+    if (!pw || !pw->pw_name || !pw->pw_dir) {
+        /* No usable user fixture (CI sandboxes etc.) -- skip. */
+        TEST_PASS();
+        lle_syntax_highlighter_destroy(h);
+        return;
+    }
+    struct stat st;
+    if (stat(pw->pw_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        /* User's home dir doesn't exist or isn't a directory --
+         * unusual but skip rather than fail spuriously. */
+        TEST_PASS();
+        lle_syntax_highlighter_destroy(h);
+        return;
+    }
+
+    char input[256];
+    snprintf(input, sizeof(input), "ls ~%s", pw->pw_name);
+    lle_syntax_highlight(h, input, strlen(input));
+    lle_syntax_token_type_t type = find_path_token(h);
+
+    if (type == LLE_TOKEN_PATH_DIR_HOME) {
+        TEST_PASS();
+    } else {
+        char msg[256];
+        snprintf(msg, sizeof(msg),
+                 "expected PATH_DIR_HOME for `~%s`, got %d",
+                 pw->pw_name, (int)type);
+        TEST_FAIL(msg);
+    }
+    lle_syntax_highlighter_destroy(h);
+}
+
+/* Test: `~nosuchuser_xyz_xyzzy` (a username unlikely to exist)
+ * classifies as PATH_INVALID -- the prefix can't be resolved and the
+ * literal `~nosuchuser_...` can't be stat'd. */
+TEST(path_implicit_tilde_unknown_user) {
+    lle_syntax_highlighter_t *h = NULL;
+    lle_syntax_highlighter_create(&h);
+
+    /* Pick a username that almost certainly doesn't exist. */
+    const char *input = "ls ~nosuchuser_xyz_xyzzy_2026";
+    lle_syntax_highlight(h, input, strlen(input));
+    lle_syntax_token_type_t type = find_path_token(h);
+
+    if (type == LLE_TOKEN_PATH_INVALID) {
+        TEST_PASS();
+    } else {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "expected PATH_INVALID for unknown `~user`, got %d", (int)type);
+        TEST_FAIL(msg);
+    }
+    lle_syntax_highlighter_destroy(h);
+}
+
 /* Test: shape-specific color knob takes precedence over the kind-only
  * fallback. Sets both path_file and path_file_absolute and verifies
  * an absolute file path resolves to the specific knob's value. */
@@ -810,6 +958,10 @@ int main(void) {
     RUN_TEST(path_implicit_dot);
     RUN_TEST(path_implicit_dotdot);
     RUN_TEST(path_implicit_tilde_alone);
+    RUN_TEST(path_implicit_tilde_plus);
+    RUN_TEST(path_implicit_tilde_minus);
+    RUN_TEST(path_implicit_tilde_user);
+    RUN_TEST(path_implicit_tilde_unknown_user);
     RUN_TEST(path_color_shape_specific_overrides_kind);
     RUN_TEST(path_color_falls_to_kind_only);
     RUN_TEST(ansi_render);
