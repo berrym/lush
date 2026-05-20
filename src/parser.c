@@ -4264,8 +4264,12 @@ static node_t *parse_case_statement(parser_t *parser) {
 
                 token_t *pattern_token = tokenizer_current(parser->tokenizer);
 
-                // Accept word-like tokens, wildcards, brackets, variables, and
-                // equals for patterns (equals needed for patterns like HOME=*)
+                // Accept word-like tokens, wildcards, brackets, variables,
+                // equals (patterns like HOME=*), and comma (patterns like
+                // a,b which bash and dash treat as a literal comma-bearing
+                // pattern). TOK_COMMA is a separate token at the lexer
+                // layer since 80647a09 -- here it concatenates into the
+                // pattern text.
                 if (token_is_word_like(pattern_token->type) ||
                     pattern_token->type == TOK_MULTIPLY ||
                     pattern_token->type == TOK_QUESTION ||
@@ -4273,7 +4277,8 @@ static node_t *parse_case_statement(parser_t *parser) {
                     pattern_token->type == TOK_LBRACKET ||
                     pattern_token->type == TOK_RBRACKET ||
                     pattern_token->type == TOK_VARIABLE ||
-                    pattern_token->type == TOK_ASSIGN) {
+                    pattern_token->type == TOK_ASSIGN ||
+                    pattern_token->type == TOK_COMMA) {
 
                     size_t token_len = strlen(pattern_token->text);
                     char *new_single_pattern = realloc(
