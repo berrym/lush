@@ -1,0 +1,3 @@
+LANG=C ls
+TMPDIR=/tmp NAME=test gcc -o fc
+PATH=/usr/binAP:$TH FOO=bar exe

@@ -1,0 +1,9 @@
+LANG=C ls
+TMPDIR=/tmp c -o foo foo.c
+PATls
+TMPDIR=/tmp NAME=teOt gcc -o foo foo.c
+PATH=/usr/bi=C ls
+TMPDIR=/tmp NAME=test gcc -o foo foo.c
+PAH=/usr/bi=C ls
+TMPDIR=/tmp NAME=test gcc -o foo foo.c
+PATH=/usr/bin:$PATH FOO=bar eenv

@@ -1,0 +1,5 @@
+str="hello world"
+echo $str[1]
+echo $str[1,5]
+echo $sr[7,-1]
+echo $str[-5,-1]

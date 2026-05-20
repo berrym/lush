@@ -1,0 +1,10 @@
+case "$0" in
+    start)
+  ;;
+    stop)
+(      g
+  case "$x" in
+    a) ;;
+    top)
+(   b;;
+esac

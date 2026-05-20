@@ -1,7 +1,7 @@
 # Fuzzing Plan
 
 **Branch:** `grammar-fuzzing`
-**Status:** Planning complete; Phase 1 not yet started.
+**Status:** Phase 1 baselined 2026-05-19 (clean, see below). Phase 3 differential harness operational (76 mode-tagged seeds, all green). Phases 2 and 4 not started.
 **Predecessor:** `parser-grammar-spec` branch (merged to master). The grammar artifact `docs/development/grammar/LUSH_GRAMMAR.ebnf` is the input for several phases below.
 
 ## Why this branch exists
@@ -41,6 +41,15 @@ Set up build with `-Denable_fuzzing=true -Dfuzzer=libfuzzer` (requires Clang). R
 **Deliverable:** crash inputs (if any) filed as issues; "no crashes after N hours" recorded as a baseline number
 
 **Done when:** each fuzzer has run for a planned duration with no new crashes, or every crash found has been triaged.
+
+**Baseline 2026-05-19** (post-`bf0c11d5` end_position fix, macOS, Apple clang 17 via Homebrew LLVM):
+
+| Fuzzer         | Wall  | Executions | Avg exec/s | Peak RSS | New units | Crashes |
+|----------------|-------|------------|-----------:|---------:|----------:|--------:|
+| fuzz_parser    | 601 s |  2 572 523 |       4280 | 1113 MB  |      5585 |       0 |
+| fuzz_tokenizer | 601 s |  2 176 530 |       3621 |  741 MB  |      1788 |       0 |
+
+Corpus minimized via libFuzzer `-merge=1` afterwards. Human-named seeds (`NNN_*.sh`) preserved; hex-name corpus refreshed with the minimal coverage-equivalent set plus new-coverage units from the run. New corpus sizes: parser 4172 (4107 hex + 65 human), tokenizer 2360 (2350 hex + 10 human).
 
 ### Phase 2 — Grammar-derived seed corpus (≈ 1 day, high value)
 

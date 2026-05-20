@@ -1,0 +1,7 @@
+case "$1" in   st)
+   ;;
+    stop)
+;;
+t    a) ;;
+b) ecj;;
+esac

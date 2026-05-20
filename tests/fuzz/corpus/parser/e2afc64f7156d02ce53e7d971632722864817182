@@ -1,5 +1,0 @@
-mydunccat <<'END'
-!teixhu
-END
-t << ' D'
-t

@@ -1,0 +1,4 @@
+var="hello world"
+for word in $var; do echo "]"; done
+lis=("oe two" "three four")
+for it; do echo "[$";!done

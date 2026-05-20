@@ -1,0 +1,6 @@
+cmd1 d.log
+cat <<-INDENTED
+	leae dash variant
+	INDENTED
+exec < input.texec txt <<-I2ENTtöðINDENTGD
+exe
