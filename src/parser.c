@@ -1060,6 +1060,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
          token_is_word_like(arg_token->type) ||
          token_is_keyword(arg_token->type) || arg_token->type == TOK_VARIABLE ||
          arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+         arg_token->type == TOK_COMMA ||
          arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
          arg_token->type == TOK_NOT_EQUAL);
     if (!accepted) {
@@ -1092,6 +1093,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             token_is_keyword(arg_token->type) ||
             arg_token->type == TOK_VARIABLE ||
             arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+            arg_token->type == TOK_COMMA ||
             arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
             arg_token->type == TOK_NOT_EQUAL)) {
 
@@ -1805,7 +1807,7 @@ static char *parse_scalar_assignment_string(parser_t *parser,
         (token_is_word_like(value->type) || value->type == TOK_VARIABLE ||
          value->type == TOK_ARITH_EXP || value->type == TOK_COMMAND_SUB ||
          value->type == TOK_BACKQUOTE || value->type == TOK_ASSIGN ||
-         value->type == TOK_PLUS_ASSIGN)) {
+         value->type == TOK_PLUS_ASSIGN || value->type == TOK_COMMA)) {
 
         // Build complete value by concatenating adjacent tokens
         size_t value_capacity = 256;
@@ -1830,7 +1832,8 @@ static char *parse_scalar_assignment_string(parser_t *parser,
                 value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
                 value->type == TOK_COMMAND_SUB ||
                 value->type == TOK_BACKQUOTE || value->type == TOK_ASSIGN ||
-                value->type == TOK_PLUS_ASSIGN)) {
+                value->type == TOK_PLUS_ASSIGN ||
+                value->type == TOK_COMMA)) {
 
             size_t token_len = strlen(value->text);
             /* Quote re-wrapping policy for assignment-value
@@ -2580,7 +2583,8 @@ static node_t *parse_redirection(parser_t *parser) {
                                  current_token->type == TOK_VARIABLE ||
                                  current_token->type == TOK_ARITH_EXP ||
                                  current_token->type == TOK_COMMAND_SUB ||
-                                 current_token->type == TOK_BACKQUOTE)) {
+                                 current_token->type == TOK_BACKQUOTE ||
+                                 current_token->type == TOK_COMMA)) {
 
             size_t token_len = strlen(current_token->text);
             char *new_target =
@@ -3713,24 +3717,34 @@ static node_t *parse_for_statement(parser_t *parser) {
             size_t current_end_pos = word_token->end_position;
             tokenizer_advance(parser->tokenizer);
 
-            // Check for WORD=VALUE pattern: if next token is '=' followed by
-            // word, combine them into a single word (POSIX: for i in a=b c=d;
-            // do ...) Handle chained equals like a=b=c as a single word
-            // IMPORTANT: Only combine if there's no whitespace between tokens
-            while (tokenizer_match(parser->tokenizer, TOK_ASSIGN)) {
-                // Check if '=' is adjacent to the previous token (no
-                // whitespace)
-                token_t *assign_token = tokenizer_current(parser->tokenizer);
-                if (assign_token->position != current_end_pos) {
-                    // There's whitespace before '=', don't combine
+            // General shell-word adjacency: any word-like, TOK_ASSIGN, or
+            // TOK_COMMA token that begins exactly where the previous token
+            // ended is part of the same word (POSIX 2.10.2 word
+            // concatenation). Handles `a=b` and `a=b=c` (assignment-like
+            // for-list words), `a,b,c` (comma-separated list element),
+            // `pre$VAR.txt` mixes, etc. A whitespace gap or a non-word
+            // token breaks the loop.
+            for (;;) {
+                token_t *next_tok = tokenizer_current(parser->tokenizer);
+                if (!next_tok || next_tok->position != current_end_pos) {
                     break;
                 }
-                size_t assign_end_pos = assign_token->end_position;
-                tokenizer_advance(parser->tokenizer); // consume '='
-
-                // Append '=' to combined string
-                size_t len = strlen(combined);
-                char *new_combined = realloc(combined, len + 2);
+                bool is_continuation =
+                    token_is_word_like(next_tok->type) ||
+                    next_tok->type == TOK_VARIABLE ||
+                    next_tok->type == TOK_NUMBER ||
+                    next_tok->type == TOK_COMMAND_SUB ||
+                    next_tok->type == TOK_ARITH_EXP ||
+                    next_tok->type == TOK_BACKQUOTE ||
+                    next_tok->type == TOK_ASSIGN ||
+                    next_tok->type == TOK_PLUS_ASSIGN ||
+                    next_tok->type == TOK_COMMA;
+                if (!is_continuation) {
+                    break;
+                }
+                size_t tlen = strlen(next_tok->text);
+                char *new_combined =
+                    realloc(combined, strlen(combined) + tlen + 1);
                 if (!new_combined) {
                     free(combined);
                     free_node_tree(word_node);
@@ -3739,41 +3753,9 @@ static node_t *parse_for_statement(parser_t *parser) {
                     return NULL;
                 }
                 combined = new_combined;
-                combined[len] = '=';
-                combined[len + 1] = '\0';
-
-                // Check if there's a value IMMEDIATELY after '=' (no
-                // whitespace)
-                token_t *value_token = tokenizer_current(parser->tokenizer);
-                bool is_adjacent = (value_token->position == assign_end_pos);
-
-                if (is_adjacent && (token_is_word_like(value_token->type) ||
-                                    value_token->type == TOK_VARIABLE ||
-                                    value_token->type == TOK_NUMBER)) {
-                    // Append the value (it's adjacent to '=', so part of same
-                    // word)
-                    size_t vlen = strlen(value_token->text);
-                    new_combined =
-                        realloc(combined, strlen(combined) + vlen + 1);
-                    if (!new_combined) {
-                        free(combined);
-                        free_node_tree(word_node);
-                        free_node_tree(for_node);
-                        free_node_tree(word_list);
-                        return NULL;
-                    }
-                    combined = new_combined;
-                    strcat(combined, value_token->text);
-                    // Update end position for next iteration's adjacency check
-                    current_end_pos = value_token->end_position;
-                    tokenizer_advance(parser->tokenizer);
-                    // Continue loop to check for more '=' (handles a=b=c)
-                } else {
-                    // No adjacent value after '=' - word ends with '=' (e.g.,
-                    // empty=) Or there's whitespace before next token (separate
-                    // word)
-                    break;
-                }
+                strcat(combined, next_tok->text);
+                current_end_pos = next_tok->end_position;
+                tokenizer_advance(parser->tokenizer);
             }
 
             word_node->val.str = combined;
@@ -4746,8 +4728,7 @@ static node_t *parse_function_definition(parser_t *parser) {
         if (current && current->type == TOK_RPAREN) {
             // End of parameters
             break;
-        } else if (current && current->text &&
-                   strcmp(current->text, ",") == 0) {
+        } else if (current && current->type == TOK_COMMA) {
             tokenizer_advance(parser->tokenizer); // Skip comma
             current = tokenizer_current(parser->tokenizer);
             // Continue to next parameter

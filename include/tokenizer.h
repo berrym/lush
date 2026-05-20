@@ -46,6 +46,12 @@ typedef enum {
     TOK_REDIRECT_FD_ALLOC, // {varname}> - fd allocation (bash 4.1+/zsh)
     TOK_REDIRECT_CLOBBER,  // >|
     TOK_ASSIGN,            // =
+    TOK_COMMA,             // , (parameter separator for lush function
+                           //   parameter lists; an adjacency token
+                           //   elsewhere -- collect_word_argument and
+                           //   the assignment-value collector accept
+                           //   it so unquoted noatime,noexec still
+                           //   concatenates into a single shell word)
     TOK_NOT_EQUAL,         // !=
     TOK_PLUS,              // +
     TOK_MINUS,             // -

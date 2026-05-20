@@ -1,7 +1,5 @@
 # lush extension: function parameters and parameter defaults.
-# Single-parameter forms exercise the parser path; multi-parameter
-# forms are tracked in #107 (tokenizer glues ',' into the preceding
-# WORD so the parameter separator is unreachable).
+# Single parameter and multi-parameter forms with and without defaults.
 
 # Single parameter, no default
 greet(name) {
@@ -9,16 +7,30 @@ greet(name) {
 }
 greet alice
 
-# Single parameter with default value
+# Single parameter with default
 welcome(greeting=hi) {
     echo "$greeting, world"
 }
 welcome
 welcome hey
 
-# Keyword-style function declaration with parameter
-function configure(host=localhost) {
-    echo "host=$host"
+# Two parameters
+pair(a, b) {
+    echo "$a $b"
 }
-configure
-configure example.com
+pair one two
+
+# Multiple parameters with mixed defaults
+build(target, profile=debug, jobs=4) {
+    echo "target=$target profile=$profile jobs=$jobs"
+}
+build prog
+build prog release
+build prog release 8
+
+# Keyword-style declaration with parameters
+function configure(host, port=8080) {
+    echo "host=$host port=$port"
+}
+configure localhost
+configure example.com 9090

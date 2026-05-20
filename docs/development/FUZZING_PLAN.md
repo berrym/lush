@@ -77,7 +77,7 @@ This is mechanical translation work, not invention — the grammar already exist
 | 074_case_redirect.sh           | case_statement with trailing_redirections                 |
 | 075_proc_sub_redirect.sh       | process_substitution as redirection_target               |
 | 076_fd_var_target.sh           | fd_target = TOK_VARIABLE in fd_dup_op                     |
-| 077_lush_func_params.sh        | parameter with default (single-param form; #107)          |
+| 077_lush_func_params.sh        | parameter with default; single and multi-parameter forms  |
 | 078_array_mixed.sh             | array_literal mixed positional + indexed array_element    |
 | 079_subscript_assign.sh        | NAME[subscript]=value subscript assignment                |
 | 080_multi_heredoc.sh           | multiple heredoc_redirection on one command + quoted delims |
@@ -86,7 +86,7 @@ This is mechanical translation work, not invention — the grammar already exist
 Two real parser bugs were surfaced while constructing the seeds:
 
 - `case x in a) echo b; ;; esac` was rejected because the parser treated a non-adjacent pair of `;` as the `;;` terminator. Fixed in this commit by requiring `;;` to be positionally adjacent via `token->end_position`.
-- `f(a, b) { :; }` (multi-parameter lush functions) is broken because the tokenizer absorbs `,` into the preceding TOK_WORD. Tracked as #107.
+- `f(a, b) { :; }` (multi-parameter lush functions) was broken because the tokenizer absorbed `,` into the preceding TOK_WORD; the parameter-list separator was unreachable. Fixed by introducing TOK_COMMA at the tokenizer layer (`,` removed from `is_word_char` / `is_word_codepoint`, added to `is_operator_char`'s dispatch set) and extending parser adjacency-collection paths (`collect_word_argument`, `parse_scalar_assignment_string`, redirection-target collector, for-loop word collector) to glue adjacent TOK_COMMA back into shell words so `noatime,noexec`, `awk -F,`, and `for x in a,b,c` keep working. Closes #107.
 
 ### Phase 3 — Mode-aware differential test harness (2-3 days, the architectural piece)
 
