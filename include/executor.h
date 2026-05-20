@@ -114,6 +114,16 @@ typedef struct executor {
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
     size_t context_depth; // Current depth of context stack
 
+    /* Location of the currently-executing simple command. Set at the
+     * top of execute_command() from command->loc and restored on exit,
+     * giving expansion-subsystem errors a precise source pointer even
+     * when no enclosing construct has been pushed onto context_stack
+     * (e.g. a bare top-level command from `lush -c '...'`). Read by
+     * executor_current_loc(); writers must save+restore so nested
+     * calls don't clobber it. SOURCE_LOC_UNKNOWN when no command is
+     * currently executing. */
+    source_location_t active_loc;
+
     // Process substitution fd tracking (for cleanup after command execution)
     int procsub_fds[32];    // File descriptors from process substitutions
     pid_t procsub_pids[32]; // Child PIDs from process substitutions

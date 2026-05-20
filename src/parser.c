@@ -1475,6 +1475,14 @@ static node_t *parse_simple_command(parser_t *parser) {
 
         if (next &&
             (next->type == TOK_ASSIGN || next->type == TOK_PLUS_ASSIGN)) {
+            /* Capture the variable-name token's loc before
+             * parse_scalar_assignment_string advances past it; needed so
+             * the resulting NODE_COMMAND carries a real source location
+             * (otherwise expansion-subsystem errors inside the
+             * assignment's value -- e.g. ${var:?word} -- fall back to
+             * SOURCE_LOC_UNKNOWN at runtime). */
+            source_location_t assign_loc =
+                token_to_source_location(current, parser->source_name);
             node_t *array_node = NULL;
             char *assignment =
                 parse_scalar_assignment_string(parser, &array_node);
@@ -1486,7 +1494,7 @@ static node_t *parse_simple_command(parser_t *parser) {
             if (!assignment) {
                 return NULL; // hard parse/allocation error
             }
-            node_t *acmd = new_node(NODE_COMMAND);
+            node_t *acmd = new_node_at(NODE_COMMAND, assign_loc);
             if (!acmd) {
                 free(assignment);
                 return NULL;
