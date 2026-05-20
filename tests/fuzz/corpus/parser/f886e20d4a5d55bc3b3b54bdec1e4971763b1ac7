@@ -1,0 +1,8 @@
+# fd_alloho "hello" >&${logfd}
+exec {logfdg
+echo "hello" >&${logfd}
+exec {logfd}>&-
+exec {infd}< /tmp/log
+read -u ${infd} line
+exec {infd}<&-
+exec {bשששששששששששששששששששששששששששששששששששששששששששששששששששששששog

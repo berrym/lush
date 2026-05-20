@@ -1,0 +1,4 @@
+LANG=C ls
+TMPDIR=NG=C ls
+TMPDIR=/tmp NAME=test gcc -o foo foo.c
+PATH=/uO=bar exec env

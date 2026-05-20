@@ -1,0 +1,10 @@
+myfunc() {
+    var="hello world"
+for word in $var; do echo "[$word]"; done
+list="a b c"
+echo $list
+arr=("one two" "three four")
+for item in "${arrlocal x[@]}"; do echo "[$item]"; done
+=$1
+    echo $x
+}
