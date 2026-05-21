@@ -12296,6 +12296,58 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                     }
 
+                    /* Apply trailing parameter-expansion operator on an
+                     * indexed/associative element: `${arr[key]:-default}`,
+                     * `${arr[key]:+alt}`, etc. Without this, the array
+                     * branch returned the (possibly empty) element value
+                     * unconditionally, dropping the operator entirely
+                     * (real_world/bash/200 fell back to "" instead of the
+                     * `:-info` default for a missing assoc key). For
+                     * arrays we can't distinguish unset from empty (a
+                     * missing key reads as ""), so both `:-` and `-`
+                     * behave identically here, as do `:+` and `+`. The
+                     * default/alt RHS is variable-expanded so
+                     * `${arr[k]:-$fallback}` works. */
+                    const char *after_bracket = close + 1;
+                    if (*after_bracket != '\0') {
+                        bool value_is_empty = (!result || !*result);
+                        const char *rhs = NULL;
+                        bool want_default_when_empty = false; /* :- / - */
+                        bool want_alt_when_nonempty = false;  /* :+ / + */
+                        if (after_bracket[0] == ':' &&
+                            (after_bracket[1] == '-' ||
+                             after_bracket[1] == '+')) {
+                            rhs = after_bracket + 2;
+                            want_default_when_empty = (after_bracket[1] == '-');
+                            want_alt_when_nonempty = (after_bracket[1] == '+');
+                        } else if (after_bracket[0] == '-' ||
+                                   after_bracket[0] == '+') {
+                            rhs = after_bracket + 1;
+                            want_default_when_empty = (after_bracket[0] == '-');
+                            want_alt_when_nonempty = (after_bracket[0] == '+');
+                        }
+                        if (rhs) {
+                            char *expanded_rhs =
+                                expand_variables_in_string(executor, rhs);
+                            const char *rhs_final =
+                                expanded_rhs ? expanded_rhs : rhs;
+                            if (want_default_when_empty && value_is_empty) {
+                                free(result);
+                                result = strdup(rhs_final);
+                            } else if (want_alt_when_nonempty &&
+                                       !value_is_empty) {
+                                free(result);
+                                result = strdup(rhs_final);
+                            } else if (want_alt_when_nonempty) {
+                                free(result);
+                                result = strdup("");
+                            }
+                            if (expanded_rhs) {
+                                free(expanded_rhs);
+                            }
+                        }
+                    }
+
                     free(subscript);
                     free(arr_name);
                     return result ? result : strdup("");
