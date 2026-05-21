@@ -2777,17 +2777,22 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 
         // Check if this line matches the delimiter
         if (strcmp(line_content, match_delimiter) == 0) {
-            // Found delimiter - stop collecting. Advance line_start past
-            // the delimiter line so tokenizer->position (set from
-            // line_start below) lands at the byte AFTER the delimiter
-            // newline. Without this advance, the tokenizer re-scans the
-            // delimiter line as if it were script text and emits an
-            // "EOF: command not found" style error (real_world/posix/105).
+            // Found delimiter - stop collecting. Advance line_start to
+            // the newline terminating the delimiter line (NOT past it)
+            // so tokenizer->position (set below) emits a NEWLINE token
+            // first. The NEWLINE terminates the simple command holding
+            // the heredoc; only after that does the parser re-enable
+            // keyword recognition for the next statement. Skipping the
+            // newline (line_end + 1) merges the heredoc command with
+            // the following statement, making `fi` etc. parse as a
+            // word instead of a keyword (test_parser_fuzzer
+            // heredoc_in_if). Leaving line_start at the delimiter line
+            // (no advance) re-tokenizes "EOF" as a stray identifier
+            // (real_world/posix/105 -> "EOF: command not found").
+            // Landing exactly on line_end is the correct middle ground.
             found_delimiter_line = true;
             free(line);
-            line_start = (line_end < tokenizer->input_length)
-                             ? line_end + 1
-                             : line_end;
+            line_start = line_end;
             break;
         }
 
