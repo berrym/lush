@@ -2562,7 +2562,13 @@ static node_t *parse_redirection(parser_t *parser) {
             return NULL;
         }
 
-        // Store delimiter in the redirection node value
+        // Store delimiter in the redirection node value. The
+        // operator text (`<<` / `<<-`) was strdup'd into val.str
+        // earlier as a default; for heredocs val.str holds the
+        // delimiter instead, so free the operator string before
+        // overwriting (caught by LeakSanitizer running fuzz_parser
+        // on a heredoc input -- 3 bytes leaked per parse).
+        free(redir_node->val.str);
         redir_node->val.str = delimiter; // Transfer ownership
         redir_node->val_type = VAL_STR;
 

@@ -787,7 +787,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     tokenizer->position++;
                 }
             }
-            // Unterminated single-quoted string
+            // Unterminated single-quoted string -- free the segment
+            // builder buffer before returning, otherwise every input
+            // with an unbalanced quote leaks 256+ bytes (caught via
+            // LeakSanitizer running fuzz_parser; see corresponding
+            // fix at the unterminated-double-quote site below).
+            free(result);
             return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                              tokenizer->position - start_pos, start_line,
                              start_column, start_pos);
@@ -1004,7 +1009,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             }
         }
 
-        // Unterminated double-quoted string
+        // Unterminated double-quoted string -- free the segment
+        // builder buffer before returning, otherwise every input
+        // with an unbalanced double quote leaks 256+ bytes.
+        free(result);
         return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                          tokenizer->position - start_pos, start_line,
                          start_column, start_pos);
