@@ -2321,6 +2321,19 @@ static void loop_monitor_init(loop_monitor_t *m) {
     m->armed = false;
 }
 
+/* A `return` (or `exit`) executed inside a function surfaces as the
+ * special 200-455 status code that bin_return / the executor use to
+ * signal function unwinding. Loop bodies must recognize it, stop
+ * iterating, and propagate the code unchanged so the enclosing
+ * function actually returns. Without this check, `for x in ...; do
+ * ... return 0; done` ran every remaining iteration and then fell
+ * through to the post-loop statements (real_world/bash/201 is_in()).
+ * This check must run BEFORE loop_errexit_tripped: a function-return
+ * code is non-zero and would otherwise be misread as a failed body. */
+static bool loop_body_is_function_return(int body_status) {
+    return body_status >= 200 && body_status <= 455;
+}
+
 /* errexit_in_loops: when FEATURE_ERREXIT_IN_LOOPS is enabled (curated
  * lush-mode default; off in POSIX/bash/zsh for polyglot parity), the
  * first non-zero body exit aborts the loop. Caller should report
@@ -2449,6 +2462,12 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             // Continue to next iteration (just reset and loop again)
         }
 
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
+        }
+
         if (loop_errexit_tripped(last_result)) {
             errexit_tripped = true;
             break;
@@ -2574,6 +2593,12 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             // Continue to next iteration
         }
 
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
+        }
+
         if (loop_errexit_tripped(last_result)) {
             errexit_tripped = true;
             break;
@@ -2688,6 +2713,11 @@ static int execute_repeat(executor_t *executor, node_t *repeat_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             continue;
+        }
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
         }
         if (executor->shell_exit_requested) {
             break;
@@ -3045,6 +3075,12 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                 // Continue to next iteration
             }
 
+            /* `return` inside the body: stop iterating, propagate the
+             * function-return signal to the enclosing function. */
+            if (loop_body_is_function_return(last_result)) {
+                break;
+            }
+
             if (loop_errexit_tripped(last_result)) {
                 errexit_tripped = true;
                 break;
@@ -3246,6 +3282,12 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             // Fall through to update expression
+        }
+
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
         }
 
         if (loop_errexit_tripped(last_result)) {
@@ -9269,6 +9311,64 @@ static bool match_pattern(const char *str, const char *pattern) {
             }
 
             while (*p && *p != ']') {
+                /* POSIX character class [:CLASS:] (e.g. [:space:],
+                 * [:alpha:], [:digit:]). Used heavily by real-world
+                 * trim/parse idioms - `${s%%[![:space:]]*}` was
+                 * silently treating [:space:] as the literal
+                 * character set { '[', ':', 's', 'p', 'a', 'c', 'e' }
+                 * because the class form was never parsed
+                 * (real_world/bash/201 trim function). Scan for `:]`
+                 * to delimit the class name, then test via ctype. */
+                if (p[0] == '[' && p[1] == ':') {
+                    const char *class_start = p + 2;
+                    const char *class_end = strstr(class_start, ":]");
+                    if (class_end) {
+                        size_t cl = (size_t)(class_end - class_start);
+                        unsigned char uc = (unsigned char)*s;
+                        bool cls_match = false;
+                        if (cl == 5 && memcmp(class_start, "space", 5) == 0) {
+                            cls_match = isspace(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "alpha", 5) == 0) {
+                            cls_match = isalpha(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "digit", 5) == 0) {
+                            cls_match = isdigit(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "alnum", 5) == 0) {
+                            cls_match = isalnum(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "upper", 5) == 0) {
+                            cls_match = isupper(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "lower", 5) == 0) {
+                            cls_match = islower(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "punct", 5) == 0) {
+                            cls_match = ispunct(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "print", 5) == 0) {
+                            cls_match = isprint(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "graph", 5) == 0) {
+                            cls_match = isgraph(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "blank", 5) == 0) {
+                            cls_match = (uc == ' ' || uc == '\t');
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "cntrl", 5) == 0) {
+                            cls_match = iscntrl(uc) != 0;
+                        } else if (cl == 6 &&
+                                   memcmp(class_start, "xdigit", 6) == 0) {
+                            cls_match = isxdigit(uc) != 0;
+                        }
+                        if (cls_match) {
+                            matched = true;
+                        }
+                        p = class_end + 2; /* past `:]` */
+                        continue;
+                    }
+                }
                 if (p[1] == '-' && p[2] != ']' && p[2] != '\0') {
                     // Range pattern like a-z
                     if (*s >= *p && *s <= p[2]) {
