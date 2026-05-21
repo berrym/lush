@@ -1242,8 +1242,14 @@ lle_theme_t *lle_theme_create_corporate(void) {
     theme->capabilities =
         LLE_THEME_CAP_ASCII_FALLBACK | LLE_THEME_CAP_INHERITABLE;
 
-    /* Professional blues and grays using 256-color palette */
-    theme->colors.primary = lle_color_256(24);      /* Dark blue */
+    /* Professional blues and grays using 256-color palette. Primary
+     * (color 32 = #0087d7) is the brand color applied to ${user} and
+     * ${symbol} (see composer.c:108,121). Index 24 was too dark
+     * (#005f87) -- legible on iTerm2's default background but
+     * invisible on Ghostty / kitty / Alacritty's pure-black default
+     * background. 32 keeps the subdued-blue palette feel while
+     * reading on every modern terminal. */
+    theme->colors.primary = lle_color_256(32);      /* Medium blue */
     theme->colors.secondary = lle_color_256(67);    /* Steel blue */
     theme->colors.success = lle_color_256(28);      /* Dark green */
     theme->colors.warning = lle_color_256(172);     /* Orange */
