@@ -7512,7 +7512,26 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    const char *close = strchr(open + 1, '}');
+    /* Find the matching close brace, tracking nesting depth so that
+     * patterns like `{{1..3},{a..c}}` resolve the OUTER brace first
+     * rather than the first inner `}`. Without this, the function
+     * splits content as `{1..3` and bails, leaving the pattern
+     * un-expanded (real_world/bash/206). */
+    const char *close = NULL;
+    {
+        int depth = 1;
+        for (const char *p = open + 1; *p; p++) {
+            if (*p == '{') {
+                depth++;
+            } else if (*p == '}') {
+                depth--;
+                if (depth == 0) {
+                    close = p;
+                    break;
+                }
+            }
+        }
+    }
     if (!close) {
         // Malformed brace - return original pattern
         char **result = malloc(2 * sizeof(char *));
@@ -7545,8 +7564,27 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     strncpy(content, open + 1, content_len);
     content[content_len] = '\0';
 
-    // Check if this is a range pattern (contains ..)
+    /* Check if this is a SIMPLE range pattern (e.g. `1..10`, `a..z`,
+     * `1..10..2`). A range pattern has `..` and no top-level commas
+     * and no nested braces — otherwise it's a comma-list whose items
+     * happen to contain ranges (e.g. `{{1..3},{a..c}}`) and must be
+     * split on the outer commas first. */
+    bool is_range = false;
     if (strstr(content, "..")) {
+        is_range = true;
+        int depth = 0;
+        for (const char *p = content; *p; p++) {
+            if (*p == '{') {
+                depth++;
+            } else if (*p == '}') {
+                depth--;
+            } else if (*p == ',' && depth == 0) {
+                is_range = false;
+                break;
+            }
+        }
+    }
+    if (is_range) {
         char **range_result =
             expand_brace_range(prefix, content, suffix, expanded_count);
         free(prefix);
@@ -7564,11 +7602,21 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    // Count comma-separated items
+    /* Count comma-separated items at the TOP LEVEL only. Commas
+     * inside nested braces belong to the inner pattern and must not
+     * split the outer one (e.g. `{{1..3},{a..c}}` has two outer
+     * items, not five). */
     int item_count = 1;
-    for (const char *p = content; *p; p++) {
-        if (*p == ',') {
-            item_count++;
+    {
+        int depth = 0;
+        for (const char *p = content; *p; p++) {
+            if (*p == '{') {
+                depth++;
+            } else if (*p == '}') {
+                depth--;
+            } else if (*p == ',' && depth == 0) {
+                item_count++;
+            }
         }
     }
 
@@ -7587,8 +7635,15 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     char *comma_pos = content;
 
     while (result_index < item_count) {
-        // Find next comma or end of string
-        while (*comma_pos && *comma_pos != ',') {
+        /* Find next TOP-LEVEL comma (depth 0) or end of string.
+         * Nested braces hide their commas from the outer split. */
+        int depth = 0;
+        while (*comma_pos && !(depth == 0 && *comma_pos == ',')) {
+            if (*comma_pos == '{') {
+                depth++;
+            } else if (*comma_pos == '}') {
+                depth--;
+            }
             comma_pos++;
         }
 
@@ -7645,9 +7700,19 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     free(prefix);
     free(content);
 
-    // Recursively expand any remaining brace patterns in results
-    // This handles Cartesian products like {1..2}{a..b}
-    if (strchr(suffix, '{')) {
+    /* Recursively expand any remaining brace patterns in results.
+     * This handles Cartesian products like `{1..2}{a..b}` (where the
+     * suffix carries another brace) AND nested patterns like
+     * `{{1..3},{a..c}}` (where each comma-separated item is itself a
+     * brace pattern). Scan all results so neither case is missed. */
+    bool any_result_has_brace = false;
+    for (int i = 0; i < item_count; i++) {
+        if (strchr(result[i], '{')) {
+            any_result_has_brace = true;
+            break;
+        }
+    }
+    if (any_result_has_brace) {
         char **final_results = NULL;
         int final_count = 0;
         int cap = brace_expansion_cap();
@@ -16185,6 +16250,34 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         // elements even if they contain spaces
                         bool is_quoted = (elem->type == NODE_STRING_LITERAL ||
                                           elem->type == NODE_STRING_EXPANDABLE);
+
+                        /* Brace expansion on unquoted indexed-array
+                         * elements: `arr=(/tmp/{a,b}/sub)` must yield
+                         * two elements, matching bash/zsh behavior.
+                         * Each brace-expansion result becomes its own
+                         * array element regardless of internal spaces
+                         * (the brace expander has already partitioned
+                         * the source into discrete words). */
+                        if (!is_quoted &&
+                            needs_brace_expansion(final_value)) {
+                            int brace_count = 0;
+                            char **brace_results = expand_brace_pattern(
+                                final_value, &brace_count);
+                            if (brace_results) {
+                                for (int bi = 0; bi < brace_count; bi++) {
+                                    symtable_array_set_index(array, index,
+                                                             brace_results[bi]);
+                                    index++;
+                                    free(brace_results[bi]);
+                                }
+                                free(brace_results);
+                                if (expanded) {
+                                    free(expanded);
+                                }
+                                elem = elem->next_sibling;
+                                continue;
+                            }
+                        }
 
                         // Word split the expanded value if it contains spaces
                         // This handles ${(s:,:)var} and ${(f)var} producing
