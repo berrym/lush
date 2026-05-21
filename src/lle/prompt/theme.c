@@ -1242,28 +1242,37 @@ lle_theme_t *lle_theme_create_corporate(void) {
     theme->capabilities =
         LLE_THEME_CAP_ASCII_FALLBACK | LLE_THEME_CAP_INHERITABLE;
 
-    /* Professional blues and grays using 256-color palette. Primary
-     * (color 32 = #0087d7) is the brand color applied to ${user} and
-     * ${symbol} (see composer.c:108,121). Index 24 was too dark
-     * (#005f87) -- legible on iTerm2's default background but
-     * invisible on Ghostty / kitty / Alacritty's pure-black default
-     * background. 32 keeps the subdued-blue palette feel while
-     * reading on every modern terminal. */
+    /* Professional blues and grays using 256-color palette.
+     *
+     * Targets dark terminal backgrounds (text = light gray 250). Every
+     * color was audited (tools/theme_contrast_audit.py) for WCAG AA
+     * contrast against pure-black bg; previously index 24 (primary),
+     * 124 (error/path_root), and the borderline 28 (success/git_clean)
+     * dropped below 4.5:1 and rendered invisible / unreadable on
+     * terminals with very dark defaults (Ghostty, kitty, Alacritty).
+     *
+     * Primary (32 = #0087d7) is the brand color used by ${user} and
+     * ${symbol} (see composer.c:108,121). Error / path_root (196 =
+     * #ff0000) are bumped from 124 (#af0000, 2.82:1) for guaranteed
+     * AA contrast on dark backgrounds -- an "error" signal that's
+     * barely visible defeats the point. Success / git_clean (34 =
+     * #00af00) was bumped from 28 (#008700) to clear the AA bar for
+     * body-sized prompt text. */
     theme->colors.primary = lle_color_256(32);      /* Medium blue */
     theme->colors.secondary = lle_color_256(67);    /* Steel blue */
-    theme->colors.success = lle_color_256(28);      /* Dark green */
+    theme->colors.success = lle_color_256(34);      /* Bright dark green */
     theme->colors.warning = lle_color_256(172);     /* Orange */
-    theme->colors.error = lle_color_256(124);       /* Dark red */
+    theme->colors.error = lle_color_256(196);       /* Saturated red */
     theme->colors.info = lle_color_256(31);         /* Cyan */
     theme->colors.text = lle_color_256(250);        /* Light gray */
     theme->colors.text_dim = lle_color_256(242);    /* Dim gray */
     theme->colors.highlight = lle_color_256(117);   /* Light blue */
-    theme->colors.git_clean = lle_color_256(28);    /* Dark green */
+    theme->colors.git_clean = lle_color_256(34);    /* Bright dark green */
     theme->colors.git_dirty = lle_color_256(172);   /* Orange */
-    theme->colors.git_staged = lle_color_256(34);   /* Bright green */
+    theme->colors.git_staged = lle_color_256(40);   /* Brighter green */
     theme->colors.git_branch = lle_color_256(67);   /* Steel blue */
     theme->colors.path_home = lle_color_256(117);   /* Light blue */
-    theme->colors.path_root = lle_color_256(124);   /* Dark red */
+    theme->colors.path_root = lle_color_256(196);   /* Saturated red */
     theme->colors.path_normal = lle_color_256(250); /* Light gray */
 
     /* Professional layout */
