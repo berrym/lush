@@ -4,7 +4,9 @@
 tmpdir=$(mktemp -d -t test_trap.XXXXXX)
 cleanup() {
     rm -rf "$tmpdir"
-    echo "cleaned up $tmpdir"
+    # Don't echo the tmpdir path - mktemp randomness would defeat
+    # the scorecard's stdout match across lush/bash invocations.
+    echo "cleaned up"
 }
 trap cleanup EXIT
 

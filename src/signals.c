@@ -416,6 +416,25 @@ int get_signal_number(const char *signame) {
  *
  * Clears each bit after executing the trap.
  */
+/* Execute a trap command in the CURRENT shell, not a /bin/sh subshell.
+ * Routing through the global executor preserves the user-defined
+ * functions, variables, aliases, and shell options that the trap body
+ * almost always references (real_world/posix/106 cleanup function was
+ * invisible to `system()`-spawned /bin/sh -> "cleanup: command not
+ * found"). Falls back to system() only if the executor is unavailable
+ * (very early startup or after teardown). */
+static void run_trap_command(const char *command) {
+    if (!command || !*command) {
+        return;
+    }
+    executor_t *exec = get_global_executor();
+    if (exec) {
+        (void)executor_execute_command_line(exec, command, 1);
+    } else {
+        (void)!system(command);
+    }
+}
+
 void execute_pending_traps(void) {
     sig_atomic_t pending = pending_trap_signals;
     if (pending == 0) {
@@ -433,7 +452,7 @@ void execute_pending_traps(void) {
                 /* Trap commands are fire-and-forget; their exit status
                  * is propagated by the surrounding shell context, not by
                  * this trap dispatch. */
-                (void)!system(trap->command);
+                run_trap_command(trap->command);
             }
         }
     }
@@ -448,10 +467,10 @@ void execute_pending_traps(void) {
 void execute_exit_traps(void) {
     trap_entry_t *trap = find_trap(0); // EXIT is signal 0
     if (trap && trap->command) {
-        // Execute the EXIT trap command
-        // For now, we'll use system() - this could be improved to use the
-        // shell's executor.  Exit-trap status is not propagated.
-        (void)!system(trap->command);
+        /* Run in the current shell via the global executor so user
+         * functions, variables, and options are in scope. Exit-trap
+         * status is not propagated. */
+        run_trap_command(trap->command);
     }
 
     // Reset terminal to clean state on exit
