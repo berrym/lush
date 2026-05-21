@@ -4250,8 +4250,21 @@ static node_t *parse_case_statement(parser_t *parser) {
 
     // Parse case items until 'esac'
     parser_loop_guard_t items_guard = PARSER_LOOP_GUARD_INIT;
-    while (!tokenizer_match(parser->tokenizer, TOK_ESAC) &&
-           !tokenizer_match(parser->tokenizer, TOK_EOF)) {
+    while (1) {
+        /* Skip separators (newlines, comments, optional whitespace) between
+         * case items. Without this, a `;;` followed by a `# trailing
+         * comment` newline `esac` pattern (extremely common in real shell
+         * scripts -- see real_world/posix/100) errors with "expected
+         * pattern" when the loop body tries to parse the comment as a
+         * pattern. POSIX 2.10.2: case_item is `pattern_list ')' compound_list
+         * 'DSEMI'` followed by either another case_item or 'esac', with
+         * linebreaks / comments allowed in between. */
+        skip_separators(parser);
+
+        if (tokenizer_match(parser->tokenizer, TOK_ESAC) ||
+            tokenizer_match(parser->tokenizer, TOK_EOF)) {
+            break;
+        }
 
         if (!parser_loop_check_progress(parser, &items_guard,
                                         "parse_case_statement items")) {
