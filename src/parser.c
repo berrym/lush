@@ -2777,9 +2777,17 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 
         // Check if this line matches the delimiter
         if (strcmp(line_content, match_delimiter) == 0) {
-            // Found delimiter - stop collecting
+            // Found delimiter - stop collecting. Advance line_start past
+            // the delimiter line so tokenizer->position (set from
+            // line_start below) lands at the byte AFTER the delimiter
+            // newline. Without this advance, the tokenizer re-scans the
+            // delimiter line as if it were script text and emits an
+            // "EOF: command not found" style error (real_world/posix/105).
             found_delimiter_line = true;
             free(line);
+            line_start = (line_end < tokenizer->input_length)
+                             ? line_end + 1
+                             : line_end;
             break;
         }
 
