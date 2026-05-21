@@ -1259,6 +1259,20 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return executor->shell_exit_status;
         }
 
+        /* `exit` builtin requested shell termination. bin_exit sets the
+         * global exit_flag (the REPL polls it to leave its top-level
+         * loop) and stashes the chosen status in last_exit_status. The
+         * REPL alone is not enough: when a script is run as a single
+         * parsed AST, the whole tree executes inside ONE call to
+         * execute_command_list, so without this check every statement
+         * after `exit` still runs (real_world/posix/101 fell through
+         * `exit $?` and ran trailing `rm -f` / `exit 0`). Honor it
+         * here so `exit` inside any nested construct - case arm, if
+         * body, brace group, loop - immediately propagates up. */
+        if (exit_flag) {
+            return last_exit_status;
+        }
+
         // Flush stdout to prevent pipeline from picking up residual output
         fflush(stdout);
 
@@ -8503,11 +8517,21 @@ static int execute_case(executor_t *executor, node_t *node) {
         }
 
         if (matched) {
-            // Execute commands for this case item
+            /* Execute commands for this case item. A case arm is a
+             * command list - run every statement sequentially. Do NOT
+             * short-circuit on a non-zero status (that was wrong: it
+             * dropped `exit $?` after a non-zero `do_status` in
+             * real_world/posix/101 init scripts, and silently dropped
+             * later statements in `x) echo a; false; echo b ;;`).
+             * Errexit (set -e) is enforced at execute_command_list,
+             * not here. Honor loop control / shell exit between
+             * statements so `break` / `continue` / `exit` propagate
+             * out of the arm without running trailing commands. */
             node_t *commands = case_item->first_child;
             while (commands) {
                 result = execute_node(executor, commands);
-                if (result != 0) {
+                if (executor->loop_control != LOOP_NORMAL ||
+                    executor->shell_exit_requested || exit_flag) {
                     break;
                 }
                 commands = commands->next_sibling;
