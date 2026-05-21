@@ -2382,3 +2382,31 @@ diff_oracle = executable('diff_oracle',
                          'tests/fuzz/diff_oracle.c',
                          include_directories: inc,
                          build_by_default: false)
+
+# ============================================================================
+# REAL-WORLD SCRIPT SCORECARD (1.5.0 release-readiness signal)
+# ============================================================================
+# Reuses diff_oracle to grade lush against representative real-world script
+# patterns under tests/real_world/. Failures here are concrete release-
+# readiness items: each one is something a user's actual script can't run.
+#
+# Run examples:
+#   meson compile -C build diff_oracle
+#   find tests/real_world -name '*.sh' | xargs ./build/diff_oracle
+#
+# See tests/real_world/README.md for the curation criteria.
+# ----------------------------------------------------------------------------
+
+# Wrap diff_oracle in a small driver so the meson test target reports
+# pass-percentage and a clean summary rather than per-script JSON. The
+# driver is checked in at tools/real_world_scorecard.sh.
+if fs.exists('tools/real_world_scorecard.sh')
+  test('real-world scorecard',
+       find_program('tools/real_world_scorecard.sh'),
+       args: [diff_oracle.full_path(),
+              meson.project_source_root() / 'tests/real_world',
+              lush_exe.full_path()],
+       suite: 'real-world',
+       is_parallel: false,
+       timeout: 120)
+endif
