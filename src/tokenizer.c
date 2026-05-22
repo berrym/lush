@@ -2368,6 +2368,51 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             continue;
                         }
                     }
+                    /* Check for a trailing zsh glob qualifier:
+                     * `*.txt(N)`, `foo(.@)`, etc. A '(' that follows a
+                     * word character and encloses ONLY glob-qualifier
+                     * characters, with the matching ')' ending the
+                     * word, is part of the glob word -- not a subshell.
+                     * (`*(.N)` is already absorbed by the extglob
+                     * branch above via prev=='*'; this handles the
+                     * prefixed-pattern form the extglob branch misses.)
+                     */
+                    else if (shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
+                        size_t scan_pos = tokenizer->position + 1;
+                        bool only_qual = true;
+                        bool found_close = false;
+                        while (scan_pos < tokenizer->input_length) {
+                            char sc = tokenizer->input[scan_pos];
+                            if (sc == ')') {
+                                found_close = true;
+                                break;
+                            }
+                            if (!strchr("./@*rwND,", sc)) {
+                                only_qual = false;
+                                break;
+                            }
+                            scan_pos++;
+                        }
+                        if (found_close && only_qual &&
+                            scan_pos > tokenizer->position + 1) {
+                            /* The qualifier must end the word: after
+                             * ')' expect whitespace, EOF, or a token
+                             * boundary (incl. the ')' of an enclosing
+                             * array literal). */
+                            size_t after = scan_pos + 1;
+                            char ac = (after < tokenizer->input_length)
+                                          ? tokenizer->input[after]
+                                          : '\0';
+                            if (ac == '\0' || isspace((unsigned char)ac) ||
+                                strchr(")|&;<>", ac)) {
+                                is_numeric = false;
+                                size_t old_pos = tokenizer->position;
+                                tokenizer->position = after;
+                                tokenizer->column += (after - old_pos);
+                                continue;
+                            }
+                        }
+                    }
                     // Not an extglob pattern or array literal - end the word
                     // here
                     break;
