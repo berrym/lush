@@ -102,6 +102,14 @@ lle_result_t lle_history_next(lle_editor_t *editor);
 /* Global LLE editor instance (proper architecture) */
 static lle_editor_t *global_lle_editor = NULL;
 
+/* When true, the in-progress lle_readline() call records nothing to
+ * history -- no in-memory entry, no history-file write. Set only by
+ * lle_readline_no_history() around its lle_readline() call. Safe as a
+ * file-static because lle_readline() is non-reentrant by contract
+ * (see lle_readline.h). The debugger's (lush-debug) break-prompt is
+ * the first consumer: its commands must not pollute shell history. */
+static bool g_lle_readline_suppress_history = false;
+
 /**
  * @brief Get the global LLE editor instance
  *
@@ -1151,7 +1159,8 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
     }
 
     /* Add to LLE history before completing */
-    if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
+    if (!g_lle_readline_suppress_history && ctx->editor &&
+        ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
                               NULL);
@@ -1334,7 +1343,8 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
     }
 
     /* Add to LLE history before completing */
-    if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
+    if (!g_lle_readline_suppress_history && ctx->editor &&
+        ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
                               NULL);
@@ -3753,4 +3763,19 @@ char *lle_readline(const char *prompt) {
     lle_watchdog_stop();
 
     return final_line;
+}
+
+/*
+ * Read a line exactly as lle_readline(), but record nothing to
+ * history -- no in-memory entry and no history-file write. For
+ * transient prompts whose input must not pollute the user's shell
+ * history; the debugger's (lush-debug) break-prompt is the first
+ * consumer. lle_readline() is non-reentrant by contract, so setting
+ * the file-static suppression flag across the call is safe.
+ */
+char *lle_readline_no_history(const char *prompt) {
+    g_lle_readline_suppress_history = true;
+    char *line = lle_readline(prompt);
+    g_lle_readline_suppress_history = false;
+    return line;
 }

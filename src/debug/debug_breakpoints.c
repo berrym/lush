@@ -603,7 +603,7 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
      * move is to stop prompting and let execution continue. */
     fflush(ctx->debug_output);
     while (ctx->step_mode) {
-        char *line = lle_readline("(lush-debug) ");
+        char *line = lle_readline_no_history("(lush-debug) ");
         if (!line) {
             debug_printf(ctx, "\nContinuing execution...\n");
             ctx->step_mode = false;

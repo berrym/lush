@@ -56,6 +56,24 @@ extern "C" {
  */
 char *lle_readline(const char *prompt);
 
+/**
+ * @brief Read a line like lle_readline(), recording nothing to history
+ *
+ * Identical to lle_readline() except the returned line is never added
+ * to the in-memory history nor written to the history file. Intended
+ * for transient prompts whose input must not pollute the user's shell
+ * history -- for example the debugger's interactive break-prompt.
+ *
+ * @param prompt The prompt string to display (may be NULL).
+ * @return Newly allocated input line (caller frees with free()), or
+ *         NULL on EOF / interrupt / error -- same contract as
+ *         lle_readline().
+ *
+ * @note Not reentrant. Shares lle_readline()'s single-active-call
+ *       contract.
+ */
+char *lle_readline_no_history(const char *prompt);
+
 #ifdef __cplusplus
 }
 #endif
