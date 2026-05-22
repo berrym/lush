@@ -1466,38 +1466,40 @@ int config_execute_script_file(const char *path) {
         }
         executor->source_depth++;
         executor->source_return = false;
-        // Set script context for proper error reporting with file path
-        executor_set_script_context(executor, path, 1);
+        // Set script context so breakpoints can match this file.
+        executor_set_script_context(executor, path);
     }
 
     char *complete_input;
     int result = 0;
-    int construct_number = 1;
+    /* 1-based file line of the first character of the next construct,
+     * threaded into parse_and_execute as the parser's starting line so
+     * node->loc.line carries the absolute source line. */
+    size_t source_line = 1;
 
     // Read complete multi-line constructs (same as bin_source)
     while ((complete_input = get_input_complete(file)) != NULL) {
+        // Physical lines this construct spans, for advancing source_line.
+        size_t construct_lines = 0;
+        for (const char *p = complete_input; *p; p++) {
+            if (*p == '\n') {
+                construct_lines++;
+            }
+        }
+
         // Skip empty constructs
         char *trimmed = complete_input;
         while (*trimmed == ' ' || *trimmed == '\t' || *trimmed == '\n')
             trimmed++;
         if (*trimmed == '\0') {
             free(complete_input);
-            construct_number++;
+            source_line += construct_lines;
             continue;
         }
 
-        // Update script context line number for debugging
-        if (executor) {
-            executor_set_script_context(executor, path, construct_number);
-        }
-
-        /* Parse and execute the complete construct. construct_number
-         * tracks 1-based logical-construct order within the sourced
-         * file, not source line number; passing 1 here preserves the
-         * pre-2026-04 behaviour. Future work may thread the actual
-         * source line of the construct's first character through here
-         * for accurate multi-line script-source diagnostics. */
-        int construct_result = parse_and_execute(complete_input, 1);
+        // Parse and execute the complete construct at its true file line.
+        int construct_result = parse_and_execute(complete_input, source_line);
+        source_line += construct_lines;
 
         // Check for return from sourced script (exit code 200+)
         // This matches how bin_source handles the special return code
@@ -1515,7 +1517,6 @@ int config_execute_script_file(const char *path) {
         }
 
         free(complete_input);
-        construct_number++;
 
         // Check if 'return' was called in the sourced script
         if (executor && executor->source_return) {
@@ -1527,7 +1528,7 @@ int config_execute_script_file(const char *path) {
     if (executor) {
         executor->source_depth--;
         executor->source_return = saved_source_return;
-        executor_set_script_context(executor, saved_script_file, 1);
+        executor_set_script_context(executor, saved_script_file);
         free((char *)saved_script_file);
     }
 

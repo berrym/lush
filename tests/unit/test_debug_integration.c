@@ -20,12 +20,12 @@
  * Scope, honestly stated -- the gate starts against the currently-
  * working surface and grows per debugger tier:
  *
- *  - Line-exact assertions use FLAT scripts only (sequential simple
- *    commands). The executor tracks the breakpoint line with the
- *    `current_script_line` counter, which increments once per
- *    NODE_COMMAND; for a flat script that is exact, but it mis-lands
- *    around control structures. Control-structure breakpoint tests
- *    arrive when task #12 replaces the counter with node->loc.line.
+ *  - Breakpoints match node->loc.line, the parser-recorded absolute
+ *    1-based source line, so they land correctly inside control
+ *    structures and loop bodies too -- see
+ *    breakpoint_in_loop_body_fires_each_iteration. The line is
+ *    absolute as long as the executed batch is parsed with the right
+ *    starting line, which every script-execution path now threads.
  *  - Conditional breakpoints are not exercised here: debug_evaluate_
  *    condition() is still a documented TODO stub that returns true for
  *    every comparison. Asserting against a stub would test nothing.
@@ -98,7 +98,7 @@ static gate_result_t run_under_debugger(executor_t *exec,
 
     g_debug_context = ctx;
     if (with_script_context) {
-        executor_set_script_context(exec, "gate.sh", 1);
+        executor_set_script_context(exec, "gate.sh");
     }
 
     FILE *out_tmp = tmpfile();
@@ -274,6 +274,30 @@ TEST(breakpoint_hit_count_accumulates) {
     executor_free(exec);
 }
 
+/* node->loc.line is the real source line, so a breakpoint inside a loop
+ * body lands correctly and re-fires every iteration. The old command-
+ * ordinal counter needed a dedicated loop_body_start_line workaround for
+ * this; node->loc.line needs none. This is the headline #12 win. */
+TEST(breakpoint_in_loop_body_fires_each_iteration) {
+    executor_t *exec = executor_new();
+    debug_context_t *ctx = debug_ctx_new_captured();
+    ASSERT_NOT_NULL(exec, "executor_new");
+    ASSERT_NOT_NULL(ctx, "debug_ctx_new_captured");
+
+    /* Lines: 1 `for i in a b c` / 2 `do` / 3 `echo $i` / 4 `done`.
+     * Line 3 runs once per loop iteration -- three times. */
+    int id = debug_add_breakpoint(ctx, "gate.sh", 3, NULL);
+    ASSERT_TRUE(id >= 0, "breakpoint added");
+
+    run_under_debugger(exec, ctx, "for i in a b c\ndo\necho $i\ndone", true);
+
+    ASSERT_EQ(find_breakpoint(ctx, id)->hit_count, 3,
+              "loop-body breakpoint fired once per iteration");
+
+    debug_cleanup(ctx);
+    executor_free(exec);
+}
+
 /* ============================================================================
  * Execution survives the break -- the section-7 anti-hang guarantee
  * ============================================================================
@@ -351,6 +375,7 @@ int main(void) {
     RUN_TEST(breakpoint_requires_script_context);
     RUN_TEST(multiple_breakpoints_fire_independently);
     RUN_TEST(breakpoint_hit_count_accumulates);
+    RUN_TEST(breakpoint_in_loop_body_fires_each_iteration);
 
     printf("\nExecution survives the break:\n");
     RUN_TEST(execution_continues_past_breakpoint);

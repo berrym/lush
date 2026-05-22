@@ -85,12 +85,16 @@ int bin_source(int argc, char **argv) {
     executor->source_depth++;
     executor->source_return = false;
 
-    // Set script execution context for debugging
-    executor_set_script_context(executor, argv[1], 1);
+    // Set script execution context so breakpoints can match this file.
+    executor_set_script_context(executor, argv[1]);
 
     char *complete_input;
     int result = 0;
-    int construct_number = 1;
+    /* 1-based file line of the first character of the next construct.
+     * Threaded into parse_and_execute as the parser's starting line so
+     * node->loc.line carries the absolute source line -- what both
+     * breakpoints and structured-error snippets match against. */
+    size_t source_line = 1;
 
     // Read complete multi-line constructs instead of line by line
     while ((complete_input = get_input_complete(file)) != NULL) {
@@ -100,25 +104,27 @@ int bin_source(int argc, char **argv) {
             break;
         }
 
+        // Physical lines this construct spans, for advancing source_line.
+        size_t construct_lines = 0;
+        for (const char *p = complete_input; *p; p++) {
+            if (*p == '\n') {
+                construct_lines++;
+            }
+        }
+
         // Skip empty constructs
         char *trimmed = complete_input;
         while (*trimmed == ' ' || *trimmed == '\t' || *trimmed == '\n')
             trimmed++;
         if (*trimmed == '\0') {
             free(complete_input);
-            construct_number++;
+            source_line += construct_lines;
             continue;
         }
 
-        // Update script context for debugging
-        executor_set_script_context(executor, argv[1], construct_number);
-
-        /* Parse and execute the complete construct. Sourced-script
-         * line tracking through bin_source: construct_number is the
-         * 1-based construct ordinal, not a file line; passing 1 here
-         * preserves pre-2026-04 behaviour. Threading the actual source
-         * line of each construct through bin_source is future work. */
-        int construct_result = parse_and_execute(complete_input, 1);
+        // Parse and execute the complete construct at its true file line.
+        int construct_result = parse_and_execute(complete_input, source_line);
+        source_line += construct_lines;
 
         // Check for return from sourced script (exit code 200+)
         if (construct_result >= 200 && construct_result <= 455) {
@@ -133,7 +139,6 @@ int bin_source(int argc, char **argv) {
         }
 
         free(complete_input);
-        construct_number++;
     }
 
     // Clear source tracking and restore parent's source_return state

@@ -467,7 +467,7 @@ int parse_and_execute(const char *command, size_t starting_line) {
         if (!is_interactive_shell()) {
             char *script_name = symtable_get_global("0");
             if (script_name) {
-                executor_set_script_context(global_executor, script_name, 1);
+                executor_set_script_context(global_executor, script_name);
                 free(script_name);
             }
         }

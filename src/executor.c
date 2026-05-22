@@ -326,7 +326,6 @@ executor_t *executor_new(void) {
     executor->has_error = false;
     executor->functions = NULL;
     executor->current_script_file = NULL;
-    executor->current_script_line = 0;
     executor->in_script_execution = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
@@ -382,7 +381,6 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->has_error = false;
     executor->functions = NULL;
     executor->current_script_file = NULL;
-    executor->current_script_line = 0;
     executor->in_script_execution = false;
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
@@ -490,14 +488,17 @@ void executor_set_symtable(executor_t *executor, symtable_manager_t *symtable) {
 }
 
 /**
- * @brief Set script execution context for debugging
+ * @brief Set script execution context for breakpoint matching
+ *
+ * Records the script file so the breakpoint check in execute_node can
+ * fire. The source line is no longer tracked here -- breakpoints match
+ * against node->loc.line, the parser-recorded absolute source line.
  *
  * @param executor Executor context
  * @param script_file Script file path (NULL to clear)
- * @param line_number Current line number in script
  */
-void executor_set_script_context(executor_t *executor, const char *script_file,
-                                 int line_number) {
+void executor_set_script_context(executor_t *executor,
+                                 const char *script_file) {
     if (!executor) {
         return;
     }
@@ -507,7 +508,6 @@ void executor_set_script_context(executor_t *executor, const char *script_file,
 
     // Set new script context
     executor->current_script_file = script_file ? strdup(script_file) : NULL;
-    executor->current_script_line = line_number;
     executor->in_script_execution = (script_file != NULL);
 }
 
@@ -523,7 +523,6 @@ void executor_clear_script_context(executor_t *executor) {
 
     free(executor->current_script_file);
     executor->current_script_file = NULL;
-    executor->current_script_line = 0;
     executor->in_script_execution = false;
 }
 
@@ -535,16 +534,6 @@ void executor_clear_script_context(executor_t *executor) {
  */
 const char *executor_get_current_script_file(executor_t *executor) {
     return executor ? executor->current_script_file : NULL;
-}
-
-/**
- * @brief Get current script line number
- *
- * @param executor Executor context
- * @return Line number or 0 if not in script
- */
-int executor_get_current_script_line(executor_t *executor) {
-    return executor ? executor->current_script_line : 0;
 }
 
 /**
@@ -1117,27 +1106,13 @@ static int execute_node(executor_t *executor, node_t *node) {
     // Advanced debug system integration
     DEBUG_TRACE_NODE(node, __FILE__, __LINE__);
 
-    // Check for breakpoints using script context
+    // Check for a breakpoint at this node's source line. node->loc.line
+    // is the absolute 1-based source line (0 when the parser recorded no
+    // location); debug_check_breakpoint ignores line 0, so an unlocated
+    // node is skipped and its executable children carry the real line.
     if (executor->in_script_execution && executor->current_script_file) {
-        // Handle loop-aware line tracking
-        if (g_debug_context && g_debug_context->execution_context.in_loop) {
-            // If this is the first statement in a loop body, save the line
-            // number
-            if (g_debug_context->execution_context.loop_body_start_line == 0 &&
-                node->type == NODE_COMMAND) {
-                g_debug_context->execution_context.loop_body_start_line =
-                    executor->current_script_line;
-            }
-        }
-
         DEBUG_BREAKPOINT_CHECK(executor->current_script_file,
-                               executor->current_script_line);
-
-        // Only increment line number for simple sequential commands, not
-        // control structures
-        if (node->type == NODE_COMMAND) {
-            executor->current_script_line++;
-        }
+                               (int)node->loc.line);
     }
 
     switch (node->type) {
@@ -3152,15 +3127,6 @@ static int execute_for(executor_t *executor, node_t *for_node) {
             if (g_debug_context && g_debug_context->enabled) {
                 debug_update_loop_variable(g_debug_context, var_name,
                                            expanded_words[i]);
-
-                // Reset line number to loop body start for iterations after the
-                // first
-                if (i > 0 &&
-                    g_debug_context->execution_context.loop_body_start_line >
-                        0) {
-                    executor->current_script_line =
-                        g_debug_context->execution_context.loop_body_start_line;
-                }
             }
 
             // Execute body

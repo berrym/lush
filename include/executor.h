@@ -84,9 +84,8 @@ typedef struct executor {
     loop_control_t loop_control;  // Loop control state
     int loop_depth;               // Current loop nesting depth
 
-    // Script execution context for debugging
+    // Script execution context for breakpoint matching
     char *current_script_file; // Current script file being executed
-    int current_script_line;   // Current line number in script
     bool in_script_execution;  // True if executing from script file
 
     // Sourced script tracking (Phase 6: return from sourced scripts)
@@ -490,14 +489,13 @@ void free_function_params(function_param_t *params);
  */
 
 /**
- * @brief Set script execution context for debugging
+ * @brief Set script execution context for breakpoint matching
  *
  * @param executor Executor context
- * @param script_file Script file path
- * @param line_number Current line number
+ * @param script_file Script file path (NULL to clear)
  */
-void executor_set_script_context(executor_t *executor, const char *script_file,
-                                 int line_number);
+void executor_set_script_context(executor_t *executor,
+                                 const char *script_file);
 
 /**
  * @brief Clear script execution context
@@ -513,14 +511,6 @@ void executor_clear_script_context(executor_t *executor);
  * @return Script file path or NULL
  */
 const char *executor_get_current_script_file(executor_t *executor);
-
-/**
- * @brief Get current script line number
- *
- * @param executor Executor context
- * @return Line number or 0 if not in script
- */
-int executor_get_current_script_line(executor_t *executor);
 
 /* ============================================================================
  * Security
