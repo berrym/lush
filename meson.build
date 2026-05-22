@@ -1721,6 +1721,29 @@ if fs.exists('tests/unit/test_debug_breakpoints.c')
 endif
 
 # ============================================================================
+# Debugger Integration Gate (PHILOSOPHY section 7)
+# Drives the real executor with a live debug context: breakpoints fire,
+# stay silent when they should, honour the script-execution gate, and
+# execution survives the break.
+if fs.exists('tests/unit/test_debug_integration.c')
+  test_debug_integration_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_debug_integration_sources += s
+    endif
+  endforeach
+  test_debug_integration = executable('test_debug_integration',
+                                      'tests/unit/test_debug_integration.c',
+                                      'tests/unit/test_executor_stubs.c',
+                                      test_debug_integration_sources + lle_shell_sources,
+                                      include_directories: [inc, include_directories('tests')],
+                                      dependencies: [lle_dep, libm])
+  test('Debug Integration Gate', test_debug_integration,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# ============================================================================
 # Display Controller Tests
 # Tests display controller: configuration, error handling, completion menu, autosuggestions
 if fs.exists('tests/unit/test_display_controller.c')
