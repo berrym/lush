@@ -137,15 +137,14 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
         return false;
     }
 
-    debug_printf(ctx, "[DEBUG] Checking breakpoint at %s:%d\n", file, line);
+    debug_trace_printf(ctx, "Checking breakpoint at %s:%d\n", file, line);
 
     breakpoint_t *bp = ctx->breakpoints;
     while (bp) {
         if (bp->enabled && bp->line == line && strcmp(bp->file, file) == 0) {
             bp->hit_count++;
 
-            debug_printf(ctx,
-                         "[DEBUG] BREAKPOINT MATCHED - entering debug mode\n");
+            debug_trace_printf(ctx, "BREAKPOINT MATCHED - entering debug mode\n");
             debug_printf(ctx, "\n>>> BREAKPOINT HIT <<<\n");
             debug_printf(ctx, "Breakpoint %d at %s:%d (hit count: %d)\n",
                          bp->id, file, line, bp->hit_count);
@@ -157,8 +156,7 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
                 debug_printf(ctx, "  Condition: %s -> %s\n", bp->condition,
                              condition_met ? "true" : "false");
                 if (!condition_met) {
-                    debug_printf(ctx,
-                                 "[DEBUG] Condition not met, continuing\n");
+                    debug_trace_printf(ctx, "Condition not met, continuing\n");
                     return false; // Continue execution if condition not met
                 }
             }
@@ -167,14 +165,13 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
             debug_show_context(ctx, file, line);
 
             // Enter interactive debugging mode
-            debug_printf(ctx,
-                         "[DEBUG] About to enter interactive debug mode\n");
+            debug_trace_printf(ctx, "About to enter interactive debug mode\n");
             // A breakpoint hit leaves the debugger single-stepping
             // (step-into semantics) until the user says otherwise.
             ctx->step_mode = true;
             ctx->step_target_depth = INT_MAX;
             debug_enter_interactive_mode(ctx);
-            debug_printf(ctx, "[DEBUG] Exited interactive debug mode\n");
+            debug_trace_printf(ctx, "Exited interactive debug mode\n");
 
             return true;
         }
@@ -731,15 +728,14 @@ void debug_print_help(debug_context_t *ctx) {
 void debug_save_execution_context(debug_context_t *ctx, executor_t *executor,
                                   node_t *node) {
     if (!ctx || !executor || !node) {
-        debug_printf(ctx,
-                     "[DEBUG] debug_save_execution_context: NULL parameter - "
+        debug_trace_printf(ctx, "debug_save_execution_context: NULL parameter - "
                      "ctx=%p executor=%p node=%p\n",
                      (void *)ctx, (void *)executor, (void *)node);
         return;
     }
 
-    debug_printf(
-        ctx, "[DEBUG] debug_save_execution_context: Called with node type %d\n",
+    debug_trace_printf(
+        ctx, "debug_save_execution_context: Called with node type %d\n",
         node->type);
 
     // Detect if we're in a loop
@@ -748,21 +744,20 @@ void debug_save_execution_context(debug_context_t *ctx, executor_t *executor,
          node->type == NODE_UNTIL);
 
     if (ctx->execution_context.in_loop) {
-        debug_printf(ctx,
-                     "[DEBUG] Saving loop execution context - node type: %d\n",
+        debug_trace_printf(ctx, "Saving loop execution context - node type: %d\n",
                      node->type);
 
         // Save loop-specific context
         if (node->type == NODE_FOR) {
             // For now, we'll detect the loop variable from execution context
             // This is a simplified approach until we can properly parse the AST
-            debug_printf(ctx, "[DEBUG] FOR loop detected, saving context\n");
+            debug_trace_printf(ctx, "FOR loop detected, saving context\n");
         }
 
         // Save reference to loop AST node
         ctx->execution_context.loop_node = node;
     } else {
-        debug_printf(ctx, "[DEBUG] Not a loop node - type: %d\n", node->type);
+        debug_trace_printf(ctx, "Not a loop node - type: %d\n", node->type);
     }
 }
 
@@ -777,22 +772,20 @@ void debug_restore_execution_context(debug_context_t *ctx, executor_t *executor,
     (void)executor; /* Reserved for execution state restoration */
     (void)node;     /* Reserved for node-specific restoration */
     if (!ctx) {
-        printf("[DEBUG] debug_restore_execution_context: ctx is NULL\n");
         return;
     }
 
     if (!ctx->execution_context.in_loop) {
-        debug_printf(
-            ctx,
-            "[DEBUG] debug_restore_execution_context: Not in loop context\n");
+        debug_trace_printf(
+            ctx, "debug_restore_execution_context: Not in loop context\n");
         return;
     }
 
-    debug_printf(ctx, "[DEBUG] Restoring loop execution context\n");
+    debug_trace_printf(ctx, "Restoring loop execution context\n");
 
     // For now, just log that we're restoring context
     // TODO: Full variable restoration
-    debug_printf(ctx, "[DEBUG] Loop context restoration (placeholder)\n");
+    debug_trace_printf(ctx, "Loop context restoration (placeholder)\n");
 }
 
 /**
@@ -805,7 +798,7 @@ void debug_cleanup_execution_context(debug_context_t *ctx) {
     }
 
     if (ctx->execution_context.in_loop) {
-        debug_printf(ctx, "[DEBUG] Cleaning up loop execution context\n");
+        debug_trace_printf(ctx, "Cleaning up loop execution context\n");
     }
 
     free(ctx->execution_context.loop_variable);
@@ -831,7 +824,7 @@ void debug_enter_loop(debug_context_t *ctx, const char *loop_type,
         return;
     }
 
-    debug_printf(ctx, "[DEBUG] Entering %s loop with variable '%s' = '%s'\n",
+    debug_trace_printf(ctx, "Entering %s loop with variable '%s' = '%s'\n",
                  loop_type ? loop_type : "unknown",
                  variable ? variable : "unknown", value ? value : "unknown");
 
@@ -862,7 +855,7 @@ void debug_update_loop_variable(debug_context_t *ctx, const char *variable,
         return;
     }
 
-    debug_printf(ctx, "[DEBUG] Loop variable update: '%s' = '%s'\n",
+    debug_trace_printf(ctx, "Loop variable update: '%s' = '%s'\n",
                  variable ? variable : "unknown", value ? value : "unknown");
 
     // Update the stored loop variable value
@@ -880,7 +873,7 @@ void debug_exit_loop(debug_context_t *ctx) {
         return;
     }
 
-    debug_printf(ctx, "[DEBUG] Exiting loop after %d iterations\n",
+    debug_trace_printf(ctx, "Exiting loop after %d iterations\n",
                  ctx->execution_context.loop_iteration);
 
     // Clean up loop context

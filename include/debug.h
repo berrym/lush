@@ -631,13 +631,32 @@ void debug_format_time(long ns, char *buffer, size_t size);
  */
 
 /**
- * @brief Print formatted debug output
+ * @brief Print user-facing debugger output
+ *
+ * Indented by current stack depth; no per-line tag. For the interactive
+ * debugger UI -- banners, hit messages, the inspection output the user
+ * is actually reading. Internal engine trace uses debug_trace_printf().
  *
  * @param ctx Debug context
  * @param format printf-style format string
  * @param ... Format arguments
  */
 void debug_printf(debug_context_t *ctx, const char *format, ...);
+
+/**
+ * @brief Print internal engine trace, gated on debug level
+ *
+ * For diagnostic chatter the debugger emits about its own operation --
+ * "checking breakpoint", "saving loop context", per-iteration variable
+ * updates. Silent unless ctx->level >= DEBUG_TRACE, so normal debugging
+ * is not polluted. Output is otherwise identical to debug_printf:
+ * indented by stack depth, no per-line tag.
+ *
+ * @param ctx Debug context
+ * @param format printf-style format string
+ * @param ... Format arguments
+ */
+void debug_trace_printf(debug_context_t *ctx, const char *format, ...);
 
 /**
  * @brief Print a separator line

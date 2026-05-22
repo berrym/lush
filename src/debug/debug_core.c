@@ -298,15 +298,31 @@ void debug_printf(debug_context_t *ctx, const char *format, ...) {
     va_list args;
     va_start(args, format);
 
-    // Add debug prefix
-    fprintf(ctx->debug_output, "[DEBUG] ");
-
-    // Add stack depth indication
+    // Indent by stack depth.
     for (int i = 0; i < ctx->stack_depth; i++) {
         fprintf(ctx->debug_output, "  ");
     }
 
-    // Print the actual message
+    vfprintf(ctx->debug_output, format, args);
+    fflush(ctx->debug_output);
+
+    va_end(args);
+}
+
+/* Internal engine trace. Silent unless the user opted into a trace
+ * level -- so the interactive UI stays clean during normal debugging. */
+void debug_trace_printf(debug_context_t *ctx, const char *format, ...) {
+    if (!ctx || !ctx->enabled || ctx->level < DEBUG_TRACE) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+
+    for (int i = 0; i < ctx->stack_depth; i++) {
+        fprintf(ctx->debug_output, "  ");
+    }
+
     vfprintf(ctx->debug_output, format, args);
     fflush(ctx->debug_output);
 
@@ -322,7 +338,6 @@ void debug_print_separator(debug_context_t *ctx) {
         return;
     }
 
-    fprintf(ctx->debug_output, "[DEBUG] ");
     for (int i = 0; i < 60; i++) {
         fprintf(ctx->debug_output, "-");
     }
@@ -561,7 +576,7 @@ void debug_print_node(debug_context_t *ctx, node_t *node, int indent) {
     }
 
     char *desc = debug_get_node_description(node);
-    fprintf(ctx->debug_output, "[DEBUG] %s\n", desc);
+    fprintf(ctx->debug_output, "%s\n", desc);
     free(desc);
 
     // Print children
