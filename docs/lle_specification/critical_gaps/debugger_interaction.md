@@ -62,60 +62,64 @@ Consequences, all positive:
   (`lle_source_manager_register`) -- a debug-command / variable-name
   source can be registered for the debug prompt.
 - LLE's multiline-continuation machinery shows the prompt layer
-  already handles dynamic, context-aware re-prompting. Note this is
-  *intra-session* re-prompting within one `lle_readline` call, not
-  the nested call a debug prompt needs -- see §4.
+  already handles dynamic, context-aware re-prompting -- though the
+  debug prompt needs nothing that elaborate (§4).
 
-## 4. The gap to close: re-entrancy
+## 4. The gap to close -- and what it is *not*
 
-`lle_readline()` is explicitly documented **not reentrant**
-(`include/lle/lle_readline.h:51`: "This function is NOT reentrant.
-Only one readline operation should be active at a time."). The note
-states an assumption; it cites no hazard. It reflects that LLE was
-never *designed or validated* for a nested call.
+The fix is bounded, and it is **not a re-entrancy problem**. This is
+worth stating precisely, because it is easy to assume otherwise.
 
-A debug prompt is, structurally, a nested `lle_readline()`: the break
-fires deep in the executor while the shell's primary prompt is
-logically suspended on the stack. Closing the gap means genuinely
-**validating and hardening** `lle_readline` for re-entrancy -- not
-assuming the per-call state "looks isolated enough." The
-non-reentrancy contract is a real contract; lifting it is the work.
+A breakpoint fires during *executor execution*. The shell's main loop
+(`src/lush.c:301-356`) reads a complete input batch -- via LLE in
+interactive mode -- and only *then* calls `parse_and_execute`; the
+breakpoint check in `execute_node` is gated on `in_script_execution`,
+which is set during execution, not during input reading. So by the
+time the debugger reaches its prompt, the primary `lle_readline` has
+already returned and is **off the stack**. The debug prompt is a
+**sequential** `lle_readline` call invoked from a deep executor stack
+frame -- not a nested one. The `lle_readline.h:51` non-reentrancy
+`@note` is therefore not violated: sequential calls are the normal,
+supported case -- every shell prompt is one.
 
-## 5. Open questions the implementation must resolve
+The gap is narrow: `debug_enter_interactive_mode` must call
+`lle_readline` (with the debug prompt string and a debug completion
+source) in place of its `fgets` loop. The terminal conflict
+disappears because `lle_readline` owns its terminal lifecycle per
+call, exactly as it does for every prompt.
 
-A risk register, not a list of knowns:
+## 5. What the implementation must still handle
 
-- **Shared editor state.** `global_lle_editor` (and the Spec-26
-  `g_lle_integration` editor) persist across calls as a config holder
-  -- history, keybindings, completion config. A nested call must not
-  corrupt the parked outer call's view of it. To be proven.
-- **Display layer.** LLE renders through the layered display
-  controller. A nested readline drawing the debug prompt while the
-  outer session's display state is parked must not corrupt the outer
-  prompt's layer -- the debug prompt may need a separate layer, or
-  the outer display must be suspended for the duration.
-- **Terminal state.** The plausible LIFO composition in §3 must be
-  verified precisely under a real nested session, including the
-  `TCSAFLUSH` discard-unread-input behavior on enter/exit.
-- **Event system.** A nested event loop while an outer one is parked
-  -- any shared queue or global handler state.
-- **Completion source lifetime.** Registering and scoping a
-  debug-only completion source so it applies to the debug prompt and
-  not the primary prompt, and is cleaned up after.
+Not a re-entrancy risk register -- a short list of real, bounded
+concerns:
+
+- **LLE availability.** In interactive mode LLE is initialized. Under
+  `lush script.sh` (non-interactive) LLE may not be initialized and
+  there may be no controlling terminal. The debug prompt must detect
+  this and degrade gracefully -- with no terminal, interactive
+  debugging is simply unavailable (the current code already probes
+  `/dev/tty` for this).
+- **Clean hand-back to the executor.** `lle_readline` runs while the
+  executor is mid-statement; it must leave terminal and display state
+  as it found them so execution resumes cleanly. `lle_readline`
+  already brackets its terminal raw-mode per call -- this should
+  hold, but verify.
+- **Completion source.** Registering a debug-command / variable-name
+  completion source, scoped to the debug prompt and cleaned up after.
+- **History.** Debug commands must not pollute the shell's command
+  history -- the debug prompt's `lle_readline` use must not feed the
+  shared history.
 
 ## 6. Effort
 
-The foundation is genuinely present: a parameterized prompt,
-substantially per-call session state, pluggable completion, and a
-terminal model that plausibly composes. The architecture permits a
-nested session. This is a focused re-entrancy validation-and-hardening
-effort, not a rewrite.
-
-Its size is determined by what the validation in §5 finds; it is not
-responsibly pre-estimated before that validation is done. An early
-exploratory "~30 lines" estimate is explicitly **not** relied upon
-here -- it predated verification and assumed coexisting terminal
-interfaces that the per-call lifecycle may not produce.
+With the re-entrancy framing corrected, this is genuinely modest. The
+debug prompt is a sequential `lle_readline` call -- a supported usage
+-- so the work is: replace the `fgets` loop with an `lle_readline`
+call, register a debug completion source, and handle the
+no-terminal / LLE-not-initialized degraded case. No re-entrancy
+hardening of `lle_readline` is required. The size is small; the care
+goes into the degraded-mode handling and the completion source, not
+into LLE internals.
 
 ## 7. Relationship to the debugger workstream
 
