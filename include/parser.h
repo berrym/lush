@@ -34,6 +34,32 @@
  */
 #define PARSER_MAX_RECURSION_DEPTH 256
 
+/**
+ * Maximum number of heredocs whose body collection can be pending on a
+ * single command line (`cat <<A <<B <<C ...`). Real scripts never come
+ * close; the cap exists only to bound the fixed-size queue.
+ */
+#define PARSER_MAX_PENDING_HEREDOCS 16
+
+/**
+ * A heredoc redirection whose body has NOT yet been collected.
+ *
+ * POSIX heredoc bodies start on the line AFTER the line containing the
+ * `<<delim` operator -- so when the parser sees `<<delim` it cannot
+ * collect the body immediately without skipping the rest of that line
+ * (e.g. the `| wc` in `cat <<EOF | wc`). Instead the parser records a
+ * pending_heredoc_t and keeps tokenizing the line normally; the body is
+ * collected when the line's terminating newline is reached, in queue
+ * order (multiple heredocs on one line stack their bodies in sequence).
+ */
+typedef struct {
+    node_t *redir_node;       /* NODE_REDIR_HEREDOC[_STRIP] to populate   */
+    const char *delimiter;    /* borrowed from redir_node->val.str        */
+    bool strip_tabs;          /* <<- variant: strip leading tabs          */
+    bool expand_variables;    /* unquoted delimiter -> expand body at exec */
+    source_location_t op_loc; /* `<<` operator location, for diagnostics  */
+} pending_heredoc_t;
+
 /** Parser state */
 typedef struct parser {
     tokenizer_t *tokenizer;
@@ -50,6 +76,10 @@ typedef struct parser {
 
     /* Recursion depth tracking for stack overflow protection */
     size_t recursion_depth;
+
+    /* Heredocs awaiting deferred body collection (see pending_heredoc_t) */
+    pending_heredoc_t pending_heredocs[PARSER_MAX_PENDING_HEREDOCS];
+    size_t pending_heredoc_count;
 } parser_t;
 
 /* ============================================================================
