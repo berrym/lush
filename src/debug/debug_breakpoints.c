@@ -18,6 +18,7 @@
 #include "shell_mode.h"
 #include "symtable.h"
 
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,7 +169,10 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
             // Enter interactive debugging mode
             debug_printf(ctx,
                          "[DEBUG] About to enter interactive debug mode\n");
-            ctx->step_mode = true; // Enable step mode for interactive debugging
+            // A breakpoint hit leaves the debugger single-stepping
+            // (step-into semantics) until the user says otherwise.
+            ctx->step_mode = true;
+            ctx->step_target_depth = INT_MAX;
             debug_enter_interactive_mode(ctx);
             debug_printf(ctx, "[DEBUG] Exited interactive debug mode\n");
 
@@ -177,8 +181,10 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
         bp = bp->next;
     }
 
-    // Check if we're in step mode
-    if (ctx->step_mode) {
+    // Single-stepping stops here only when this node is not deeper than
+    // the step target -- that is what makes step-over skip nested
+    // function bodies and step-out run on to the caller.
+    if (ctx->step_mode && ctx->stack_depth <= ctx->step_target_depth) {
         debug_printf(ctx, "\n>>> STEP <<<\n");
         debug_printf(ctx, "At %s:%d\n", file, line);
         debug_show_context(ctx, file, line);
@@ -254,6 +260,8 @@ void debug_step_into(debug_context_t *ctx) {
 
     ctx->mode = DEBUG_MODE_STEP;
     ctx->step_mode = true;
+    // Stop at the next node, at any depth.
+    ctx->step_target_depth = INT_MAX;
 
     debug_printf(ctx, "Stepping into...\n");
 }
@@ -269,6 +277,9 @@ void debug_step_over(debug_context_t *ctx) {
 
     ctx->mode = DEBUG_MODE_STEP_OVER;
     ctx->step_mode = true;
+    // Stop at the next node no deeper than here -- a called function's
+    // body runs to completion without stopping.
+    ctx->step_target_depth = ctx->stack_depth;
 
     debug_printf(ctx, "Stepping over...\n");
 }
@@ -282,10 +293,11 @@ void debug_step_out(debug_context_t *ctx) {
         return;
     }
 
-    // Step out means continue until we exit the current function
-    // For now, just continue
-    ctx->mode = DEBUG_MODE_CONTINUE;
-    ctx->step_mode = false;
+    // Step out: keep stepping, but suppressed until the stack unwinds
+    // past the current command frame -- then stop in the caller.
+    ctx->mode = DEBUG_MODE_STEP_OVER;
+    ctx->step_mode = true;
+    ctx->step_target_depth = ctx->stack_depth - 1;
 
     debug_printf(ctx, "Stepping out...\n");
 }
@@ -310,10 +322,14 @@ void debug_continue(debug_context_t *ctx) {
  * @param ctx Debug context
  * @param input User input string
  */
-void debug_handle_user_input(debug_context_t *ctx, const char *input) {
+bool debug_handle_user_input(debug_context_t *ctx, const char *input) {
     if (!ctx || !input) {
-        return;
+        return false;
     }
+
+    // Resume execution after this command? continue / step / next /
+    // finish / quit / empty say yes; inspection commands say no.
+    bool resume = false;
 
     // Remove newline and trim whitespace
     char *cmd = strdup(input);
@@ -334,18 +350,22 @@ void debug_handle_user_input(debug_context_t *ctx, const char *input) {
         ctx->step_mode = false;
         ctx->mode = DEBUG_MODE_CONTINUE;
         free(cmd);
-        return;
+        return true;
     }
 
     // Parse and handle commands
     if (strcmp(trimmed, "c") == 0 || strcmp(trimmed, "continue") == 0) {
         debug_continue(ctx);
+        resume = true;
     } else if (strcmp(trimmed, "s") == 0 || strcmp(trimmed, "step") == 0) {
         debug_step_into(ctx);
+        resume = true;
     } else if (strcmp(trimmed, "n") == 0 || strcmp(trimmed, "next") == 0) {
         debug_step_over(ctx);
+        resume = true;
     } else if (strcmp(trimmed, "f") == 0 || strcmp(trimmed, "finish") == 0) {
         debug_step_out(ctx);
+        resume = true;
     } else if (strcmp(trimmed, "bt") == 0 ||
                strcmp(trimmed, "backtrace") == 0) {
         debug_show_stack(ctx);
@@ -401,7 +421,7 @@ void debug_handle_user_input(debug_context_t *ctx, const char *input) {
                          "Unknown mode: %s (valid: posix, bash, zsh, lush)\n",
                          mode_name);
             free(cmd);
-            return;
+            return false;
         }
         if (shell_mode_set(new_mode)) {
             debug_printf(ctx, "Shell mode set to: %s\n",
@@ -438,12 +458,14 @@ void debug_handle_user_input(debug_context_t *ctx, const char *input) {
         debug_printf(ctx, "Continuing execution...\n");
         ctx->step_mode = false;
         ctx->mode = DEBUG_MODE_CONTINUE;
+        resume = true;
     } else {
         debug_printf(ctx, "Unknown command: '%s' (type 'help' for commands)\n",
                      trimmed);
     }
 
     free(cmd);
+    return resume;
 }
 
 /**
@@ -602,15 +624,23 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
      * run with no controlling terminal); in every such case the right
      * move is to stop prompting and let execution continue. */
     fflush(ctx->debug_output);
-    while (ctx->step_mode) {
+    /* Read commands until one resumes execution. Inspection commands
+     * (vars, print, backtrace, ...) loop back for another prompt;
+     * continue / step / next / finish / quit exit so the executor
+     * proceeds. EOF -- no controlling terminal, or Ctrl-D -- is
+     * treated as continue. */
+    for (;;) {
         char *line = lle_readline_no_history("(lush-debug) ");
         if (!line) {
             debug_printf(ctx, "\nContinuing execution...\n");
             ctx->step_mode = false;
             break;
         }
-        debug_handle_user_input(ctx, line);
+        bool resume = debug_handle_user_input(ctx, line);
         free(line);
+        if (resume) {
+            break;
+        }
     }
 
     debug_printf(ctx, "Exited interactive debug mode\n");

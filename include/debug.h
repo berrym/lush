@@ -117,6 +117,11 @@ typedef struct debug_context {
     /* Execution state */
     debug_frame_t *current_frame; /**< Current stack frame */
     int stack_depth;              /**< Current stack depth */
+    int step_target_depth;        /**< Single-stepping stops only when
+                                       stack_depth <= this. INT_MAX for
+                                       step-into (stop everywhere), the
+                                       current depth for step-over, and
+                                       depth-1 for step-out. */
 
     /* Execution context preservation (for loop debugging fix) */
     struct {
@@ -719,12 +724,15 @@ void debug_set_analysis_output_file(debug_context_t *ctx, const char *filename);
  */
 
 /**
- * @brief Handle user debug command input
+ * @brief Handle one user debug command at the interactive break prompt
  *
  * @param ctx Debug context
  * @param input User input string
+ * @return true if the command resumes execution (continue / step / next /
+ *         finish / quit / empty), so the prompt loop should exit; false
+ *         for inspection commands, so the loop should prompt again.
  */
-void debug_handle_user_input(debug_context_t *ctx, const char *input);
+bool debug_handle_user_input(debug_context_t *ctx, const char *input);
 
 /**
  * @brief Print debug help information

@@ -654,6 +654,39 @@ static int test_check_breakpoint_disabled_breakpoint(void) {
  * STEP EXECUTION TESTS
  * ============================================================ */
 
+/* The step-depth gate: debug_check_breakpoint takes its step branch
+ * only when stack_depth <= step_target_depth. This is the mechanism
+ * behind step-over (skip deeper call frames) and step-out (run on to
+ * the caller). With no breakpoint registered, a true return means the
+ * step branch fired. */
+static int test_step_fires_within_target_depth(void) {
+    debug_context_t *ctx = create_test_context();
+    ASSERT_NOT_NULL(ctx);
+    ctx->step_mode = true;
+    ctx->step_target_depth = 5;
+    ctx->stack_depth = 3;
+
+    /* 3 <= 5: not deeper than the target -- stepping stops here. */
+    ASSERT(debug_check_breakpoint(ctx, "f.sh", 1));
+
+    free_test_context(ctx);
+    return 1;
+}
+
+static int test_step_suppressed_beyond_target_depth(void) {
+    debug_context_t *ctx = create_test_context();
+    ASSERT_NOT_NULL(ctx);
+    ctx->step_mode = true;
+    ctx->step_target_depth = 2;
+    ctx->stack_depth = 6;
+
+    /* 6 > 2: this node is inside a stepped-over call -- no stop. */
+    ASSERT(!debug_check_breakpoint(ctx, "f.sh", 1));
+
+    free_test_context(ctx);
+    return 1;
+}
+
 static int test_step_into_null_context(void) {
     /* Should not crash */
     debug_step_into(NULL);
@@ -738,10 +771,14 @@ static int test_step_out_sets_mode(void) {
     ASSERT_NOT_NULL(ctx);
     ctx->step_mode = true;
     ctx->mode = DEBUG_MODE_STEP;
+    ctx->stack_depth = 3;
 
     debug_step_out(ctx);
-    ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
-    ASSERT(!ctx->step_mode);
+    /* Step-out keeps single-stepping, but suppressed until the stack
+     * unwinds past the current frame: target depth is stack_depth - 1. */
+    ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);
+    ASSERT(ctx->step_mode);
+    ASSERT_EQ(ctx->step_target_depth, 2);
 
     free_test_context(ctx);
     return 1;
@@ -904,10 +941,14 @@ static int test_handle_user_input_finish_short(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
     ctx->step_mode = true;
+    ctx->stack_depth = 2;
 
-    debug_handle_user_input(ctx, "f\n");
-    ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
-    ASSERT(!ctx->step_mode);
+    /* 'f' is a resume command and performs step-out. */
+    bool resume = debug_handle_user_input(ctx, "f\n");
+    ASSERT(resume);
+    ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);
+    ASSERT(ctx->step_mode);
+    ASSERT_EQ(ctx->step_target_depth, 1);
 
     free_test_context(ctx);
     return 1;
@@ -917,10 +958,13 @@ static int test_handle_user_input_finish_long(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
     ctx->step_mode = true;
+    ctx->stack_depth = 2;
 
-    debug_handle_user_input(ctx, "finish\n");
-    ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
-    ASSERT(!ctx->step_mode);
+    bool resume = debug_handle_user_input(ctx, "finish\n");
+    ASSERT(resume);
+    ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);
+    ASSERT(ctx->step_mode);
+    ASSERT_EQ(ctx->step_target_depth, 1);
 
     free_test_context(ctx);
     return 1;
@@ -1793,11 +1837,12 @@ static int test_step_mode_transitions(void) {
     ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
     ASSERT(!ctx->step_mode);
 
-    /* Step into again, then step out */
+    /* Step into again, then step out -- step-out keeps stepping, with
+     * a target depth one frame shallower than the current one. */
     debug_step_into(ctx);
     debug_step_out(ctx);
-    ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
-    ASSERT(!ctx->step_mode);
+    ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);
+    ASSERT(ctx->step_mode);
 
     free_test_context(ctx);
     return 1;
@@ -1871,6 +1916,8 @@ int main(void) {
     RUN_TEST(step_out_null_context);
     RUN_TEST(step_out_disabled_context);
     RUN_TEST(step_out_sets_mode);
+    RUN_TEST(step_fires_within_target_depth);
+    RUN_TEST(step_suppressed_beyond_target_depth);
     RUN_TEST(continue_null_context);
     RUN_TEST(continue_disabled_context);
     RUN_TEST(continue_clears_step_mode);
