@@ -234,6 +234,89 @@ The asymmetry is principled: one is the engine silently lying; the
 other is a configurable, syntactically-requested expansion. Word
 splitting stays exactly as it is, governed by the feature matrix.
 
+### 3.9 List and map values meeting a position
+
+§3.4 forbids implicit list→string coercion; §3.5 binds presentation to
+the subscript. This section completes the model: what a list or map
+value does when it reaches a position, and what is forbidden outright.
+
+**The whole-word constraint.** A vector-yielding expansion -- a bare
+`${arr}` that resolves to a list/map, `${arr[@]}`, or a
+vector-producing map operator (`(k)`, `(v)`, `(kv)`) -- must occupy
+the *entire* whitespace-delimited word it appears in. It may not be
+glued to literal text or to another expansion within a single word.
+
+- Permitted: `${arr[@]}`, `"${arr[@]}"` -- the expansion is the whole
+  word's content (the quotes are a whitespace anchor, §3.6, and do not
+  change this).
+- Forbidden: `x${arr}`, `"prefix_${arr[@]}"` -- a list glued to text.
+  Gluing a list to a string has no coherent meaning; allowing it would
+  force an implicit flatten, which §3.4 forbids.
+
+String concatenation is therefore *not* a slot category -- it is a
+within-word phenomenon governed entirely by this constraint. To build
+a string from a list, join it explicitly (`${arr[*]}`, an explicit
+join) and concatenate the resulting *scalar*.
+
+The constraint is enforced at **runtime**: whether an expansion is
+vector-yielding depends on the variable's value, which is runtime
+state -- `x${arr}` is ordinary concatenation when `arr` holds a scalar
+and a violation when it holds a list. (An explicit `[@]` glued to text
+is statically detectable, and an implementation may diagnose it early,
+but the guarantee is defined at runtime, uniform with the slot check
+below.)
+
+**Slot context.** Every position an expansion can occupy is either
+vector-accepting or scalar-requiring:
+
+| Slot category    | Positions |
+|------------------|-----------|
+| Vector-accepting | argv (command arguments); the command-name position; array initializer `( ... )`; for-loop word list |
+| Scalar-requiring | variable assignment RHS; `case` word (`case $x in`); redirect target (`>`, `>>`); here-string (`<<<`); arithmetic operand `$(( ... ))`; conditional-expression operand `[[ ... ]]` |
+
+This table states the model's intent; the engine must codify the
+*complete* enumeration of positions. It is a living classification,
+not yet exhaustive here.
+
+A list or map value -- bare `${arr}`, or a vector-producing operator
+-- is valid in a vector-accepting slot: it contributes its elements,
+exactly as `${arr[@]}` does. In a scalar-requiring slot it is a type
+error. `${arr[*]}` and explicit joins produce a scalar and are valid
+in scalar-requiring slots.
+
+**Type-mismatch diagnostic.** A list or map value that reaches a
+scalar-requiring slot, or that violates the whole-word constraint, is
+a runtime type error. The engine halts the offending evaluation and
+emits a diagnostic through the structured-error system, the source
+span on the offending expansion:
+
+```
+error[E_TYPE]: type mismatch -- expected scalar string, got list
+  --> script.lush:12:13
+   |
+12 | msg="prefix ${my_list}"
+   |             ^^^^^^^^^^ list value in a scalar within-word position
+   |
+   = help: join the list explicitly to place it in a string position --
+           ${my_list[*]} for space-joining, or an explicit join.
+```
+
+`E_TYPE` is a placeholder; the real code is assigned from lush's
+structured-error registry, not invented here.
+
+**Enforcement.** The check is runtime (a variable's kind is runtime
+state). In a script, a type mismatch aborts with a non-zero exit
+before the bad value can reach a downstream command. Interactively,
+the diagnostic prints to stderr, the current command line is
+abandoned, and control returns cleanly to the prompt and the
+debugger -- the session is not killed.
+
+This makes the bare `${arr}` fully defined: it is the first-class
+list (or map) value itself; `[@]` / `[*]` are operators *on* that
+value, not type switches; the value flows into vector-accepting
+positions and is a diagnosed type error in scalar-requiring ones.
+There is no implicit join, ever.
+
 ---
 
 ## 4. The three boundary rules
@@ -387,7 +470,7 @@ sizes are rough engineering estimates.)
 | Transformation always fires | yes (`known_divergences.txt` 301/314) | yes (§3.5) | **match** |
 | Presentation by subscript | yes -- `${arr[@]}` vector, `${(flags)arr}` scalar (`known_divergences.txt` 307) | yes (§3.5) | **match** |
 | Quoting irrelevant to presentation | `parse_parameter_expansion` does not receive quote context; `expand_quoted_string` tracks `in_double_quotes` but does not thread it down | presentation must NOT consult quote context (§3.6) -- so the un-threaded state is *correct*, not a gap | **match** |
-| Implicit list-to-string | the expansion engine still joins lists to strings on some paths | no implicit coercion (§3.4) | real -- needs a full audit of expansion sites |
+| Implicit list-to-string | audited (`docs/development/EXPANSION_AUDIT.md`): reduces to one site -- `${arr[@]}` joins at `executor.c:12437` where §3.5 requires a vector; bare `${arr}` now specified by §3.9 | no implicit coercion (§3.4, §3.9) | one targeted fix -- split the `[@]`/`[*]` branch |
 | `(@)` flag | recognized among parameter flags | redundant; at most a spelling alias (§3.7) | small |
 | Word splitting | `FEATURE_WORD_SPLIT_DEFAULT`, per-mode | retained as a preset (§3.8) | **match** |
 | Typed-function form | not implemented -- no `fn` keyword, no typed parameters; `return_value` is a builtin emitting a `__LUSH_RETURN__` marker, not a language construct | a typed form carrying lexical scope (§5.3) | large -- form not yet designed |
@@ -404,13 +487,6 @@ are coupled and are deliberately out of scope for this document; see
 Recorded here so they are not lost. These are *not* decided by this
 document; they are to be decided against it, as their own work.
 
-- **The bare, un-subscripted reference `${arr}`** on a list- or
-  map-valued variable. `[@]` and `[*]` are defined (§3.5); the
-  no-subscript form is not. Candidates: it is the first-class list
-  value itself; it is a diagnosed error ("a structured value
-  referenced without a presentation subscript"); it defaults to
-  `[*]`-style scalar. Current behavior is joined-scalar
-  (`known_divergences.txt` 307). To be decided.
 - **The typed-function form.** Its syntax, typed parameters, a proper
   `return_value` construct (replacing the marker-hack builtin), and
   the lexical-scope resolution pass. A full design of its own.
