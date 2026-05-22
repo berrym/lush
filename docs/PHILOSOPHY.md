@@ -197,6 +197,38 @@ this project worth building.
 
 ---
 
+## 7. The debugger keeps pace with the language
+
+Lush's integrated debugger is part of its identity (§1): "the IDE for
+shell developers" is only true while the debugger understands
+everything the shell can do. A debugger that has fallen behind the
+language it debugs is worse than no debugger -- it misleads with
+authority.
+
+So the rule: no change to the language surface, the value model, or
+observable execution semantics is complete until the debugger can
+still see it. A new construct, a new value kind, a new scoping
+discipline each carries a debugger obligation -- breakpoints still
+halt within it, stepping still steps through it, inspection still
+renders it truthfully. "Done" includes the debugger.
+
+This cannot be a rule enforced by memory. Memory-enforced rules decay,
+and this one already did: the debugger's breakpoint and stepping
+integration silently rotted away across an era of executor changes,
+because nothing forced the parallel work and nothing tested it. The
+rule is therefore enforced by a gate -- an integration test suite that
+drives the debugger over representative scripts and asserts it can set
+breakpoints, halt, step, and inspect every value type. When a core
+change outpaces the debugger, that test goes red; red CI is an
+emergency, not a backlog item. The gate, not good intentions, holds
+the rule.
+
+The gate also scopes the rule honestly. A change the gate still passes
+needs no debugger work. A change that reddens it is not done until the
+debugger -- and the gate -- are green again.
+
+---
+
 ## See also
 
 - [VISION.md](VISION.md) -- project philosophy and design ambitions.
