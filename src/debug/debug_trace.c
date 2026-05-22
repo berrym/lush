@@ -622,20 +622,59 @@ void debug_watch_variable(debug_context_t *ctx, const char *name) {
 
     debug_printf(ctx, "WATCH: %s\n", clean_name);
 
-    // Get current value for baseline
-    const char *current_value = symtable_get_global(clean_name);
-    if (current_value) {
-        debug_printf(ctx, "  Current value: '%s'\n", current_value);
+    // Resolve the current binding -- arrays carry a richer label than
+    // the scope-chain scalar lookup. Either render the type alongside
+    // the value, or report that the name is unbound.
+    array_value_t *array = symtable_get_array(clean_name);
+    if (array) {
+        debug_printf(
+            ctx, "  Type:  %s\n",
+            debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
+        debug_printf(ctx, "  Count: %zu element%s\n", array->count,
+                     array->count == 1 ? "" : "s");
         debug_printf(ctx, "  Variable is now being watched for changes\n");
-        debug_printf(ctx,
-                     "  (Watch implementation: basic monitoring active)\n");
     } else {
-        debug_printf(ctx, "  Variable '%s' is not currently set\n", clean_name);
-        debug_printf(ctx, "  Will watch for when it gets assigned\n");
+        char *value = symtable_get_var(symtable_manager(), clean_name);
+        if (value) {
+            debug_printf(ctx, "  Type:  Scalar\n");
+            debug_printf(ctx, "  Value: \"%s\"\n", value);
+            debug_printf(ctx, "  Variable is now being watched for changes\n");
+            free(value);
+        } else {
+            debug_printf(ctx, "  Variable '%s' is not currently set\n",
+                         clean_name);
+            debug_printf(ctx, "  Will watch for when it gets assigned\n");
+        }
     }
 
     // TODO: Implement proper watch list management
     // For now, just acknowledge the watch request
+}
+
+void debug_show_variable_type(debug_context_t *ctx, const char *name) {
+    if (!ctx || !ctx->enabled || !name) {
+        return;
+    }
+
+    const char *clean_name = (name[0] == '$') ? name + 1 : name;
+
+    array_value_t *array = symtable_get_array(clean_name);
+    if (array) {
+        debug_printf(
+            ctx, "%s: %s (%zu element%s)\n", clean_name,
+            debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
+            array->count, array->count == 1 ? "" : "s");
+        return;
+    }
+
+    char *value = symtable_get_var(symtable_manager(), clean_name);
+    if (value) {
+        debug_printf(ctx, "%s: Scalar\n", clean_name);
+        free(value);
+        return;
+    }
+
+    debug_printf(ctx, "%s: not set\n", clean_name);
 }
 
 /**

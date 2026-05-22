@@ -755,6 +755,82 @@ TEST(inspect_variable_renders_assoc_array_as_map) {
     debug_cleanup(ctx);
 }
 
+/* debug_show_variable_type on an indexed array reports List + count. */
+TEST(show_variable_type_indexed_array_is_list) {
+    init_symtable();
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured ctx");
+
+    array_value_t *arr = symtable_array_create(false);
+    ASSERT_NOT_NULL(arr, "create indexed array");
+    int rc = symtable_set_array("type_list_probe", arr);
+    ASSERT_EQ(rc, 0, "register array");
+
+    debug_show_variable_type(ctx, "type_list_probe");
+
+    char log[1024];
+    read_debug_output(ctx, log, sizeof(log));
+    ASSERT_TRUE(strstr(log, "type_list_probe: List") != NULL,
+                "indexed array reported as List");
+
+    debug_cleanup(ctx);
+}
+
+/* debug_show_variable_type on an associative array reports Map. */
+TEST(show_variable_type_assoc_array_is_map) {
+    init_symtable();
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured ctx");
+
+    array_value_t *arr = symtable_array_create(true);
+    ASSERT_NOT_NULL(arr, "create associative array");
+    int rc = symtable_set_array("type_map_probe", arr);
+    ASSERT_EQ(rc, 0, "register array");
+
+    debug_show_variable_type(ctx, "type_map_probe");
+
+    char log[1024];
+    read_debug_output(ctx, log, sizeof(log));
+    ASSERT_TRUE(strstr(log, "type_map_probe: Map") != NULL,
+                "associative array reported as Map");
+
+    debug_cleanup(ctx);
+}
+
+/* debug_show_variable_type for a scalar reports Scalar. */
+TEST(show_variable_type_scalar) {
+    init_symtable();
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured ctx");
+
+    symtable_set_var(symtable_manager(), "type_scalar_probe", "hi",
+                     SYMVAR_NONE);
+
+    debug_show_variable_type(ctx, "type_scalar_probe");
+
+    char log[1024];
+    read_debug_output(ctx, log, sizeof(log));
+    ASSERT_TRUE(strstr(log, "type_scalar_probe: Scalar") != NULL,
+                "scalar reported as Scalar");
+
+    debug_cleanup(ctx);
+}
+
+/* debug_show_variable_type for an unbound name says so honestly. */
+TEST(show_variable_type_unset) {
+    init_symtable();
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured ctx");
+
+    debug_show_variable_type(ctx, "definitely_not_a_variable_xyz");
+
+    char log[1024];
+    read_debug_output(ctx, log, sizeof(log));
+    ASSERT_TRUE(strstr(log, "not set") != NULL, "unset reported");
+
+    debug_cleanup(ctx);
+}
+
 TEST(watch_variable_null_params) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
@@ -854,6 +930,10 @@ int main(void) {
     RUN_TEST(inspect_all_variables_shows_locals_in_function_scope);
     RUN_TEST(inspect_variable_renders_indexed_array_as_list);
     RUN_TEST(inspect_variable_renders_assoc_array_as_map);
+    RUN_TEST(show_variable_type_indexed_array_is_list);
+    RUN_TEST(show_variable_type_assoc_array_is_map);
+    RUN_TEST(show_variable_type_scalar);
+    RUN_TEST(show_variable_type_unset);
     RUN_TEST(watch_variable_null_params);
     RUN_TEST(watch_variable_basic);
     RUN_TEST(show_variable_changes);

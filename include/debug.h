@@ -381,6 +381,21 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name);
 void debug_inspect_all_variables(debug_context_t *ctx);
 
 /**
+ * @brief Show only the user-facing type of a variable
+ *
+ * Resolves the variable in the same order as debug_inspect_variable
+ * (array store first, then the scope chain) and prints just the
+ * Scalar / List / Map / Func / Nameref label per SEMANTICS.md, with
+ * the element count for arrays. Reports "not set" when no binding is
+ * found in any reachable scope or the array store. For the
+ * (lush-debug) prompt's `type <name>` / `t <name>` command.
+ *
+ * @param ctx Debug context
+ * @param name Variable name (with or without $ prefix)
+ */
+void debug_show_variable_type(debug_context_t *ctx, const char *name);
+
+/**
  * @brief Add a variable to the watch list
  *
  * @param ctx Debug context

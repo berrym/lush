@@ -379,6 +379,11 @@ bool debug_handle_user_input(debug_context_t *ctx, const char *input) {
         // Variable inspection
         char *var = trimmed + (trimmed[1] == ' ' ? 2 : 6);
         debug_inspect_variable(ctx, var);
+    } else if (strncmp(trimmed, "type ", 5) == 0 ||
+               strncmp(trimmed, "t ", 2) == 0) {
+        // Variable type query -- short answer (Scalar / List / Map).
+        char *var = trimmed + (trimmed[1] == ' ' ? 2 : 5);
+        debug_show_variable_type(ctx, var);
     } else if (strncmp(trimmed, "set ", 4) == 0) {
         // Variable assignment
         char *assignment = trimmed + 4;
