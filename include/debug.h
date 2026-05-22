@@ -68,7 +68,6 @@ typedef struct debug_frame {
     char *file_path;            /**< Path to source file */
     int line_number;            /**< Current line number */
     node_t *current_node;       /**< Current AST node */
-    symtable_t *local_vars;     /**< Local variables in this frame */
     struct debug_frame *parent; /**< Parent frame */
     struct timespec start_time; /**< Frame start time */
     struct timespec end_time;   /**< Frame end time */

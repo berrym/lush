@@ -21,6 +21,50 @@
 #include <string.h>
 #include <time.h>
 
+/* Map a symtable-side value classification to lush's user-facing type
+ * vocabulary -- Scalar / List / Map -- per SEMANTICS.md. The
+ * is_associative flag is meaningful only for SYMVAR_ARRAY entries:
+ * lush arrays carry that flag on array_value_t, and the same enum
+ * value SYMVAR_ARRAY covers both indexed (List) and associative (Map)
+ * arrays. */
+static const char *debug_var_type_label(symvar_type_t type,
+                                        bool is_associative) {
+    switch (type) {
+    case SYMVAR_STRING:
+    case SYMVAR_INTEGER:
+        return "Scalar";
+    case SYMVAR_ARRAY:
+        return is_associative ? "Map" : "List";
+    case SYMVAR_FUNCTION:
+        return "Func";
+    case SYMVAR_NAMEREF:
+        return "Nameref";
+    }
+    return "?";
+}
+
+/* Callback printing one variable from a scope's vars_ht entry. The
+ * vars_ht stores only scalar-shaped types (arrays live in separate
+ * global storage, reached via symtable_enumerate_arrays). */
+static void debug_local_var_print_cb(const char *name, const char *value,
+                                     symvar_type_t type, void *userdata) {
+    debug_context_t *ctx = (debug_context_t *)userdata;
+    debug_printf(ctx, "  %-12s %-7s \"%s\"\n", name,
+                 debug_var_type_label(type, false), value);
+}
+
+/* Callback printing one array entry from symtable_enumerate_arrays. */
+static void debug_array_print_cb(const char *name, array_value_t *array,
+                                 void *userdata) {
+    debug_context_t *ctx = (debug_context_t *)userdata;
+    if (!array) {
+        return;
+    }
+    debug_printf(ctx, "  %-12s %-7s (%zu element%s)\n", name,
+                 debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
+                 array->count, array->count == 1 ? "" : "s");
+}
+
 /**
  * @brief Trace execution of an AST node
  * @param ctx Debug context
@@ -50,11 +94,12 @@ void debug_trace_node(debug_context_t *ctx, node_t *node, const char *file,
         debug_printf(ctx, "  Time: %s\n", time_str);
     }
 
-    // Show variables if enabled and we have a current frame
-    if (ctx->show_variables && ctx->current_frame &&
-        ctx->current_frame->local_vars) {
+    // Show variables if enabled and we are inside a non-global scope.
+    if (ctx->show_variables &&
+        symtable_current_scope_type(symtable_manager()) != SCOPE_GLOBAL) {
         debug_printf(ctx, "  Variables in scope:\n");
-        // TODO: Implement variable display from symtable
+        symtable_enumerate_current_scope_vars(symtable_manager(),
+                                              debug_local_var_print_cb, ctx);
     }
 
     ctx->total_commands++;
@@ -188,7 +233,6 @@ debug_frame_t *debug_push_frame(debug_context_t *ctx, const char *function,
     frame->file_path = file ? strdup(file) : NULL;
     frame->line_number = line;
     frame->current_node = NULL;
-    frame->local_vars = NULL;
     frame->parent = ctx->current_frame;
 
     // Set timing
@@ -326,21 +370,35 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    // First try local variables if in function context
-    const char *value = NULL;
-    const char *scope = "unknown";
-
-    if (ctx->current_frame && ctx->current_frame->local_vars) {
-        // TODO: Look up in local variables when symtable iteration is available
-        debug_printf(ctx, "  (checking local scope - needs implementation)\n");
+    // Arrays first -- they carry the richest type info (List vs Map).
+    array_value_t *array = symtable_get_array(clean_name);
+    if (array) {
+        debug_printf(
+            ctx, "  Type:  %s\n",
+            debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
+        debug_printf(ctx, "  Count: %zu element%s\n", array->count,
+                     array->count == 1 ? "" : "s");
+        debug_printf(ctx, "  Scope: %s\n",
+                     symtable_current_scope_type(symtable_manager()) ==
+                             SCOPE_GLOBAL
+                         ? "global"
+                         : "function");
+        return;
     }
 
-    // Try global symtable
-    value = symtable_get_global(clean_name);
+    // Scalar via the scope chain: symtable_get_var walks current scope
+    // up to global. The return is heap-allocated and must be freed.
+    char *owned_value = symtable_get_var(symtable_manager(), clean_name);
+    const char *value = owned_value;
+    const char *scope = NULL;
     if (value) {
-        scope = "global";
+        scope =
+            (symtable_current_scope_type(symtable_manager()) != SCOPE_GLOBAL)
+                ? "shell (in or above current scope)"
+                : "global";
     } else {
-        // Check environment variables
+        // Environment fallback for unexported shell vars that landed
+        // in the process environment.
         value = getenv(clean_name);
         if (value) {
             scope = "environment";
@@ -348,19 +406,24 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
     }
 
     if (value) {
-        debug_printf(ctx, "  Value: '%s'\n", value);
-        debug_printf(ctx, "  Type: string\n");
+        debug_printf(ctx, "  Type:  Scalar\n");
+        debug_printf(ctx, "  Value: \"%s\"\n", value);
         debug_printf(ctx, "  Length: %zu characters\n", strlen(value));
         debug_printf(ctx, "  Scope: %s\n", scope);
 
-        // Show first few characters if value is very long
+        // Show first few characters if value is very long.
         if (strlen(value) > 100) {
             char preview[104];
             strncpy(preview, value, 100);
             preview[100] = '\0';
-            debug_printf(ctx, "  Preview: '%.100s...'\n", preview);
+            debug_printf(ctx, "  Preview: \"%.100s...\"\n", preview);
         }
-    } else {
+        free(owned_value);
+        return;
+    }
+    free(owned_value);
+
+    {
         // Check for special variables
         if (strcmp(clean_name, "?") == 0) {
             const char *exit_status = symtable_get_global("?") ?: "0";
@@ -464,17 +527,22 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
         return;
     }
 
+    /* Single source of truth for the current scope: ask the symtable.
+     * The debug frame's function_name tracks the executing command,
+     * not the scope, so it would mislabel inside builtins, loops, etc. */
+    const char *current_scope_name =
+        symtable_current_scope_name(symtable_manager());
     debug_printf(ctx, "Current scope: %s\n",
-                 ctx->current_frame ? ctx->current_frame->function_name
-                                    : "global");
+                 current_scope_name ? current_scope_name : "global");
     debug_printf(ctx, "\n");
 
-    // Show local function variables if in function context
-    if (ctx->current_frame && ctx->current_frame->local_vars) {
+    // Show local variables when inside any non-global scope (function
+    // body, loop body, etc.). Iterates the current scope's vars_ht
+    // directly so values shadowed from outer scopes are not included.
+    if (symtable_current_scope_type(symtable_manager()) != SCOPE_GLOBAL) {
         debug_printf(ctx, "Local Variables:\n");
-        // TODO: Implement symtable iteration to show local variables
-        debug_printf(
-            ctx, "  (local variables inspection needs symtable iteration)\n");
+        symtable_enumerate_current_scope_vars(symtable_manager(),
+                                              debug_local_var_print_cb, ctx);
         debug_printf(ctx, "\n");
     }
 
@@ -490,6 +558,13 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
     if (!callback_data.found_any) {
         debug_printf(ctx, "  (no user-defined shell variables found)\n");
     }
+    debug_printf(ctx, "\n");
+
+    // Arrays (Lists and Maps) -- not in any scope's vars_ht; lush stores
+    // them in separate global array storage. Render with the
+    // is_associative-derived type label and element count.
+    debug_printf(ctx, "Arrays:\n");
+    symtable_enumerate_arrays(debug_array_print_cb, ctx);
     debug_printf(ctx, "\n");
 
     // Also show commonly accessed system variables for completeness

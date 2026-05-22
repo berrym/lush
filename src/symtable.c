@@ -482,6 +482,13 @@ bool symtable_in_function_scope(symtable_manager_t *manager) {
     return false;
 }
 
+scope_type_t symtable_current_scope_type(symtable_manager_t *manager) {
+    if (!manager || !manager->current_scope) {
+        return SCOPE_GLOBAL;
+    }
+    return manager->current_scope->scope_type;
+}
+
 /**
  * @brief Set a variable in the current scope
  *
@@ -1538,6 +1545,34 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
         symvar_t *var = deserialize_variable(key, serialized);
         if (var && !(var->flags & SYMVAR_UNSET)) {
             callback(key, var->value, userdata);
+        }
+        free_symvar(var);
+    }
+
+    ht_strstr_enum_destroy(enum_iter);
+}
+
+void symtable_enumerate_current_scope_vars(
+    symtable_manager_t *manager,
+    void (*callback)(const char *name, const char *value, symvar_type_t type,
+                     void *userdata),
+    void *userdata) {
+    if (!manager || !manager->current_scope ||
+        !manager->current_scope->vars_ht || !callback) {
+        return;
+    }
+
+    ht_enum_t *enum_iter =
+        ht_strstr_enum_create(manager->current_scope->vars_ht);
+    if (!enum_iter) {
+        return;
+    }
+
+    const char *key, *serialized;
+    while (ht_strstr_enum_next(enum_iter, &key, &serialized)) {
+        symvar_t *var = deserialize_variable(key, serialized);
+        if (var && !(var->flags & SYMVAR_UNSET)) {
+            callback(key, var->value, var->type, userdata);
         }
         free_symvar(var);
     }

@@ -222,6 +222,20 @@ const char *symtable_current_scope_name(symtable_manager_t *manager);
  */
 bool symtable_in_function_scope(symtable_manager_t *manager);
 
+/**
+ * @brief Get the type of the current (innermost) scope
+ *
+ * Returns SCOPE_GLOBAL when no scope is pushed, otherwise the
+ * scope_type of the innermost pushed scope (SCOPE_FUNCTION /
+ * SCOPE_LOOP / SCOPE_SUBSHELL / SCOPE_CONDITIONAL). Used by the
+ * debugger to label and gate its local-variable view.
+ *
+ * @param manager Manager instance
+ * @return Current scope type (SCOPE_GLOBAL if manager is NULL or no
+ *         scope is active).
+ */
+scope_type_t symtable_current_scope_type(symtable_manager_t *manager);
+
 /* Variable Operations */
 
 /**
@@ -595,6 +609,27 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
                                                      const char *value,
                                                      void *userdata),
                                     void *userdata);
+
+/**
+ * @brief Enumerate variables defined directly in the current scope
+ *
+ * Iterates entries in @p manager->current_scope->vars_ht only -- it does
+ * NOT walk the scope chain, so this returns just the variables declared
+ * in the innermost active scope (e.g. a function's locals). Array
+ * variables live in separate global storage and are reached through
+ * symtable_enumerate_arrays(); only scalar / integer / nameref entries
+ * appear here. Used by the debugger's local-variable inspection.
+ *
+ * @param manager Manager instance
+ * @param callback Called for each variable. @p type carries the symvar
+ *                 type so the consumer can label Scalar / Nameref / etc.
+ * @param userdata Opaque pointer passed through to the callback
+ */
+void symtable_enumerate_current_scope_vars(
+    symtable_manager_t *manager,
+    void (*callback)(const char *name, const char *value, symvar_type_t type,
+                     void *userdata),
+    void *userdata);
 
 /**
  * @brief Count global variables
