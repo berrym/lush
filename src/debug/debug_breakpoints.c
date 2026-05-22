@@ -13,6 +13,7 @@
 #include "debug.h"
 #include "errors.h"
 #include "executor.h"
+#include "lle/lle_readline.h"
 #include "node.h"
 #include "shell_mode.h"
 #include "symtable.h"
@@ -585,71 +586,33 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
                      ctx->execution_context.loop_variable_value ?: "unknown");
     }
 
-    // Check if we're in interactive mode by testing if stdin is connected to a
-    // terminal
-    bool is_interactive = isatty(STDIN_FILENO);
-    FILE *debug_input = stdin;
-
-    // If not interactive, try to open the controlling terminal
-    if (!is_interactive) {
-        debug_input = fopen("/dev/tty", "r");
-        if (!debug_input) {
-            debug_printf(ctx, "Warning: Cannot access controlling terminal for "
-                              "interactive debugging.\n");
-            debug_printf(
-                ctx, "Run lush interactively for full debugging experience.\n");
-            debug_printf(ctx, "Continuing execution...\n");
-            ctx->step_mode = false;
-            return;
-        }
-        debug_printf(ctx, "Opened controlling terminal for debug input.\n");
-    }
-
     // Show available commands
     debug_printf(
         ctx,
         "Common commands: c/continue, s/step, n/next, vars, help, q/quit\n");
 
+    /* Read commands through LLE -- the single owner of terminal and
+     * user interaction. This is a sequential lle_readline() call: the
+     * primary prompt's readline returned long ago (the break fires
+     * during executor execution), so it is a normal supported use,
+     * not a re-entrant one. LLE owns the terminal lifecycle, so there
+     * is no fgets/termios contention with the line editor -- the bug
+     * that froze sessions. lle_readline() returns NULL on EOF,
+     * interrupt, or when LLE is unavailable (e.g. a non-interactive
+     * run with no controlling terminal); in every such case the right
+     * move is to stop prompting and let execution continue. */
+    fflush(ctx->debug_output);
     while (ctx->step_mode) {
-        debug_printf(ctx, "(lush-debug) ");
-        fflush(ctx->debug_output);
-
-        char input[256];
-        if (fgets(input, sizeof(input), debug_input)) {
-            debug_handle_user_input(ctx, input);
-        } else {
-            // EOF or error - continue execution and restore loop variable if
-            // needed
-            if (ctx->execution_context.in_loop &&
-                ctx->execution_context.loop_variable &&
-                ctx->execution_context.loop_variable_value) {
-                debug_printf(ctx,
-                             "[DEBUG] Restoring loop variable before "
-                             "continuing: %s = '%s'\n",
-                             ctx->execution_context.loop_variable,
-                             ctx->execution_context.loop_variable_value);
-                // Use shell environment variable setting as fallback
-                char env_cmd[512];
-                snprintf(env_cmd, sizeof(env_cmd), "%s=%s",
-                         ctx->execution_context.loop_variable,
-                         ctx->execution_context.loop_variable_value);
-                putenv(env_cmd);
-            }
-
-            if (feof(debug_input)) {
-                debug_printf(ctx, "\nEOF received - continuing execution\n");
-            } else {
-                debug_printf(ctx, "\nInput error - continuing execution\n");
-            }
+        char *line = lle_readline("(lush-debug) ");
+        if (!line) {
+            debug_printf(ctx, "\nContinuing execution...\n");
             ctx->step_mode = false;
             break;
         }
+        debug_handle_user_input(ctx, line);
+        free(line);
     }
 
-    // Close the debug input stream if we opened /dev/tty
-    if (!is_interactive && debug_input != stdin) {
-        fclose(debug_input);
-    }
     debug_printf(ctx, "Exited interactive debug mode\n");
     // Don't clean up execution context here - let the loop manage its own
     // context
