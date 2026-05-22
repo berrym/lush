@@ -191,36 +191,31 @@ TEST(breakpoint_enable_disable) {
 TEST(breakpoint_check_hit) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+    debug_enable(ctx, true);
+    /* debug_check_breakpoint reports through debug_output and, on a
+     * hit, enters the (no-terminal, immediately-returning) debug
+     * prompt; route its chatter to /dev/null. */
+    ctx->debug_output = fopen("/dev/null", "w");
 
     int id = debug_add_breakpoint(ctx, "test.sh", 10, NULL);
     ASSERT(id >= 0, "Add should succeed");
 
-    /* Verify breakpoint state directly without triggering interactive mode */
-    /* Check that breakpoint list contains our breakpoint */
-    breakpoint_t *bp = ctx->breakpoints;
-    bool found = false;
-    while (bp) {
-        if (bp->line == 10 && strcmp(bp->file, "test.sh") == 0) {
-            found = true;
-            ASSERT_TRUE(bp->enabled, "Breakpoint should be enabled");
-            ASSERT_EQ(bp->hit_count, 0, "Hit count should be 0 initially");
-            break;
-        }
-        bp = bp->next;
-    }
-    ASSERT_TRUE(found, "Should find breakpoint at test.sh:10");
+    /* A matching, enabled breakpoint is a hit: debug_check_breakpoint
+     * returns true and increments the hit count. This exercises the
+     * real function -- not a hand-walk of the breakpoint list. */
+    bool hit = debug_check_breakpoint(ctx, "test.sh", 10);
+    ASSERT_TRUE(hit, "Matching breakpoint should report a hit");
+    ASSERT_EQ(ctx->breakpoints->hit_count, 1, "Hit count should be 1");
 
-    /* Verify breakpoint at different location is NOT found */
-    bp = ctx->breakpoints;
-    bool found_other = false;
-    while (bp) {
-        if (bp->line == 11 && strcmp(bp->file, "test.sh") == 0) {
-            found_other = true;
-            break;
-        }
-        bp = bp->next;
-    }
-    ASSERT_FALSE(found_other, "Should not find breakpoint at test.sh:11");
+    /* No breakpoint at line 11 -> no hit. */
+    bool miss = debug_check_breakpoint(ctx, "test.sh", 11);
+    ASSERT_FALSE(miss, "No breakpoint at test.sh:11 should not hit");
+
+    /* Same line number, different file -> no hit. */
+    bool other_file = debug_check_breakpoint(ctx, "other.sh", 10);
+    ASSERT_FALSE(other_file, "Breakpoint is file-specific");
+
+    ASSERT_EQ(ctx->breakpoints->hit_count, 1, "Misses do not raise hit count");
 
     debug_cleanup(ctx);
 }
@@ -228,22 +223,17 @@ TEST(breakpoint_check_hit) {
 TEST(breakpoint_check_disabled) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+    debug_enable(ctx, true);
+    ctx->debug_output = fopen("/dev/null", "w");
 
     int id = debug_add_breakpoint(ctx, "test.sh", 10, NULL);
     debug_enable_breakpoint(ctx, id, false);
 
-    /* Verify breakpoint is disabled in the list */
-    breakpoint_t *bp = ctx->breakpoints;
-    bool found = false;
-    while (bp) {
-        if (bp->id == id) {
-            found = true;
-            ASSERT_FALSE(bp->enabled, "Breakpoint should be disabled");
-            break;
-        }
-        bp = bp->next;
-    }
-    ASSERT_TRUE(found, "Should find breakpoint");
+    /* A disabled breakpoint is not a hit even at its own location. */
+    bool hit = debug_check_breakpoint(ctx, "test.sh", 10);
+    ASSERT_FALSE(hit, "Disabled breakpoint should not report a hit");
+    ASSERT_EQ(ctx->breakpoints->hit_count, 0,
+              "Disabled breakpoint hit count stays 0");
 
     debug_cleanup(ctx);
 }

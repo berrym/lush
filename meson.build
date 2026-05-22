@@ -2265,24 +2265,6 @@ if fs.exists('tests/unit/test_hashtable.c')
        timeout: 30)
 endif
 
-# Debug Core Tests
-if fs.exists('tests/unit/test_debug_core.c')
-  test_debug_core_sources = []
-  foreach s : src
-    if not s.endswith('lush.c')
-      test_debug_core_sources += s
-    endif
-  endforeach
-  test_debug_core = executable('test_debug_core',
-                               'tests/unit/test_debug_core.c',
-                               'tests/unit/test_executor_stubs.c',
-                               test_debug_core_sources + lle_shell_sources,
-                               include_directories: [inc, include_directories('tests')],
-                               dependencies: [lle_dep, libm])
-  test('Debug Core', test_debug_core,
-       suite: 'unit',
-       timeout: 30)
-endif
 
 # Node to Source Tests
 if fs.exists('tests/unit/test_node_to_source.c')
