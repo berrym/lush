@@ -787,7 +787,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     tokenizer->position++;
                 }
             }
-            // Unterminated single-quoted string
+            // Unterminated single-quoted string -- free the segment
+            // builder buffer before returning, otherwise every input
+            // with an unbalanced quote leaks 256+ bytes (caught via
+            // LeakSanitizer running fuzz_parser; see corresponding
+            // fix at the unterminated-double-quote site below).
+            free(result);
             return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                              tokenizer->position - start_pos, start_line,
                              start_column, start_pos);
@@ -1004,7 +1009,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             }
         }
 
-        // Unterminated double-quoted string
+        // Unterminated double-quoted string -- free the segment
+        // builder buffer before returning, otherwise every input
+        // with an unbalanced double quote leaks 256+ bytes.
+        free(result);
         return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                          tokenizer->position - start_pos, start_line,
                          start_column, start_pos);
@@ -2358,6 +2366,51 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             tokenizer->column += (scan_pos - old_pos);
                             // Continue scanning for more word chars
                             continue;
+                        }
+                    }
+                    /* Check for a trailing zsh glob qualifier:
+                     * `*.txt(N)`, `foo(.@)`, etc. A '(' that follows a
+                     * word character and encloses ONLY glob-qualifier
+                     * characters, with the matching ')' ending the
+                     * word, is part of the glob word -- not a subshell.
+                     * (`*(.N)` is already absorbed by the extglob
+                     * branch above via prev=='*'; this handles the
+                     * prefixed-pattern form the extglob branch misses.)
+                     */
+                    else if (shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
+                        size_t scan_pos = tokenizer->position + 1;
+                        bool only_qual = true;
+                        bool found_close = false;
+                        while (scan_pos < tokenizer->input_length) {
+                            char sc = tokenizer->input[scan_pos];
+                            if (sc == ')') {
+                                found_close = true;
+                                break;
+                            }
+                            if (!strchr("./@*rwND,", sc)) {
+                                only_qual = false;
+                                break;
+                            }
+                            scan_pos++;
+                        }
+                        if (found_close && only_qual &&
+                            scan_pos > tokenizer->position + 1) {
+                            /* The qualifier must end the word: after
+                             * ')' expect whitespace, EOF, or a token
+                             * boundary (incl. the ')' of an enclosing
+                             * array literal). */
+                            size_t after = scan_pos + 1;
+                            char ac = (after < tokenizer->input_length)
+                                          ? tokenizer->input[after]
+                                          : '\0';
+                            if (ac == '\0' || isspace((unsigned char)ac) ||
+                                strchr(")|&;<>", ac)) {
+                                is_numeric = false;
+                                size_t old_pos = tokenizer->position;
+                                tokenizer->position = after;
+                                tokenizer->column += (after - old_pos);
+                                continue;
+                            }
                         }
                     }
                     // Not an extglob pattern or array literal - end the word

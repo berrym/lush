@@ -426,14 +426,17 @@ int main(int argc, char **argv) {
     // Cleanup is handled by atexit() handlers registered in init.c
     // This prevents double cleanup when exit() command is used
 
-    // Cleanup global executor before exit
+    /* Run EXIT traps BEFORE tearing down the executor: the trap body
+     * is parsed and executed by the executor itself, so it must still
+     * exist (otherwise execute_exit_traps falls back to /bin/sh, and
+     * any reference to a user-defined function or shell variable in
+     * the trap body fails). */
+    execute_exit_traps();
+
     if (global_executor) {
         executor_free(global_executor);
         global_executor = NULL;
     }
-
-    // Execute EXIT traps before shell terminates normally
-    execute_exit_traps();
 
     // Exit with the status of the last command executed (POSIX requirement)
     exit(last_exit_status);

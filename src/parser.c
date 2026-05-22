@@ -68,9 +68,7 @@ static node_t *parse_anonymous_function(parser_t *parser);
 
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
-static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
-                                     bool strip_tabs, bool expand_variables,
-                                     source_location_t op_loc);
+static bool collect_pending_heredocs(parser_t *parser);
 static void set_parser_error(parser_t *parser, const char *message);
 static bool expect_token(parser_t *parser, token_type_t expected);
 
@@ -120,6 +118,9 @@ parser_t *parser_new_with_source(const char *input, const char *source_name,
 
     /* Initialize recursion depth tracking */
     parser->recursion_depth = 0;
+
+    /* No heredocs pending body collection yet */
+    parser->pending_heredoc_count = 0;
 
     return parser;
 }
@@ -618,7 +619,17 @@ node_t *parser_parse(parser_t *parser) {
         return NULL; // Empty input
     }
 
-    return parse_command_list(parser);
+    node_t *ast = parse_command_list(parser);
+
+    /* A heredoc operator on the last line with no body and no
+     * line-terminating newline never reaches the skip_separators
+     * collection trigger. Flush here so the unterminated-heredoc
+     * error is still reported rather than silently dropped. */
+    if (parser->pending_heredoc_count > 0) {
+        collect_pending_heredocs(parser);
+    }
+
+    return ast;
 }
 
 /**
@@ -630,7 +641,11 @@ node_t *parser_parse(parser_t *parser) {
  * @return AST for the command line
  */
 node_t *parser_parse_command_line(parser_t *parser) {
-    return parse_command_list(parser);
+    node_t *ast = parse_command_list(parser);
+    if (parser && parser->pending_heredoc_count > 0) {
+        collect_pending_heredocs(parser);
+    }
+    return ast;
 }
 
 /**
@@ -645,6 +660,16 @@ static void skip_separators(parser_t *parser) {
            tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
            tokenizer_match(parser->tokenizer, TOK_WHITESPACE) ||
            tokenizer_match(parser->tokenizer, TOK_COMMENT)) {
+        /* A newline that follows a `<<delim` operator is the trigger to
+         * collect the deferred heredoc body/bodies. collect_pending_
+         * heredocs repositions the tokenizer past the last terminator,
+         * so do NOT also advance -- re-evaluate the loop condition
+         * against the freshly tokenized post-heredoc token. */
+        if (tokenizer_match(parser->tokenizer, TOK_NEWLINE) &&
+            parser->pending_heredoc_count > 0) {
+            collect_pending_heredocs(parser);
+            continue;
+        }
         tokenizer_advance(parser->tokenizer);
     }
 }
@@ -835,12 +860,9 @@ static node_t *parse_command_list(parser_t *parser) {
             return NULL;
         }
 
-        // Skip separators, newlines, and comments
-        while (tokenizer_match(parser->tokenizer, TOK_SEMICOLON) ||
-               tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
-               tokenizer_match(parser->tokenizer, TOK_COMMENT)) {
-            tokenizer_advance(parser->tokenizer);
-        }
+        // Skip separators, newlines, comments -- and collect any
+        // deferred heredoc bodies triggered by a line-ending newline.
+        skip_separators(parser);
 
         if (tokenizer_match(parser->tokenizer, TOK_EOF)) {
             break;
@@ -919,6 +941,13 @@ static node_t *parse_pipeline(parser_t *parser) {
         // Skip newlines after pipe - allows multiline pipelines
         while (tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
                tokenizer_match(parser->tokenizer, TOK_WHITESPACE)) {
+            /* `cmd <<EOF |` then newline: the heredoc body follows that
+             * newline. Collect it before consuming the newline. */
+            if (tokenizer_match(parser->tokenizer, TOK_NEWLINE) &&
+                parser->pending_heredoc_count > 0) {
+                collect_pending_heredocs(parser);
+                continue;
+            }
             tokenizer_advance(parser->tokenizer);
         }
 
@@ -2532,7 +2561,7 @@ static node_t *parse_redirection(parser_t *parser) {
         }
     }
 
-    // For here documents, collect the content
+    // For here documents, DEFER body collection
     if (node_type == NODE_REDIR_HEREDOC ||
         node_type == NODE_REDIR_HEREDOC_STRIP) {
         // Store delimiter before advancing tokenizer
@@ -2549,43 +2578,42 @@ static node_t *parse_redirection(parser_t *parser) {
         }
         // Only unquoted delimiters allow variable expansion
 
-        // Advance past the delimiter token first
+        // Advance past the delimiter token
         tokenizer_advance(parser->tokenizer);
 
-        // Collect the here document content (this will advance the tokenizer
-        // further)
-        char *content = collect_heredoc_content(parser, delimiter, strip_tabs,
-                                                expand_variables, op_loc);
-        if (!content) {
-            free(delimiter);
-            free_node_tree(redir_node);
-            return NULL;
-        }
-
-        // Store delimiter in the redirection node value
+        // Store delimiter in the redirection node value. The
+        // operator text (`<<` / `<<-`) was strdup'd into val.str
+        // earlier as a default; for heredocs val.str holds the
+        // delimiter instead, so free the operator string before
+        // overwriting (caught by LeakSanitizer running fuzz_parser
+        // on a heredoc input -- 3 bytes leaked per parse).
+        free(redir_node->val.str);
         redir_node->val.str = delimiter; // Transfer ownership
         redir_node->val_type = VAL_STR;
 
-        // Create content node with the collected content
-        node_t *content_node = new_node(NODE_VAR);
-        if (!content_node) {
-            free(content);
+        /* DEFERRED COLLECTION. The heredoc body physically begins on
+         * the line AFTER the operator -- collecting it now would mean
+         * jumping the tokenizer past everything that still follows
+         * `<<delim` on this line (`| wc`, a trailing `; cmd2`, etc.),
+         * losing those tokens. Instead queue the heredoc; the body is
+         * collected by collect_pending_heredocs() when the parser
+         * reaches the line-terminating newline. The content and
+         * expand-flag child nodes are attached there. */
+        if (parser->pending_heredoc_count >= PARSER_MAX_PENDING_HEREDOCS) {
+            parser_error_add(parser, SHELL_ERR_HEREDOC_DELIMITER,
+                             "too many here-documents on one line "
+                             "(maximum %d)",
+                             PARSER_MAX_PENDING_HEREDOCS);
             free_node_tree(redir_node);
             return NULL;
         }
-        content_node->val.str = content; // Transfer ownership
-        content_node->val_type = VAL_STR;
-        add_child_node(redir_node, content_node);
-
-        // Create a second child node to store the expand_variables flag
-        node_t *expand_flag_node = new_node(NODE_VAR);
-        if (!expand_flag_node) {
-            free_node_tree(redir_node);
-            return NULL;
-        }
-        expand_flag_node->val.str = strdup(expand_variables ? "1" : "0");
-        expand_flag_node->val_type = VAL_STR;
-        add_child_node(redir_node, expand_flag_node);
+        pending_heredoc_t *ph =
+            &parser->pending_heredocs[parser->pending_heredoc_count++];
+        ph->redir_node = redir_node;
+        ph->delimiter = redir_node->val.str; /* borrowed; node owns it */
+        ph->strip_tabs = strip_tabs;
+        ph->expand_variables = expand_variables;
+        ph->op_loc = op_loc;
 
         return redir_node;
     } else {
@@ -2650,27 +2678,38 @@ static node_t *parse_redirection(parser_t *parser) {
 }
 
 /**
- * @brief Collect here-document content
+ * @brief Collect a single here-document body
  *
- * Scans input for lines until the delimiter is found alone on a line.
- * Handles <<- (strip leading tabs) variant. Updates tokenizer position
- * to after the here-document.
+ * Scans input lines starting at @p body_start until the delimiter is
+ * found alone on a line, accumulating the body text. Handles the <<-
+ * (strip leading tabs) variant. Pure scan: does NOT touch the
+ * tokenizer's position or token cache -- the caller
+ * (collect_pending_heredocs) is responsible for repositioning the
+ * tokenizer once every pending heredoc on the line is collected.
  *
- * @param parser Parser instance
- * @param delimiter End delimiter string
- * @param strip_tabs If true, strip leading tabs from each line
- * @param expand_variables If true, variables will be expanded during execution
- * @return Collected content string (caller must free)
+ * @param parser    Parser instance (for error reporting)
+ * @param delimiter End delimiter string (may carry surrounding quotes)
+ * @param strip_tabs If true, strip leading tabs from each line (<<-)
+ * @param body_start Absolute input byte offset where the body begins
+ * @param op_loc     Source location of the `<<` operator (for errors)
+ * @param body_end   OUT: input offset just past the terminator line's
+ *                   newline (or input_length); set even on error
+ * @return Collected content string (caller frees), or NULL on an
+ *         unterminated heredoc (parser error already recorded)
  */
-static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
-                                     bool strip_tabs, bool expand_variables,
-                                     source_location_t op_loc) {
-    (void)expand_variables; /* Expansion handled during execution phase */
-    if (!parser || !delimiter) {
+static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
+                                      bool strip_tabs, size_t body_start,
+                                      source_location_t op_loc,
+                                      size_t *body_end) {
+    if (!parser || !delimiter || !body_end) {
+        if (body_end) {
+            *body_end = body_start;
+        }
         return NULL;
     }
 
     tokenizer_t *tokenizer = parser->tokenizer;
+    *body_end = body_start;
 
     /* Strip outer quotes from the delimiter if present so body lines
      * compare against the user-visible terminator text (`'END'` →
@@ -2691,57 +2730,28 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
         }
     }
 
-    /* The heredoc body always begins on the line AFTER the operator's
-     * line. The parser captured the operator's source_location_t into
-     * op_loc before any tokenizer_advance freed the operator token,
-     * so op_loc.offset is a reliable absolute byte position of the
-     * `<<` operator. Scan from just past `<<` to the next newline;
-     * the byte after that newline is content_start.
-     *
-     * The previous implementation searched the entire input from byte
-     * 0 for a literal `<< delimiter` substring match, which had two
-     * unfixable defects:
-     *
-     *   - Issue #51: when two heredocs in the same input shared a
-     *     delimiter, the search for the second always found the first
-     *     and reset tokenizer->position backwards, causing the parser
-     *     to re-parse the second heredoc forever. Anchoring the
-     *     search at op_loc.offset (the previous fix) avoided one
-     *     backward jump but kept the search.
-     *
-     *   - Issue #52: the search couldn't handle shell quote-
-     *     concatenation in the delimiter spec (e.g. `<< ''ai`, where
-     *     the parser correctly resolves the delimiter to "ai" but the
-     *     input bytes show `''ai`). The literal-substring match
-     *     failed, content_start defaulted to the initial value of 0,
-     *     and body collection started at byte 0 of the input — finding
-     *     spurious terminator lines and resetting tokenizer->position
-     *     to inside the live parse, triggering O(N^2) command-list
-     *     growth in the case-arm body parser.
-     *
-     * Both classes are eliminated by computing content_start from
-     * op_loc.offset directly. The delimiter spec text in the input is
-     * not used for content_start; only for the terminator-line match
-     * below. */
-    size_t content_start = op_loc.offset + 2; /* past `<<` */
-    while (content_start < tokenizer->input_length &&
-           tokenizer->input[content_start] != '\n') {
-        content_start++;
-    }
-    if (content_start < tokenizer->input_length) {
-        content_start++; /* skip the newline */
-    }
+    /* The body begins exactly at body_start -- the caller
+     * (collect_pending_heredocs) computed it as the byte just past the
+     * line-terminating newline that followed the `<<delim` operator,
+     * or, for the second and later heredocs declared on the same line,
+     * the byte just past the previous heredoc's terminator. No
+     * scanning for the operator or the delimiter spec is needed here:
+     * deferral guarantees we are always positioned at a body start. */
+    (void)op_loc; /* retained only for the unterminated-heredoc error */
 
     // Collect lines until we find the delimiter
     size_t content_size = 0;
     size_t content_capacity = 1024;
     char *content = malloc(content_capacity);
     if (!content) {
+        if (unquoted_delimiter) {
+            free(unquoted_delimiter);
+        }
         return NULL;
     }
     content[0] = '\0';
 
-    size_t line_start = content_start;
+    size_t line_start = body_start;
     bool found_delimiter_line = false;
     while (line_start < tokenizer->input_length) {
         // Find end of current line
@@ -2756,6 +2766,9 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
         char *line = malloc(line_len + 1);
         if (!line) {
             free(content);
+            if (unquoted_delimiter) {
+                free(unquoted_delimiter);
+            }
             return NULL;
         }
         strncpy(line, &tokenizer->input[line_start], line_len);
@@ -2771,9 +2784,19 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
 
         // Check if this line matches the delimiter
         if (strcmp(line_content, match_delimiter) == 0) {
-            // Found delimiter - stop collecting
+            /* Found the terminator. body_end is the byte just past the
+             * terminator line's newline -- the resume point for the
+             * tokenizer (or the start of the next heredoc's body, when
+             * several heredocs share a line). When the terminator line
+             * is the final line with no trailing newline, line_end is
+             * already input_length. Deferral collects the body during
+             * separator-skipping, so landing past the newline is
+             * correct: the parser is between statements and re-enters
+             * keyword-aware tokenization for whatever follows. */
             found_delimiter_line = true;
             free(line);
+            *body_end = (line_end < tokenizer->input_length) ? line_end + 1
+                                                             : line_end;
             break;
         }
 
@@ -2786,6 +2809,9 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
             if (!new_content) {
                 free(line);
                 free(content);
+                if (unquoted_delimiter) {
+                    free(unquoted_delimiter);
+                }
                 return NULL;
             }
             content = new_content;
@@ -2829,24 +2855,10 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
         if (unquoted_delimiter) {
             free(unquoted_delimiter);
         }
+        /* All input consumed scanning for the missing terminator. */
+        *body_end = tokenizer->input_length;
         return NULL;
     }
-
-    // Update tokenizer position to after the delimiter line
-    tokenizer->position = line_start;
-
-    // Update line and column tracking
-    for (size_t i = content_start; i < tokenizer->position; i++) {
-        if (tokenizer->input[i] == '\n') {
-            tokenizer->line++;
-            tokenizer->column = 1;
-        } else {
-            tokenizer->column++;
-        }
-    }
-
-    // Refresh tokenizer cache from the updated position
-    tokenizer_refresh_from_position(tokenizer);
 
     // Clean up temporary delimiter
     if (unquoted_delimiter) {
@@ -2854,6 +2866,111 @@ static char *collect_heredoc_content(parser_t *parser, const char *delimiter,
     }
 
     return content;
+}
+
+/**
+ * @brief Collect every here-document body pending on the current line
+ *
+ * Called when the parser reaches the newline that terminates a command
+ * line on which one or more `<<delim` operators appeared. The bodies
+ * follow that newline in declaration order; this drains the parser's
+ * pending_heredocs queue, scans each body, attaches the collected
+ * content (and an expand-flag sibling) to the corresponding
+ * NODE_REDIR_HEREDOC node, then repositions the tokenizer past the
+ * final terminator so normal parsing resumes after the last heredoc.
+ *
+ * Must be invoked with the current token being the line-terminating
+ * NEWLINE (or EOF). The tokenizer's token cache is rebuilt from the
+ * post-heredoc position before returning.
+ *
+ * @param parser Parser instance
+ * @return true on success, false if any heredoc was unterminated
+ */
+static bool collect_pending_heredocs(parser_t *parser) {
+    if (!parser || parser->pending_heredoc_count == 0) {
+        return true;
+    }
+
+    tokenizer_t *tk = parser->tokenizer;
+    token_t *cur = tokenizer_current(tk);
+
+    /* The first body begins immediately after the line-terminating
+     * newline. If the line was not newline-terminated (heredoc op on
+     * the final line, no trailing '\n'), there is no body -- scanning
+     * from end-of-input makes collect_one_heredoc_body report the
+     * unterminated-heredoc error. */
+    size_t scan;
+    size_t base_offset;
+    size_t base_line;
+    if (cur && cur->type == TOK_NEWLINE) {
+        scan = cur->position + 1; /* past the '\n' */
+        base_line = cur->line + 1;
+    } else if (cur) {
+        scan = cur->position;
+        base_line = cur->line;
+    } else {
+        scan = tk->position;
+        base_line = tk->line;
+    }
+    base_offset = scan;
+
+    bool ok = true;
+    for (size_t i = 0; i < parser->pending_heredoc_count; i++) {
+        pending_heredoc_t *ph = &parser->pending_heredocs[i];
+        size_t body_end = scan;
+        char *content =
+            collect_one_heredoc_body(parser, ph->delimiter, ph->strip_tabs,
+                                     scan, ph->op_loc, &body_end);
+        scan = body_end;
+        if (!content) {
+            ok = false;
+            break;
+        }
+
+        /* Body content child, then the expand-variables flag child --
+         * the layout the executor's heredoc handling expects. */
+        node_t *content_node = new_node(NODE_VAR);
+        if (!content_node) {
+            free(content);
+            ok = false;
+            break;
+        }
+        content_node->val.str = content;
+        content_node->val_type = VAL_STR;
+        add_child_node(ph->redir_node, content_node);
+
+        node_t *expand_flag_node = new_node(NODE_VAR);
+        if (!expand_flag_node) {
+            ok = false;
+            break;
+        }
+        expand_flag_node->val.str =
+            strdup(ph->expand_variables ? "1" : "0");
+        expand_flag_node->val_type = VAL_STR;
+        add_child_node(ph->redir_node, expand_flag_node);
+    }
+
+    parser->pending_heredoc_count = 0;
+
+    /* Reposition the tokenizer past the last terminator and rebuild
+     * its line/column counters by counting newlines across the span
+     * just consumed as heredoc bodies. */
+    tk->position = scan;
+    size_t line = base_line;
+    size_t column = 1;
+    for (size_t p = base_offset; p < scan && p < tk->input_length; p++) {
+        if (tk->input[p] == '\n') {
+            line++;
+            column = 1;
+        } else {
+            column++;
+        }
+    }
+    tk->line = line;
+    tk->column = column;
+    tokenizer_refresh_from_position(tk);
+
+    return ok;
 }
 
 /**
@@ -4244,8 +4361,21 @@ static node_t *parse_case_statement(parser_t *parser) {
 
     // Parse case items until 'esac'
     parser_loop_guard_t items_guard = PARSER_LOOP_GUARD_INIT;
-    while (!tokenizer_match(parser->tokenizer, TOK_ESAC) &&
-           !tokenizer_match(parser->tokenizer, TOK_EOF)) {
+    while (1) {
+        /* Skip separators (newlines, comments, optional whitespace) between
+         * case items. Without this, a `;;` followed by a `# trailing
+         * comment` newline `esac` pattern (extremely common in real shell
+         * scripts -- see real_world/posix/100) errors with "expected
+         * pattern" when the loop body tries to parse the comment as a
+         * pattern. POSIX 2.10.2: case_item is `pattern_list ')' compound_list
+         * 'DSEMI'` followed by either another case_item or 'esac', with
+         * linebreaks / comments allowed in between. */
+        skip_separators(parser);
+
+        if (tokenizer_match(parser->tokenizer, TOK_ESAC) ||
+            tokenizer_match(parser->tokenizer, TOK_EOF)) {
+            break;
+        }
 
         if (!parser_loop_check_progress(parser, &items_guard,
                                         "parse_case_statement items")) {

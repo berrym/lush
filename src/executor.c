@@ -1259,6 +1259,20 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return executor->shell_exit_status;
         }
 
+        /* `exit` builtin requested shell termination. bin_exit sets the
+         * global exit_flag (the REPL polls it to leave its top-level
+         * loop) and stashes the chosen status in last_exit_status. The
+         * REPL alone is not enough: when a script is run as a single
+         * parsed AST, the whole tree executes inside ONE call to
+         * execute_command_list, so without this check every statement
+         * after `exit` still runs (real_world/posix/101 fell through
+         * `exit $?` and ran trailing `rm -f` / `exit 0`). Honor it
+         * here so `exit` inside any nested construct - case arm, if
+         * body, brace group, loop - immediately propagates up. */
+        if (exit_flag) {
+            return last_exit_status;
+        }
+
         // Flush stdout to prevent pipeline from picking up residual output
         fflush(stdout);
 
@@ -2307,6 +2321,19 @@ static void loop_monitor_init(loop_monitor_t *m) {
     m->armed = false;
 }
 
+/* A `return` (or `exit`) executed inside a function surfaces as the
+ * special 200-455 status code that bin_return / the executor use to
+ * signal function unwinding. Loop bodies must recognize it, stop
+ * iterating, and propagate the code unchanged so the enclosing
+ * function actually returns. Without this check, `for x in ...; do
+ * ... return 0; done` ran every remaining iteration and then fell
+ * through to the post-loop statements (real_world/bash/201 is_in()).
+ * This check must run BEFORE loop_errexit_tripped: a function-return
+ * code is non-zero and would otherwise be misread as a failed body. */
+static bool loop_body_is_function_return(int body_status) {
+    return body_status >= 200 && body_status <= 455;
+}
+
 /* errexit_in_loops: when FEATURE_ERREXIT_IN_LOOPS is enabled (curated
  * lush-mode default; off in POSIX/bash/zsh for polyglot parity), the
  * first non-zero body exit aborts the loop. Caller should report
@@ -2435,6 +2462,12 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             // Continue to next iteration (just reset and loop again)
         }
 
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
+        }
+
         if (loop_errexit_tripped(last_result)) {
             errexit_tripped = true;
             break;
@@ -2560,6 +2593,12 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             // Continue to next iteration
         }
 
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
+        }
+
         if (loop_errexit_tripped(last_result)) {
             errexit_tripped = true;
             break;
@@ -2675,6 +2714,11 @@ static int execute_repeat(executor_t *executor, node_t *repeat_node) {
             executor->loop_control = LOOP_NORMAL;
             continue;
         }
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
+        }
         if (executor->shell_exit_requested) {
             break;
         }
@@ -2684,6 +2728,78 @@ static int execute_repeat(executor_t *executor, node_t *repeat_node) {
     executor_pop_context(executor);
     symtable_pop_scope(executor->symtable);
     return last_result;
+}
+
+/**
+ * @brief Pathname-expand a slice of a for-loop word list in place
+ *
+ * Replaces every word in words[start..*count) that carries glob
+ * metacharacters with its sorted matches; words with no matches are
+ * kept verbatim (bash default) unless nullglob drops them. The slice
+ * mechanism lets the caller glob only the words produced by an
+ * UNQUOTED word node, leaving quoted words and `$@` elements alone.
+ *
+ * The for-loop word builder expands variables, braces, and fields but
+ * historically never globbed -- `for x in *` iterated the literal
+ * `*`. expand_glob_pattern handles zsh glob qualifiers, extglob,
+ * nullglob, and `set -f` internally.
+ *
+ * @return false only on allocation failure
+ */
+static bool for_word_list_glob_range(char ***words, int *count, int start) {
+    if (!words || !*words || !count) {
+        return true;
+    }
+    char **src = *words;
+    int n = *count;
+
+    bool any = false;
+    for (int i = start; i < n; i++) {
+        if (src[i] && needs_glob_expansion(src[i])) {
+            any = true;
+            break;
+        }
+    }
+    if (!any) {
+        return true;
+    }
+
+    char **out = NULL;
+    int out_count = 0;
+    for (int i = 0; i < n; i++) {
+        if (i >= start && src[i] && needs_glob_expansion(src[i])) {
+            int gc = 0;
+            char **g = expand_glob_pattern(src[i], &gc);
+            if (g) {
+                char **no =
+                    realloc(out, (size_t)(out_count + gc) * sizeof(char *));
+                if (!no) {
+                    free(g);
+                    free(out);
+                    return false;
+                }
+                out = no;
+                for (int j = 0; j < gc; j++) {
+                    out[out_count++] = g[j];
+                }
+                free(g);
+                free(src[i]);
+                continue;
+            }
+        }
+        char **no = realloc(out, (size_t)(out_count + 1) * sizeof(char *));
+        if (!no) {
+            free(out);
+            return false;
+        }
+        out = no;
+        out[out_count++] = src[i];
+    }
+
+    free(src);
+    *words = out;
+    *count = out_count;
+    return true;
 }
 
 /**
@@ -2765,6 +2881,13 @@ static int execute_for(executor_t *executor, node_t *for_node) {
     if (word_list && word_list->first_child) {
         node_t *word = word_list->first_child;
         while (word) {
+            /* Index into expanded_words where this word node's
+             * normal-expansion output begins, and whether that output
+             * is eligible for pathname expansion. -1 until the normal
+             * expansion path runs (the `$@` and vector paths produce
+             * already-final values that are never glob-expanded). */
+            int normal_wc_start = -1;
+            bool word_globbable = false;
             if (word->val.str) {
                 // Special handling for "$@" to preserve word boundaries
                 if (strcmp(word->val.str, "\"$@\"") == 0 ||
@@ -2858,7 +2981,12 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                         continue;
                     }
 
-                    // Normal expansion and splitting for other words
+                    // Normal expansion and splitting for other words.
+                    // Record the start index and quotedness so the
+                    // words produced below can be pathname-expanded.
+                    normal_wc_start = word_count;
+                    word_globbable = (word->type != NODE_STRING_LITERAL &&
+                                      word->type != NODE_STRING_EXPANDABLE);
                     char *expanded = expand_if_needed(executor, word->val.str);
                     if (expanded) {
                         // Check for brace expansion first
@@ -2971,6 +3099,23 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                     }
                 }
             }
+            /* Pathname-expand the words this UNQUOTED word node just
+             * produced. normal_wc_start is -1 for the `$@` / vector
+             * paths and for quoted word nodes, leaving those
+             * untouched. */
+            if (normal_wc_start >= 0 && word_globbable) {
+                if (!for_word_list_glob_range(&expanded_words, &word_count,
+                                              normal_wc_start)) {
+                    set_executor_error(executor,
+                                       "Memory allocation failed in for loop");
+                    for (int j = 0; j < word_count; j++) {
+                        free(expanded_words[j]);
+                    }
+                    free(expanded_words);
+                    symtable_pop_scope(executor->symtable);
+                    return 1;
+                }
+            }
             word = word->next_sibling;
         }
     }
@@ -3029,6 +3174,12 @@ static int execute_for(executor_t *executor, node_t *for_node) {
             } else if (executor->loop_control == LOOP_CONTINUE) {
                 executor->loop_control = LOOP_NORMAL;
                 // Continue to next iteration
+            }
+
+            /* `return` inside the body: stop iterating, propagate the
+             * function-return signal to the enclosing function. */
+            if (loop_body_is_function_return(last_result)) {
+                break;
             }
 
             if (loop_errexit_tripped(last_result)) {
@@ -3232,6 +3383,12 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
             // Fall through to update expression
+        }
+
+        /* `return` inside the body: stop iterating, propagate the
+         * function-return signal to the enclosing function. */
+        if (loop_body_is_function_return(last_result)) {
+            break;
         }
 
         if (loop_errexit_tripped(last_result)) {
@@ -5739,7 +5896,17 @@ typedef enum {
     GLOB_QUAL_EXEC = 8,      // (*) - executable files
     GLOB_QUAL_READABLE = 16, // (r) - readable files
     GLOB_QUAL_WRITABLE = 32, // (w) - writable files
+    /* Behavior modifiers (not type/permission filters): */
+    GLOB_QUAL_NULLGLOB = 64,  // (N) - no match -> empty, never literal
+    GLOB_QUAL_DOTGLOB = 128,  // (D) - include dot (hidden) files
 } glob_qualifier_t;
+
+/* Bits that filter by file type or permission (vs. behavior modifiers
+ * like N/D). matches_glob_qualifier only needs to act when one of
+ * these is set. */
+#define GLOB_QUAL_FILTER_MASK                                                  \
+    (GLOB_QUAL_FILE | GLOB_QUAL_DIR | GLOB_QUAL_LINK | GLOB_QUAL_EXEC |         \
+     GLOB_QUAL_READABLE | GLOB_QUAL_WRITABLE)
 
 /**
  * @brief Parse and strip glob qualifier from pattern
@@ -5797,6 +5964,12 @@ static glob_qualifier_t parse_glob_qualifier(const char *pattern,
                     break;
                 case 'w':
                     qual |= GLOB_QUAL_WRITABLE;
+                    break;
+                case 'N':
+                    qual |= GLOB_QUAL_NULLGLOB;
+                    break;
+                case 'D':
+                    qual |= GLOB_QUAL_DOTGLOB;
                     break;
                 case ',':
                     break; // Separator, ignore
@@ -6806,6 +6979,113 @@ static char **expand_globstar_pattern(const char *pattern,
     return results;
 }
 
+/**
+ * @brief Expand a glob pattern with dotfile matching (zsh `D` qualifier)
+ *
+ * libc glob() never matches leading-dot files and offers no portable
+ * flag to change that (GLOB_PERIOD is a glibc/_GNU_SOURCE extension,
+ * absent on macOS). The zsh `(D)` glob qualifier explicitly requests
+ * dotfile inclusion, so for D-qualified patterns scan the directory
+ * directly with readdir + fnmatch. `.` and `..` are always excluded.
+ *
+ * Only single-component patterns and `dir/filepat` forms are handled
+ * (the qualifier-glob syntax in practice never nests deeper). Results
+ * are filtered through matches_glob_qualifier for any type/permission
+ * bits combined with D.
+ *
+ * @param base_pattern Pattern with the qualifier already stripped
+ * @param qualifier    Parsed qualifier bitmask (includes GLOB_QUAL_DOTGLOB)
+ * @param count        OUT: number of matches
+ * @return Match array (caller frees), empty array on no match, or NULL
+ *         on error
+ */
+static char **expand_glob_dotglob(const char *base_pattern,
+                                  glob_qualifier_t qualifier, int *count) {
+    *count = 0;
+
+    /* Split into directory and filename pattern at the last '/'. */
+    const char *slash = strrchr(base_pattern, '/');
+    char *dir = NULL;
+    const char *filepat = base_pattern;
+    if (slash) {
+        size_t dlen = (size_t)(slash - base_pattern);
+        dir = malloc(dlen + 1);
+        if (!dir) {
+            return NULL;
+        }
+        memcpy(dir, base_pattern, dlen);
+        dir[dlen] = '\0';
+        filepat = slash + 1;
+    }
+
+    DIR *d = opendir(dir ? dir : ".");
+    if (!d) {
+        free(dir);
+        return NULL;
+    }
+
+    char **result = NULL;
+    size_t result_count = 0;
+    size_t result_cap = 0;
+    struct dirent *entry;
+    while ((entry = readdir(d)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 ||
+            strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        /* fnmatch without FNM_PERIOD: `*` matches leading-dot names,
+         * which is exactly the D-qualifier semantics. */
+        if (fnmatch(filepat, entry->d_name, 0) != 0) {
+            continue;
+        }
+        /* Build the path as the caller would see it. */
+        char *path;
+        if (dir) {
+            size_t plen = strlen(dir) + 1 + strlen(entry->d_name) + 1;
+            path = malloc(plen);
+            if (path) {
+                snprintf(path, plen, "%s/%s", dir, entry->d_name);
+            }
+        } else {
+            path = strdup(entry->d_name);
+        }
+        if (!path) {
+            continue;
+        }
+        if ((qualifier & GLOB_QUAL_FILTER_MASK) &&
+            !matches_glob_qualifier(path, qualifier)) {
+            free(path);
+            continue;
+        }
+        if (result_count + 1 >= result_cap) {
+            size_t new_cap = result_cap ? result_cap * 2 : 8;
+            char **nr = realloc(result, new_cap * sizeof(char *));
+            if (!nr) {
+                free(path);
+                break;
+            }
+            result = nr;
+            result_cap = new_cap;
+        }
+        result[result_count++] = path;
+    }
+    closedir(d);
+    free(dir);
+
+    if (!result) {
+        /* No matches: hand back an empty (non-NULL) array. */
+        result = malloc(sizeof(char *));
+        if (result) {
+            result[0] = NULL;
+        }
+        *count = 0;
+        return result;
+    }
+    result[result_count] = NULL;
+    *count = (int)result_count;
+    return result;
+}
+
 static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     if (!pattern || !expanded_count) {
         *expanded_count = 0;
@@ -6953,13 +7233,36 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
+    /* The zsh `D` qualifier requests dotfile matching, which libc
+     * glob() cannot do portably -- route through a readdir scan. */
+    if (qualifier & GLOB_QUAL_DOTGLOB) {
+        char **dot_results =
+            expand_glob_dotglob(base_pattern, qualifier, expanded_count);
+        free(base_pattern);
+        if (dot_results) {
+            return dot_results;
+        }
+        /* Scan failed: fall back to the literal pattern. */
+        char **result = malloc(2 * sizeof(char *));
+        if (result) {
+            result[0] = strdup(pattern);
+            result[1] = NULL;
+            *expanded_count = 1;
+        } else {
+            *expanded_count = 0;
+        }
+        return result;
+    }
+
     glob_t globbuf;
     int glob_result = glob(base_pattern, GLOB_NOSORT, NULL, &globbuf);
     free(base_pattern);
 
     if (glob_result == GLOB_NOMATCH) {
-        // No matches - check nullglob setting
-        if (shell_mode_allows(FEATURE_NULL_GLOB)) {
+        // No matches - nullglob mode OR an explicit (N) qualifier
+        // both mean "expand to nothing" rather than the literal.
+        if (shell_mode_allows(FEATURE_NULL_GLOB) ||
+            (qualifier & GLOB_QUAL_NULLGLOB)) {
             // Nullglob: unmatched patterns expand to nothing
             // Return empty array (not NULL, to distinguish from error)
             char **result = malloc(sizeof(char *));
@@ -7047,9 +7350,11 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         globfree(&globbuf);
 
         if (match_count == 0) {
-            // No matches after filtering - check nullglob
+            // No matches after filtering - nullglob mode OR an
+            // explicit (N) qualifier both expand to nothing.
             free(result);
-            if (shell_mode_allows(FEATURE_NULL_GLOB)) {
+            if (shell_mode_allows(FEATURE_NULL_GLOB) ||
+                (qualifier & GLOB_QUAL_NULLGLOB)) {
                 // Nullglob: expand to nothing
                 // Return empty array (not NULL, to distinguish from error)
                 result = malloc(sizeof(char *));
@@ -7512,7 +7817,26 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    const char *close = strchr(open + 1, '}');
+    /* Find the matching close brace, tracking nesting depth so that
+     * patterns like `{{1..3},{a..c}}` resolve the OUTER brace first
+     * rather than the first inner `}`. Without this, the function
+     * splits content as `{1..3` and bails, leaving the pattern
+     * un-expanded (real_world/bash/206). */
+    const char *close = NULL;
+    {
+        int depth = 1;
+        for (const char *p = open + 1; *p; p++) {
+            if (*p == '{') {
+                depth++;
+            } else if (*p == '}') {
+                depth--;
+                if (depth == 0) {
+                    close = p;
+                    break;
+                }
+            }
+        }
+    }
     if (!close) {
         // Malformed brace - return original pattern
         char **result = malloc(2 * sizeof(char *));
@@ -7545,8 +7869,27 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     strncpy(content, open + 1, content_len);
     content[content_len] = '\0';
 
-    // Check if this is a range pattern (contains ..)
+    /* Check if this is a SIMPLE range pattern (e.g. `1..10`, `a..z`,
+     * `1..10..2`). A range pattern has `..` and no top-level commas
+     * and no nested braces — otherwise it's a comma-list whose items
+     * happen to contain ranges (e.g. `{{1..3},{a..c}}`) and must be
+     * split on the outer commas first. */
+    bool is_range = false;
     if (strstr(content, "..")) {
+        is_range = true;
+        int depth = 0;
+        for (const char *p = content; *p; p++) {
+            if (*p == '{') {
+                depth++;
+            } else if (*p == '}') {
+                depth--;
+            } else if (*p == ',' && depth == 0) {
+                is_range = false;
+                break;
+            }
+        }
+    }
+    if (is_range) {
         char **range_result =
             expand_brace_range(prefix, content, suffix, expanded_count);
         free(prefix);
@@ -7564,11 +7907,21 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    // Count comma-separated items
+    /* Count comma-separated items at the TOP LEVEL only. Commas
+     * inside nested braces belong to the inner pattern and must not
+     * split the outer one (e.g. `{{1..3},{a..c}}` has two outer
+     * items, not five). */
     int item_count = 1;
-    for (const char *p = content; *p; p++) {
-        if (*p == ',') {
-            item_count++;
+    {
+        int depth = 0;
+        for (const char *p = content; *p; p++) {
+            if (*p == '{') {
+                depth++;
+            } else if (*p == '}') {
+                depth--;
+            } else if (*p == ',' && depth == 0) {
+                item_count++;
+            }
         }
     }
 
@@ -7587,8 +7940,15 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     char *comma_pos = content;
 
     while (result_index < item_count) {
-        // Find next comma or end of string
-        while (*comma_pos && *comma_pos != ',') {
+        /* Find next TOP-LEVEL comma (depth 0) or end of string.
+         * Nested braces hide their commas from the outer split. */
+        int depth = 0;
+        while (*comma_pos && !(depth == 0 && *comma_pos == ',')) {
+            if (*comma_pos == '{') {
+                depth++;
+            } else if (*comma_pos == '}') {
+                depth--;
+            }
             comma_pos++;
         }
 
@@ -7645,9 +8005,19 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     free(prefix);
     free(content);
 
-    // Recursively expand any remaining brace patterns in results
-    // This handles Cartesian products like {1..2}{a..b}
-    if (strchr(suffix, '{')) {
+    /* Recursively expand any remaining brace patterns in results.
+     * This handles Cartesian products like `{1..2}{a..b}` (where the
+     * suffix carries another brace) AND nested patterns like
+     * `{{1..3},{a..c}}` (where each comma-separated item is itself a
+     * brace pattern). Scan all results so neither case is missed. */
+    bool any_result_has_brace = false;
+    for (int i = 0; i < item_count; i++) {
+        if (strchr(result[i], '{')) {
+            any_result_has_brace = true;
+            break;
+        }
+    }
+    if (any_result_has_brace) {
         char **final_results = NULL;
         int final_count = 0;
         int cap = brace_expansion_cap();
@@ -8438,11 +8808,21 @@ static int execute_case(executor_t *executor, node_t *node) {
         }
 
         if (matched) {
-            // Execute commands for this case item
+            /* Execute commands for this case item. A case arm is a
+             * command list - run every statement sequentially. Do NOT
+             * short-circuit on a non-zero status (that was wrong: it
+             * dropped `exit $?` after a non-zero `do_status` in
+             * real_world/posix/101 init scripts, and silently dropped
+             * later statements in `x) echo a; false; echo b ;;`).
+             * Errexit (set -e) is enforced at execute_command_list,
+             * not here. Honor loop control / shell exit between
+             * statements so `break` / `continue` / `exit` propagate
+             * out of the arm without running trailing commands. */
             node_t *commands = case_item->first_child;
             while (commands) {
                 result = execute_node(executor, commands);
-                if (result != 0) {
+                if (executor->loop_control != LOOP_NORMAL ||
+                    executor->shell_exit_requested || exit_flag) {
                     break;
                 }
                 commands = commands->next_sibling;
@@ -9180,6 +9560,64 @@ static bool match_pattern(const char *str, const char *pattern) {
             }
 
             while (*p && *p != ']') {
+                /* POSIX character class [:CLASS:] (e.g. [:space:],
+                 * [:alpha:], [:digit:]). Used heavily by real-world
+                 * trim/parse idioms - `${s%%[![:space:]]*}` was
+                 * silently treating [:space:] as the literal
+                 * character set { '[', ':', 's', 'p', 'a', 'c', 'e' }
+                 * because the class form was never parsed
+                 * (real_world/bash/201 trim function). Scan for `:]`
+                 * to delimit the class name, then test via ctype. */
+                if (p[0] == '[' && p[1] == ':') {
+                    const char *class_start = p + 2;
+                    const char *class_end = strstr(class_start, ":]");
+                    if (class_end) {
+                        size_t cl = (size_t)(class_end - class_start);
+                        unsigned char uc = (unsigned char)*s;
+                        bool cls_match = false;
+                        if (cl == 5 && memcmp(class_start, "space", 5) == 0) {
+                            cls_match = isspace(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "alpha", 5) == 0) {
+                            cls_match = isalpha(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "digit", 5) == 0) {
+                            cls_match = isdigit(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "alnum", 5) == 0) {
+                            cls_match = isalnum(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "upper", 5) == 0) {
+                            cls_match = isupper(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "lower", 5) == 0) {
+                            cls_match = islower(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "punct", 5) == 0) {
+                            cls_match = ispunct(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "print", 5) == 0) {
+                            cls_match = isprint(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "graph", 5) == 0) {
+                            cls_match = isgraph(uc) != 0;
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "blank", 5) == 0) {
+                            cls_match = (uc == ' ' || uc == '\t');
+                        } else if (cl == 5 &&
+                                   memcmp(class_start, "cntrl", 5) == 0) {
+                            cls_match = iscntrl(uc) != 0;
+                        } else if (cl == 6 &&
+                                   memcmp(class_start, "xdigit", 6) == 0) {
+                            cls_match = isxdigit(uc) != 0;
+                        }
+                        if (cls_match) {
+                            matched = true;
+                        }
+                        p = class_end + 2; /* past `:]` */
+                        continue;
+                    }
+                }
                 if (p[1] == '-' && p[2] != ']' && p[2] != '\0') {
                     // Range pattern like a-z
                     if (*s >= *p && *s <= p[2]) {
@@ -12204,6 +12642,58 @@ static char *parse_parameter_expansion(executor_t *executor,
                             if (idx_result)
                                 free(idx_result);
                             result = strdup("");
+                        }
+                    }
+
+                    /* Apply trailing parameter-expansion operator on an
+                     * indexed/associative element: `${arr[key]:-default}`,
+                     * `${arr[key]:+alt}`, etc. Without this, the array
+                     * branch returned the (possibly empty) element value
+                     * unconditionally, dropping the operator entirely
+                     * (real_world/bash/200 fell back to "" instead of the
+                     * `:-info` default for a missing assoc key). For
+                     * arrays we can't distinguish unset from empty (a
+                     * missing key reads as ""), so both `:-` and `-`
+                     * behave identically here, as do `:+` and `+`. The
+                     * default/alt RHS is variable-expanded so
+                     * `${arr[k]:-$fallback}` works. */
+                    const char *after_bracket = close + 1;
+                    if (*after_bracket != '\0') {
+                        bool value_is_empty = (!result || !*result);
+                        const char *rhs = NULL;
+                        bool want_default_when_empty = false; /* :- / - */
+                        bool want_alt_when_nonempty = false;  /* :+ / + */
+                        if (after_bracket[0] == ':' &&
+                            (after_bracket[1] == '-' ||
+                             after_bracket[1] == '+')) {
+                            rhs = after_bracket + 2;
+                            want_default_when_empty = (after_bracket[1] == '-');
+                            want_alt_when_nonempty = (after_bracket[1] == '+');
+                        } else if (after_bracket[0] == '-' ||
+                                   after_bracket[0] == '+') {
+                            rhs = after_bracket + 1;
+                            want_default_when_empty = (after_bracket[0] == '-');
+                            want_alt_when_nonempty = (after_bracket[0] == '+');
+                        }
+                        if (rhs) {
+                            char *expanded_rhs =
+                                expand_variables_in_string(executor, rhs);
+                            const char *rhs_final =
+                                expanded_rhs ? expanded_rhs : rhs;
+                            if (want_default_when_empty && value_is_empty) {
+                                free(result);
+                                result = strdup(rhs_final);
+                            } else if (want_alt_when_nonempty &&
+                                       !value_is_empty) {
+                                free(result);
+                                result = strdup(rhs_final);
+                            } else if (want_alt_when_nonempty) {
+                                free(result);
+                                result = strdup("");
+                            }
+                            if (expanded_rhs) {
+                                free(expanded_rhs);
+                            }
                         }
                     }
 
@@ -16185,6 +16675,60 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         // elements even if they contain spaces
                         bool is_quoted = (elem->type == NODE_STRING_LITERAL ||
                                           elem->type == NODE_STRING_EXPANDABLE);
+
+                        /* Brace expansion on unquoted indexed-array
+                         * elements: `arr=(/tmp/{a,b}/sub)` must yield
+                         * two elements, matching bash/zsh behavior.
+                         * Each brace-expansion result becomes its own
+                         * array element regardless of internal spaces
+                         * (the brace expander has already partitioned
+                         * the source into discrete words). */
+                        if (!is_quoted &&
+                            needs_brace_expansion(final_value)) {
+                            int brace_count = 0;
+                            char **brace_results = expand_brace_pattern(
+                                final_value, &brace_count);
+                            if (brace_results) {
+                                for (int bi = 0; bi < brace_count; bi++) {
+                                    symtable_array_set_index(array, index,
+                                                             brace_results[bi]);
+                                    index++;
+                                    free(brace_results[bi]);
+                                }
+                                free(brace_results);
+                                if (expanded) {
+                                    free(expanded);
+                                }
+                                elem = elem->next_sibling;
+                                continue;
+                            }
+                        }
+
+                        /* Pathname (glob) expansion on unquoted
+                         * indexed-array elements: `arr=(*.txt)` must
+                         * list the matching files, not iterate the
+                         * literal pattern. expand_glob_pattern handles
+                         * zsh glob qualifiers, extglob, nullglob, and
+                         * `set -f` internally. */
+                        if (!is_quoted && needs_glob_expansion(final_value)) {
+                            int glob_count = 0;
+                            char **glob_results =
+                                expand_glob_pattern(final_value, &glob_count);
+                            if (glob_results) {
+                                for (int gi = 0; gi < glob_count; gi++) {
+                                    symtable_array_set_index(array, index,
+                                                             glob_results[gi]);
+                                    index++;
+                                    free(glob_results[gi]);
+                                }
+                                free(glob_results);
+                                if (expanded) {
+                                    free(expanded);
+                                }
+                                elem = elem->next_sibling;
+                                continue;
+                            }
+                        }
 
                         // Word split the expanded value if it contains spaces
                         // This handles ${(s:,:)var} and ${(f)var} producing

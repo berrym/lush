@@ -149,6 +149,7 @@ int bin_printf(int argc, char **argv) {
 
         for (int i = 0; format[i] != '\0'; i++) {
             if (format[i] == '%' && format[i + 1] != '\0') {
+                int spec_start = i; /* points at '%' for forwarding to libc */
                 i++; // Skip the %
 
                 // Handle literal %
@@ -220,6 +221,24 @@ int bin_printf(int argc, char **argv) {
                 const char *format_arg =
                     (arg_index < argc) ? argv[arg_index] : "";
 
+                /* Reconstruct the user's original conversion spec
+                 * (e.g. "%05d", "%+8.2f") so libc printf handles all
+                 * flags — `0`, `+`, ` `, `#`, `-` — uniformly across
+                 * every numeric specifier. Without this, lush would
+                 * silently drop every flag except `-`. */
+                char fwd_fmt[64];
+                {
+                    size_t fwd_len = (size_t)(i - spec_start + 1);
+                    if (fwd_len >= sizeof(fwd_fmt)) {
+                        fwd_len = sizeof(fwd_fmt) - 1;
+                    }
+                    memcpy(fwd_fmt, &format[spec_start], fwd_len);
+                    fwd_fmt[fwd_len] = '\0';
+                }
+                (void)width;
+                (void)left_align;
+                (void)zero_pad;
+
                 switch (specifier) {
                 case 's': {
                     // String format
@@ -258,10 +277,8 @@ int bin_printf(int argc, char **argv) {
                 }
                 case 'd':
                 case 'i': {
-                    // Integer format
                     int value = (arg_index < argc) ? atoi(format_arg) : 0;
-                    int effective_width = left_align ? -width : width;
-                    printf("%*d", effective_width, value);
+                    printf(fwd_fmt, value);
                     if (arg_index < argc) {
                         arg_index++;
                         args_used_this_pass++;
@@ -295,43 +312,14 @@ int bin_printf(int argc, char **argv) {
                     break;
                 }
                 case 'x':
-                case 'X': {
-                    // Hexadecimal format
-                    unsigned int value =
-                        (arg_index < argc)
-                            ? (unsigned int)strtoul(format_arg, NULL, 10)
-                            : 0;
-                    int effective_width = left_align ? -width : width;
-                    printf(specifier == 'x' ? "%*x" : "%*X", effective_width,
-                           value);
-                    if (arg_index < argc) {
-                        arg_index++;
-                        args_used_this_pass++;
-                    }
-                    break;
-                }
-                case 'o': {
-                    // Octal format
-                    unsigned int value =
-                        (arg_index < argc)
-                            ? (unsigned int)strtoul(format_arg, NULL, 10)
-                            : 0;
-                    int effective_width = left_align ? -width : width;
-                    printf("%*o", effective_width, value);
-                    if (arg_index < argc) {
-                        arg_index++;
-                        args_used_this_pass++;
-                    }
-                    break;
-                }
+                case 'X':
+                case 'o':
                 case 'u': {
-                    // Unsigned integer format
                     unsigned int value =
                         (arg_index < argc)
                             ? (unsigned int)strtoul(format_arg, NULL, 10)
                             : 0;
-                    int effective_width = left_align ? -width : width;
-                    printf("%*u", effective_width, value);
+                    printf(fwd_fmt, value);
                     if (arg_index < argc) {
                         arg_index++;
                         args_used_this_pass++;
@@ -339,54 +327,14 @@ int bin_printf(int argc, char **argv) {
                     break;
                 }
                 case 'f':
-                case 'F': {
-                    // Float format
-                    double value =
-                        (arg_index < argc) ? strtod(format_arg, NULL) : 0.0;
-                    int effective_width = left_align ? -width : width;
-                    if (precision >= 0) {
-                        printf("%*.*f", effective_width, precision, value);
-                    } else {
-                        printf("%*f", effective_width, value);
-                    }
-                    if (arg_index < argc) {
-                        arg_index++;
-                        args_used_this_pass++;
-                    }
-                    break;
-                }
+                case 'F':
                 case 'g':
-                case 'G': {
-                    // General float format
-                    double value =
-                        (arg_index < argc) ? strtod(format_arg, NULL) : 0.0;
-                    int effective_width = left_align ? -width : width;
-                    if (precision >= 0) {
-                        printf(specifier == 'g' ? "%*.*g" : "%*.*G",
-                               effective_width, precision, value);
-                    } else {
-                        printf(specifier == 'g' ? "%*g" : "%*G",
-                               effective_width, value);
-                    }
-                    if (arg_index < argc) {
-                        arg_index++;
-                        args_used_this_pass++;
-                    }
-                    break;
-                }
+                case 'G':
                 case 'e':
                 case 'E': {
-                    // Scientific notation
                     double value =
                         (arg_index < argc) ? strtod(format_arg, NULL) : 0.0;
-                    int effective_width = left_align ? -width : width;
-                    if (precision >= 0) {
-                        printf(specifier == 'e' ? "%*.*e" : "%*.*E",
-                               effective_width, precision, value);
-                    } else {
-                        printf(specifier == 'e' ? "%*e" : "%*E",
-                               effective_width, value);
-                    }
+                    printf(fwd_fmt, value);
                     if (arg_index < argc) {
                         arg_index++;
                         args_used_this_pass++;
