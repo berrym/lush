@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 /* The pre-existing local ASSERT(cond, msg) used a 2-arg signature
@@ -1674,6 +1675,251 @@ TEST(local_variable_in_function) {
 }
 
 /* ============================================================================
+ * REGRESSION TESTS -- 2026-05 real-world hardening wave (PR #113)
+ *
+ * Behavioural coverage for the defects the real-world script corpus
+ * surfaced. Every test runs a shell snippet in-process and asserts on
+ * observable behaviour; each names the fix it guards.
+ * ============================================================================
+ */
+
+/* Create an empty file -- fixture helper for the glob tests. */
+static void rt_touch(const char *path) {
+    FILE *f = fopen(path, "w");
+    if (f) {
+        fclose(f);
+    }
+}
+
+/* --- Deferred here-document collection -------------------------------- */
+
+TEST(rt_heredoc_through_pipe) {
+    /* The body must reach `tr`; the parser once collected the heredoc
+     * inline and lost the `| tr` that followed `<<EOF` on the line. */
+    run_result_t r = run_shell("cat <<EOF | tr a-z A-Z\nhello world\nEOF\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "HELLO WORLD\n");
+}
+
+TEST(rt_heredoc_trailing_command) {
+    run_result_t r = run_shell("cat <<EOF; echo after\nbody\nEOF\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "body\nafter\n");
+}
+
+TEST(rt_heredoc_in_if_body) {
+    run_result_t r = run_shell("if true; then\ncat <<EOF\ninside\nEOF\nfi\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "inside\n");
+}
+
+TEST(rt_heredoc_loop_redirection) {
+    run_result_t r = run_shell(
+        "while read l; do echo \"got $l\"; done <<EOF\nx\ny\nEOF\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "got x\ngot y\n");
+}
+
+TEST(rt_heredoc_strip_tabs) {
+    /* <<- strips leading tabs from body lines and the terminator. */
+    run_result_t r = run_shell("cat <<-EOF\n\t\tindented\n\t\tEOF\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "indented\n");
+}
+
+TEST(rt_heredoc_quoted_delimiter) {
+    /* A quoted delimiter disables expansion of the body. */
+    run_result_t r = run_shell("cat <<'EOF'\nliteral $UNSET here\nEOF\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "literal $UNSET here\n");
+}
+
+TEST(rt_heredoc_multiline_var_body) {
+    /* Body referencing a multi-line variable -- posix/105 regression. */
+    run_result_t r =
+        run_shell("x=\"line1\nline2\"\ncat <<EOF\n$x\nEOF\necho done\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "line1\nline2\ndone\n");
+}
+
+TEST(rt_heredoc_unterminated_error) {
+    run_result_t r = run_shell("cat <<EOF\nno terminator follows\n");
+    ASSERT_TRUE(r.exit_status != 0, "unterminated heredoc must fail");
+}
+
+/* --- Glob expansion in for-loops, arrays, and zsh qualifiers ---------- */
+
+TEST(rt_glob_for_array_qualifiers) {
+    char saved_cwd[4096];
+    ASSERT_NOT_NULL(getcwd(saved_cwd, sizeof saved_cwd), "getcwd");
+
+    char dir[] = "/tmp/lush_glob_test.XXXXXX";
+    ASSERT_NOT_NULL(mkdtemp(dir), "mkdtemp");
+    ASSERT_EQ(chdir(dir), 0, "chdir into temp dir");
+
+    /* Fixture: three regular files, one subdirectory, one dotfile. */
+    rt_touch("alpha.txt");
+    rt_touch("beta.txt");
+    rt_touch("gamma.log");
+    mkdir("subdir", 0700);
+    rt_touch(".hidden");
+
+    /* for-loop word list globs (previously iterated the literal "*"). */
+    run_result_t r =
+        run_shell("n=0; for f in *; do n=$((n+1)); done; echo $n");
+    ASSERT_STDOUT_EQ(r, "4\n");
+
+    /* indexed-array initializer globs. */
+    r = run_shell("arr=(*.txt); echo ${#arr[@]}");
+    ASSERT_STDOUT_EQ(r, "2\n");
+
+    /* zsh (.N) qualifier -- regular files only. */
+    r = run_shell("arr=(*(.N)); echo ${#arr[@]}");
+    ASSERT_STDOUT_EQ(r, "3\n");
+
+    /* zsh (/N) qualifier -- directories only. */
+    r = run_shell("arr=(*(/N)); echo ${#arr[@]}");
+    ASSERT_STDOUT_EQ(r, "1\n");
+
+    /* zsh (DN) qualifier -- include dotfiles. */
+    r = run_shell("arr=(*(DN)); echo ${#arr[@]}");
+    ASSERT_STDOUT_EQ(r, "5\n");
+
+    /* qualifier on a prefixed pattern -- *.txt(N). */
+    r = run_shell("arr=(*.txt(N)); echo ${#arr[@]}");
+    ASSERT_STDOUT_EQ(r, "2\n");
+
+    /* Teardown: remove the fixture while still inside the temp dir. */
+    unlink("alpha.txt");
+    unlink("beta.txt");
+    unlink("gamma.log");
+    unlink(".hidden");
+    rmdir("subdir");
+    ASSERT_EQ(chdir(saved_cwd), 0, "restore cwd");
+    rmdir(dir);
+}
+
+/* --- return / exit propagation out of loops and case arms ------------- */
+
+TEST(rt_return_from_for_loop) {
+    run_result_t r = run_shell(
+        "f() { for x in 1 2 3; do if [ \"$x\" = 2 ]; then return 5; fi; "
+        "done; return 0; }\nf\necho $?\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "5\n");
+}
+
+TEST(rt_return_from_while_loop) {
+    run_result_t r =
+        run_shell("f() { while true; do return 3; done; }\nf\necho $?\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "3\n");
+}
+
+TEST(rt_case_arm_runs_all) {
+    /* A case arm is a command list -- a non-zero command must not
+     * short-circuit the rest of the arm. */
+    run_result_t r =
+        run_shell("case x in x) echo one; false; echo two ;; esac\n");
+    ASSERT_STDOUT_EQ(r, "one\ntwo\n");
+}
+
+TEST(rt_case_arm_return_status) {
+    /* posix/101 init-script shape: a function returning non-zero in a
+     * case arm, its status captured by a following command. */
+    run_result_t r = run_shell(
+        "do_status() { return 3; }\n"
+        "case status in status) do_status; rc=$?; esac\necho $rc\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_EQ(r, "3\n");
+}
+
+/* --- printf flag forwarding ------------------------------------------- */
+
+TEST(rt_printf_flags) {
+    run_result_t r = run_shell("printf '%05d\\n' 42");
+    ASSERT_STDOUT_EQ(r, "00042\n");
+    r = run_shell("printf '%+d\\n' 42");
+    ASSERT_STDOUT_EQ(r, "+42\n");
+    r = run_shell("printf '%#x\\n' 255");
+    ASSERT_STDOUT_EQ(r, "0xff\n");
+    r = run_shell("printf '[%-5d]\\n' 42");
+    ASSERT_STDOUT_EQ(r, "[42   ]\n");
+    r = run_shell("printf '% d\\n' 42");
+    ASSERT_STDOUT_EQ(r, " 42\n");
+}
+
+/* --- brace expansion -------------------------------------------------- */
+
+TEST(rt_brace_nested) {
+    run_result_t r = run_shell("echo {{1..3},{a..c}}");
+    ASSERT_STDOUT_EQ(r, "1 2 3 a b c\n");
+}
+
+TEST(rt_brace_cartesian) {
+    run_result_t r = run_shell("echo file{1..2}.{log,txt}");
+    ASSERT_STDOUT_EQ(r, "file1.log file1.txt file2.log file2.txt\n");
+}
+
+TEST(rt_brace_in_array_init) {
+    run_result_t r =
+        run_shell("arr=(x{1,2,3}y); echo ${#arr[@]} ${arr[0]} ${arr[2]}");
+    ASSERT_STDOUT_EQ(r, "3 x1y x3y\n");
+}
+
+/* --- parameter expansion operators on array elements ------------------ */
+
+TEST(rt_array_elem_default_missing) {
+    run_result_t r =
+        run_shell("declare -A m; m[a]=1; echo \"[${m[b]:-fallback}]\"");
+    ASSERT_STDOUT_EQ(r, "[fallback]\n");
+}
+
+TEST(rt_array_elem_default_present) {
+    run_result_t r =
+        run_shell("declare -A m; m[a]=hi; echo \"[${m[a]:-fallback}]\"");
+    ASSERT_STDOUT_EQ(r, "[hi]\n");
+}
+
+TEST(rt_array_elem_alt_present) {
+    run_result_t r =
+        run_shell("declare -A m; m[a]=hi; echo \"[${m[a]:+set}]\"");
+    ASSERT_STDOUT_EQ(r, "[set]\n");
+}
+
+TEST(rt_array_elem_alt_missing) {
+    run_result_t r =
+        run_shell("declare -A m; m[a]=hi; echo \"[${m[b]:+set}]\"");
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+/* --- POSIX character classes in pattern matching ---------------------- */
+
+TEST(rt_char_class_space) {
+    /* [[:space:]] non-negated class -- strips trailing whitespace. */
+    run_result_t r = run_shell("s='a   '; echo \"[${s%%[[:space:]]*}]\"");
+    ASSERT_STDOUT_EQ(r, "[a]\n");
+}
+
+TEST(rt_char_class_negated) {
+    /* [![:space:]] -- the building block of the whitespace-trim idiom. */
+    run_result_t r = run_shell("s='  hi'; echo \"[${s%%[![:space:]]*}]\"");
+    ASSERT_STDOUT_EQ(r, "[  ]\n");
+}
+
+TEST(rt_char_class_digit) {
+    /* [[:digit:]] in a parameter-expansion suffix-removal pattern. */
+    run_result_t r = run_shell("s=abc123; echo \"[${s%%[[:digit:]]*}]\"");
+    ASSERT_STDOUT_EQ(r, "[abc]\n");
+}
+
+TEST(rt_char_class_upper) {
+    /* [![:upper:]] negated class. */
+    run_result_t r = run_shell("s=ABCdef; echo \"[${s%%[![:upper:]]*}]\"");
+    ASSERT_STDOUT_EQ(r, "[ABC]\n");
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -1835,12 +2081,47 @@ int main(void) {
     printf("\nLocal variable tests:\n");
     RUN_TEST(local_variable_in_function);
 
-    printf("\n========================================\n");
-    printf("All executor integration tests PASSED!\n");
-    printf("========================================\n");
+    printf("\nRegression: deferred here-documents:\n");
+    RUN_TEST(rt_heredoc_through_pipe);
+    RUN_TEST(rt_heredoc_trailing_command);
+    RUN_TEST(rt_heredoc_in_if_body);
+    RUN_TEST(rt_heredoc_loop_redirection);
+    RUN_TEST(rt_heredoc_strip_tabs);
+    RUN_TEST(rt_heredoc_quoted_delimiter);
+    RUN_TEST(rt_heredoc_multiline_var_body);
+    RUN_TEST(rt_heredoc_unterminated_error);
+
+    printf("\nRegression: glob expansion and qualifiers:\n");
+    RUN_TEST(rt_glob_for_array_qualifiers);
+
+    printf("\nRegression: return/case control flow:\n");
+    RUN_TEST(rt_return_from_for_loop);
+    RUN_TEST(rt_return_from_while_loop);
+    RUN_TEST(rt_case_arm_runs_all);
+    RUN_TEST(rt_case_arm_return_status);
+
+    printf("\nRegression: printf flags:\n");
+    RUN_TEST(rt_printf_flags);
+
+    printf("\nRegression: brace expansion:\n");
+    RUN_TEST(rt_brace_nested);
+    RUN_TEST(rt_brace_cartesian);
+    RUN_TEST(rt_brace_in_array_init);
+
+    printf("\nRegression: array-element parameter expansion:\n");
+    RUN_TEST(rt_array_elem_default_missing);
+    RUN_TEST(rt_array_elem_default_present);
+    RUN_TEST(rt_array_elem_alt_present);
+    RUN_TEST(rt_array_elem_alt_missing);
+
+    printf("\nRegression: POSIX character classes:\n");
+    RUN_TEST(rt_char_class_space);
+    RUN_TEST(rt_char_class_negated);
+    RUN_TEST(rt_char_class_digit);
+    RUN_TEST(rt_char_class_upper);
 
     /* Cleanup global symbol table */
     free_global_symtable();
 
-    return 0;
+    return TEST_RESULT();
 }
