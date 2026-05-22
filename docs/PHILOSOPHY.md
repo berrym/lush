@@ -213,9 +213,10 @@ halt within it, stepping still steps through it, inspection still
 renders it truthfully. "Done" includes the debugger.
 
 This cannot be a rule enforced by memory. Memory-enforced rules decay,
-and this one already did: the debugger's breakpoint and stepping
-integration silently rotted away across an era of executor changes,
-because nothing forced the parallel work and nothing tested it. The
+and this one already did: the debugger fell out of step with the
+executor as the shell grew around it -- its line tracking, its
+variable inspection, and the robustness of its break flow all decayed
+-- because nothing forced the parallel work and nothing tested it. The
 rule is therefore enforced by a gate -- an integration test suite that
 drives the debugger over representative scripts and asserts it can set
 breakpoints, halt, step, and inspect every value type. When a core
