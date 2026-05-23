@@ -17,9 +17,15 @@
 #include <string.h>
 #include <time.h>
 
-/* Capture debug output into a fixed buffer so tests can assert on
- * what the debugger rendered. Reads ctx->debug_output (assumed to be
- * a tmpfile). */
+/**
+ * @brief Capture debug output into a fixed buffer for assertions
+ *
+ * Reads ctx->debug_output (assumed to be a tmpfile) from offset 0.
+ *
+ * @param ctx Debug context with a tmpfile-backed debug_output.
+ * @param buf Destination buffer.
+ * @param cap Buffer capacity (NUL-terminator included).
+ */
 static void read_debug_output(debug_context_t *ctx, char *buf, size_t cap) {
     buf[0] = '\0';
     if (!ctx || !ctx->debug_output || ctx->debug_output == stderr) {
@@ -31,10 +37,16 @@ static void read_debug_output(debug_context_t *ctx, char *buf, size_t cap) {
     buf[n] = '\0';
 }
 
-/* Build a debug context whose output is captured in a tmpfile so the
- * test can assert on what the debugger printed. The cleanup path
- * (debug_cleanup) fcloses non-stderr debug_output, so the file is
- * owned by the context. */
+/**
+ * @brief Build a debug context with a tmpfile-captured debug_output
+ *
+ * The cleanup path (debug_cleanup) fcloses any non-stderr
+ * debug_output, so the tmpfile is owned by the returned context and
+ * lives until debug_cleanup.
+ *
+ * @return Heap-allocated, enabled debug context with debug_output set
+ *         to a tmpfile, or NULL on allocation failure.
+ */
 static debug_context_t *new_captured_ctx(void) {
     debug_context_t *ctx = debug_init();
     if (!ctx) {
@@ -613,15 +625,21 @@ TEST(inspect_all_variables_with_frame) {
     debug_cleanup(ctx);
 }
 
-/* Helper used by enumerate_current_scope_vars_in_function_scope -- a
- * minimal collector callback recording one observed (name, type) pair
- * into the userdata. */
+/**
+ * @brief Probe used by enumerate_current_scope_vars_in_function_scope
+ *
+ * Minimal collector recording one observed (name, type) pair for the
+ * target variable.
+ */
 typedef struct {
     const char *target;
     bool found;
     symvar_type_t type;
 } scope_probe_t;
 
+/**
+ * @brief Symtable enumeration callback that fills a scope_probe_t
+ */
 static void scope_probe_cb(const char *name, const char *value,
                            symvar_type_t type, void *userdata) {
     (void)value;
@@ -834,7 +852,13 @@ TEST(show_variable_type_unset) {
     debug_cleanup(ctx);
 }
 
-/* Test seams declared in src/debug/debug_view.c -- not public API. */
+/**
+ * @brief Test seams declared in src/debug/debug_view.c
+ *
+ * These are intentionally not part of the public debug.h API; they
+ * exist only so view tests can pin the glyph set instead of being at
+ * the mercy of the environment locale.
+ */
 void debug_view_force_ascii_for_tests(void);
 void debug_view_force_utf8_for_tests(void);
 void debug_view_reset_glyph_cache(void);

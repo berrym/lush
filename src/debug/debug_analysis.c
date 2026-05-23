@@ -534,10 +534,20 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
  * pass skips lines whose first non-whitespace character is "#".
  */
 
-/* Find the first occurrence of a vector-yielding subscript inside the
- * ${...} expansion that begins at `start` (which must point at the
- * "${"). Returns true if found; *end is set to the position just
- * after the closing "}". */
+/**
+ * @brief Scan a ${...} expansion for a vector-yielding subscript
+ *
+ * Finds [@] subscripts and the parameter-flag (k)/(v)/(kv) vector
+ * operators inside the brace expansion that begins at @p start. The
+ * (i)/(I) flags yield indices (scalars) and are excluded.
+ *
+ * @param start Pointer to the leading '$' of "${...".
+ * @param avail Bytes available from @p start to the end of the line.
+ * @param out_has_vector Set to true if a vector trigger was found.
+ * @param out_end Position immediately after the closing '}'.
+ * @return true if a complete "${...}" was scanned (closing brace
+ *         found), false if the expansion was unterminated.
+ */
 static bool scan_vector_expansion(const char *start, size_t avail,
                                   bool *out_has_vector, size_t *out_end) {
     if (avail < 3 || start[0] != '$' || start[1] != '{') {
@@ -581,6 +591,20 @@ static bool scan_vector_expansion(const char *start, size_t avail,
     return true;
 }
 
+/**
+ * @brief Static type-mismatch warning pass (SEMANTICS.md section 3.9)
+ *
+ * Walks the script content line by line and flags ${...[@]...} (plus
+ * the parameter-flag (k)/(v)/(kv) vector operators) appearing as the
+ * RHS of an "=" assignment, with or without an intervening double
+ * quote. Adds entries under the "type" category to ctx's analysis
+ * issue list. Comment-only lines are skipped; "==" string-equality
+ * is excluded.
+ *
+ * @param ctx Debug context to receive analysis issues.
+ * @param file Script path (for issue line citations).
+ * @param content Full script content as a single NUL-terminated string.
+ */
 static void debug_analyze_types(debug_context_t *ctx, const char *file,
                                 const char *content) {
     if (!ctx || !file || !content) {

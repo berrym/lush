@@ -73,6 +73,15 @@ static const debug_view_glyphs_t glyphs_ascii = {
  * which set the debugger uses for the rest of the run. */
 static const debug_view_glyphs_t *g_glyphs = NULL;
 
+/**
+ * @brief Does the locale string advertise a UTF-8 encoding?
+ *
+ * Recognizes "UTF-8", "utf-8", "UTF8", "utf8" as substrings -- the
+ * spellings POSIX and shell tooling actually use.
+ *
+ * @param locale LANG / LC_CTYPE / LC_ALL value (may be NULL/empty).
+ * @return true if the string indicates a UTF-8 locale.
+ */
 static bool env_indicates_utf8_locale(const char *locale) {
     if (!locale || !*locale) {
         return false;
@@ -81,6 +90,15 @@ static bool env_indicates_utf8_locale(const char *locale) {
            strstr(locale, "UTF8") != NULL || strstr(locale, "utf8") != NULL;
 }
 
+/**
+ * @brief Pick the right glyph set for the active terminal
+ *
+ * Matches LLE's terminal_capabilities heuristic: assume UTF-8 unless
+ * the locale doesn't advertise it or TERM is the linux framebuffer
+ * console (which has limited UTF-8 support).
+ *
+ * @return Pointer to one of the static glyph_sets (UTF-8 or ASCII).
+ */
 static const debug_view_glyphs_t *resolve_glyphs(void) {
     /* The linux framebuffer console renders box-drawing characters
      * unreliably; match LLE's terminal_capabilities.c which treats it
@@ -107,6 +125,11 @@ static const debug_view_glyphs_t *resolve_glyphs(void) {
     return &glyphs_utf8;
 }
 
+/**
+ * @brief Return the cached glyph set, resolving on first use.
+ *
+ * @return The active glyph set for this process.
+ */
 static const debug_view_glyphs_t *view_glyphs(void) {
     if (!g_glyphs) {
         g_glyphs = resolve_glyphs();
@@ -124,6 +147,17 @@ static const debug_view_glyphs_t *view_glyphs(void) {
  * ============================================================================
  */
 
+/**
+ * @brief Emit one user-facing debugger line with a left gutter
+ *
+ * Implementation of the public API declared in debug.h. Writes the
+ * gutter glyph followed by the printf-formatted text and a newline,
+ * then flushes ctx->debug_output.
+ *
+ * @param ctx Debug context (must have debug_output set).
+ * @param format printf-style format string.
+ * @param ... Format arguments.
+ */
 void debug_view_emit_line(debug_context_t *ctx, const char *format, ...) {
     if (!ctx || !ctx->enabled || !ctx->debug_output || !format) {
         return;
@@ -143,6 +177,17 @@ void debug_view_emit_line(debug_context_t *ctx, const char *format, ...) {
     fflush(ctx->debug_output);
 }
 
+/**
+ * @brief Open a framed block with an optional bracketed title
+ *
+ * Writes a top border of the form "<corner>- [title] <fill>...".
+ * Title length is consumed from the fixed inner width so the
+ * trailing fill ends near DEBUG_VIEW_FRAME_WIDTH columns. Pair with
+ * debug_view_end_frame.
+ *
+ * @param ctx Debug context.
+ * @param title Title to embed, or NULL/"" for an unlabeled frame.
+ */
 void debug_view_begin_frame(debug_context_t *ctx, const char *title) {
     if (!ctx || !ctx->enabled || !ctx->debug_output) {
         return;
@@ -176,6 +221,11 @@ void debug_view_begin_frame(debug_context_t *ctx, const char *title) {
     fflush(ctx->debug_output);
 }
 
+/**
+ * @brief Close a framed block opened with debug_view_begin_frame
+ *
+ * @param ctx Debug context.
+ */
 void debug_view_end_frame(debug_context_t *ctx) {
     if (!ctx || !ctx->enabled || !ctx->debug_output) {
         return;
@@ -190,10 +240,22 @@ void debug_view_end_frame(debug_context_t *ctx) {
     fflush(ctx->debug_output);
 }
 
-/* Used by tests to deterministically force a glyph set regardless of
- * the process environment. NOT part of the public debug.h API. */
+/**
+ * @brief Test seam: clear the cached glyph set
+ *
+ * The next call to view_glyphs() will re-resolve from the current
+ * environment. Not part of the public debug.h API; used by
+ * test_debug_trace's view tests so each case starts from a known
+ * state.
+ */
 void debug_view_reset_glyph_cache(void) { g_glyphs = NULL; }
 
+/**
+ * @brief Test seam: force the ASCII glyph set regardless of env
+ */
 void debug_view_force_ascii_for_tests(void) { g_glyphs = &glyphs_ascii; }
 
+/**
+ * @brief Test seam: force the UTF-8 glyph set regardless of env
+ */
 void debug_view_force_utf8_for_tests(void) { g_glyphs = &glyphs_utf8; }

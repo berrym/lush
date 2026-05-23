@@ -21,12 +21,20 @@
 #include <string.h>
 #include <time.h>
 
-/* Map a symtable-side value classification to lush's user-facing type
- * vocabulary -- Scalar / List / Map -- per SEMANTICS.md. The
- * is_associative flag is meaningful only for SYMVAR_ARRAY entries:
- * lush arrays carry that flag on array_value_t, and the same enum
- * value SYMVAR_ARRAY covers both indexed (List) and associative (Map)
- * arrays. */
+/**
+ * @brief Map a symtable type to the user-facing Scalar/List/Map label
+ *
+ * Per SEMANTICS.md. The @p is_associative flag is meaningful only for
+ * SYMVAR_ARRAY entries -- lush arrays carry the flag on
+ * array_value_t, and the same SYMVAR_ARRAY enum value covers both
+ * indexed (List) and associative (Map) arrays.
+ *
+ * @param type Symtable variable type.
+ * @param is_associative For SYMVAR_ARRAY only: true for Map, false
+ *                       for List. Ignored for other types.
+ * @return Static string literal label: "Scalar" / "List" / "Map" /
+ *         "Func" / "Nameref" / "?".
+ */
 static const char *debug_var_type_label(symvar_type_t type,
                                         bool is_associative) {
     switch (type) {
@@ -43,9 +51,18 @@ static const char *debug_var_type_label(symvar_type_t type,
     return "?";
 }
 
-/* Callback printing one variable from a scope's vars_ht entry. The
- * vars_ht stores only scalar-shaped types (arrays live in separate
- * global storage, reached via symtable_enumerate_arrays). */
+/**
+ * @brief Callback: render one scope-local variable through the view
+ *
+ * Used as the callback to symtable_enumerate_current_scope_vars. The
+ * scope's vars_ht stores only scalar-shaped types -- arrays live in
+ * separate global storage, reached via symtable_enumerate_arrays.
+ *
+ * @param name Variable name.
+ * @param value Variable value (deserialized string).
+ * @param type Variable type (from the symtable entry).
+ * @param userdata Debug context pointer (debug_context_t *).
+ */
 static void debug_local_var_print_cb(const char *name, const char *value,
                                      symvar_type_t type, void *userdata) {
     debug_context_t *ctx = (debug_context_t *)userdata;
@@ -53,7 +70,15 @@ static void debug_local_var_print_cb(const char *name, const char *value,
                          debug_var_type_label(type, false), value);
 }
 
-/* Callback printing one array entry from symtable_enumerate_arrays. */
+/**
+ * @brief Callback: render one array entry through the view
+ *
+ * Used as the callback to symtable_enumerate_arrays.
+ *
+ * @param name Array variable name.
+ * @param array Array value (carries is_associative + element count).
+ * @param userdata Debug context pointer (debug_context_t *).
+ */
 static void debug_array_print_cb(const char *name, array_value_t *array,
                                  void *userdata) {
     debug_context_t *ctx = (debug_context_t *)userdata;

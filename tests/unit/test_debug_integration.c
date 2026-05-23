@@ -50,10 +50,15 @@
  * ============================================================================
  */
 
-/* A live, enabled debug context whose output is captured to a temp file
- * so tests can assert on what the debugger reported. debug_cleanup()
- * fclose()s a non-stderr debug_output, so the capture file is owned by
- * the context and must not be closed separately. */
+/**
+ * @brief Build a live debug context with output captured to a tmpfile
+ *
+ * The capture file is owned by the context: debug_cleanup() fcloses
+ * any non-stderr debug_output, so callers must not close it
+ * separately.
+ *
+ * @return Heap-allocated, enabled debug context, or NULL on failure.
+ */
 static debug_context_t *debug_ctx_new_captured(void) {
     debug_context_t *ctx = debug_init();
     if (!ctx) {
@@ -67,7 +72,13 @@ static debug_context_t *debug_ctx_new_captured(void) {
     return ctx;
 }
 
-/* Read the debugger's captured output into buf. */
+/**
+ * @brief Read the debugger's captured output into @p buf
+ *
+ * @param ctx Debug context with a tmpfile-backed debug_output.
+ * @param buf Destination buffer (NUL-terminated on return).
+ * @param buf_size Buffer capacity (including NUL).
+ */
 static void debug_ctx_read_output(debug_context_t *ctx, char *buf,
                                   size_t buf_size) {
     buf[0] = '\0';
@@ -85,11 +96,22 @@ typedef struct {
     char out[4096];
 } gate_result_t;
 
-/* Run `script` through `exec` with `ctx` installed as the global debug
- * context. When with_script_context is true the executor is placed in
- * script-execution mode (file "gate.sh", first line 1) -- the state the
- * breakpoint check in execute_node is gated on. Script stdout is
- * captured so tests can prove execution continued past a break. */
+/**
+ * @brief Run @p script through @p exec with @p ctx as the global debug
+ *        context
+ *
+ * When @p with_script_context is true the executor is placed in
+ * script-execution mode (file "gate.sh", first line 1) -- the state
+ * the breakpoint check in execute_node is gated on. Script stdout is
+ * captured so tests can prove execution continued past a break.
+ *
+ * @param exec Executor to drive (caller owns lifetime).
+ * @param ctx Debug context (installed as g_debug_context for the
+ *            duration of the call, then cleared).
+ * @param script Shell source to execute.
+ * @param with_script_context Set script-execution mode for the call.
+ * @return Exit status plus captured stdout.
+ */
 static gate_result_t run_under_debugger(executor_t *exec,
                                         debug_context_t *ctx,
                                         const char *script,
@@ -127,7 +149,13 @@ static gate_result_t run_under_debugger(executor_t *exec,
     return r;
 }
 
-/* Walk the breakpoint list for the breakpoint with this id. */
+/**
+ * @brief Walk the breakpoint list for the breakpoint with this id
+ *
+ * @param ctx Debug context.
+ * @param id Breakpoint id (as returned by debug_add_breakpoint).
+ * @return The breakpoint, or NULL if not found.
+ */
 static breakpoint_t *find_breakpoint(debug_context_t *ctx, int id) {
     for (breakpoint_t *bp = ctx->breakpoints; bp; bp = bp->next) {
         if (bp->id == id) {
