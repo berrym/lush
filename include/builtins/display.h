@@ -35,5 +35,6 @@ int display_lle_reset(int argc, char **argv);
 int display_lle_theme(int argc, char **argv);
 int display_lle_completion(int argc, char **argv);
 int display_lle_widget(int argc, char **argv);
+int display_lle_hook(int argc, char **argv);
 
 #endif // BUILTINS_DISPLAY_H

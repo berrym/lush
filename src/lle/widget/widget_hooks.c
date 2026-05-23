@@ -13,6 +13,8 @@
 
 #include "lle/widget_hooks.h"
 #include "lle/lle_editor.h"
+#include "lle/lle_shell_event_hub.h"
+#include "lle/widget_hooks_bridge.h"
 #include <string.h>
 
 /* ============================================================================
@@ -293,4 +295,49 @@ lle_result_t lle_widget_hooks_disable(lle_widget_hooks_manager_t *manager) {
 
     manager->hooks_enabled = false;
     return LLE_SUCCESS;
+}
+
+/* ============================================================================
+ * Shell event hub bridge (declared in widget_hooks_bridge.h)
+ * ============================================================================
+ *
+ * Composes two independent subsystems: lle_shell_event_hub (shell-side
+ * lifecycle events) and lle_widget_hooks_manager (LLE-side widget
+ * triggers). The shell-side has no notion of widgets; the LLE-side has
+ * no notion of shell lifecycle. The bridge runs both, so a user widget
+ * attached to LLE_HOOK_PRE_COMMAND fires every time lush.c emits a
+ * PRE_COMMAND event before parse_and_execute.
+ */
+
+static void bridge_pre_command(void *event_data, void *user_data) {
+    (void)event_data;
+    lle_editor_t *editor = (lle_editor_t *)user_data;
+    if (!editor || !editor->widget_hooks_manager) {
+        return;
+    }
+    lle_widget_hook_trigger(editor->widget_hooks_manager, LLE_HOOK_PRE_COMMAND,
+                            editor);
+}
+
+static void bridge_post_command(void *event_data, void *user_data) {
+    (void)event_data;
+    lle_editor_t *editor = (lle_editor_t *)user_data;
+    if (!editor || !editor->widget_hooks_manager) {
+        return;
+    }
+    lle_widget_hook_trigger(editor->widget_hooks_manager, LLE_HOOK_POST_COMMAND,
+                            editor);
+}
+
+void lle_widget_hooks_bridge_install(struct lle_shell_event_hub *hub,
+                                     struct lle_editor *editor) {
+    if (!hub || !editor) {
+        return;
+    }
+    lle_shell_event_hub_register(
+        (lle_shell_event_hub_t *)hub, LLE_SHELL_EVENT_PRE_COMMAND,
+        bridge_pre_command, editor, "widget-hooks-pre-command-bridge");
+    lle_shell_event_hub_register(
+        (lle_shell_event_hub_t *)hub, LLE_SHELL_EVENT_POST_COMMAND,
+        bridge_post_command, editor, "widget-hooks-post-command-bridge");
 }

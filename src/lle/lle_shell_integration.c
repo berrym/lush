@@ -31,6 +31,7 @@
 #include "lle/prompt/theme.h"
 #include "lle/prompt/theme_loader.h"
 #include "lle/utf8_support.h"
+#include "lle/widget_hooks_bridge.h"
 #include "lush.h"
 #include "lush_memory_pool.h"
 #include "shell_mode.h"
@@ -280,6 +281,17 @@ lle_result_t lle_shell_integration_init(void) {
         return result;
     }
     integ->init_state.editor_initialized = true;
+
+    // Step 5.5: Bridge shell event hub -> widget hooks manager so the
+    // editor's PRE_COMMAND / POST_COMMAND hooks fire when the shell
+    // emits the matching lifecycle events from lush.c. The bridge
+    // handlers live in widget_hooks.c; they take the editor as
+    // user_data and trigger the corresponding hook on its
+    // widget_hooks_manager. Lets user widgets registered via
+    // `display lle hook add` participate in shell lifecycle.
+    if (integ->editor && integ->editor->widget_hooks_manager) {
+        lle_widget_hooks_bridge_install(integ->event_hub, integ->editor);
+    }
 
     /* Step 6: Initialize history (already done in create_and_configure_editor)
      */
