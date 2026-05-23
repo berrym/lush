@@ -12340,34 +12340,32 @@ static char *parse_parameter_expansion(executor_t *executor,
             return strdup("0");
         }
 
-        // Regular variable length: ${#var}
-        char *value = symtable_get_var(executor->symtable, var_name);
-        if (value) {
-            int len = strlen(value);
-            free(value); // Free the strdup'd value after getting length
+        /* Regular variable length: ${#var}. Mode-aware for the array
+         * case on a bare array name (issue #99):
+         *   zsh:  number of elements
+         *   bash: length of arr[0] (treats $arr as ${arr[0]})
+         *   lush: number of elements (curated zsh idiom)
+         *   posix: arrays don't exist, but if one was carried over
+         *          from a prior mode, match bash's first-element rule.
+         * Unified lookup branches on kind in a single call. */
+        lush_value_view_t view = {0};
+        symtable_lookup(var_name, &view);
+        if (view.kind == LUSH_VALUE_SCALAR) {
+            int len = (int)strlen(view.scalar_value);
+            lush_value_view_clear(&view);
             char *result = malloc(16);
             if (result) {
                 snprintf(result, 16, "%d", len);
             }
             return result ? result : strdup("0");
         }
-        /* Scalar lookup missed; check if var_name is an array. Mode-
-         * aware semantics for ${#arr} on a bare array name:
-         *   zsh:  number of elements
-         *   bash: length of arr[0] (treats $arr as ${arr[0]})
-         *   lush: number of elements (curated zsh idiom; bash users
-         *         should use ${#arr[@]} for the element count and
-         *         ${#arr[0]} for length-of-first explicitly)
-         *   posix: arrays do not exist; if one happens to be defined
-         *          (mode carryover) match bash's first-element rule.
-         * Issue #99.
-         */
-        array_value_t *array = symtable_get_array(var_name);
-        if (array) {
+        if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
+            array_value_t *array = view.array;
             shell_mode_t mode = shell_mode_get();
             // size_t can render up to 20 digits on 64-bit + null.
             char *result = malloc(24);
             if (!result) {
+                lush_value_view_clear(&view);
                 return strdup("0");
             }
             if (mode == SHELL_MODE_BASH || mode == SHELL_MODE_POSIX) {
@@ -12376,6 +12374,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             } else {
                 snprintf(result, 24, "%zu", symtable_array_length(array));
             }
+            lush_value_view_clear(&view);
             return result;
         }
         return strdup("0");
