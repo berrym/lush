@@ -87,6 +87,30 @@ typedef enum {
     // Extended language features (Phase 7: Zsh-Specific)
     NODE_ANON_FUNCTION, /**< () { body } - anonymous function (immediately
                            executed) */
+
+    /**
+     * @brief Typed-function form AST nodes (SEMANTICS §5.3, §7).
+     *
+     * NODE_FN_DECL is a typed-function declaration. Its val.str packs
+     * the signature as
+     *   "name\x1F<return_kind>\x1F<p1_name>:<p1_kind>\x1F<p2_name>:<p2_kind>..."
+     * with return_kind = "" for void; first_child is the body (a brace
+     * group or compound command).
+     *
+     * NODE_FN_CALL is a typed-function call expression used as the
+     * right-hand side of a NODE_LET_FN. val.str is the callee name;
+     * children are the argument expressions in declaration order.
+     *
+     * NODE_FN_RETURN is a `return [expression]` statement inside a fn
+     * body; first_child is the return-value expression (NULL for void).
+     *
+     * NODE_LET_FN is the `let name = name(args)` capture form. val.str
+     * is the LHS variable name; first_child is the NODE_FN_CALL.
+     */
+    NODE_FN_DECL,
+    NODE_FN_CALL,
+    NODE_FN_RETURN,
+    NODE_LET_FN,
 } node_type_t;
 
 // Case item terminator types for fall-through behavior

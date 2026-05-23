@@ -41,6 +41,7 @@ static const struct {
     {    "time",     TOK_TIME},
     {  "coproc",   TOK_COPROC},
     {  "repeat",   TOK_REPEAT},
+    {      "fn",       TOK_FN},
     {      NULL,     TOK_WORD}  // Sentinel
 };
 
@@ -356,6 +357,10 @@ const char *token_type_name(token_type_t type) {
         return "UNTIL";
     case TOK_FUNCTION:
         return "FUNCTION";
+    case TOK_FN:
+        return "FN";
+    case TOK_ARROW:
+        return "ARROW";
     case TOK_NEWLINE:
         return "NEWLINE";
     case TOK_WHITESPACE:
@@ -373,13 +378,14 @@ const char *token_type_name(token_type_t type) {
  * @brief Check if token type is a shell keyword
  *
  * Keywords include: if, then, else, elif, fi, while, do, done,
- * for, in, case, esac, until, function.
+ * for, in, case, esac, until, function, fn, select, time, coproc,
+ * repeat.
  *
  * @param type Token type to check
  * @return true if token is a keyword
  */
 bool token_is_keyword(token_type_t type) {
-    return type >= TOK_IF && type <= TOK_REPEAT;
+    return type >= TOK_IF && type <= TOK_FN;
 }
 
 /**
@@ -1713,11 +1719,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             // Fall through to word tokenization
             break;
 
-        case '-':
-            tokenizer->position++;
-            tokenizer->column++;
-            return token_new(TOK_MINUS, "-", 1, start_line, start_column,
-                             start_pos);
+            // case '-' is not reachable here -- '-' is a word char (not
+            // an operator char) and is consumed by the word tokenizer
+            // below. The '->' arrow is handled before the word path so
+            // it does not get absorbed into a word.
 
             // case '*':
             //     tokenizer->position++;
@@ -2200,6 +2205,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         // Not a redirection, reset position and treat as regular number
         tokenizer->position = num_start;
         tokenizer->column = start_column;
+    }
+
+    // Typed-function return-kind arrow '->'. Match only when '-' and
+    // '>' are adjacent (no whitespace); the design specifies adjacent
+    // recognition so '-' followed by ' >' (with space) parses as a
+    // word '-' followed by the redirection operator, unchanged.
+    if (c == '-' && tokenizer->position + 1 < tokenizer->input_length &&
+        tokenizer->input[tokenizer->position + 1] == '>') {
+        tokenizer->position += 2;
+        tokenizer->column += 2;
+        return token_new(TOK_ARROW, "->", 2, start_line, start_column,
+                         start_pos);
     }
 
     // Handle words and numbers (UTF-8 aware)

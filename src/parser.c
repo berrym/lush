@@ -66,6 +66,10 @@ static node_t *parse_coproc(parser_t *parser);
 // Forward declarations for extended language features (Phase 7: Zsh)
 static node_t *parse_anonymous_function(parser_t *parser);
 
+// Typed-function form (SEMANTICS §5.3, §7).
+static node_t *parse_fn_declaration(parser_t *parser);
+static bool is_valid_fn_kind_name(const char *text);
+
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
 static bool collect_pending_heredocs(parser_t *parser);
@@ -1379,6 +1383,8 @@ static node_t *parse_simple_command(parser_t *parser) {
             return parse_coproc(parser);
         case TOK_REPEAT:
             return parse_repeat_statement(parser);
+        case TOK_FN:
+            return parse_fn_declaration(parser);
         default:
             // Other keywords (like ESAC, FI, DONE, etc.) are handled by their
             // parent constructs - returning NULL here lets the parent detect
@@ -5709,14 +5715,292 @@ static node_t *parse_process_substitution(parser_t *parser) {
 }
 
 /**
- * @brief Parse an array element assignment arr[index]=value
+ * @brief Check whether the given text names a valid typed-function kind.
  *
- * Parses the Bash-style array element assignment.
- * Also handles += for append operations.
- *
- * Grammar: name[subscript]=value | name[subscript]+=value
- *
- * @param parser Parser instance
- * @param var_name Name of the array variable
- * @return Array assignment AST node
+ * The three admitted kinds match SEMANTICS §7 (`scalar`, `list`, `map`).
+ * No `any` / polymorphic kind: helpers that want to be untyped use the
+ * POSIX function form instead.
  */
+static bool is_valid_fn_kind_name(const char *text) {
+    if (!text) {
+        return false;
+    }
+    return (strcmp(text, "scalar") == 0) || (strcmp(text, "list") == 0) ||
+           (strcmp(text, "map") == 0);
+}
+
+/**
+ * @brief Parse a typed-function declaration.
+ *
+ * Grammar:
+ *     fn IDENT ( [param [, param]*] ) [-> kind] compound_command
+ *     param := IDENT ":" kind
+ *     kind  := "scalar" | "list" | "map"
+ *
+ * AST representation (node.h NODE_FN_DECL):
+ *   val.str = "name\x1f<return_kind>\x1fp1:kind1\x1fp2:kind2..."
+ *   first_child = body (a brace group / compound command).
+ *
+ * Empty parameter list and absent return kind are both legal. An
+ * absent return kind is encoded as an empty string between the two
+ * \x1F separators; void functions have no `return EXPR` (caught at
+ * resolve time in a later phase).
+ *
+ * @param parser Parser instance positioned at TOK_FN.
+ * @return New NODE_FN_DECL node, or NULL on error (parser->has_error set).
+ */
+static node_t *parse_fn_declaration(parser_t *parser) {
+    token_t *current = tokenizer_current(parser->tokenizer);
+    if (!current || current->type != TOK_FN) {
+        parser_error_add(parser, SHELL_ERR_UNEXPECTED_TOKEN,
+                         "expected 'fn' keyword");
+        return NULL;
+    }
+
+    // Capture the source location of the 'fn' keyword for diagnostics.
+    source_location_t fn_loc =
+        token_to_source_location(current, parser->source_name);
+
+    parser_push_context(parser, "parsing typed-function declaration");
+
+    // Consume 'fn'.
+    tokenizer_advance(parser->tokenizer);
+    current = tokenizer_current(parser->tokenizer);
+
+    // Function name.
+    if (!current || !token_is_word_like(current->type)) {
+        parser_error_add_with_help(
+            parser, SHELL_ERR_INVALID_FUNCTION,
+            "syntax: fn name(p: kind, ...) [-> kind] { body }",
+            "expected function name after 'fn'");
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    char *name = strdup(current->text);
+    if (!name) {
+        parser_pop_context(parser);
+        return NULL;
+    }
+    tokenizer_advance(parser->tokenizer);
+
+    // Opening paren is mandatory.
+    if (!expect_token_with_help(
+            parser, TOK_LPAREN,
+            "typed functions require '(' after the function name")) {
+        free(name);
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    // Buffer the encoded parameter signature.
+    char param_buf[2048];
+    param_buf[0] = '\0';
+    size_t param_len = 0;
+    int param_count = 0;
+
+    current = tokenizer_current(parser->tokenizer);
+    while (current && current->type != TOK_RPAREN && current->type != TOK_EOF) {
+        /* Parameter forms accepted (the tokenizer treats ':' as a word
+         * char, so the surface form `name: kind` may arrive in a few
+         * shapes depending on whitespace):
+         *   1. one TOK_WORD `name:kind`           (no whitespace anywhere)
+         *   2. TOK_WORD `name:` then TOK_WORD `kind`  (space after ':')
+         *   3. TOK_WORD `name` then TOK_WORD `:kind`  (space before ':')
+         *   4. TOK_WORD `name` then TOK_WORD `:` then TOK_WORD `kind`
+         *
+         * In every case we extract the colon-delimited (name, kind)
+         * pair by string-splitting around the first ':'. */
+        if (!token_is_word_like(current->type)) {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_INVALID_FUNCTION,
+                "each parameter must be 'name: kind' where kind is "
+                "scalar, list, or map",
+                "expected parameter name");
+            free(name);
+            parser_pop_context(parser);
+            return NULL;
+        }
+
+        // Gather up to three consecutive word tokens forming the
+        // parameter and slice them around the first ':'.
+        char composite[256];
+        composite[0] = '\0';
+        size_t composite_len = 0;
+        for (int i = 0; i < 3; i++) {
+            if (!current || !token_is_word_like(current->type)) {
+                break;
+            }
+            size_t tl = strlen(current->text);
+            if (composite_len + tl + 1 >= sizeof(composite)) {
+                break;
+            }
+            memcpy(composite + composite_len, current->text, tl);
+            composite_len += tl;
+            composite[composite_len] = '\0';
+            tokenizer_advance(parser->tokenizer);
+            // Stop once we have a ':' AND non-empty text after it.
+            const char *colon = strchr(composite, ':');
+            if (colon && colon[1] != '\0') {
+                break;
+            }
+            current = tokenizer_current(parser->tokenizer);
+            // If the next token is TOK_COMMA or TOK_RPAREN, we've run
+            // out of words for this parameter -- stop collecting.
+            if (!current || current->type == TOK_COMMA ||
+                current->type == TOK_RPAREN) {
+                break;
+            }
+        }
+
+        const char *colon = strchr(composite, ':');
+        if (!colon || colon == composite || colon[1] == '\0') {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_INVALID_FUNCTION,
+                "annotate each parameter with its kind: name: scalar / "
+                "list / map",
+                "expected 'name: kind' in parameter list (got '%s')",
+                composite);
+            free(name);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        size_t p_name_len = (size_t)(colon - composite);
+        char *p_name = malloc(p_name_len + 1);
+        if (!p_name) {
+            free(name);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        memcpy(p_name, composite, p_name_len);
+        p_name[p_name_len] = '\0';
+        const char *p_kind = colon + 1;
+
+        if (!is_valid_fn_kind_name(p_kind)) {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_INVALID_FUNCTION,
+                "valid kinds are: scalar, list, map (no 'any' in the "
+                "initial form)",
+                "unknown parameter kind '%s' for parameter '%s'", p_kind,
+                p_name);
+            free(p_name);
+            free(name);
+            parser_pop_context(parser);
+            return NULL;
+        }
+
+        int written =
+            snprintf(param_buf + param_len, sizeof(param_buf) - param_len,
+                     "\x1f%s:%s", p_name, p_kind);
+        if (written < 0 || (size_t)written >= sizeof(param_buf) - param_len) {
+            parser_error_add(parser, SHELL_ERR_INVALID_FUNCTION,
+                             "typed-function signature too large");
+            free(p_name);
+            free(name);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        param_len += (size_t)written;
+        param_count++;
+        free(p_name);
+
+        // Optional comma between parameters.
+        current = tokenizer_current(parser->tokenizer);
+        if (current && current->type == TOK_COMMA) {
+            tokenizer_advance(parser->tokenizer);
+            current = tokenizer_current(parser->tokenizer);
+        }
+    }
+
+    // Closing paren.
+    if (!expect_token_with_help(parser, TOK_RPAREN,
+                                "typed functions require ')' to close "
+                                "the parameter list")) {
+        free(name);
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    // Optional return-kind annotation: -> kind. The tokenizer emits
+    // TOK_ARROW only when '-' and '>' are adjacent (no whitespace),
+    // matching the design's adjacency requirement.
+    const char *return_kind = "";
+    current = tokenizer_current(parser->tokenizer);
+    if (current && current->type == TOK_ARROW) {
+        tokenizer_advance(parser->tokenizer);
+        current = tokenizer_current(parser->tokenizer);
+        if (!current || !token_is_word_like(current->type) ||
+            !is_valid_fn_kind_name(current->text)) {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_INVALID_FUNCTION,
+                "valid return kinds are: scalar, list, map (no 'any')",
+                "expected return kind after '->'");
+            free(name);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        return_kind = current->text;
+        tokenizer_advance(parser->tokenizer);
+    }
+
+    // Body: must be a brace group. Skip newlines between signature
+    // and body.
+    while (tokenizer_match(parser->tokenizer, TOK_NEWLINE)) {
+        tokenizer_advance(parser->tokenizer);
+    }
+    current = tokenizer_current(parser->tokenizer);
+    if (!current || current->type != TOK_LBRACE) {
+        parser_error_add_with_help(
+            parser, SHELL_ERR_INVALID_FUNCTION,
+            "typed-function bodies must be enclosed in '{ ... }'",
+            "expected '{' to begin the function body");
+        free(name);
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    node_t *body = parse_brace_group(parser);
+    if (!body) {
+        free(name);
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    // Build the encoded val.str: "name\x1f<return_kind>\x1f<params>".
+    // param_buf already has a leading \x1F per entry; the second
+    // \x1F here separates return_kind from the first param.
+    size_t encoded_size =
+        strlen(name) + 1 + strlen(return_kind) + 1 + param_len + 1;
+    char *encoded = malloc(encoded_size);
+    if (!encoded) {
+        free_node_tree(body);
+        free(name);
+        parser_pop_context(parser);
+        return NULL;
+    }
+    int n = snprintf(encoded, encoded_size, "%s\x1f%s%s", name, return_kind,
+                     param_buf);
+    if (n < 0 || (size_t)n >= encoded_size) {
+        free(encoded);
+        free_node_tree(body);
+        free(name);
+        parser_pop_context(parser);
+        return NULL;
+    }
+    free(name);
+
+    node_t *decl = new_node_at(NODE_FN_DECL, fn_loc);
+    if (!decl) {
+        free(encoded);
+        free_node_tree(body);
+        parser_pop_context(parser);
+        return NULL;
+    }
+    decl->val.str = encoded;
+    decl->val_type = VAL_STR;
+    add_child_node(decl, body);
+
+    (void)param_count; // reserved for static-check coupling
+    parser_pop_context(parser);
+    return decl;
+}

@@ -1179,6 +1179,18 @@ static int execute_node(executor_t *executor, node_t *node) {
         return 0;
     case NODE_ANON_FUNCTION:
         return execute_anonymous_function(executor, node);
+    case NODE_FN_DECL:
+    case NODE_FN_CALL:
+    case NODE_FN_RETURN:
+    case NODE_LET_FN:
+        // Typed-function AST nodes parse but the executor does not yet
+        // run them. Surface a clear structured error so a declaration
+        // in a script halts loudly rather than silently no-op'ing.
+        executor_error_report(
+            executor, SHELL_ERR_FUNCTION_ERROR, node->loc,
+            "typed-function form ('fn' / let-fn-call / typed return) is "
+            "recognized by the parser but is not yet executable");
+        return 1;
     default:
         if (executor->debug) {
             printf("DEBUG: Unknown node type %d, skipping\n", node->type);
