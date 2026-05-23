@@ -584,21 +584,41 @@ struct lle_event_system {
 /*
  * Initialize event system
  */
+/**
+ * @brief Initialize event system
+ * @param system Output: newly created event system
+ * @param pool Memory pool used to allocate events
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_system_init(lle_event_system_t **system,
                                    lle_memory_pool_t *pool);
 
 /*
  * Destroy event system
  */
+/**
+ * @brief Destroy event system and release all associated resources
+ * @param system Event system to destroy
+ */
 void lle_event_system_destroy(lle_event_system_t *system);
 
 /*
  * Start event system (begin processing)
  */
+/**
+ * @brief Start event system (begin processing)
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_system_start(lle_event_system_t *system);
 
 /*
  * Stop event system (stop processing)
+ */
+/**
+ * @brief Stop event system (stop processing)
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_system_stop(lle_event_system_t *system);
 
@@ -610,6 +630,15 @@ lle_result_t lle_event_system_stop(lle_event_system_t *system);
 /*
  * Create event
  */
+/**
+ * @brief Create event
+ * @param system Event system
+ * @param type Event kind/type
+ * @param data Generic event-specific data (may be NULL)
+ * @param data_size Size of data in bytes
+ * @param event Output: newly created event
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
                               void *data, size_t data_size,
                               lle_event_t **event);
@@ -617,10 +646,22 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
 /*
  * Destroy event
  */
+/**
+ * @brief Destroy event and return its memory to the pool
+ * @param system Event system
+ * @param event Event to destroy
+ */
 void lle_event_destroy(lle_event_system_t *system, lle_event_t *event);
 
 /*
  * Clone event
+ */
+/**
+ * @brief Clone event
+ * @param system Event system
+ * @param source Source event to clone
+ * @param dest Output: newly created clone
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_clone(lle_event_system_t *system, lle_event_t *source,
                              lle_event_t **dest);
@@ -633,35 +674,72 @@ lle_result_t lle_event_clone(lle_event_system_t *system, lle_event_t *source,
 /*
  * Initialize event queue
  */
+/**
+ * @brief Initialize event queue
+ * @param queue Output: newly created queue
+ * @param capacity Maximum number of events the queue can hold
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_queue_init(lle_event_queue_t **queue, size_t capacity);
 
 /*
  * Destroy event queue
+ */
+/**
+ * @brief Destroy event queue and release associated resources
+ * @param queue Queue to destroy
  */
 void lle_event_queue_destroy(lle_event_queue_t *queue);
 
 /*
  * Enqueue event
  */
+/**
+ * @brief Enqueue event for later processing
+ * @param system Event system
+ * @param event Event to enqueue
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_enqueue(lle_event_system_t *system, lle_event_t *event);
 
 /*
  * Dequeue event
+ */
+/**
+ * @brief Dequeue next event from the queue
+ * @param system Event system
+ * @param event Output: dequeued event
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_dequeue(lle_event_system_t *system, lle_event_t **event);
 
 /*
  * Get queue size
  */
+/**
+ * @brief Get current queue size (number of queued events)
+ * @param system Event system
+ * @return Number of events currently in the queue
+ */
 size_t lle_event_queue_size(lle_event_system_t *system);
 
 /*
  * Check if queue is empty
  */
+/**
+ * @brief Check if queue is empty
+ * @param system Event system
+ * @return true if the queue contains no events
+ */
 bool lle_event_queue_empty(lle_event_system_t *system);
 
 /*
  * Check if queue is full
+ */
+/**
+ * @brief Check if queue is full
+ * @param system Event system
+ * @return true if the queue is at capacity
  */
 bool lle_event_queue_full(lle_event_system_t *system);
 
@@ -673,6 +751,15 @@ bool lle_event_queue_full(lle_event_system_t *system);
 /*
  * Register event handler
  */
+/**
+ * @brief Register event handler for a specific event type
+ * @param system Event system
+ * @param type Event kind to register the handler for
+ * @param handler Handler function
+ * @param user_data User data passed to the handler on each dispatch
+ * @param name Handler name (for debugging)
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_handler_register(lle_event_system_t *system,
                                         lle_event_kind_t type,
                                         lle_event_handler_fn handler,
@@ -681,6 +768,13 @@ lle_result_t lle_event_handler_register(lle_event_system_t *system,
 /*
  * Unregister specific handler
  */
+/**
+ * @brief Unregister a specific handler by name
+ * @param system Event system
+ * @param type Event kind the handler was registered for
+ * @param name Handler name to unregister
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_handler_unregister(lle_event_system_t *system,
                                           lle_event_kind_t type,
                                           const char *name);
@@ -688,11 +782,23 @@ lle_result_t lle_event_handler_unregister(lle_event_system_t *system,
 /*
  * Unregister all handlers for event type
  */
+/**
+ * @brief Unregister all handlers for a given event type
+ * @param system Event system
+ * @param type Event kind to clear handlers for
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_handler_unregister_all(lle_event_system_t *system,
                                               lle_event_kind_t type);
 
 /*
  * Get handler count for event type
+ */
+/**
+ * @brief Get handler count for a given event type
+ * @param system Event system
+ * @param type Event kind to query
+ * @return Number of handlers registered for this event type
  */
 size_t lle_event_handler_count(lle_event_system_t *system,
                                lle_event_kind_t type);
@@ -705,16 +811,33 @@ size_t lle_event_handler_count(lle_event_system_t *system,
 /*
  * Dispatch event to all registered handlers
  */
+/**
+ * @brief Dispatch event to all registered handlers
+ * @param system Event system
+ * @param event Event to dispatch
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_dispatch(lle_event_system_t *system, lle_event_t *event);
 
 /*
  * Process events from queue (up to max_events)
+ */
+/**
+ * @brief Process events from queue up to a maximum count
+ * @param system Event system
+ * @param max_events Maximum number of events to process in this call
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_process_queue(lle_event_system_t *system,
                                      uint32_t max_events);
 
 /*
  * Process all events in queue
+ */
+/**
+ * @brief Process all events currently in the queue
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_process_all(lle_event_system_t *system);
 
@@ -726,15 +849,32 @@ lle_result_t lle_event_process_all(lle_event_system_t *system);
 /*
  * Get current timestamp in microseconds
  */
+/**
+ * @brief Get current timestamp in microseconds
+ * @return Monotonic timestamp in microseconds
+ */
 uint64_t lle_event_get_timestamp_us(void);
 
 /*
  * Get event type name (for debugging)
  */
+/**
+ * @brief Get event type name for debugging
+ * @param type Event kind
+ * @return Static string naming the event type
+ */
 const char *lle_event_type_name(lle_event_kind_t type);
 
 /*
  * Get event system statistics
+ */
+/**
+ * @brief Get event system statistics
+ * @param system Event system
+ * @param created Output: total events created
+ * @param dispatched Output: total events dispatched
+ * @param dropped Output: total events dropped (queue full)
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_system_get_stats(lle_event_system_t *system,
                                         uint64_t *created, uint64_t *dispatched,
@@ -749,15 +889,34 @@ lle_result_t lle_event_system_get_stats(lle_event_system_t *system,
  * Initialize enhanced statistics (optional - called automatically if
  * config.record_detailed_stats is true)
  */
+/**
+ * @brief Initialize enhanced statistics
+ *
+ * Optional: called automatically if config.record_detailed_stats is true.
+ *
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_enhanced_stats_init(lle_event_system_t *system);
 
 /*
  * Destroy enhanced statistics
  */
+/**
+ * @brief Destroy enhanced statistics and release resources
+ * @param system Event system
+ */
 void lle_event_enhanced_stats_destroy(lle_event_system_t *system);
 
 /*
  * Get per-type statistics for a specific event type
+ */
+/**
+ * @brief Get per-type statistics for a specific event type
+ * @param system Event system
+ * @param type Event kind to query
+ * @param stats Output: statistics for this event type
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_enhanced_stats_get_type(lle_event_system_t *system,
                                                lle_event_kind_t type,
@@ -766,11 +925,27 @@ lle_result_t lle_event_enhanced_stats_get_type(lle_event_system_t *system,
 /*
  * Get all type statistics (returns array)
  */
+/**
+ * @brief Get all per-type statistics as an array
+ * @param system Event system
+ * @param stats Output: array of per-type statistics
+ * @param count Output: number of entries in the array
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_enhanced_stats_get_all_types(
     lle_event_system_t *system, lle_event_type_stats_t **stats, size_t *count);
 
 /*
  * Get cycle statistics
+ */
+/**
+ * @brief Get processing cycle statistics
+ * @param system Event system
+ * @param cycles Output: total completed cycles
+ * @param total_time Output: total cycle processing time
+ * @param min_time Output: minimum cycle processing time
+ * @param max_time Output: maximum cycle processing time
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_enhanced_stats_get_cycles(lle_event_system_t *system,
                                                  uint64_t *cycles,
@@ -781,6 +956,13 @@ lle_result_t lle_event_enhanced_stats_get_cycles(lle_event_system_t *system,
 /*
  * Get queue depth statistics
  */
+/**
+ * @brief Get peak queue depth statistics
+ * @param system Event system
+ * @param max_main_depth Output: peak depth of the main queue
+ * @param max_priority_depth Output: peak depth of the priority queue
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_event_enhanced_stats_get_queue_depth(lle_event_system_t *system,
                                          uint64_t *max_main_depth,
@@ -788,6 +970,11 @@ lle_event_enhanced_stats_get_queue_depth(lle_event_system_t *system,
 
 /*
  * Reset all enhanced statistics
+ */
+/**
+ * @brief Reset all enhanced statistics to zero
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_enhanced_stats_reset(lle_event_system_t *system);
 
@@ -799,12 +986,24 @@ lle_result_t lle_event_enhanced_stats_reset(lle_event_system_t *system);
 /*
  * Set processing configuration
  */
+/**
+ * @brief Set processing configuration
+ * @param system Event system
+ * @param config Configuration to apply
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_event_processing_set_config(lle_event_system_t *system,
                                 const lle_event_processing_config_t *config);
 
 /*
  * Get processing configuration
+ */
+/**
+ * @brief Get processing configuration
+ * @param system Event system
+ * @param config Output: current configuration
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t
 lle_event_processing_get_config(lle_event_system_t *system,
@@ -813,11 +1012,22 @@ lle_event_processing_get_config(lle_event_system_t *system,
 /*
  * Set processing state
  */
+/**
+ * @brief Set processing state (running, stopped, paused)
+ * @param system Event system
+ * @param state New processing state
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_processing_set_state(lle_event_system_t *system,
                                             lle_processing_state_t state);
 
 /*
  * Get processing state
+ */
+/**
+ * @brief Get current processing state
+ * @param system Event system
+ * @return Current processing state
  */
 lle_processing_state_t
 lle_event_processing_get_state(lle_event_system_t *system);
@@ -830,15 +1040,35 @@ lle_event_processing_get_state(lle_event_system_t *system);
 /*
  * Initialize event filter system (optional - created on demand)
  */
+/**
+ * @brief Initialize event filter system
+ *
+ * Optional: filter system is created on demand when a filter is added.
+ *
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_filter_system_init(lle_event_system_t *system);
 
 /*
  * Destroy event filter system
  */
+/**
+ * @brief Destroy event filter system and release resources
+ * @param system Event system
+ */
 void lle_event_filter_system_destroy(lle_event_system_t *system);
 
 /*
  * Add event filter
+ */
+/**
+ * @brief Add an event filter
+ * @param system Event system
+ * @param name Filter name (for later lookup and debugging)
+ * @param filter Filter callback function
+ * @param user_data User data passed to the filter on each invocation
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_filter_add(lle_event_system_t *system, const char *name,
                                   lle_event_filter_fn filter, void *user_data);
@@ -846,11 +1076,23 @@ lle_result_t lle_event_filter_add(lle_event_system_t *system, const char *name,
 /*
  * Remove event filter by name
  */
+/**
+ * @brief Remove an event filter by name
+ * @param system Event system
+ * @param name Filter name to remove
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_filter_remove(lle_event_system_t *system,
                                      const char *name);
 
 /*
  * Enable event filter by name
+ */
+/**
+ * @brief Enable a previously-added event filter by name
+ * @param system Event system
+ * @param name Filter name to enable
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_filter_enable(lle_event_system_t *system,
                                      const char *name);
@@ -858,11 +1100,28 @@ lle_result_t lle_event_filter_enable(lle_event_system_t *system,
 /*
  * Disable event filter by name
  */
+/**
+ * @brief Disable an event filter by name (without removing it)
+ * @param system Event system
+ * @param name Filter name to disable
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_filter_disable(lle_event_system_t *system,
                                       const char *name);
 
 /*
  * Get filter statistics
+ */
+/**
+ * @brief Get per-filter statistics
+ * @param system Event system
+ * @param name Filter name to query
+ * @param filtered Output: total events checked
+ * @param passed Output: events passed
+ * @param blocked Output: events blocked
+ * @param transformed Output: events transformed
+ * @param errored Output: filter errors
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_filter_get_stats(lle_event_system_t *system,
                                         const char *name, uint64_t *filtered,
@@ -878,12 +1137,26 @@ lle_result_t lle_event_filter_get_stats(lle_event_system_t *system,
 /*
  * Set pre-dispatch hook
  */
+/**
+ * @brief Set pre-dispatch hook
+ * @param system Event system
+ * @param hook Pre-dispatch callback
+ * @param user_data User data passed to the hook
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_set_pre_dispatch_hook(lle_event_system_t *system,
                                              lle_event_pre_dispatch_fn hook,
                                              void *user_data);
 
 /*
  * Set post-dispatch hook
+ */
+/**
+ * @brief Set post-dispatch hook
+ * @param system Event system
+ * @param hook Post-dispatch callback
+ * @param user_data User data passed to the hook
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_set_post_dispatch_hook(lle_event_system_t *system,
                                               lle_event_post_dispatch_fn hook,
@@ -897,16 +1170,32 @@ lle_result_t lle_event_set_post_dispatch_hook(lle_event_system_t *system,
 /*
  * Set system state
  */
+/**
+ * @brief Set system state
+ * @param system Event system
+ * @param state New system state
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_system_set_state(lle_event_system_t *system,
                                         lle_system_state_t state);
 
 /*
  * Get current system state
  */
+/**
+ * @brief Get current system state
+ * @param system Event system
+ * @return Current system state
+ */
 lle_system_state_t lle_event_system_get_state(lle_event_system_t *system);
 
 /*
  * Get previous system state
+ */
+/**
+ * @brief Get previous system state (for recovery)
+ * @param system Event system
+ * @return Previous system state
  */
 lle_system_state_t
 lle_event_system_get_previous_state(lle_event_system_t *system);
@@ -919,10 +1208,25 @@ lle_event_system_get_previous_state(lle_event_system_t *system);
 /*
  * Initialize timer system (called internally - can also be called explicitly)
  */
+/**
+ * @brief Initialize timer system
+ *
+ * Called internally during event-system init; may also be called explicitly.
+ *
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_timer_system_init(lle_event_system_t *system);
 
 /*
  * Destroy timer system (called internally during system destroy)
+ */
+/**
+ * @brief Destroy timer system and release resources
+ *
+ * Called internally during event-system destroy.
+ *
+ * @param system Event system
  */
 void lle_event_timer_system_destroy(lle_event_system_t *system);
 
@@ -934,6 +1238,14 @@ void lle_event_timer_system_destroy(lle_event_system_t *system);
  * @param delay_us     Delay before firing (microseconds)
  * @param timer_id_out Output: timer ID for later reference
  * @return LLE_SUCCESS or error code
+ */
+/**
+ * @brief Create a one-shot timer (fires once)
+ * @param system Event system
+ * @param event Event to dispatch when timer fires (will be cloned)
+ * @param delay_us Delay before firing (microseconds)
+ * @param timer_id_out Output: timer ID for later reference
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
                                          lle_event_t *event, uint64_t delay_us,
@@ -949,6 +1261,15 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
  * @param timer_id_out     Output: timer ID for later reference
  * @return LLE_SUCCESS or error code
  */
+/**
+ * @brief Create a repeating timer
+ * @param system Event system
+ * @param event Event to dispatch when timer fires (will be cloned)
+ * @param initial_delay_us Initial delay before first fire (microseconds)
+ * @param interval_us Repeat interval (microseconds)
+ * @param timer_id_out Output: timer ID for later reference
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
                                            lle_event_t *event,
                                            uint64_t initial_delay_us,
@@ -962,6 +1283,12 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
  * @param timer_id Timer ID to cancel
  * @return LLE_SUCCESS or error code
  */
+/**
+ * @brief Cancel a timer (removes and destroys it)
+ * @param system Event system
+ * @param timer_id Timer ID to cancel
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_timer_cancel(lle_event_system_t *system,
                                     uint64_t timer_id);
 
@@ -972,6 +1299,12 @@ lle_result_t lle_event_timer_cancel(lle_event_system_t *system,
  * @param timer_id Timer ID to enable
  * @return LLE_SUCCESS or error code
  */
+/**
+ * @brief Enable a timer (without destroying it)
+ * @param system Event system
+ * @param timer_id Timer ID to enable
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_timer_enable(lle_event_system_t *system,
                                     uint64_t timer_id);
 
@@ -981,6 +1314,12 @@ lle_result_t lle_event_timer_enable(lle_event_system_t *system,
  * @param system   Event system
  * @param timer_id Timer ID to disable
  * @return LLE_SUCCESS or error code
+ */
+/**
+ * @brief Disable a timer (without destroying it)
+ * @param system Event system
+ * @param timer_id Timer ID to disable
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_timer_disable(lle_event_system_t *system,
                                      uint64_t timer_id);
@@ -996,6 +1335,15 @@ lle_result_t lle_event_timer_disable(lle_event_system_t *system,
  * @param is_repeating     Output: is this a repeating timer?
  * @return LLE_SUCCESS or error code
  */
+/**
+ * @brief Get timer information
+ * @param system Event system
+ * @param timer_id Timer ID to query
+ * @param next_fire_time_us Output: when timer will next fire (absolute timestamp)
+ * @param fire_count Output: how many times timer has fired
+ * @param is_repeating Output: is this a repeating timer?
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_timer_get_info(lle_event_system_t *system,
                                       uint64_t timer_id,
                                       uint64_t *next_fire_time_us,
@@ -1008,6 +1356,14 @@ lle_result_t lle_event_timer_get_info(lle_event_system_t *system,
  * @param system Event system
  * @return LLE_SUCCESS or error code
  */
+/**
+ * @brief Process all timers that are ready to fire
+ *
+ * Call this periodically (e.g., in the main event loop).
+ *
+ * @param system Event system
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_event_timer_process(lle_event_system_t *system);
 
 /*
@@ -1018,6 +1374,14 @@ lle_result_t lle_event_timer_process(lle_event_system_t *system);
  * @param fired    Output: total times timers have fired
  * @param cancelled Output: total timers cancelled
  * @return LLE_SUCCESS or error code
+ */
+/**
+ * @brief Get timer system statistics
+ * @param system Event system
+ * @param created Output: total timers created
+ * @param fired Output: total times timers have fired
+ * @param cancelled Output: total timers cancelled
+ * @return LLE_SUCCESS or an error code on failure
  */
 lle_result_t lle_event_timer_get_stats(lle_event_system_t *system,
                                        uint64_t *created, uint64_t *fired,
