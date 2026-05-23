@@ -4418,12 +4418,23 @@ static node_t *parse_case_statement(parser_t *parser) {
                 // pattern). TOK_COMMA is a separate token at the lexer
                 // layer since 80647a09 -- here it concatenates into the
                 // pattern text.
+                //
+                // TOK_DOUBLE_LBRACKET / TOK_DOUBLE_RBRACKET arrive when
+                // the user writes a POSIX character class like
+                // `[[:space:]]` inside a case pattern: the tokenizer
+                // greedily lexes "[[" as the extended-test opener (and
+                // likewise "]]" as the closer), but the case-pattern
+                // context wants their literal text. Accept the tokens
+                // here and append "[[" / "]]" -- match_pattern handles
+                // the resulting `[[:class:]]` string correctly.
                 if (token_is_word_like(pattern_token->type) ||
                     pattern_token->type == TOK_MULTIPLY ||
                     pattern_token->type == TOK_QUESTION ||
                     pattern_token->type == TOK_GLOB ||
                     pattern_token->type == TOK_LBRACKET ||
                     pattern_token->type == TOK_RBRACKET ||
+                    pattern_token->type == TOK_DOUBLE_LBRACKET ||
+                    pattern_token->type == TOK_DOUBLE_RBRACKET ||
                     pattern_token->type == TOK_VARIABLE ||
                     pattern_token->type == TOK_ASSIGN ||
                     pattern_token->type == TOK_COMMA) {

@@ -293,6 +293,44 @@ TEST(case_wildcard) {
     executor_free(exec);
 }
 
+/* POSIX character classes ([[:space:]], [[:upper:]], ...) parse correctly
+ * inside case patterns. The tokenizer greedily lexes "[[" as
+ * TOK_DOUBLE_LBRACKET (the extended-test opener); the case-pattern
+ * collector now accepts that token as literal "[[" text so the resulting
+ * pattern string "[[:class:]]" reaches match_pattern intact. */
+TEST(case_posix_character_class) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "case \" \" in [[:space:]]) R=ws;; *) R=other;; esac");
+    ASSERT_EXIT_STATUS(r, 0);
+    char *r1 = symtable_get_var(exec->symtable, "R");
+    ASSERT_NOT_NULL(r1, "R should be set");
+    ASSERT_STR_EQ(r1, "ws", "[[:space:]] matched whitespace");
+    free(r1);
+
+    r = run_shell_with_executor(
+        exec, "case \"A\" in [[:upper:]]) R=up;; *) R=other;; esac");
+    ASSERT_EXIT_STATUS(r, 0);
+    char *r2 = symtable_get_var(exec->symtable, "R");
+    ASSERT_NOT_NULL(r2, "R should be set");
+    ASSERT_STR_EQ(r2, "up", "[[:upper:]] matched uppercase");
+    free(r2);
+
+    /* Non-match falls through to the wildcard arm without misparsing
+     * the bracket class. */
+    r = run_shell_with_executor(
+        exec, "case \"x\" in [[:space:]]) R=ws;; *) R=other;; esac");
+    ASSERT_EXIT_STATUS(r, 0);
+    char *r3 = symtable_get_var(exec->symtable, "R");
+    ASSERT_NOT_NULL(r3, "R should be set");
+    ASSERT_STR_EQ(r3, "other", "non-whitespace falls through to default");
+    free(r3);
+
+    executor_free(exec);
+}
+
 /* ============================================================================
  * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
  *
@@ -2025,6 +2063,7 @@ int main(void) {
     RUN_TEST(until_loop);
     RUN_TEST(case_statement);
     RUN_TEST(case_wildcard);
+    RUN_TEST(case_posix_character_class);
 
     printf("\nSEMANTICS 3.4/3.9 conformance tests:\n");
     RUN_TEST(arr_at_in_scalar_assignment_raises_type_mismatch);
