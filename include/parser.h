@@ -323,4 +323,4 @@ void parser_exit_recursion(parser_t *parser);
  */
 size_t parser_get_recursion_depth(parser_t *parser);
 
-#endif // PARSER_H
+#endif /* PARSER_H */

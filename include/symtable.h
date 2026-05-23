@@ -26,11 +26,11 @@ typedef struct symvar symvar_t;
 
 // Variable types
 typedef enum {
-    SYMVAR_STRING,   // Regular string variable
-    SYMVAR_INTEGER,  // Integer variable (for arithmetic)
-    SYMVAR_ARRAY,    // Array variable (bash extension)
-    SYMVAR_FUNCTION, // Function definition
-    SYMVAR_NAMEREF   // Nameref variable (reference to another variable)
+    SYMVAR_STRING,   /**< Regular string variable */
+    SYMVAR_INTEGER,  /**< Integer variable (for arithmetic) */
+    SYMVAR_ARRAY,    /**< Array variable (bash extension) */
+    SYMVAR_FUNCTION, /**< Function definition */
+    SYMVAR_NAMEREF   /**< Nameref variable (reference to another variable) */
 } symvar_type_t;
 
 /* ============================================================================
@@ -74,45 +74,47 @@ typedef struct array_value {
 // Variable flags
 typedef enum {
     SYMVAR_NONE = 0,
-    SYMVAR_EXPORTED = (1 << 0),     // Variable is exported to environment
-    SYMVAR_READONLY = (1 << 1),     // Variable is read-only
-    SYMVAR_LOCAL = (1 << 2),        // Variable is local to current scope
-    SYMVAR_SPECIAL_VAR = (1 << 3),  // Special system variable
-    SYMVAR_UNSET = (1 << 4),        // Variable is explicitly unset
-    SYMVAR_NAMEREF_FLAG = (1 << 5), // Variable is a nameref (local -n)
-    SYMVAR_LOWERCASE = (1 << 6),    // Convert value to lowercase (declare -l)
-    SYMVAR_UPPERCASE = (1 << 7),    // Convert value to uppercase (declare -u)
-    SYMVAR_TRACE = (1 << 8),        // Trace attribute (declare -t)
-    SYMVAR_INTEGER_ATTR = (1 << 9)  // Integer (declare -i): RHS of
-                                    // assignment is arith-evaluated
+    SYMVAR_EXPORTED = (1 << 0),     /**< Variable is exported to environment */
+    SYMVAR_READONLY = (1 << 1),     /**< Variable is read-only */
+    SYMVAR_LOCAL = (1 << 2),        /**< Variable is local to current scope */
+    SYMVAR_SPECIAL_VAR = (1 << 3),  /**< Special system variable */
+    SYMVAR_UNSET = (1 << 4),        /**< Variable is explicitly unset */
+    SYMVAR_NAMEREF_FLAG = (1 << 5), /**< Variable is a nameref (local -n) */
+    SYMVAR_LOWERCASE = (1 << 6),    /**< Convert value to lowercase (declare -l) */
+    SYMVAR_UPPERCASE = (1 << 7),    /**< Convert value to uppercase (declare -u) */
+    SYMVAR_TRACE = (1 << 8),        /**< Trace attribute (declare -t) */
+    /**
+     * Integer (declare -i): RHS of assignment is arith-evaluated
+     */
+    SYMVAR_INTEGER_ATTR = (1 << 9)
 } symvar_flags_t;
 
 // Scope types for different contexts
 typedef enum {
-    SCOPE_GLOBAL,     // Global shell scope
-    SCOPE_FUNCTION,   // Function local scope
-    SCOPE_LOOP,       // Loop iteration scope (for/while)
-    SCOPE_SUBSHELL,   // Subshell scope
-    SCOPE_CONDITIONAL // Conditional execution scope (if/case)
+    SCOPE_GLOBAL,     /**< Global shell scope */
+    SCOPE_FUNCTION,   /**< Function local scope */
+    SCOPE_LOOP,       /**< Loop iteration scope (for/while) */
+    SCOPE_SUBSHELL,   /**< Subshell scope */
+    SCOPE_CONDITIONAL /**< Conditional execution scope (if/case) */
 } scope_type_t;
 
 // Variable entry structure
 struct symvar {
-    char *name;           // Variable name
-    char *value;          // Variable value (string representation)
-    symvar_type_t type;   // Variable type
-    symvar_flags_t flags; // Variable flags
-    size_t scope_level;   // Scope level where defined
-    symvar_t *next;       // Next variable in hash chain
+    char *name;           /**< Variable name */
+    char *value;          /**< Variable value (string representation) */
+    symvar_type_t type;   /**< Variable type */
+    symvar_flags_t flags; /**< Variable flags */
+    size_t scope_level;   /**< Scope level where defined */
+    symvar_t *next;       /**< Next variable in hash chain */
 };
 
 // Enhanced symbol table scope structure using libhashtable
 struct symtable_scope_enhanced {
-    scope_type_t scope_type;  // Type of scope
-    size_t level;             // Scope nesting level
-    ht_strstr_t *vars_ht;     // libhashtable ht_strstr_t for variables
-    symtable_scope_t *parent; // Parent scope
-    char *scope_name;         // Name of scope (for debugging)
+    scope_type_t scope_type;  /**< Type of scope */
+    size_t level;             /**< Scope nesting level */
+    ht_strstr_t *vars_ht;     /**< libhashtable ht_strstr_t for variables */
+    symtable_scope_t *parent; /**< Parent scope */
+    char *scope_name;         /**< Name of scope (for debugging) */
 };
 
 // Symbol table manager (forward declaration for implementation)

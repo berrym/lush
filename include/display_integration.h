@@ -46,9 +46,10 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/* ============================================================================
+ * CONSTANTS AND CONFIGURATION
+ * ============================================================================
+ */
 
 #define DISPLAY_INTEGRATION_VERSION_MAJOR 1
 #define DISPLAY_INTEGRATION_VERSION_MINOR 0
@@ -64,43 +65,56 @@ extern "C" {
 #define DISPLAY_INTEGRATION_DEFAULT_OPTIMIZATION_LEVEL                         \
     DISPLAY_OPTIMIZATION_BALANCED
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/* ============================================================================
+ * TYPE DEFINITIONS
+ * ============================================================================
+ */
 
 /**
  * Fallback reason enumeration for safety infrastructure.
  * Tracks why layered display operations fall back to standard functions.
  */
 typedef enum {
-    INTEGRATION_FALLBACK_NONE = 0, // No fallback - layered display succeeded
-    INTEGRATION_FALLBACK_CONTROLLER_NULL,  // Display controller is null
-    INTEGRATION_FALLBACK_CONTROLLER_ERROR, // Display controller returned error
-    INTEGRATION_FALLBACK_BUFFER_ERROR,     // Buffer allocation or size error
-    INTEGRATION_FALLBACK_TIMEOUT,      // Operation exceeded timeout threshold
-    INTEGRATION_FALLBACK_USER_REQUEST, // User explicitly disabled layered
-                                       // display
-    INTEGRATION_FALLBACK_SAFETY_CHECK, // Safety check failed
-    INTEGRATION_FALLBACK_MEMORY_ERROR, // Memory allocation failure
-    INTEGRATION_FALLBACK_INITIALIZATION_ERROR, // System not properly
-                                               // initialized
-    INTEGRATION_FALLBACK_RECURSION_PROTECTION  // Recursion protection triggered
+    INTEGRATION_FALLBACK_NONE = 0, /**< No fallback - layered display succeeded */
+    INTEGRATION_FALLBACK_CONTROLLER_NULL,  /**< Display controller is null */
+    INTEGRATION_FALLBACK_CONTROLLER_ERROR, /**< Display controller returned error */
+    INTEGRATION_FALLBACK_BUFFER_ERROR,     /**< Buffer allocation or size error */
+    INTEGRATION_FALLBACK_TIMEOUT,      /**< Operation exceeded timeout threshold */
+    /**
+     * User explicitly disabled layered display
+     */
+    INTEGRATION_FALLBACK_USER_REQUEST,
+    INTEGRATION_FALLBACK_SAFETY_CHECK, /**< Safety check failed */
+    INTEGRATION_FALLBACK_MEMORY_ERROR, /**< Memory allocation failure */
+    /**
+     * System not properly initialized
+     */
+    INTEGRATION_FALLBACK_INITIALIZATION_ERROR,
+    INTEGRATION_FALLBACK_RECURSION_PROTECTION  /**< Recursion protection triggered */
 } integration_fallback_reason_t;
 
 /**
  * Display integration health status enumeration.
  */
 typedef enum {
-    DISPLAY_INTEGRATION_HEALTH_EXCELLENT =
-        0, // Operating perfectly with layered display
-    DISPLAY_INTEGRATION_HEALTH_GOOD = 1, // Operating well with minor issues
-    DISPLAY_INTEGRATION_HEALTH_DEGRADED =
-        2, // Performance issues or high fallback rate
-    DISPLAY_INTEGRATION_HEALTH_ERROR = 3, // Error in layered display system
-    DISPLAY_INTEGRATION_HEALTH_DISABLED =
-        4, // Layered display intentionally disabled
-    DISPLAY_INTEGRATION_HEALTH_NOT_INITIALIZED =
-        5 // Integration system not initialized
+    /**
+     * Operating perfectly with layered display
+     */
+    DISPLAY_INTEGRATION_HEALTH_EXCELLENT = 0,
+    DISPLAY_INTEGRATION_HEALTH_GOOD = 1, /**< Operating well with minor issues */
+    /**
+     * Performance issues or high fallback rate
+     */
+    DISPLAY_INTEGRATION_HEALTH_DEGRADED = 2,
+    DISPLAY_INTEGRATION_HEALTH_ERROR = 3, /**< Error in layered display system */
+    /**
+     * Layered display intentionally disabled
+     */
+    DISPLAY_INTEGRATION_HEALTH_DISABLED = 4,
+    /**
+     * Integration system not initialized
+     */
+    DISPLAY_INTEGRATION_HEALTH_NOT_INITIALIZED = 5
 } display_integration_health_t;
 
 /**
