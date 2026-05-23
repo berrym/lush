@@ -36,7 +36,7 @@
 #include <string.h>
 
 /* ========================================================================== */
-/*                           ERROR RECOVERY HELPERS                           */
+// ERROR RECOVERY HELPERS
 /* ========================================================================== */
 
 /**
@@ -51,23 +51,23 @@ insert_replacement_character(lle_input_parser_system_t *parser_sys) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* If no event system, recovery still succeeds (just no event generated) */
+    // If no event system, recovery still succeeds (just no event generated)
     if (!parser_sys->event_system) {
         return LLE_SUCCESS;
     }
 
-    /* Unicode replacement character U+FFFD in UTF-8 */
+    // Unicode replacement character U+FFFD in UTF-8
     const char replacement_utf8[] = "\xEF\xBF\xBD";
     const size_t replacement_len = 3;
 
-    /* Create text input event with replacement character */
+    // Create text input event with replacement character
     lle_parsed_input_t replacement_input = {
         .type = LLE_PARSED_INPUT_TYPE_TEXT,
         .handled = false,
         .parse_time_us = 0,
     };
 
-    /* Fill text input info in union */
+    // Fill text input info in union
     replacement_input.data.text_info.codepoint = 0xFFFD;
     replacement_input.data.text_info.utf8_length = replacement_len;
     memcpy(replacement_input.data.text_info.utf8_bytes, replacement_utf8,
@@ -76,11 +76,11 @@ insert_replacement_character(lle_input_parser_system_t *parser_sys) {
     replacement_input.data.text_info.display_width = 1;
     replacement_input.data.text_info.timestamp = lle_event_get_timestamp_us();
 
-    /* Generate event for replacement character */
+    // Generate event for replacement character
     lle_result_t result =
         lle_input_parser_generate_text_events(parser_sys, &replacement_input);
 
-    /* Note: Error statistics could be tracked in error_ctx if needed */
+    // Note: Error statistics could be tracked in error_ctx if needed
 
     return result;
 }
@@ -97,16 +97,16 @@ static lle_result_t process_as_text(lle_input_parser_system_t *parser_sys,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Process each byte as text input */
+    // Process each byte as text input
     for (size_t i = 0; i < data_len; i++) {
-        /* Create text input event for single byte */
+        // Create text input event for single byte
         lle_parsed_input_t text_input = {
             .type = LLE_PARSED_INPUT_TYPE_TEXT,
             .handled = false,
             .parse_time_us = 0,
         };
 
-        /* Fill basic text info */
+        // Fill basic text info
         text_input.data.text_info.codepoint = (uint8_t)data[i];
         text_input.data.text_info.utf8_length = 1;
         text_input.data.text_info.utf8_bytes[0] = data[i];
@@ -114,7 +114,7 @@ static lle_result_t process_as_text(lle_input_parser_system_t *parser_sys,
         text_input.data.text_info.display_width = 1;
         text_input.data.text_info.timestamp = lle_event_get_timestamp_us();
 
-        /* Generate event for this character */
+        // Generate event for this character
         lle_result_t result =
             lle_input_parser_generate_text_events(parser_sys, &text_input);
         if (result != LLE_SUCCESS) {
@@ -136,7 +136,7 @@ reset_sequence_parser(lle_input_parser_system_t *parser_sys) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Reset parser state if available */
+    // Reset parser state if available
     if (parser_sys->sequence_parser) {
         parser_sys->sequence_parser->state = LLE_PARSER_STATE_NORMAL;
         parser_sys->sequence_parser->buffer_pos = 0;
@@ -162,18 +162,18 @@ force_key_resolution(lle_input_parser_system_t *parser_sys) {
 
     lle_key_detector_t *detector = parser_sys->key_detector;
 
-    /* If we have buffered key data, process it now */
+    // If we have buffered key data, process it now
     if (detector->sequence_pos > 0) {
-        /* Create key event from current buffer */
+        // Create key event from current buffer
         lle_parsed_input_t key_input = {
             .type = LLE_PARSED_INPUT_TYPE_KEY,
             .handled = false,
             .parse_time_us = 0,
         };
 
-        /* Fill key info with best guess */
+        // Fill key info with best guess
         key_input.data.key_info.type = LLE_KEY_TYPE_SPECIAL;
-        key_input.data.key_info.keycode = 27; /* ESC */
+        key_input.data.key_info.keycode = 27; // ESC
         key_input.data.key_info.modifiers = LLE_KEY_MOD_NONE;
         strcpy(key_input.data.key_info.key_name, "Escape");
         memcpy(key_input.data.key_info.sequence, detector->sequence_buffer,
@@ -182,11 +182,11 @@ force_key_resolution(lle_input_parser_system_t *parser_sys) {
         key_input.data.key_info.is_repeat = false;
         key_input.data.key_info.timestamp = lle_event_get_timestamp_us();
 
-        /* Generate event */
+        // Generate event
         lle_result_t result =
             lle_input_parser_generate_key_events(parser_sys, &key_input);
 
-        /* Clear buffer */
+        // Clear buffer
         detector->sequence_pos = 0;
         memset(detector->sequence_buffer, 0, sizeof(detector->sequence_buffer));
 
@@ -208,14 +208,14 @@ static lle_result_t reset_all_parsers(lle_input_parser_system_t *parser_sys) {
 
     lle_result_t result = LLE_SUCCESS;
 
-    /* Reset sequence parser */
+    // Reset sequence parser
     if (parser_sys->sequence_parser) {
         result = reset_sequence_parser(parser_sys);
         if (result != LLE_SUCCESS)
             return result;
     }
 
-    /* Reset key detector */
+    // Reset key detector
     if (parser_sys->key_detector) {
         parser_sys->key_detector->sequence_pos = 0;
         parser_sys->key_detector->ambiguous_sequence = false;
@@ -223,7 +223,7 @@ static lle_result_t reset_all_parsers(lle_input_parser_system_t *parser_sys) {
                sizeof(parser_sys->key_detector->sequence_buffer));
     }
 
-    /* Reset UTF-8 processor state */
+    // Reset UTF-8 processor state
     if (parser_sys->utf8_processor) {
         parser_sys->utf8_processor->utf8_pos = 0;
         parser_sys->utf8_processor->expected_bytes = 0;
@@ -232,13 +232,13 @@ static lle_result_t reset_all_parsers(lle_input_parser_system_t *parser_sys) {
 
     /* Reset mouse parser - no internal buffer state to reset based on structure
      */
-    /* Mouse parser state is managed by its own functions */
+    // Mouse parser state is managed by its own functions
 
     return LLE_SUCCESS;
 }
 
 /* ========================================================================== */
-/*                      MAIN ERROR RECOVERY FUNCTION                          */
+// MAIN ERROR RECOVERY FUNCTION
 /* ========================================================================== */
 
 /**
@@ -260,15 +260,15 @@ lle_result_t lle_input_parser_recover_from_error(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Record recovery attempt start time */
+    // Record recovery attempt start time
     uint64_t start_time = lle_event_get_timestamp_us();
 
     lle_result_t result = LLE_SUCCESS;
 
-    /* Dispatch to appropriate recovery strategy */
+    // Dispatch to appropriate recovery strategy
     switch (error_code) {
     case LLE_ERROR_INVALID_ENCODING:
-        /* Invalid UTF-8: Replace with Unicode replacement character U+FFFD */
+        // Invalid UTF-8: Replace with Unicode replacement character U+FFFD
         result = insert_replacement_character(parser_sys);
         break;
 
@@ -282,7 +282,7 @@ lle_result_t lle_input_parser_recover_from_error(
         break;
 
     case LLE_ERROR_INPUT_PARSING:
-        /* Generic input parsing error: Try to recover data */
+        // Generic input parsing error: Try to recover data
         if (problematic_data && data_len > 0) {
             result = process_as_text(parser_sys, problematic_data, data_len);
         } else {
@@ -291,7 +291,7 @@ lle_result_t lle_input_parser_recover_from_error(
         break;
 
     case LLE_ERROR_INVALID_FORMAT:
-        /* Invalid format (mouse, sequence, etc): Skip and continue */
+        // Invalid format (mouse, sequence, etc): Skip and continue
         if (parser_sys->mouse_parser) {
             __atomic_fetch_add(
                 &parser_sys->mouse_parser->invalid_mouse_sequences, 1,
@@ -301,7 +301,7 @@ lle_result_t lle_input_parser_recover_from_error(
         break;
 
     case LLE_ERROR_TIMEOUT:
-        /* Timeout: Force resolution of ambiguous sequences and reset parsers */
+        // Timeout: Force resolution of ambiguous sequences and reset parsers
         result = force_key_resolution(parser_sys);
         if (result == LLE_SUCCESS) {
             result = reset_all_parsers(parser_sys);
@@ -309,25 +309,25 @@ lle_result_t lle_input_parser_recover_from_error(
         break;
 
     case LLE_ERROR_INVALID_STATE:
-        /* Invalid state: Reset all parsers to ground state */
+        // Invalid state: Reset all parsers to ground state
         result = reset_all_parsers(parser_sys);
         break;
 
     default:
-        /* Unknown error - reset all parsers to recover */
+        // Unknown error - reset all parsers to recover
         result = reset_all_parsers(parser_sys);
         break;
     }
 
     /* Note: Recovery performance statistics could be tracked in perf_monitor if
      * needed */
-    (void)start_time; /* Suppress unused variable warning */
+    (void)start_time; // Suppress unused variable warning
 
     return result;
 }
 
 /* ========================================================================== */
-/*                      ERROR DETECTION AND VALIDATION                        */
+// ERROR DETECTION AND VALIDATION
 /* ========================================================================== */
 
 /**
@@ -347,30 +347,30 @@ lle_result_t lle_input_parser_validate_utf8(const char *data, size_t len,
         uint8_t byte = (uint8_t)data[i];
         size_t char_len = 0;
 
-        /* Determine expected UTF-8 character length */
+        // Determine expected UTF-8 character length
         if ((byte & 0x80) == 0) {
-            char_len = 1; /* ASCII */
+            char_len = 1; // ASCII
         } else if ((byte & 0xE0) == 0xC0) {
-            char_len = 2; /* 2-byte UTF-8 */
+            char_len = 2; // 2-byte UTF-8
         } else if ((byte & 0xF0) == 0xE0) {
-            char_len = 3; /* 3-byte UTF-8 */
+            char_len = 3; // 3-byte UTF-8
         } else if ((byte & 0xF8) == 0xF0) {
-            char_len = 4; /* 4-byte UTF-8 */
+            char_len = 4; // 4-byte UTF-8
         } else {
-            /* Invalid start byte */
+            // Invalid start byte
             return LLE_ERROR_INVALID_ENCODING;
         }
 
-        /* Check if we have enough bytes */
+        // Check if we have enough bytes
         if (i + char_len > len) {
-            /* Incomplete sequence at end of buffer */
+            // Incomplete sequence at end of buffer
             return LLE_ERROR_INVALID_ENCODING;
         }
 
-        /* Validate continuation bytes */
+        // Validate continuation bytes
         for (size_t j = 1; j < char_len; j++) {
             if ((data[i + j] & 0xC0) != 0x80) {
-                /* Invalid continuation byte */
+                // Invalid continuation byte
                 return LLE_ERROR_INVALID_ENCODING;
             }
         }
@@ -393,7 +393,7 @@ bool lle_input_parser_check_sequence_timeout(
         return false;
     }
 
-    /* Check if sequence parser has partial data */
+    // Check if sequence parser has partial data
     if (parser_sys->sequence_parser &&
         parser_sys->sequence_parser->buffer_pos > 0) {
         uint64_t elapsed =
@@ -403,7 +403,7 @@ bool lle_input_parser_check_sequence_timeout(
         }
     }
 
-    /* Check if key detector has partial data */
+    // Check if key detector has partial data
     if (parser_sys->key_detector &&
         parser_sys->key_detector->sequence_pos > 0) {
         uint64_t elapsed =
@@ -427,13 +427,13 @@ lle_input_parser_handle_timeout(lle_input_parser_system_t *parser_sys) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Recover from timeout error */
+    // Recover from timeout error
     return lle_input_parser_recover_from_error(parser_sys, LLE_ERROR_TIMEOUT,
                                                NULL, 0);
 }
 
 /* ========================================================================== */
-/*                         ERROR STATISTICS AND REPORTING                     */
+// ERROR STATISTICS AND REPORTING
 /* ========================================================================== */
 
 /**
@@ -451,17 +451,17 @@ lle_input_parser_get_error_stats(lle_input_parser_system_t *parser_sys,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Get UTF-8 processor error stats */
+    // Get UTF-8 processor error stats
     if (utf8_errors && parser_sys->utf8_processor) {
         *utf8_errors = parser_sys->utf8_processor->invalid_sequences_handled;
     }
 
-    /* Get mouse parser error stats */
+    // Get mouse parser error stats
     if (mouse_errors && parser_sys->mouse_parser) {
         *mouse_errors = parser_sys->mouse_parser->invalid_mouse_sequences;
     }
 
-    /* Get sequence parser error stats */
+    // Get sequence parser error stats
     if (sequence_errors && parser_sys->sequence_parser) {
         *sequence_errors = parser_sys->sequence_parser->malformed_sequences;
     }

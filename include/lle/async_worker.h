@@ -156,20 +156,20 @@ typedef struct lle_async_worker {
     pthread_mutex_t queue_mutex; /**< Queue mutex */
     pthread_cond_t queue_cond;   /**< Queue condition variable */
 
-    /* Request queue */
+    // Request queue
     lle_async_request_t *queue_head; /**< Queue head */
     lle_async_request_t *queue_tail; /**< Queue tail */
     size_t queue_size;               /**< Current queue size */
 
-    /* State */
+    // State
     bool running;            /**< Worker is running */
     bool shutdown_requested; /**< Shutdown has been requested */
 
-    /* Completion callback */
+    // Completion callback
     lle_async_completion_fn on_complete; /**< Completion callback */
     void *callback_user_data;            /**< Callback user data */
 
-    /* Statistics */
+    // Statistics
     uint64_t total_requests;  /**< Total requests submitted */
     uint64_t total_completed; /**< Total requests completed */
     uint64_t total_timeouts;  /**< Total requests timed out */
@@ -327,4 +327,4 @@ lle_result_t lle_async_worker_get_stats(const lle_async_worker_t *worker,
 }
 #endif
 
-#endif /* LLE_ASYNC_WORKER_H */
+#endif // LLE_ASYNC_WORKER_H

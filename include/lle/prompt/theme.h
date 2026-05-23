@@ -115,7 +115,7 @@ typedef enum lle_basic_color {
  * @brief Semantic color scheme for themes
  */
 typedef struct lle_color_scheme {
-    /* Core semantic colors */
+    // Core semantic colors
     lle_color_t primary;   /**< Primary accent color */
     lle_color_t secondary; /**< Secondary accent color */
     lle_color_t success;   /**< Success indicator */
@@ -123,17 +123,17 @@ typedef struct lle_color_scheme {
     lle_color_t error;     /**< Error indicator */
     lle_color_t info;      /**< Information color */
 
-    /* Text colors */
+    // Text colors
     lle_color_t text;        /**< Normal text */
     lle_color_t text_dim;    /**< Dimmed text */
     lle_color_t text_bright; /**< Bright/highlighted text */
 
-    /* Structural colors */
+    // Structural colors
     lle_color_t border;     /**< Border/separator color */
     lle_color_t background; /**< Background color */
     lle_color_t highlight;  /**< Highlight color */
 
-    /* Git-specific colors */
+    // Git-specific colors
     lle_color_t git_clean;     /**< Clean repository */
     lle_color_t git_dirty;     /**< Dirty repository */
     lle_color_t git_staged;    /**< Staged changes */
@@ -142,13 +142,13 @@ typedef struct lle_color_scheme {
     lle_color_t git_ahead;     /**< Commits ahead */
     lle_color_t git_behind;    /**< Commits behind */
 
-    /* Path colors */
+    // Path colors
     lle_color_t path_home;      /**< Home directory */
     lle_color_t path_root;      /**< Root directory */
     lle_color_t path_normal;    /**< Normal path */
     lle_color_t path_separator; /**< Path separator */
 
-    /* Status colors */
+    // Status colors
     lle_color_t status_ok;      /**< Success status */
     lle_color_t status_error;   /**< Error status */
     lle_color_t status_running; /**< Running status */
@@ -219,7 +219,7 @@ typedef struct lle_segment_config {
     char name[32];   /**< Segment name (e.g., "directory", "git") */
     bool configured; /**< True if any field was set */
 
-    /* Visibility */
+    // Visibility
     bool show;     /**< Whether segment is visible */
     bool show_set; /**< True if show was explicitly configured */
 
@@ -228,15 +228,15 @@ typedef struct lle_segment_config {
     int truncation_length;      /**< Truncation length */
     bool truncation_length_set; /**< True if truncation_length was configured */
 
-    /* Style variant ("full", "short", "basename") */
+    // Style variant ("full", "short", "basename")
     char style[32]; /**< Style variant name */
     bool style_set; /**< True if style was configured */
 
-    /* Format string (strftime for time, etc.) */
+    // Format string (strftime for time, etc.)
     char format[64]; /**< Format string */
     bool format_set; /**< True if format was configured */
 
-    /* Git-specific booleans */
+    // Git-specific booleans
     bool show_branch;           /**< Show git branch name */
     bool show_branch_set;       /**< True if show_branch was configured */
     bool show_status;           /**< Show git dirty/clean status */
@@ -246,19 +246,19 @@ typedef struct lle_segment_config {
     bool show_stash;            /**< Show stash indicator */
     bool show_stash_set;        /**< True if show_stash was configured */
 
-    /* Directory-specific */
+    // Directory-specific
     char home_symbol[LLE_SYMBOL_MAX]; /**< Home directory replacement symbol */
     bool home_symbol_set;             /**< True if home_symbol was configured */
 
-    /* Duration-specific */
+    // Duration-specific
     int min_time;      /**< Minimum duration in ms to show (cmd_duration) */
     bool min_time_set; /**< True if min_time was configured */
 
-    /* Shell level-specific */
+    // Shell level-specific
     int min_level;      /**< Minimum nesting depth to show (shlvl) */
     bool min_level_set; /**< True if min_level was configured */
 
-    /* Powerline colors (per-segment foreground and background) */
+    // Powerline colors (per-segment foreground and background)
     lle_color_t fg_color; /**< Foreground color for powerline mode */
     bool fg_color_set;    /**< True if fg_color was configured */
     lle_color_t bg_color; /**< Background color for powerline mode */
@@ -344,41 +344,41 @@ typedef struct lle_prompt_layout {
  * @brief Complete theme definition
  */
 typedef struct lle_theme {
-    /* Identity */
+    // Identity
     char name[LLE_THEME_NAME_MAX];        /**< Theme name */
     char description[LLE_THEME_DESC_MAX]; /**< Theme description */
     char author[LLE_THEME_NAME_MAX];      /**< Theme author */
     char version[16];                     /**< Theme version */
 
-    /* Classification */
+    // Classification
     lle_theme_category_t category; /**< Theme category */
     lle_theme_source_t source;     /**< Theme source */
     uint32_t capabilities;         /**< Capability flags */
 
-    /* Inheritance */
+    // Inheritance
     char inherits_from[LLE_THEME_NAME_MAX]; /**< Parent theme name */
 
-    /* Visual configuration */
+    // Visual configuration
     lle_color_scheme_t colors;  /**< Color scheme */
     lle_symbol_set_t symbols;   /**< Symbol set */
     lle_prompt_layout_t layout; /**< Prompt layout */
 
-    /* Syntax highlighting colors (optional - overrides defaults) */
+    // Syntax highlighting colors (optional - overrides defaults)
     lle_syntax_colors_t syntax_colors; /**< Syntax highlighting colors */
     bool has_syntax_colors; /**< True if syntax colors defined in theme */
 
-    /* Segment configuration */
+    // Segment configuration
     char enabled_segments[LLE_THEME_MAX_SEGMENTS][32];
     size_t enabled_segment_count;
 
-    /* Per-segment configuration from [segments.<name>] TOML sections */
+    // Per-segment configuration from [segments.<name>] TOML sections
     lle_segment_config_t segment_configs[LLE_THEME_MAX_SEGMENT_CONFIGS];
     size_t segment_config_count;
 
-    /* Source file tracking (for hot-reload) */
+    // Source file tracking (for hot-reload)
     char filepath[PATH_MAX]; /**< Source file path (empty if builtin) */
 
-    /* Runtime state (not persisted) */
+    // Runtime state (not persisted)
     struct lle_theme *parent; /**< Resolved parent pointer */
     bool is_active;           /**< Currently active */
     uint64_t load_time_ns;    /**< Time to load */
@@ -391,17 +391,17 @@ typedef struct lle_theme_registry {
     lle_theme_t *themes[LLE_THEME_REGISTRY_MAX]; /**< Theme storage */
     size_t count;                                /**< Number of themes */
 
-    /* Active theme tracking */
+    // Active theme tracking
     lle_theme_t *active_theme; /**< Currently active theme */
     char active_theme_name[LLE_THEME_NAME_MAX];
 
-    /* Default theme */
+    // Default theme
     char default_theme_name[LLE_THEME_NAME_MAX];
 
-    /* State */
+    // State
     bool initialized; /**< Registry is initialized */
 
-    /* Statistics */
+    // Statistics
     size_t builtin_count;    /**< Built-in theme count */
     size_t user_count;       /**< User theme count */
     uint64_t total_switches; /**< Total theme switches */
@@ -681,4 +681,4 @@ void lle_symbol_set_init_nerd_font(lle_symbol_set_t *symbols);
 }
 #endif
 
-#endif /* LLE_PROMPT_THEME_H */
+#endif // LLE_PROMPT_THEME_H

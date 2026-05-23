@@ -291,4 +291,4 @@ void autocorrect_reset_stats(void);
  */
 void autocorrect_set_debug(bool enabled);
 
-#endif /* AUTOCORRECT_H */
+#endif // AUTOCORRECT_H

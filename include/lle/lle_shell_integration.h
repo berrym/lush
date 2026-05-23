@@ -39,7 +39,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Forward declaration - full type in lle/prompt/composer.h */
+// Forward declaration - full type in lle/prompt/composer.h
 typedef struct lle_prompt_composer lle_prompt_composer_t;
 
 /* ============================================================================
@@ -81,31 +81,31 @@ typedef struct lle_init_state {
  * - Destroyed by lle_shell_integration_shutdown() or atexit handler
  */
 typedef struct lle_shell_integration {
-    /* Initialization state */
+    // Initialization state
     lle_init_state_t init_state; /**< Which subsystems are initialized */
 
-    /* Memory management - session arena is root of arena hierarchy */
+    // Memory management - session arena is root of arena hierarchy
     lle_arena_t *session_arena; /**< Session-lifetime arena (root) */
 
-    /* Core components */
+    // Core components
     lle_editor_t *editor;                   /**< LLE editor instance */
     lle_shell_event_hub_t *event_hub;       /**< Shell event hub */
     lle_prompt_composer_t *prompt_composer; /**< Prompt composer (Spec 25) */
 
-    /* Safety and recovery state */
+    // Safety and recovery state
     bool recovery_mode;           /**< True if in recovery after error */
     uint32_t error_count;         /**< Consecutive error count */
     uint32_t ctrl_g_count;        /**< Ctrl+G count for panic detection */
     uint64_t last_ctrl_g_time_us; /**< Timestamp of last Ctrl+G */
 
-    /* Statistics */
+    // Statistics
     uint64_t total_readline_calls; /**< Total lle_readline() invocations */
     uint64_t successful_reads;     /**< Successful line reads */
     uint64_t recovery_count;       /**< Times recovery was triggered */
     uint64_t hard_reset_count;     /**< Hard resets performed */
     uint64_t nuclear_reset_count;  /**< Nuclear resets performed */
 
-    /* Timestamps */
+    // Timestamps
     uint64_t init_time_us;       /**< When integration was initialized */
     uint64_t last_reset_time_us; /**< When last reset occurred */
 } lle_shell_integration_t;
@@ -366,4 +366,4 @@ void lush_update_editing_mode(void);
  */
 char *lush_readline_with_prompt(const char *prompt);
 
-#endif /* LLE_SHELL_INTEGRATION_H */
+#endif // LLE_SHELL_INTEGRATION_H

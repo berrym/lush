@@ -38,7 +38,7 @@
 #define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
 #define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================
  * ERROR STRING TESTS
@@ -228,13 +228,13 @@ static int test_create_initializes_defaults(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    /* Check default configuration */
+    // Check default configuration
     ASSERT_EQ(engine->intelligent_positioning, true);
     ASSERT_EQ(engine->adaptive_strategy, true);
     ASSERT_EQ(engine->performance_monitoring, true);
     ASSERT_EQ(engine->current_strategy, COMPOSITION_STRATEGY_ADAPTIVE);
 
-    /* Not initialized until composition_engine_init() called */
+    // Not initialized until composition_engine_init() called
     ASSERT_EQ(engine->initialized, false);
 
     composition_engine_destroy(engine);
@@ -245,7 +245,7 @@ static int test_create_initializes_version_string(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    /* Version string should be set */
+    // Version string should be set
     ASSERT(strlen(engine->version_string) > 0);
 
     composition_engine_destroy(engine);
@@ -253,7 +253,7 @@ static int test_create_initializes_version_string(void) {
 }
 
 static int test_destroy_null_engine(void) {
-    /* Should not crash */
+    // Should not crash
     composition_engine_destroy(NULL);
     return 1;
 }
@@ -262,9 +262,9 @@ static int test_destroy_cleans_up_resources(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    /* Destroy should clean up */
+    // Destroy should clean up
     composition_engine_destroy(engine);
-    /* If we get here without crash, success */
+    // If we get here without crash, success
     return 1;
 }
 
@@ -350,7 +350,7 @@ static int test_cleanup_uninitialized_engine(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    /* Should not crash even if not initialized */
+    // Should not crash even if not initialized
     composition_engine_error_t result = composition_engine_cleanup(engine);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
 
@@ -779,7 +779,7 @@ static int test_get_version_valid(void) {
         composition_engine_get_version(engine, version, sizeof(version));
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
 
-    /* Version should be in format x.y.z */
+    // Version should be in format x.y.z
     ASSERT(strlen(version) > 0);
     ASSERT(strchr(version, '.') != NULL);
 
@@ -803,7 +803,7 @@ static int test_validate_cache_null_outputs(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    /* NULL outputs should be allowed */
+    // NULL outputs should be allowed
     composition_engine_error_t result =
         composition_engine_validate_cache(engine, NULL, NULL);
     ASSERT_EQ(result, COMPOSITION_ENGINE_SUCCESS);
@@ -889,11 +889,11 @@ static int test_compose_with_cursor_invalid_width(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    /* Invalid width should use fallback of 80 */
+    // Invalid width should use fallback of 80
     composition_with_cursor_t result_buf;
     composition_engine_error_t result =
         composition_engine_compose_with_cursor(engine, 0, -1, &result_buf);
-    /* Should return NOT_INITIALIZED since engine not initialized */
+    // Should return NOT_INITIALIZED since engine not initialized
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED);
 
     composition_engine_destroy(engine);
@@ -1019,7 +1019,7 @@ static int test_calculate_hash_small_buffer(void) {
     composition_engine_t *engine = composition_engine_create();
     ASSERT_NOT_NULL(engine);
 
-    char hash[8]; /* Too small */
+    char hash[8]; // Too small
     composition_engine_error_t result =
         composition_engine_calculate_hash(engine, hash, sizeof(hash));
     ASSERT_EQ(result, COMPOSITION_ENGINE_ERROR_INVALID_PARAM);

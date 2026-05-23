@@ -138,7 +138,7 @@ static const config_enum_def_t lle_dedup_strategy_enum = {
 // Shell Mode mappings (Phase 0: Extended Language Support)
 static const config_enum_mapping_t shell_mode_mappings[] = {
     {"posix", SHELL_MODE_POSIX},
-    {   "sh", SHELL_MODE_POSIX}, /* Alias for posix */
+    {   "sh", SHELL_MODE_POSIX}, // Alias for posix
     { "bash",  SHELL_MODE_BASH},
     {  "zsh",   SHELL_MODE_ZSH},
     { "lush",  SHELL_MODE_LUSH},
@@ -530,7 +530,7 @@ static const int num_config_options =
  * ============================================================================
  */
 
-/* Forward declarations for sync hooks */
+// Forward declarations for sync hooks
 static void history_sync_to_runtime(void);
 static void history_sync_from_runtime(void);
 static void shell_sync_to_runtime(void);
@@ -729,7 +729,7 @@ static void shell_sync_to_runtime(void) {
 
     if (config_registry_get_string("shell.mode", sval, sizeof(sval)) ==
         CREG_SUCCESS) {
-        /* Map mode string to enum - use Unicode comparison */
+        // Map mode string to enum - use Unicode comparison
         if (lle_unicode_strings_equal(sval, "posix",
                                       &LLE_UNICODE_COMPARE_DEFAULT)) {
             config.shell_mode = SHELL_MODE_POSIX;
@@ -744,7 +744,7 @@ static void shell_sync_to_runtime(void) {
         }
     }
 
-    /* POSIX options - sync to shell_opts via config_set_shell_option */
+    // POSIX options - sync to shell_opts via config_set_shell_option
     if (config_registry_get_boolean("shell.errexit", &bval) == CREG_SUCCESS) {
         config_set_shell_option("errexit", bval);
     }
@@ -763,7 +763,7 @@ static void shell_sync_to_runtime(void) {
  * @brief Sync shell options from runtime to registry
  */
 static void shell_sync_from_runtime(void) {
-    /* Map mode enum to string */
+    // Map mode enum to string
     const char *mode_str = "lush";
     switch (config.shell_mode) {
     case SHELL_MODE_POSIX:
@@ -781,7 +781,7 @@ static void shell_sync_from_runtime(void) {
     }
     config_registry_set_string("shell.mode", mode_str);
 
-    /* POSIX options - read from shell_opts via config_get_shell_option */
+    // POSIX options - read from shell_opts via config_get_shell_option
     config_registry_set_boolean("shell.errexit",
                                 config_get_shell_option("errexit"));
     config_registry_set_boolean("shell.nounset",
@@ -2374,14 +2374,14 @@ int config_get_xdg_dir(char *buffer, size_t size) {
         return -1;
     }
 
-    /* Check XDG_CONFIG_HOME first */
+    // Check XDG_CONFIG_HOME first
     const char *xdg_config = getenv("XDG_CONFIG_HOME");
     if (xdg_config && xdg_config[0] != '\0') {
         snprintf(buffer, size, "%s/%s", xdg_config, CONFIG_XDG_DIR);
         return 0;
     }
 
-    /* Fall back to ~/.config */
+    // Fall back to ~/.config
     const char *home = get_home_directory();
     if (!home) {
         return -1;
@@ -2493,10 +2493,10 @@ static int ensure_xdg_dir_exists(void) {
  */
 int config_migrate_to_xdg(void) {
     if (!config_ctx.needs_migration) {
-        return 0; /* Nothing to migrate */
+        return 0; // Nothing to migrate
     }
 
-    /* Ensure XDG directory exists */
+    // Ensure XDG directory exists
     if (ensure_xdg_dir_exists() != 0) {
         shell_error_t *err = shell_error_create(
             SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
@@ -2508,14 +2508,14 @@ int config_migrate_to_xdg(void) {
         return -1;
     }
 
-    /* Get XDG config path */
+    // Get XDG config path
     char xdg_path[CONFIG_PATH_MAX];
     if (config_get_xdg_config_path(xdg_path, sizeof(xdg_path)) != 0) {
         return -1;
     }
 
-    /* Save current config to XDG location in TOML format */
-    /* Note: This will be enhanced once registry is wired up */
+    // Save current config to XDG location in TOML format
+    // Note: This will be enhanced once registry is wired up
     if (config_save_file(xdg_path) != 0) {
         shell_error_t *err = shell_error_create(
             SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
@@ -2527,7 +2527,7 @@ int config_migrate_to_xdg(void) {
         return -1;
     }
 
-    /* Update context */
+    // Update context
     free(config_ctx.user_config_path);
     config_ctx.user_config_path = strdup(xdg_path);
     config_ctx.format = CONFIG_FORMAT_TOML;
@@ -2554,26 +2554,26 @@ char *config_get_user_config_path(void) {
     char legacy_path[CONFIG_PATH_MAX];
     struct stat st;
 
-    /* Try XDG path first */
+    // Try XDG path first
     if (config_get_xdg_config_path(xdg_path, sizeof(xdg_path)) == 0) {
         if (stat(xdg_path, &st) == 0 && S_ISREG(st.st_mode)) {
             return strdup(xdg_path);
         }
     }
 
-    /* Try legacy path */
+    // Try legacy path
     if (config_get_legacy_config_path(legacy_path, sizeof(legacy_path)) == 0) {
         if (stat(legacy_path, &st) == 0 && S_ISREG(st.st_mode)) {
             return strdup(legacy_path);
         }
     }
 
-    /* Neither exists - return XDG path for new config creation */
+    // Neither exists - return XDG path for new config creation
     if (xdg_path[0] != '\0') {
         return strdup(xdg_path);
     }
 
-    /* Fallback to legacy if we couldn't determine XDG path */
+    // Fallback to legacy if we couldn't determine XDG path
     if (legacy_path[0] != '\0') {
         return strdup(legacy_path);
     }
@@ -2620,14 +2620,14 @@ int config_load_system(void) {
 int config_save_user(void) {
     char xdg_path[CONFIG_PATH_MAX];
 
-    /* Always save to XDG location in TOML format */
+    // Always save to XDG location in TOML format
     if (config_get_xdg_config_path(xdg_path, sizeof(xdg_path)) == 0) {
-        /* Ensure XDG directory exists */
+        // Ensure XDG directory exists
         char xdg_dir[CONFIG_PATH_MAX];
         if (config_get_xdg_dir(xdg_dir, sizeof(xdg_dir)) == 0) {
             struct stat st;
             if (stat(xdg_dir, &st) != 0) {
-                /* Directory doesn't exist, create it */
+                // Directory doesn't exist, create it
                 if (mkdir(xdg_dir, 0755) != 0 && errno != EEXIST) {
                     int saved_errno = errno;
                     shell_error_t *err = shell_error_create(
@@ -2639,7 +2639,7 @@ int config_save_user(void) {
                         shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);
                     }
-                    /* Fall back to current path */
+                    // Fall back to current path
                     if (config_ctx.user_config_path) {
                         return config_save_file(config_ctx.user_config_path);
                     }
@@ -2651,7 +2651,7 @@ int config_save_user(void) {
         int result = config_save_file(xdg_path);
 
         if (result == 0) {
-            /* Update context to point to new location */
+            // Update context to point to new location
             if (config_ctx.needs_migration) {
                 fprintf(stderr, "lush: Configuration saved to %s\n", xdg_path);
                 fprintf(stderr, "lush: You may remove the old %s file\n",
@@ -2661,7 +2661,7 @@ int config_save_user(void) {
                 config_ctx.needs_migration = false;
             }
 
-            /* Update user_config_path to the new TOML location */
+            // Update user_config_path to the new TOML location
             free(config_ctx.user_config_path);
             config_ctx.user_config_path = strdup(xdg_path);
             config_ctx.format = CONFIG_FORMAT_TOML;
@@ -2670,7 +2670,7 @@ int config_save_user(void) {
         return result;
     }
 
-    /* Fallback to existing path if XDG resolution failed */
+    // Fallback to existing path if XDG resolution failed
     if (!config_ctx.user_config_path) {
         return -1;
     }
@@ -2692,22 +2692,22 @@ int config_save_file(const char *path) {
         return -1;
     }
 
-    /* Detect file format based on extension */
+    // Detect file format based on extension
     size_t path_len = strlen(path);
     bool is_toml = (path_len > 5 &&
                     lle_unicode_strings_equal(path + path_len - 5, ".toml",
                                               &LLE_UNICODE_COMPARE_DEFAULT));
 
     if (is_toml) {
-        /* Sync current runtime config to registry before saving */
+        // Sync current runtime config to registry before saving
         config_registry_sync_from_runtime();
 
-        /* Use registry's TOML save */
+        // Use registry's TOML save
         creg_result_t result = config_registry_save(path);
         return (result == CREG_SUCCESS) ? 0 : -1;
     }
 
-    /* Legacy INI-style format */
+    // Legacy INI-style format
     FILE *file = fopen(path, "w");
     if (!file) {
         return -1;
@@ -2786,22 +2786,22 @@ int config_load_file(const char *path) {
         return -1;
     }
 
-    /* Detect file format based on extension */
+    // Detect file format based on extension
     size_t path_len = strlen(path);
     bool is_toml = (path_len > 5 &&
                     lle_unicode_strings_equal(path + path_len - 5, ".toml",
                                               &LLE_UNICODE_COMPARE_DEFAULT));
 
     if (is_toml) {
-        /* Use TOML parser via config registry */
+        // Use TOML parser via config registry
         creg_result_t result = config_registry_load(path);
         if (result == CREG_SUCCESS) {
-            /* Sync registry values to runtime config struct */
+            // Sync registry values to runtime config struct
             config_registry_sync_to_runtime();
             config_ctx.format = CONFIG_FORMAT_TOML;
             return 0;
         }
-        /* Fall through to legacy parser on failure */
+        // Fall through to legacy parser on failure
         {
             shell_error_t *err =
                 shell_error_create(SHELL_ERR_INVALID_ARGUMENT,
@@ -2814,7 +2814,7 @@ int config_load_file(const char *path) {
         }
     }
 
-    /* Legacy INI-style parser */
+    // Legacy INI-style parser
     config_ctx.format = CONFIG_FORMAT_LEGACY;
 
     FILE *file = fopen(path, "r");
@@ -2854,7 +2854,7 @@ int config_load_file(const char *path) {
 
     fclose(file);
 
-    /* After loading legacy config, sync values to registry */
+    // After loading legacy config, sync values to registry
     config_registry_sync_from_runtime();
 
     return 0;
@@ -3106,7 +3106,7 @@ int config_parse_option(const char *key, const char *value) {
                 break;
             }
             case CONFIG_TYPE_ENUM: {
-                /* Look up string value in enum mapping table */
+                // Look up string value in enum mapping table
                 int enum_val = opt->enum_def->default_value;
                 if (opt->enum_def && opt->enum_def->mappings) {
                     for (const config_enum_mapping_t *m =
@@ -3381,7 +3381,7 @@ bool config_validate_lle_dedup_strategy(const char *value) {
 bool config_validate_shell_mode(const char *value) {
     return (strcmp(value, "posix") == 0 || strcmp(value, "bash") == 0 ||
             strcmp(value, "zsh") == 0 || strcmp(value, "lush") == 0 ||
-            strcmp(value, "sh") == 0); /* sh is alias for posix */
+            strcmp(value, "sh") == 0); // sh is alias for posix
 }
 
 /* config_error(), config_warning(), and config_get_last_error() removed
@@ -3667,7 +3667,7 @@ void builtin_config(int argc, char **argv) {
             printf("Error: Migration failed\n");
         }
     } else if (strcmp(argv[1], "path") == 0) {
-        /* Show current config file paths */
+        // Show current config file paths
         printf("Configuration paths:\n");
         if (config_ctx.user_config_path) {
             printf("  User config:   %s%s\n", config_ctx.user_config_path,

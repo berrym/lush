@@ -336,7 +336,7 @@ executor_t *executor_new(void) {
     executor->source_depth = 0;
     executor->source_return = false;
 
-    /* Initialize error context stack (Phase 3) */
+    // Initialize error context stack (Phase 3)
     executor->context_depth = 0;
     for (size_t i = 0; i < EXECUTOR_CONTEXT_STACK_MAX; i++) {
         executor->context_stack[i] = NULL;
@@ -344,7 +344,7 @@ executor_t *executor_new(void) {
     }
     executor->active_loc = SOURCE_LOC_UNKNOWN;
 
-    /* Initialize process substitution fd tracking */
+    // Initialize process substitution fd tracking
     executor->procsub_fd_count = 0;
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
@@ -391,7 +391,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->source_depth = 0;
     executor->source_return = false;
 
-    /* Initialize error context stack (Phase 3) */
+    // Initialize error context stack (Phase 3)
     executor->context_depth = 0;
     for (size_t i = 0; i < EXECUTOR_CONTEXT_STACK_MAX; i++) {
         executor->context_stack[i] = NULL;
@@ -399,7 +399,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     }
     executor->active_loc = SOURCE_LOC_UNKNOWN;
 
-    /* Initialize process substitution fd tracking */
+    // Initialize process substitution fd tracking
     executor->procsub_fd_count = 0;
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
@@ -440,7 +440,7 @@ void executor_free(executor_t *executor) {
         // Free script context
         free(executor->current_script_file);
 
-        /* Free error context stack (Phase 3) */
+        // Free error context stack (Phase 3)
         executor_clear_context(executor);
 
         free(executor);
@@ -674,7 +674,7 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         return;
     }
 
-    /* Create the error */
+    // Create the error
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -682,7 +682,7 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
     va_end(args);
 
     if (!error) {
-        /* Fallback to legacy error system */
+        // Fallback to legacy error system
         set_executor_error(executor, "runtime error");
         return;
     }
@@ -698,7 +698,7 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    /* Add context stack to error */
+    // Add context stack to error
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
         if (executor->context_stack[i]) {
@@ -706,14 +706,13 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    /* Display the error immediately */
+    // Display the error immediately
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
     /* Set legacy error state for compatibility - use NULL since error was
      * already displayed */
     executor->has_error = true;
-    executor->error_message =
-        NULL; /* Already displayed via structured system */
+    executor->error_message = NULL; // Already displayed via structured system
 
     shell_error_free(error);
 }
@@ -731,7 +730,7 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         return;
     }
 
-    /* Create the error */
+    // Create the error
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -739,7 +738,7 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
     va_end(args);
 
     if (!error) {
-        /* Fallback to legacy error system */
+        // Fallback to legacy error system
         set_executor_error(executor, "runtime error");
         return;
     }
@@ -755,7 +754,7 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    /* Add context stack to error */
+    // Add context stack to error
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
         if (executor->context_stack[i]) {
@@ -763,14 +762,13 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    /* Display the error immediately */
+    // Display the error immediately
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
     /* Set legacy error state for compatibility - use NULL since error was
      * already displayed */
     executor->has_error = true;
-    executor->error_message =
-        NULL; /* Already displayed via structured system */
+    executor->error_message = NULL; // Already displayed via structured system
 
     shell_error_free(error);
 }
@@ -795,17 +793,17 @@ static void report_command_not_found(executor_t *executor, const char *command,
         return;
     }
 
-    /* Create the error */
+    // Create the error
     shell_error_t *error =
         shell_error_create(SHELL_ERR_COMMAND_NOT_FOUND, SHELL_SEVERITY_ERROR,
                            loc, "%s: command not found", command);
     if (!error) {
-        /* Fallback to simple error message */
+        // Fallback to simple error message
         fprintf(stderr, "lush: %s: command not found\n", command);
         return;
     }
 
-    /* Attach source line for the rust-style snippet block */
+    // Attach source line for the rust-style snippet block
     if (SOURCE_LOC_VALID(loc)) {
         char *src_line = executor_get_source_line(executor, loc.line);
         if (src_line) {
@@ -815,7 +813,7 @@ static void report_command_not_found(executor_t *executor, const char *command,
         }
     }
 
-    /* Add context stack to error */
+    // Add context stack to error
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
         if (executor->context_stack[i]) {
@@ -830,7 +828,7 @@ static void report_command_not_found(executor_t *executor, const char *command,
         autocorrect_find_suggestions(executor, command, &results);
 
     if (num_suggestions > 0) {
-        /* Build suggestion string */
+        // Build suggestion string
         char suggestion[256];
         if (num_suggestions == 1) {
             snprintf(suggestion, sizeof(suggestion), "did you mean '%s'?",
@@ -861,10 +859,10 @@ static void report_command_not_found(executor_t *executor, const char *command,
      * no suggestions) */
     autocorrect_free_results(&results);
 
-    /* Display the error */
+    // Display the error
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
-    /* Set legacy error state */
+    // Set legacy error state
     executor->has_error = true;
     executor->error_message = NULL;
 
@@ -979,7 +977,7 @@ int executor_execute_command_line(executor_t *executor, const char *input,
     // Check syntax check mode (set -n) - parse but don't execute
     if (shell_opts.syntax_check) {
         if (parser_has_error(parser)) {
-            /* Display structured errors if available */
+            // Display structured errors if available
             parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
             /* Set executor error for legacy compatibility (may be NULL with new
              * system) */
@@ -996,7 +994,7 @@ int executor_execute_command_line(executor_t *executor, const char *input,
     }
 
     if (parser_has_error(parser)) {
-        /* Display structured errors if available */
+        // Display structured errors if available
         parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
         /* Set executor error for legacy compatibility (may be NULL with new
          * system) */
@@ -1046,7 +1044,7 @@ char *executor_get_source_line(executor_t *executor, size_t file_line) {
     size_t line_start = 0;
     size_t i = 0;
 
-    /* Walk to the start of the requested batch-relative line. */
+    // Walk to the start of the requested batch-relative line.
     while (src[i] != '\0' && current_line < batch_line) {
         if (src[i] == '\n') {
             current_line++;
@@ -1055,10 +1053,10 @@ char *executor_get_source_line(executor_t *executor, size_t file_line) {
         i++;
     }
     if (current_line != batch_line) {
-        return NULL; /* Requested line is past end of batch text. */
+        return NULL; // Requested line is past end of batch text.
     }
 
-    /* Find the end of the line (newline or end-of-string). */
+    // Find the end of the line (newline or end-of-string).
     size_t line_end = line_start;
     while (src[line_end] != '\0' && src[line_end] != '\n') {
         line_end++;
@@ -1313,7 +1311,7 @@ static int execute_command_dispatch(executor_t *executor, node_t *command);
 typedef struct {
     char *name;
     bool existed;
-    char *old_value; /* strdup of prior value when existed */
+    char *old_value; /**< strdup of prior value when existed */
     bool was_exported;
 } prefix_save_t;
 
@@ -1329,7 +1327,7 @@ static char *prefix_assign_name(const char *s) {
     }
     size_t n = (size_t)(eq - s);
     if (n > 0 && s[n - 1] == '+') {
-        n--; /* += append */
+        n--; // += append
     }
     if (n == 0) {
         return NULL;
@@ -1394,7 +1392,7 @@ static int prefix_apply(executor_t *executor, node_t *command, bool transient,
             char *old = existed ? symtable_get_global(name) : NULL;
             symvar_flags_t fl =
                 mgr ? symtable_get_flags(mgr, name) : SYMVAR_NONE;
-            saves[idx].name = name; /* ownership moves to saves */
+            saves[idx].name = name; // ownership moves to saves
             saves[idx].existed = existed;
             saves[idx].old_value = old;
             saves[idx].was_exported = (fl & SYMVAR_EXPORTED) != 0;
@@ -1414,7 +1412,7 @@ static int prefix_apply(executor_t *executor, node_t *command, bool transient,
             }
             return st;
         }
-        symtable_export_global(name); /* setenv: child/env-readers see it */
+        symtable_export_global(name); // setenv: child/env-readers see it
 
         if (transient) {
             idx++;
@@ -1430,7 +1428,7 @@ static int prefix_apply(executor_t *executor, node_t *command, bool transient,
     return 0;
 }
 
-/* Undo a transient prefix_apply() and free the snapshot array. */
+// Undo a transient prefix_apply() and free the snapshot array.
 static void prefix_restore_and_free(prefix_save_t *saves, int n) {
     if (!saves) {
         return;
@@ -1480,7 +1478,7 @@ static int execute_command(executor_t *executor, node_t *command) {
 }
 
 static int execute_command_inner(executor_t *executor, node_t *command) {
-    /* command non-null and NODE_COMMAND is guaranteed by the wrapper. */
+    // command non-null and NODE_COMMAND is guaranteed by the wrapper.
 
     // Reset expansion error flags for this command
     executor->expansion_error = false;
@@ -1831,9 +1829,9 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                  */
                 char *old_pwd = getcwd(NULL, 0);
 
-                /* Auto-cd to the directory */
+                // Auto-cd to the directory
                 if (chdir(argv[0]) == 0) {
-                    /* Successfully changed directory, update PWD */
+                    // Successfully changed directory, update PWD
                     char *new_pwd = getcwd(NULL, 0);
                     if (new_pwd) {
                         symtable_set_global("PWD", new_pwd);
@@ -1852,9 +1850,9 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
 
                         free(new_pwd);
                     }
-                    result = 0; /* Success */
+                    result = 0; // Success
                 } else {
-                    /* Failed to change directory, show error */
+                    // Failed to change directory, show error
                     shell_error_t *error = shell_error_create(
                         SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
                         executor_current_loc(executor), "cd: %s: %s", argv[0],
@@ -2301,10 +2299,10 @@ cleanup:
  * and match bash/zsh exactly.
  */
 typedef struct {
-    int streak;            /* consecutive non-zero body exits */
-    int last_status;       /* last non-zero status seen */
-    struct timespec start; /* monotonic clock at first non-zero of streak */
-    bool armed;            /* streak start time captured */
+    int streak;            /**< consecutive non-zero body exits */
+    int last_status;       /**< last non-zero status seen */
+    struct timespec start; /**< monotonic clock at first non-zero of streak */
+    bool armed;            /**< streak start time captured */
 } loop_monitor_t;
 
 static void loop_monitor_init(loop_monitor_t *m) {
@@ -2340,7 +2338,7 @@ static bool loop_monitor_check(loop_monitor_t *m, int body_status) {
     int n_threshold = config.loop_failure_streak;
     int t_threshold = config.loop_failure_seconds;
     if (n_threshold <= 0) {
-        /* heuristic disabled */
+        // heuristic disabled
         return false;
     }
     if (body_status == 0) {
@@ -2408,7 +2406,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     bool errexit_tripped = false;
     int iteration = 0;
 
-    /* Push loop context for error reporting (Phase 3) */
+    // Push loop context for error reporting (Phase 3)
     executor_push_context(executor, while_node->loc, "in while loop");
 
     // Check for trailing redirections on the while loop
@@ -2470,7 +2468,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             break;
         }
 
-        /* POSIX-required shell abort fired from inside the body. */
+        // POSIX-required shell abort fired from inside the body.
         if (executor->shell_exit_requested) {
             break;
         }
@@ -2484,7 +2482,7 @@ static int execute_while(executor_t *executor, node_t *while_node) {
         restore_file_descriptors(&redir_state);
     }
 
-    /* Pop loop context */
+    // Pop loop context
     executor_pop_context(executor);
 
     if (errexit_tripped) {
@@ -2601,7 +2599,7 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             break;
         }
 
-        /* POSIX-required shell abort fired from inside the body. */
+        // POSIX-required shell abort fired from inside the body.
         if (executor->shell_exit_requested) {
             break;
         }
@@ -3175,13 +3173,13 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                 break;
             }
 
-            /* POSIX-required shell abort fired from inside the body. */
+            // POSIX-required shell abort fired from inside the body.
             if (executor->shell_exit_requested) {
                 break;
             }
         }
 
-        /* Honor abort across the outer iteration as well. */
+        // Honor abort across the outer iteration as well.
         if (executor->shell_exit_requested) {
             break;
         }
@@ -3638,7 +3636,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                 break;
             }
 
-            /* POSIX-required shell abort: drop out of the select body. */
+            // POSIX-required shell abort: drop out of the select body.
             if (executor->shell_exit_requested) {
                 break;
             }
@@ -3655,7 +3653,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
             continue;
         }
 
-        /* POSIX-required shell abort: stop the outer select loop. */
+        // POSIX-required shell abort: stop the outer select loop.
         if (executor->shell_exit_requested) {
             break;
         }
@@ -4236,10 +4234,10 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         return false;
     }
 
-    /* $@ / $* (unbraced). */
+    // $@ / $* (unbraced).
     bool positional_at =
         (len == 2 && s[0] == '$' && (s[1] == '@' || s[1] == '*'));
-    /* ${...} braced forms. */
+    // ${...} braced forms.
     bool braced = (len >= 3 && s[0] == '$' && s[1] == '{' && s[len - 1] == '}');
     /* Bare `$NAME` where NAME is an array. zsh expands bare array
      * references to N words in word-list contexts (for-loop iteration,
@@ -4293,9 +4291,9 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
     bool keys_form = false;
     const char *name_start = NULL;
     size_t name_len = 0;
-    char subscript = '@'; /* @ vs *; only matters for joining policy */
+    char subscript = '@'; // @ vs *; only matters for joining policy
     int slice_offset = 0;
-    int slice_length = -1; /* -1 = "to end" */
+    int slice_length = -1; // -1 = "to end"
     bool has_slice = false;
     bool is_positional = positional_at;
 
@@ -4308,7 +4306,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         name_len = len - 1;
         subscript = '@';
     } else {
-        /* inner content between { and } */
+        // inner content between { and }
         const char *p = s + 2;
         const char *end = s + len - 1;
         if (p == end) {
@@ -4344,7 +4342,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                         flag_O = true;
                         break;
                     case 'a':
-                        /* array order, no sort -- default */
+                        // array order, no sort -- default
                         flag_o = false;
                         flag_O = false;
                         break;
@@ -4447,7 +4445,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     }
                 }
             }
-            /* Not our shape -- not a vector form. */
+            // Not our shape -- not a vector form.
             return false;
         }
         if (*p == '!') {
@@ -4457,12 +4455,12 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         if (p == end) {
             return false;
         }
-        /* Special-cased ${@} / ${*}: positional, no subscript. */
+        // Special-cased ${@} / ${*}: positional, no subscript.
         if (!keys_form && (end - p) == 1 && (*p == '@' || *p == '*')) {
             is_positional = true;
             subscript = *p;
         } else {
-            /* Must be NAME[@] / NAME[*] optionally followed by :N or :N:M */
+            // Must be NAME[@] / NAME[*] optionally followed by :N or :N:M
             name_start = p;
             while (p < end && (isalnum((unsigned char)*p) || *p == '_')) {
                 p++;
@@ -4484,7 +4482,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 return false;
             }
             p++;
-            /* Optional slicing :N or :N:M. */
+            // Optional slicing :N or :N:M.
             if (p < end && *p == ':') {
                 has_slice = true;
                 p++;
@@ -4511,13 +4509,13 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     return false;
                 }
             } else if (p != end) {
-                /* Junk between `]` and `}`. Not a recognised vector form. */
+                // Junk between `]` and `}`. Not a recognised vector form.
                 return false;
             }
         }
     }
 
-    /* Now produce the element vector. */
+    // Now produce the element vector.
     char **vec = NULL;
     int vcount = 0;
     int vcap = 0;
@@ -4560,7 +4558,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
             }
         }
     } else {
-        /* Array name lookup. Need a NUL-terminated name. */
+        // Array name lookup. Need a NUL-terminated name.
         char name_buf[256];
         if (name_len >= sizeof(name_buf)) {
             return false;
@@ -4570,12 +4568,12 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
 
         array_value_t *array = symtable_get_array(name_buf);
         if (!array) {
-            /* Not actually an array -- not our case; fall back. */
+            // Not actually an array -- not our case; fall back.
             return false;
         }
 
         if (keys_form) {
-            /* Produce keys (assoc) or indices (indexed). Honor slicing. */
+            // Produce keys (assoc) or indices (indexed). Honor slicing.
             if (array->is_associative) {
                 size_t kcount = 0;
                 char **keys = symtable_array_get_keys(array, &kcount);
@@ -4670,7 +4668,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 free(keys);
             }
         } else {
-            /* Produce values. Honor slicing. */
+            // Produce values. Honor slicing.
             size_t total = symtable_array_length(array);
             int start = 0, end_idx = (int)total - 1;
             if (has_slice) {
@@ -4780,7 +4778,7 @@ static char *expand_array_unsubscripted(executor_t *executor,
         const char *first = symtable_array_get_index(array, 0);
         return strdup(first ? first : "");
     }
-    /* zsh and lush: joined-by-space */
+    // zsh and lush: joined-by-space
     char *result = symtable_array_expand(array, " ");
     return result ? result : strdup("");
 }
@@ -5340,7 +5338,7 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                 if (dq_content) {
                     strncpy(dq_content, &text[dq_start], dq_len);
                     dq_content[dq_len] = '\0';
-                    /* Content inside `"..."` -- DQ rules apply. */
+                    // Content inside `"..."` -- DQ rules apply.
                     char *expanded =
                         expand_quoted_string(executor, dq_content, true);
                     free(dq_content);
@@ -5607,13 +5605,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         size_t len = strlen(text);
         char *result = malloc(len + 1);
         if (!result)
-            return strdup(text); /* OOM fallback */
+            return strdup(text); // OOM fallback
         size_t out = 0;
         for (size_t i = 0; i < len; i++) {
             if (text[i] == '\\' && i + 1 < len) {
                 char next = text[i + 1];
                 if (next == '\n') {
-                    /* Line continuation: drop both bytes. */
+                    // Line continuation: drop both bytes.
                     i++;
                     continue;
                 }
@@ -5892,7 +5890,7 @@ typedef enum {
     GLOB_QUAL_EXEC = 8,      // (*) - executable files
     GLOB_QUAL_READABLE = 16, // (r) - readable files
     GLOB_QUAL_WRITABLE = 32, // (w) - writable files
-    /* Behavior modifiers (not type/permission filters): */
+    // Behavior modifiers (not type/permission filters):
     GLOB_QUAL_NULLGLOB = 64, // (N) - no match -> empty, never literal
     GLOB_QUAL_DOTGLOB = 128, // (D) - include dot (hidden) files
 } glob_qualifier_t;
@@ -6284,7 +6282,7 @@ static bool regex_pattern_is_safe(const char *pattern) {
         return false;
     }
     if (config.regex_pattern_max <= 0) {
-        return true; /* explicitly unbounded */
+        return true; // explicitly unbounded
     }
     return strlen(pattern) <= (size_t)config.regex_pattern_max;
 }
@@ -6553,7 +6551,7 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
             case '+':
                 *out++ = '+';
                 break;
-            case '@': /* exactly one, no quantifier */
+            case '@': // exactly one, no quantifier
                 break;
             case '!':
                 *is_negated = true;
@@ -6779,23 +6777,23 @@ static int expand_globstar_recursive(const char *base_dir,
                                      int *capacity) {
     DIR *dir = opendir(base_dir[0] ? base_dir : ".");
     if (!dir) {
-        return 0; /* Not an error - directory might not be readable */
+        return 0; // Not an error - directory might not be readable
     }
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        /* Skip . and .. */
+        // Skip . and ..
         if (strcmp(entry->d_name, ".") == 0 ||
             strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        /* Skip hidden files unless dotglob is enabled */
+        // Skip hidden files unless dotglob is enabled
         if (entry->d_name[0] == '.' && !shell_mode_allows(FEATURE_DOT_GLOB)) {
             continue;
         }
 
-        /* Build full path */
+        // Build full path
         char full_path[PATH_MAX];
         if (base_dir[0]) {
             snprintf(full_path, sizeof(full_path), "%s/%s", base_dir,
@@ -6804,21 +6802,21 @@ static int expand_globstar_recursive(const char *base_dir,
             snprintf(full_path, sizeof(full_path), "%s", entry->d_name);
         }
 
-        /* Check if this path matches the remaining pattern */
+        // Check if this path matches the remaining pattern
         if (remaining_pattern && remaining_pattern[0]) {
-            /* Build candidate path with remaining pattern */
+            // Build candidate path with remaining pattern
             char candidate[PATH_MAX];
             int written = snprintf(candidate, sizeof(candidate), "%s/%s",
                                    full_path, remaining_pattern);
             if (written < 0 || (size_t)written >= sizeof(candidate)) {
-                continue; /* Path too long, skip this entry */
+                continue; // Path too long, skip this entry
             }
 
-            /* Use glob to match the remaining pattern */
+            // Use glob to match the remaining pattern
             glob_t globbuf;
             if (glob(candidate, GLOB_NOSORT, NULL, &globbuf) == 0) {
                 for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-                    /* Resize array if needed */
+                    // Resize array if needed
                     if (*count >= *capacity) {
                         *capacity = *capacity ? *capacity * 2 : 32;
                         char **new_results =
@@ -6835,7 +6833,7 @@ static int expand_globstar_recursive(const char *base_dir,
                 globfree(&globbuf);
             }
         } else {
-            /* No remaining pattern - match the path itself */
+            // No remaining pattern - match the path itself
             if (*count >= *capacity) {
                 *capacity = *capacity ? *capacity * 2 : 32;
                 char **new_results =
@@ -6849,7 +6847,7 @@ static int expand_globstar_recursive(const char *base_dir,
             (*results)[(*count)++] = strdup(full_path);
         }
 
-        /* Recurse into directories */
+        // Recurse into directories
         struct stat st;
         if (stat(full_path, &st) == 0 && S_ISDIR(st.st_mode)) {
             if (expand_globstar_recursive(full_path, remaining_pattern, results,
@@ -6882,13 +6880,13 @@ static char **expand_globstar_pattern(const char *pattern,
         return NULL;
     }
 
-    /* Find the ** in the pattern */
+    // Find the ** in the pattern
     const char *starstar = strstr(pattern, "**");
     if (!starstar) {
         return NULL;
     }
 
-    /* Split into prefix (before **) and suffix (after **) */
+    // Split into prefix (before **) and suffix (after **)
     size_t prefix_len = starstar - pattern;
     char *prefix = malloc(prefix_len + 1);
     if (!prefix)
@@ -6897,25 +6895,25 @@ static char **expand_globstar_pattern(const char *pattern,
     strncpy(prefix, pattern, prefix_len);
     prefix[prefix_len] = '\0';
 
-    /* Remove trailing slash from prefix if present */
+    // Remove trailing slash from prefix if present
     if (prefix_len > 0 && prefix[prefix_len - 1] == '/') {
         prefix[prefix_len - 1] = '\0';
     }
 
-    /* Get suffix (after **) */
+    // Get suffix (after **)
     const char *suffix = starstar + 2;
     if (*suffix == '/')
         suffix++; /* Skip leading slash after ** */
 
-    /* Initialize results */
+    // Initialize results
     char **results = NULL;
     int count = 0;
     int capacity = 0;
 
-    /* Start directory */
+    // Start directory
     const char *start_dir = prefix[0] ? prefix : ".";
 
-    /* First, match the start directory itself with the suffix pattern */
+    // First, match the start directory itself with the suffix pattern
     if (suffix[0]) {
         char candidate[PATH_MAX];
         if (prefix[0]) {
@@ -6947,7 +6945,7 @@ static char **expand_globstar_pattern(const char *pattern,
         }
     }
 
-    /* Recursively expand through directories */
+    // Recursively expand through directories
     if (expand_globstar_recursive(start_dir, suffix[0] ? suffix : NULL,
                                   &results, &count, &capacity) < 0) {
         free(prefix);
@@ -6964,7 +6962,7 @@ static char **expand_globstar_pattern(const char *pattern,
         return NULL;
     }
 
-    /* Add NULL terminator */
+    // Add NULL terminator
     char **final = realloc(results, (count + 1) * sizeof(char *));
     if (final) {
         final[count] = NULL;
@@ -6999,7 +6997,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
                                   glob_qualifier_t qualifier, int *count) {
     *count = 0;
 
-    /* Split into directory and filename pattern at the last '/'. */
+    // Split into directory and filename pattern at the last '/'.
     const char *slash = strrchr(base_pattern, '/');
     char *dir = NULL;
     const char *filepat = base_pattern;
@@ -7034,7 +7032,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
         if (fnmatch(filepat, entry->d_name, 0) != 0) {
             continue;
         }
-        /* Build the path as the caller would see it. */
+        // Build the path as the caller would see it.
         char *path;
         if (dir) {
             size_t plen = strlen(dir) + 1 + strlen(entry->d_name) + 1;
@@ -7069,7 +7067,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
     free(dir);
 
     if (!result) {
-        /* No matches: hand back an empty (non-NULL) array. */
+        // No matches: hand back an empty (non-NULL) array.
         result = malloc(sizeof(char *));
         if (result) {
             result[0] = NULL;
@@ -7244,7 +7242,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         if (dot_results) {
             return dot_results;
         }
-        /* Scan failed: fall back to the literal pattern. */
+        // Scan failed: fall back to the literal pattern.
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -8037,7 +8035,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                 char **sub_results =
                     expand_brace_pattern(result[i], &sub_count);
                 if (sub_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
-                    /* Recursive cap propagation. */
+                    // Recursive cap propagation.
                     free(result[i]);
                     limit_hit = true;
                     continue;
@@ -8276,7 +8274,7 @@ static int execute_external_command_with_setup(executor_t *executor,
     }
 }
 
-/* Forward declaration for test builtin */
+// Forward declaration for test builtin
 static int execute_test_builtin(executor_t *executor, char **argv);
 
 /**
@@ -8385,7 +8383,7 @@ static bool is_builtin_command(const char *cmd) { return is_builtin(cmd); }
  */
 MAYBE_UNUSED
 static int execute_test_builtin(executor_t *executor, char **argv) {
-    (void)executor; /* Reserved for executor-aware test evaluation */
+    (void)executor; // Reserved for executor-aware test evaluation
     if (!argv || !argv[0]) {
         return 1;
     }
@@ -9075,7 +9073,7 @@ static int execute_function_call(executor_t *executor,
 
     // No need to clear environment variables with new approach
 
-    /* Push function context for error reporting (Phase 3) */
+    // Push function context for error reporting (Phase 3)
     source_location_t func_loc =
         func->body ? func->body->loc : SOURCE_LOC_UNKNOWN;
     executor_push_context(executor, func_loc, "in function '%s'",
@@ -9145,7 +9143,7 @@ static int execute_function_call(executor_t *executor,
                 restore_file_descriptors(&redir_state);
             }
 
-            /* Pop function context before returning */
+            // Pop function context before returning
             executor_pop_context(executor);
 
             // Restore previous scope before returning
@@ -9170,7 +9168,7 @@ static int execute_function_call(executor_t *executor,
         restore_file_descriptors(&redir_state);
     }
 
-    /* Pop function context */
+    // Pop function context
     executor_pop_context(executor);
 
     // Restore previous scope
@@ -9246,8 +9244,8 @@ void free_function_params(function_param_t *params) {
 static int validate_function_parameters(executor_t *executor,
                                         function_def_t *func, char **argv,
                                         int argc, source_location_t loc) {
-    (void)argv; /* Reserved for argument type validation */
-    (void)argc; /* Reserved for arity checking */
+    (void)argv; // Reserved for argument type validation
+    (void)argc; // Reserved for arity checking
     if (!func) {
         return 1;
     }
@@ -9643,7 +9641,7 @@ static bool match_pattern(const char *str, const char *pattern) {
                         if (cls_match) {
                             matched = true;
                         }
-                        p = class_end + 2; /* past `:]` */
+                        p = class_end + 2; // past `:]`
                         continue;
                     }
                 }
@@ -9783,8 +9781,8 @@ static char *convert_case_first_upper(const char *str) {
         return strdup("");
     }
 
-    /* Allocate buffer for Unicode conversion (may need more space) */
-    size_t buf_size = len * 4 + 1; /* UTF-8 worst case */
+    // Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; // UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -9792,7 +9790,7 @@ static char *convert_case_first_upper(const char *str) {
 
     size_t out_len = lle_utf8_toupper_first(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        /* Fallback to simple copy on error */
+        // Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -9818,8 +9816,8 @@ static char *convert_case_first_lower(const char *str) {
         return strdup("");
     }
 
-    /* Allocate buffer for Unicode conversion (may need more space) */
-    size_t buf_size = len * 4 + 1; /* UTF-8 worst case */
+    // Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; // UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -9827,7 +9825,7 @@ static char *convert_case_first_lower(const char *str) {
 
     size_t out_len = lle_utf8_tolower_first(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        /* Fallback to simple copy on error */
+        // Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -9910,8 +9908,8 @@ static char *convert_case_all_upper(const char *str) {
         return strdup("");
     }
 
-    /* Allocate buffer for Unicode conversion (may need more space) */
-    size_t buf_size = len * 4 + 1; /* UTF-8 worst case */
+    // Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; // UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -9919,7 +9917,7 @@ static char *convert_case_all_upper(const char *str) {
 
     size_t out_len = lle_utf8_toupper(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        /* Fallback to simple copy on error */
+        // Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -9945,8 +9943,8 @@ static char *convert_case_all_lower(const char *str) {
         return strdup("");
     }
 
-    /* Allocate buffer for Unicode conversion (may need more space) */
-    size_t buf_size = len * 4 + 1; /* UTF-8 worst case */
+    // Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; // UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -9954,7 +9952,7 @@ static char *convert_case_all_lower(const char *str) {
 
     size_t out_len = lle_utf8_tolower(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        /* Fallback to simple copy on error */
+        // Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -9981,8 +9979,8 @@ static char *convert_case_capitalize_words(const char *str) {
         return strdup("");
     }
 
-    /* Allocate buffer - capitalize shouldn't change length significantly */
-    size_t buf_size = len * 4 + 1; /* UTF-8 worst case */
+    // Allocate buffer - capitalize shouldn't change length significantly
+    size_t buf_size = len * 4 + 1; // UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -9993,7 +9991,7 @@ static char *convert_case_capitalize_words(const char *str) {
     bool word_start = true;
 
     while (*src) {
-        /* Get UTF-8 codepoint length */
+        // Get UTF-8 codepoint length
         size_t cp_len = 1;
         unsigned char c = (unsigned char)*src;
         if (c >= 0xC0 && c < 0xE0)
@@ -10003,7 +10001,7 @@ static char *convert_case_capitalize_words(const char *str) {
         else if (c >= 0xF0)
             cp_len = 4;
 
-        /* Ensure we don't read past end */
+        // Ensure we don't read past end
         size_t remaining = strlen(src);
         if (cp_len > remaining)
             cp_len = remaining;
@@ -10012,7 +10010,7 @@ static char *convert_case_capitalize_words(const char *str) {
             *dst++ = *src++;
             word_start = true;
         } else if (word_start) {
-            /* Uppercase the first character of word */
+            // Uppercase the first character of word
             char temp[8] = {0};
             memcpy(temp, src, cp_len);
             char upper[16] = {0};
@@ -10028,7 +10026,7 @@ static char *convert_case_capitalize_words(const char *str) {
             src += cp_len;
             word_start = false;
         } else {
-            /* Lowercase the rest */
+            // Lowercase the rest
             char temp[8] = {0};
             memcpy(temp, src, cp_len);
             char lower[16] = {0};
@@ -10124,7 +10122,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 if (fnmatch(pattern, substr, 0) == 0) {
                     matched = true;
                     match_len = try_len;
-                    /* For glob with *, prefer longest match. */
+                    // For glob with *, prefer longest match.
                     if (strchr(pattern, '*')) {
                         for (size_t longer = try_len + 1; longer <= str_len;
                              longer++) {
@@ -10340,7 +10338,7 @@ static char *transform_quote(const char *str) {
     }
 
     if (has_control) {
-        /* $'...' ANSI-C form for strings with control chars. */
+        // $'...' ANSI-C form for strings with control chars.
         size_t result_size = len * 4 + 4;
         char *result = malloc(result_size);
         if (!result) {
@@ -10396,7 +10394,7 @@ static char *transform_quote(const char *str) {
         for (size_t i = 0; i < len; i++) {
             unsigned char c = (unsigned char)str[i];
             if (c == '\'') {
-                /* Emit `'\''`: close, escape, reopen. */
+                // Emit `'\''`: close, escape, reopen.
                 result[pos++] = '\'';
                 result[pos++] = '\\';
                 result[pos++] = '\'';
@@ -11190,11 +11188,11 @@ static char *slice_string_graphemes(const char *str, size_t str_len,
             grapheme_idx++;
         }
 
-        /* Advance by one codepoint. */
+        // Advance by one codepoint.
         uint32_t cp;
         int cp_len = lle_utf8_decode_codepoint(str + i, str_len - i, &cp);
         if (cp_len <= 0) {
-            i++; /* Skip invalid byte to avoid infinite loop. */
+            i++; // Skip invalid byte to avoid infinite loop.
         } else {
             i += (size_t)cp_len;
         }
@@ -11840,7 +11838,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     width_buf[width_str_len] = '\0';
                     int width = atoi(width_buf);
 
-                    /* Optional fill: another :FILL: after the width. */
+                    // Optional fill: another :FILL: after the width.
                     char *fill = NULL;
                     const char *after_width = width_end + 1;
                     const char *closing = after_width;
@@ -12092,7 +12090,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 qsort(ctx.names, ctx.count, sizeof(char *), strptr_cmp);
             }
 
-            /* Build space-separated result. */
+            // Build space-separated result.
             size_t total_len = 0;
             for (size_t i = 0; i < ctx.count; i++) {
                 total_len += strlen(ctx.names[i]) + 1;
@@ -12239,7 +12237,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                                  "0");
                                     } else {
                                         if (idx > 0) {
-                                            idx--; /* 1-based -> 0-based */
+                                            idx--; // 1-based -> 0-based
                                         }
                                         const char *elem =
                                             symtable_array_get_index(array,
@@ -12298,7 +12296,7 @@ static char *parse_parameter_expansion(executor_t *executor,
         array_value_t *array = symtable_get_array(var_name);
         if (array) {
             shell_mode_t mode = shell_mode_get();
-            /* size_t can render up to 20 digits on 64-bit + null. */
+            // size_t can render up to 20 digits on 64-bit + null.
             char *result = malloc(24);
             if (!result) {
                 return strdup("0");
@@ -12388,7 +12386,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                      * joined string instead of picking elements. Issue
                      * #97. */
                     int slice_offset = 0;
-                    int slice_length = -1; /* -1 = "to end" */
+                    int slice_length = -1; // -1 = "to end"
                     bool has_slice = (close[1] == ':' &&
                                       (strcmp(subscript, "@") == 0 ||
                                        strcmp(subscript, "*") == 0) &&
@@ -12404,7 +12402,7 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                     if (has_slice) {
                         size_t total = symtable_array_length(array);
-                        /* Negative offset counts from end (bash). */
+                        // Negative offset counts from end (bash).
                         if (slice_offset < 0) {
                             slice_offset = (int)total + slice_offset;
                             if (slice_offset < 0) {
@@ -12696,7 +12694,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                     result = strdup("");
                                 } else {
                                     if (idx > 0) {
-                                        idx--; /* 1-based -> 0-based */
+                                        idx--; // 1-based -> 0-based
                                     }
                                     const char *elem =
                                         symtable_array_get_index(array, idx);
@@ -12730,8 +12728,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                     if (*after_bracket != '\0') {
                         bool value_is_empty = (!result || !*result);
                         const char *rhs = NULL;
-                        bool want_default_when_empty = false; /* :- / - */
-                        bool want_alt_when_nonempty = false;  /* :+ / + */
+                        bool want_default_when_empty = false; // :- / -
+                        bool want_alt_when_nonempty = false;  // :+ / +
                         if (after_bracket[0] == ':' &&
                             (after_bracket[1] == '-' ||
                              after_bracket[1] == '+')) {
@@ -13044,7 +13042,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     }
                 }
             } else {
-                /* arr[@] / arr[*] */
+                // arr[@] / arr[*]
                 char arr_name[256];
                 size_t name_len = vn_len - 3;
                 if (name_len < sizeof(arr_name)) {
@@ -13063,7 +13061,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
             }
 
-            /* Apply the case-mod op to each element. */
+            // Apply the case-mod op to each element.
             size_t out_cap = 64;
             size_t out_pos = 0;
             char *joined = malloc(out_cap);
@@ -14241,7 +14239,7 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
             executor->has_error = true;
             executor->error_message = NULL;
         } else {
-            /* Fallback if shell_error_create failed (e.g. OOM) */
+            // Fallback if shell_error_create failed (e.g. OOM)
             executor_error_report(
                 executor, arithm_error_code(), executor_current_loc(executor),
                 "arithmetic: %s", msg ? msg : "evaluation error");
@@ -15214,7 +15212,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 result[result_pos++] = next_char;
                 i += 2;
             } else {
-                /* DQ + non-meta: keep the backslash and char literally. */
+                // DQ + non-meta: keep the backslash and char literally.
                 if (result_pos >= buffer_size - 2) {
                     buffer_size *= 2;
                     result = realloc(result, buffer_size);
@@ -15595,7 +15593,7 @@ int executor_execute_background(executor_t *executor, node_t *command) {
  * @return 0 on success
  */
 int executor_builtin_jobs(executor_t *executor, char **argv) {
-    (void)argv; /* Reserved for job filtering options */
+    (void)argv; // Reserved for job filtering options
     if (!executor) {
         return 1;
     }

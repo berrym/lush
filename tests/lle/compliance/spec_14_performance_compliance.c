@@ -24,15 +24,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Include only the performance header */
+// Include only the performance header
 #include "lle/performance.h"
 
-/* Test tracking */
+// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Simple assertion macros */
+// Simple assertion macros
 #define ASSERT_EQ(expected, actual, message)                                   \
     do {                                                                       \
         tests_run++;                                                           \
@@ -71,11 +71,11 @@ static int tests_failed = 0;
 static bool test_performance_targets(void) {
     printf("  Testing performance target constants...\n");
 
-    /* Target response time: 500µs = 500,000ns */
+    // Target response time: 500µs = 500,000ns
     ASSERT_EQ(500000ULL, LLE_PERF_TARGET_RESPONSE_TIME_NS,
               "LLE_PERF_TARGET_RESPONSE_TIME_NS must be 500000ns (500µs)");
 
-    /* Monitoring overhead: 10µs = 10,000ns */
+    // Monitoring overhead: 10µs = 10,000ns
     ASSERT_EQ(10000ULL, LLE_PERF_MONITORING_OVERHEAD_NS,
               "LLE_PERF_MONITORING_OVERHEAD_NS must be 10000ns (10µs)");
 
@@ -119,11 +119,11 @@ static bool test_profiler_configuration(void) {
     ASSERT_EQ(256, LLE_PROFILER_FUNCTION_KEY_MAX,
               "LLE_PROFILER_FUNCTION_KEY_MAX must be 256");
 
-    /* Hot spot threshold: 100µs = 100,000ns */
+    // Hot spot threshold: 100µs = 100,000ns
     ASSERT_EQ(100000ULL, LLE_PROFILER_HOT_SPOT_THRESHOLD_NS,
               "LLE_PROFILER_HOT_SPOT_THRESHOLD_NS must be 100000ns (100µs)");
 
-    /* Long running threshold: 10ms = 10,000,000ns */
+    // Long running threshold: 10ms = 10,000,000ns
     ASSERT_EQ(
         10000000ULL, LLE_PROFILER_LONG_RUNNING_THRESHOLD_NS,
         "LLE_PROFILER_LONG_RUNNING_THRESHOLD_NS must be 10000000ns (10ms)");
@@ -181,7 +181,7 @@ static bool test_memory_pattern_constants(void) {
 static bool test_performance_operation_types_exist(void) {
     printf("  Testing performance operation types...\n");
 
-    /* Verify key operation types are defined and accessible */
+    // Verify key operation types are defined and accessible
     int op_types[] = {
         LLE_PERF_OP_TERMINAL_INPUT,      LLE_PERF_OP_TERMINAL_OUTPUT,
         LLE_PERF_OP_BUFFER_INSERT,       LLE_PERF_OP_BUFFER_DELETE,
@@ -194,11 +194,11 @@ static bool test_performance_operation_types_exist(void) {
         LLE_PERF_OP_CACHE_INSERT,        LLE_PERF_OP_CACHE_EVICTION,
         LLE_PERF_OP_MEMORY_ALLOC,        LLE_PERF_OP_MEMORY_FREE};
 
-    /* Just verify they compile and are accessible */
+    // Just verify they compile and are accessible
     ASSERT_TRUE(sizeof(op_types) > 0,
                 "Performance operation types must be defined and accessible");
 
-    /* Verify first operation type starts at 0 */
+    // Verify first operation type starts at 0
     ASSERT_EQ(0, LLE_PERF_OP_TERMINAL_INPUT,
               "LLE_PERF_OP_TERMINAL_INPUT must equal 0");
 
@@ -229,7 +229,7 @@ int main(void) {
     printf("Running Spec 14 (Performance Monitoring) Compliance Tests...\n");
     printf("===========================================================\n\n");
 
-    /* Run all compliance tests */
+    // Run all compliance tests
     test_performance_targets();
     test_cache_configuration();
     test_profiler_configuration();
@@ -238,7 +238,7 @@ int main(void) {
     test_performance_operation_types_exist();
     test_component_count();
 
-    /* Print results */
+    // Print results
     printf("\n");
     printf("===========================================================\n");
     printf("Tests run:    %d\n", tests_run);

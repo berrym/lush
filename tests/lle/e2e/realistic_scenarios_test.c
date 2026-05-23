@@ -20,10 +20,10 @@
 #include <stdio.h>
 #include <string.h>
 
-/* External global from test_memory_mock.c */
+// External global from test_memory_mock.c
 extern lush_memory_pool_t *global_memory_pool;
 
-/* Test macros */
+// Test macros
 #define TEST(name)                                                             \
     static void name(void);                                                    \
     static void name##_wrapper(void) {                                         \
@@ -72,7 +72,7 @@ TEST(scenario_basic_command_editing) {
     lle_change_tracker_t *tracker = NULL;
     lle_result_t result;
 
-    /* Initialize */
+    // Initialize
     result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Create buffer");
 
@@ -81,7 +81,7 @@ TEST(scenario_basic_command_editing) {
 
     buffer->change_tracking_enabled = true;
 
-    /* User types: "ls -la" */
+    // User types: "ls -la"
     lle_change_sequence_t *seq1 = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "type command", &seq1);
     ASSERT_SUCCESS(result, "Begin sequence");
@@ -93,11 +93,11 @@ TEST(scenario_basic_command_editing) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence");
 
-    /* Verify state */
+    // Verify state
     ASSERT_EQ(buffer->length, 6, "Buffer length is 6");
     ASSERT_STR_EQ((char *)buffer->data, "ls -la", "Buffer content");
 
-    /* User realizes they want "-lah", moves cursor to end and adds 'h' */
+    // User realizes they want "-lah", moves cursor to end and adds 'h'
     lle_change_sequence_t *seq2 = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "add h", &seq2);
     ASSERT_SUCCESS(result, "Begin sequence");
@@ -109,23 +109,23 @@ TEST(scenario_basic_command_editing) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence");
 
-    /* Verify final state */
+    // Verify final state
     ASSERT_EQ(buffer->length, 7, "Buffer length is 7");
     ASSERT_STR_EQ((char *)buffer->data, "ls -lah", "Final buffer content");
 
-    /* User can undo the 'h' addition */
+    // User can undo the 'h' addition
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo add h");
     ASSERT_EQ(buffer->length, 6, "Buffer length back to 6");
     ASSERT_STR_EQ((char *)buffer->data, "ls -la", "Buffer after undo");
 
-    /* And redo it */
+    // And redo it
     result = lle_change_tracker_redo(tracker, buffer);
     ASSERT_SUCCESS(result, "Redo add h");
     ASSERT_EQ(buffer->length, 7, "Buffer length is 7 again");
     ASSERT_STR_EQ((char *)buffer->data, "ls -lah", "Buffer after redo");
 
-    /* Cleanup */
+    // Cleanup
     lle_change_tracker_destroy(tracker);
     lle_buffer_destroy(buffer);
 }
@@ -155,7 +155,7 @@ TEST(scenario_typo_correction_with_utf8) {
 
     buffer->change_tracking_enabled = true;
 
-    /* User types: "echo 'Hello 🌍 Wrold'" (typo: Wrold) */
+    // User types: "echo 'Hello 🌍 Wrold'" (typo: Wrold)
     lle_change_sequence_t *seq = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "type with typo", &seq);
     ASSERT_SUCCESS(result, "Begin sequence");
@@ -167,31 +167,31 @@ TEST(scenario_typo_correction_with_utf8) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence");
 
-    /* Verify UTF-8 counts */
+    // Verify UTF-8 counts
     ASSERT_EQ(buffer->codepoint_count, 20,
               "Codepoint count (emoji is 1 codepoint)");
 
-    /* User notices typo, deletes "Wrold" and types "World" */
+    // User notices typo, deletes "Wrold" and types "World"
     result = lle_change_tracker_begin_sequence(tracker, "fix typo", &seq);
     ASSERT_SUCCESS(result, "Begin fix sequence");
     buffer->current_sequence = seq;
 
-    /* Delete "Wrold" (5 bytes at position 17) - emoji is 4 bytes */
+    // Delete "Wrold" (5 bytes at position 17) - emoji is 4 bytes
     result = lle_buffer_delete_text(buffer, 17, 5);
     ASSERT_SUCCESS(result, "Delete 'Wrold'");
 
-    /* Insert "World" */
+    // Insert "World"
     result = lle_buffer_insert_text(buffer, 17, "World", 5);
     ASSERT_SUCCESS(result, "Insert 'World'");
 
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete fix");
 
-    /* Verify corrected text */
+    // Verify corrected text
     ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello 🌍 World'",
                   "Corrected text");
 
-    /* Undo and redo work correctly */
+    // Undo and redo work correctly
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo correction");
     ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello 🌍 Wrold'",
@@ -202,7 +202,7 @@ TEST(scenario_typo_correction_with_utf8) {
     ASSERT_STR_EQ((char *)buffer->data, "echo 'Hello 🌍 World'",
                   "Corrected again");
 
-    /* Cleanup */
+    // Cleanup
     lle_cursor_manager_destroy(cursor_mgr);
     lle_change_tracker_destroy(tracker);
     lle_buffer_destroy(buffer);
@@ -232,7 +232,7 @@ TEST(scenario_complex_command_construction) {
 
     buffer->change_tracking_enabled = true;
 
-    /* Step 1: Start with basic grep */
+    // Step 1: Start with basic grep
     lle_change_sequence_t *seq = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "initial grep", &seq);
     ASSERT_SUCCESS(result, "Begin sequence");
@@ -244,11 +244,11 @@ TEST(scenario_complex_command_construction) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence");
 
-    /* Validate buffer */
+    // Validate buffer
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after step 1");
 
-    /* Step 2: Add filename */
+    // Step 2: Add filename
     result = lle_change_tracker_begin_sequence(tracker, "add filename", &seq);
     ASSERT_SUCCESS(result, "Begin sequence");
     buffer->current_sequence = seq;
@@ -262,7 +262,7 @@ TEST(scenario_complex_command_construction) {
     ASSERT_STR_EQ((char *)buffer->data, "grep error app.log",
                   "After adding filename");
 
-    /* Step 3: Add pipe to sort */
+    // Step 3: Add pipe to sort
     result = lle_change_tracker_begin_sequence(tracker, "add pipe", &seq);
     ASSERT_SUCCESS(result, "Begin sequence");
     buffer->current_sequence = seq;
@@ -273,7 +273,7 @@ TEST(scenario_complex_command_construction) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence");
 
-    /* Step 4: Add unique filter */
+    // Step 4: Add unique filter
     result = lle_change_tracker_begin_sequence(tracker, "add uniq", &seq);
     ASSERT_SUCCESS(result, "Begin sequence");
     buffer->current_sequence = seq;
@@ -284,30 +284,30 @@ TEST(scenario_complex_command_construction) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence");
 
-    /* Verify final complex command */
+    // Verify final complex command
     ASSERT_STR_EQ((char *)buffer->data, "grep error app.log | sort | uniq -c",
                   "Final complex command");
     ASSERT_EQ(buffer->length, 35, "Final buffer length");
 
-    /* Validate final buffer */
+    // Validate final buffer
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after complete construction");
 
-    /* User can undo steps */
-    result = lle_change_tracker_undo(tracker, buffer); /* Remove uniq */
+    // User can undo steps
+    result = lle_change_tracker_undo(tracker, buffer); // Remove uniq
     ASSERT_SUCCESS(result, "Undo step 4");
     ASSERT_STR_EQ((char *)buffer->data, "grep error app.log | sort",
                   "After undo 1");
 
-    result = lle_change_tracker_undo(tracker, buffer); /* Remove sort */
+    result = lle_change_tracker_undo(tracker, buffer); // Remove sort
     ASSERT_SUCCESS(result, "Undo step 3");
     ASSERT_STR_EQ((char *)buffer->data, "grep error app.log", "After undo 2");
 
-    result = lle_change_tracker_undo(tracker, buffer); /* Remove filename */
+    result = lle_change_tracker_undo(tracker, buffer); // Remove filename
     ASSERT_SUCCESS(result, "Undo step 2");
     ASSERT_STR_EQ((char *)buffer->data, "grep error", "After undo 3");
 
-    /* Redo all steps */
+    // Redo all steps
     result = lle_change_tracker_redo(tracker, buffer);
     ASSERT_SUCCESS(result, "Redo step 2");
 
@@ -320,7 +320,7 @@ TEST(scenario_complex_command_construction) {
     ASSERT_STR_EQ((char *)buffer->data, "grep error app.log | sort | uniq -c",
                   "Back to final state");
 
-    /* Cleanup */
+    // Cleanup
     lle_buffer_validator_destroy(validator);
     lle_change_tracker_destroy(tracker);
     lle_buffer_destroy(buffer);
@@ -350,7 +350,7 @@ TEST(scenario_cursor_navigation_editing) {
 
     buffer->change_tracking_enabled = true;
 
-    /* Initial command: "find . -name test.txt" */
+    // Initial command: "find . -name test.txt"
     lle_change_sequence_t *seq = NULL;
     result =
         lle_change_tracker_begin_sequence(tracker, "initial command", &seq);
@@ -363,12 +363,12 @@ TEST(scenario_cursor_navigation_editing) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence");
 
-    /* User wants to change "test.txt" to "*.txt" */
-    /* Navigate to position 13 (start of "test.txt") */
+    // User wants to change "test.txt" to "*.txt"
+    // Navigate to position 13 (start of "test.txt")
     result = lle_cursor_manager_move_to_byte_offset(cursor_mgr, 13);
     ASSERT_SUCCESS(result, "Move cursor to position 13");
 
-    /* Delete "test" (4 bytes) */
+    // Delete "test" (4 bytes)
     result = lle_change_tracker_begin_sequence(tracker, "delete test", &seq);
     ASSERT_SUCCESS(result, "Begin delete");
     buffer->current_sequence = seq;
@@ -379,7 +379,7 @@ TEST(scenario_cursor_navigation_editing) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete delete");
 
-    /* Insert "*" */
+    // Insert "*"
     result =
         lle_change_tracker_begin_sequence(tracker, "insert asterisk", &seq);
     ASSERT_SUCCESS(result, "Begin insert");
@@ -391,22 +391,22 @@ TEST(scenario_cursor_navigation_editing) {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete insert");
 
-    /* Verify result */
+    // Verify result
     ASSERT_STR_EQ((char *)buffer->data, "find . -name *.txt",
                   "Modified command");
     ASSERT_EQ(buffer->length, 18, "Modified buffer length");
 
-    /* Undo changes */
+    // Undo changes
     result = lle_change_tracker_undo(tracker, buffer); /* Undo insert * */
     ASSERT_SUCCESS(result, "Undo insert");
 
-    result = lle_change_tracker_undo(tracker, buffer); /* Undo delete test */
+    result = lle_change_tracker_undo(tracker, buffer); // Undo delete test
     ASSERT_SUCCESS(result, "Undo delete");
 
     ASSERT_STR_EQ((char *)buffer->data, "find . -name test.txt",
                   "Back to original");
 
-    /* Cleanup */
+    // Cleanup
     lle_change_tracker_destroy(tracker);
     lle_cursor_manager_destroy(cursor_mgr);
     lle_buffer_destroy(buffer);
@@ -437,10 +437,10 @@ TEST(scenario_continuous_validation) {
 
     buffer->change_tracking_enabled = true;
 
-    /* Series of operations with validation after each */
+    // Series of operations with validation after each
     lle_change_sequence_t *seq = NULL;
 
-    /* Op 1: Insert */
+    // Op 1: Insert
     result = lle_change_tracker_begin_sequence(tracker, "op1", &seq);
     ASSERT_SUCCESS(result, "Begin op1");
     buffer->current_sequence = seq;
@@ -454,7 +454,7 @@ TEST(scenario_continuous_validation) {
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Valid after op1");
 
-    /* Op 2: Append */
+    // Op 2: Append
     result = lle_change_tracker_begin_sequence(tracker, "op2", &seq);
     ASSERT_SUCCESS(result, "Begin op2");
     buffer->current_sequence = seq;
@@ -468,7 +468,7 @@ TEST(scenario_continuous_validation) {
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Valid after op2");
 
-    /* Op 3: Insert in middle */
+    // Op 3: Insert in middle
     result = lle_change_tracker_begin_sequence(tracker, "op3", &seq);
     ASSERT_SUCCESS(result, "Begin op3");
     buffer->current_sequence = seq;
@@ -485,12 +485,12 @@ TEST(scenario_continuous_validation) {
     ASSERT_STR_EQ((char *)buffer->data, "cat big_file.txt | grep pattern",
                   "After all ops");
 
-    /* Op 4: Delete */
+    // Op 4: Delete
     result = lle_change_tracker_begin_sequence(tracker, "op4", &seq);
     ASSERT_SUCCESS(result, "Begin op4");
     buffer->current_sequence = seq;
 
-    result = lle_buffer_delete_text(buffer, 4, 4); /* Remove "big_" */
+    result = lle_buffer_delete_text(buffer, 4, 4); // Remove "big_"
     ASSERT_SUCCESS(result, "Delete text");
 
     result = lle_change_tracker_complete_sequence(tracker);
@@ -502,12 +502,12 @@ TEST(scenario_continuous_validation) {
     ASSERT_STR_EQ((char *)buffer->data, "cat file.txt | grep pattern",
                   "After delete");
 
-    /* Verify validation statistics */
+    // Verify validation statistics
     printf("    Validations performed: %u\n", validator->validation_count);
     printf("    Validation failures: %u\n", validator->validation_failures);
     ASSERT_EQ(validator->validation_failures, 0, "Zero validation failures");
 
-    /* Cleanup */
+    // Cleanup
     lle_change_tracker_destroy(tracker);
     lle_buffer_validator_destroy(validator);
     lle_buffer_destroy(buffer);

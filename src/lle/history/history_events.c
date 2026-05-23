@@ -43,11 +43,11 @@
  * Emitted when an entry is added, accessed, or deleted
  */
 typedef struct {
-    uint64_t entry_id;     /* Entry ID */
-    const char *command;   /* Command text (read-only) */
-    size_t command_length; /* Command length */
-    int exit_code;         /* Exit code */
-    uint64_t timestamp;    /* Entry timestamp */
+    uint64_t entry_id;     /**< Entry ID */
+    const char *command;   /**< Command text (read-only) */
+    size_t command_length; /**< Command length */
+    int exit_code;         /**< Exit code */
+    uint64_t timestamp;    /**< Entry timestamp */
 } lle_history_entry_event_data_t;
 
 /**
@@ -55,10 +55,10 @@ typedef struct {
  * Emitted when history is loaded or saved
  */
 typedef struct {
-    const char *file_path; /* File path */
-    size_t entry_count;    /* Number of entries affected */
-    bool success;          /* Operation success */
-    uint64_t duration_us;  /* Operation duration */
+    const char *file_path; /**< File path */
+    size_t entry_count;    /**< Number of entries affected */
+    bool success;          /**< Operation success */
+    uint64_t duration_us;  /**< Operation duration */
 } lle_history_file_event_data_t;
 
 /**
@@ -66,9 +66,9 @@ typedef struct {
  * Emitted when a search is performed
  */
 typedef struct {
-    const char *search_query; /* Search query */
-    size_t result_count;      /* Number of results */
-    uint64_t duration_us;     /* Search duration */
+    const char *search_query; /**< Search query */
+    size_t result_count;      /**< Number of results */
+    uint64_t duration_us;     /**< Search duration */
 } lle_history_search_event_data_t;
 
 /* ============================================================================
@@ -80,26 +80,26 @@ typedef struct {
  * History event system state
  */
 typedef struct {
-    lle_event_system_t *event_system; /* Event system reference */
-    lle_history_core_t *history_core; /* History core reference */
+    lle_event_system_t *event_system; /**< Event system reference */
+    lle_history_core_t *history_core; /**< History core reference */
 
-    /* Event emission statistics */
-    uint64_t events_emitted;          /* Total events emitted */
-    uint64_t entry_added_events;      /* Entry added events */
-    uint64_t entry_accessed_events;   /* Entry accessed events */
-    uint64_t entry_deleted_events;    /* Entry deleted events */
-    uint64_t history_loaded_events;   /* History loaded events */
-    uint64_t history_saved_events;    /* History saved events */
-    uint64_t history_searched_events; /* History searched events */
+    // Event emission statistics
+    uint64_t events_emitted;          /**< Total events emitted */
+    uint64_t entry_added_events;      /**< Entry added events */
+    uint64_t entry_accessed_events;   /**< Entry accessed events */
+    uint64_t entry_deleted_events;    /**< Entry deleted events */
+    uint64_t history_loaded_events;   /**< History loaded events */
+    uint64_t history_saved_events;    /**< History saved events */
+    uint64_t history_searched_events; /**< History searched events */
 
-    /* Configuration */
-    bool events_enabled;     /* Event emission enabled */
-    bool emit_access_events; /* Emit access events (can be noisy) */
+    // Configuration
+    bool events_enabled;     /**< Event emission enabled */
+    bool emit_access_events; /**< Emit access events (can be noisy) */
 
-    bool initialized; /* Initialization flag */
+    bool initialized; /**< Initialization flag */
 } lle_history_event_state_t;
 
-/* Global event state */
+// Global event state
 static lle_history_event_state_t *g_event_state = NULL;
 
 /* ============================================================================
@@ -134,12 +134,12 @@ lle_result_t lle_history_events_init(lle_event_system_t *event_system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if already initialized */
+    // Check if already initialized
     if (g_event_state && g_event_state->initialized) {
         return LLE_ERROR_ALREADY_INITIALIZED;
     }
 
-    /* Allocate event state */
+    // Allocate event state
     g_event_state = (lle_history_event_state_t *)lle_pool_alloc(
         sizeof(lle_history_event_state_t));
     if (!g_event_state) {
@@ -148,12 +148,12 @@ lle_result_t lle_history_events_init(lle_event_system_t *event_system,
 
     memset(g_event_state, 0, sizeof(lle_history_event_state_t));
 
-    /* Initialize state */
+    // Initialize state
     g_event_state->event_system = event_system;
     g_event_state->history_core = history_core;
     g_event_state->events_enabled = true;
     g_event_state->emit_access_events =
-        false; /* Disabled by default (can be noisy) */
+        false; // Disabled by default (can be noisy)
     g_event_state->initialized = true;
 
     return LLE_SUCCESS;
@@ -168,7 +168,7 @@ lle_result_t lle_history_events_shutdown(void) {
         return LLE_SUCCESS;
     }
 
-    /* Free event state */
+    // Free event state
     lle_pool_free(g_event_state);
     g_event_state = NULL;
 
@@ -202,14 +202,14 @@ lle_result_t lle_history_emit_entry_added(uint64_t entry_id,
     }
 
     if (!g_event_state->events_enabled) {
-        return LLE_SUCCESS; /* Events disabled, not an error */
+        return LLE_SUCCESS; // Events disabled, not an error
     }
 
     if (!command) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Create event data */
+    // Create event data
     lle_history_entry_event_data_t *event_data =
         (lle_history_entry_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_entry_event_data_t));
@@ -218,12 +218,12 @@ lle_result_t lle_history_emit_entry_added(uint64_t entry_id,
     }
 
     event_data->entry_id = entry_id;
-    event_data->command = command; /* Read-only reference */
+    event_data->command = command; // Read-only reference
     event_data->command_length = strlen(command);
     event_data->exit_code = exit_code;
     event_data->timestamp = get_timestamp_us();
 
-    /* Create and emit event */
+    // Create and emit event
     lle_event_t *event = NULL;
     lle_result_t result = lle_event_create(
         g_event_state->event_system, LLE_EVENT_HISTORY_CHANGED, event_data,
@@ -234,14 +234,14 @@ lle_result_t lle_history_emit_entry_added(uint64_t entry_id,
         return result;
     }
 
-    /* Set event metadata */
+    // Set event metadata
     event->source = LLE_EVENT_SOURCE_HISTORY;
     event->priority = LLE_PRIORITY_LOW;
 
-    /* Dispatch event */
+    // Dispatch event
     result = lle_event_dispatch(g_event_state->event_system, event);
 
-    /* Update statistics */
+    // Update statistics
     if (result == LLE_SUCCESS) {
         g_event_state->events_emitted++;
         g_event_state->entry_added_events++;
@@ -263,14 +263,14 @@ lle_result_t lle_history_emit_entry_accessed(uint64_t entry_id,
     }
 
     if (!g_event_state->events_enabled || !g_event_state->emit_access_events) {
-        return LLE_SUCCESS; /* Access events disabled */
+        return LLE_SUCCESS; // Access events disabled
     }
 
     if (!command) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Create event data */
+    // Create event data
     lle_history_entry_event_data_t *event_data =
         (lle_history_entry_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_entry_event_data_t));
@@ -281,10 +281,10 @@ lle_result_t lle_history_emit_entry_accessed(uint64_t entry_id,
     event_data->entry_id = entry_id;
     event_data->command = command;
     event_data->command_length = strlen(command);
-    event_data->exit_code = -1; /* Not applicable for access */
+    event_data->exit_code = -1; // Not applicable for access
     event_data->timestamp = get_timestamp_us();
 
-    /* Create and emit event */
+    // Create and emit event
     lle_event_t *event = NULL;
     lle_result_t result = lle_event_create(
         g_event_state->event_system, LLE_EVENT_HISTORY_NAVIGATE, event_data,
@@ -328,7 +328,7 @@ lle_result_t lle_history_emit_history_loaded(const char *file_path,
         return LLE_SUCCESS;
     }
 
-    /* Create event data */
+    // Create event data
     lle_history_file_event_data_t *event_data =
         (lle_history_file_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_file_event_data_t));
@@ -336,12 +336,12 @@ lle_result_t lle_history_emit_history_loaded(const char *file_path,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    event_data->file_path = file_path; /* Read-only reference */
+    event_data->file_path = file_path; // Read-only reference
     event_data->entry_count = entry_count;
     event_data->success = success;
     event_data->duration_us = duration_us;
 
-    /* Create and emit event */
+    // Create and emit event
     lle_event_t *event = NULL;
     lle_result_t result = lle_event_create(
         g_event_state->event_system, LLE_EVENT_HISTORY_CHANGED, event_data,
@@ -385,7 +385,7 @@ lle_result_t lle_history_emit_history_saved(const char *file_path,
         return LLE_SUCCESS;
     }
 
-    /* Create event data */
+    // Create event data
     lle_history_file_event_data_t *event_data =
         (lle_history_file_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_file_event_data_t));
@@ -398,7 +398,7 @@ lle_result_t lle_history_emit_history_saved(const char *file_path,
     event_data->success = success;
     event_data->duration_us = duration_us;
 
-    /* Create and emit event */
+    // Create and emit event
     lle_event_t *event = NULL;
     lle_result_t result = lle_event_create(
         g_event_state->event_system, LLE_EVENT_HISTORY_CHANGED, event_data,
@@ -440,7 +440,7 @@ lle_result_t lle_history_emit_history_search(const char *search_query,
         return LLE_SUCCESS;
     }
 
-    /* Create event data */
+    // Create event data
     lle_history_search_event_data_t *event_data =
         (lle_history_search_event_data_t *)lle_pool_alloc(
             sizeof(lle_history_search_event_data_t));
@@ -452,7 +452,7 @@ lle_result_t lle_history_emit_history_search(const char *search_query,
     event_data->result_count = result_count;
     event_data->duration_us = duration_us;
 
-    /* Create and emit event */
+    // Create and emit event
     lle_event_t *event = NULL;
     lle_result_t result = lle_event_create(
         g_event_state->event_system, LLE_EVENT_HISTORY_SEARCH, event_data,

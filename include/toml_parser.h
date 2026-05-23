@@ -392,4 +392,4 @@ static inline bool toml_value_get_boolean(const toml_value_t *value,
 }
 #endif
 
-#endif /* TOML_PARSER_H */
+#endif // TOML_PARSER_H

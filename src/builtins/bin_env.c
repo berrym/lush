@@ -31,18 +31,18 @@ extern char **environ;
  * @return Exit status of command, or 0 for printing
  */
 int bin_env(int argc, char **argv) {
-    bool ignore_env = false;      /* -i: start with empty environment */
-    bool null_terminator = false; /* -0: NUL instead of newline */
-    char **unset_vars = NULL;     /* -u: variables to unset */
+    bool ignore_env = false;      // -i: start with empty environment
+    bool null_terminator = false; // -0: NUL instead of newline
+    char **unset_vars = NULL;     // -u: variables to unset
     int unset_count = 0;
     int unset_capacity = 0;
 
-    /* Check if invoked as printenv */
+    // Check if invoked as printenv
     bool is_printenv = (strcmp(argv[0], "printenv") == 0);
 
     int i = 1;
 
-    /* Parse options */
+    // Parse options
     while (i < argc && argv[i][0] == '-' && argv[i][1] != '\0') {
         if (strcmp(argv[i], "--") == 0) {
             i++;
@@ -59,7 +59,7 @@ int bin_env(int argc, char **argv) {
                 free(unset_vars);
                 return 1;
             }
-            /* Add to unset list */
+            // Add to unset list
             if (unset_count >= unset_capacity) {
                 unset_capacity = unset_capacity ? unset_capacity * 2 : 4;
                 char **new_unset =
@@ -91,7 +91,7 @@ int bin_env(int argc, char **argv) {
         }
     }
 
-    /* Collect NAME=VALUE assignments */
+    // Collect NAME=VALUE assignments
     char **env_assignments = NULL;
     int env_count = 0;
     int env_capacity = 0;
@@ -112,24 +112,24 @@ int bin_env(int argc, char **argv) {
         i++;
     }
 
-    /* printenv: just print variable values */
+    // printenv: just print variable values
     if (is_printenv) {
         char delim = null_terminator ? '\0' : '\n';
         if (i >= argc) {
-            /* Print all environment variables */
+            // Print all environment variables
             extern char **environ;
             for (char **env = environ; *env; env++) {
                 printf("%s%c", *env, delim);
             }
         } else {
-            /* Print specific variables */
+            // Print specific variables
             int result = 0;
             for (; i < argc; i++) {
                 const char *val = getenv(argv[i]);
                 if (val) {
                     printf("%s%c", val, delim);
                 } else {
-                    result = 1; /* Variable not found */
+                    result = 1; // Variable not found
                 }
             }
             free(unset_vars);
@@ -141,19 +141,19 @@ int bin_env(int argc, char **argv) {
         return 0;
     }
 
-    /* No command: print environment */
+    // No command: print environment
     if (i >= argc) {
         char delim = null_terminator ? '\0' : '\n';
         if (ignore_env) {
-            /* Only print explicit assignments */
+            // Only print explicit assignments
             for (int j = 0; j < env_count; j++) {
                 printf("%s%c", env_assignments[j], delim);
             }
         } else {
             extern char **environ;
-            /* Print current environment (minus unset vars, plus assignments) */
+            // Print current environment (minus unset vars, plus assignments)
             for (char **env = environ; *env; env++) {
-                /* Check if should be unset */
+                // Check if should be unset
                 bool skip = false;
                 for (int u = 0; u < unset_count; u++) {
                     size_t ulen = strlen(unset_vars[u]);
@@ -163,7 +163,7 @@ int bin_env(int argc, char **argv) {
                         break;
                     }
                 }
-                /* Check if overridden by assignment */
+                // Check if overridden by assignment
                 for (int j = 0; j < env_count; j++) {
                     char *eq = strchr(env_assignments[j], '=');
                     size_t nlen = eq - env_assignments[j];
@@ -177,7 +177,7 @@ int bin_env(int argc, char **argv) {
                     printf("%s%c", *env, delim);
                 }
             }
-            /* Print assignments */
+            // Print assignments
             for (int j = 0; j < env_count; j++) {
                 printf("%s%c", env_assignments[j], delim);
             }
@@ -187,7 +187,7 @@ int bin_env(int argc, char **argv) {
         return 0;
     }
 
-    /* Run command with modified environment */
+    // Run command with modified environment
     pid_t pid = lush_fork();
     if (pid < 0) {
         int saved_errno = errno;
@@ -202,7 +202,7 @@ int bin_env(int argc, char **argv) {
     }
 
     if (pid == 0) {
-        /* Child process */
+        // Child process
 
         if (ignore_env) {
             /* Clear entire environment - use portable approach
@@ -213,32 +213,32 @@ int bin_env(int argc, char **argv) {
             static char *empty_env[] = {NULL};
             environ = empty_env;
         } else {
-            /* Unset specified variables */
+            // Unset specified variables
             for (int u = 0; u < unset_count; u++) {
                 unsetenv(unset_vars[u]);
             }
         }
 
-        /* Apply assignments */
+        // Apply assignments
         for (int j = 0; j < env_count; j++) {
             char *eq = strchr(env_assignments[j], '=');
             if (eq) {
                 *eq = '\0';
                 setenv(env_assignments[j], eq + 1, 1);
-                *eq = '='; /* Restore for potential re-use */
+                *eq = '='; // Restore for potential re-use
             }
         }
 
-        /* Execute command */
+        // Execute command
         execvp(argv[i], &argv[i]);
 
-        /* exec failed */
+        // exec failed
         int exit_code = (errno == ENOENT) ? 127 : 126;
         fprintf(stderr, "env: %s: %s\n", argv[i], strerror(errno));
         _exit(exit_code);
     }
 
-    /* Parent: wait for child */
+    // Parent: wait for child
     free(unset_vars);
     free(env_assignments);
 

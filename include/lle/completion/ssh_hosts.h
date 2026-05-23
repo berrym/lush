@@ -163,4 +163,4 @@ ssh_host_cache_t *get_ssh_host_cache(void);
 }
 #endif
 
-#endif /* LLE_SSH_HOSTS_H */
+#endif // LLE_SSH_HOSTS_H

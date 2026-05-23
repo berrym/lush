@@ -20,7 +20,7 @@
 
 #include "lle/memory_management.h"
 #include <errno.h>
-#include <fcntl.h> /* For O_CREAT, O_EXCL on macOS sem_open */
+#include <fcntl.h> // For O_CREAT, O_EXCL on macOS sem_open
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +28,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-/* macOS uses named semaphores (sem_open) instead of unnamed (sem_init) */
+// macOS uses named semaphores (sem_open) instead of unnamed (sem_init)
 #ifdef __APPLE__
 #define LLE_USE_NAMED_SEMAPHORES 1
 #else
@@ -56,18 +56,18 @@ struct lle_memory_pool_t {
     size_t max_size;
     bool allow_resize;
 
-    /* Lush integration support */
-    bool uses_external_allocator;     /* True if wrapping lush_pool */
-    void *external_allocator_context; /* Pointer to lush_memory_pool_t */
+    // Lush integration support
+    bool uses_external_allocator;     /**< True if wrapping lush_pool */
+    void *external_allocator_context; /**< Pointer to lush_memory_pool_t */
 
-    /* Free block tracking */
+    // Free block tracking
     struct {
         void *address;
         size_t size;
     } free_blocks[256];
     size_t free_block_count;
 
-    /* Allocation tracking */
+    // Allocation tracking
     struct {
         void *address;
         size_t size;
@@ -85,12 +85,12 @@ struct lle_memory_pool_base_t {
     pthread_mutex_t resize_mutex;
 };
 
-/* Constants defined in header - removed duplicates */
+// Constants defined in header - removed duplicates
 
 struct lle_buffer_memory_pool_t {
     lle_memory_pool_base_t base;
 
-    /* Buffer-specific optimization */
+    // Buffer-specific optimization
     struct {
         void *buffer_blocks[LLE_MAX_BUFFER_BLOCKS];
         size_t block_sizes[LLE_MAX_BUFFER_BLOCKS];
@@ -98,7 +98,7 @@ struct lle_buffer_memory_pool_t {
         size_t preferred_buffer_size;
     } buffer_optimization;
 
-    /* UTF-8 string optimization */
+    // UTF-8 string optimization
     struct {
         void *string_cache[LLE_STRING_CACHE_SIZE];
         size_t string_lengths[LLE_STRING_CACHE_SIZE];
@@ -106,7 +106,7 @@ struct lle_buffer_memory_pool_t {
         struct timespec cache_times[LLE_STRING_CACHE_SIZE];
     } string_cache;
 
-    /* Memory compaction */
+    // Memory compaction
     struct {
         void *compaction_buffer;
         size_t compaction_threshold;
@@ -118,7 +118,7 @@ struct lle_buffer_memory_pool_t {
 struct lle_event_memory_pool_t {
     lle_memory_pool_base_t base;
 
-    /* High-frequency allocation optimization */
+    // High-frequency allocation optimization
     struct {
         void *event_slots[LLE_EVENT_POOL_SIZE];
         bool slots_in_use[LLE_EVENT_POOL_SIZE];
@@ -126,7 +126,7 @@ struct lle_event_memory_pool_t {
         size_t allocation_counter;
     } event_slots;
 
-    /* Event type specialization */
+    // Event type specialization
     struct {
         void *input_events[LLE_INPUT_EVENT_CACHE];
         void *display_events[LLE_DISPLAY_EVENT_CACHE];
@@ -136,7 +136,7 @@ struct lle_event_memory_pool_t {
         size_t system_count;
     } event_caches;
 
-    /* Performance monitoring */
+    // Performance monitoring
     struct {
         uint64_t fast_allocations;
         uint64_t pool_allocations;
@@ -167,7 +167,7 @@ struct lle_memory_pool_hierarchy_t {
     } allocation_stats;
 };
 
-/* Copy from spec: lle_memory_manager_t (lines 75-92) */
+// Copy from spec: lle_memory_manager_t (lines 75-92)
 struct lle_memory_manager_t {
     lle_memory_pool_manager_t *pool_manager;
     lle_memory_tracker_t *tracker;
@@ -175,26 +175,26 @@ struct lle_memory_manager_t {
     lle_memory_security_t *security;
     lle_memory_analytics_t *analytics;
 
-    /* Integration with Lush memory system */
+    // Integration with Lush memory system
     lush_memory_pool_t *lush_pools;
     bool lush_integration_active;
 
-    /* Configuration and state */
+    // Configuration and state
     lle_memory_config_t config;
     lle_memory_state_t state;
 
-    /* Performance monitoring */
+    // Performance monitoring
     struct timespec last_gc_time;
     size_t total_allocated;
     size_t peak_usage;
     double allocation_rate;
 };
 
-/* Copy from spec: lle_garbage_collector_t (lines 710-745) */
+// Copy from spec: lle_garbage_collector_t (lines 710-745)
 struct lle_garbage_collector_t {
     lle_memory_manager_t *memory_manager;
 
-    /* GC configuration */
+    // GC configuration
     struct {
         lle_gc_strategy_t strategy;
         size_t gc_trigger_threshold;
@@ -203,7 +203,7 @@ struct lle_garbage_collector_t {
         bool enable_concurrent_gc;
     } gc_config;
 
-    /* GC state tracking */
+    // GC state tracking
     struct {
         lle_gc_state_t current_state;
         struct timespec last_gc_time;
@@ -212,7 +212,7 @@ struct lle_garbage_collector_t {
         size_t memory_freed_total;
     } gc_state;
 
-    /* GC performance metrics */
+    // GC performance metrics
     struct {
         struct timespec fastest_gc;
         struct timespec slowest_gc;
@@ -220,14 +220,14 @@ struct lle_garbage_collector_t {
         double gc_efficiency;
     } gc_performance;
 
-    /* Concurrent GC support */
+    // Concurrent GC support
     pthread_t gc_thread;
     pthread_mutex_t gc_mutex;
     pthread_cond_t gc_condition;
     volatile bool gc_thread_active;
 };
 
-/* Note: Constants are defined in memory_management.h */
+// Note: Constants are defined in memory_management.h
 
 struct lle_dynamic_pool_resizer_t {
     lle_memory_pool_t *pool;
@@ -389,7 +389,7 @@ struct lle_memory_access_optimizer_t {
     } cache_optimization;
 };
 
-/* lle_memory_pool_tuner_t is defined in header */
+// lle_memory_pool_tuner_t is defined in header
 
 struct lle_memory_error_handler_t {
     struct {
@@ -462,31 +462,31 @@ struct lle_buffer_overflow_protection_t {
     } bounds_checking;
 };
 
-/* Copy from spec: lle_lush_memory_integration_t */
+// Copy from spec: lle_lush_memory_integration_t
 struct lle_lush_memory_integration_t {
     lush_memory_pool_t *shell_pools[LUSH_POOL_COUNT];
     lle_memory_pool_t *lle_pools[LLE_POOL_COUNT];
 
-    /* Shared memory regions */
+    // Shared memory regions
     void *shared_buffer_region;
     size_t shared_region_size;
 
-    /* Integration configuration */
+    // Integration configuration
     bool enable_pool_sharing;
     bool enable_cross_allocation;
     double shared_memory_ratio;
 
-    /* Performance monitoring */
+    // Performance monitoring
     lle_memory_stats_t lush_stats;
     lle_memory_stats_t lle_stats;
     lle_memory_stats_t shared_stats;
 
-    /* Synchronization */
+    // Synchronization
     pthread_mutex_t integration_mutex;
     volatile bool integration_active;
 };
 
-/* Copy from spec: lle_shared_memory_pool_t */
+// Copy from spec: lle_shared_memory_pool_t
 struct lle_shared_memory_pool_t {
     void *memory_region;
     size_t total_size;
@@ -494,7 +494,7 @@ struct lle_shared_memory_pool_t {
     size_t lle_allocated;
     size_t free_space;
 
-    /* Allocation tracking */
+    // Allocation tracking
     struct {
         void *ptr;
         size_t size;
@@ -504,7 +504,7 @@ struct lle_shared_memory_pool_t {
 
     size_t allocation_count;
 
-    /* Fragmentation management */
+    // Fragmentation management
     struct {
         void *start;
         size_t size;
@@ -512,12 +512,12 @@ struct lle_shared_memory_pool_t {
 
     size_t fragment_count;
 
-    /* Synchronization */
+    // Synchronization
     pthread_rwlock_t access_lock;
     volatile int reference_count;
 };
 
-/* Copy from spec: lle_memory_pool_tuner_t (moved from header) */
+// Copy from spec: lle_memory_pool_tuner_t (moved from header)
 struct lle_memory_pool_tuner_t {
     lle_memory_pool_t *target_pool;
 
@@ -559,7 +559,7 @@ struct lle_memory_pool_tuner_t {
     } tuning_history;
 };
 
-/* Copy from spec: lle_memory_encryption_t (moved from header) */
+// Copy from spec: lle_memory_encryption_t (moved from header)
 struct lle_memory_encryption_t {
     struct {
         lle_encryption_algorithm_t algorithm;
@@ -620,10 +620,10 @@ struct lle_lush_memory_integration_complete_t {
         pthread_mutex_t integration_mutex;
         pthread_rwlock_t shared_memory_lock;
 #if LLE_USE_NAMED_SEMAPHORES
-        sem_t *resource_semaphore; /* macOS: named semaphore (pointer) */
-        char semaphore_name[64];   /* Name for sem_unlink cleanup */
+        sem_t *resource_semaphore; /**< macOS: named semaphore (pointer) */
+        char semaphore_name[64];   /**< Name for sem_unlink cleanup */
 #else
-        sem_t resource_semaphore; /* Linux: unnamed semaphore */
+        sem_t resource_semaphore; /**< Linux: unnamed semaphore */
 #endif
         volatile bool coordination_active;
     } synchronization;
@@ -637,7 +637,7 @@ struct lle_lush_memory_integration_complete_t {
     } error_handling;
 };
 
-/* Copy from spec: lle_memory_test_framework_t (moved from header) */
+// Copy from spec: lle_memory_test_framework_t (moved from header)
 struct lle_memory_test_framework_t {
     struct {
         bool enable_stress_testing;
@@ -673,7 +673,7 @@ struct lle_memory_test_framework_t {
     } test_results;
 };
 
-/* Copy from spec: lle_display_memory_coordination_t */
+// Copy from spec: lle_display_memory_coordination_t
 struct lle_display_memory_coordination_t {
     lle_memory_pool_t *prompt_memory_pool;
     lle_memory_pool_t *syntax_highlight_pool;
@@ -703,19 +703,19 @@ struct lle_display_memory_coordination_t {
     } performance_tracking;
 };
 
-/* Global state */
+// Global state
 static struct {
     bool initialized;
     pthread_mutex_t global_lock;
     lle_memory_manager_t *global_manager;
     lle_memory_stats_t stats;
 
-    /* Allocation tracking table for accurate size tracking */
+    // Allocation tracking table for accurate size tracking
     struct {
         void *address;
         size_t size;
         struct timespec allocation_time;
-    } allocations[4096]; /* Track up to 4096 concurrent allocations */
+    } allocations[4096]; /**< Track up to 4096 concurrent allocations */
     size_t allocation_count;
 } lle_memory_global = {.initialized = false,
                        .global_lock = PTHREAD_MUTEX_INITIALIZER,
@@ -795,45 +795,45 @@ lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
         return LLE_ERROR_NULL_POINTER;
     }
 
-    /* Allocate LLE pool structure */
+    // Allocate LLE pool structure
     lle_memory_pool_t *pool =
         (lle_memory_pool_t *)calloc(1, sizeof(lle_memory_pool_t));
     if (!pool) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize pool metadata */
+    // Initialize pool metadata
     pool->type = pool_type;
-    pool->alignment = 16; /* Default alignment */
-    pool->size = 0;       /* Size tracked by lush_pool */
+    pool->alignment = 16; // Default alignment
+    pool->size = 0;       // Size tracked by lush_pool
     pool->used = 0;
     pool->free = 0;
-    pool->max_size = 1024 * 1024; /* 1MB default max */
+    pool->max_size = 1024 * 1024; // 1MB default max
     pool->allow_resize = true;
     pool->total_allocations = 0;
     pool->total_deallocations = 0;
     pool->peak_usage = 0;
 
-    /* Initialize mutex */
+    // Initialize mutex
     if (pthread_mutex_init(&pool->lock, NULL) != 0) {
         free(pool);
         return LLE_ERROR_INITIALIZATION_FAILED;
     }
 
-    /* Set creation time */
+    // Set creation time
     clock_gettime(CLOCK_MONOTONIC, &pool->creation_time);
     pool->last_resize_time = pool->creation_time;
 
-    /* Initialize free blocks tracking */
+    // Initialize free blocks tracking
     memset(pool->free_blocks, 0, sizeof(pool->free_blocks));
     pool->free_block_count = 0;
 
     /* Note: We don't allocate memory_region here because lush_pool handles it
      * The lush_pool pointer is passed in and allocations go through it
      * This pool structure is just for tracking and coordination */
-    pool->memory_region = NULL; /* Managed externally by lush_pool */
+    pool->memory_region = NULL; // Managed externally by lush_pool
 
-    /* Mark that this pool uses external (Lush) allocation */
+    // Mark that this pool uses external (Lush) allocation
     pool->uses_external_allocator = true;
     pool->external_allocator_context = lush_pool;
 
@@ -852,14 +852,14 @@ void lle_memory_pool_destroy(lle_memory_pool_t *pool) {
         return;
     }
 
-    /* Destroy mutex */
+    // Destroy mutex
     pthread_mutex_destroy(&pool->lock);
 
     /* Note: We don't free pool->memory_region because it's managed by
      * lush_pool We also don't free allocations because they're tracked by
      * lush_pool */
 
-    /* Free the pool structure itself */
+    // Free the pool structure itself
     free(pool);
 }
 
@@ -872,13 +872,13 @@ void *lle_pool_alloc(size_t size) {
     if (size == 0)
         return NULL;
 
-    /* Use Lush pool directly */
+    // Use Lush pool directly
     void *ptr = lush_pool_alloc(size);
 
     if (ptr && lle_memory_global.initialized) {
         pthread_mutex_lock(&lle_memory_global.global_lock);
 
-        /* Update statistics */
+        // Update statistics
         lle_memory_global.stats.total_allocated += size;
         lle_memory_global.stats.current_usage += size;
         if (lle_memory_global.stats.current_usage >
@@ -887,7 +887,7 @@ void *lle_pool_alloc(size_t size) {
                 lle_memory_global.stats.current_usage;
         }
 
-        /* Record allocation in tracking table */
+        // Record allocation in tracking table
         if (lle_memory_global.allocation_count < 4096) {
             size_t idx = lle_memory_global.allocation_count++;
             lle_memory_global.allocations[idx].address = ptr;
@@ -908,11 +908,11 @@ void lle_pool_free(void *ptr) {
     if (!ptr)
         return;
 
-    /* Track deallocation before freeing */
+    // Track deallocation before freeing
     if (lle_memory_global.initialized) {
         pthread_mutex_lock(&lle_memory_global.global_lock);
 
-        /* Find the allocation in our tracking table */
+        // Find the allocation in our tracking table
         size_t freed_size = 0;
         bool found = false;
         for (size_t i = 0; i < lle_memory_global.allocation_count; i++) {
@@ -920,7 +920,7 @@ void lle_pool_free(void *ptr) {
                 freed_size = lle_memory_global.allocations[i].size;
                 found = true;
 
-                /* Remove from table by shifting remaining entries */
+                // Remove from table by shifting remaining entries
                 for (size_t j = i; j < lle_memory_global.allocation_count - 1;
                      j++) {
                     lle_memory_global.allocations[j] =
@@ -931,7 +931,7 @@ void lle_pool_free(void *ptr) {
             }
         }
 
-        /* Update statistics */
+        // Update statistics
         lle_memory_global.stats.total_freed += freed_size;
         if (found) {
             lle_memory_global.stats.current_usage -= freed_size;
@@ -947,7 +947,7 @@ void *lle_pool_allocate(lle_memory_pool_base_t *pool, size_t size) {
     if (!pool || size == 0)
         return NULL;
 
-    /* For base pool, use standard allocation */
+    // For base pool, use standard allocation
     return lle_pool_alloc(size);
 }
 
@@ -956,22 +956,22 @@ void *lle_pool_allocate_aligned(lle_memory_pool_t *pool, size_t size,
     if (!pool || size == 0 || alignment == 0)
         return NULL;
 
-    /* Alignment must be power of 2 */
+    // Alignment must be power of 2
     if ((alignment & (alignment - 1)) != 0)
         return NULL;
 
-    /* Allocate extra for alignment */
+    // Allocate extra for alignment
     size_t total_size = size + alignment + sizeof(void *);
     void *raw_ptr = lle_pool_alloc(total_size);
     if (!raw_ptr)
         return NULL;
 
-    /* Calculate aligned address */
+    // Calculate aligned address
     uintptr_t addr = (uintptr_t)raw_ptr + sizeof(void *);
     uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
     void *aligned_ptr = (void *)aligned_addr;
 
-    /* Store original pointer */
+    // Store original pointer
     *((void **)aligned_ptr - 1) = raw_ptr;
 
     return aligned_ptr;
@@ -979,7 +979,7 @@ void *lle_pool_allocate_aligned(lle_memory_pool_t *pool, size_t size,
 
 void *lle_pool_allocate_fast(lle_memory_pool_t *pool, size_t size) {
     LLE_UNUSED(pool);
-    /* Fast path - just use standard allocation */
+    // Fast path - just use standard allocation
     return lle_pool_alloc(size);
 }
 
@@ -995,10 +995,10 @@ void lle_pool_free_fast(lle_memory_pool_t *pool, void *ptr) {
 
 bool lle_memory_is_valid_transition(lle_memory_state_t old_state,
                                     lle_memory_state_t new_state) {
-    /* State machine transition validation */
+    // State machine transition validation
     switch (old_state) {
     case LLE_MEMORY_STATE_INITIALIZING:
-        /* From INITIALIZING can go to ACTIVE or ERROR */
+        // From INITIALIZING can go to ACTIVE or ERROR
         return (new_state == LLE_MEMORY_STATE_ACTIVE ||
                 new_state == LLE_MEMORY_STATE_ERROR);
 
@@ -1012,28 +1012,28 @@ bool lle_memory_is_valid_transition(lle_memory_state_t old_state,
                 new_state == LLE_MEMORY_STATE_SHUTDOWN);
 
     case LLE_MEMORY_STATE_OPTIMIZING:
-        /* From OPTIMIZING can return to ACTIVE or go to ERROR */
+        // From OPTIMIZING can return to ACTIVE or go to ERROR
         return (new_state == LLE_MEMORY_STATE_ACTIVE ||
                 new_state == LLE_MEMORY_STATE_ERROR);
 
     case LLE_MEMORY_STATE_GC_RUNNING:
-        /* From GC_RUNNING can return to ACTIVE or go to ERROR */
+        // From GC_RUNNING can return to ACTIVE or go to ERROR
         return (new_state == LLE_MEMORY_STATE_ACTIVE ||
                 new_state == LLE_MEMORY_STATE_ERROR);
 
     case LLE_MEMORY_STATE_LOW_MEMORY:
-        /* From LOW_MEMORY can recover to ACTIVE or escalate to ERROR */
+        // From LOW_MEMORY can recover to ACTIVE or escalate to ERROR
         return (new_state == LLE_MEMORY_STATE_ACTIVE ||
                 new_state == LLE_MEMORY_STATE_ERROR ||
                 new_state == LLE_MEMORY_STATE_SHUTDOWN);
 
     case LLE_MEMORY_STATE_ERROR:
-        /* From ERROR can only go to SHUTDOWN or stay in ERROR */
+        // From ERROR can only go to SHUTDOWN or stay in ERROR
         return (new_state == LLE_MEMORY_STATE_ERROR ||
                 new_state == LLE_MEMORY_STATE_SHUTDOWN);
 
     case LLE_MEMORY_STATE_SHUTDOWN:
-        /* SHUTDOWN is terminal - no transitions allowed */
+        // SHUTDOWN is terminal - no transitions allowed
         return false;
 
     default:
@@ -1045,7 +1045,7 @@ lle_result_t lle_memory_initialize_pools(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Initialize Lush pools if needed */
+    // Initialize Lush pools if needed
     if (!global_memory_pool || !global_memory_pool->initialized) {
         lush_pool_config_t config = lush_pool_get_default_config();
         if (lush_pool_init(&config) != LUSH_POOL_SUCCESS) {
@@ -1069,7 +1069,7 @@ void lle_memory_start_monitoring(lle_memory_manager_t *manager) {
 lle_result_t lle_memory_start_optimization(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
-    /* Optimization would analyze patterns and adjust pool sizes */
+    // Optimization would analyze patterns and adjust pool sizes
     return LLE_SUCCESS;
 }
 
@@ -1077,7 +1077,7 @@ lle_result_t
 lle_memory_start_garbage_collection(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
-    /* GC would scan for unreachable allocations */
+    // GC would scan for unreachable allocations
     return LLE_SUCCESS;
 }
 
@@ -1085,16 +1085,16 @@ lle_result_t lle_memory_handle_low_memory(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Transition to low memory state */
+    // Transition to low memory state
     manager->state = LLE_MEMORY_STATE_LOW_MEMORY;
 
-    /* Trigger garbage collection to free memory */
+    // Trigger garbage collection to free memory
     lle_result_t result = lle_memory_start_garbage_collection(manager);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Struct fields changed - need pool_manager subsystem */
+    // Struct fields changed - need pool_manager subsystem
 
     return LLE_SUCCESS;
 }
@@ -1103,33 +1103,33 @@ lle_result_t lle_memory_handle_error_state(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Mark system as in error state */
+    // Mark system as in error state
     lle_memory_state_t prev_state = manager->state;
     manager->state = LLE_MEMORY_STATE_ERROR;
 
-    /* Attempt recovery based on previous state */
+    // Attempt recovery based on previous state
     lle_result_t recovery_result = LLE_ERROR_FATAL_INTERNAL;
 
     switch (prev_state) {
     case LLE_MEMORY_STATE_LOW_MEMORY:
-        /* Try one more aggressive cleanup */
+        // Try one more aggressive cleanup
         recovery_result = lle_memory_handle_low_memory(manager);
         break;
 
     case LLE_MEMORY_STATE_GC_RUNNING:
     case LLE_MEMORY_STATE_OPTIMIZING:
-        /* Abort the operation and return to active if possible */
+        // Abort the operation and return to active if possible
         manager->state = LLE_MEMORY_STATE_ACTIVE;
         recovery_result = LLE_SUCCESS;
         break;
 
     case LLE_MEMORY_STATE_ERROR:
-        /* Already in error, escalate to shutdown */
+        // Already in error, escalate to shutdown
         recovery_result = lle_memory_shutdown_pools(manager);
         break;
 
     default:
-        /* For other states, try to transition to shutdown gracefully */
+        // For other states, try to transition to shutdown gracefully
         recovery_result = lle_memory_shutdown_pools(manager);
         break;
     }
@@ -1141,8 +1141,8 @@ lle_result_t lle_memory_shutdown_pools(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Cleanup all pools */
-    /* (pools array removed from struct - need to use manager->pool_manager) */
+    // Cleanup all pools
+    // (pools array removed from struct - need to use manager->pool_manager)
 
     return LLE_SUCCESS;
 }
@@ -1201,9 +1201,9 @@ lle_result_t lle_analyze_lush_memory_config(lush_memory_pool_t *lush_pools,
     if (!lush_pools || !lush_config)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Copy configuration from Lush */
+    // Copy configuration from Lush
     for (size_t i = 0; i < LLE_POOL_COUNT && i < LUSH_POOL_COUNT; i++) {
-        lush_config->pool_sizes[i] = 4096 * (i + 1); /* Default sizes */
+        lush_config->pool_sizes[i] = 4096 * (i + 1); // Default sizes
         lush_config->max_pool_sizes[i] = 65536 * (i + 1);
     }
     lush_config->block_size = 64;
@@ -1234,8 +1234,8 @@ lle_create_specialized_pool(lle_memory_manager_t *manager,
         return LLE_ERROR_INITIALIZATION_FAILED;
     }
 
-    /* Use pool_manager subsystem */
-    (void)pool; /* Suppress unused warning */
+    // Use pool_manager subsystem
+    (void)pool; // Suppress unused warning
 
     return LLE_SUCCESS;
 }
@@ -1275,7 +1275,7 @@ lle_initialize_cross_allocation_tables(lle_memory_manager_t *manager) {
      * regardless of which pool they came from. This provides unified tracking
      * across pools. */
 
-    /* Ensure global tracking is initialized */
+    // Ensure global tracking is initialized
     if (!lle_memory_global.initialized) {
         lle_memory_global.initialized = true;
         lle_memory_global.allocation_count = 0;
@@ -1293,7 +1293,7 @@ lle_result_t lle_start_integration_monitoring(lle_memory_manager_t *manager) {
      * No additional monitoring infrastructure needed - stats are updated
      * automatically during allocation and deallocation. */
 
-    /* Verify statistics collection is enabled in Lush pools */
+    // Verify statistics collection is enabled in Lush pools
     if (global_memory_pool) {
         global_memory_pool->enable_statistics = true;
     }
@@ -1435,14 +1435,14 @@ int lle_find_suitable_fragment(void *pool, size_t size) {
     (void)size;
     /* Fragment management not needed with Lush's fixed-size block pools.
      * Lush handles fragmentation through its free list management. */
-    return -1; /* No fragment found - use normal allocation */
+    return -1; // No fragment found - use normal allocation
 }
 
 void lle_remove_fragment(void *pool, int fragment_index) {
     if (!pool)
         return;
     (void)fragment_index;
-    /* Fragment removal not needed - Lush manages free blocks internally */
+    // Fragment removal not needed - Lush manages free blocks internally
 }
 
 /* ============================================================================
@@ -1488,19 +1488,19 @@ void *lle_check_string_cache(lle_buffer_memory_pool_t *pool, size_t size) {
     if (!pool)
         return NULL;
 
-    /* Search string cache for matching size allocation */
+    // Search string cache for matching size allocation
     for (size_t i = 0; i < LLE_STRING_CACHE_SIZE; i++) {
         if (pool->string_cache.string_cache[i] != NULL &&
             pool->string_cache.string_lengths[i] == size) {
-            /* Found cached string of exact size - reuse it */
+            // Found cached string of exact size - reuse it
             void *cached_ptr = pool->string_cache.string_cache[i];
-            pool->string_cache.string_cache[i] = NULL; /* Remove from cache */
+            pool->string_cache.string_cache[i] = NULL; // Remove from cache
             pool->string_cache.string_lengths[i] = 0;
             return cached_ptr;
         }
     }
 
-    return NULL; /* No cache hit */
+    return NULL; // No cache hit
 }
 
 void *lle_allocate_buffer_block(lle_buffer_memory_pool_t *pool, size_t size) {
@@ -1512,7 +1512,7 @@ void *lle_allocate_buffer_block(lle_buffer_memory_pool_t *pool, size_t size) {
 size_t lle_optimize_buffer_allocation_size(size_t size,
                                            lle_buffer_type_t buffer_type) {
     LLE_UNUSED(buffer_type);
-    /* Round up to optimal size */
+    // Round up to optimal size
     return lle_align_memory_size(size, 64);
 }
 
@@ -1606,7 +1606,7 @@ void *lle_try_emergency_allocation(lle_memory_pool_hierarchy_t *hierarchy,
                                    size_t size) {
     if (!hierarchy)
         return NULL;
-    return malloc(size); /* Emergency fallback to system malloc */
+    return malloc(size); // Emergency fallback to system malloc
 }
 
 void lle_log_emergency_allocation(size_t size,
@@ -1856,11 +1856,11 @@ lle_result_t lle_gc_mark_phase(lle_garbage_collector_t *gc,
     size_t total_marked = 0;
 
     if (global_memory_pool && global_memory_pool->initialized) {
-        /* Scan each pool in Lush's memory system */
+        // Scan each pool in Lush's memory system
         for (int pool_idx = 0; pool_idx < LUSH_POOL_COUNT; pool_idx++) {
             lush_pool_t *pool = &global_memory_pool->pools[pool_idx];
 
-            /* Scan all blocks in this pool */
+            // Scan all blocks in this pool
             for (size_t block_idx = 0; block_idx < pool->current_blocks;
                  block_idx++) {
                 lush_pool_block_t *block = &pool->all_blocks[block_idx];
@@ -1899,7 +1899,7 @@ lle_result_t lle_gc_sweep_phase(lle_garbage_collector_t *gc,
         for (int pool_idx = 0; pool_idx < LUSH_POOL_COUNT; pool_idx++) {
             lush_pool_t *pool = &global_memory_pool->pools[pool_idx];
 
-            /* Scan all blocks looking for very old allocations */
+            // Scan all blocks looking for very old allocations
             for (size_t block_idx = 0; block_idx < pool->current_blocks;
                  block_idx++) {
                 lush_pool_block_t *block = &pool->all_blocks[block_idx];
@@ -1913,7 +1913,7 @@ lle_result_t lle_gc_sweep_phase(lle_garbage_collector_t *gc,
                      * This is conservative - real applications should manage
                      * their memory */
                     if (age > age_threshold_us) {
-                        /* Free this potentially leaked block */
+                        // Free this potentially leaked block
                         lush_pool_free(block->memory);
                         total_freed += block->size;
                     }
@@ -1947,13 +1947,13 @@ lle_result_t lle_gc_compact_phase(lle_garbage_collector_t *gc) {
             pool->free_list = NULL;
             pool->free_blocks = 0;
 
-            /* Add all free blocks to the free list in address order */
+            // Add all free blocks to the free list in address order
             for (size_t block_idx = 0; block_idx < pool->current_blocks;
                  block_idx++) {
                 lush_pool_block_t *block = &pool->all_blocks[block_idx];
 
                 if (!block->in_use) {
-                    /* Add to front of free list */
+                    // Add to front of free list
                     block->next = pool->free_list;
                     block->prev = NULL;
                     if (pool->free_list) {
@@ -2137,7 +2137,7 @@ void lle_cleanup_buffer_regions(lle_buffer_memory_t *buffer_mem,
                                 lle_memory_pool_t *pool) {
     if (!buffer_mem)
         return;
-    (void)pool; /* Pool parameter not needed - using global allocator */
+    (void)pool; // Pool parameter not needed - using global allocator
 
     if (buffer_mem->buffer_regions.primary_buffer) {
         lle_pool_free(buffer_mem->buffer_regions.primary_buffer);
@@ -2189,7 +2189,7 @@ lle_result_t lle_initialize_utf8_management(lle_buffer_memory_t *buffer_mem,
 size_t lle_calculate_scratch_buffer_size(const lle_buffer_config_t *config) {
     if (!config)
         return 4096;
-    return 4096; /* Default scratch buffer size */
+    return 4096; // Default scratch buffer size
 }
 
 /* ============================================================================
@@ -2335,7 +2335,7 @@ lle_expand_line_tracking_arrays(lle_multiline_buffer_t *multiline_buffer) {
 
 bool lle_buffer_has_space(lle_buffer_memory_t *buffer_memory,
                           size_t required_space) {
-    (void)required_space; /* Reserved for capacity checking */
+    (void)required_space; // Reserved for capacity checking
     if (!buffer_memory)
         return false;
     return true;
@@ -2367,7 +2367,7 @@ lle_result_t lle_expand_primary_buffer(lle_buffer_memory_t *buffer_memory,
 
 size_t lle_calculate_buffer_tail_size(lle_buffer_memory_t *buffer_memory,
                                       size_t offset) {
-    (void)offset; /* Reserved for tail size calculation */
+    (void)offset; // Reserved for tail size calculation
     if (!buffer_memory)
         return 0;
     return 0;
@@ -2749,7 +2749,7 @@ lle_analyze_memory_access_patterns(lle_memory_access_optimizer_t *optimizer) {
 lle_result_t
 lle_measure_pool_performance(lle_memory_pool_t *pool, size_t sample_size,
                              lle_memory_pool_performance_t *performance) {
-    (void)sample_size; /* Reserved for sample-based measurement */
+    (void)sample_size; // Reserved for sample-based measurement
     if (!pool || !performance)
         return LLE_ERROR_NULL_POINTER;
 
@@ -2820,7 +2820,7 @@ lle_result_t lle_execute_tuning_action(lle_memory_pool_tuner_t *tuner,
 void lle_rollback_tuning_actions(lle_memory_pool_tuner_t *tuner,
                                  lle_tuning_action_plan_t *action_plan,
                                  size_t action_index) {
-    (void)action_index; /* Reserved for targeted rollback */
+    (void)action_index; // Reserved for targeted rollback
     if (!tuner || !action_plan)
         return;
     if (tuner->tuning_history.history_count > 0) {
@@ -2979,7 +2979,7 @@ void lle_record_memory_error(lle_memory_error_handler_t *error_handler,
         error_handler->error_tracking.error_count++;
         error_handler->error_tracking.last_error_time = lle_get_current_time();
     }
-    (void)error_result; /* Map error_result to error_type */
+    (void)error_result; // Map error_result to error_type
 }
 
 lle_memory_recovery_strategy_t
@@ -3180,7 +3180,7 @@ uint32_t lle_access_type_to_permissions(lle_access_type_t access_type) {
 
 void lle_log_security_incident(lle_security_incident_t incident_type,
                                void *address, size_t size) {
-    /* Log security incident - need encryption context parameter */
+    // Log security incident - need encryption context parameter
     (void)incident_type;
     (void)address;
     (void)size;
@@ -3352,20 +3352,20 @@ lle_result_t lle_initialize_complete_memory_integration(
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* Initialize semaphore - platform-specific implementation */
+    // Initialize semaphore - platform-specific implementation
 #if LLE_USE_NAMED_SEMAPHORES
-    /* macOS: Use named semaphores (sem_open) since sem_init is deprecated */
+    // macOS: Use named semaphores (sem_open) since sem_init is deprecated
     snprintf(integration->synchronization.semaphore_name,
              sizeof(integration->synchronization.semaphore_name),
              "/lle_mem_%d_%p", getpid(), (void *)integration);
 
-    /* Unlink any stale semaphore with this name first (ignore errors) */
+    // Unlink any stale semaphore with this name first (ignore errors)
     sem_unlink(integration->synchronization.semaphore_name);
-    errno = 0; /* Clear errno after sem_unlink which may set it */
+    errno = 0; // Clear errno after sem_unlink which may set it
 
     integration->synchronization.resource_semaphore =
         sem_open(integration->synchronization.semaphore_name, O_CREAT | O_EXCL,
-                 0600, 1 /* Initial value */
+                 0600, 1 // Initial value
         );
 
     if (integration->synchronization.resource_semaphore == SEM_FAILED) {
@@ -3375,7 +3375,7 @@ lle_result_t lle_initialize_complete_memory_integration(
         return LLE_ERROR_SYSTEM_CALL;
     }
 #else
-    /* Linux: Use unnamed semaphores (sem_init) */
+    // Linux: Use unnamed semaphores (sem_init)
     if (sem_init(&integration->synchronization.resource_semaphore, 0, 1) != 0) {
         pthread_rwlock_destroy(
             &integration->synchronization.shared_memory_lock);
@@ -3423,16 +3423,16 @@ void lle_cleanup_integration_sync(
         return;
     integration->synchronization.coordination_active = false;
 
-    /* Clean up semaphore - platform-specific */
+    // Clean up semaphore - platform-specific
 #if LLE_USE_NAMED_SEMAPHORES
-    /* macOS: Close and unlink named semaphore */
+    // macOS: Close and unlink named semaphore
     if (integration->synchronization.resource_semaphore != SEM_FAILED &&
         integration->synchronization.resource_semaphore != NULL) {
         sem_close(integration->synchronization.resource_semaphore);
         sem_unlink(integration->synchronization.semaphore_name);
     }
 #else
-    /* Linux: Destroy unnamed semaphore */
+    // Linux: Destroy unnamed semaphore
     sem_destroy(&integration->synchronization.resource_semaphore);
 #endif
 
@@ -3580,7 +3580,7 @@ lle_run_basic_memory_tests(lle_memory_test_framework_t *test_framework,
     if (!test_framework || !memory_manager)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Test basic allocation */
+    // Test basic allocation
     void *ptr = lle_pool_alloc(1024);
     if (!ptr) {
         lle_record_test_failure(test_framework,
@@ -3596,7 +3596,7 @@ lle_run_basic_memory_tests(lle_memory_test_framework_t *test_framework,
 void lle_record_test_failure(lle_memory_test_framework_t *test_framework,
                              lle_test_failure_reason_t reason,
                              lle_result_t result) {
-    (void)result; /* Reserved for detailed failure logging */
+    (void)result; // Reserved for detailed failure logging
     if (!test_framework)
         return;
     if (test_framework->test_results.failure_count < LLE_MAX_TEST_FAILURES) {

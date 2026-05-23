@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Test tracking */
+// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 
@@ -36,7 +36,7 @@ static int tests_passed = 0;
 TEST(fallback_hierarchy) {
     printf("\nFallback Hierarchy Tests:\n");
 
-    /* Get a valid detection result */
+    // Get a valid detection result
     lle_terminal_detection_result_t *detection = NULL;
     lle_result_t res =
         lle_detect_terminal_capabilities_comprehensive(&detection);
@@ -49,7 +49,7 @@ TEST(fallback_hierarchy) {
         return;
     }
 
-    /* Create context with detected mode */
+    // Create context with detected mode
     lle_adaptive_context_t *context = NULL;
     res = lle_initialize_adaptive_context(&context, detection, NULL);
     TEST_ASSERT(res == LLE_SUCCESS, "Context initialization succeeds");
@@ -62,10 +62,10 @@ TEST(fallback_hierarchy) {
     lle_adaptive_mode_t original_mode = context->mode;
     printf("  Original mode: %s\n", lle_adaptive_mode_to_string(original_mode));
 
-    /* Test fallback from current mode */
+    // Test fallback from current mode
     res = lle_adaptive_try_fallback_mode(context);
 
-    /* Verify fallback worked based on original mode */
+    // Verify fallback worked based on original mode
     switch (original_mode) {
     case LLE_ADAPTIVE_MODE_NATIVE:
         TEST_ASSERT(res == LLE_SUCCESS, "Native mode can fallback");
@@ -96,7 +96,7 @@ TEST(fallback_hierarchy) {
         break;
     }
 
-    /* Test health status after fallback */
+    // Test health status after fallback
     if (res == LLE_SUCCESS) {
         TEST_ASSERT(context->healthy == true, "Context healthy after fallback");
         TEST_ASSERT(context->error_count == 0,
@@ -115,7 +115,7 @@ TEST(fallback_hierarchy) {
 TEST(multiple_fallbacks) {
     printf("\nMultiple Fallback Tests:\n");
 
-    /* Create a detection result for testing */
+    // Create a detection result for testing
     lle_terminal_detection_result_t *detection = NULL;
     (void)lle_detect_terminal_capabilities_comprehensive(&detection);
 
@@ -126,8 +126,8 @@ TEST(multiple_fallbacks) {
         return;
     }
 
-    /* Try to create context with native mode for maximum fallback levels */
-    /* Note: We can only test modes that actually initialize */
+    // Try to create context with native mode for maximum fallback levels
+    // Note: We can only test modes that actually initialize
     lle_adaptive_context_t *context = NULL;
     (void)lle_initialize_adaptive_context(&context, detection, NULL);
 
@@ -139,13 +139,13 @@ TEST(multiple_fallbacks) {
     lle_adaptive_mode_t start_mode = context->mode;
     int fallback_count = 0;
 
-    /* Keep falling back until we can't */
+    // Keep falling back until we can't
     while (lle_adaptive_try_fallback_mode(context) == LLE_SUCCESS) {
         fallback_count++;
         printf("  Fallback %d: %s\n", fallback_count,
                lle_adaptive_mode_to_string(context->mode));
 
-        /* Sanity check - should never need more than 3 fallbacks */
+        // Sanity check - should never need more than 3 fallbacks
         if (fallback_count > 3) {
             TEST_ASSERT(false, "Too many fallbacks (infinite loop?)");
             break;
@@ -170,11 +170,11 @@ TEST(multiple_fallbacks) {
 TEST(fallback_errors) {
     printf("\nFallback Error Handling Tests:\n");
 
-    /* Test NULL context */
+    // Test NULL context
     lle_result_t res = lle_adaptive_try_fallback_mode(NULL);
     TEST_ASSERT(res == LLE_ERROR_INVALID_PARAMETER, "NULL context rejected");
 
-    /* Test NONE mode fallback */
+    // Test NONE mode fallback
     lle_adaptive_context_t *context = calloc(1, sizeof(lle_adaptive_context_t));
     context->mode = LLE_ADAPTIVE_MODE_NONE;
     context->healthy = true;
@@ -193,7 +193,7 @@ TEST(fallback_errors) {
 TEST(degradation_chain) {
     printf("\nGraceful Degradation Chain Tests:\n");
 
-    /* Verify expected fallback paths */
+    // Verify expected fallback paths
     printf("  Expected degradation paths:\n");
     printf("    NATIVE -> ENHANCED -> MINIMAL\n");
     printf("    ENHANCED -> MINIMAL\n");
@@ -202,7 +202,7 @@ TEST(degradation_chain) {
 
     TEST_ASSERT(true, "Degradation hierarchy documented");
 
-    /* These are verified by the actual fallback tests above */
+    // These are verified by the actual fallback tests above
     TEST_ASSERT(true, "Native degradation path verified");
     TEST_ASSERT(true, "Enhanced degradation path verified");
     TEST_ASSERT(true, "Multiplexed degradation path verified");

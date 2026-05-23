@@ -34,7 +34,7 @@ TEST(interface_init_basic) {
     ASSERT(interface->terminal_fd >= 0);
     ASSERT(interface->raw_mode_active == false);
 
-    /* Cleanup */
+    // Cleanup
     lle_unix_interface_destroy(interface);
 }
 
@@ -44,7 +44,7 @@ TEST(interface_init_null_parameter) {
 }
 
 TEST(interface_destroy_null) {
-    /* Should not crash */
+    // Should not crash
     lle_unix_interface_destroy(NULL);
 }
 
@@ -53,7 +53,7 @@ TEST(interface_double_destroy) {
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /* First destroy */
+    // First destroy
     lle_unix_interface_destroy(interface);
 
     /* Second destroy on same pointer is undefined, but we test that
@@ -69,7 +69,7 @@ TEST(interface_preserves_terminal_fd) {
     int fd = interface->terminal_fd;
     ASSERT(fd >= 0);
 
-    /* Verify the fd is still valid (skip if not a TTY) */
+    // Verify the fd is still valid (skip if not a TTY)
     if (isatty(fd)) {
         struct termios current;
         int tcget_result = tcgetattr(fd, &current);
@@ -94,36 +94,36 @@ TEST(raw_mode_enter_exit) {
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get original terminal settings */
+    // Get original terminal settings
     struct termios original;
     int tcget_result = tcgetattr(STDIN_FILENO, &original);
     ASSERT(tcget_result == 0);
 
-    /* Enter raw mode */
+    // Enter raw mode
     result = lle_unix_interface_enter_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(interface->raw_mode_active == true);
 
-    /* Verify raw mode is active */
+    // Verify raw mode is active
     struct termios raw;
     tcget_result = tcgetattr(STDIN_FILENO, &raw);
     ASSERT(tcget_result == 0);
 
-    /* Check key raw mode characteristics */
-    ASSERT((raw.c_lflag & ICANON) == 0); /* Non-canonical */
-    ASSERT((raw.c_lflag & ECHO) == 0);   /* No echo */
+    // Check key raw mode characteristics
+    ASSERT((raw.c_lflag & ICANON) == 0); // Non-canonical
+    ASSERT((raw.c_lflag & ECHO) == 0);   // No echo
 
-    /* Exit raw mode */
+    // Exit raw mode
     result = lle_unix_interface_exit_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(interface->raw_mode_active == false);
 
-    /* Verify original settings restored */
+    // Verify original settings restored
     struct termios restored;
     tcget_result = tcgetattr(STDIN_FILENO, &restored);
     ASSERT(tcget_result == 0);
 
-    /* Compare key flags (exact match may vary by system) */
+    // Compare key flags (exact match may vary by system)
     ASSERT((restored.c_lflag & ICANON) == (original.c_lflag & ICANON));
     ASSERT((restored.c_lflag & ECHO) == (original.c_lflag & ECHO));
 
@@ -140,7 +140,7 @@ TEST(raw_mode_idempotent_enter) {
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Enter raw mode twice */
+    // Enter raw mode twice
     result = lle_unix_interface_enter_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
 
@@ -148,7 +148,7 @@ TEST(raw_mode_idempotent_enter) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(interface->raw_mode_active == true);
 
-    /* Exit once should restore */
+    // Exit once should restore
     result = lle_unix_interface_exit_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
 
@@ -165,12 +165,12 @@ TEST(raw_mode_idempotent_exit) {
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Exit without entering should be safe */
+    // Exit without entering should be safe
     result = lle_unix_interface_exit_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(interface->raw_mode_active == false);
 
-    /* Enter and exit twice */
+    // Enter and exit twice
     result = lle_unix_interface_enter_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
 
@@ -201,19 +201,19 @@ TEST(raw_mode_cleanup_on_destroy) {
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get original settings */
+    // Get original settings
     struct termios original;
     int tcget_result = tcgetattr(STDIN_FILENO, &original);
     ASSERT(tcget_result == 0);
 
-    /* Enter raw mode */
+    // Enter raw mode
     result = lle_unix_interface_enter_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Destroy without exiting raw mode */
+    // Destroy without exiting raw mode
     lle_unix_interface_destroy(interface);
 
-    /* Verify terminal restored */
+    // Verify terminal restored
     struct termios restored;
     tcget_result = tcgetattr(STDIN_FILENO, &restored);
     ASSERT(tcget_result == 0);
@@ -245,7 +245,7 @@ TEST(get_window_size_basic) {
     ASSERT(width <= 10000);
     ASSERT(height <= 10000);
 
-    /* Verify cached values match */
+    // Verify cached values match
     ASSERT(interface->current_width == width);
     ASSERT(interface->current_height == height);
 
@@ -259,15 +259,15 @@ TEST(get_window_size_null_parameters) {
 
     size_t width = 0, height = 0;
 
-    /* Null interface */
+    // Null interface
     result = lle_unix_interface_get_window_size(NULL, &width, &height);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* Null width */
+    // Null width
     result = lle_unix_interface_get_window_size(interface, NULL, &height);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* Null height */
+    // Null height
     result = lle_unix_interface_get_window_size(interface, &width, NULL);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
@@ -287,11 +287,11 @@ TEST(get_window_size_caching) {
     result = lle_unix_interface_get_window_size(interface, &width2, &height2);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Should return same values (assuming no resize between calls) */
+    // Should return same values (assuming no resize between calls)
     ASSERT(width1 == width2);
     ASSERT(height1 == height2);
 
-    /* Cached values should match */
+    // Cached values should match
     ASSERT(interface->current_width == width2);
     ASSERT(interface->current_height == height2);
 
@@ -308,7 +308,7 @@ TEST(window_size_fallback_values) {
     size_t width = 0, height = 0;
     result = lle_unix_interface_get_window_size(interface, &width, &height);
 
-    /* Should succeed even if not a tty (fallback to 80x24 or env vars) */
+    // Should succeed even if not a tty (fallback to 80x24 or env vars)
     ASSERT(result == LLE_SUCCESS);
     ASSERT(width > 0);
     ASSERT(height > 0);
@@ -332,11 +332,11 @@ TEST(read_event_stub) {
 
     lle_input_event_t event;
 
-    /* Null interface */
+    // Null interface
     result = lle_unix_interface_read_event(NULL, &event, 0);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* Null event */
+    // Null event
     result = lle_unix_interface_read_event(interface, NULL, 0);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
@@ -349,7 +349,7 @@ TEST(read_event_stub) {
  */
 
 TEST(multiple_interfaces) {
-    /* Verify we can create multiple interface instances */
+    // Verify we can create multiple interface instances
     lle_unix_interface_t *interface1 = NULL;
     lle_unix_interface_t *interface2 = NULL;
 
@@ -361,10 +361,10 @@ TEST(multiple_interfaces) {
     ASSERT(result2 == LLE_SUCCESS);
     ASSERT(interface2 != NULL);
 
-    /* Should be different instances */
+    // Should be different instances
     ASSERT(interface1 != interface2);
 
-    /* Cleanup */
+    // Cleanup
     lle_unix_interface_destroy(interface1);
     lle_unix_interface_destroy(interface2);
 }
@@ -375,33 +375,33 @@ TEST(full_lifecycle) {
         return;
     }
 
-    /* Test complete lifecycle: init -> raw mode -> operations -> cleanup */
+    // Test complete lifecycle: init -> raw mode -> operations -> cleanup
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Get window size */
+    // Get window size
     size_t width = 0, height = 0;
     result = lle_unix_interface_get_window_size(interface, &width, &height);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(width > 0 && height > 0);
 
-    /* Enter raw mode */
+    // Enter raw mode
     result = lle_unix_interface_enter_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(interface->raw_mode_active == true);
 
-    /* Get window size again in raw mode */
+    // Get window size again in raw mode
     size_t width2 = 0, height2 = 0;
     result = lle_unix_interface_get_window_size(interface, &width2, &height2);
     ASSERT(result == LLE_SUCCESS);
 
-    /* Exit raw mode */
+    // Exit raw mode
     result = lle_unix_interface_exit_raw_mode(interface);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(interface->raw_mode_active == false);
 
-    /* Cleanup */
+    // Cleanup
     lle_unix_interface_destroy(interface);
 }
 

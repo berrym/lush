@@ -26,7 +26,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * DATABASE INITIALIZATION TESTS
@@ -48,14 +48,14 @@ TEST(compat_init_cleanup_cycle) {
 }
 
 TEST(compat_cleanup_without_init) {
-    /* Should not crash */
+    // Should not crash
     compat_cleanup();
 }
 
 TEST(compat_reload) {
     compat_init(NULL);
     int result = compat_reload();
-    /* May succeed or fail depending on file availability */
+    // May succeed or fail depending on file availability
     (void)result;
     compat_cleanup();
 }
@@ -225,7 +225,7 @@ TEST(compat_get_target_default) {
 
     const char *target = compat_get_target();
     ASSERT_NOT_NULL(target, "Target should not be NULL");
-    /* Default is typically "posix" */
+    // Default is typically "posix"
 
     compat_cleanup();
 }
@@ -250,7 +250,7 @@ TEST(compat_set_strict) {
 TEST(compat_is_strict_default) {
     compat_init(NULL);
 
-    /* Default should be non-strict */
+    // Default should be non-strict
     ASSERT(!compat_is_strict(), "Strict mode should be off by default");
 
     compat_cleanup();
@@ -265,7 +265,7 @@ TEST(compat_get_entry_count) {
     compat_init(NULL);
 
     size_t count = compat_get_entry_count();
-    /* Count may be 0 if no data files found, which is okay for testing */
+    // Count may be 0 if no data files found, which is okay for testing
     (void)count;
 
     compat_cleanup();
@@ -275,7 +275,7 @@ TEST(compat_get_entry_nonexistent) {
     compat_init(NULL);
 
     const compat_entry_t *entry = compat_get_entry("nonexistent_entry_id");
-    /* May or may not find it depending on database content */
+    // May or may not find it depending on database content
     (void)entry;
 
     compat_cleanup();
@@ -286,7 +286,7 @@ TEST(compat_get_by_category) {
 
     const compat_entry_t *entries[10];
     size_t count = compat_get_by_category(COMPAT_CATEGORY_BUILTIN, entries, 10);
-    /* May have entries or not */
+    // May have entries or not
     ASSERT(count <= 10, "Should not exceed max");
 
     compat_cleanup();
@@ -297,7 +297,7 @@ TEST(compat_get_by_feature) {
 
     const compat_entry_t *entries[10];
     size_t count = compat_get_by_feature("echo", entries, 10);
-    /* May have entries or not */
+    // May have entries or not
     ASSERT(count <= 10, "Should not exceed max");
 
     compat_cleanup();
@@ -307,7 +307,7 @@ TEST(compat_get_first_by_feature) {
     compat_init(NULL);
 
     const compat_entry_t *entry = compat_get_first_by_feature("arrays");
-    /* May or may not find it */
+    // May or may not find it
     (void)entry;
 
     compat_cleanup();
@@ -331,7 +331,7 @@ TEST(compat_foreach_entry) {
 
     foreach_count = 0;
     compat_foreach_entry(count_callback, NULL);
-    /* Count should match get_entry_count */
+    // Count should match get_entry_count
     ASSERT_EQ((size_t)foreach_count, compat_get_entry_count(),
               "foreach should visit all entries");
 
@@ -348,8 +348,8 @@ TEST(compat_is_portable_simple) {
 
     compat_result_t result;
     bool portable = compat_is_portable("echo hello", SHELL_MODE_POSIX, &result);
-    /* Basic echo should be portable */
-    (void)portable; /* May vary by database content */
+    // Basic echo should be portable
+    (void)portable; // May vary by database content
 
     compat_cleanup();
 }
@@ -357,7 +357,7 @@ TEST(compat_is_portable_simple) {
 TEST(compat_is_portable_null_result) {
     compat_init(NULL);
 
-    /* Should not crash with NULL result */
+    // Should not crash with NULL result
     bool portable = compat_is_portable("echo hello", SHELL_MODE_POSIX, NULL);
     (void)portable;
 
@@ -370,7 +370,7 @@ TEST(compat_check_line) {
     compat_result_t results[10];
     size_t count =
         compat_check_line("echo -e 'hello\\n'", SHELL_MODE_POSIX, results, 10);
-    /* May find issues or not depending on database */
+    // May find issues or not depending on database
     ASSERT(count <= 10, "Should not exceed max results");
 
     compat_cleanup();
@@ -413,7 +413,7 @@ TEST(compat_effective_severity_strict) {
 
     compat_set_strict(true);
     compat_severity_t sev = compat_effective_severity(&entry);
-    /* In strict mode, warnings may be elevated to errors */
+    // In strict mode, warnings may be elevated to errors
     ASSERT(sev >= COMPAT_SEVERITY_WARNING,
            "Severity should be at least warning");
 
@@ -477,7 +477,7 @@ TEST(compat_format_result) {
 TEST(compat_debug_print_stats) {
     compat_init(NULL);
 
-    /* Should not crash - output goes to stderr */
+    // Should not crash - output goes to stderr
     FILE *old_stderr = stderr;
     FILE *null_err = fopen("/dev/null", "w");
     if (null_err) {

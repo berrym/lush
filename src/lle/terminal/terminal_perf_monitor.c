@@ -55,7 +55,7 @@ void lle_terminal_track_operation_time(lle_performance_monitor_t *perf_monitor,
      * For now, operation recorded successfully (placeholder).
      */
 
-    (void)duration_us; /* Suppress unused warning */
+    (void)duration_us; // Suppress unused warning
 }
 
 /**
@@ -74,18 +74,18 @@ void lle_terminal_monitor_display_generation(
         return;
     }
 
-    /* Check if generation time exceeds target */
-    const uint64_t TARGET_GENERATION_TIME_US = 500; /* 500us target */
+    // Check if generation time exceeds target
+    const uint64_t TARGET_GENERATION_TIME_US = 500; // 500us target
 
     if (generation_time_us > TARGET_GENERATION_TIME_US) {
-        /* Log performance warning (when Spec 14 Phase 2 implemented) */
-        /* For now, just track the metric */
+        // Log performance warning (when Spec 14 Phase 2 implemented)
+        // For now, just track the metric
     }
 
-    /* Calculate per-line generation time */
+    // Calculate per-line generation time
     uint64_t per_line_time_us =
         line_count > 0 ? generation_time_us / line_count : 0;
-    (void)per_line_time_us; /* Will be used for optimization decisions */
+    (void)per_line_time_us; // Will be used for optimization decisions
 }
 
 /**
@@ -104,17 +104,17 @@ void lle_terminal_monitor_input_processing(
         return;
     }
 
-    /* Check if processing time exceeds target */
-    const uint64_t TARGET_INPUT_TIME_US = 100; /* 100us target */
+    // Check if processing time exceeds target
+    const uint64_t TARGET_INPUT_TIME_US = 100; // 100us target
 
     if (processing_time_us > TARGET_INPUT_TIME_US) {
-        /* Log performance warning */
+        // Log performance warning
     }
 
-    /* Monitor event queue depth for backlog detection */
+    // Monitor event queue depth for backlog detection
     const size_t QUEUE_WARNING_THRESHOLD = 10;
     if (event_queue_depth > QUEUE_WARNING_THRESHOLD) {
-        /* Warn about input event backlog */
+        // Warn about input event backlog
     }
 }
 

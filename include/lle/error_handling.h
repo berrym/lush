@@ -26,7 +26,7 @@
 #define LLE_MAYBE_UNUSED
 #endif
 
-/* Convenience macro for unused parameters in function bodies */
+// Convenience macro for unused parameters in function bodies
 #define LLE_UNUSED(x) (void)(x)
 
 #include <pthread.h>
@@ -35,7 +35,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-/* Forward declarations for circular dependencies */
+// Forward declarations for circular dependencies
 struct lle_memory_pool;
 struct lle_performance_monitor;
 
@@ -51,11 +51,11 @@ struct lle_performance_monitor;
  * by category. Used as return type for virtually every LLE function.
  */
 typedef enum {
-    /* Success codes (0-999) */
+    // Success codes (0-999)
     LLE_SUCCESS = 0,           /**< Operation completed successfully */
     LLE_SUCCESS_WITH_WARNINGS, /**< Success with non-critical issues */
 
-    /* Input validation errors (1000-1099) */
+    // Input validation errors (1000-1099)
     LLE_ERROR_INVALID_PARAMETER = 1000, /**< Invalid function parameter */
     LLE_ERROR_NULL_POINTER,             /**< Null pointer passed */
     LLE_ERROR_BUFFER_OVERFLOW,          /**< Buffer size exceeded */
@@ -65,7 +65,7 @@ typedef enum {
     LLE_ERROR_INVALID_FORMAT,           /**< Data format validation failed */
     LLE_ERROR_INVALID_ENCODING,         /**< Text encoding validation failed */
 
-    /* Memory management errors (1100-1199) */
+    // Memory management errors (1100-1199)
     LLE_ERROR_OUT_OF_MEMORY = 1100,  /**< Memory allocation failed */
     LLE_ERROR_MEMORY_CORRUPTION,     /**< Memory corruption detected */
     LLE_ERROR_MEMORY_POOL_EXHAUSTED, /**< Specific pool exhausted */
@@ -75,7 +75,7 @@ typedef enum {
     LLE_ERROR_MEMORY_ALIGNMENT,  /**< Memory alignment requirements violated */
     LLE_ERROR_MEMORY_PROTECTION, /**< Memory protection violation */
 
-    /* System integration errors (1200-1299) */
+    // System integration errors (1200-1299)
     LLE_ERROR_SYSTEM_CALL = 1200,   /**< System call failed */
     LLE_ERROR_IO_ERROR,             /**< I/O operation failed */
     LLE_ERROR_TIMEOUT,              /**< Operation timed out */
@@ -85,7 +85,7 @@ typedef enum {
     LLE_ERROR_DEVICE_ERROR,         /**< Device or driver error */
     LLE_ERROR_NETWORK_ERROR,        /**< Network operation failed */
 
-    /* Component-specific errors (1300-1399) */
+    // Component-specific errors (1300-1399)
     LLE_ERROR_BUFFER_COMPONENT = 1300,  /**< Buffer management error */
     LLE_ERROR_EVENT_SYSTEM,             /**< Event system error */
     LLE_ERROR_TERMINAL_ABSTRACTION,     /**< Terminal abstraction error */
@@ -103,7 +103,7 @@ typedef enum {
     LLE_ERROR_NO_OPERATION_IN_PROGRESS, /**< No operation in progress */
     LLE_ERROR_INVALID_INPUT_EVENT,      /**< Invalid input event data */
 
-    /* Feature and extensibility errors (1400-1499) */
+    // Feature and extensibility errors (1400-1499)
     LLE_ERROR_FEATURE_DISABLED = 1400,  /**< Required feature disabled */
     LLE_ERROR_FEATURE_NOT_AVAILABLE,    /**< Feature not available */
     LLE_ERROR_PLUGIN_LOAD_FAILED,       /**< Plugin loading failed */
@@ -115,7 +115,7 @@ typedef enum {
     LLE_ERROR_CONFIGURATION_INVALID,    /**< Configuration validation failed */
     LLE_ERROR_CONFIGURATION_MISSING,    /**< Required configuration missing */
 
-    /* Performance and resource errors (1500-1599) */
+    // Performance and resource errors (1500-1599)
     LLE_ERROR_PERFORMANCE_DEGRADED = 1500, /**< Performance below threshold */
     LLE_ERROR_RESOURCE_EXHAUSTED,          /**< Resource limit exceeded */
     LLE_ERROR_QUEUE_FULL,                  /**< Event queue full */
@@ -131,7 +131,7 @@ typedef enum {
     LLE_ERROR_ALREADY_EXISTS,      /**< Item already exists */
     LLE_ERROR_DISABLED,            /**< Feature/widget is disabled */
 
-    /* Critical system errors (1600-1699) */
+    // Critical system errors (1600-1699)
     LLE_ERROR_INITIALIZATION_FAILED = 1600, /**< System initialization failed */
     LLE_ERROR_SHUTDOWN_FAILED,              /**< System shutdown failed */
     LLE_ERROR_STATE_CORRUPTION,             /**< Internal state corrupted */
@@ -283,45 +283,45 @@ typedef enum {
  * and performance impact.
  */
 typedef struct lle_error_context {
-    /* Primary error information */
+    // Primary error information
     lle_result_t error_code;       /**< Primary error code */
     const char *error_message;     /**< Human-readable error message */
     const char *technical_details; /**< Technical details for debugging */
 
-    /* Source location information */
+    // Source location information
     const char *function_name;  /**< Function where error occurred */
     const char *file_name;      /**< Source file name */
     int line_number;            /**< Line number in source */
     const char *component_name; /**< LLE component name */
 
-    /* Execution context */
+    // Execution context
     uint64_t thread_id;         /**< Thread identifier */
     uint64_t timestamp_ns;      /**< Error timestamp (nanoseconds) */
     uint64_t operation_id;      /**< Unique operation identifier */
     const char *operation_name; /**< Operation being performed */
 
-    /* System state information */
+    // System state information
     size_t memory_usage_bytes;      /**< Current memory usage */
     size_t memory_pool_utilization; /**< Memory pool utilization percentage */
     uint32_t active_components;     /**< Bitmask of active components */
     uint32_t system_load_factor;    /**< Current system load (0-100) */
 
-    /* Error chain and causality */
+    // Error chain and causality
     struct lle_error_context *root_cause;      /**< Root cause error */
     struct lle_error_context *immediate_cause; /**< Immediate cause error */
     uint32_t error_chain_depth;                /**< Depth in error chain */
 
-    /* Recovery and handling information */
+    // Recovery and handling information
     uint32_t recovery_attempts;      /**< Number of recovery attempts made */
     uint32_t degradation_level;      /**< Current system degradation level */
     bool auto_recovery_possible;     /**< Whether auto-recovery is possible */
     bool user_intervention_required; /**< Whether user intervention needed */
 
-    /* Performance impact */
+    // Performance impact
     uint64_t performance_impact_ns; /**< Performance impact measurement */
     bool critical_path_affected;    /**< Whether critical path affected */
 
-    /* Custom context data */
+    // Custom context data
     void *context_data;       /**< Component-specific context data */
     size_t context_data_size; /**< Size of context data */
     void (*context_data_cleanup)(
@@ -341,7 +341,7 @@ typedef struct lle_error_state_machine {
     uint64_t total_handling_time_ns; /**< Total time in error handling */
     uint32_t state_transitions;      /**< Number of state transitions */
 
-    /* State-specific data union */
+    // State-specific data union
     union {
         struct {
             uint32_t analysis_progress; /**< Analysis progress percentage */
@@ -387,13 +387,13 @@ typedef void (*lle_error_reporter_t)(const lle_error_context_t *context,
  * console, log files, system log, and callbacks.
  */
 typedef struct lle_error_reporting_config {
-    /* Reporting targets */
+    // Reporting targets
     bool console_reporting_enabled;    /**< Enable console reporting */
     bool log_file_reporting_enabled;   /**< Enable log file reporting */
     bool system_log_reporting_enabled; /**< Enable system log reporting */
     bool callback_reporting_enabled;   /**< Enable callback reporting */
 
-    /* Reporting filters */
+    // Reporting filters
     lle_error_severity_t
         min_console_severity; /**< Minimum severity for console */
     lle_error_severity_t
@@ -403,16 +403,16 @@ typedef struct lle_error_reporting_config {
     lle_error_severity_t
         min_callback_severity; /**< Minimum severity for callback */
 
-    /* Configuration */
+    // Configuration
     const char *log_file_path;   /**< Path to log file */
     size_t max_log_file_size;    /**< Maximum log file size */
     uint32_t log_rotation_count; /**< Number of rotated logs to keep */
 
-    /* Callback */
+    // Callback
     lle_error_reporter_t error_callback; /**< Error reporting callback */
     void *callback_user_data;            /**< User data for callback */
 
-    /* Performance settings */
+    // Performance settings
     bool async_reporting;              /**< Use async reporting */
     uint32_t reporting_queue_size;     /**< Size of async reporting queue */
     uint64_t max_reporting_latency_ns; /**< Maximum reporting latency */
@@ -427,20 +427,20 @@ typedef struct lle_error_reporting_config {
 typedef struct lle_error_reporting_system {
     lle_error_reporting_config_t config; /**< Reporting configuration */
 
-    /* Infrastructure */
+    // Infrastructure
     FILE *log_file;             /**< Open log file handle */
     void *async_queue;          /**< Async reporting queue (circular buffer) */
     pthread_t reporting_thread; /**< Async reporting thread */
     pthread_mutex_t reporting_mutex; /**< Reporting mutex */
 
-    /* Statistics */
+    // Statistics
     uint64_t total_errors_reported; /**< Total errors reported */
     uint64_t
         errors_by_severity[LLE_SEVERITY_FATAL + 1]; /**< Errors by severity */
     uint64_t avg_reporting_latency_ns; /**< Average reporting latency */
     uint64_t max_reporting_latency_ns; /**< Maximum reporting latency */
 
-    /* Suppression */
+    // Suppression
     void *error_suppression_table; /**< Error suppression hashtable */
     uint32_t max_duplicate_errors_per_minute; /**< Max duplicates per minute */
 } lle_error_reporting_system_t;
@@ -461,22 +461,22 @@ typedef struct lle_recovery_strategy {
     const char *strategy_name;         /**< Strategy name */
     const char *description;           /**< Strategy description */
 
-    /* Parameters */
+    // Parameters
     uint32_t max_attempts;   /**< Maximum retry attempts */
     uint64_t retry_delay_ms; /**< Delay between retries */
     uint64_t timeout_ms;     /**< Strategy timeout */
 
-    /* Success probability and cost */
+    // Success probability and cost
     float success_probability;  /**< Estimated success probability (0-1) */
     uint64_t estimated_cost_ns; /**< Estimated execution cost */
     uint32_t degradation_level; /**< Degradation level if applied */
 
-    /* Prerequisites */
+    // Prerequisites
     uint32_t required_resources;     /**< Required resource bitmask */
     bool requires_user_confirmation; /**< Requires user confirmation */
     bool affects_critical_path;      /**< Affects critical path */
 
-    /* Implementation */
+    // Implementation
     lle_result_t (*execute_strategy)(
         const lle_error_context_t *error_context,
         void *strategy_data);  /**< Execution function */
@@ -501,7 +501,7 @@ typedef struct lle_feature_degradation_map {
     bool is_critical_feature;         /**< Whether feature is critical */
     const char *fallback_description; /**< Fallback description */
 
-    /* Degradation functions */
+    // Degradation functions
     /** Apply degradation to the feature at the given level */
     lle_result_t (*apply_degradation)(uint32_t degradation_level,
                                       void *feature_data);
@@ -520,18 +520,18 @@ typedef struct lle_degradation_controller {
     lle_degradation_level_t previous_level; /**< Previous degradation level */
     uint64_t degradation_start_time_ns;     /**< Time degradation started */
 
-    /* Feature mapping */
+    // Feature mapping
     lle_feature_degradation_map_t
         *feature_map;         /**< Feature degradation mappings */
     size_t feature_map_count; /**< Number of feature mappings */
 
-    /* Statistics */
+    // Statistics
     uint64_t degradation_events;          /**< Number of degradation events */
     uint64_t total_degraded_time_ns;      /**< Total time in degraded state */
     uint64_t automatic_recovery_attempts; /**< Automatic recovery attempts */
     uint64_t successful_recoveries;       /**< Successful recoveries */
 
-    /* Recovery monitoring */
+    // Recovery monitoring
     bool recovery_in_progress;          /**< Recovery in progress */
     uint64_t recovery_start_time_ns;    /**< Recovery start time */
     uint32_t recovery_progress_percent; /**< Recovery progress percentage */
@@ -563,17 +563,17 @@ typedef struct lle_event_circuit_breaker {
 typedef struct lle_memory_safe_error_context {
     lle_error_context_t base_context; /**< Base error context */
 
-    /* Memory tracking */
+    // Memory tracking
     struct lle_memory_pool *error_pool; /**< Error memory pool */
     void **allocated_resources;         /**< Allocated resources array */
     size_t allocated_count;             /**< Number of allocated resources */
     size_t allocated_capacity;          /**< Capacity of resources array */
 
-    /* Cleanup functions */
+    // Cleanup functions
     void (**cleanup_functions)(void *); /**< Cleanup function array */
     size_t cleanup_count;               /**< Number of cleanup functions */
 
-    /* Memory protection */
+    // Memory protection
     uint32_t magic_header; /**< Magic header for validation */
     uint32_t magic_footer; /**< Magic footer for validation */
 } lle_memory_safe_error_context_t;
@@ -594,7 +594,7 @@ typedef struct lle_memory_safe_error_context {
 typedef struct lle_forensic_log_entry {
     lle_error_context_t error_context; /**< Error context */
 
-    /* System snapshot */
+    // System snapshot
     struct {
         uint64_t total_memory_usage;     /**< Total memory usage */
         uint64_t peak_memory_usage;      /**< Peak memory usage */
@@ -607,7 +607,7 @@ typedef struct lle_forensic_log_entry {
         uint32_t cache_hit_rate_percent; /**< Cache hit rate percentage */
     } system_snapshot;
 
-    /* Stack trace */
+    // Stack trace
     struct {
         void *stack_frames[LLE_MAX_STACK_FRAMES]; /**< Stack frame pointers */
         size_t frame_count;        /**< Number of frames captured */
@@ -615,7 +615,7 @@ typedef struct lle_forensic_log_entry {
         bool stack_trace_complete; /**< Stack trace is complete */
     } stack_trace;
 
-    /* Component state dumps */
+    // Component state dumps
     struct {
         char *buffer_state_dump;       /**< Buffer state dump */
         char *event_system_state_dump; /**< Event system state dump */
@@ -624,7 +624,7 @@ typedef struct lle_forensic_log_entry {
         size_t total_state_dump_size;  /**< Total dump size */
     } component_state;
 
-    /* Recovery log */
+    // Recovery log
     struct {
         lle_recovery_strategy_t
             attempted_strategies[10];    /**< Attempted strategies */
@@ -680,7 +680,7 @@ typedef struct lle_error_injection_config {
     uint64_t injection_interval_ns;  /**< Minimum injection interval */
     uint64_t last_injection_time_ns; /**< Last injection time */
 
-    /* Statistics */
+    // Statistics
     uint64_t total_injections;      /**< Total injections */
     uint64_t successful_recoveries; /**< Successful recoveries */
     uint64_t failed_recoveries;     /**< Failed recoveries */
@@ -701,7 +701,7 @@ typedef struct lle_error_validation_test {
         expected_degradation;      /**< Expected degradation level */
     uint64_t max_recovery_time_ns; /**< Maximum recovery time */
 
-    /* Test functions */
+    // Test functions
     /** Prepare test fixtures and state before execution */
     lle_result_t (*setup_test)(void *test_context);
     /** Execute the validation test body */
@@ -718,7 +718,7 @@ typedef struct lle_error_validation_test {
  * All implementations are in src/lle/error_handling.c (Layer 1)
  */
 
-/* Error Context Management */
+// Error Context Management
 /**
  * @brief Create a new error context populated with the supplied fields
  * @param error_code Primary error code
@@ -770,7 +770,7 @@ void lle_init_memory_safe_error_context(lle_memory_safe_error_context_t *ctx);
 void lle_cleanup_memory_safe_error_context(
     lle_memory_safe_error_context_t *ctx);
 
-/* Error Severity */
+// Error Severity
 /**
  * @brief Determine the severity of an error using its code and context
  * @param error_code Error code to classify
@@ -788,7 +788,7 @@ lle_determine_error_severity(lle_result_t error_code,
  */
 lle_error_severity_t lle_fast_determine_severity(lle_result_t error_code);
 
-/* Error Reporting */
+// Error Reporting
 /**
  * @brief Report an error through all configured reporting channels
  * @param context Error context to report
@@ -831,7 +831,7 @@ void lle_fast_report_critical_error(const lle_error_context_t *ctx);
 bool lle_should_suppress_error(lle_error_reporting_system_t *system,
                                const lle_error_context_t *context);
 
-/* Recovery Strategy */
+// Recovery Strategy
 /**
  * @brief Select the best recovery strategy for an error context
  * @param error_context Error context to recover from
@@ -852,7 +852,7 @@ lle_get_recovery_strategies_for_error(lle_result_t error_code,
                                       lle_recovery_strategy_t **strategies,
                                       size_t *strategy_count);
 
-/* Degradation Control */
+// Degradation Control
 /**
  * @brief Apply a system degradation level via the degradation controller
  * @param controller Degradation controller
@@ -872,7 +872,7 @@ lle_result_t lle_apply_degradation(lle_degradation_controller_t *controller,
 void lle_log_degradation_event(lle_degradation_level_t level,
                                const char *reason);
 
-/* Component-Specific Error Handlers */
+// Component-Specific Error Handlers
 /**
  * @brief Handle a buffer subsystem error
  * @param buffer Buffer instance the error occurred in
@@ -894,7 +894,7 @@ lle_result_t
 lle_handle_event_system_error(void *event_system, lle_event_error_t error,
                               lle_event_circuit_breaker_t *breaker);
 
-/* Memory Integration */
+// Memory Integration
 /**
  * @brief Initialize the dedicated memory pools used by the error subsystem
  * @return LLE_SUCCESS or an error code on failure
@@ -915,7 +915,7 @@ void *lle_error_pool_alloc(size_t size);
  */
 char *lle_error_string_pool_strdup(const char *str);
 
-/* Forensic Logging */
+// Forensic Logging
 /**
  * @brief Create a forensic log entry capturing system state for an error
  * @param error_context Error context to capture
@@ -933,7 +933,7 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
  */
 const char *lle_generate_technical_details(lle_result_t error_code);
 
-/* Performance-Critical Path */
+// Performance-Critical Path
 /**
  * @brief Handle an error on the performance-critical execution path
  * @param error_code Error code that occurred
@@ -943,7 +943,7 @@ const char *lle_generate_technical_details(lle_result_t error_code);
 lle_result_t lle_handle_critical_path_error(lle_result_t error_code,
                                             const char *component);
 
-/* Timing Functions */
+// Timing Functions
 /**
  * @brief Get a fast monotonic timestamp in nanoseconds
  * @return Timestamp in nanoseconds
@@ -968,7 +968,7 @@ uint64_t lle_get_thread_id(void);
  */
 uint64_t lle_get_timestamp_ns(void);
 
-/* Atomic Operations */
+// Atomic Operations
 /**
  * @brief Atomically increment an error statistics counter
  * @param counter Pointer to the atomic counter
@@ -1013,7 +1013,7 @@ lle_result_t lle_error_update_statistics_lockfree(lle_result_t error_code,
                                                   uint64_t recovery_time_ns,
                                                   bool recovery_successful);
 
-/* System State */
+// System State
 /**
  * @brief Get the identifier of the current in-flight operation
  * @return Current operation identifier
@@ -1050,7 +1050,7 @@ uint64_t lle_measure_current_performance_impact(void);
  */
 bool lle_is_critical_path_active(void);
 
-/* Testing and Validation */
+// Testing and Validation
 /**
  * @brief Possibly inject a test error based on injection configuration
  * @param component Component name being tested
@@ -1090,4 +1090,4 @@ lle_result_t lle_run_error_handling_validation_suite(void);
 lle_result_t
 lle_run_individual_validation_test(const lle_error_validation_test_t *test);
 
-#endif /* LLE_ERROR_HANDLING_H */
+#endif // LLE_ERROR_HANDLING_H

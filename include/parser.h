@@ -53,11 +53,11 @@
  * order (multiple heredocs on one line stack their bodies in sequence).
  */
 typedef struct {
-    node_t *redir_node;       /* NODE_REDIR_HEREDOC[_STRIP] to populate   */
-    const char *delimiter;    /* borrowed from redir_node->val.str        */
-    bool strip_tabs;          /* <<- variant: strip leading tabs          */
-    bool expand_variables;    /* unquoted delimiter -> expand body at exec */
-    source_location_t op_loc; /* `<<` operator location, for diagnostics  */
+    node_t *redir_node;       /**< NODE_REDIR_HEREDOC[_STRIP] to populate */
+    const char *delimiter;    /**< borrowed from redir_node->val.str */
+    bool strip_tabs;          /**< <<- variant: strip leading tabs */
+    bool expand_variables;    /**< unquoted delimiter -> expand body at exec */
+    source_location_t op_loc; /**< `<<` operator location, for diagnostics */
 } pending_heredoc_t;
 
 /** Parser state */
@@ -66,18 +66,18 @@ typedef struct parser {
     const char *error_message;
     bool has_error;
 
-    /* Structured error collection (Phase 2 error management) */
+    // Structured error collection (Phase 2 error management)
     shell_error_collector_t *error_collector;
-    const char *source_name; /* Script name for error display */
+    const char *source_name; /**< Script name for error display */
 
-    /* Parser context stack for context-aware error messages */
+    // Parser context stack for context-aware error messages
     const char *context_stack[PARSER_CONTEXT_MAX];
     size_t context_depth;
 
-    /* Recursion depth tracking for stack overflow protection */
+    // Recursion depth tracking for stack overflow protection
     size_t recursion_depth;
 
-    /* Heredocs awaiting deferred body collection (see pending_heredoc_t) */
+    // Heredocs awaiting deferred body collection (see pending_heredoc_t)
     pending_heredoc_t pending_heredocs[PARSER_MAX_PENDING_HEREDOCS];
     size_t pending_heredoc_count;
 } parser_t;
@@ -323,4 +323,4 @@ void parser_exit_recursion(parser_t *parser);
  */
 size_t parser_get_recursion_depth(parser_t *parser);
 
-#endif /* PARSER_H */
+#endif // PARSER_H

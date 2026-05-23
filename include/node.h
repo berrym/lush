@@ -13,7 +13,7 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include "shell_error.h" /* For source_location_t */
+#include "shell_error.h" // For source_location_t
 
 #include <stddef.h>
 #include <stdint.h>
@@ -43,10 +43,10 @@ typedef enum {
     NODE_REDIR_FD,            /**< '&1', '&2', etc. */
     NODE_REDIR_FD_ALLOC, /**< '{varname}>' - fd allocation (bash 4.1+/zsh) */
     NODE_REDIR_CLOBBER,  /**< '>|' */
-    /* List types for semantic clarity */
+    // List types for semantic clarity
     NODE_COMMAND_LIST, /**< Sequence of commands separated by semicolons */
     NODE_PIPELINE,     /**< Sequence of commands connected by pipes */
-    /* Control structures */
+    // Control structures
     NODE_IF,        /**< if statement */
     NODE_FOR,       /**< for loop (POSIX: for var in words) */
     NODE_FOR_ARITH, /**< C-style for loop: for ((init; test; update)) */
@@ -57,34 +57,34 @@ typedef enum {
     NODE_FUNCTION, /**< function definition */
     NODE_BRACE_GROUP, /**< brace group { commands; } */
     NODE_SUBSHELL,    /**< subshell ( commands ) */
-    /* Logical operators */
+    // Logical operators
     NODE_LOGICAL_AND, /**< && operator */
     NODE_LOGICAL_OR,  /**< || operator */
-    /* Job control */
+    // Job control
     NODE_BACKGROUND, /**< & operator (background execution) */
 
-    /* Extended language features (Phase 1: Arrays and Arithmetic) */
+    // Extended language features (Phase 1: Arrays and Arithmetic)
     NODE_ARITH_CMD,     /**< (( expr )) - arithmetic command evaluation */
     NODE_ARRAY_LITERAL, /**< (a b c) - array literal */
     NODE_ARRAY_ACCESS,  /**< ${arr[index]} - array element access */
     NODE_ARRAY_ASSIGN,  /**< arr[n]=value or arr=(...) - array assignment */
     NODE_ARRAY_APPEND,  /**< arr+=(a b c) - append elements to array */
 
-    /* Extended language features (Phase 2: Extended Tests) */
+    // Extended language features (Phase 2: Extended Tests)
     NODE_EXTENDED_TEST, /**< [[ expr ]] - extended test command */
 
-    /* Extended language features (Phase 3: Process Substitution) */
+    // Extended language features (Phase 3: Process Substitution)
     NODE_PROC_SUB_IN,  /**< <(cmd) - process substitution input */
     NODE_PROC_SUB_OUT, /**< >(cmd) - process substitution output */
     NODE_COPROC,       /**< coproc name cmd - coprocess */
 
-    /* Extended language features (Phase 5: Control Flow) */
+    // Extended language features (Phase 5: Control Flow)
     NODE_CASE_ITEM, /**< Case item with terminator type */
     NODE_SELECT,    /**< select var in list; do body; done */
     NODE_TIME,      /**< time [-p] pipeline */
     NODE_NEGATE,    /**< ! pipeline - negate exit status */
 
-    /* Extended language features (Phase 7: Zsh-Specific) */
+    // Extended language features (Phase 7: Zsh-Specific)
     NODE_ANON_FUNCTION, /**< () { body } - anonymous function (immediately
                            executed) */
 } node_type_t;
@@ -126,7 +126,7 @@ typedef struct node {
     struct node *first_child;                 ///< First child in linked list
     struct node *next_sibling, *prev_sibling; ///< Sibling linked-list pointers
 
-    /* Source location tracking for error reporting */
+    // Source location tracking for error reporting
     source_location_t loc;
 } node_t;
 

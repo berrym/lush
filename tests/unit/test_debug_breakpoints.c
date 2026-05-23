@@ -38,9 +38,9 @@
 #define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
 #define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
-/* Test framework macros */
+// Test framework macros
 
-/* Helper to create a debug context for testing */
+// Helper to create a debug context for testing
 static debug_context_t *create_test_context(void) {
     debug_context_t *ctx = calloc(1, sizeof(debug_context_t));
     if (ctx) {
@@ -51,7 +51,7 @@ static debug_context_t *create_test_context(void) {
         ctx->current_frame = NULL;
         ctx->mode = DEBUG_MODE_CONTINUE;
         ctx->step_mode = false;
-        /* Initialize execution context */
+        // Initialize execution context
         ctx->execution_context.in_loop = false;
         ctx->execution_context.loop_variable = NULL;
         ctx->execution_context.loop_variable_value = NULL;
@@ -62,7 +62,7 @@ static debug_context_t *create_test_context(void) {
     return ctx;
 }
 
-/* Helper to free a debug context */
+// Helper to free a debug context
 static void free_test_context(debug_context_t *ctx) {
     if (ctx) {
         debug_clear_breakpoints(ctx);
@@ -165,7 +165,7 @@ static int test_add_multiple_breakpoints(void) {
     ASSERT(id2 != id3);
     ASSERT(id1 != id3);
 
-    /* Breakpoints are added to head of list, so most recent is first */
+    // Breakpoints are added to head of list, so most recent is first
     ASSERT_NOT_NULL(ctx->breakpoints);
     ASSERT_EQ(ctx->breakpoints->id, id3);
     ASSERT_NOT_NULL(ctx->breakpoints->next);
@@ -261,11 +261,11 @@ static int test_remove_breakpoint_from_middle(void) {
     int id2 = debug_add_breakpoint(ctx, "file2.sh", 20, NULL);
     int id3 = debug_add_breakpoint(ctx, "file3.sh", 30, NULL);
 
-    /* List order: id3 -> id2 -> id1 */
+    // List order: id3 -> id2 -> id1
     bool result = debug_remove_breakpoint(ctx, id2);
     ASSERT(result);
 
-    /* List should now be: id3 -> id1 */
+    // List should now be: id3 -> id1
     ASSERT_NOT_NULL(ctx->breakpoints);
     ASSERT_EQ(ctx->breakpoints->id, id3);
     ASSERT_NOT_NULL(ctx->breakpoints->next);
@@ -283,7 +283,7 @@ static int test_remove_breakpoint_from_head(void) {
     int id1 = debug_add_breakpoint(ctx, "file1.sh", 10, NULL);
     int id2 = debug_add_breakpoint(ctx, "file2.sh", 20, NULL);
 
-    /* List order: id2 -> id1, remove head */
+    // List order: id2 -> id1, remove head
     bool result = debug_remove_breakpoint(ctx, id2);
     ASSERT(result);
 
@@ -302,7 +302,7 @@ static int test_remove_breakpoint_from_tail(void) {
     int id1 = debug_add_breakpoint(ctx, "file1.sh", 10, NULL);
     int id2 = debug_add_breakpoint(ctx, "file2.sh", 20, NULL);
 
-    /* List order: id2 -> id1, remove tail */
+    // List order: id2 -> id1, remove tail
     bool result = debug_remove_breakpoint(ctx, id1);
     ASSERT(result);
 
@@ -321,10 +321,10 @@ static int test_remove_breakpoint_with_condition_frees_memory(void) {
     int id = debug_add_breakpoint(ctx, "test.sh", 10, "$x > 10");
     ASSERT(id > 0);
 
-    /* Verify condition was set */
+    // Verify condition was set
     ASSERT_NOT_NULL(ctx->breakpoints->condition);
 
-    /* Remove should free condition string without crashing */
+    // Remove should free condition string without crashing
     bool result = debug_remove_breakpoint(ctx, id);
     ASSERT(result);
     ASSERT_NULL(ctx->breakpoints);
@@ -391,7 +391,7 @@ static int test_enable_breakpoint_already_enabled(void) {
     int id = debug_add_breakpoint(ctx, "test.sh", 10, NULL);
     ASSERT(ctx->breakpoints->enabled);
 
-    /* Enable an already enabled breakpoint */
+    // Enable an already enabled breakpoint
     bool result = debug_enable_breakpoint(ctx, id, true);
     ASSERT(result);
     ASSERT(ctx->breakpoints->enabled);
@@ -406,7 +406,7 @@ static int test_reenable_breakpoint(void) {
 
     int id = debug_add_breakpoint(ctx, "test.sh", 10, NULL);
 
-    /* Disable then re-enable */
+    // Disable then re-enable
     debug_enable_breakpoint(ctx, id, false);
     ASSERT(!ctx->breakpoints->enabled);
 
@@ -426,11 +426,11 @@ static int test_enable_specific_breakpoint_in_list(void) {
     int id2 = debug_add_breakpoint(ctx, "file2.sh", 20, NULL);
     int id3 = debug_add_breakpoint(ctx, "file3.sh", 30, NULL);
 
-    /* Disable the middle one */
+    // Disable the middle one
     bool result = debug_enable_breakpoint(ctx, id2, false);
     ASSERT(result);
 
-    /* Verify only id2 is disabled */
+    // Verify only id2 is disabled
     breakpoint_t *bp = ctx->breakpoints;
     while (bp) {
         if (bp->id == id2) {
@@ -452,7 +452,7 @@ static int test_enable_specific_breakpoint_in_list(void) {
  * ============================================================ */
 
 static int test_list_breakpoints_null_context(void) {
-    /* Should not crash */
+    // Should not crash
     debug_list_breakpoints(NULL);
     return 1;
 }
@@ -462,7 +462,7 @@ static int test_list_breakpoints_disabled_context(void) {
     ASSERT_NOT_NULL(ctx);
     ctx->enabled = false;
 
-    /* Should not crash, just return early */
+    // Should not crash, just return early
     debug_list_breakpoints(ctx);
 
     free_test_context(ctx);
@@ -473,7 +473,7 @@ static int test_list_breakpoints_empty(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Should not crash with no breakpoints */
+    // Should not crash with no breakpoints
     debug_list_breakpoints(ctx);
 
     free_test_context(ctx);
@@ -487,7 +487,7 @@ static int test_list_breakpoints_with_entries(void) {
     debug_add_breakpoint(ctx, "file1.sh", 10, NULL);
     debug_add_breakpoint(ctx, "file2.sh", 20, "$x == 5");
 
-    /* Should not crash, output goes to /dev/null */
+    // Should not crash, output goes to /dev/null
     debug_list_breakpoints(ctx);
 
     free_test_context(ctx);
@@ -499,7 +499,7 @@ static int test_list_breakpoints_with_entries(void) {
  * ============================================================ */
 
 static int test_clear_breakpoints_null_context(void) {
-    /* Should not crash */
+    // Should not crash
     debug_clear_breakpoints(NULL);
     return 1;
 }
@@ -560,7 +560,7 @@ static int test_clear_breakpoints_resets_id_counter(void) {
     debug_clear_breakpoints(ctx);
     ASSERT_EQ(ctx->next_breakpoint_id, 1);
 
-    /* Adding after clear should start from 1 */
+    // Adding after clear should start from 1
     int id = debug_add_breakpoint(ctx, "test.sh", 30, NULL);
     ASSERT_EQ(id, 1);
 
@@ -624,11 +624,11 @@ static int test_check_breakpoint_no_match(void) {
 
     debug_add_breakpoint(ctx, "test.sh", 10, NULL);
 
-    /* Different file */
+    // Different file
     bool result = debug_check_breakpoint(ctx, "other.sh", 10);
     ASSERT(!result);
 
-    /* Different line */
+    // Different line
     result = debug_check_breakpoint(ctx, "test.sh", 20);
     ASSERT(!result);
 
@@ -666,7 +666,7 @@ static int test_step_fires_within_target_depth(void) {
     ctx->step_target_depth = 5;
     ctx->stack_depth = 3;
 
-    /* 3 <= 5: not deeper than the target -- stepping stops here. */
+    // 3 <= 5: not deeper than the target -- stepping stops here.
     ASSERT(debug_check_breakpoint(ctx, "f.sh", 1));
 
     free_test_context(ctx);
@@ -680,7 +680,7 @@ static int test_step_suppressed_beyond_target_depth(void) {
     ctx->step_target_depth = 2;
     ctx->stack_depth = 6;
 
-    /* 6 > 2: this node is inside a stepped-over call -- no stop. */
+    // 6 > 2: this node is inside a stepped-over call -- no stop.
     ASSERT(!debug_check_breakpoint(ctx, "f.sh", 1));
 
     free_test_context(ctx);
@@ -688,7 +688,7 @@ static int test_step_suppressed_beyond_target_depth(void) {
 }
 
 static int test_step_into_null_context(void) {
-    /* Should not crash */
+    // Should not crash
     debug_step_into(NULL);
     return 1;
 }
@@ -699,7 +699,7 @@ static int test_step_into_disabled_context(void) {
     ctx->enabled = false;
 
     debug_step_into(ctx);
-    /* Should not change state when disabled */
+    // Should not change state when disabled
     ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
     ASSERT(!ctx->step_mode);
 
@@ -796,7 +796,7 @@ static int test_continue_disabled_context(void) {
     ctx->step_mode = true;
 
     debug_continue(ctx);
-    /* Should not change state when disabled */
+    // Should not change state when disabled
     ASSERT(ctx->step_mode);
 
     free_test_context(ctx);
@@ -842,7 +842,7 @@ static int test_handle_user_input_empty(void) {
     ctx->step_mode = true;
 
     debug_handle_user_input(ctx, "");
-    /* Empty input defaults to continue */
+    // Empty input defaults to continue
     ASSERT(!ctx->step_mode);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
 
@@ -856,7 +856,7 @@ static int test_handle_user_input_whitespace_only(void) {
     ctx->step_mode = true;
 
     debug_handle_user_input(ctx, "   \t  \n");
-    /* Whitespace-only input defaults to continue */
+    // Whitespace-only input defaults to continue
     ASSERT(!ctx->step_mode);
 
     free_test_context(ctx);
@@ -943,7 +943,7 @@ static int test_handle_user_input_finish_short(void) {
     ctx->step_mode = true;
     ctx->stack_depth = 2;
 
-    /* 'f' is a resume command and performs step-out. */
+    // 'f' is a resume command and performs step-out.
     bool resume = debug_handle_user_input(ctx, "f\n");
     ASSERT(resume);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);
@@ -1003,7 +1003,7 @@ static int test_handle_user_input_unknown_command(void) {
     debug_mode_t original_mode = ctx->mode;
 
     debug_handle_user_input(ctx, "foobar\n");
-    /* Unknown command should not change mode */
+    // Unknown command should not change mode
     ASSERT_EQ(ctx->mode, original_mode);
 
     free_test_context(ctx);
@@ -1029,7 +1029,7 @@ static int test_handle_user_input_backtrace(void) {
     ctx->step_mode = true;
     debug_mode_t original_mode = ctx->mode;
 
-    /* bt command shows stack, doesn't change mode */
+    // bt command shows stack, doesn't change mode
     debug_handle_user_input(ctx, "bt\n");
     ASSERT_EQ(ctx->mode, original_mode);
 
@@ -1045,7 +1045,7 @@ static int test_handle_user_input_list(void) {
     ASSERT_NOT_NULL(ctx);
     debug_add_breakpoint(ctx, "test.sh", 10, NULL);
 
-    /* l/list shows breakpoints */
+    // l/list shows breakpoints
     debug_handle_user_input(ctx, "l\n");
     debug_handle_user_input(ctx, "list\n");
 
@@ -1057,7 +1057,7 @@ static int test_handle_user_input_help(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* h/help shows help text */
+    // h/help shows help text
     debug_handle_user_input(ctx, "h\n");
     debug_handle_user_input(ctx, "help\n");
 
@@ -1069,7 +1069,7 @@ static int test_handle_user_input_vars(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* vars shows all variables */
+    // vars shows all variables
     debug_handle_user_input(ctx, "vars\n");
 
     free_test_context(ctx);
@@ -1080,7 +1080,7 @@ static int test_handle_user_input_where(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* where shows current location */
+    // where shows current location
     debug_handle_user_input(ctx, "where\n");
 
     free_test_context(ctx);
@@ -1091,7 +1091,7 @@ static int test_handle_user_input_print_variable(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* p <var> inspects variable */
+    // p <var> inspects variable
     debug_handle_user_input(ctx, "p myvar\n");
     debug_handle_user_input(ctx, "print somevar\n");
 
@@ -1103,7 +1103,7 @@ static int test_handle_user_input_watch(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* watch <var> adds to watch list */
+    // watch <var> adds to watch list
     debug_handle_user_input(ctx, "watch counter\n");
 
     free_test_context(ctx);
@@ -1114,7 +1114,7 @@ static int test_handle_user_input_set(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* set <var>=<value> sets variable */
+    // set <var>=<value> sets variable
     debug_handle_user_input(ctx, "set x=10\n");
 
     free_test_context(ctx);
@@ -1125,7 +1125,7 @@ static int test_handle_user_input_eval(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* eval <expr> evaluates expression */
+    // eval <expr> evaluates expression
     debug_handle_user_input(ctx, "eval $x + 1\n");
 
     free_test_context(ctx);
@@ -1136,7 +1136,7 @@ static int test_handle_user_input_mode(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* mode shows current shell mode */
+    // mode shows current shell mode
     debug_handle_user_input(ctx, "mode\n");
 
     free_test_context(ctx);
@@ -1147,7 +1147,7 @@ static int test_handle_user_input_features(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* features lists all shell features */
+    // features lists all shell features
     debug_handle_user_input(ctx, "features\n");
 
     free_test_context(ctx);
@@ -1167,7 +1167,7 @@ static int test_stack_up_with_context(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Currently a placeholder */
+    // Currently a placeholder
     debug_stack_up(ctx);
 
     free_test_context(ctx);
@@ -1183,7 +1183,7 @@ static int test_stack_down_with_context(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Currently a placeholder */
+    // Currently a placeholder
     debug_stack_down(ctx);
 
     free_test_context(ctx);
@@ -1222,8 +1222,7 @@ static int test_show_current_location_with_frame(void) {
 
     debug_show_current_location(ctx);
 
-    ctx->current_frame =
-        NULL; /* Don't let free_test_context touch stack frame */
+    ctx->current_frame = NULL; // Don't let free_test_context touch stack frame
     free_test_context(ctx);
     return 1;
 }
@@ -1251,7 +1250,7 @@ static int test_set_variable_with_assignment(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Currently a placeholder */
+    // Currently a placeholder
     debug_set_variable(ctx, "myvar=hello");
 
     free_test_context(ctx);
@@ -1281,7 +1280,7 @@ static int test_evaluate_expression_with_expression(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Currently a placeholder */
+    // Currently a placeholder
     debug_evaluate_expression(ctx, "$x + 1");
 
     free_test_context(ctx);
@@ -1294,7 +1293,7 @@ static int test_evaluate_expression_with_expression(void) {
 
 static int test_evaluate_condition_null_context(void) {
     bool result = debug_evaluate_condition(NULL, "$x == 5");
-    ASSERT(result); /* NULL context returns true */
+    ASSERT(result); // NULL context returns true
     return 1;
 }
 
@@ -1303,7 +1302,7 @@ static int test_evaluate_condition_null_condition(void) {
     ASSERT_NOT_NULL(ctx);
 
     bool result = debug_evaluate_condition(ctx, NULL);
-    ASSERT(result); /* NULL condition means always true */
+    ASSERT(result); // NULL condition means always true
 
     free_test_context(ctx);
     return 1;
@@ -1313,7 +1312,7 @@ static int test_evaluate_condition_with_comparison(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Currently returns true for any comparison */
+    // Currently returns true for any comparison
     bool result = debug_evaluate_condition(ctx, "$x == 5");
     ASSERT(result);
 
@@ -1334,7 +1333,7 @@ static int test_evaluate_condition_with_variable_check(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Currently returns true for variable existence checks */
+    // Currently returns true for variable existence checks
     bool result = debug_evaluate_condition(ctx, "$myvar");
     ASSERT(result);
 
@@ -1365,7 +1364,7 @@ static int test_show_context_nonexistent_file(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Should handle missing file gracefully */
+    // Should handle missing file gracefully
     debug_show_context(ctx, "/nonexistent/path/file.sh", 10);
 
     free_test_context(ctx);
@@ -1484,7 +1483,7 @@ static int test_update_loop_variable_not_in_loop(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Not in loop context, should do nothing */
+    // Not in loop context, should do nothing
     debug_update_loop_variable(ctx, "i", "5");
     ASSERT_EQ(ctx->execution_context.loop_iteration, 0);
 
@@ -1545,7 +1544,7 @@ static int test_exit_loop_not_in_loop(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Not in loop, should do nothing without crashing */
+    // Not in loop, should do nothing without crashing
     debug_exit_loop(ctx);
 
     free_test_context(ctx);
@@ -1576,7 +1575,7 @@ static int test_loop_lifecycle(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Simulate a for loop: for i in a b c */
+    // Simulate a for loop: for i in a b c
     debug_enter_loop(ctx, "for", "i", "a");
     ASSERT(ctx->execution_context.in_loop);
     ASSERT_EQ(ctx->execution_context.loop_iteration, 0);
@@ -1602,10 +1601,10 @@ static int test_save_execution_context_null_params(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* All NULL parameters */
+    // All NULL parameters
     debug_save_execution_context(NULL, NULL, NULL);
 
-    /* Partial NULL parameters */
+    // Partial NULL parameters
     debug_save_execution_context(ctx, NULL, NULL);
 
     executor_t executor = {0};
@@ -1702,13 +1701,13 @@ static int test_restore_execution_context_in_loop(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Enter loop first */
+    // Enter loop first
     debug_enter_loop(ctx, "for", "i", "value");
 
     executor_t executor = {0};
     node_t node = {.type = NODE_FOR};
 
-    /* Restore should work without crash */
+    // Restore should work without crash
     debug_restore_execution_context(ctx, &executor, &node);
 
     free_test_context(ctx);
@@ -1770,17 +1769,17 @@ static int test_multiple_breakpoints_workflow(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Add several breakpoints */
+    // Add several breakpoints
     int bp1 = debug_add_breakpoint(ctx, "main.sh", 10, NULL);
     int bp2 = debug_add_breakpoint(ctx, "main.sh", 20, "$x > 0");
     int bp3 = debug_add_breakpoint(ctx, "utils.sh", 5, NULL);
 
     ASSERT(bp1 > 0 && bp2 > 0 && bp3 > 0);
 
-    /* Disable one */
+    // Disable one
     debug_enable_breakpoint(ctx, bp2, false);
 
-    /* Verify state */
+    // Verify state
     breakpoint_t *bp = ctx->breakpoints;
     int count = 0;
     int disabled_count = 0;
@@ -1793,10 +1792,10 @@ static int test_multiple_breakpoints_workflow(void) {
     ASSERT_EQ(count, 3);
     ASSERT_EQ(disabled_count, 1);
 
-    /* Remove one */
+    // Remove one
     debug_remove_breakpoint(ctx, bp1);
 
-    /* Verify removal */
+    // Verify removal
     bp = ctx->breakpoints;
     count = 0;
     while (bp) {
@@ -1806,7 +1805,7 @@ static int test_multiple_breakpoints_workflow(void) {
     }
     ASSERT_EQ(count, 2);
 
-    /* Clear all */
+    // Clear all
     debug_clear_breakpoints(ctx);
     ASSERT_NULL(ctx->breakpoints);
 
@@ -1818,21 +1817,21 @@ static int test_step_mode_transitions(void) {
     debug_context_t *ctx = create_test_context();
     ASSERT_NOT_NULL(ctx);
 
-    /* Start in continue mode */
+    // Start in continue mode
     ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
     ASSERT(!ctx->step_mode);
 
-    /* Step into */
+    // Step into
     debug_step_into(ctx);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP);
     ASSERT(ctx->step_mode);
 
-    /* Step over */
+    // Step over
     debug_step_over(ctx);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);
     ASSERT(ctx->step_mode);
 
-    /* Continue */
+    // Continue
     debug_continue(ctx);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
     ASSERT(!ctx->step_mode);

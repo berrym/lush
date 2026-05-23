@@ -92,4 +92,4 @@ int restore_file_descriptors(redirection_state_t *state);
  */
 void redirection_error(const char *message);
 
-#endif /* REDIRECTION_H */
+#endif // REDIRECTION_H

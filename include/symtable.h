@@ -154,7 +154,7 @@ typedef struct {
  * ============================================================================
  */
 
-/* Manager Lifecycle */
+// Manager Lifecycle
 
 /**
  * @brief Create a new symbol table manager
@@ -178,7 +178,7 @@ void symtable_manager_free(symtable_manager_t *manager);
  */
 void symtable_manager_set_debug(symtable_manager_t *manager, bool debug);
 
-/* Scope Management */
+// Scope Management
 
 /**
  * @brief Push a new scope onto the scope stack
@@ -240,7 +240,7 @@ bool symtable_in_function_scope(symtable_manager_t *manager);
  */
 scope_type_t symtable_current_scope_type(symtable_manager_t *manager);
 
-/* Variable Operations */
+// Variable Operations
 
 /**
  * @brief Set a variable with flags
@@ -392,7 +392,7 @@ int symtable_set_flags(symtable_manager_t *manager, const char *name,
  */
 bool symtable_var_exists(symtable_manager_t *manager, const char *name);
 
-/* Export/Environment Operations */
+// Export/Environment Operations
 
 /**
  * @brief Mark a variable as exported
@@ -418,7 +418,7 @@ char **symtable_get_environ(symtable_manager_t *manager);
  */
 void symtable_free_environ(char **environ);
 
-/* Debugging */
+// Debugging
 
 /**
  * @brief Dump variables in a specific scope
@@ -447,7 +447,7 @@ void symtable_dump_all_scopes(symtable_manager_t *manager);
  */
 symtable_manager_t *symtable_get_global_manager(void);
 
-/* Basic Variable Operations (Global Scope) */
+// Basic Variable Operations (Global Scope)
 
 /**
  * @brief Get a global variable value
@@ -491,7 +491,7 @@ bool symtable_exists_global(const char *name);
  */
 int symtable_unset_global(const char *name);
 
-/* Integer Variable Operations */
+// Integer Variable Operations
 
 /**
  * @brief Get a global variable as integer
@@ -511,7 +511,7 @@ int symtable_get_global_int(const char *name, int default_value);
  */
 int symtable_set_global_int(const char *name, int value);
 
-/* Boolean Variable Operations */
+// Boolean Variable Operations
 
 /**
  * @brief Get a global variable as boolean
@@ -531,7 +531,7 @@ bool symtable_get_global_bool(const char *name, bool default_value);
  */
 int symtable_set_global_bool(const char *name, bool value);
 
-/* Export Operations */
+// Export Operations
 
 /**
  * @brief Export a global variable to environment
@@ -549,7 +549,7 @@ int symtable_export_global(const char *name);
  */
 int symtable_unexport_global(const char *name);
 
-/* Special Variable Operations */
+// Special Variable Operations
 
 /**
  * @brief Set a special system variable
@@ -577,7 +577,7 @@ char *symtable_get_special_global(const char *name);
  */
 int symtable_set_readonly_global(const char *name, const char *value);
 
-/* Debugging */
+// Debugging
 
 /** @brief Dump global scope variables */
 void symtable_debug_dump_global_scope(void);
@@ -643,7 +643,7 @@ void symtable_enumerate_current_scope_vars(symtable_manager_t *manager,
  */
 size_t symtable_count_global_vars(void);
 
-/* Environment Array */
+// Environment Array
 
 /**
  * @brief Get environment as array for exec
@@ -669,13 +669,13 @@ void symtable_free_environment_array(char **env);
 #define symtable_get(mgr, name) symtable_get_var(mgr, name)
 #define symtable_export(mgr, name) symtable_export_var(mgr, name)
 
-/* Backward compatibility macros */
+// Backward compatibility macros
 #define get_global_var(name) symtable_get_global(name)
 #define set_global_var(name, value) symtable_set_global(name, value)
 #define get_global_var_default(name, def) symtable_get_global_default(name, def)
 #define export_global_var(name) symtable_export_global(name)
 
-/* Advanced operations (direct modern API access) */
+// Advanced operations (direct modern API access)
 #define symtable_manager() symtable_get_global_manager()
 #define symtable_push_function_scope(name)                                     \
     symtable_push_scope(symtable_manager(), SCOPE_FUNCTION, name)
@@ -722,7 +722,7 @@ void free_environ_array(char **env);
  * ============================================================================
  */
 
-/* Legacy flag definitions */
+// Legacy flag definitions
 #define FLAG_EXPORT (1 << 0)
 #define FLAG_READONLY (1 << 1)
 #define FLAG_CMD_EXPORT (1 << 2)
@@ -734,7 +734,7 @@ void free_environ_array(char **env);
 #define FLAG_SPECIAL_VAR (1 << 8)
 #define FLAG_TEMP_VAR (1 << 9)
 
-/* Legacy functions (for string management system) */
+// Legacy functions (for string management system)
 
 /**
  * @brief Allocate a new legacy symbol table at the given scope level
@@ -833,7 +833,7 @@ void symtable_entry_setval(symtable_entry_t *entry, char *val);
  * ============================================================================
  */
 
-/* Feature detection */
+// Feature detection
 
 /**
  * @brief Report whether the libhashtable-backed symbol table is available
@@ -849,7 +849,7 @@ bool symtable_libht_available(void);
  */
 const char *symtable_implementation_info(void);
 
-/* Enhanced API (feature flag controlled) */
+// Enhanced API (feature flag controlled)
 
 /** @brief Initialize the libhashtable-backed symbol table */
 void init_symtable_libht(void);
@@ -864,7 +864,7 @@ void free_symtable_libht(void);
  */
 void *get_libht_manager(void);
 
-/* Enhanced variable operations */
+// Enhanced variable operations
 
 /**
  * @brief Set a variable using the enhanced (libhashtable) backend
@@ -885,7 +885,7 @@ int symtable_set_var_enhanced(const char *name, const char *value,
  */
 char *symtable_get_var_enhanced(const char *name);
 
-/* Enhanced scope operations */
+// Enhanced scope operations
 
 /**
  * @brief Push a scope using the enhanced (libhashtable) backend
@@ -903,7 +903,7 @@ int symtable_push_scope_enhanced(scope_type_t type, const char *name);
  */
 int symtable_pop_scope_enhanced(void);
 
-/* Performance and testing */
+// Performance and testing
 
 /**
  * @brief Run a benchmark comparison between symbol table backends
@@ -924,7 +924,7 @@ int symtable_libht_test(void);
  * ============================================================================
  */
 
-/* Feature detection */
+// Feature detection
 
 /**
  * @brief Report whether the optimized (libhashtable v2) backend is available
@@ -940,7 +940,7 @@ bool symtable_opt_available(void);
  */
 const char *symtable_opt_implementation_info(void);
 
-/* Optimized API (feature flag controlled) */
+// Optimized API (feature flag controlled)
 
 /** @brief Initialize the optimized (libhashtable v2) symbol table */
 void init_symtable_opt(void);
@@ -955,7 +955,7 @@ void free_symtable_opt(void);
  */
 void *get_opt_manager(void);
 
-/* Optimized variable operations */
+// Optimized variable operations
 
 /**
  * @brief Set a variable using the optimized (libhashtable v2) backend
@@ -976,7 +976,7 @@ int symtable_set_var_opt_api(const char *name, const char *value,
  */
 char *symtable_get_var_opt_api(const char *name);
 
-/* Optimized scope operations */
+// Optimized scope operations
 
 /**
  * @brief Push a scope using the optimized (libhashtable v2) backend
@@ -994,7 +994,7 @@ int symtable_push_scope_opt_api(scope_type_t type, const char *name);
  */
 int symtable_pop_scope_opt_api(void);
 
-/* Performance and testing */
+// Performance and testing
 
 /**
  * @brief Run a benchmark comparison for the optimized backend
@@ -1166,7 +1166,7 @@ char **symtable_array_get_values(array_value_t *array, size_t *count);
  */
 char *symtable_array_expand(array_value_t *array, const char *sep);
 
-/* Array Variable Management */
+// Array Variable Management
 
 /**
  * @brief Set a variable as an array

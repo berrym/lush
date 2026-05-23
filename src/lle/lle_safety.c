@@ -115,7 +115,7 @@ void lle_safety_mark_success(void) {
     g_lle_integration->successful_reads++;
     g_lle_integration->total_readline_calls++;
 
-    /* Reset error counter on success */
+    // Reset error counter on success
     lle_reset_error_counter();
 }
 

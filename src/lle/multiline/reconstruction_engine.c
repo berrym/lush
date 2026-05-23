@@ -20,11 +20,11 @@
 #include <ctype.h>
 #include <string.h>
 
-/* Default configuration values */
+// Default configuration values
 #define DEFAULT_SPACES_PER_LEVEL 2
-#define DEFAULT_MAX_OUTPUT_LENGTH 1048576 /* 1MB */
+#define DEFAULT_MAX_OUTPUT_LENGTH 1048576 // 1MB
 
-/* Reconstruction engine implementation */
+// Reconstruction engine implementation
 struct lle_reconstruction_engine {
     lle_memory_pool_t *memory_pool;
     lle_structure_analyzer_t *analyzer;
@@ -33,7 +33,7 @@ struct lle_reconstruction_engine {
     bool active;
 };
 
-/* Forward declarations for internal functions */
+// Forward declarations for internal functions
 static size_t
 calculate_indented_size(const char *text, size_t length,
                         lle_command_structure_t *structure,
@@ -91,7 +91,7 @@ lle_result_t lle_reconstruction_engine_create(
     lle_reconstruction_engine_t **engine, lle_memory_pool_t *memory_pool,
     lle_structure_analyzer_t *analyzer, lle_multiline_parser_t *parser,
     const lle_reconstruction_options_t *options) {
-    if (!engine || !analyzer || !parser) { /* memory_pool can be NULL */
+    if (!engine || !analyzer || !parser) { // memory_pool can be NULL
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
@@ -130,7 +130,7 @@ lle_reconstruction_engine_destroy(lle_reconstruction_engine_t *engine) {
     }
 
     engine->active = false;
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -175,7 +175,7 @@ lle_result_t lle_reconstruction_engine_normalize_whitespace(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate output buffer (same size as input is sufficient) */
+    // Allocate output buffer (same size as input is sufficient)
     char *output = lle_pool_alloc(command_length + 1);
     if (!output) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -189,7 +189,7 @@ lle_result_t lle_reconstruction_engine_normalize_whitespace(
     for (size_t i = 0; i < command_length; i++) {
         char c = command_text[i];
 
-        /* Handle quotes */
+        // Handle quotes
         if (!in_quote && (c == '"' || c == '\'')) {
             in_quote = true;
             quote_char = c;
@@ -204,21 +204,21 @@ lle_result_t lle_reconstruction_engine_normalize_whitespace(
             continue;
         }
 
-        /* Don't normalize inside quotes */
+        // Don't normalize inside quotes
         if (in_quote) {
             output[out_pos++] = c;
             last_was_space = false;
             continue;
         }
 
-        /* Normalize whitespace outside quotes */
+        // Normalize whitespace outside quotes
         if (isspace(c)) {
             if (c == '\n') {
-                /* Preserve newlines */
+                // Preserve newlines
                 output[out_pos++] = '\n';
                 last_was_space = false;
             } else if (!last_was_space) {
-                /* Replace multiple spaces with single space */
+                // Replace multiple spaces with single space
                 output[out_pos++] = ' ';
                 last_was_space = true;
             }
@@ -256,7 +256,7 @@ lle_result_t lle_reconstruction_engine_apply_indentation(
     }
 
     if (!engine->options.apply_indentation) {
-        /* No indentation requested, just copy */
+        // No indentation requested, just copy
         char *output = lle_pool_alloc(original_length + 1);
         if (!output) {
             return LLE_ERROR_OUT_OF_MEMORY;
@@ -268,7 +268,7 @@ lle_result_t lle_reconstruction_engine_apply_indentation(
         return LLE_SUCCESS;
     }
 
-    /* Parse into lines */
+    // Parse into lines
     lle_multiline_parse_result_t *parse_result = NULL;
     lle_result_t res = lle_multiline_parser_parse(
         engine->parser, original_text, original_length, &parse_result);
@@ -277,7 +277,7 @@ lle_result_t lle_reconstruction_engine_apply_indentation(
         return res;
     }
 
-    /* Calculate output size */
+    // Calculate output size
     size_t output_size = calculate_indented_size(original_text, original_length,
                                                  structure, &engine->options);
 
@@ -286,14 +286,14 @@ lle_result_t lle_reconstruction_engine_apply_indentation(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate output buffer */
+    // Allocate output buffer
     char *output = lle_pool_alloc(output_size + 1);
     if (!output) {
         lle_multiline_parser_free_result(engine->parser, parse_result);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Apply indentation to lines */
+    // Apply indentation to lines
     size_t out_len = 0;
     res = apply_indentation_to_lines(engine, parse_result->first_line,
                                      structure, output, &out_len);
@@ -327,7 +327,7 @@ lle_result_t lle_reconstruction_engine_reconstruct(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate result structure */
+    // Allocate result structure
     lle_reconstructed_command_t *recon =
         lle_pool_alloc(sizeof(lle_reconstructed_command_t));
     if (!recon) {
@@ -336,7 +336,7 @@ lle_result_t lle_reconstruction_engine_reconstruct(
 
     memset(recon, 0, sizeof(lle_reconstructed_command_t));
 
-    /* Analyze structure */
+    // Analyze structure
     lle_command_structure_t *structure = NULL;
     lle_result_t res = lle_structure_analyzer_analyze(
         engine->analyzer, command_text, command_length, &structure);
@@ -345,7 +345,7 @@ lle_result_t lle_reconstruction_engine_reconstruct(
         return res;
     }
 
-    /* Normalize whitespace if requested */
+    // Normalize whitespace if requested
     const char *input_text = command_text;
     size_t input_length = command_length;
     char *normalized = NULL;
@@ -359,7 +359,7 @@ lle_result_t lle_reconstruction_engine_reconstruct(
         }
     }
 
-    /* Apply indentation if requested */
+    // Apply indentation if requested
     char *output_text = NULL;
     size_t output_length = 0;
 
@@ -376,7 +376,7 @@ lle_result_t lle_reconstruction_engine_reconstruct(
     recon->length = output_length;
     recon->indentation_applied = engine->options.apply_indentation;
 
-    /* Count lines and build line offset array */
+    // Count lines and build line offset array
     size_t line_count = 1;
     for (size_t i = 0; i < output_length; i++) {
         if (output_text[i] == '\n') {
@@ -417,7 +417,7 @@ lle_reconstruction_engine_free_result(lle_reconstruction_engine_t *engine,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -439,13 +439,13 @@ static size_t
 calculate_indented_size(const char *text, size_t length,
                         lle_command_structure_t *structure,
                         const lle_reconstruction_options_t *options) {
-    (void)text; /* Length used instead of text scanning */
-    /* Estimate: original size + (max_depth * spaces_per_level * line_count) */
+    (void)text; // Length used instead of text scanning
+    // Estimate: original size + (max_depth * spaces_per_level * line_count)
     size_t line_count = structure->total_lines > 0 ? structure->total_lines : 1;
     size_t max_indent = structure->max_depth * options->spaces_per_level;
 
     return length + (max_indent * line_count) +
-           line_count; /* +line_count for newlines */
+           line_count; // +line_count for newlines
 }
 
 /**
@@ -465,7 +465,7 @@ static size_t get_indent_for_line(lle_command_structure_t *structure,
 
     size_t indent_spaces = structure->indentation->level_per_line[line_number];
 
-    /* Convert to indentation levels */
+    // Convert to indentation levels
     size_t indent_level =
         indent_spaces / (structure->indentation->spaces_per_level > 0
                              ? structure->indentation->spaces_per_level
@@ -490,23 +490,23 @@ static lle_result_t apply_indentation_to_lines(
     lle_parsed_line_t *current_line = first_line;
 
     while (current_line) {
-        /* Get indentation for this line */
+        // Get indentation for this line
         size_t indent_spaces = get_indent_for_line(
             structure, current_line->line_number, &engine->options);
 
-        /* Add indentation */
+        // Add indentation
         for (size_t i = 0; i < indent_spaces; i++) {
             output[out_pos++] = engine->options.indent_char;
         }
 
-        /* Find start of non-whitespace content */
+        // Find start of non-whitespace content
         size_t content_start = 0;
         while (content_start < current_line->length &&
                isspace(current_line->content[content_start])) {
             content_start++;
         }
 
-        /* Copy line content (without leading whitespace) */
+        // Copy line content (without leading whitespace)
         size_t content_len = current_line->length - content_start;
         if (content_len > 0) {
             memcpy(&output[out_pos], &current_line->content[content_start],
@@ -514,7 +514,7 @@ static lle_result_t apply_indentation_to_lines(
             out_pos += content_len;
         }
 
-        /* Add newline if not last line or if preserve_line_breaks is enabled */
+        // Add newline if not last line or if preserve_line_breaks is enabled
         if (current_line->next || engine->options.preserve_line_breaks) {
             output[out_pos++] = '\n';
         }

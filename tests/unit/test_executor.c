@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * LIFECYCLE TESTS
@@ -111,7 +111,7 @@ TEST(variable_assignment) {
     run_result_t r = run_shell_with_executor(exec, "FOO=bar");
     ASSERT_EXIT_STATUS(r, 0);
 
-    /* Verify variable was set */
+    // Verify variable was set
     char *value = symtable_get_var(exec->symtable, "FOO");
     ASSERT_NOT_NULL(value, "Variable should be set");
     ASSERT_STR_EQ(value, "bar", "Variable value mismatch");
@@ -126,7 +126,7 @@ TEST(variable_expansion) {
 
     executor_execute_command_line(exec, "MYVAR=hello", 1);
 
-    /* Test that variable exists */
+    // Test that variable exists
     char *value = symtable_get_var(exec->symtable, "MYVAR");
     ASSERT_NOT_NULL(value, "Variable should be set");
     ASSERT_STR_EQ(value, "hello", "Variable value mismatch");
@@ -211,11 +211,11 @@ TEST(for_loop_basic) {
 }
 
 TEST(for_loop_no_in) {
-    /* Tests Issue #55 fix - for without 'in' iterates over $@ */
+    // Tests Issue #55 fix - for without 'in' iterates over $@
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Set positional parameters and iterate */
+    // Set positional parameters and iterate
     run_result_t r = run_shell_with_executor(
         exec, "set -- a b c; COUNT=0; for arg; do COUNT=$((COUNT+1)); done");
     ASSERT_EXIT_STATUS(r, 0);
@@ -515,7 +515,7 @@ TEST(arr_at_in_scalar_assignment_raises_type_mismatch) {
      * must not reach stdout. */
     ASSERT_TRUE(strstr(r.out, "saw_post_assign") == NULL,
                 "execution aborted after type mismatch");
-    /* The diagnostic must reach stderr with the canonical phrasing. */
+    // The diagnostic must reach stderr with the canonical phrasing.
     ASSERT_STDERR_CONTAINS(r, "type mismatch");
     ASSERT_STDERR_CONTAINS(r, "${arr[@]}");
     ASSERT_TRUE(r.exit_status != 0, "non-zero exit on type-mismatch abort");
@@ -536,7 +536,7 @@ TEST(arr_at_in_for_loop_iterates) {
     ASSERT_STDOUT_CONTAINS(r, "iter=a");
     ASSERT_STDOUT_CONTAINS(r, "iter=b");
     ASSERT_STDOUT_CONTAINS(r, "iter=c");
-    /* No spurious type-mismatch diagnostic. */
+    // No spurious type-mismatch diagnostic.
     ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
                 "no error in vector position");
 
@@ -584,7 +584,7 @@ TEST(and_operator_fail) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Set RESULT first, then verify it's NOT changed */
+    // Set RESULT first, then verify it's NOT changed
     executor_execute_command_line(exec, "RESULT=initial", 1);
     run_result_t r = run_shell_with_executor(exec, "false && RESULT=changed");
     ASSERT_EXIT_STATUS(r, 1);
@@ -601,7 +601,7 @@ TEST(or_operator_success) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* First succeeds, second should not run */
+    // First succeeds, second should not run
     executor_execute_command_line(exec, "RESULT=initial", 1);
     run_result_t r = run_shell_with_executor(exec, "true || RESULT=changed");
     ASSERT_EXIT_STATUS(r, 0);
@@ -653,7 +653,7 @@ TEST(function_definition_posix) {
 }
 
 TEST(function_definition_ksh) {
-    /* Tests Issue #56 fix - function without parentheses */
+    // Tests Issue #56 fix - function without parentheses
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -1118,7 +1118,7 @@ TEST(subshell_isolation) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     executor_execute_command_line(exec, "OUTER=yes", 1);
-    /* Variable set in subshell should not affect parent */
+    // Variable set in subshell should not affect parent
     executor_execute_command_line(exec, "(INNER=subshell)", 1);
 
     char *outer = symtable_get_var(exec->symtable, "OUTER");
@@ -1126,7 +1126,7 @@ TEST(subshell_isolation) {
     ASSERT_STR_EQ(outer, "yes", "OUTER should be yes");
     free(outer);
 
-    /* INNER should not exist in parent */
+    // INNER should not exist in parent
     char *inner = symtable_get_var(exec->symtable, "INNER");
     ASSERT(inner == NULL, "INNER should NOT be set in parent");
 
@@ -1137,7 +1137,7 @@ TEST(brace_group) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Brace group runs in current shell */
+    // Brace group runs in current shell
     run_result_t r = run_shell_with_executor(exec, "{ A=1; B=2; }");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1282,7 +1282,7 @@ TEST(builtin_shift) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Test shift with positional parameters */
+    // Test shift with positional parameters
     executor_execute_command_line(exec, "set -- a b c d e", 1);
     executor_execute_command_line(exec, "FIRST=$1", 1);
     executor_execute_command_line(exec, "shift", 1);
@@ -1372,7 +1372,7 @@ TEST(loop_continue) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Count only odd numbers: skip even iterations */
+    // Count only odd numbers: skip even iterations
     run_result_t r = run_shell_with_executor(
         exec, "SUM=0; for i in 1 2 3 4 5; do "
               "if [ $((i % 2)) -eq 0 ]; then continue; fi; "
@@ -1396,7 +1396,7 @@ TEST(pipeline_simple) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Simple pipeline - echo piped to cat */
+    // Simple pipeline - echo piped to cat
     run_result_t r = run_shell_with_executor(exec, "true | true");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1407,7 +1407,7 @@ TEST(pipeline_exit_status) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Pipeline exit status is last command's status */
+    // Pipeline exit status is last command's status
     run_result_t r = run_shell_with_executor(exec, "true | false");
     ASSERT_EXIT_STATUS(r, 1);
 
@@ -1418,7 +1418,7 @@ TEST(pipeline_three_commands) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Three-stage pipeline */
+    // Three-stage pipeline
     run_result_t r = run_shell_with_executor(exec, "true | true | true");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1673,7 +1673,7 @@ TEST(command_substitution_syntax) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Verify command substitution parses and executes without error */
+    // Verify command substitution parses and executes without error
     run_result_t r = run_shell_with_executor(exec, "X=$(true)");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1689,7 +1689,7 @@ TEST(command_substitution_exit_status) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* For now, just test that the syntax works */
+    // For now, just test that the syntax works
     run_result_t r = run_shell_with_executor(exec, "X=$(true)");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1733,8 +1733,8 @@ TEST(special_var_dollar_dollar) {
 
     char *pid = symtable_get_var(exec->symtable, "PID");
     ASSERT_NOT_NULL(pid, "$$ should be set");
-    /* PID should be set - could be 0 in test environment or actual PID */
-    /* Just verify it's a valid number */
+    // PID should be set - could be 0 in test environment or actual PID
+    // Just verify it's a valid number
     int pid_val = atoi(pid);
     ASSERT(pid_val >= 0, "$$ should be non-negative");
     free(pid);
@@ -1833,14 +1833,14 @@ TEST(negation_command) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Skip actual negation test until bug is fixed */
-    /* int status = executor_execute_command_line(exec, "! false", 1); */
-    /* ASSERT_EQ(status, 0, "Negated false should return 0"); */
+    // Skip actual negation test until bug is fixed
+    // int status = executor_execute_command_line(exec, "! false", 1);
+    // ASSERT_EQ(status, 0, "Negated false should return 0");
 
-    /* status = executor_execute_command_line(exec, "! true", 1); */
-    /* ASSERT_EQ(status, 1, "Negated true should return 1"); */
+    // status = executor_execute_command_line(exec, "! true", 1);
+    // ASSERT_EQ(status, 1, "Negated true should return 1");
 
-    /* For now, just verify executor works without negation */
+    // For now, just verify executor works without negation
     run_result_t r = run_shell_with_executor(exec, "true");
     ASSERT_EXIT_STATUS(r, 0);
 
@@ -1863,7 +1863,7 @@ TEST(here_string) {
     /* cat outputs with trailing newline, command substitution may preserve it
      */
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /* Check that result starts with "hello" (may have trailing newline) */
+    // Check that result starts with "hello" (may have trailing newline)
     ASSERT(strncmp(result, "hello", 5) == 0,
            "Here string should provide 'hello'");
     free(result);
@@ -1950,7 +1950,7 @@ TEST(local_variable_in_function) {
  * ============================================================================
  */
 
-/* Create an empty file -- fixture helper for the glob tests. */
+// Create an empty file -- fixture helper for the glob tests.
 static void rt_touch(const char *path) {
     FILE *f = fopen(path, "w");
     if (f) {
@@ -1958,7 +1958,7 @@ static void rt_touch(const char *path) {
     }
 }
 
-/* --- Deferred here-document collection -------------------------------- */
+// --- Deferred here-document collection --------------------------------
 
 TEST(rt_heredoc_through_pipe) {
     /* The body must reach `tr`; the parser once collected the heredoc
@@ -1988,21 +1988,21 @@ TEST(rt_heredoc_loop_redirection) {
 }
 
 TEST(rt_heredoc_strip_tabs) {
-    /* <<- strips leading tabs from body lines and the terminator. */
+    // <<- strips leading tabs from body lines and the terminator.
     run_result_t r = run_shell("cat <<-EOF\n\t\tindented\n\t\tEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "indented\n");
 }
 
 TEST(rt_heredoc_quoted_delimiter) {
-    /* A quoted delimiter disables expansion of the body. */
+    // A quoted delimiter disables expansion of the body.
     run_result_t r = run_shell("cat <<'EOF'\nliteral $UNSET here\nEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "literal $UNSET here\n");
 }
 
 TEST(rt_heredoc_multiline_var_body) {
-    /* Body referencing a multi-line variable -- posix/105 regression. */
+    // Body referencing a multi-line variable -- posix/105 regression.
     run_result_t r =
         run_shell("x=\"line1\nline2\"\ncat <<EOF\n$x\nEOF\necho done\n");
     ASSERT_EXIT_STATUS(r, 0);
@@ -2014,7 +2014,7 @@ TEST(rt_heredoc_unterminated_error) {
     ASSERT_TRUE(r.exit_status != 0, "unterminated heredoc must fail");
 }
 
-/* --- Glob expansion in for-loops, arrays, and zsh qualifiers ---------- */
+// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
     char saved_cwd[4096];
@@ -2024,38 +2024,38 @@ TEST(rt_glob_for_array_qualifiers) {
     ASSERT_NOT_NULL(mkdtemp(dir), "mkdtemp");
     ASSERT_EQ(chdir(dir), 0, "chdir into temp dir");
 
-    /* Fixture: three regular files, one subdirectory, one dotfile. */
+    // Fixture: three regular files, one subdirectory, one dotfile.
     rt_touch("alpha.txt");
     rt_touch("beta.txt");
     rt_touch("gamma.log");
     mkdir("subdir", 0700);
     rt_touch(".hidden");
 
-    /* for-loop word list globs (previously iterated the literal "*"). */
+    // for-loop word list globs (previously iterated the literal "*").
     run_result_t r = run_shell("n=0; for f in *; do n=$((n+1)); done; echo $n");
     ASSERT_STDOUT_EQ(r, "4\n");
 
-    /* indexed-array initializer globs. */
+    // indexed-array initializer globs.
     r = run_shell("arr=(*.txt); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "2\n");
 
-    /* zsh (.N) qualifier -- regular files only. */
+    // zsh (.N) qualifier -- regular files only.
     r = run_shell("arr=(*(.N)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "3\n");
 
-    /* zsh (/N) qualifier -- directories only. */
+    // zsh (/N) qualifier -- directories only.
     r = run_shell("arr=(*(/N)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "1\n");
 
-    /* zsh (DN) qualifier -- include dotfiles. */
+    // zsh (DN) qualifier -- include dotfiles.
     r = run_shell("arr=(*(DN)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "5\n");
 
-    /* qualifier on a prefixed pattern -- *.txt(N). */
+    // qualifier on a prefixed pattern -- *.txt(N).
     r = run_shell("arr=(*.txt(N)); echo ${#arr[@]}");
     ASSERT_STDOUT_EQ(r, "2\n");
 
-    /* Teardown: remove the fixture while still inside the temp dir. */
+    // Teardown: remove the fixture while still inside the temp dir.
     unlink("alpha.txt");
     unlink("beta.txt");
     unlink("gamma.log");
@@ -2065,7 +2065,7 @@ TEST(rt_glob_for_array_qualifiers) {
     rmdir(dir);
 }
 
-/* --- return / exit propagation out of loops and case arms ------------- */
+// --- return / exit propagation out of loops and case arms -------------
 
 TEST(rt_return_from_for_loop) {
     run_result_t r = run_shell(
@@ -2100,7 +2100,7 @@ TEST(rt_case_arm_return_status) {
     ASSERT_STDOUT_EQ(r, "3\n");
 }
 
-/* --- printf flag forwarding ------------------------------------------- */
+// --- printf flag forwarding -------------------------------------------
 
 TEST(rt_printf_flags) {
     run_result_t r = run_shell("printf '%05d\\n' 42");
@@ -2115,7 +2115,7 @@ TEST(rt_printf_flags) {
     ASSERT_STDOUT_EQ(r, " 42\n");
 }
 
-/* --- brace expansion -------------------------------------------------- */
+// --- brace expansion --------------------------------------------------
 
 TEST(rt_brace_nested) {
     run_result_t r = run_shell("echo {{1..3},{a..c}}");
@@ -2133,7 +2133,7 @@ TEST(rt_brace_in_array_init) {
     ASSERT_STDOUT_EQ(r, "3 x1y x3y\n");
 }
 
-/* --- parameter expansion operators on array elements ------------------ */
+// --- parameter expansion operators on array elements ------------------
 
 TEST(rt_array_elem_default_missing) {
     run_result_t r =
@@ -2159,28 +2159,28 @@ TEST(rt_array_elem_alt_missing) {
     ASSERT_STDOUT_EQ(r, "[]\n");
 }
 
-/* --- POSIX character classes in pattern matching ---------------------- */
+// --- POSIX character classes in pattern matching ----------------------
 
 TEST(rt_char_class_space) {
-    /* [[:space:]] non-negated class -- strips trailing whitespace. */
+    // [[:space:]] non-negated class -- strips trailing whitespace.
     run_result_t r = run_shell("s='a   '; echo \"[${s%%[[:space:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[a]\n");
 }
 
 TEST(rt_char_class_negated) {
-    /* [![:space:]] -- the building block of the whitespace-trim idiom. */
+    // [![:space:]] -- the building block of the whitespace-trim idiom.
     run_result_t r = run_shell("s='  hi'; echo \"[${s%%[![:space:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[  ]\n");
 }
 
 TEST(rt_char_class_digit) {
-    /* [[:digit:]] in a parameter-expansion suffix-removal pattern. */
+    // [[:digit:]] in a parameter-expansion suffix-removal pattern.
     run_result_t r = run_shell("s=abc123; echo \"[${s%%[[:digit:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[abc]\n");
 }
 
 TEST(rt_char_class_upper) {
-    /* [![:upper:]] negated class. */
+    // [![:upper:]] negated class.
     run_result_t r = run_shell("s=ABCdef; echo \"[${s%%[![:upper:]]*}]\"");
     ASSERT_STDOUT_EQ(r, "[ABC]\n");
 }
@@ -2190,14 +2190,14 @@ TEST(rt_char_class_upper) {
  * ============================================================================
  */
 
-/* Forward declarations for initialization */
+// Forward declarations for initialization
 extern void init_symtable(void);
 extern void free_global_symtable(void);
 
 int main(void) {
     printf("Running executor integration tests...\n\n");
 
-    /* Initialize global symbol table - required for executor_new() */
+    // Initialize global symbol table - required for executor_new()
     init_symtable();
 
     printf("Lifecycle tests:\n");
@@ -2400,7 +2400,7 @@ int main(void) {
     RUN_TEST(rt_char_class_digit);
     RUN_TEST(rt_char_class_upper);
 
-    /* Cleanup global symbol table */
+    // Cleanup global symbol table
     free_global_symtable();
 
     return TEST_RESULT();

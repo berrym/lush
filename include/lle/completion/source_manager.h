@@ -37,7 +37,7 @@ typedef enum {
     LLE_SOURCE_CUSTOM,            /**< User-registered custom sources */
 } lle_source_type_t;
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_completion_source lle_completion_source_t;
 typedef struct lle_source_manager lle_source_manager_t;
 
@@ -90,10 +90,10 @@ struct lle_completion_source {
     lle_source_type_t type; /**< Source type identifier */
     const char *name;       /**< Human-readable source name */
 
-    /* Source function - generates completions for given prefix */
+    // Source function - generates completions for given prefix
     lle_source_generate_fn generate; /**< Generation callback */
 
-    /* Optional: Check if source is applicable for context */
+    // Optional: Check if source is applicable for context
     lle_source_applicable_fn is_applicable; /**< Applicability callback */
 
     void *user_data; /**< Source-specific data */
@@ -163,4 +163,4 @@ lle_result_t lle_source_manager_query(lle_source_manager_t *manager,
 }
 #endif
 
-#endif /* LLE_SOURCE_MANAGER_H */
+#endif // LLE_SOURCE_MANAGER_H

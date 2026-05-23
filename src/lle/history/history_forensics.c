@@ -31,7 +31,7 @@
 #include <time.h>
 #include <unistd.h>
 
-/* Platform-specific includes for terminal name */
+// Platform-specific includes for terminal name
 #if defined(__linux__)
 #include <linux/tty.h>
 #include <sys/ioctl.h>
@@ -58,7 +58,7 @@ static bool get_terminal_name(char *buffer, size_t size) {
         return false;
     }
 
-    /* Try ttyname() first */
+    // Try ttyname() first
     const char *tty = ttyname(STDIN_FILENO);
     if (tty) {
         strncpy(buffer, tty, size - 1);
@@ -66,14 +66,14 @@ static bool get_terminal_name(char *buffer, size_t size) {
         return true;
     }
 
-    /* Fallback: check if connected to terminal */
+    // Fallback: check if connected to terminal
     if (isatty(STDIN_FILENO)) {
         strncpy(buffer, "unknown_tty", size - 1);
         buffer[size - 1] = '\0';
         return true;
     }
 
-    /* Not a terminal */
+    // Not a terminal
     strncpy(buffer, "not_a_tty", size - 1);
     buffer[size - 1] = '\0';
     return false;
@@ -117,7 +117,7 @@ uint64_t lle_forensic_get_timestamp_ns(void) {
     struct timespec ts;
 
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
-        /* Fallback to lower precision */
+        // Fallback to lower precision
         return (uint64_t)time(NULL) * 1000000000ULL;
     }
 
@@ -140,16 +140,16 @@ lle_result_t lle_forensic_capture_context(lle_forensic_context_t *context) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize structure */
+    // Initialize structure
     memset(context, 0, sizeof(lle_forensic_context_t));
 
-    /* Capture process information */
+    // Capture process information
     context->process_id = getpid();
     context->session_id = getsid(0);
     context->user_id = getuid();
     context->group_id = getgid();
 
-    /* Capture terminal name */
+    // Capture terminal name
     char tty_buffer[256];
     if (get_terminal_name(tty_buffer, sizeof(tty_buffer))) {
         context->terminal_name = pool_strdup(tty_buffer);
@@ -157,7 +157,7 @@ lle_result_t lle_forensic_capture_context(lle_forensic_context_t *context) {
         context->terminal_name = NULL;
     }
 
-    /* Capture working directory */
+    // Capture working directory
     char cwd_buffer[4096];
     if (getcwd(cwd_buffer, sizeof(cwd_buffer)) != NULL) {
         context->working_directory = pool_strdup(cwd_buffer);
@@ -165,7 +165,7 @@ lle_result_t lle_forensic_capture_context(lle_forensic_context_t *context) {
         context->working_directory = NULL;
     }
 
-    /* Capture high-precision timestamp */
+    // Capture high-precision timestamp
     context->timestamp_ns = lle_forensic_get_timestamp_ns();
 
     return LLE_SUCCESS;
@@ -190,31 +190,31 @@ lle_forensic_apply_to_entry(lle_history_entry_t *entry,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Apply process information */
+    // Apply process information
     entry->process_id = context->process_id;
     entry->session_id = context->session_id;
     entry->user_id = context->user_id;
     entry->group_id = context->group_id;
 
-    /* Apply terminal name */
+    // Apply terminal name
     if (context->terminal_name) {
         entry->terminal_name = pool_strdup(context->terminal_name);
     }
 
-    /* Apply working directory (if not already set) */
+    // Apply working directory (if not already set)
     if (!entry->working_directory && context->working_directory) {
         entry->working_directory = pool_strdup(context->working_directory);
     }
 
-    /* Initialize timing fields */
+    // Initialize timing fields
     entry->start_time_ns = context->timestamp_ns;
-    entry->end_time_ns = 0; /* Will be set by mark_end */
+    entry->end_time_ns = 0; // Will be set by mark_end
     entry->duration_ms = 0;
 
-    /* Initialize usage tracking */
+    // Initialize usage tracking
     entry->usage_count = 0;
     entry->last_access_time =
-        context->timestamp_ns / 1000000000ULL; /* Convert to seconds */
+        context->timestamp_ns / 1000000000ULL; // Convert to seconds
 
     return LLE_SUCCESS;
 }
@@ -283,15 +283,15 @@ lle_result_t lle_forensic_mark_end(lle_history_entry_t *entry) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Capture end time */
+    // Capture end time
     entry->end_time_ns = lle_forensic_get_timestamp_ns();
 
-    /* Calculate duration in milliseconds */
+    // Calculate duration in milliseconds
     if (entry->end_time_ns > entry->start_time_ns) {
         uint64_t duration_ns = entry->end_time_ns - entry->start_time_ns;
         entry->duration_ms = (uint32_t)(duration_ns / 1000000ULL);
     } else {
-        /* Clock issue or zero duration */
+        // Clock issue or zero duration
         entry->duration_ms = 0;
     }
 
@@ -319,7 +319,7 @@ lle_result_t lle_forensic_increment_usage(lle_history_entry_t *entry) {
 
     entry->usage_count++;
 
-    /* Also update last access time */
+    // Also update last access time
     entry->last_access_time = time(NULL);
 
     return LLE_SUCCESS;

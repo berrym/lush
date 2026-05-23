@@ -26,9 +26,9 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
-/* Helper to setup and teardown pool for each test */
+// Helper to setup and teardown pool for each test
 static void setup_pool(void) {
     lush_pool_config_t config = lush_pool_get_default_config();
     lush_pool_error_t err = lush_pool_init(&config);
@@ -88,15 +88,15 @@ TEST(pool_init_with_statistics) {
 TEST(pool_double_init) {
     lush_pool_config_t config = lush_pool_get_default_config();
     lush_pool_init(&config);
-    /* Second init should handle gracefully */
+    // Second init should handle gracefully
     lush_pool_error_t err = lush_pool_init(&config);
-    /* May succeed (reinit) or fail gracefully */
+    // May succeed (reinit) or fail gracefully
     lush_pool_shutdown();
-    (void)err; /* Suppress unused warning */
+    (void)err; // Suppress unused warning
 }
 
 TEST(pool_shutdown_without_init) {
-    /* Should not crash */
+    // Should not crash
     lush_pool_shutdown();
 }
 
@@ -110,7 +110,7 @@ TEST(pool_alloc_small) {
 
     void *ptr = lush_pool_alloc(64);
     ASSERT_NOT_NULL(ptr, "Small allocation should succeed");
-    memset(ptr, 0xAB, 64); /* Write to verify usability */
+    memset(ptr, 0xAB, 64); // Write to verify usability
     lush_pool_free(ptr);
 
     teardown_pool();
@@ -153,7 +153,7 @@ TEST(pool_alloc_zero) {
     setup_pool();
 
     void *ptr = lush_pool_alloc(0);
-    /* May return NULL or minimal allocation */
+    // May return NULL or minimal allocation
     if (ptr) {
         lush_pool_free(ptr);
     }
@@ -164,7 +164,7 @@ TEST(pool_alloc_zero) {
 TEST(pool_alloc_oversized) {
     setup_pool();
 
-    /* Larger than XLarge pool - should fallback to malloc */
+    // Larger than XLarge pool - should fallback to malloc
     void *ptr = lush_pool_alloc(100000);
     ASSERT_NOT_NULL(ptr, "Oversized allocation should fallback to malloc");
     lush_pool_free(ptr);
@@ -191,7 +191,7 @@ TEST(pool_alloc_multiple) {
 TEST(pool_free_null) {
     setup_pool();
 
-    /* Should not crash */
+    // Should not crash
     lush_pool_free(NULL);
 
     teardown_pool();
@@ -211,7 +211,7 @@ TEST(pool_realloc_grow) {
 
     void *new_ptr = lush_pool_realloc(ptr, 256);
     ASSERT_NOT_NULL(new_ptr, "Realloc grow should succeed");
-    /* First 64 bytes should be preserved */
+    // First 64 bytes should be preserved
     ASSERT(((char *)new_ptr)[0] == 'A', "Data should be preserved");
 
     lush_pool_free(new_ptr);
@@ -250,7 +250,7 @@ TEST(pool_realloc_zero_size) {
     ASSERT_NOT_NULL(ptr, "Initial allocation should succeed");
 
     void *new_ptr = lush_pool_realloc(ptr, 0);
-    /* Should free and return NULL */
+    // Should free and return NULL
     ASSERT_NULL(new_ptr, "Realloc to 0 should free");
 
     teardown_pool();
@@ -267,7 +267,7 @@ TEST(pool_calloc_basic) {
     int *arr = lush_pool_calloc(10, sizeof(int));
     ASSERT_NOT_NULL(arr, "Calloc should succeed");
 
-    /* All should be zero */
+    // All should be zero
     for (int i = 0; i < 10; i++) {
         ASSERT_EQ(arr[i], 0, "Calloc memory should be zeroed");
     }
@@ -423,7 +423,7 @@ TEST(pool_is_pool_pointer) {
     ASSERT_NOT_NULL(malloc_ptr, "Malloc should succeed");
 
     bool is_pool = lush_pool_is_pool_pointer(pool_ptr);
-    /* May be true if from pool, false if from malloc fallback */
+    // May be true if from pool, false if from malloc fallback
     (void)is_pool;
 
     bool is_not_pool = lush_pool_is_pool_pointer(malloc_ptr);
@@ -464,7 +464,7 @@ TEST(pool_error_string) {
 TEST(pool_get_last_error) {
     setup_pool();
 
-    /* After successful operations, last error should be SUCCESS */
+    // After successful operations, last error should be SUCCESS
     void *ptr = lush_pool_alloc(64);
     lush_pool_error_t err = lush_pool_get_last_error();
     ASSERT_EQ(err, LUSH_POOL_SUCCESS, "Last error should be SUCCESS");
@@ -476,7 +476,7 @@ TEST(pool_get_last_error) {
 TEST(pool_set_debug_mode) {
     setup_pool();
 
-    /* Should not crash */
+    // Should not crash
     lush_pool_set_debug_mode(true);
     lush_pool_set_debug_mode(false);
 
@@ -491,9 +491,9 @@ TEST(pool_set_debug_mode) {
 TEST(pool_meets_performance_targets) {
     setup_pool();
 
-    /* Just verify the function doesn't crash - actual performance may vary */
+    // Just verify the function doesn't crash - actual performance may vary
     bool meets = lush_pool_meets_performance_targets();
-    (void)meets; /* Result is system-dependent */
+    (void)meets; // Result is system-dependent
 
     teardown_pool();
 }
@@ -507,7 +507,7 @@ TEST(pool_get_memory_usage) {
     double efficiency;
 
     lush_pool_get_memory_usage(&pool_bytes, &malloc_bytes, &efficiency);
-    /* Initially should be minimal */
+    // Initially should be minimal
 
     void *ptr = lush_pool_alloc(64);
     lush_pool_get_memory_usage(&pool_bytes, &malloc_bytes, &efficiency);
@@ -532,9 +532,9 @@ TEST(pool_get_memory_usage) {
 TEST(pool_stress_alloc_free) {
     setup_pool();
 
-    /* Many allocations and frees */
+    // Many allocations and frees
     for (int i = 0; i < 1000; i++) {
-        size_t size = (i % 4) * 100 + 50; /* Vary sizes */
+        size_t size = (i % 4) * 100 + 50; // Vary sizes
         void *ptr = lush_pool_alloc(size);
         ASSERT_NOT_NULL(ptr, "Stress allocation should succeed");
         memset(ptr, 0xAA, size);
@@ -573,7 +573,7 @@ int main(void) {
     printf("Configuration Tests:\n");
     RUN_TEST(get_default_config);
     RUN_TEST(get_display_optimized_config);
-    /* get_minimal_config test removed - function not implemented */
+    // get_minimal_config test removed - function not implemented
 
     printf("\nInitialization Tests:\n");
     RUN_TEST(pool_init_default);
@@ -614,7 +614,7 @@ int main(void) {
 
     printf("\nPool Info Tests:\n");
     RUN_TEST(pool_get_recommended_size);
-    /* pool_get_pool_info test removed - function not implemented */
+    // pool_get_pool_info test removed - function not implemented
     RUN_TEST(pool_is_healthy);
     RUN_TEST(pool_is_pool_pointer);
 
@@ -632,7 +632,7 @@ int main(void) {
     RUN_TEST(pool_get_memory_usage);
 
     printf("\nPreallocate Tests:\n");
-    /* pool_preallocate test removed - function not implemented */
+    // pool_preallocate test removed - function not implemented
 
     printf("\nStress Tests:\n");
     RUN_TEST(pool_stress_alloc_free);

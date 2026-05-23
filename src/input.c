@@ -85,7 +85,7 @@ typedef struct {
     bool in_command_substitution;
     bool in_arithmetic;
     bool in_function_definition;
-    bool saw_posix_func_parens; /* Saw name() pattern, waiting for { */
+    bool saw_posix_func_parens; /**< Saw name() pattern, waiting for { */
     bool in_case_statement;
     bool in_if_statement;
     bool in_while_loop;
@@ -209,9 +209,9 @@ static void analyze_line(const char *line, input_state_t *state) {
     const char *p = line;
     char word[256] = {0};
     int word_pos = 0;
-    (void)word_pos; /* Reserved for word boundary tracking */
+    (void)word_pos; // Reserved for word boundary tracking
     bool at_word_start = true;
-    (void)at_word_start; /* Reserved for word start detection */
+    (void)at_word_start; // Reserved for word start detection
 
     while (*p) {
         unsigned char uc = (unsigned char)*p;

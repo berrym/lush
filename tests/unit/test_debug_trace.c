@@ -667,7 +667,7 @@ TEST(enumerate_current_scope_vars_in_function_scope) {
                                           &probe);
     ASSERT_TRUE(probe.found, "fn_local visible in current scope");
 
-    /* Scope-only enumeration: a global must NOT appear in this set. */
+    // Scope-only enumeration: a global must NOT appear in this set.
     symtable_set_var(symtable_manager(), "global_unrelated", "world",
                      SYMVAR_NONE);
     scope_probe_t probe_global = {"global_unrelated", false, SYMVAR_STRING};
@@ -698,7 +698,7 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
      * pointing at a temporary executor. */
     extern executor_t *current_executor;
     executor_t *saved = current_executor;
-    current_executor = (executor_t *)0x1; /* sentinel non-NULL */
+    current_executor = (executor_t *)0x1; // sentinel non-NULL
 
     debug_inspect_all_variables(ctx);
 
@@ -718,7 +718,7 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
     debug_cleanup(ctx);
 }
 
-/* debug_inspect_variable on an indexed array renders Type: List. */
+// debug_inspect_variable on an indexed array renders Type: List.
 TEST(inspect_variable_renders_indexed_array_as_list) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -745,7 +745,7 @@ TEST(inspect_variable_renders_indexed_array_as_list) {
     debug_cleanup(ctx);
 }
 
-/* debug_inspect_variable on an associative array renders Type: Map. */
+// debug_inspect_variable on an associative array renders Type: Map.
 TEST(inspect_variable_renders_assoc_array_as_map) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -772,7 +772,7 @@ TEST(inspect_variable_renders_assoc_array_as_map) {
     debug_cleanup(ctx);
 }
 
-/* debug_show_variable_type on an indexed array reports List + count. */
+// debug_show_variable_type on an indexed array reports List + count.
 TEST(show_variable_type_indexed_array_is_list) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -793,7 +793,7 @@ TEST(show_variable_type_indexed_array_is_list) {
     debug_cleanup(ctx);
 }
 
-/* debug_show_variable_type on an associative array reports Map. */
+// debug_show_variable_type on an associative array reports Map.
 TEST(show_variable_type_assoc_array_is_map) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -814,7 +814,7 @@ TEST(show_variable_type_assoc_array_is_map) {
     debug_cleanup(ctx);
 }
 
-/* debug_show_variable_type for a scalar reports Scalar. */
+// debug_show_variable_type for a scalar reports Scalar.
 TEST(show_variable_type_scalar) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -833,7 +833,7 @@ TEST(show_variable_type_scalar) {
     debug_cleanup(ctx);
 }
 
-/* debug_show_variable_type for an unbound name says so honestly. */
+// debug_show_variable_type for an unbound name says so honestly.
 TEST(show_variable_type_unset) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -887,7 +887,7 @@ TEST(view_emit_line_utf8_uses_box_drawing_gutter) {
 
     char log[256];
     read_debug_output(ctx, log, sizeof(log));
-    /* U+2502 (BOX DRAWINGS LIGHT VERTICAL) is 0xE2 0x94 0x82 in UTF-8. */
+    // U+2502 (BOX DRAWINGS LIGHT VERTICAL) is 0xE2 0x94 0x82 in UTF-8.
     ASSERT_TRUE(strstr(log, "\xE2\x94\x82 hi\n") != NULL,
                 "UTF-8 vertical-bar gutter present");
 

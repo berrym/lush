@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-/* Forward declarations for mutual recursion. */
+// Forward declarations for mutual recursion.
 static int evaluate_test_expression(char **argv, int start, int end);
 static int evaluate_single_test(char **argv, int start, int end);
 

@@ -151,7 +151,7 @@ typedef struct lle_shell_event_hub {
     /** Whether hub is initialized */
     bool initialized;
 
-    /* Statistics */
+    // Statistics
     uint64_t events_fired;      /**< Total events fired */
     uint64_t directory_changes; /**< Directory change events */
     uint64_t commands_executed; /**< Commands executed (post-command count) */
@@ -302,4 +302,4 @@ uint64_t lle_shell_event_get_timestamp_us(void);
  */
 const char *lle_shell_event_type_name(lle_shell_event_type_t event_type);
 
-#endif /* LLE_SHELL_EVENT_HUB_H */
+#endif // LLE_SHELL_EVENT_HUB_H

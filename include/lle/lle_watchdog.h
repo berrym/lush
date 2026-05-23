@@ -146,4 +146,4 @@ typedef struct {
  */
 lle_result_t lle_watchdog_get_stats(lle_watchdog_stats_t *stats);
 
-#endif /* LLE_WATCHDOG_H */
+#endif // LLE_WATCHDOG_H

@@ -175,7 +175,7 @@ static void calculate_prompt_metrics(const char *content,
         /* Skip readline's prompt markers: \001 (RL_PROMPT_START_IGNORE) and
          * \002 (RL_PROMPT_END_IGNORE) */
         if (*current == '\001' || *current == '\002') {
-            /* Don't count these control characters */
+            // Don't count these control characters
             current++;
             continue;
         }
@@ -184,16 +184,16 @@ static void calculate_prompt_metrics(const char *content,
             in_ansi_sequence = true;
             metrics->has_ansi_sequences = true;
         } else if (in_ansi_sequence) {
-            /* While in ANSI sequence, check if this is the terminator */
+            // While in ANSI sequence, check if this is the terminator
             if ((*current >= 'A' && *current <= 'Z') ||
                 (*current >= 'a' && *current <= 'z')) {
-                /* ANSI sequences end with a letter (A-Z or a-z) */
+                // ANSI sequences end with a letter (A-Z or a-z)
                 in_ansi_sequence = false;
             }
             /* Don't count ANY characters while in_ansi_sequence (including
              * terminators) */
         } else {
-            /* Not in ANSI sequence - count this character */
+            // Not in ANSI sequence - count this character
             if (*current == '\n') {
                 metrics->line_count++;
                 if (current_line_width > metrics->max_line_width) {
@@ -217,7 +217,7 @@ static void calculate_prompt_metrics(const char *content,
                         metrics->has_unicode = true;
                     }
                 }
-                /* Skip UTF-8 continuation bytes - don't increment counter */
+                // Skip UTF-8 continuation bytes - don't increment counter
             }
         }
         current++;
@@ -243,7 +243,7 @@ static void calculate_prompt_metrics(const char *content,
     // Command always starts after the LAST line, so use current_line_width
     metrics->estimated_command_row = metrics->line_count;
     metrics->estimated_command_column =
-        current_line_width + 1; /* +1 for 1-indexed columns */
+        current_line_width + 1; // +1 for 1-indexed columns
 }
 
 /**
@@ -415,7 +415,7 @@ static void update_performance_stats(prompt_layer_t *layer,
  */
 static layer_events_error_t
 handle_theme_change_event(const layer_event_t *event, void *user_data) {
-    (void)event; /* Event type already validated by dispatcher */
+    (void)event; // Event type already validated by dispatcher
     prompt_layer_t *layer = (prompt_layer_t *)user_data;
     if (!layer || !validate_layer_memory(layer))
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
@@ -441,7 +441,7 @@ handle_theme_change_event(const layer_event_t *event, void *user_data) {
  */
 static layer_events_error_t
 handle_content_refresh_event(const layer_event_t *event, void *user_data) {
-    (void)event; /* Event type already validated by dispatcher */
+    (void)event; // Event type already validated by dispatcher
     prompt_layer_t *layer = (prompt_layer_t *)user_data;
     if (!layer || !validate_layer_memory(layer))
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
@@ -950,7 +950,7 @@ prompt_layer_error_t prompt_layer_optimize(prompt_layer_t *layer) {
 
     // Clean up expired cache entries
     int expired_count = 0;
-    (void)expired_count; /* Reserved for cache cleanup statistics */
+    (void)expired_count; // Reserved for cache cleanup statistics
     for (int i = 0; i < PROMPT_LAYER_CACHE_SIZE; i++) {
         prompt_cache_entry_t *entry = &layer->cache[i];
         if (entry->is_valid) {

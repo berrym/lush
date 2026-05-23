@@ -44,7 +44,7 @@
 #define ASSERT_FALSE(a) ASSERT(!(a))
 
 /* ========================================================================== */
-/* Test Fixtures                                                              */
+// Test Fixtures
 /* ========================================================================== */
 
 static lle_prompt_composer_t g_composer;
@@ -72,7 +72,7 @@ static void teardown_composer(void) {
 }
 
 /* ========================================================================== */
-/* Composer Lifecycle Tests                                                   */
+// Composer Lifecycle Tests
 /* ========================================================================== */
 
 TEST(composer_init_basic) {
@@ -102,7 +102,7 @@ TEST(composer_init_null) {
 }
 
 TEST(composer_cleanup_null) {
-    /* Should not crash */
+    // Should not crash
     lle_composer_cleanup(NULL);
 }
 
@@ -123,7 +123,7 @@ TEST(composer_configure) {
 }
 
 /* ========================================================================== */
-/* Prompt Rendering Tests                                                     */
+// Prompt Rendering Tests
 /* ========================================================================== */
 
 TEST(composer_render_basic) {
@@ -190,7 +190,7 @@ TEST(composer_render_template_conditional) {
     setup_composer();
 
     char output[256];
-    /* User segment should always be visible */
+    // User segment should always be visible
     lle_result_t result = lle_composer_render_template(
         &g_composer, "${?user:yes:no}", output, sizeof(output));
 
@@ -208,14 +208,14 @@ TEST(composer_render_template_unknown_segment) {
         &g_composer, "prefix ${nonexistent} suffix", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    /* Unknown segment should be omitted */
+    // Unknown segment should be omitted
     ASSERT_STR_EQ(output, "prefix  suffix");
 
     teardown_composer();
 }
 
 /* ========================================================================== */
-/* Context Management Tests                                                   */
+// Context Management Tests
 /* ========================================================================== */
 
 TEST(composer_update_context) {
@@ -246,7 +246,7 @@ TEST(composer_refresh_directory) {
 TEST(composer_invalidate_caches) {
     setup_composer();
 
-    /* Should not crash */
+    // Should not crash
     lle_composer_invalidate_caches(&g_composer);
     lle_composer_invalidate_caches(NULL);
 
@@ -254,7 +254,7 @@ TEST(composer_invalidate_caches) {
 }
 
 /* ========================================================================== */
-/* Theme Integration Tests                                                    */
+// Theme Integration Tests
 /* ========================================================================== */
 
 TEST(composer_set_theme) {
@@ -289,15 +289,15 @@ TEST(composer_theme_affects_render) {
 
     lle_prompt_output_t output1, output2;
 
-    /* Render with minimal theme */
+    // Render with minimal theme
     lle_composer_set_theme(&g_composer, "minimal");
     lle_composer_render(&g_composer, &output1);
 
-    /* Render with default theme */
+    // Render with default theme
     lle_composer_set_theme(&g_composer, "default");
     lle_composer_render(&g_composer, &output2);
 
-    /* Different themes should produce different output */
+    // Different themes should produce different output
     int different = (output1.ps1_len != output2.ps1_len ||
                      strcmp(output1.ps1, output2.ps1) != 0);
     ASSERT_TRUE(different);
@@ -306,7 +306,7 @@ TEST(composer_theme_affects_render) {
 }
 
 /* ========================================================================== */
-/* Render Context Tests                                                       */
+// Render Context Tests
 /* ========================================================================== */
 
 TEST(composer_create_render_ctx) {
@@ -331,20 +331,20 @@ TEST(composer_render_ctx_null) {
 }
 
 /* ========================================================================== */
-/* Integration Tests                                                          */
+// Integration Tests
 /* ========================================================================== */
 
 TEST(composer_full_prompt_render) {
     setup_composer();
 
-    /* Set a theme with all features */
+    // Set a theme with all features
     lle_composer_set_theme(&g_composer, "informative");
 
-    /* Update context with realistic values */
+    // Update context with realistic values
     lle_composer_update_context(&g_composer, 0, 250);
     lle_composer_refresh_directory(&g_composer);
 
-    /* Render complete prompt */
+    // Render complete prompt
     lle_prompt_output_t output;
     lle_result_t result = lle_composer_render(&g_composer, &output);
 
@@ -352,7 +352,7 @@ TEST(composer_full_prompt_render) {
     ASSERT(output.ps1_len > 0);
     ASSERT(output.ps2_len > 0);
 
-    /* Verify visual width is calculated */
+    // Verify visual width is calculated
     ASSERT(output.ps1_visual_width > 0);
     ASSERT(output.ps2_visual_width > 0);
 
@@ -382,13 +382,13 @@ TEST(composer_multiple_themes) {
 TEST(composer_segment_visibility) {
     setup_composer();
 
-    /* Git segment should not be visible outside git repo (usually) */
+    // Git segment should not be visible outside git repo (usually)
     char output[256];
     lle_result_t result = lle_composer_render_template(
         &g_composer, "${?git:IN_GIT:NOT_GIT}", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    /* Result depends on whether we're in a git repo */
+    // Result depends on whether we're in a git repo
     ASSERT(strlen(output) > 0);
 
     teardown_composer();
@@ -411,20 +411,20 @@ TEST(composer_statistics) {
 }
 
 /* ========================================================================== */
-/* Main Test Runner                                                           */
+// Main Test Runner
 /* ========================================================================== */
 
 int main(void) {
     printf("=== LLE Prompt Composer Tests ===\n\n");
 
-    /* Lifecycle tests */
+    // Lifecycle tests
     RUN_TEST(composer_init_basic);
     RUN_TEST(composer_init_with_registries);
     RUN_TEST(composer_init_null);
     RUN_TEST(composer_cleanup_null);
     RUN_TEST(composer_configure);
 
-    /* Rendering tests */
+    // Rendering tests
     RUN_TEST(composer_render_basic);
     RUN_TEST(composer_render_null);
     RUN_TEST(composer_render_uninitialized);
@@ -433,22 +433,22 @@ int main(void) {
     RUN_TEST(composer_render_template_conditional);
     RUN_TEST(composer_render_template_unknown_segment);
 
-    /* Context tests */
+    // Context tests
     RUN_TEST(composer_update_context);
     RUN_TEST(composer_refresh_directory);
     RUN_TEST(composer_invalidate_caches);
 
-    /* Theme integration tests */
+    // Theme integration tests
     RUN_TEST(composer_set_theme);
     RUN_TEST(composer_set_theme_invalid);
     RUN_TEST(composer_get_theme_null);
     RUN_TEST(composer_theme_affects_render);
 
-    /* Render context tests */
+    // Render context tests
     RUN_TEST(composer_create_render_ctx);
     RUN_TEST(composer_render_ctx_null);
 
-    /* Integration tests */
+    // Integration tests
     RUN_TEST(composer_full_prompt_render);
     RUN_TEST(composer_multiple_themes);
     RUN_TEST(composer_segment_visibility);

@@ -32,16 +32,16 @@ static void handle_sigint(int sig) {
 }
 
 int main(void) {
-    /* Get original terminal settings */
+    // Get original terminal settings
     if (tcgetattr(STDIN_FILENO, &orig_termios) < 0) {
         fprintf(stderr, "Failed to get terminal attributes\n");
         return 1;
     }
 
-    /* Set raw mode for INPUT only - keep output processing for display */
+    // Set raw mode for INPUT only - keep output processing for display
     struct termios raw = orig_termios;
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    /* DON'T disable OPOST - we need output processing for proper \n handling */
+    // DON'T disable OPOST - we need output processing for proper \n handling
     raw.c_cflag |= (CS8);
     raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
     raw.c_cc[VMIN] = 0;
@@ -65,19 +65,19 @@ int main(void) {
         if (n > 0) {
             total += n;
 
-            /* Check for Ctrl+C */
+            // Check for Ctrl+C
             if (buf[0] == 3) {
                 running = false;
                 break;
             }
 
-            /* Show what we got */
+            // Show what we got
             printf("\nRead %zd bytes (total: %" PRIu64 "): ", n, total);
             for (ssize_t i = 0; i < n; i++) {
                 printf("%02X ", buf[i]);
             }
 
-            /* Check for escape sequence */
+            // Check for escape sequence
             if (buf[0] == 27 && n > 1) {
                 printf(" <ESC sequence>");
             }

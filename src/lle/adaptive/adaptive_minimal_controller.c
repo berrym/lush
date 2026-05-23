@@ -74,20 +74,20 @@ typedef struct {
  * Minimal controller structure.
  */
 struct lle_minimal_controller_t {
-    /* Basic text processing */
+    // Basic text processing
     lle_text_buffer_t *text_buffer;
     lle_basic_history_t *history;
     lle_simple_completion_t *completion;
     lle_simple_input_processor_t *input_processor;
 
-    /* Output configuration */
+    // Output configuration
     FILE *output_stream;
     bool echo_enabled;
 
-    /* Memory management */
+    // Memory management
     lush_memory_pool_t *memory_pool;
 
-    /* Statistics */
+    // Statistics
     uint64_t lines_read;
     uint64_t history_entries_added;
     uint64_t completions_performed;
@@ -252,7 +252,7 @@ static lle_result_t lle_basic_history_add(lle_basic_history_t *history,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Don't add duplicate of last entry */
+    // Don't add duplicate of last entry
     if (history->count > 0) {
         size_t last_index =
             (history->write_index + history->capacity - 1) % history->capacity;
@@ -261,12 +261,12 @@ static lle_result_t lle_basic_history_add(lle_basic_history_t *history,
         }
     }
 
-    /* Free old entry if overwriting */
+    // Free old entry if overwriting
     if (history->entries[history->write_index]) {
         free(history->entries[history->write_index]);
     }
 
-    /* Add new entry */
+    // Add new entry
     history->entries[history->write_index] = strdup(entry);
     if (!history->entries[history->write_index]) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -295,7 +295,7 @@ static const char *lle_basic_history_get(lle_basic_history_t *history,
         return NULL;
     }
 
-    /* Calculate actual index (newest first) */
+    // Calculate actual index (newest first)
     size_t actual_index =
         (history->write_index + history->capacity - 1 - index) %
         history->capacity;
@@ -436,12 +436,12 @@ lle_simple_input_processor_read_line(lle_simple_input_processor_t *processor,
 
     if (!fgets(processor->input_buffer, processor->buffer_size, stdin)) {
         if (feof(stdin)) {
-            return LLE_ERROR_OUT_OF_MEMORY; /* EOF */
+            return LLE_ERROR_OUT_OF_MEMORY; // EOF
         }
         return LLE_ERROR_INPUT_PARSING;
     }
 
-    /* Remove trailing newline */
+    // Remove trailing newline
     size_t len = strlen(processor->input_buffer);
     if (len > 0 && processor->input_buffer[len - 1] == '\n') {
         processor->input_buffer[len - 1] = '\0';
@@ -476,14 +476,14 @@ lle_initialize_minimal_controller(lle_adaptive_context_t *context,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize text buffer */
+    // Initialize text buffer
     minimal->text_buffer = lle_text_buffer_create_basic();
     if (!minimal->text_buffer) {
         free(minimal);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize history */
+    // Initialize history
     minimal->history = lle_basic_history_create();
     if (!minimal->history) {
         lle_text_buffer_destroy(minimal->text_buffer);
@@ -491,7 +491,7 @@ lle_initialize_minimal_controller(lle_adaptive_context_t *context,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize completion */
+    // Initialize completion
     minimal->completion = lle_simple_completion_create();
     if (!minimal->completion) {
         lle_basic_history_destroy(minimal->history);
@@ -500,7 +500,7 @@ lle_initialize_minimal_controller(lle_adaptive_context_t *context,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize input processor */
+    // Initialize input processor
     lle_result_t result =
         lle_simple_input_processor_create(&minimal->input_processor);
     if (result != LLE_SUCCESS) {
@@ -557,13 +557,13 @@ lle_result_t lle_minimal_read_line(lle_minimal_controller_t *minimal,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Display prompt */
+    // Display prompt
     if (minimal->echo_enabled) {
         fputs(prompt, minimal->output_stream);
         fflush(minimal->output_stream);
     }
 
-    /* Read line */
+    // Read line
     char *input_line = NULL;
     lle_result_t result = lle_simple_input_processor_read_line(
         minimal->input_processor, &input_line);
@@ -571,19 +571,19 @@ lle_result_t lle_minimal_read_line(lle_minimal_controller_t *minimal,
         return result;
     }
 
-    /* Set text buffer */
+    // Set text buffer
     result = lle_text_buffer_set(minimal->text_buffer, input_line);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Add to history if non-empty */
+    // Add to history if non-empty
     if (strlen(input_line) > 0) {
         lle_basic_history_add(minimal->history, input_line);
         minimal->history_entries_added++;
     }
 
-    /* Duplicate line for caller */
+    // Duplicate line for caller
     *line = strdup(input_line);
     if (!*line) {
         return LLE_ERROR_OUT_OF_MEMORY;

@@ -66,7 +66,7 @@ static lle_unix_interface_t *g_signal_interface = NULL;
 static void handle_sigwinch(int sig) {
     (void)sig;
 
-    /* Set flag to be checked in event loop (async-signal-safe) */
+    // Set flag to be checked in event loop (async-signal-safe)
     if (g_signal_interface) {
         g_signal_interface->sigwinch_received = true;
     }
@@ -85,13 +85,13 @@ static void handle_sigtstp(int sig) {
     if (!g_signal_interface)
         return;
 
-    /* Exit raw mode before suspending (async-signal-safe) */
+    // Exit raw mode before suspending (async-signal-safe)
     if (g_signal_interface->raw_mode_active) {
         tcsetattr(g_signal_interface->terminal_fd, TCSAFLUSH,
                   &g_signal_interface->original_termios);
     }
 
-    /* Re-raise signal with default handler to actually suspend */
+    // Re-raise signal with default handler to actually suspend
     signal(sig, SIG_DFL);
     raise(sig);
 }
@@ -110,13 +110,13 @@ static void handle_sigcont(int sig) {
     if (!g_signal_interface)
         return;
 
-    /* Re-enter raw mode if we were in it (async-signal-safe) */
+    // Re-enter raw mode if we were in it (async-signal-safe)
     if (g_signal_interface->raw_mode_active) {
         tcsetattr(g_signal_interface->terminal_fd, TCSAFLUSH,
                   &g_signal_interface->raw_termios);
     }
 
-    /* Re-install SIGTSTP handler (it was reset to default) */
+    // Re-install SIGTSTP handler (it was reset to default)
     signal(SIGTSTP, handle_sigtstp);
 }
 
@@ -139,7 +139,7 @@ static void handle_sigcont(int sig) {
  */
 static void cleanup_on_exit(void) {
     if (g_signal_interface && g_signal_interface->raw_mode_active) {
-        /* This is safe in atexit context */
+        // This is safe in atexit context
         tcsetattr(g_signal_interface->terminal_fd, TCSAFLUSH,
                   &g_signal_interface->original_termios);
     }
@@ -185,7 +185,7 @@ static bool signals_installed = false;
  */
 static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
     if (signals_installed) {
-        return LLE_SUCCESS; /* Already installed */
+        return LLE_SUCCESS; // Already installed
     }
 
     struct sigaction sa;
@@ -197,7 +197,7 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
     sigemptyset(&sa.sa_mask);
     sigaddset(&sa.sa_mask, SIGTSTP);
     sigaddset(&sa.sa_mask, SIGCONT);
-    sa.sa_flags = SA_RESTART; /* Restart interrupted system calls */
+    sa.sa_flags = SA_RESTART; // Restart interrupted system calls
 
     if (sigaction(SIGWINCH, &sa, &original_sigwinch) != 0) {
         return LLE_ERROR_SYSTEM_CALL;
@@ -235,7 +235,7 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
      * correctly.
      */
 
-    /* Set global pointer for handlers */
+    // Set global pointer for handlers
     g_signal_interface = interface;
     signals_installed = true;
 
@@ -256,18 +256,18 @@ static void restore_signal_handlers(lle_unix_interface_t *interface) {
         return;
     }
 
-    /* Only restore if this was the interface that installed them */
+    // Only restore if this was the interface that installed them
     if (g_signal_interface != interface) {
         return;
     }
 
-    /* Restore signal handlers that we installed */
+    // Restore signal handlers that we installed
     sigaction(SIGWINCH, &original_sigwinch, NULL);
     sigaction(SIGTSTP, &original_sigtstp, NULL);
     sigaction(SIGCONT, &original_sigcont, NULL);
-    /* Note: We don't restore SIGINT/SIGTERM because we never installed them */
+    // Note: We don't restore SIGINT/SIGTERM because we never installed them
 
-    /* Clear global pointer */
+    // Clear global pointer
     g_signal_interface = NULL;
     signals_installed = false;
 }
@@ -288,30 +288,30 @@ lle_result_t lle_unix_interface_init(lle_unix_interface_t **interface) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate interface structure */
+    // Allocate interface structure
     lle_unix_interface_t *iface = calloc(1, sizeof(lle_unix_interface_t));
     if (!iface) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Set file descriptor (using STDIN for terminal operations) */
+    // Set file descriptor (using STDIN for terminal operations)
     iface->terminal_fd = STDIN_FILENO;
 
-    /* Save original terminal state (if this is a TTY) */
+    // Save original terminal state (if this is a TTY)
     /* In non-TTY environments (tests, pipes), tcgetattr will fail - that's OK
      */
     if (tcgetattr(iface->terminal_fd, &iface->original_termios) != 0) {
-        /* Not a TTY - initialize with empty termios */
+        // Not a TTY - initialize with empty termios
         memset(&iface->original_termios, 0, sizeof(struct termios));
     }
 
-    /* Initialize state */
+    // Initialize state
     iface->raw_mode_active = false;
     iface->size_changed = false;
     iface->sigwinch_received = false;
     iface->last_error = LLE_SUCCESS;
 
-    /* Get initial window size */
+    // Get initial window size
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
         iface->current_width = ws.ws_col;
@@ -321,17 +321,17 @@ lle_result_t lle_unix_interface_init(lle_unix_interface_t **interface) {
         iface->current_height = 24;
     }
 
-    /* Install signal handlers */
+    // Install signal handlers
     lle_result_t result = install_signal_handlers(iface);
     if (result != LLE_SUCCESS) {
         free(iface);
         return result;
     }
 
-    /* Register atexit cleanup */
+    // Register atexit cleanup
     register_cleanup();
 
-    /* Initialize parser-related fields to NULL (will be set up later) */
+    // Initialize parser-related fields to NULL (will be set up later)
     iface->sequence_parser = NULL;
     iface->key_detector = NULL;
     iface->capabilities = NULL;
@@ -359,11 +359,11 @@ lle_result_t lle_unix_interface_init_sequence_parser(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Store references for later use */
+    // Store references for later use
     interface->capabilities = capabilities;
     interface->memory_pool = memory_pool;
 
-    /* Initialize sequence parser */
+    // Initialize sequence parser
     lle_result_t result = lle_sequence_parser_init(&interface->sequence_parser,
                                                    capabilities, memory_pool);
 
@@ -373,7 +373,7 @@ lle_result_t lle_unix_interface_init_sequence_parser(
         return result;
     }
 
-    /* Initialize key detector */
+    // Initialize key detector
     result = lle_key_detector_init(&interface->key_detector, capabilities,
                                    memory_pool);
 
@@ -398,31 +398,31 @@ void lle_unix_interface_destroy(lle_unix_interface_t *interface) {
         return;
     }
 
-    /* Ensure we exit raw mode before cleanup */
+    // Ensure we exit raw mode before cleanup
     if (interface->raw_mode_active) {
         lle_unix_interface_exit_raw_mode(interface);
     }
 
-    /* Clean up sequence parser if initialized */
+    // Clean up sequence parser if initialized
     if (interface->sequence_parser) {
         lle_sequence_parser_destroy(interface->sequence_parser);
         interface->sequence_parser = NULL;
     }
 
-    /* Clean up key detector if initialized */
+    // Clean up key detector if initialized
     if (interface->key_detector) {
         lle_key_detector_destroy(interface->key_detector);
         interface->key_detector = NULL;
     }
 
-    /* Clear references (we don't own capabilities or memory_pool) */
+    // Clear references (we don't own capabilities or memory_pool)
     interface->capabilities = NULL;
     interface->memory_pool = NULL;
 
-    /* Restore original signal handlers */
+    // Restore original signal handlers
     restore_signal_handlers(interface);
 
-    /* Free structure */
+    // Free structure
     free(interface);
 }
 
@@ -438,47 +438,47 @@ lle_unix_interface_enter_raw_mode(lle_unix_interface_t *interface) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Already in raw mode? (idempotent) */
+    // Already in raw mode? (idempotent)
     if (interface->raw_mode_active) {
         return LLE_SUCCESS;
     }
 
-    /* Copy original settings */
+    // Copy original settings
     interface->raw_termios = interface->original_termios;
 
-    /* Modify for raw mode */
+    // Modify for raw mode
     struct termios *raw = &interface->raw_termios;
 
-    /* Input flags - disable special processing */
-    raw->c_iflag &= ~(BRKINT | /* No break signal */
-                      ICRNL |  /* Don't translate CR to NL */
-                      INPCK |  /* Disable parity checking */
-                      ISTRIP | /* Don't strip 8th bit */
-                      IXON);   /* Disable XON/XOFF flow control */
+    // Input flags - disable special processing
+    raw->c_iflag &= ~(BRKINT | // No break signal
+                      ICRNL |  // Don't translate CR to NL
+                      INPCK |  // Disable parity checking
+                      ISTRIP | // Don't strip 8th bit
+                      IXON);   // Disable XON/XOFF flow control
 
-    /* Output flags - KEEP output processing for proper display */
+    // Output flags - KEEP output processing for proper display
     /* NOTE: Disabling OPOST causes display corruption - \n won't return to
      * column 0 */
-    /* We need raw INPUT mode, but output should remain processed for display */
+    // We need raw INPUT mode, but output should remain processed for display
 
-    /* Control flags - 8-bit characters */
-    raw->c_cflag |= (CS8); /* 8 bits per byte */
+    // Control flags - 8-bit characters
+    raw->c_cflag |= (CS8); // 8 bits per byte
 
     /* Local flags - disable canonical mode and echo, but KEEP signals enabled
      */
-    raw->c_lflag &= ~(ECHO |   /* No echo */
-                      ICANON | /* Non-canonical mode */
-                      IEXTEN); /* Disable extended input processing */
+    raw->c_lflag &= ~(ECHO |   // No echo
+                      ICANON | // Non-canonical mode
+                      IEXTEN); // Disable extended input processing
     /* KEEP ISIG ENABLED - allow Ctrl-C to generate SIGINT for proper shell
      * behavior */
     /* This ensures lush's signal handler (src/signals.c) can manage child
      * processes */
 
-    /* Control characters - non-blocking read */
-    raw->c_cc[VMIN] = 0;  /* Non-blocking: return immediately */
-    raw->c_cc[VTIME] = 0; /* No timeout */
+    // Control characters - non-blocking read
+    raw->c_cc[VMIN] = 0;  // Non-blocking: return immediately
+    raw->c_cc[VTIME] = 0; // No timeout
 
-    /* Apply settings - TCSAFLUSH discards unread input */
+    // Apply settings - TCSAFLUSH discards unread input
     if (tcsetattr(interface->terminal_fd, TCSAFLUSH, raw) != 0) {
         interface->last_error = LLE_ERROR_SYSTEM_CALL;
         return LLE_ERROR_SYSTEM_CALL;
@@ -499,12 +499,12 @@ lle_result_t lle_unix_interface_exit_raw_mode(lle_unix_interface_t *interface) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Not in raw mode? (idempotent) */
+    // Not in raw mode? (idempotent)
     if (!interface->raw_mode_active) {
         return LLE_SUCCESS;
     }
 
-    /* Restore original settings */
+    // Restore original settings
     if (tcsetattr(interface->terminal_fd, TCSAFLUSH,
                   &interface->original_termios) != 0) {
         interface->last_error = LLE_ERROR_SYSTEM_CALL;
@@ -531,27 +531,27 @@ lle_result_t lle_unix_interface_get_window_size(lle_unix_interface_t *interface,
 
     struct winsize ws;
 
-    /* Try ioctl first */
+    // Try ioctl first
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 &&
         ws.ws_row > 0) {
         *width = ws.ws_col;
         *height = ws.ws_row;
 
-        /* Update cached size */
+        // Update cached size
         interface->current_width = ws.ws_col;
         interface->current_height = ws.ws_row;
 
         return LLE_SUCCESS;
     }
 
-    /* Fallback to environment variables */
+    // Fallback to environment variables
     const char *env_cols = getenv("COLUMNS");
     const char *env_lines = getenv("LINES");
 
     *width = (env_cols && *env_cols) ? (size_t)atoi(env_cols) : 80;
     *height = (env_lines && *env_lines) ? (size_t)atoi(env_lines) : 24;
 
-    /* Update cached size */
+    // Update cached size
     interface->current_width = *width;
     interface->current_height = *height;
 
@@ -577,14 +577,14 @@ lle_result_t lle_unix_interface_get_window_size(lle_unix_interface_t *interface,
  */
 static lle_special_key_t convert_key_code(uint32_t keycode,
                                           lle_key_type_t key_type) {
-    /* For cursor keys and editing keys, keycode typically maps directly */
+    // For cursor keys and editing keys, keycode typically maps directly
     switch (key_type) {
     case LLE_KEY_TYPE_CURSOR:
-        /* Cursor keys: handle both numeric (1-4) and ASCII ('A'-'D') formats */
+        // Cursor keys: handle both numeric (1-4) and ASCII ('A'-'D') formats
         if (keycode >= 1 && keycode <= 4) {
             return (lle_special_key_t)(LLE_KEY_UP + keycode - 1);
         }
-        /* CSI cursor keys use ASCII: A=Up, B=Down, C=Right, D=Left */
+        // CSI cursor keys use ASCII: A=Up, B=Down, C=Right, D=Left
         switch (keycode) {
         case 'A':
             return LLE_KEY_UP;
@@ -594,12 +594,12 @@ static lle_special_key_t convert_key_code(uint32_t keycode,
             return LLE_KEY_RIGHT;
         case 'D':
             return LLE_KEY_LEFT;
-        /* Home/End also sometimes reported as cursor type */
+        // Home/End also sometimes reported as cursor type
         case 'H':
             return LLE_KEY_HOME;
         case 'F':
             return LLE_KEY_END;
-        /* PageUp/PageDown with ASCII digit keycodes */
+        // PageUp/PageDown with ASCII digit keycodes
         case '5':
             return LLE_KEY_PAGE_UP;
         case '6':
@@ -609,13 +609,13 @@ static lle_special_key_t convert_key_code(uint32_t keycode,
         }
         break;
     case LLE_KEY_TYPE_FUNCTION:
-        /* Function keys: F1-F12 */
+        // Function keys: F1-F12
         if (keycode >= 1 && keycode <= 12) {
             return (lle_special_key_t)(LLE_KEY_F1 + keycode - 1);
         }
         break;
     case LLE_KEY_TYPE_EDITING:
-        /* Editing keys: map common codes (both numeric and ASCII) */
+        // Editing keys: map common codes (both numeric and ASCII)
         switch (keycode) {
         case 1:
             return LLE_KEY_HOME;
@@ -638,13 +638,13 @@ static lle_special_key_t convert_key_code(uint32_t keycode,
         }
         break;
     case LLE_KEY_TYPE_CONTROL:
-        /* Control characters - treat as regular characters for now */
-        /* Ctrl+C (0x03) should be handled by the application layer */
+        // Control characters - treat as regular characters for now
+        // Ctrl+C (0x03) should be handled by the application layer
         /* We'll return UNKNOWN here and let the character handler deal with it
          */
         break;
     case LLE_KEY_TYPE_SPECIAL:
-        /* Special keys */
+        // Special keys
         switch (keycode) {
         case 9:
             return LLE_KEY_TAB;
@@ -710,11 +710,11 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
 
     memset(event, 0, sizeof(lle_input_event_t));
     event->timestamp = parsed->data.text_info.timestamp;
-    event->sequence_number = 0; /* Will be set by caller if needed */
+    event->sequence_number = 0; // Will be set by caller if needed
 
     switch (parsed->type) {
     case LLE_PARSED_INPUT_TYPE_TEXT:
-        /* Regular text input */
+        // Regular text input
         event->type = LLE_INPUT_TYPE_CHARACTER;
         event->data.character.codepoint = parsed->data.text_info.codepoint;
         memcpy(event->data.character.utf8_bytes,
@@ -725,8 +725,8 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
         break;
 
     case LLE_PARSED_INPUT_TYPE_KEY: {
-        /* Key press or combination */
-        /* First try to convert to special key */
+        // Key press or combination
+        // First try to convert to special key
         lle_special_key_t special_key = convert_key_code(
             parsed->data.key_info.keycode, parsed->data.key_info.type);
 
@@ -734,7 +734,7 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
          * treat it as a regular character event (e.g., Ctrl+C) */
         if (special_key == LLE_KEY_UNKNOWN &&
             parsed->data.key_info.type == LLE_KEY_TYPE_CONTROL) {
-            /* Control character - return as CHARACTER event */
+            // Control character - return as CHARACTER event
             /* For control chars, keycode might be ASCII letter, so use raw
              * value */
             uint32_t ctrl_code = parsed->data.key_info.keycode;
@@ -750,7 +750,7 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
             event->data.character.utf8_bytes[0] = (char)ctrl_code;
             event->data.character.byte_count = 1;
         } else {
-            /* Regular special key */
+            // Regular special key
             event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
             event->data.special_key.key = special_key;
             event->data.special_key.keycode = parsed->data.key_info.keycode;
@@ -762,9 +762,9 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
     }
 
     case LLE_PARSED_INPUT_TYPE_MOUSE:
-        /* Mouse events are not directly supported by lle_input_event_t */
-        /* We'll need to handle these through a different mechanism later */
-        /* For now, treat as unknown/error */
+        // Mouse events are not directly supported by lle_input_event_t
+        // We'll need to handle these through a different mechanism later
+        // For now, treat as unknown/error
         event->type = LLE_INPUT_TYPE_ERROR;
         event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
         snprintf(event->data.error.error_message,
@@ -773,7 +773,7 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
         break;
 
     case LLE_PARSED_INPUT_TYPE_SEQUENCE:
-        /* Terminal sequence - treat as error for now */
+        // Terminal sequence - treat as error for now
         event->type = LLE_INPUT_TYPE_ERROR;
         event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
         snprintf(event->data.error.error_message,
@@ -782,7 +782,7 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
         break;
 
     case LLE_PARSED_INPUT_TYPE_PASTE:
-        /* Bracketed paste - treat as error for now */
+        // Bracketed paste - treat as error for now
         event->type = LLE_INPUT_TYPE_ERROR;
         event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
         snprintf(event->data.error.error_message,
@@ -791,7 +791,7 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
         break;
 
     case LLE_PARSED_INPUT_TYPE_FOCUS:
-        /* Focus events - treat as error for now */
+        // Focus events - treat as error for now
         event->type = LLE_INPUT_TYPE_ERROR;
         event->data.error.error_code = LLE_ERROR_FEATURE_NOT_AVAILABLE;
         snprintf(event->data.error.error_message,
@@ -801,7 +801,7 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
 
     case LLE_PARSED_INPUT_TYPE_UNKNOWN:
     default:
-        /* Unknown input type */
+        // Unknown input type
         event->type = LLE_INPUT_TYPE_ERROR;
         event->data.error.error_code = LLE_ERROR_INPUT_PARSING;
         snprintf(event->data.error.error_message,
@@ -829,14 +829,14 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
  */
 static int get_utf8_length(unsigned char first_byte) {
     if ((first_byte & 0x80) == 0x00)
-        return 1; /* 0xxxxxxx - ASCII */
+        return 1; // 0xxxxxxx - ASCII
     if ((first_byte & 0xE0) == 0xC0)
-        return 2; /* 110xxxxx - 2 bytes */
+        return 2; // 110xxxxx - 2 bytes
     if ((first_byte & 0xF0) == 0xE0)
-        return 3; /* 1110xxxx - 3 bytes */
+        return 3; // 1110xxxx - 3 bytes
     if ((first_byte & 0xF8) == 0xF0)
-        return 4; /* 11110xxx - 4 bytes */
-    return -1;    /* Invalid first byte */
+        return 4; // 11110xxx - 4 bytes
+    return -1;    // Invalid first byte
 }
 
 /**
@@ -863,7 +863,7 @@ static lle_result_t decode_utf8(lle_unix_interface_t *interface,
     int expected_bytes = get_utf8_length(first_byte);
 
     if (expected_bytes < 0) {
-        /* Invalid first byte - use replacement character */
+        // Invalid first byte - use replacement character
         *codepoint_out = 0xFFFD;
         utf8_bytes[0] = (char)first_byte;
         *byte_count_out = 1;
@@ -874,25 +874,25 @@ static lle_result_t decode_utf8(lle_unix_interface_t *interface,
     *byte_count_out = (uint8_t)expected_bytes;
 
     if (expected_bytes == 1) {
-        /* ASCII - fast path */
+        // ASCII - fast path
         *codepoint_out = first_byte;
         return LLE_SUCCESS;
     }
 
-    /* Read additional bytes for multi-byte sequence */
+    // Read additional bytes for multi-byte sequence
     for (int i = 1; i < expected_bytes; i++) {
         unsigned char byte;
         ssize_t n = read(interface->terminal_fd, &byte, 1);
 
         if (n <= 0) {
-            /* Incomplete sequence - use replacement character */
+            // Incomplete sequence - use replacement character
             *codepoint_out = 0xFFFD;
             return LLE_SUCCESS;
         }
 
-        /* Validate continuation byte (10xxxxxx) */
+        // Validate continuation byte (10xxxxxx)
         if ((byte & 0xC0) != 0x80) {
-            /* Invalid continuation - use replacement character */
+            // Invalid continuation - use replacement character
             *codepoint_out = 0xFFFD;
             return LLE_SUCCESS;
         }
@@ -900,7 +900,7 @@ static lle_result_t decode_utf8(lle_unix_interface_t *interface,
         utf8_bytes[i] = (char)byte;
     }
 
-    /* Decode to Unicode codepoint */
+    // Decode to Unicode codepoint
     switch (expected_bytes) {
     case 2:
         *codepoint_out =
@@ -955,10 +955,10 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Clear event structure */
+    // Clear event structure
     memset(event, 0, sizeof(lle_input_event_t));
 
-    /* Check for pending SIGWINCH (resize event has priority) */
+    // Check for pending SIGWINCH (resize event has priority)
     if (interface->sigwinch_received) {
         interface->sigwinch_received = false;
 
@@ -984,7 +984,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         return LLE_SUCCESS;
     }
 
-    /* Use select() for timeout support */
+    // Use select() for timeout support
     fd_set readfds;
     FD_ZERO(&readfds);
     FD_SET(interface->terminal_fd, &readfds);
@@ -992,7 +992,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
     struct timeval tv;
     struct timeval *tv_ptr;
 
-    /* Determine effective timeout */
+    // Determine effective timeout
     uint32_t effective_timeout_ms = timeout_ms;
 
     /* If parser is accumulating an escape sequence, use a shorter timeout
@@ -1012,7 +1012,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
     }
 
     if (effective_timeout_ms == UINT32_MAX) {
-        /* Infinite timeout - pass NULL to select() */
+        // Infinite timeout - pass NULL to select()
         tv_ptr = NULL;
     } else {
         tv.tv_sec = (time_t)(effective_timeout_ms / 1000);
@@ -1025,18 +1025,18 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
 
     if (ready == -1) {
         if (errno == EINTR) {
-            /* Interrupted by signal - check for resize */
+            // Interrupted by signal - check for resize
             if (interface->sigwinch_received) {
-                /* Recursively handle resize event */
+                // Recursively handle resize event
                 return lle_unix_interface_read_event(interface, event,
                                                      timeout_ms);
             }
-            /* Other signal - return timeout */
+            // Other signal - return timeout
             event->type = LLE_INPUT_TYPE_TIMEOUT;
             event->timestamp = lle_get_current_time_microseconds();
             return LLE_SUCCESS;
         }
-        /* System call error */
+        // System call error
         event->type = LLE_INPUT_TYPE_ERROR;
         event->timestamp = lle_get_current_time_microseconds();
         event->data.error.error_code = LLE_ERROR_SYSTEM_CALL;
@@ -1047,17 +1047,17 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
     }
 
     if (ready == 0) {
-        /* Timeout - no data available */
-        /* Check if parser is accumulating a sequence that has timed out */
+        // Timeout - no data available
+        // Check if parser is accumulating a sequence that has timed out
         if (interface->sequence_parser) {
             lle_parsed_input_t *timeout_input = NULL;
             lle_result_t timeout_result = lle_sequence_parser_check_timeout(
                 interface->sequence_parser,
-                300000, /* 300ms timeout for ESC+key (Meta) sequences */
+                300000, // 300ms timeout for ESC+key (Meta) sequences
                 &timeout_input);
 
             if (timeout_result == LLE_SUCCESS && timeout_input) {
-                /* Timeout occurred - return the ESC key event */
+                // Timeout occurred - return the ESC key event
                 lle_result_t convert_result =
                     convert_parsed_input_to_event(timeout_input, event);
                 lle_pool_free(timeout_input);
@@ -1070,18 +1070,18 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         return LLE_SUCCESS;
     }
 
-    /* Data available - read first byte */
+    // Data available - read first byte
     unsigned char first_byte = 0;
     ssize_t bytes_read = read(interface->terminal_fd, &first_byte, 1);
 
     if (bytes_read == -1) {
         if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
-            /* Non-blocking read interrupted - treat as timeout */
+            // Non-blocking read interrupted - treat as timeout
             event->type = LLE_INPUT_TYPE_TIMEOUT;
             event->timestamp = lle_get_current_time_microseconds();
             return LLE_SUCCESS;
         }
-        /* Read error */
+        // Read error
         event->type = LLE_INPUT_TYPE_ERROR;
         event->timestamp = lle_get_current_time_microseconds();
         event->data.error.error_code = LLE_ERROR_SYSTEM_CALL;
@@ -1092,13 +1092,13 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
     }
 
     if (bytes_read == 0) {
-        /* EOF - stdin closed */
+        // EOF - stdin closed
         event->type = LLE_INPUT_TYPE_EOF;
         event->timestamp = lle_get_current_time_microseconds();
         return LLE_SUCCESS;
     }
 
-    /* Use comprehensive sequence parser if available */
+    // Use comprehensive sequence parser if available
     if (interface->sequence_parser) {
         /* Check if parser is accumulating a sequence or if this is ESC/control
          * char IMPORTANT: Don't send standalone control chars (Ctrl-A through
@@ -1110,7 +1110,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         bool should_parse = parser_accumulating || (first_byte == 0x1B);
 
         if (should_parse) {
-            /* Feed byte to comprehensive parser */
+            // Feed byte to comprehensive parser
             lle_parsed_input_t *parsed_input = NULL;
             char byte_buffer[1] = {(char)first_byte};
 
@@ -1121,7 +1121,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             lle_sequence_parser_get_buffer(interface->sequence_parser,
                                            &pre_buffer, &pre_buffer_len);
 
-            /* Make a copy since parser will reset after returning a result */
+            // Make a copy since parser will reset after returning a result
             char saved_buffer[256];
             size_t saved_len = (pre_buffer_len < sizeof(saved_buffer))
                                    ? pre_buffer_len
@@ -1144,11 +1144,11 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             }
 
             if (parsed_input) {
-                /* Parser returned a complete sequence */
+                // Parser returned a complete sequence
                 /* Note: Parser has already reset its buffer, but we saved it
                  * beforehand */
 
-                /* Add the last byte we just processed to the saved buffer */
+                // Add the last byte we just processed to the saved buffer
                 if (saved_len < sizeof(saved_buffer)) {
                     saved_buffer[saved_len++] = first_byte;
                 }
@@ -1169,7 +1169,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                 if (should_try_detector && interface->key_detector &&
                     saved_len > 0) {
 
-                    /* Try to identify the key */
+                    // Try to identify the key
                     lle_key_info_t *key_info = NULL;
                     lle_result_t detect_result =
                         lle_key_detector_process_sequence(
@@ -1185,31 +1185,31 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                     }
                 }
 
-                /* Convert to event */
+                // Convert to event
                 lle_result_t convert_result =
                     convert_parsed_input_to_event(parsed_input, event);
                 lle_pool_free(parsed_input);
                 return convert_result;
             }
 
-            /* Parser is accumulating a sequence - check for timeout first */
+            // Parser is accumulating a sequence - check for timeout first
             /* If ESC key was pressed and enough time has passed, return ESC as
              * standalone key */
             lle_parsed_input_t *timeout_input = NULL;
             lle_result_t timeout_result = lle_sequence_parser_check_timeout(
                 interface->sequence_parser,
-                300000, /* 300ms timeout for ESC+key (Meta) sequences */
+                300000, // 300ms timeout for ESC+key (Meta) sequences
                 &timeout_input);
 
             if (timeout_result == LLE_SUCCESS && timeout_input) {
-                /* Timeout occurred - return the ESC key event */
+                // Timeout occurred - return the ESC key event
                 lle_result_t convert_result =
                     convert_parsed_input_to_event(timeout_input, event);
                 lle_pool_free(timeout_input);
                 return convert_result;
             }
 
-            /* No timeout yet - return timeout so caller will call again */
+            // No timeout yet - return timeout so caller will call again
             event->type = LLE_INPUT_TYPE_TIMEOUT;
             event->timestamp = lle_get_current_time_microseconds();
             return LLE_SUCCESS;
@@ -1218,9 +1218,9 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
          * UTF-8 handling */
     }
 
-    /* Check for escape sequences (ESC = 0x1B = 27) */
+    // Check for escape sequences (ESC = 0x1B = 27)
     if (first_byte == 0x1B) {
-        /* Read next byte with short timeout to detect escape sequences */
+        // Read next byte with short timeout to detect escape sequences
         unsigned char second_byte;
         fd_set read_fds;
         struct timeval escape_timeout;
@@ -1229,7 +1229,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         FD_SET(interface->terminal_fd, &read_fds);
         escape_timeout.tv_sec = 0;
         escape_timeout.tv_usec =
-            100000; /* 100ms timeout for ESC+key (Meta) sequences */
+            100000; // 100ms timeout for ESC+key (Meta) sequences
 
         int ready = select(interface->terminal_fd + 1, &read_fds, NULL, NULL,
                            &escape_timeout);
@@ -1238,12 +1238,12 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             ssize_t read2 = read(interface->terminal_fd, &second_byte, 1);
 
             if (read2 == 1 && second_byte == '[') {
-                /* CSI sequence - read the final byte */
+                // CSI sequence - read the final byte
                 unsigned char final_byte;
                 ssize_t read3 = read(interface->terminal_fd, &final_byte, 1);
 
                 if (read3 == 1) {
-                    /* Detect common arrow key sequences: ESC [ A/B/C/D */
+                    // Detect common arrow key sequences: ESC [ A/B/C/D
                     event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
                     event->timestamp = lle_get_current_time_microseconds();
                     event->data.special_key.modifiers = 0;
@@ -1268,7 +1268,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                         event->data.special_key.key = LLE_KEY_END;
                         return LLE_SUCCESS;
                     case '3':
-                        /* Delete key: ESC [ 3 ~ - need to read the ~ */
+                        // Delete key: ESC [ 3 ~ - need to read the ~
                         {
                             unsigned char tilde;
                             ssize_t read4 =
@@ -1286,7 +1286,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                     }
                 }
             } else if (read2 == 1 && second_byte == 'O') {
-                /* SS3 sequence - alternate function keys */
+                // SS3 sequence - alternate function keys
                 unsigned char final_byte;
                 ssize_t read3 = read(interface->terminal_fd, &final_byte, 1);
 
@@ -1303,7 +1303,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                         event->data.special_key.key = LLE_KEY_END;
                         return LLE_SUCCESS;
                     default:
-                        /* Unknown SS3 sequence */
+                        // Unknown SS3 sequence
                         break;
                     }
                 }
@@ -1331,7 +1331,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
          * character */
     }
 
-    /* Decode UTF-8 character */
+    // Decode UTF-8 character
     uint32_t codepoint;
     char utf8_bytes[8] = {0};
     uint8_t byte_count;
@@ -1363,14 +1363,14 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
         event->timestamp = lle_get_current_time_microseconds();
         event->data.special_key.key =
-            LLE_KEY_UNKNOWN; /* Not a special key like arrow/F-key */
+            LLE_KEY_UNKNOWN; // Not a special key like arrow/F-key
         event->data.special_key.modifiers = LLE_MOD_CTRL;
         event->data.special_key.keycode =
-            codepoint + 0x40; /* 0x01->0x41='A', 0x02->0x42='B', etc. */
+            codepoint + 0x40; // 0x01->0x41='A', 0x02->0x42='B', etc.
         return LLE_SUCCESS;
     }
 
-    /* Populate character event */
+    // Populate character event
     event->type = LLE_INPUT_TYPE_CHARACTER;
     event->timestamp = lle_get_current_time_microseconds();
     event->data.character.codepoint = codepoint;
@@ -1401,7 +1401,7 @@ uint64_t lle_get_current_time_microseconds(void) {
                (uint64_t)ts.tv_nsec / 1000ULL;
     }
 
-    /* Fallback to gettimeofday if CLOCK_MONOTONIC fails */
+    // Fallback to gettimeofday if CLOCK_MONOTONIC fails
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;

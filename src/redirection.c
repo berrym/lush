@@ -60,7 +60,7 @@ static bool redir_write_all(int fd, const void *buf, size_t len) {
     return true;
 }
 
-/* Forward declarations */
+// Forward declarations
 static int handle_redirection_node(executor_t *executor, node_t *redir_node);
 static int setup_here_document(const char *delimiter, bool strip_tabs);
 static int setup_here_document_with_content(const char *content);

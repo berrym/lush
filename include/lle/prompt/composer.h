@@ -30,7 +30,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-/* Forward declaration for shell event hub */
+// Forward declaration for shell event hub
 struct lle_shell_event_hub;
 
 #ifdef __cplusplus
@@ -364,4 +364,4 @@ lle_composer_create_render_ctx(lle_prompt_composer_t *composer);
 }
 #endif
 
-#endif /* LLE_PROMPT_COMPOSER_H */
+#endif // LLE_PROMPT_COMPOSER_H

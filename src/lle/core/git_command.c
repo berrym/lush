@@ -34,7 +34,7 @@
  */
 static ssize_t read_all_available(int fd, char *buf, size_t buf_size) {
     if (!buf || buf_size == 0) {
-        /* Drain fd without storing */
+        // Drain fd without storing
         char drain[256];
         ssize_t total = 0;
         for (;;) {
@@ -42,11 +42,11 @@ static ssize_t read_all_available(int fd, char *buf, size_t buf_size) {
             if (n > 0) {
                 total += n;
             } else if (n == 0) {
-                break; /* EOF */
+                break; // EOF
             } else if (errno == EINTR) {
                 continue;
             } else {
-                break; /* Error */
+                break; // Error
             }
         }
         return total;
@@ -54,9 +54,9 @@ static ssize_t read_all_available(int fd, char *buf, size_t buf_size) {
 
     size_t pos = 0;
     for (;;) {
-        size_t remaining = buf_size - 1 - pos; /* Reserve space for NUL */
+        size_t remaining = buf_size - 1 - pos; // Reserve space for NUL
         if (remaining == 0) {
-            /* Buffer full - drain remaining to prevent child from blocking */
+            // Buffer full - drain remaining to prevent child from blocking
             char drain[256];
             for (;;) {
                 ssize_t n = read(fd, drain, sizeof(drain));
@@ -70,11 +70,11 @@ static ssize_t read_all_available(int fd, char *buf, size_t buf_size) {
         if (n > 0) {
             pos += (size_t)n;
         } else if (n == 0) {
-            break; /* EOF */
+            break; // EOF
         } else if (errno == EINTR) {
             continue;
         } else {
-            break; /* Error */
+            break; // Error
         }
     }
 
@@ -90,14 +90,14 @@ static ssize_t read_all_available(int fd, char *buf, size_t buf_size) {
 static void kill_child(pid_t pid) {
     kill(pid, SIGTERM);
 
-    /* Give child 100ms to exit gracefully */
+    // Give child 100ms to exit gracefully
     struct timeval tv = {.tv_sec = 0, .tv_usec = 100000};
     select(0, NULL, NULL, NULL, &tv);
 
     int status;
     pid_t result = waitpid(pid, &status, WNOHANG);
     if (result == 0) {
-        /* Still running - force kill */
+        // Still running - force kill
         kill(pid, SIGKILL);
         waitpid(pid, &status, 0);
     }
@@ -120,7 +120,7 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
         output[0] = '\0';
     }
 
-    /* Create pipe for capturing child stdout */
+    // Create pipe for capturing child stdout
     int pipefd[2];
     if (pipe(pipefd) < 0) {
         return result;
@@ -128,23 +128,23 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
 
     pid_t pid = lush_fork();
     if (pid < 0) {
-        /* Fork failed */
+        // Fork failed
         close(pipefd[0]);
         close(pipefd[1]);
         return result;
     }
 
     if (pid == 0) {
-        /* Child process */
-        close(pipefd[0]); /* Close read end */
+        // Child process
+        close(pipefd[0]); // Close read end
 
-        /* Redirect stdout to pipe */
+        // Redirect stdout to pipe
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) {
             _exit(127);
         }
         close(pipefd[1]);
 
-        /* Redirect stderr to /dev/null */
+        // Redirect stderr to /dev/null
         int devnull = open("/dev/null", O_WRONLY);
         if (devnull >= 0) {
             dup2(devnull, STDERR_FILENO);
@@ -152,13 +152,13 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
         }
 
         execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
-        _exit(127); /* exec failed */
+        _exit(127); // exec failed
     }
 
-    /* Parent process */
-    close(pipefd[1]); /* Close write end */
+    // Parent process
+    close(pipefd[1]); // Close write end
 
-    /* Use select() with timeout to wait for child output */
+    // Use select() with timeout to wait for child output
     struct timeval tv;
     tv.tv_sec = (long)(timeout_ms / 1000);
     tv.tv_usec = (long)((timeout_ms % 1000) * 1000);
@@ -170,25 +170,25 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
     int ready = select(pipefd[0] + 1, &readfds, NULL, NULL, &tv);
 
     if (ready < 0 && errno != EINTR) {
-        /* select error */
+        // select error
         close(pipefd[0]);
         kill_child(pid);
         return result;
     }
 
     if (ready == 0) {
-        /* Timeout - kill child */
+        // Timeout - kill child
         close(pipefd[0]);
         kill_child(pid);
         result.timed_out = true;
         return result;
     }
 
-    /* Data available or EINTR (which means a signal arrived, proceed) */
+    // Data available or EINTR (which means a signal arrived, proceed)
     read_all_available(pipefd[0], output, output_size);
     close(pipefd[0]);
 
-    /* Remove trailing newline from output */
+    // Remove trailing newline from output
     if (output && output_size > 0) {
         size_t len = strlen(output);
         while (len > 0 &&
@@ -197,7 +197,7 @@ git_cmd_result_t git_command_with_timeout(const char *cmd, char *output,
         }
     }
 
-    /* Wait for child to exit */
+    // Wait for child to exit
     int status;
     pid_t waited;
     do {

@@ -29,7 +29,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * HELPER: Substitution pattern parsing (reimplemented for testing)
@@ -49,7 +49,7 @@ static bool parse_substitution_pattern(const char *pattern, char **old,
 
     const char *equals = strchr(pattern, '=');
     if (!equals) {
-        /* No equals sign, treat entire pattern as old with empty new */
+        // No equals sign, treat entire pattern as old with empty new
         *old = strdup(pattern);
         *new_str = strdup("");
         return (*old && *new_str);
@@ -87,7 +87,7 @@ static char *apply_substitution(const char *command, const char *old,
 
     const char *pos = strstr(command, old);
     if (!pos) {
-        return strdup(command); /* No match, return original */
+        return strdup(command); // No match, return original
     }
 
     size_t old_len = strlen(old);
@@ -100,14 +100,14 @@ static char *apply_substitution(const char *command, const char *old,
         return NULL;
     }
 
-    /* Copy prefix */
+    // Copy prefix
     size_t prefix_len = (size_t)(pos - command);
     strncpy(result, command, prefix_len);
 
-    /* Copy replacement */
+    // Copy replacement
     strcpy(result + prefix_len, new_str);
 
-    /* Copy suffix */
+    // Copy suffix
     strcpy(result + prefix_len + new_len, pos + old_len);
 
     return result;
@@ -174,7 +174,7 @@ TEST(substitution_multiple_equals) {
     char *old = NULL;
     char *new_str = NULL;
 
-    /* Only first = is the separator */
+    // Only first = is the separator
     bool result = parse_substitution_pattern("a=b=c", &old, &new_str);
     ASSERT_TRUE(result, "Parse should succeed");
     ASSERT_STR_EQ(old, "a", "Old should be 'a'");
@@ -246,7 +246,7 @@ TEST(apply_sub_expand) {
 }
 
 TEST(apply_sub_first_only) {
-    /* Should only replace first occurrence */
+    // Should only replace first occurrence
     char *result = apply_substitution("echo echo echo", "echo", "print");
     ASSERT_NOT_NULL(result, "Result should not be NULL");
     ASSERT_STR_EQ(result, "print echo echo", "Only first occurrence replaced");
@@ -259,11 +259,11 @@ TEST(apply_sub_first_only) {
  */
 
 TEST(editor_env_fcedit) {
-    /* Save current environment */
+    // Save current environment
     char *saved_fcedit = getenv("FCEDIT") ? strdup(getenv("FCEDIT")) : NULL;
     char *saved_editor = getenv("EDITOR") ? strdup(getenv("EDITOR")) : NULL;
 
-    /* Set FCEDIT */
+    // Set FCEDIT
     setenv("FCEDIT", "/usr/bin/vim", 1);
     unsetenv("EDITOR");
 
@@ -271,7 +271,7 @@ TEST(editor_env_fcedit) {
     ASSERT_NOT_NULL(fcedit, "FCEDIT should be set");
     ASSERT_STR_EQ(fcedit, "/usr/bin/vim", "FCEDIT value correct");
 
-    /* Restore */
+    // Restore
     if (saved_fcedit) {
         setenv("FCEDIT", saved_fcedit, 1);
         free(saved_fcedit);
@@ -285,11 +285,11 @@ TEST(editor_env_fcedit) {
 }
 
 TEST(editor_env_editor_fallback) {
-    /* Save current environment */
+    // Save current environment
     char *saved_fcedit = getenv("FCEDIT") ? strdup(getenv("FCEDIT")) : NULL;
     char *saved_editor = getenv("EDITOR") ? strdup(getenv("EDITOR")) : NULL;
 
-    /* Unset FCEDIT, set EDITOR */
+    // Unset FCEDIT, set EDITOR
     unsetenv("FCEDIT");
     setenv("EDITOR", "/usr/bin/nano", 1);
 
@@ -299,7 +299,7 @@ TEST(editor_env_editor_fallback) {
     ASSERT_NOT_NULL(editor, "EDITOR should be set");
     ASSERT_STR_EQ(editor, "/usr/bin/nano", "EDITOR value correct");
 
-    /* Restore */
+    // Restore
     if (saved_fcedit) {
         setenv("FCEDIT", saved_fcedit, 1);
         free(saved_fcedit);
@@ -325,13 +325,13 @@ TEST(editor_env_editor_fallback) {
  */
 static int resolve_fc_index(int spec, int history_count) {
     if (spec == 0) {
-        /* 0 means current (last) command */
+        // 0 means current (last) command
         return history_count;
     } else if (spec > 0) {
-        /* Positive: absolute 1-based index */
+        // Positive: absolute 1-based index
         return (spec <= history_count) ? spec : history_count;
     } else {
-        /* Negative: relative to end */
+        // Negative: relative to end
         int resolved = history_count + spec + 1;
         return (resolved > 0) ? resolved : 1;
     }
@@ -379,35 +379,35 @@ TEST(range_small_history) {
  */
 
 TEST(fc_no_args_no_history) {
-    /* fc with no args and no history should fail gracefully */
-    /* Note: This test may need LLE to be initialized */
+    // fc with no args and no history should fail gracefully
+    // Note: This test may need LLE to be initialized
     char *argv[] = {"fc", NULL};
     int result = bin_fc(1, argv);
-    /* Without history, fc should return error */
+    // Without history, fc should return error
     ASSERT(result == 0 || result == 1, "fc should return 0 or 1");
 }
 
 TEST(fc_list_empty_history) {
-    /* fc -l with no history */
+    // fc -l with no history
     char *argv[] = {"fc", "-l", NULL};
     int result = bin_fc(2, argv);
-    /* Should succeed but show nothing or fail gracefully */
+    // Should succeed but show nothing or fail gracefully
     ASSERT(result == 0 || result == 1, "fc -l should handle empty history");
 }
 
 TEST(fc_invalid_option) {
-    /* fc with invalid option */
+    // fc with invalid option
     char *argv[] = {"fc", "-Z", NULL};
     int result = bin_fc(2, argv);
-    /* Should return error for invalid option */
+    // Should return error for invalid option
     ASSERT(result == 1 || result == 2, "fc -Z should fail");
 }
 
 TEST(fc_substitute_mode_syntax) {
-    /* fc -s without pattern - should use last command */
+    // fc -s without pattern - should use last command
     char *argv[] = {"fc", "-s", NULL};
     int result = bin_fc(2, argv);
-    /* May succeed or fail depending on history state */
+    // May succeed or fail depending on history state
     ASSERT(result == 0 || result == 1, "fc -s should handle gracefully");
 }
 
@@ -456,19 +456,19 @@ TEST(format_long_command) {
  */
 
 TEST(temp_file_creation) {
-    /* Test that we can create temp files in /tmp */
+    // Test that we can create temp files in /tmp
     char template[] = "/tmp/fc_test_XXXXXX";
     int fd = mkstemp(template);
     ASSERT(fd >= 0, "mkstemp should succeed");
 
-    /* Write some content */
+    // Write some content
     const char *content = "echo test\n";
     ssize_t written = write(fd, content, strlen(content));
     ASSERT(written == (ssize_t)strlen(content), "Write should succeed");
 
     close(fd);
 
-    /* Read it back */
+    // Read it back
     FILE *f = fopen(template, "r");
     ASSERT_NOT_NULL(f, "Should open temp file");
 
@@ -489,7 +489,7 @@ TEST(temp_file_creation) {
 int main(void) {
     printf("\n=== FC Builtin Unit Tests ===\n\n");
 
-    /* Substitution pattern tests */
+    // Substitution pattern tests
     printf("Substitution Pattern Parsing:\n");
     RUN_TEST(substitution_simple);
     RUN_TEST(substitution_empty_new);
@@ -498,7 +498,7 @@ int main(void) {
     RUN_TEST(substitution_multiple_equals);
     RUN_TEST(substitution_null_inputs);
 
-    /* Substitution application tests */
+    // Substitution application tests
     printf("\nSubstitution Application:\n");
     RUN_TEST(apply_sub_simple);
     RUN_TEST(apply_sub_at_start);
@@ -508,12 +508,12 @@ int main(void) {
     RUN_TEST(apply_sub_expand);
     RUN_TEST(apply_sub_first_only);
 
-    /* Editor environment tests */
+    // Editor environment tests
     printf("\nEditor Environment:\n");
     RUN_TEST(editor_env_fcedit);
     RUN_TEST(editor_env_editor_fallback);
 
-    /* Range specification tests */
+    // Range specification tests
     printf("\nRange Specification:\n");
     RUN_TEST(range_positive_index);
     RUN_TEST(range_negative_index);
@@ -522,20 +522,20 @@ int main(void) {
     RUN_TEST(range_out_of_bounds_negative);
     RUN_TEST(range_small_history);
 
-    /* Basic bin_fc tests */
+    // Basic bin_fc tests
     printf("\nbin_fc Basic Tests:\n");
     RUN_TEST(fc_no_args_no_history);
     RUN_TEST(fc_list_empty_history);
     RUN_TEST(fc_invalid_option);
     RUN_TEST(fc_substitute_mode_syntax);
 
-    /* List mode formatting tests */
+    // List mode formatting tests
     printf("\nList Mode Formatting:\n");
     RUN_TEST(format_with_numbers);
     RUN_TEST(format_without_numbers);
     RUN_TEST(format_long_command);
 
-    /* Temp file tests */
+    // Temp file tests
     printf("\nTemp File Handling:\n");
     RUN_TEST(temp_file_creation);
 

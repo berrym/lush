@@ -51,7 +51,7 @@ typedef enum {
  * - Context stack for proper nested construct tracking
  */
 typedef struct {
-    /* Quote tracking */
+    // Quote tracking
     int quote_count;        /**< Single quote count */
     int double_quote_count; /**< Double quote count */
     int backtick_count;     /**< Backtick count */
@@ -59,24 +59,24 @@ typedef struct {
     bool in_double_quote;   /**< Currently inside double quotes */
     bool in_backtick;       /**< Currently inside backticks */
 
-    /* Bracket/brace/parenthesis tracking */
+    // Bracket/brace/parenthesis tracking
     int paren_count;   /**< Parenthesis nesting depth */
     int brace_count;   /**< Brace nesting depth */
     int bracket_count; /**< Bracket nesting depth */
 
-    /* Escape and continuation */
+    // Escape and continuation
     bool escaped;          /**< Previous character was backslash */
     bool has_continuation; /**< Line ends with backslash */
 
-    /* Here document handling */
+    // Here document handling
     bool in_here_doc;         /**< Currently in here document */
     char *here_doc_delimiter; /**< Here document delimiter string */
 
-    /* Command substitution and arithmetic */
+    // Command substitution and arithmetic
     bool in_command_substitution; /**< Inside $(...) */
     bool in_arithmetic;           /**< Inside $((...)) */
 
-    /* Control structure tracking (legacy flags - kept for compatibility) */
+    // Control structure tracking (legacy flags - kept for compatibility)
     bool in_function_definition; /**< Inside function definition */
     bool saw_posix_func_parens;  /**< Saw name() pattern, waiting for { */
     bool in_case_statement;      /**< Inside case statement */
@@ -86,7 +86,7 @@ typedef struct {
     bool in_until_loop;          /**< Inside until loop */
     int compound_command_depth;  /**< Nesting depth of compound commands */
 
-    /* Context stack for nested construct tracking */
+    // Context stack for nested construct tracking
     /** @brief Stack of nested contexts for proper prompt switching */
     continuation_context_type_t context_stack[CONTINUATION_MAX_CONTEXT_DEPTH];
     int context_stack_depth; /**< Current depth of context stack */
@@ -177,4 +177,4 @@ bool continuation_is_control_keyword(const char *word);
  */
 bool continuation_is_terminator(const char *line);
 
-#endif /* INPUT_CONTINUATION_H */
+#endif // INPUT_CONTINUATION_H

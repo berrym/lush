@@ -59,7 +59,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-/* LLE is the sole line editor - stub definitions for display compatibility */
+// LLE is the sole line editor - stub definitions for display compatibility
 static char *rl_line_buffer = NULL;
 static int rl_end = 0;
 static int rl_point = 0;
@@ -75,10 +75,10 @@ static inline int rl_on_new_line(void) { return 0; }
  * no readline fallback is needed.
  */
 static void do_clear_screen(void) {
-    /* ESC[2J clears entire screen, ESC[H moves cursor to home position */
+    // ESC[2J clears entire screen, ESC[H moves cursor to home position
     const char *clear_seq = "\033[2J\033[H";
     if (write(STDOUT_FILENO, clear_seq, strlen(clear_seq)) < 0) {
-        /* Ignore write errors - terminal may be in unusual state */
+        // Ignore write errors - terminal may be in unusual state
     }
 }
 
@@ -111,7 +111,7 @@ static char *display_generate_prompt(void) {
             return lush_pool_strdup(output.ps1);
         }
     }
-    /* Fallback */
+    // Fallback
     return lush_pool_strdup((getuid() > 0) ? "$ " : "# ");
 }
 
@@ -160,7 +160,7 @@ static symbol_compatibility_t get_symbol_mode(void) {
         const lle_theme_t *theme = lle_theme_registry_get_active(
             g_lle_integration->prompt_composer->themes);
         if (theme) {
-            /* Map LLE capabilities to symbol mode */
+            // Map LLE capabilities to symbol mode
             if (theme->capabilities & LLE_THEME_CAP_NERD_FONT) {
                 return SYMBOL_MODE_NERD_FONT;
             } else if (theme->capabilities & LLE_THEME_CAP_UNICODE) {
@@ -1481,7 +1481,7 @@ void display_integration_print_diagnostics(void) {
  */
 bool safe_layered_display_attempt(
     const char *function_name, integration_fallback_reason_t *fallback_reason) {
-    (void)function_name; /* Reserved for diagnostic logging */
+    (void)function_name; // Reserved for diagnostic logging
     if (!fallback_reason) {
         return false; // Invalid parameter - cannot proceed safely
     }
@@ -1514,7 +1514,7 @@ bool safe_layered_display_attempt(
     // Check 4: Memory and system resources
     // Static buffer is always valid - memory check placeholder for future
     // dynamic allocation scenarios
-    (void)0; /* Memory check placeholder */
+    (void)0; // Memory check placeholder
 
     // Check 5: Configuration safety
     if (current_config.strict_compatibility_mode) {

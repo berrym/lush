@@ -202,4 +202,4 @@ lle_command_structure_find_matching_keyword(lle_command_structure_t *structure,
                                             lle_keyword_position_t *keyword,
                                             lle_keyword_position_t **match);
 
-#endif /* LLE_COMMAND_STRUCTURE_H */
+#endif // LLE_COMMAND_STRUCTURE_H

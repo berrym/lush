@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Test assertion counter */
+// Test assertion counter
 static int assertions_passed = 0;
 
 #define COMPLIANCE_ASSERT(condition, message)                                  \
@@ -42,7 +42,7 @@ int main(void) {
 
     printf("Checking Event Type category starting points exist...\n");
 
-    /* Verify major event type categories are defined (starting points) */
+    // Verify major event type categories are defined (starting points)
     COMPLIANCE_ASSERT(LLE_EVENT_KEY_PRESS == 0x1000,
                       "Key events start at 0x1000");
     COMPLIANCE_ASSERT(LLE_EVENT_MOUSE_PRESS == 0x2000,
@@ -124,7 +124,7 @@ int main(void) {
 
     printf("Checking Phase 1 core API functions...\n");
 
-    /* Verify function pointers can be assigned (header-only check) */
+    // Verify function pointers can be assigned (header-only check)
     COMPLIANCE_ASSERT(lle_event_system_init != NULL,
                       "lle_event_system_init declared");
     COMPLIANCE_ASSERT(lle_event_system_destroy != NULL,

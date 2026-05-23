@@ -33,16 +33,16 @@
 #include <time.h>
 
 /* ========================================================================== */
-/*                      LRU CACHE POLICY CONSTANTS                            */
+// LRU CACHE POLICY CONSTANTS
 /* ========================================================================== */
 
-#define LLE_CACHE_DEFAULT_MAX_ENTRIES 1000 /* Default maximum cache entries */
+#define LLE_CACHE_DEFAULT_MAX_ENTRIES 1000 // Default maximum cache entries
 #define LLE_CACHE_EVICTION_BATCH_SIZE                                          \
     100 /* Evict in batches for efficiency                                     \
          */
 
 /* ========================================================================== */
-/*                      CACHE ENTRY SERIALIZATION                             */
+// CACHE ENTRY SERIALIZATION
 /* ========================================================================== */
 
 /**
@@ -64,8 +64,8 @@ static void *serialize_cache_entry(const lle_cached_entry_t *entry,
         return NULL;
     }
 
-    /* Calculate required size: header + data */
-    size_t header_size = 128; /* Space for metadata */
+    // Calculate required size: header + data
+    size_t header_size = 128; // Space for metadata
     size_t total_size = header_size + entry->data_size;
 
     char *serialized = lle_pool_alloc(total_size);
@@ -73,7 +73,7 @@ static void *serialize_cache_entry(const lle_cached_entry_t *entry,
         return NULL;
     }
 
-    /* Write metadata header */
+    // Write metadata header
     int header_len =
         snprintf(serialized, header_size, "%zu:%" PRIu64 ":%" PRIu64 ":%u:%d|",
                  entry->data_size, entry->timestamp, entry->last_access,
@@ -84,7 +84,7 @@ static void *serialize_cache_entry(const lle_cached_entry_t *entry,
         return NULL;
     }
 
-    /* Append data verbatim — may contain embedded NULs */
+    // Append data verbatim — may contain embedded NULs
     memcpy(serialized + header_len, entry->data, entry->data_size);
 
     *out_size = (size_t)header_len + entry->data_size;
@@ -123,7 +123,7 @@ static lle_result_t deserialize_cache_entry(const void *serialized,
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    /* Find data start (after '|') — bounded scan limited to header size */
+    // Find data start (after '|') — bounded scan limited to header size
     const char *separator = memchr(bytes, '|', serialized_size);
     if (!separator) {
         return LLE_ERROR_INVALID_FORMAT;
@@ -131,19 +131,19 @@ static lle_result_t deserialize_cache_entry(const void *serialized,
     const char *data_start = separator + 1;
     size_t header_len = (size_t)(data_start - bytes);
 
-    /* Reject blobs whose payload length disagrees with the header */
+    // Reject blobs whose payload length disagrees with the header
     if (header_len + data_size != serialized_size) {
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    /* Allocate and copy data */
+    // Allocate and copy data
     entry->data = lle_pool_alloc(data_size);
     if (!entry->data) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
     memcpy(entry->data, data_start, data_size);
 
-    /* Set metadata */
+    // Set metadata
     entry->data_size = data_size;
     entry->timestamp = timestamp;
     entry->last_access = last_access;
@@ -155,7 +155,7 @@ static lle_result_t deserialize_cache_entry(const void *serialized,
 }
 
 /* ========================================================================== */
-/*                      LRU CACHE POLICY IMPLEMENTATION                       */
+// LRU CACHE POLICY IMPLEMENTATION
 /* ========================================================================== */
 
 /**
@@ -204,7 +204,7 @@ lle_cache_policy_cleanup(lle_display_cache_policy_t *policy) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* LRU list entries are owned by cache entries, not the policy */
+    // LRU list entries are owned by cache entries, not the policy
     lle_pool_free(policy);
     return LLE_SUCCESS;
 }
@@ -221,11 +221,11 @@ static void lle_lru_add_entry(lle_display_cache_policy_t *policy,
         return;
     }
 
-    /* Add to head (most recently used) */
+    // Add to head (most recently used)
     entry->next = policy->lru_head;
     policy->lru_head = entry;
 
-    /* Update tail if this is the first entry */
+    // Update tail if this is the first entry
     if (!policy->lru_tail) {
         policy->lru_tail = entry;
     }
@@ -243,7 +243,7 @@ static void lle_lru_remove_entry(lle_display_cache_policy_t *policy,
         return;
     }
 
-    /* Find and remove entry from list */
+    // Find and remove entry from list
     lle_cached_entry_t *prev = NULL;
     lle_cached_entry_t *curr = policy->lru_head;
 
@@ -279,7 +279,7 @@ static void lle_lru_touch_entry(lle_display_cache_policy_t *policy,
         return;
     }
 
-    /* Remove from current position and re-add to head */
+    // Remove from current position and re-add to head
     lle_lru_remove_entry(policy, entry);
     lle_lru_add_entry(policy, entry);
 }
@@ -297,7 +297,7 @@ lle_lru_get_eviction_candidate(lle_display_cache_policy_t *policy) {
         return NULL;
     }
 
-    /* LRU entry is at the tail */
+    // LRU entry is at the tail
     return policy->lru_tail;
 }
 
@@ -321,7 +321,7 @@ static double lle_calculate_hit_rate(lle_cache_metrics_t *metrics) {
 }
 
 /* ========================================================================== */
-/*                      DISPLAY CACHE IMPLEMENTATION                          */
+// DISPLAY CACHE IMPLEMENTATION
 /* ========================================================================== */
 
 /**
@@ -335,19 +335,19 @@ static double lle_calculate_hit_rate(lle_cache_metrics_t *metrics) {
  */
 lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
                                     lle_memory_pool_t *memory_pool) {
-    /* Step 1: Validate parameters */
+    // Step 1: Validate parameters
     if (!cache || !memory_pool) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Step 2: Allocate cache structure */
+    // Step 2: Allocate cache structure
     lle_display_cache_t *c = lle_pool_alloc(sizeof(lle_display_cache_t));
     if (!c) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
     memset(c, 0, sizeof(lle_display_cache_t));
 
-    /* Step 3: Store memory pool reference (cast from LLE to Lush type) */
+    // Step 3: Store memory pool reference (cast from LLE to Lush type)
     c->memory_pool = (lush_memory_pool_t *)memory_pool;
 
     /* Step 4: Create binary-safe libhashtable for cache storage. The cache
@@ -363,7 +363,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Step 5: Allocate cache metrics */
+    // Step 5: Allocate cache metrics
     c->metrics = lle_pool_alloc(sizeof(lle_cache_metrics_t));
     if (!c->metrics) {
         ht_strblob_destroy(c->cache_table);
@@ -372,7 +372,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     }
     memset(c->metrics, 0, sizeof(lle_cache_metrics_t));
 
-    /* Step 6: Initialize LRU cache policy */
+    // Step 6: Initialize LRU cache policy
     lle_result_t result = lle_cache_policy_init(
         &c->policy, LLE_CACHE_DEFAULT_MAX_ENTRIES, memory_pool);
     if (result != LLE_SUCCESS) {
@@ -382,7 +382,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
         return result;
     }
 
-    /* Step 7: Initialize read-write lock */
+    // Step 7: Initialize read-write lock
     if (pthread_rwlock_init(&c->cache_lock, NULL) != 0) {
         lle_cache_policy_cleanup(c->policy);
         lle_pool_free(c->metrics);
@@ -391,7 +391,7 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
         return LLE_ERROR_INITIALIZATION_FAILED;
     }
 
-    /* Step 8: Return initialized cache */
+    // Step 8: Return initialized cache
     *cache = c;
     return LLE_SUCCESS;
 }
@@ -407,25 +407,25 @@ lle_result_t lle_display_cache_cleanup(lle_display_cache_t *cache) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Destroy libhashtable (frees all entries) */
+    // Destroy libhashtable (frees all entries)
     if (cache->cache_table) {
         ht_strblob_destroy(cache->cache_table);
     }
 
-    /* Destroy lock */
+    // Destroy lock
     pthread_rwlock_destroy(&cache->cache_lock);
 
-    /* Clean up LRU policy */
+    // Clean up LRU policy
     if (cache->policy) {
         lle_cache_policy_cleanup(cache->policy);
     }
 
-    /* Free metrics */
+    // Free metrics
     if (cache->metrics) {
         lle_pool_free(cache->metrics);
     }
 
-    /* Free cache structure */
+    // Free cache structure
     lle_pool_free(cache);
 
     return LLE_SUCCESS;
@@ -444,22 +444,22 @@ lle_result_t lle_display_cache_cleanup(lle_display_cache_t *cache) {
  */
 lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
                                      const void *data, size_t data_size) {
-    /* Step 1: Validate parameters */
+    // Step 1: Validate parameters
     if (!cache || !data || data_size == 0) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Step 2: Convert key to string */
+    // Step 2: Convert key to string
     char key_str[32];
     snprintf(key_str, sizeof(key_str), "%" PRIu64, key);
 
-    /* Step 3: Create cache entry */
+    // Step 3: Create cache entry
     lle_cached_entry_t entry;
     memset(&entry, 0, sizeof(entry));
     entry.data = (void *)data;
     entry.data_size = data_size;
 
-    /* Set timestamps */
+    // Set timestamps
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     entry.timestamp =
@@ -468,23 +468,23 @@ lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
     entry.access_count = 0;
     entry.valid = true;
 
-    /* Step 4: Serialize entry into a length-prefixed binary blob */
+    // Step 4: Serialize entry into a length-prefixed binary blob
     size_t serialized_size = 0;
     void *serialized = serialize_cache_entry(&entry, &serialized_size);
     if (!serialized) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Step 5: Acquire write lock */
+    // Step 5: Acquire write lock
     pthread_rwlock_wrlock(&cache->cache_lock);
 
-    /* Step 6: Insert into libhashtable (deep copies the blob) */
+    // Step 6: Insert into libhashtable (deep copies the blob)
     ht_strblob_insert(cache->cache_table, key_str, serialized, serialized_size);
 
-    /* Step 7: Release lock */
+    // Step 7: Release lock
     pthread_rwlock_unlock(&cache->cache_lock);
 
-    /* Free serialized buffer (libhashtable made its own copy) */
+    // Free serialized buffer (libhashtable made its own copy)
     lle_pool_free(serialized);
 
     return LLE_SUCCESS;
@@ -503,32 +503,32 @@ lle_result_t lle_display_cache_store(lle_display_cache_t *cache, uint64_t key,
  */
 lle_result_t lle_display_cache_lookup(lle_display_cache_t *cache, uint64_t key,
                                       void **data, size_t *data_size) {
-    /* Step 1: Validate parameters */
+    // Step 1: Validate parameters
     if (!cache || !data || !data_size) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Step 2: Convert key to string */
+    // Step 2: Convert key to string
     char key_str[32];
     snprintf(key_str, sizeof(key_str), "%" PRIu64, key);
 
-    /* Step 3: Acquire read lock */
+    // Step 3: Acquire read lock
     pthread_rwlock_rdlock(&cache->cache_lock);
 
-    /* Step 4: Lookup in libhashtable */
+    // Step 4: Lookup in libhashtable
     size_t serialized_size = 0;
     const void *serialized =
         ht_strblob_get(cache->cache_table, key_str, &serialized_size);
 
     if (!serialized) {
-        /* Cache miss */
+        // Cache miss
         cache->metrics->cache_misses++;
         cache->metrics->hit_rate = lle_calculate_hit_rate(cache->metrics);
         pthread_rwlock_unlock(&cache->cache_lock);
         return LLE_ERROR_CACHE_MISS;
     }
 
-    /* Step 5: Deserialize entry */
+    // Step 5: Deserialize entry
     lle_cached_entry_t entry;
     lle_result_t result =
         deserialize_cache_entry(serialized, serialized_size, &entry);
@@ -539,15 +539,15 @@ lle_result_t lle_display_cache_lookup(lle_display_cache_t *cache, uint64_t key,
         return result;
     }
 
-    /* Step 6: Return data */
+    // Step 6: Return data
     *data = entry.data;
     *data_size = entry.data_size;
 
-    /* Step 7: Update metrics */
+    // Step 7: Update metrics
     cache->metrics->cache_hits++;
     cache->metrics->hit_rate = lle_calculate_hit_rate(cache->metrics);
 
-    /* Step 8: Release lock */
+    // Step 8: Release lock
     pthread_rwlock_unlock(&cache->cache_lock);
 
     return LLE_SUCCESS;
@@ -568,20 +568,20 @@ lle_result_t lle_display_cache_invalidate(lle_display_cache_t *cache,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Convert key to string */
+    // Convert key to string
     char key_str[32];
     snprintf(key_str, sizeof(key_str), "%" PRIu64, key);
 
-    /* Acquire write lock */
+    // Acquire write lock
     pthread_rwlock_wrlock(&cache->cache_lock);
 
-    /* Remove from libhashtable */
+    // Remove from libhashtable
     ht_strblob_remove(cache->cache_table, key_str);
 
-    /* Update metrics */
+    // Update metrics
     cache->metrics->evictions++;
 
-    /* Release lock */
+    // Release lock
     pthread_rwlock_unlock(&cache->cache_lock);
 
     return LLE_SUCCESS;
@@ -600,10 +600,10 @@ lle_result_t lle_display_cache_invalidate_all(lle_display_cache_t *cache) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Acquire write lock */
+    // Acquire write lock
     pthread_rwlock_wrlock(&cache->cache_lock);
 
-    /* Destroy and recreate libhashtable to clear all entries */
+    // Destroy and recreate libhashtable to clear all entries
     if (cache->cache_table) {
         ht_strblob_destroy(cache->cache_table);
     }
@@ -614,18 +614,18 @@ lle_result_t lle_display_cache_invalidate_all(lle_display_cache_t *cache) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Reset metrics but preserve historical data */
+    // Reset metrics but preserve historical data
     uint64_t total_evictions = cache->metrics->evictions;
     cache->metrics->evictions = total_evictions + cache->metrics->cache_hits;
 
-    /* Release lock */
+    // Release lock
     pthread_rwlock_unlock(&cache->cache_lock);
 
     return LLE_SUCCESS;
 }
 
 /* ========================================================================== */
-/*                      RENDER CACHE IMPLEMENTATION                           */
+// RENDER CACHE IMPLEMENTATION
 /* ========================================================================== */
 
 /**
@@ -639,30 +639,30 @@ lle_result_t lle_display_cache_invalidate_all(lle_display_cache_t *cache) {
  */
 lle_result_t lle_render_cache_init(lle_render_cache_t **cache,
                                    lle_memory_pool_t *memory_pool) {
-    /* Step 1: Validate parameters */
+    // Step 1: Validate parameters
     if (!cache || !memory_pool) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Step 2: Allocate render cache structure */
+    // Step 2: Allocate render cache structure
     lle_render_cache_t *rc = lle_pool_alloc(sizeof(lle_render_cache_t));
     if (!rc) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
     memset(rc, 0, sizeof(lle_render_cache_t));
 
-    /* Step 3: Initialize base cache using libhashtable */
+    // Step 3: Initialize base cache using libhashtable
     lle_result_t result = lle_display_cache_init(&rc->base_cache, memory_pool);
     if (result != LLE_SUCCESS) {
         lle_pool_free(rc);
         return result;
     }
 
-    /* Step 4: Configure render cache */
-    rc->max_render_size = 0; /* No limit for now */
-    rc->cache_ttl_ms = 5000; /* 5 second TTL */
+    // Step 4: Configure render cache
+    rc->max_render_size = 0; // No limit for now
+    rc->cache_ttl_ms = 5000; // 5 second TTL
 
-    /* Step 5: Return initialized cache */
+    // Step 5: Return initialized cache
     *cache = rc;
     return LLE_SUCCESS;
 }
@@ -678,12 +678,12 @@ lle_result_t lle_render_cache_cleanup(lle_render_cache_t *cache) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Clean up base cache */
+    // Clean up base cache
     if (cache->base_cache) {
         lle_display_cache_cleanup(cache->base_cache);
     }
 
-    /* Free render cache structure */
+    // Free render cache structure
     lle_pool_free(cache);
 
     return LLE_SUCCESS;
@@ -704,7 +704,7 @@ uint64_t lle_compute_cache_key(lle_buffer_t *buffer,
         return 0;
     }
 
-    /* Simple combination: XOR of buffer content hash and cursor position */
+    // Simple combination: XOR of buffer content hash and cursor position
     uint64_t buffer_hash = (uint64_t)buffer->length;
     uint64_t cursor_hash =
         ((uint64_t)cursor->line_number << 32) | cursor->column_offset;

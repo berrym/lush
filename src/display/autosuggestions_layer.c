@@ -678,25 +678,25 @@ autosuggestions_layer_set_suggestion(autosuggestions_layer_t *layer,
         return AUTOSUGGESTIONS_LAYER_ERROR_NULL_POINTER;
     }
 
-    /* Handle NULL or empty suggestion as clear */
+    // Handle NULL or empty suggestion as clear
     if (!suggestion || !*suggestion) {
         return autosuggestions_layer_clear(layer);
     }
 
-    /* Validate suggestion length */
+    // Validate suggestion length
     size_t len = strlen(suggestion);
     if (len > AUTOSUGGESTIONS_LAYER_MAX_SUGGESTION_LENGTH) {
         set_layer_error(layer, AUTOSUGGESTIONS_LAYER_ERROR_INVALID_PARAM);
         return AUTOSUGGESTIONS_LAYER_ERROR_INVALID_PARAM;
     }
 
-    /* Free existing suggestion if any */
+    // Free existing suggestion if any
     if (layer->current_suggestion) {
         free(layer->current_suggestion);
         layer->current_suggestion = NULL;
     }
 
-    /* Set new suggestion */
+    // Set new suggestion
     layer->current_suggestion = strdup(suggestion);
     if (!layer->current_suggestion) {
         set_layer_error(layer, AUTOSUGGESTIONS_LAYER_ERROR_MEMORY_ALLOCATION);
@@ -799,7 +799,7 @@ autosuggestions_layer_publish_change(autosuggestions_layer_t *layer,
          * this, clearing autosuggestion doesn't trigger a visual update. */
         layer_events_publish_simple(
             layer->event_system, LAYER_EVENT_REDRAW_NEEDED,
-            LAYER_ID_AUTOSUGGESTIONS, 0, /* broadcast to all */
+            LAYER_ID_AUTOSUGGESTIONS, 0, // broadcast to all
             LAYER_EVENT_PRIORITY_HIGH);
     }
 

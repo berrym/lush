@@ -15,7 +15,7 @@
 #include <string.h>
 
 /* ========================================================================== */
-/*                            HELPER FUNCTIONS                                */
+// HELPER FUNCTIONS
 /* ========================================================================== */
 
 /**
@@ -69,10 +69,10 @@ static size_t visual_width(const char *str) {
     if (len == 0)
         return 0;
 
-    /* Fast path: no ANSI escape sequences */
+    // Fast path: no ANSI escape sequences
     const char *esc = memchr(str, 0x1B, len);
     if (!esc) {
-        /* No escape sequences - use lle_utf8_string_width directly */
+        // No escape sequences - use lle_utf8_string_width directly
         return lle_utf8_string_width(str, len);
     }
 
@@ -84,34 +84,34 @@ static size_t visual_width(const char *str) {
     while (i < len) {
         unsigned char c = (unsigned char)str[i];
 
-        /* Check for ANSI escape sequence (ESC = 0x1B) */
+        // Check for ANSI escape sequence (ESC = 0x1B)
         if (c == 0x1B && i + 1 < len) {
             unsigned char next = (unsigned char)str[i + 1];
             if (next == '[') {
                 /* CSI sequence: ESC [ ... final_byte
                  * Skip until we find the final byte (0x40-0x7E) */
-                i += 2; /* Skip ESC [ */
+                i += 2; // Skip ESC [
                 while (i < len) {
                     unsigned char seq_char = (unsigned char)str[i];
                     i++;
                     if (seq_char >= 0x40 && seq_char <= 0x7E) {
-                        break; /* Found final byte, sequence complete */
+                        break; // Found final byte, sequence complete
                     }
                 }
-                continue; /* Don't add to width, continue to next character */
+                continue; // Don't add to width, continue to next character
             }
-            /* Other escape sequences (ESC + single char) */
+            // Other escape sequences (ESC + single char)
             i += 2;
             continue;
         }
 
-        /* Find length of text segment until next escape or end */
+        // Find length of text segment until next escape or end
         size_t segment_start = i;
         while (i < len && (unsigned char)str[i] != 0x1B) {
             i++;
         }
 
-        /* Calculate width of this segment using proper UTF-8 width */
+        // Calculate width of this segment using proper UTF-8 width
         if (i > segment_start) {
             width +=
                 lle_utf8_string_width(str + segment_start, i - segment_start);
@@ -160,7 +160,7 @@ static size_t pad_string(char *dest, size_t dest_size, const char *src,
 }
 
 /* ========================================================================== */
-/*                         PUBLIC API FUNCTIONS                               */
+// PUBLIC API FUNCTIONS
 /* ========================================================================== */
 
 /**

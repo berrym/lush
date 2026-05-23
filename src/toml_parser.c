@@ -146,13 +146,13 @@ toml_result_t toml_parser_parse(toml_parser_t *parser, toml_callback_t callback,
 
         char c = PARSER_PEEK(parser);
 
-        /* Skip comments */
+        // Skip comments
         if (c == '#') {
             parser_skip_line(parser);
             continue;
         }
 
-        /* Parse section header */
+        // Parse section header
         if (c == '[') {
             toml_result_t result = parser_parse_section(parser);
             if (result != TOML_SUCCESS) {
@@ -162,7 +162,7 @@ toml_result_t toml_parser_parse(toml_parser_t *parser, toml_callback_t callback,
             continue;
         }
 
-        /* Parse key-value pair */
+        // Parse key-value pair
         if (isalpha((unsigned char)c) || c == '_') {
             char key[TOML_PARSER_KEY_MAX];
             toml_result_t result = parser_parse_key(parser, key, sizeof(key));
@@ -172,15 +172,15 @@ toml_result_t toml_parser_parse(toml_parser_t *parser, toml_callback_t callback,
 
             parser_skip_whitespace(parser);
 
-            /* Expect '=' */
+            // Expect '='
             if (PARSER_PEEK(parser) != '=') {
                 return parser_set_error(parser, "Expected '=' after key");
             }
-            PARSER_ADVANCE(parser); /* Skip '=' */
+            PARSER_ADVANCE(parser); // Skip '='
 
             parser_skip_whitespace(parser);
 
-            /* Parse value */
+            // Parse value
             toml_value_t value;
             memset(&value, 0, sizeof(value));
             result = parser_parse_value(parser, &value);
@@ -189,7 +189,7 @@ toml_result_t toml_parser_parse(toml_parser_t *parser, toml_callback_t callback,
                 return result;
             }
 
-            /* Call callback */
+            // Call callback
             result = callback(parser->current_section, key, &value, user_data);
             toml_value_free(&value);
 
@@ -201,7 +201,7 @@ toml_result_t toml_parser_parse(toml_parser_t *parser, toml_callback_t callback,
             continue;
         }
 
-        /* Unknown character */
+        // Unknown character
         return parser_set_error(parser, "Unexpected character");
     }
 
@@ -230,7 +230,7 @@ size_t toml_parser_error_column(const toml_parser_t *parser) {
 }
 
 void toml_parser_cleanup(toml_parser_t *parser) {
-    /* Currently no dynamic allocations in parser itself */
+    // Currently no dynamic allocations in parser itself
     (void)parser;
 }
 
@@ -256,7 +256,7 @@ static void parser_skip_whitespace_and_newlines(toml_parser_t *parser) {
         if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
             PARSER_ADVANCE(parser);
         } else if (c == '#') {
-            /* Skip comment lines */
+            // Skip comment lines
             parser_skip_line(parser);
         } else {
             break;
@@ -292,9 +292,9 @@ static toml_result_t parser_parse_section(toml_parser_t *parser) {
     if (PARSER_PEEK(parser) != '[') {
         return parser_set_error(parser, "Expected '['");
     }
-    PARSER_ADVANCE(parser); /* Skip '[' */
+    PARSER_ADVANCE(parser); // Skip '['
 
-    /* Read section name */
+    // Read section name
     char section[TOML_PARSER_KEY_MAX * TOML_PARSER_SECTION_DEPTH_MAX];
     size_t len = 0;
 
@@ -308,7 +308,7 @@ static toml_result_t parser_parse_section(toml_parser_t *parser) {
             section[len++] = c;
             PARSER_ADVANCE(parser);
         } else if (c == ' ' || c == '\t') {
-            /* Skip whitespace in section name */
+            // Skip whitespace in section name
             PARSER_ADVANCE(parser);
         } else {
             return parser_set_error(parser,
@@ -319,13 +319,13 @@ static toml_result_t parser_parse_section(toml_parser_t *parser) {
     if (PARSER_PEEK(parser) != ']') {
         return parser_set_error(parser, "Expected ']'");
     }
-    PARSER_ADVANCE(parser); /* Skip ']' */
+    PARSER_ADVANCE(parser); // Skip ']'
 
     section[len] = '\0';
     snprintf(parser->current_section, sizeof(parser->current_section), "%s",
              section);
 
-    /* Skip rest of line */
+    // Skip rest of line
     parser_skip_whitespace(parser);
     if (PARSER_PEEK(parser) == '#') {
         parser_skip_comment(parser);
@@ -368,30 +368,30 @@ static toml_result_t parser_parse_value(toml_parser_t *parser,
 
     char c = PARSER_PEEK(parser);
 
-    /* String */
+    // String
     if (c == '"') {
         value->type = TOML_VALUE_STRING;
         return parser_parse_string(parser, value->data.string,
                                    sizeof(value->data.string));
     }
 
-    /* Array */
+    // Array
     if (c == '[') {
         return parser_parse_array(parser, value);
     }
 
-    /* Inline table */
+    // Inline table
     if (c == '{') {
         return parser_parse_inline_table(parser, value);
     }
 
-    /* Boolean: true or false */
+    // Boolean: true or false
     if (c == 't' || c == 'f') {
         value->type = TOML_VALUE_BOOLEAN;
         return parser_parse_boolean(parser, &value->data.boolean);
     }
 
-    /* Integer (including negative) */
+    // Integer (including negative)
     if (isdigit((unsigned char)c) || c == '-' || c == '+') {
         value->type = TOML_VALUE_INTEGER;
         return parser_parse_integer(parser, &value->data.integer);
@@ -405,7 +405,7 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
     if (PARSER_PEEK(parser) != '"') {
         return parser_set_error(parser, "Expected '\"'");
     }
-    PARSER_ADVANCE(parser); /* Skip opening quote */
+    PARSER_ADVANCE(parser); // Skip opening quote
 
     size_t len = 0;
 
@@ -413,7 +413,7 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
         char c = PARSER_PEEK(parser);
 
         if (c == '"') {
-            PARSER_ADVANCE(parser); /* Skip closing quote */
+            PARSER_ADVANCE(parser); // Skip closing quote
             out[len] = '\0';
             return TOML_SUCCESS;
         }
@@ -423,7 +423,7 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
         }
 
         if (c == '\\') {
-            /* Escape sequence */
+            // Escape sequence
             PARSER_ADVANCE(parser);
             if (PARSER_EOF(parser)) {
                 return parser_set_error(parser, "Unterminated escape sequence");
@@ -450,7 +450,7 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
                 break;
             case 'u':
             case 'U': {
-                /* Unicode escape: \uXXXX or \UXXXXXXXX */
+                // Unicode escape: \uXXXX or \UXXXXXXXX
                 int hex_digits = (escaped == 'u') ? 4 : 8;
                 uint32_t codepoint = 0;
 
@@ -476,18 +476,18 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
                     codepoint = (codepoint << 4) | (uint32_t)digit;
                 }
 
-                /* Validate codepoint range */
+                // Validate codepoint range
                 if (codepoint > 0x10FFFF) {
                     return parser_set_error(parser,
                                             "Unicode codepoint out of range");
                 }
-                /* Reject surrogates (reserved for UTF-16) */
+                // Reject surrogates (reserved for UTF-16)
                 if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
                     return parser_set_error(parser,
                                             "Surrogate codepoints not allowed");
                 }
 
-                /* Encode to UTF-8 using LLE's Unicode support */
+                // Encode to UTF-8 using LLE's Unicode support
                 char utf8_buf[4];
                 int utf8_len = lle_utf8_encode_codepoint(codepoint, utf8_buf);
                 if (utf8_len <= 0) {
@@ -495,14 +495,14 @@ static toml_result_t parser_parse_string(toml_parser_t *parser, char *out,
                         parser, "Failed to encode Unicode codepoint");
                 }
 
-                /* Add UTF-8 bytes to output */
+                // Add UTF-8 bytes to output
                 if (len + (size_t)utf8_len >= out_size) {
                     return parser_set_error(parser, "String too long");
                 }
                 for (int i = 0; i < utf8_len; i++) {
                     out[len++] = utf8_buf[i];
                 }
-                continue; /* Skip the normal character append */
+                continue; // Skip the normal character append
             }
             default:
                 return parser_set_error(parser, "Invalid escape sequence");
@@ -524,14 +524,14 @@ static toml_result_t parser_parse_integer(toml_parser_t *parser, int64_t *out) {
     char buffer[32];
     size_t len = 0;
 
-    /* Sign */
+    // Sign
     char c = PARSER_PEEK(parser);
     if (c == '-' || c == '+') {
         buffer[len++] = c;
         PARSER_ADVANCE(parser);
     }
 
-    /* Digits */
+    // Digits
     while (!PARSER_EOF(parser)) {
         c = PARSER_PEEK(parser);
         if (isdigit((unsigned char)c)) {
@@ -586,13 +586,13 @@ static toml_result_t parser_parse_array(toml_parser_t *parser,
     if (PARSER_PEEK(parser) != '[') {
         return parser_set_error(parser, "Expected '['");
     }
-    PARSER_ADVANCE(parser); /* Skip '[' */
+    PARSER_ADVANCE(parser); // Skip '['
 
     value->type = TOML_VALUE_ARRAY;
     value->data.array.items = NULL;
     value->data.array.count = 0;
 
-    /* Allocate array storage */
+    // Allocate array storage
     toml_value_t *items = calloc(TOML_PARSER_ARRAY_MAX, sizeof(toml_value_t));
     if (!items) {
         return TOML_ERROR_OUT_OF_MEMORY;
@@ -606,11 +606,11 @@ static toml_result_t parser_parse_array(toml_parser_t *parser,
             return parser_set_error(parser, "Array too large");
         }
 
-        /* Parse array element */
+        // Parse array element
         toml_result_t result =
             parser_parse_value(parser, &items[value->data.array.count]);
         if (result != TOML_SUCCESS) {
-            /* Free already parsed items */
+            // Free already parsed items
             for (size_t i = 0; i < value->data.array.count; i++) {
                 toml_value_free(&items[i]);
             }
@@ -621,7 +621,7 @@ static toml_result_t parser_parse_array(toml_parser_t *parser,
 
         parser_skip_whitespace_and_newlines(parser);
 
-        /* Check for comma or end */
+        // Check for comma or end
         if (PARSER_PEEK(parser) == ',') {
             PARSER_ADVANCE(parser);
             parser_skip_whitespace_and_newlines(parser);
@@ -641,7 +641,7 @@ static toml_result_t parser_parse_array(toml_parser_t *parser,
         free(items);
         return parser_set_error(parser, "Unterminated array");
     }
-    PARSER_ADVANCE(parser); /* Skip ']' */
+    PARSER_ADVANCE(parser); // Skip ']'
 
     value->data.array.items = items;
     return TOML_SUCCESS;
@@ -652,7 +652,7 @@ static toml_result_t parser_parse_inline_table(toml_parser_t *parser,
     if (PARSER_PEEK(parser) != '{') {
         return parser_set_error(parser, "Expected '{'");
     }
-    PARSER_ADVANCE(parser); /* Skip '{' */
+    PARSER_ADVANCE(parser); // Skip '{'
 
     value->type = TOML_VALUE_TABLE;
     value->data.table.count = 0;
@@ -664,7 +664,7 @@ static toml_result_t parser_parse_inline_table(toml_parser_t *parser,
             return parser_set_error(parser, "Inline table too large");
         }
 
-        /* Parse key */
+        // Parse key
         toml_table_entry_t *entry =
             &value->data.table.entries[value->data.table.count];
         toml_result_t result =
@@ -675,7 +675,7 @@ static toml_result_t parser_parse_inline_table(toml_parser_t *parser,
 
         parser_skip_whitespace(parser);
 
-        /* Expect '=' */
+        // Expect '='
         if (PARSER_PEEK(parser) != '=') {
             return parser_set_error(parser, "Expected '=' in inline table");
         }
@@ -683,7 +683,7 @@ static toml_result_t parser_parse_inline_table(toml_parser_t *parser,
 
         parser_skip_whitespace(parser);
 
-        /* Parse value */
+        // Parse value
         entry->value = calloc(1, sizeof(toml_value_t));
         if (!entry->value) {
             return TOML_ERROR_OUT_OF_MEMORY;
@@ -699,7 +699,7 @@ static toml_result_t parser_parse_inline_table(toml_parser_t *parser,
         value->data.table.count++;
         parser_skip_whitespace(parser);
 
-        /* Check for comma or end */
+        // Check for comma or end
         if (PARSER_PEEK(parser) == ',') {
             PARSER_ADVANCE(parser);
             parser_skip_whitespace(parser);
@@ -712,7 +712,7 @@ static toml_result_t parser_parse_inline_table(toml_parser_t *parser,
     if (PARSER_PEEK(parser) != '}') {
         return parser_set_error(parser, "Unterminated inline table");
     }
-    PARSER_ADVANCE(parser); /* Skip '}' */
+    PARSER_ADVANCE(parser); // Skip '}'
 
     return TOML_SUCCESS;
 }
@@ -788,7 +788,7 @@ toml_result_t toml_value_table_get_string(const toml_value_t *value,
     }
 
     for (size_t i = 0; i < value->data.table.count; i++) {
-        /* Use Unicode-aware comparison for key lookup */
+        // Use Unicode-aware comparison for key lookup
         if (toml_streq(value->data.table.entries[i].key, key)) {
             const toml_value_t *v = value->data.table.entries[i].value;
             if (v && v->type == TOML_VALUE_STRING) {
@@ -813,7 +813,7 @@ toml_result_t toml_value_table_get_integer(const toml_value_t *value,
     }
 
     for (size_t i = 0; i < value->data.table.count; i++) {
-        /* Use Unicode-aware comparison for key lookup */
+        // Use Unicode-aware comparison for key lookup
         if (toml_streq(value->data.table.entries[i].key, key)) {
             const toml_value_t *v = value->data.table.entries[i].value;
             if (v && v->type == TOML_VALUE_INTEGER) {
@@ -838,7 +838,7 @@ toml_result_t toml_value_table_get_boolean(const toml_value_t *value,
     }
 
     for (size_t i = 0; i < value->data.table.count; i++) {
-        /* Use Unicode-aware comparison for key lookup */
+        // Use Unicode-aware comparison for key lookup
         if (toml_streq(value->data.table.entries[i].key, key)) {
             const toml_value_t *v = value->data.table.entries[i].value;
             if (v && v->type == TOML_VALUE_BOOLEAN) {

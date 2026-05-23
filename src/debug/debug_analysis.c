@@ -567,7 +567,7 @@ static bool scan_vector_expansion(const char *start, size_t avail,
             }
         } else if (c == '[' && i + 2 < avail && start[i + 1] == '@' &&
                    start[i + 2] == ']') {
-            /* The [@] subscript is the canonical vector trigger. */
+            // The [@] subscript is the canonical vector trigger.
             has_vector = true;
         } else if (c == '(' && i + 2 < avail && depth == 1) {
             /* Parameter-flag operators (k) / (v) / (kv) yield vectors
@@ -583,7 +583,7 @@ static bool scan_vector_expansion(const char *start, size_t avail,
         i++;
     }
     if (depth != 0) {
-        return false; /* no closing brace -- bail */
+        return false; // no closing brace -- bail
     }
     *out_has_vector = has_vector;
     *out_end = i;
@@ -618,7 +618,7 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
         if (i == content_len || content[i] == '\n') {
             size_t line_len = (size_t)(content + i - line_start);
 
-            /* Skip blank lines and shell comments outright. */
+            // Skip blank lines and shell comments outright.
             const char *trim = line_start;
             const char *end = line_start + line_len;
             while (trim < end && (*trim == ' ' || *trim == '\t')) {
@@ -634,7 +634,7 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
                 if (line_start[k] != '=') {
                     continue;
                 }
-                /* Skip "==" (string equality), not assignment. */
+                // Skip "==" (string equality), not assignment.
                 if (k + 1 < line_len && line_start[k + 1] == '=') {
                     continue;
                 }
@@ -663,7 +663,7 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
                         "use ${name[*]} for a space-joined scalar, "
                         "or use the array directly in a vector-"
                         "accepting position (argv, for-in list)");
-                    k = e + end_pos; /* don't double-flag */
+                    k = e + end_pos; // don't double-flag
                 }
             }
 

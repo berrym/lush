@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * NODE CREATION TESTS
@@ -43,7 +43,7 @@ TEST(new_node_command) {
 }
 
 TEST(new_node_various_types) {
-    /* Test creation of various node types */
+    // Test creation of various node types
     node_type_t types[] = {
         NODE_COMMAND,     NODE_PIPE,        NODE_IF,          NODE_FOR,
         NODE_WHILE,       NODE_CASE,        NODE_FUNCTION,    NODE_SUBSHELL,
@@ -109,12 +109,12 @@ TEST(add_multiple_children) {
     ASSERT_EQ(parent->children, 3, "Parent should have 3 children");
     ASSERT(parent->first_child == child1, "first_child should be child1");
 
-    /* Check sibling chain */
+    // Check sibling chain
     ASSERT(child1->next_sibling == child2, "child1->next should be child2");
     ASSERT(child2->next_sibling == child3, "child2->next should be child3");
     ASSERT_NULL(child3->next_sibling, "child3 should have no next sibling");
 
-    /* Check prev siblings */
+    // Check prev siblings
     ASSERT_NULL(child1->prev_sibling, "child1 should have no prev sibling");
     ASSERT(child2->prev_sibling == child1, "child2->prev should be child1");
     ASSERT(child3->prev_sibling == child2, "child3->prev should be child2");
@@ -142,7 +142,7 @@ TEST(nested_children) {
     ASSERT(child1->first_child == grandchild,
            "Grandchild should be child's first_child");
 
-    free_node_tree(parent); /* Should free all three nodes */
+    free_node_tree(parent); // Should free all three nodes
 }
 
 /* ============================================================================
@@ -154,14 +154,14 @@ TEST(set_node_val_str_basic) {
     node_t *node = new_node(NODE_VAR);
     ASSERT_NOT_NULL(node, "Node creation failed");
 
-    /* set_node_val_str takes ownership of the string */
+    // set_node_val_str takes ownership of the string
     char *value = strdup("test_value");
     set_node_val_str(node, value);
 
     ASSERT_EQ(node->val_type, VAL_STR, "Value type should be VAL_STR");
     ASSERT_STR_EQ(node->val.str, "test_value", "String value mismatch");
 
-    free_node_tree(node); /* Should free the string too */
+    free_node_tree(node); // Should free the string too
 }
 
 TEST(set_node_val_str_overwrite) {
@@ -181,7 +181,7 @@ TEST(set_node_val_str_overwrite) {
  */
 
 TEST(pipeline_structure) {
-    /* Create a pipeline: cmd1 | cmd2 | cmd3 */
+    // Create a pipeline: cmd1 | cmd2 | cmd3
     node_t *pipeline = new_node(NODE_PIPELINE);
     node_t *cmd1 = new_node(NODE_COMMAND);
     node_t *cmd2 = new_node(NODE_COMMAND);
@@ -234,7 +234,7 @@ TEST(for_loop_structure) {
      */
     node_t *for_node = new_node(NODE_FOR);
     node_t *var = new_node(NODE_VAR);
-    node_t *list = new_node(NODE_COMMAND); /* Word list */
+    node_t *list = new_node(NODE_COMMAND); // Word list
     node_t *body = new_node(NODE_COMMAND);
 
     set_node_val_str(var, strdup("i"));
@@ -280,26 +280,26 @@ TEST(command_with_redirections) {
  */
 
 TEST(free_node_tree_null) {
-    /* Should handle NULL gracefully */
+    // Should handle NULL gracefully
     free_node_tree(NULL);
-    /* If we get here without crashing, test passed */
+    // If we get here without crashing, test passed
 }
 
 TEST(free_node_tree_single) {
     node_t *node = new_node(NODE_COMMAND);
     free_node_tree(node);
-    /* Memory freed successfully if no crash */
+    // Memory freed successfully if no crash
 }
 
 TEST(free_node_tree_with_value) {
     node_t *node = new_node(NODE_VAR);
     set_node_val_str(node, strdup("test_string"));
     free_node_tree(node);
-    /* String should be freed along with node */
+    // String should be freed along with node
 }
 
 TEST(free_node_tree_deep) {
-    /* Create a deep tree and free it */
+    // Create a deep tree and free it
     node_t *root = new_node(NODE_COMMAND_LIST);
     node_t *current = root;
 
@@ -309,11 +309,11 @@ TEST(free_node_tree_deep) {
         current = child;
     }
 
-    free_node_tree(root); /* Should free all 11 nodes */
+    free_node_tree(root); // Should free all 11 nodes
 }
 
 TEST(free_node_tree_wide) {
-    /* Create a wide tree (many siblings) */
+    // Create a wide tree (many siblings)
     node_t *root = new_node(NODE_COMMAND_LIST);
 
     for (int i = 0; i < 20; i++) {
@@ -325,7 +325,7 @@ TEST(free_node_tree_wide) {
     }
 
     ASSERT_EQ(root->children, 20, "Should have 20 children");
-    free_node_tree(root); /* Should free all 21 nodes */
+    free_node_tree(root); // Should free all 21 nodes
 }
 
 /* ============================================================================

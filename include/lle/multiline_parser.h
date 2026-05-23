@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_multiline_parser lle_multiline_parser_t;
 typedef struct lle_structure_analyzer lle_structure_analyzer_t;
 
@@ -156,4 +156,4 @@ lle_result_t lle_multiline_parser_reset(lle_multiline_parser_t *parser);
 }
 #endif
 
-#endif /* LLE_MULTILINE_PARSER_H */
+#endif // LLE_MULTILINE_PARSER_H

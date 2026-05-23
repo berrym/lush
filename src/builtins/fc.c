@@ -30,10 +30,10 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Maximum editor command length */
+// Maximum editor command length
 #define FC_MAX_EDITOR_COMMAND 4096
 
-/* fc command options */
+// fc command options
 typedef struct fc_options {
     bool list_mode;
     bool reverse_order;
@@ -104,7 +104,7 @@ static bool parse_substitution_pattern(const char *pattern, char **old,
 
     const char *equals = strchr(pattern, '=');
     if (!equals) {
-        /* No equals sign, treat entire pattern as old with empty new */
+        // No equals sign, treat entire pattern as old with empty new
         *old = strdup(pattern);
         *new_str = strdup("");
         return (*old && *new_str);
@@ -156,7 +156,7 @@ static char *get_default_editor(void) {
         return strdup(visual);
     }
 
-    /* POSIX default */
+    // POSIX default
     return strdup("ed");
 }
 
@@ -285,7 +285,7 @@ static bool resolve_range_spec(lle_history_core_t *history, const char *spec,
         return false;
     }
 
-    /* Check for negative offset */
+    // Check for negative offset
     if (spec[0] == '-' && isdigit((unsigned char)spec[1])) {
         long offset = strtol(spec, NULL, 10);
         if (offset < 0 && (size_t)(-offset) <= count) {
@@ -295,7 +295,7 @@ static bool resolve_range_spec(lle_history_core_t *history, const char *spec,
         return false;
     }
 
-    /* Check for positive number (1-based history number) */
+    // Check for positive number (1-based history number)
     if (isdigit((unsigned char)spec[0])) {
         long num = strtol(spec, NULL, 10);
         if (num > 0 && (size_t)num <= count) {
@@ -305,7 +305,7 @@ static bool resolve_range_spec(lle_history_core_t *history, const char *spec,
         return false;
     }
 
-    /* String prefix search - find most recent match */
+    // String prefix search - find most recent match
     size_t prefix_len = strlen(spec);
     for (size_t i = count; i > 0; i--) {
         lle_history_entry_t *entry = NULL;
@@ -348,7 +348,7 @@ static bool parse_range(lle_history_core_t *history, const char *first_str,
     size_t first_idx, last_idx;
 
     if (!first_str) {
-        /* Default: last command for edit, last 16 for list */
+        // Default: last command for edit, last 16 for list
         if (opts->list_mode) {
             first_idx = (count > 16) ? count - 16 : 0;
             last_idx = count - 1;
@@ -373,7 +373,7 @@ static bool parse_range(lle_history_core_t *history, const char *first_str,
                 return false;
             }
         } else {
-            /* Single spec: for list use to end, for edit use single command */
+            // Single spec: for list use to end, for edit use single command
             if (opts->list_mode) {
                 last_idx = count - 1;
             } else {
@@ -382,7 +382,7 @@ static bool parse_range(lle_history_core_t *history, const char *first_str,
         }
     }
 
-    /* Ensure first <= last */
+    // Ensure first <= last
     if (first_idx > last_idx) {
         size_t tmp = first_idx;
         first_idx = last_idx;
@@ -469,7 +469,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Collect commands in range */
+    // Collect commands in range
     size_t content_capacity = 1024;
     size_t content_size = 0;
     char *content = malloc(content_capacity);
@@ -488,7 +488,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
             entry && entry->command) {
             size_t cmd_len = strlen(entry->command);
 
-            /* Ensure buffer capacity */
+            // Ensure buffer capacity
             if (content_size + cmd_len + 2 > content_capacity) {
                 content_capacity = (content_size + cmd_len + 2) * 2;
                 char *new_content = realloc(content, content_capacity);
@@ -517,7 +517,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Create temporary file */
+    // Create temporary file
     char *temp_filename = create_temp_file(content);
     free(content);
 
@@ -528,7 +528,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Determine editor to use */
+    // Determine editor to use
     char *editor_cmd =
         opts->editor ? strdup(opts->editor) : get_default_editor();
     if (!editor_cmd) {
@@ -540,7 +540,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Build and execute editor command */
+    // Build and execute editor command
     char editor_command[FC_MAX_EDITOR_COMMAND];
     snprintf(editor_command, sizeof(editor_command), "%s %s", editor_cmd,
              temp_filename);
@@ -557,7 +557,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Read back edited content */
+    // Read back edited content
     char *edited_content = read_file_content(temp_filename);
     unlink(temp_filename);
     free(temp_filename);
@@ -569,7 +569,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Execute edited commands line by line */
+    // Execute edited commands line by line
     int final_status = 0;
     char *line_start = edited_content;
     char *line_end;
@@ -577,13 +577,13 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
     while ((line_end = strchr(line_start, '\n')) != NULL) {
         *line_end = '\0';
 
-        /* Skip empty lines and whitespace-only lines */
+        // Skip empty lines and whitespace-only lines
         char *trimmed = line_start;
         while (*trimmed && isspace((unsigned char)*trimmed))
             trimmed++;
 
         if (*trimmed) {
-            /* Add to history and execute */
+            // Add to history and execute
             lle_history_bridge_add_entry(trimmed, 0, NULL);
             printf("%s\n", trimmed);
             final_status = execute_command(trimmed);
@@ -592,7 +592,7 @@ static int fc_edit(lle_history_core_t *history, fc_options_t *opts) {
         line_start = line_end + 1;
     }
 
-    /* Handle last line if no trailing newline */
+    // Handle last line if no trailing newline
     if (*line_start) {
         char *trimmed = line_start;
         while (*trimmed && isspace((unsigned char)*trimmed))
@@ -639,14 +639,14 @@ static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
 
     const char *original = entry->command;
 
-    /* If no pattern specified, just re-execute */
+    // If no pattern specified, just re-execute
     if (!opts->old_pattern || !*opts->old_pattern) {
         printf("%s\n", original);
         lle_history_bridge_add_entry(original, 0, NULL);
         return execute_command(original);
     }
 
-    /* Find pattern in command */
+    // Find pattern in command
     const char *match = strstr(original, opts->old_pattern);
     if (!match) {
         executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
@@ -656,7 +656,7 @@ static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Build new command with substitution */
+    // Build new command with substitution
     size_t old_len = strlen(opts->old_pattern);
     size_t new_len = opts->new_pattern ? strlen(opts->new_pattern) : 0;
     size_t original_len = strlen(original);
@@ -671,7 +671,7 @@ static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
-    /* Build the new command */
+    // Build the new command
     strncpy(new_command, original, prefix_len);
     new_command[prefix_len] = '\0';
     if (opts->new_pattern) {
@@ -679,7 +679,7 @@ static int fc_substitute(lle_history_core_t *history, fc_options_t *opts) {
     }
     strcat(new_command, match + old_len);
 
-    /* Print and execute */
+    // Print and execute
     printf("%s\n", new_command);
     lle_history_bridge_add_entry(new_command, 0, NULL);
     int status = execute_command(new_command);
@@ -739,12 +739,12 @@ int bin_fc(int argc, char **argv) {
         return 1;
     }
 
-    /* Initialize options */
+    // Initialize options
     fc_options_t opts = {0};
 
-    /* Parse command line options */
+    // Parse command line options
     int opt;
-    optind = 1; /* Reset getopt */
+    optind = 1; // Reset getopt
     while ((opt = getopt(argc, argv, "e:lnrs")) != -1) {
         switch (opt) {
         case 'e':
@@ -768,7 +768,7 @@ int bin_fc(int argc, char **argv) {
         }
     }
 
-    /* Handle substitute mode pattern parsing */
+    // Handle substitute mode pattern parsing
     if (opts.substitute_mode) {
         if (optind < argc && strchr(argv[optind], '=')) {
             if (!parse_substitution_pattern(argv[optind], &opts.old_pattern,
@@ -782,13 +782,13 @@ int bin_fc(int argc, char **argv) {
             }
             optind++;
         } else {
-            /* No pattern - will just re-execute */
+            // No pattern - will just re-execute
             opts.old_pattern = strdup("");
             opts.new_pattern = strdup("");
         }
     }
 
-    /* Parse range arguments */
+    // Parse range arguments
     const char *first_str = (optind < argc) ? argv[optind] : NULL;
     const char *last_str = (optind + 1 < argc) ? argv[optind + 1] : NULL;
 
@@ -799,7 +799,7 @@ int bin_fc(int argc, char **argv) {
         return 1;
     }
 
-    /* Execute appropriate fc operation */
+    // Execute appropriate fc operation
     int status;
     if (opts.list_mode) {
         status = fc_list(history, &opts);
@@ -809,7 +809,7 @@ int bin_fc(int argc, char **argv) {
         status = fc_edit(history, &opts);
     }
 
-    /* Cleanup */
+    // Cleanup
     free(opts.editor);
     free(opts.old_pattern);
     free(opts.new_pattern);

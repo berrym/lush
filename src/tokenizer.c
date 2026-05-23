@@ -74,7 +74,7 @@ tokenizer_t *tokenizer_new_at(const char *input, size_t starting_line) {
         return NULL;
     }
     if (starting_line == 0) {
-        starting_line = 1; /* defensive: 0 is unknown; 1-based per source */
+        starting_line = 1; // defensive: 0 is unknown; 1-based per source
     }
 
     tokenizer_t *tokenizer = malloc(sizeof(tokenizer_t));
@@ -1149,7 +1149,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                      * up the second `(` and reparse as command sub.
                      * Issue #99. */
                     size_t scan = tokenizer->position + 1;
-                    int depth = 2; /* counting the two outer `(` */
+                    int depth = 2; // counting the two outer `(`
                     bool looks_arith = true;
                     while (scan < tokenizer->input_length && depth > 0) {
                         char sc = tokenizer->input[scan];

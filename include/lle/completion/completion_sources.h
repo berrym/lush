@@ -157,4 +157,4 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
 }
 #endif
 
-#endif /* LLE_COMPLETION_SOURCES_H */
+#endif // LLE_COMPLETION_SOURCES_H

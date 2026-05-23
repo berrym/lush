@@ -86,7 +86,7 @@ TEST(fixer_init_null) {
 }
 
 TEST(fixer_cleanup_null) {
-    /* Should not crash */
+    // Should not crash
     fixer_cleanup(NULL);
 }
 
@@ -95,7 +95,7 @@ TEST(fixer_cleanup_double) {
     fixer_init(&ctx);
     fixer_cleanup(&ctx);
 
-    /* Second cleanup should be safe */
+    // Second cleanup should be safe
     fixer_cleanup(&ctx);
 }
 
@@ -281,11 +281,11 @@ TEST(fixer_apply_fixes_single) {
     fixer_init(&ctx);
     fixer_load_string(&ctx, "source config.sh", "test.sh");
 
-    fixer_fix_t fix = {0}; /* Zero-initialize all fields first */
+    fixer_fix_t fix = {0}; // Zero-initialize all fields first
     fix.line = 1;
     fix.column = 1;
     fix.match_start = 0;
-    fix.match_length = 6; /* "source" */
+    fix.match_length = 6; // "source"
     fix.original = "source";
     fix.replacement = ".";
     fix.type = FIX_TYPE_SAFE;
@@ -326,7 +326,7 @@ TEST(fixer_apply_fixes_skip_unsafe) {
     fixer_add_fix(&ctx, &fix);
 
     fixer_options_t opts = {
-        .include_unsafe = false, /* Don't include unsafe */
+        .include_unsafe = false, // Don't include unsafe
     };
 
     char output[256];
@@ -354,7 +354,7 @@ TEST(fixer_apply_fixes_include_unsafe) {
     fixer_add_fix(&ctx, &fix);
 
     fixer_options_t opts = {
-        .include_unsafe = true, /* Include unsafe */
+        .include_unsafe = true, // Include unsafe
     };
 
     char output[256];
@@ -376,13 +376,13 @@ TEST(fixer_apply_fixes_skip_manual) {
     fixer_fix_t fix = {0};
     fix.match_start = 0;
     fix.match_length = 4;
-    fix.replacement = NULL; /* No replacement for manual */
+    fix.replacement = NULL; // No replacement for manual
     fix.type = FIX_TYPE_MANUAL;
 
     fixer_add_fix(&ctx, &fix);
 
     fixer_options_t opts = {
-        .include_unsafe = true, /* Even with unsafe, manual should be skipped */
+        .include_unsafe = true, // Even with unsafe, manual should be skipped
     };
 
     char output[256];
@@ -457,7 +457,7 @@ TEST(fixer_write_file_basic) {
 
     ASSERT_EQ(result, FIXER_OK, "write_file should succeed");
 
-    /* Verify content was written */
+    // Verify content was written
     FILE *f = fopen(path, "r");
     ASSERT_NOT_NULL(f, "File should exist");
 
@@ -477,19 +477,19 @@ TEST(fixer_write_file_with_backup) {
     char path[512];
     snprintf(path, sizeof(path), "%s/backup_test.sh", test_script_dir);
 
-    /* Create original file */
+    // Create original file
     const char *original = "#!/bin/sh\necho original\n";
     FILE *f = fopen(path, "w");
     fputs(original, f);
     fclose(f);
 
-    /* Write new content with backup */
+    // Write new content with backup
     const char *content = "#!/bin/sh\necho new\n";
     fixer_result_t result = fixer_write_file(path, content, true);
 
     ASSERT_EQ(result, FIXER_OK, "write_file with backup should succeed");
 
-    /* Verify backup exists */
+    // Verify backup exists
     char backup_path[520];
     snprintf(backup_path, sizeof(backup_path), "%s.bak", path);
 
@@ -606,7 +606,7 @@ TEST(fixer_interactive_init_null) {
 }
 
 TEST(fixer_interactive_cleanup_null) {
-    /* Should not crash */
+    // Should not crash
     fixer_interactive_cleanup(NULL);
 }
 
@@ -818,7 +818,7 @@ TEST(fixer_interactive_apply_none_accepted) {
     fixer_interactive_t session;
     fixer_interactive_init(&session, &ctx, &opts);
 
-    /* Don't accept any fixes */
+    // Don't accept any fixes
     const fixer_fix_t *next_fix;
     fixer_interactive_next(&session, &next_fix);
     fixer_interactive_respond(&session, FIXER_RESPONSE_NO);
@@ -853,7 +853,7 @@ TEST(fixer_interactive_apply_some_accepted) {
     fixer_interactive_t session;
     fixer_interactive_init(&session, &ctx, &opts);
 
-    /* Accept the fix */
+    // Accept the fix
     const fixer_fix_t *next_fix;
     fixer_interactive_next(&session, &next_fix);
     fixer_interactive_respond(&session, FIXER_RESPONSE_YES);

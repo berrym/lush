@@ -19,7 +19,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Mock memory pool (same as test_input_stream.c) */
+// Mock memory pool (same as test_input_stream.c)
 static int mock_pool_dummy = 43;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 

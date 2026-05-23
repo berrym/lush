@@ -271,14 +271,14 @@ static const lle_action_registry_entry_t ACTION_REGISTRY[] = {
      .func.simple = lle_insert_newline_literal,
      .description = "Insert literal newline"                                 },
 
-    /* Sentinel - marks end of registry */
+    // Sentinel - marks end of registry
     {                     .name = NULL,
      .type = LLE_ACTION_TYPE_SIMPLE,
      .func.simple = NULL,
      .description = NULL                                                     }
 };
 
-/* Count of actions (excluding sentinel) */
+// Count of actions (excluding sentinel)
 static const size_t ACTION_REGISTRY_COUNT =
     (sizeof(ACTION_REGISTRY) / sizeof(ACTION_REGISTRY[0])) - 1;
 
@@ -374,7 +374,7 @@ lle_result_t lle_keybinding_get_user_config_path(char *buffer,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Try XDG_CONFIG_HOME first */
+    // Try XDG_CONFIG_HOME first
     const char *xdg_config = getenv("XDG_CONFIG_HOME");
     if (xdg_config && xdg_config[0]) {
         int written = snprintf(buffer, buffer_size, "%s/lush/%s", xdg_config,
@@ -384,7 +384,7 @@ lle_result_t lle_keybinding_get_user_config_path(char *buffer,
         }
     }
 
-    /* Fall back to ~/.config/lush/ */
+    // Fall back to ~/.config/lush/
     const char *home = get_home_dir();
     if (!home) {
         return LLE_ERROR_SYSTEM_CALL;
@@ -416,7 +416,7 @@ static char *read_file_contents(const char *filepath, size_t *size_out) {
         return NULL;
     }
 
-    /* Get file size */
+    // Get file size
     if (fseek(fp, 0, SEEK_END) != 0) {
         fclose(fp);
         return NULL;
@@ -433,14 +433,14 @@ static char *read_file_contents(const char *filepath, size_t *size_out) {
         return NULL;
     }
 
-    /* Allocate buffer */
+    // Allocate buffer
     char *content = malloc((size_t)size + 1);
     if (!content) {
         fclose(fp);
         return NULL;
     }
 
-    /* Read file */
+    // Read file
     size_t read_size = fread(content, 1, (size_t)size, fp);
     fclose(fp);
 
@@ -479,12 +479,12 @@ static lle_result_t keybinding_config_callback(const char *section,
                                                void *user_data) {
     keybinding_parser_ctx_t *ctx = user_data;
 
-    /* Only process [bindings] section */
+    // Only process [bindings] section
     if (strcmp(section, "bindings") != 0) {
         return LLE_SUCCESS;
     }
 
-    /* Value must be a string */
+    // Value must be a string
     if (value->type != LLE_THEME_VALUE_STRING) {
         ctx->result->errors_count++;
         return LLE_SUCCESS;
@@ -493,7 +493,7 @@ static lle_result_t keybinding_config_callback(const char *section,
     const char *key_sequence = key;
     const char *action_name = value->data.string;
 
-    /* Handle "none" to unbind */
+    // Handle "none" to unbind
     if (strcmp(action_name, "none") == 0 || action_name[0] == '\0') {
         lle_result_t unbind_result =
             lle_keybinding_manager_unbind(ctx->manager, key_sequence);
@@ -503,33 +503,33 @@ static lle_result_t keybinding_config_callback(const char *section,
         return LLE_SUCCESS;
     }
 
-    /* Look up action in registry */
+    // Look up action in registry
     const lle_action_registry_entry_t *entry =
         lle_action_registry_lookup(action_name);
     if (!entry) {
-        /* Unknown action - skip with warning */
+        // Unknown action - skip with warning
         ctx->result->errors_count++;
         return LLE_SUCCESS;
     }
 
-    /* Validate key sequence */
+    // Validate key sequence
     lle_key_event_t key_event;
     lle_result_t parse_result =
         lle_key_sequence_parse(key_sequence, &key_event);
     if (parse_result != LLE_SUCCESS) {
-        /* Invalid key sequence - skip with warning */
+        // Invalid key sequence - skip with warning
         ctx->result->errors_count++;
         return LLE_SUCCESS;
     }
 
-    /* Check if this overrides an existing binding */
+    // Check if this overrides an existing binding
     lle_keybinding_action_t *existing = NULL;
     if (lle_keybinding_manager_lookup(ctx->manager, key_sequence, &existing) ==
         LLE_SUCCESS) {
         ctx->result->bindings_overridden++;
     }
 
-    /* Bind based on action type */
+    // Bind based on action type
     lle_result_t bind_result;
     if (entry->type == LLE_ACTION_TYPE_SIMPLE) {
         bind_result = lle_keybinding_manager_bind(
@@ -568,10 +568,10 @@ lle_keybinding_load_from_string(lle_keybinding_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize result */
+    // Initialize result
     memset(result, 0, sizeof(*result));
 
-    /* Initialize parser */
+    // Initialize parser
     lle_theme_parser_t parser;
     lle_result_t init_result = lle_theme_parser_init(&parser, content);
     if (init_result != LLE_SUCCESS) {
@@ -581,10 +581,10 @@ lle_keybinding_load_from_string(lle_keybinding_manager_t *manager,
         return init_result;
     }
 
-    /* Set up parser context */
+    // Set up parser context
     keybinding_parser_ctx_t ctx = {.manager = manager, .result = result};
 
-    /* Parse and apply bindings */
+    // Parse and apply bindings
     lle_result_t parse_result =
         lle_theme_parser_parse(&parser, keybinding_config_callback, &ctx);
 
@@ -616,11 +616,11 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize result */
+    // Initialize result
     memset(result, 0, sizeof(*result));
     snprintf(result->filepath, sizeof(result->filepath), "%s", filepath);
 
-    /* Check if file exists */
+    // Check if file exists
     struct stat st;
     if (stat(filepath, &st) != 0) {
         result->status = LLE_ERROR_NOT_FOUND;
@@ -629,7 +629,7 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Read file contents */
+    // Read file contents
     size_t content_size;
     char *content = read_file_contents(filepath, &content_size);
     if (!content) {
@@ -639,7 +639,7 @@ lle_keybinding_load_from_file(lle_keybinding_manager_t *manager,
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* Parse content */
+    // Parse content
     lle_result_t load_result =
         lle_keybinding_load_from_string(manager, content, result);
 
@@ -661,7 +661,7 @@ lle_keybinding_load_user_config(lle_keybinding_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Get user config path */
+    // Get user config path
     char config_path[LLE_KEYBINDING_CONFIG_PATH_MAX];
     lle_result_t path_result =
         lle_keybinding_get_user_config_path(config_path, sizeof(config_path));
@@ -685,6 +685,6 @@ lle_keybinding_load_user_config(lle_keybinding_manager_t *manager,
 lle_result_t
 lle_keybinding_reload_user_config(lle_keybinding_manager_t *manager,
                                   lle_keybinding_load_result_t *result) {
-    /* Reload is the same as load - just re-apply user config */
+    // Reload is the same as load - just re-apply user config
     return lle_keybinding_load_user_config(manager, result);
 }

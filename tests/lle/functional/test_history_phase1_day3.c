@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* Test counter */
+// Test counter
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -36,7 +36,7 @@ static int tests_failed = 0;
         return;                                                                \
     } while (0)
 
-/* Test file path */
+// Test file path
 #define TEST_HISTORY_FILE "/tmp/lle_history_test.txt"
 
 /*
@@ -48,13 +48,13 @@ void test_save_and_load(void) {
     lle_history_core_t *core = NULL;
     lle_result_t result;
 
-    /* Create core and add entries */
+    // Create core and add entries
     result = lle_history_core_create(&core, NULL, NULL);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to create core");
     }
 
-    /* Add test entries */
+    // Add test entries
     const char *commands[] = {"ls -la /home", "cd /tmp", "echo 'Hello, World!'",
                               "grep pattern file.txt", "git status"};
 
@@ -67,7 +67,7 @@ void test_save_and_load(void) {
         }
     }
 
-    /* Save to file */
+    // Save to file
     result = lle_history_save_to_file(core, TEST_HISTORY_FILE);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -75,10 +75,10 @@ void test_save_and_load(void) {
         FAIL("Failed to save to file");
     }
 
-    /* Destroy core */
+    // Destroy core
     lle_history_core_destroy(core);
 
-    /* Create new core and load */
+    // Create new core and load
     result = lle_history_core_create(&core, NULL, NULL);
     if (result != LLE_SUCCESS) {
         unlink(TEST_HISTORY_FILE);
@@ -92,7 +92,7 @@ void test_save_and_load(void) {
         FAIL("Failed to load from file");
     }
 
-    /* Verify loaded entries */
+    // Verify loaded entries
     size_t count;
     lle_history_get_entry_count(core, &count);
     if (count != 5) {
@@ -125,7 +125,7 @@ void test_save_and_load(void) {
         }
     }
 
-    /* Cleanup */
+    // Cleanup
     lle_history_core_destroy(core);
     unlink(TEST_HISTORY_FILE);
     PASS();
@@ -145,7 +145,7 @@ void test_load_nonexistent_file(void) {
         FAIL("Failed to create core");
     }
 
-    /* Try to load from non-existent file - should succeed with empty history */
+    // Try to load from non-existent file - should succeed with empty history
     result =
         lle_history_load_from_file(core, "/tmp/nonexistent_history_file.txt");
     if (result != LLE_SUCCESS) {
@@ -178,7 +178,7 @@ void test_special_characters(void) {
         FAIL("Failed to create core");
     }
 
-    /* Commands with tabs, newlines, backslashes */
+    // Commands with tabs, newlines, backslashes
     const char *special_commands[] = {
         "echo 'line1\nline2'", "printf 'col1\tcol2\tcol3'",
         "echo 'path: C:\\Users\\test'", "grep 'pattern\\|other' file.txt"};
@@ -188,7 +188,7 @@ void test_special_characters(void) {
         result = lle_history_add_entry(core, special_commands[i], 0, &id);
     }
 
-    /* Save */
+    // Save
     result = lle_history_save_to_file(core, TEST_HISTORY_FILE);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -198,11 +198,11 @@ void test_special_characters(void) {
 
     lle_history_core_destroy(core);
 
-    /* Load */
+    // Load
     result = lle_history_core_create(&core, NULL, NULL);
     result = lle_history_load_from_file(core, TEST_HISTORY_FILE);
 
-    /* Verify */
+    // Verify
     for (int i = 0; i < 4; i++) {
         lle_history_entry_t *entry = NULL;
         result = lle_history_get_entry_by_index(core, i, &entry);
@@ -229,18 +229,18 @@ void test_append_entry(void) {
     lle_history_core_t *core = NULL;
     lle_result_t result;
 
-    /* Create initial history */
+    // Create initial history
     result = lle_history_core_create(&core, NULL, NULL);
     uint64_t id;
     lle_history_add_entry(core, "initial command", 0, &id);
     lle_history_save_to_file(core, TEST_HISTORY_FILE);
 
-    /* Get the entry to append */
+    // Get the entry to append
     lle_history_entry_t *entry = NULL;
     lle_history_add_entry(core, "appended command", 0, &id);
     lle_history_get_entry_by_index(core, 1, &entry);
 
-    /* Append to file */
+    // Append to file
     result = lle_history_append_entry(entry, TEST_HISTORY_FILE);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -250,7 +250,7 @@ void test_append_entry(void) {
 
     lle_history_core_destroy(core);
 
-    /* Load and verify */
+    // Load and verify
     result = lle_history_core_create(&core, NULL, NULL);
     lle_history_load_from_file(core, TEST_HISTORY_FILE);
 
@@ -288,7 +288,7 @@ void test_large_history(void) {
         FAIL("Failed to create core");
     }
 
-    /* Add 1000 entries */
+    // Add 1000 entries
     for (int i = 0; i < 1000; i++) {
         char cmd[64];
         snprintf(cmd, sizeof(cmd), "command_%d", i);
@@ -296,7 +296,7 @@ void test_large_history(void) {
         result = lle_history_add_entry(core, cmd, i % 256, &id);
     }
 
-    /* Save */
+    // Save
     result = lle_history_save_to_file(core, TEST_HISTORY_FILE);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -304,14 +304,14 @@ void test_large_history(void) {
         FAIL("Failed to save large history");
     }
 
-    /* Check file size */
+    // Check file size
     struct stat st;
     stat(TEST_HISTORY_FILE, &st);
     printf("  File size: %ld bytes for 1000 entries\n", (long)st.st_size);
 
     lle_history_core_destroy(core);
 
-    /* Load */
+    // Load
     result = lle_history_core_create(&core, NULL, NULL);
     result = lle_history_load_from_file(core, TEST_HISTORY_FILE);
     if (result != LLE_SUCCESS) {
@@ -320,7 +320,7 @@ void test_large_history(void) {
         FAIL("Failed to load large history");
     }
 
-    /* Verify count */
+    // Verify count
     size_t count;
     lle_history_get_entry_count(core, &count);
     if (count != 1000) {
@@ -330,7 +330,7 @@ void test_large_history(void) {
         FAIL("Wrong number of entries loaded");
     }
 
-    /* Spot check some entries */
+    // Spot check some entries
     for (int i = 0; i < 1000; i += 100) {
         lle_history_entry_t *entry = NULL;
         lle_history_get_entry_by_index(core, i, &entry);
@@ -361,10 +361,10 @@ void test_file_permissions(void) {
     uint64_t id;
     lle_history_add_entry(core, "test command", 0, &id);
 
-    /* Save */
+    // Save
     lle_history_save_to_file(core, TEST_HISTORY_FILE);
 
-    /* Check permissions */
+    // Check permissions
     struct stat st;
     stat(TEST_HISTORY_FILE, &st);
     mode_t perms = st.st_mode & 0777;
@@ -390,7 +390,7 @@ int main(void) {
     printf("Persistence and File Storage\n");
     printf("=================================================\n");
 
-    /* Run all tests */
+    // Run all tests
     test_save_and_load();
     test_load_nonexistent_file();
     test_special_characters();
@@ -398,7 +398,7 @@ int main(void) {
     test_large_history();
     test_file_permissions();
 
-    /* Summary */
+    // Summary
     printf("\n=================================================\n");
     printf("Test Results:\n");
     printf("  Passed: %d\n", tests_passed);

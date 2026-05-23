@@ -32,7 +32,7 @@
 #include <stdint.h>
 #include <time.h>
 
-/* Include LLE dependencies */
+// Include LLE dependencies
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lle/performance.h"
@@ -42,58 +42,58 @@
  * ============================================================================
  */
 
-/* Buffer Size and Capacity Limits */
-#define LLE_BUFFER_NAME_MAX 256               /* Maximum buffer name length */
-#define LLE_BUFFER_DEFAULT_CAPACITY 4096      /* Default 4KB buffer */
-#define LLE_BUFFER_MIN_CAPACITY 256           /* Minimum 256 bytes */
-#define LLE_BUFFER_MAX_CAPACITY (1024 * 1024) /* Maximum 1MB per buffer */
-#define LLE_BUFFER_GROWTH_FACTOR 2            /* Capacity growth factor */
+// Buffer Size and Capacity Limits
+#define LLE_BUFFER_NAME_MAX 256               // Maximum buffer name length
+#define LLE_BUFFER_DEFAULT_CAPACITY 4096      // Default 4KB buffer
+#define LLE_BUFFER_MIN_CAPACITY 256           // Minimum 256 bytes
+#define LLE_BUFFER_MAX_CAPACITY (1024 * 1024) // Maximum 1MB per buffer
+#define LLE_BUFFER_GROWTH_FACTOR 2            // Capacity growth factor
 
-/* Memory Alignment */
-#define LLE_BUFFER_MEMORY_ALIGNMENT 16 /* 16-byte alignment */
+// Memory Alignment
+#define LLE_BUFFER_MEMORY_ALIGNMENT 16 // 16-byte alignment
 
-/* Line Structure Limits */
-#define LLE_BUFFER_MAX_LINES 10000           /* Maximum lines per buffer */
-#define LLE_BUFFER_DEFAULT_LINE_CAPACITY 100 /* Default line array capacity */
+// Line Structure Limits
+#define LLE_BUFFER_MAX_LINES 10000           // Maximum lines per buffer
+#define LLE_BUFFER_DEFAULT_LINE_CAPACITY 100 // Default line array capacity
 
-/* UTF-8 Index Configuration */
-#define LLE_UTF8_INDEX_GRANULARITY 64   /* Index every 64 bytes */
-#define LLE_UTF8_INDEX_MAX_ENTRIES 1024 /* Maximum index entries */
+// UTF-8 Index Configuration
+#define LLE_UTF8_INDEX_GRANULARITY 64   // Index every 64 bytes
+#define LLE_UTF8_INDEX_MAX_ENTRIES 1024 // Maximum index entries
 
-/* Change Tracking Limits */
-#define LLE_BUFFER_MAX_UNDO_LEVELS 1000      /* Maximum undo history */
-#define LLE_BUFFER_MAX_REDO_LEVELS 1000      /* Maximum redo history */
-#define LLE_BUFFER_CHANGE_SEQUENCE_LIMIT 100 /* Max operations per sequence */
+// Change Tracking Limits
+#define LLE_BUFFER_MAX_UNDO_LEVELS 1000      // Maximum undo history
+#define LLE_BUFFER_MAX_REDO_LEVELS 1000      // Maximum redo history
+#define LLE_BUFFER_CHANGE_SEQUENCE_LIMIT 100 // Max operations per sequence
 
-/* Cache Configuration */
-#define LLE_BUFFER_CACHE_SIZE 256      /* Cache entry count */
-#define LLE_BUFFER_CACHE_LINE_TTL 1000 /* Cache entry TTL (ms) */
+// Cache Configuration
+#define LLE_BUFFER_CACHE_SIZE 256      // Cache entry count
+#define LLE_BUFFER_CACHE_LINE_TTL 1000 // Cache entry TTL (ms)
 
-/* Performance Targets (nanoseconds) */
-#define LLE_BUFFER_PERF_INSERT_MAX_NS 500000ULL /* 0.5ms insert target */
-#define LLE_BUFFER_PERF_DELETE_MAX_NS 500000ULL /* 0.5ms delete target */
+// Performance Targets (nanoseconds)
+#define LLE_BUFFER_PERF_INSERT_MAX_NS 500000ULL // 0.5ms insert target
+#define LLE_BUFFER_PERF_DELETE_MAX_NS 500000ULL // 0.5ms delete target
 #define LLE_BUFFER_PERF_UTF8_CALC_MAX_NS                                       \
     100000ULL /* 0.1ms UTF-8 calc target                                       \
                */
 
-/* Buffer Flags */
-#define LLE_BUFFER_FLAG_READONLY 0x0001    /* Buffer is read-only */
-#define LLE_BUFFER_FLAG_MODIFIED 0x0002    /* Buffer has been modified */
-#define LLE_BUFFER_FLAG_MULTILINE 0x0004   /* Multiline mode active */
-#define LLE_BUFFER_FLAG_UTF8_DIRTY 0x0008  /* UTF-8 index needs rebuild */
-#define LLE_BUFFER_FLAG_LINE_DIRTY 0x0010  /* Line structure needs rebuild */
-#define LLE_BUFFER_FLAG_CACHE_DIRTY 0x0020 /* Cache needs refresh */
-#define LLE_BUFFER_FLAG_VALIDATION_FAILED 0x0040 /* Validation failed */
+// Buffer Flags
+#define LLE_BUFFER_FLAG_READONLY 0x0001          // Buffer is read-only
+#define LLE_BUFFER_FLAG_MODIFIED 0x0002          // Buffer has been modified
+#define LLE_BUFFER_FLAG_MULTILINE 0x0004         // Multiline mode active
+#define LLE_BUFFER_FLAG_UTF8_DIRTY 0x0008        // UTF-8 index needs rebuild
+#define LLE_BUFFER_FLAG_LINE_DIRTY 0x0010        // Line structure needs rebuild
+#define LLE_BUFFER_FLAG_CACHE_DIRTY 0x0020       // Cache needs refresh
+#define LLE_BUFFER_FLAG_VALIDATION_FAILED 0x0040 // Validation failed
 
-/* Line Flags */
-#define LLE_LINE_FLAG_CONTINUATION 0x01       /* Line is a continuation */
-#define LLE_LINE_FLAG_NEEDS_REVALIDATION 0x02 /* Line needs revalidation */
-#define LLE_LINE_FLAG_CACHED 0x04             /* Line render is cached */
+// Line Flags
+#define LLE_LINE_FLAG_CONTINUATION 0x01       // Line is a continuation
+#define LLE_LINE_FLAG_NEEDS_REVALIDATION 0x02 // Line needs revalidation
+#define LLE_LINE_FLAG_CACHED 0x04             // Line render is cached
 
-/* Cache Flags */
-#define LLE_CACHE_LINE_STRUCTURE 0x01 /* Cache line structure */
-#define LLE_CACHE_RENDER 0x02         /* Cache render data */
-#define LLE_CACHE_LAYOUT 0x04         /* Cache layout data */
+// Cache Flags
+#define LLE_CACHE_LINE_STRUCTURE 0x01 // Cache line structure
+#define LLE_CACHE_RENDER 0x02         // Cache render data
+#define LLE_CACHE_LAYOUT 0x04         // Cache layout data
 
 /* ============================================================================
  * ENUMERATIONS
@@ -105,39 +105,39 @@
  * Spec Reference: Line 1014-1023
  */
 typedef enum {
-    LLE_CHANGE_TYPE_INSERT = 1,  /* Insert text operation */
-    LLE_CHANGE_TYPE_DELETE,      /* Delete text operation */
-    LLE_CHANGE_TYPE_REPLACE,     /* Replace text operation */
-    LLE_CHANGE_TYPE_CURSOR_MOVE, /* Cursor movement */
-    LLE_CHANGE_TYPE_SELECTION,   /* Selection change */
-    LLE_CHANGE_TYPE_COMPOSITE    /* Composite operation */
+    LLE_CHANGE_TYPE_INSERT = 1,  /**< Insert text operation */
+    LLE_CHANGE_TYPE_DELETE,      /**< Delete text operation */
+    LLE_CHANGE_TYPE_REPLACE,     /**< Replace text operation */
+    LLE_CHANGE_TYPE_CURSOR_MOVE, /**< Cursor movement */
+    LLE_CHANGE_TYPE_SELECTION,   /**< Selection change */
+    LLE_CHANGE_TYPE_COMPOSITE    // Composite operation
 } lle_change_type_t;
 
 /**
  * @brief Line types for multiline context
  */
 typedef enum {
-    LLE_LINE_TYPE_COMMAND,      /* Regular command line */
-    LLE_LINE_TYPE_CONTINUATION, /* Continuation line */
-    LLE_LINE_TYPE_HEREDOC,      /* Here-document content */
-    LLE_LINE_TYPE_QUOTED,       /* Inside quoted string */
-    LLE_LINE_TYPE_COMMENT       /* Comment line */
+    LLE_LINE_TYPE_COMMAND,      /**< Regular command line */
+    LLE_LINE_TYPE_CONTINUATION, /**< Continuation line */
+    LLE_LINE_TYPE_HEREDOC,      /**< Here-document content */
+    LLE_LINE_TYPE_QUOTED,       /**< Inside quoted string */
+    LLE_LINE_TYPE_COMMENT       // Comment line
 } lle_line_type_t;
 
 /**
  * @brief Multiline parser states
  */
 typedef enum {
-    LLE_MULTILINE_STATE_NONE,           /* No multiline context */
-    LLE_MULTILINE_STATE_QUOTE_SINGLE,   /* Inside single quote */
-    LLE_MULTILINE_STATE_QUOTE_DOUBLE,   /* Inside double quote */
-    LLE_MULTILINE_STATE_QUOTE_BACKTICK, /* Inside backtick */
-    LLE_MULTILINE_STATE_HEREDOC,        /* Inside heredoc */
-    LLE_MULTILINE_STATE_PAREN,          /* Inside parentheses */
-    LLE_MULTILINE_STATE_BRACE,          /* Inside braces */
-    LLE_MULTILINE_STATE_BRACKET,        /* Inside brackets */
-    LLE_MULTILINE_STATE_PIPE,           /* After pipe */
-    LLE_MULTILINE_STATE_BACKSLASH       /* After backslash */
+    LLE_MULTILINE_STATE_NONE,           /**< No multiline context */
+    LLE_MULTILINE_STATE_QUOTE_SINGLE,   /**< Inside single quote */
+    LLE_MULTILINE_STATE_QUOTE_DOUBLE,   /**< Inside double quote */
+    LLE_MULTILINE_STATE_QUOTE_BACKTICK, /**< Inside backtick */
+    LLE_MULTILINE_STATE_HEREDOC,        /**< Inside heredoc */
+    LLE_MULTILINE_STATE_PAREN,          /**< Inside parentheses */
+    LLE_MULTILINE_STATE_BRACE,          /**< Inside braces */
+    LLE_MULTILINE_STATE_BRACKET,        /**< Inside brackets */
+    LLE_MULTILINE_STATE_PIPE,           /**< After pipe */
+    LLE_MULTILINE_STATE_BACKSLASH       // After backslash
 } lle_multiline_state_t;
 
 /* ============================================================================
@@ -145,7 +145,7 @@ typedef enum {
  * ============================================================================
  */
 
-/* Forward declarations for circular dependencies */
+// Forward declarations for circular dependencies
 typedef struct lle_buffer_t lle_buffer_t;
 typedef struct lle_buffer_system_t lle_buffer_system_t;
 typedef struct lle_buffer_pool_t lle_buffer_pool_t;
@@ -166,7 +166,7 @@ typedef struct lle_buffer_performance_metrics_t
     lle_buffer_performance_metrics_t;
 typedef struct lle_cursor_cache_t lle_cursor_cache_t;
 
-/* Type aliases for flag bitfields */
+// Type aliases for flag bitfields
 typedef uint16_t lle_buffer_flags_t;
 typedef uint8_t lle_line_flags_t;
 typedef uint8_t lle_cache_flags_t;
@@ -183,26 +183,26 @@ typedef uint8_t lle_cache_flags_t;
  * Complete cursor position structure with ALL fields from specification.
  */
 struct lle_cursor_position_t {
-    /* Byte-based position (primary) */
-    size_t byte_offset; /* Byte offset in buffer */
+    // Byte-based position (primary)
+    size_t byte_offset; /**< Byte offset in buffer */
 
-    /* UTF-8 based positions */
-    size_t codepoint_index; /* Unicode codepoint index */
-    size_t grapheme_index;  /* Grapheme cluster index */
+    // UTF-8 based positions
+    size_t codepoint_index; /**< Unicode codepoint index */
+    size_t grapheme_index;  /**< Grapheme cluster index */
 
-    /* Line-based position */
-    size_t line_number;      /* Line number (0-based) */
-    size_t column_offset;    /* Column offset in line (bytes) */
-    size_t column_codepoint; /* Column position (codepoints) */
-    size_t column_grapheme;  /* Column position (graphemes) */
+    // Line-based position
+    size_t line_number;      /**< Line number (0-based) */
+    size_t column_offset;    /**< Column offset in line (bytes) */
+    size_t column_codepoint; /**< Column position (codepoints) */
+    size_t column_grapheme;  /**< Column position (graphemes) */
 
-    /* Visual position */
-    size_t visual_line;   /* Visual line (with wrapping) */
-    size_t visual_column; /* Visual column position */
+    // Visual position
+    size_t visual_line;   /**< Visual line (with wrapping) */
+    size_t visual_column; /**< Visual column position */
 
-    /* Position validity */
-    bool position_valid;     /* Position validity flag */
-    uint32_t buffer_version; /* Associated buffer version */
+    // Position validity
+    bool position_valid;     /**< Position validity flag */
+    uint32_t buffer_version; /**< Associated buffer version */
 };
 
 /**
@@ -211,10 +211,10 @@ struct lle_cursor_position_t {
  * Represents a selected range of text in the buffer.
  */
 struct lle_selection_range_t {
-    lle_cursor_position_t start; /* Selection start position */
-    lle_cursor_position_t end;   /* Selection end position */
-    bool active;                 /* Selection is active */
-    bool visual_mode;            /* Visual selection mode */
+    lle_cursor_position_t start; /**< Selection start position */
+    lle_cursor_position_t end;   /**< Selection end position */
+    bool active;                 /**< Selection is active */
+    bool visual_mode;            /**< Visual selection mode */
 };
 
 /**
@@ -225,29 +225,29 @@ struct lle_selection_range_t {
  * Maps between byte offsets, codepoint indices, and grapheme cluster indices.
  */
 struct lle_utf8_index_t {
-    /* Fast position mapping arrays */
-    size_t *byte_to_codepoint;     /* Byte offset to codepoint index */
-    size_t *codepoint_to_byte;     /* Codepoint index to byte offset */
-    size_t *grapheme_to_codepoint; /* Grapheme cluster to codepoint index */
-    size_t *codepoint_to_grapheme; /* Codepoint to grapheme cluster index */
-    size_t *grapheme_to_display;   /* Grapheme cluster to display column */
-    size_t *display_to_grapheme;   /* Display column to grapheme cluster */
+    // Fast position mapping arrays
+    size_t *byte_to_codepoint;     /**< Byte offset to codepoint index */
+    size_t *codepoint_to_byte;     /**< Codepoint index to byte offset */
+    size_t *grapheme_to_codepoint; /**< Grapheme cluster to codepoint index */
+    size_t *codepoint_to_grapheme; /**< Codepoint to grapheme cluster index */
+    size_t *grapheme_to_display;   /**< Grapheme cluster to display column */
+    size_t *display_to_grapheme;   /**< Display column to grapheme cluster */
 
-    /* Index metadata */
-    size_t byte_count;      /* Total bytes indexed */
-    size_t codepoint_count; /* Total codepoints indexed */
-    size_t grapheme_count;  /* Total grapheme clusters indexed */
-    size_t display_width;   /* Total display columns */
+    // Index metadata
+    size_t byte_count;      /**< Total bytes indexed */
+    size_t codepoint_count; /**< Total codepoints indexed */
+    size_t grapheme_count;  /**< Total grapheme clusters indexed */
+    size_t display_width;   /**< Total display columns */
 
-    /* Index validity and versioning */
-    bool index_valid;          /* Index validity flag */
-    uint32_t buffer_version;   /* Associated buffer version */
-    uint64_t last_update_time; /* Last index update time */
+    // Index validity and versioning
+    bool index_valid;          /**< Index validity flag */
+    uint32_t buffer_version;   /**< Associated buffer version */
+    uint64_t last_update_time; /**< Last index update time */
 
-    /* Performance tracking */
-    size_t rebuild_count; /* Number of index rebuilds */
+    // Performance tracking
+    size_t rebuild_count; /**< Number of index rebuilds */
     uint64_t
-        total_rebuild_time_ns; /* Total time spent rebuilding (nanoseconds) */
+        total_rebuild_time_ns; /**< Total time spent rebuilding (nanoseconds) */
 };
 
 /**
@@ -258,24 +258,24 @@ struct lle_utf8_index_t {
  * cursor positions, and content checksums.
  */
 struct lle_buffer_validator_t {
-    /* Validation configuration */
-    bool utf8_validation_enabled;   /* UTF-8 validation flag */
-    bool line_structure_validation; /* Line structure validation flag */
-    bool cursor_validation_enabled; /* Cursor position validation flag */
-    bool bounds_checking_enabled;   /* Bounds checking flag */
+    // Validation configuration
+    bool utf8_validation_enabled;   /**< UTF-8 validation flag */
+    bool line_structure_validation; /**< Line structure validation flag */
+    bool cursor_validation_enabled; /**< Cursor position validation flag */
+    bool bounds_checking_enabled;   /**< Bounds checking flag */
 
-    /* Validation statistics */
-    uint32_t validation_count;      /* Total validations performed */
-    uint32_t validation_failures;   /* Number of validation failures */
-    uint32_t corruption_detections; /* Buffer corruption detections */
-    uint32_t bounds_violations;     /* Bounds check violations */
+    // Validation statistics
+    uint32_t validation_count;      /**< Total validations performed */
+    uint32_t validation_failures;   /**< Number of validation failures */
+    uint32_t corruption_detections; /**< Buffer corruption detections */
+    uint32_t bounds_violations;     /**< Bounds check violations */
 
-    /* UTF-8 processor reference */
-    lle_utf8_processor_t *utf8_processor; /* UTF-8 processor (optional) */
+    // UTF-8 processor reference
+    lle_utf8_processor_t *utf8_processor; /**< UTF-8 processor (optional) */
 
-    /* Last validation results */
-    lle_result_t last_validation_result; /* Result of last validation */
-    uint64_t last_validation_time;       /* Timestamp of last validation */
+    // Last validation results
+    lle_result_t last_validation_result; /**< Result of last validation */
+    uint64_t last_validation_time;       /**< Timestamp of last validation */
 };
 
 /**
@@ -285,22 +285,22 @@ struct lle_buffer_validator_t {
  * Manages cursor position and movement operations.
  */
 struct lle_cursor_manager_t {
-    /* Current cursor state */
-    lle_cursor_position_t position; /* Current cursor position */
-    lle_cursor_position_t target;   /* Target cursor position */
+    // Current cursor state
+    lle_cursor_position_t position; /**< Current cursor position */
+    lle_cursor_position_t target;   /**< Target cursor position */
 
-    /* Movement preferences */
-    size_t preferred_visual_column; /* Preferred visual column */
-    bool sticky_column;             /* Sticky column mode */
+    // Movement preferences
+    size_t preferred_visual_column; /**< Preferred visual column */
+    bool sticky_column;             /**< Sticky column mode */
 
-    /* UTF-8 processor reference */
-    lle_utf8_processor_t *utf8_processor; /* UTF-8 processor (optional) */
+    // UTF-8 processor reference
+    lle_utf8_processor_t *utf8_processor; /**< UTF-8 processor (optional) */
 
-    /* Buffer reference */
-    lle_buffer_t *buffer; /* Associated buffer */
+    // Buffer reference
+    lle_buffer_t *buffer; /**< Associated buffer */
 
-    /* Performance optimization */
-    lle_cursor_cache_t *position_cache; /* Position calculation cache */
+    // Performance optimization
+    lle_cursor_cache_t *position_cache; /**< Position calculation cache */
 };
 
 /**
@@ -312,59 +312,59 @@ struct lle_cursor_manager_t {
  * Future phases will implement subsystem-specific operations.
  */
 struct lle_buffer_t {
-    /* Buffer metadata */
-    uint32_t buffer_id;             /* Unique buffer identifier */
-    char name[LLE_BUFFER_NAME_MAX]; /* Buffer name/description */
-    uint64_t creation_time;         /* Buffer creation timestamp */
-    uint64_t last_modified_time;    /* Last modification timestamp */
-    uint32_t modification_count;    /* Total modifications counter */
+    // Buffer metadata
+    uint32_t buffer_id;             /**< Unique buffer identifier */
+    char name[LLE_BUFFER_NAME_MAX]; /**< Buffer name/description */
+    uint64_t creation_time;         /**< Buffer creation timestamp */
+    uint64_t last_modified_time;    /**< Last modification timestamp */
+    uint32_t modification_count;    /**< Total modifications counter */
 
-    /* Buffer content storage */
-    char *data;      /* UTF-8 encoded buffer data */
-    size_t capacity; /* Allocated buffer capacity */
-    size_t length;   /* Current buffer length (bytes) */
-    size_t used;     /* Actually used buffer space */
+    // Buffer content storage
+    char *data;      /**< UTF-8 encoded buffer data */
+    size_t capacity; /**< Allocated buffer capacity */
+    size_t length;   /**< Current buffer length (bytes) */
+    size_t used;     /**< Actually used buffer space */
 
-    /* UTF-8 and Unicode metadata */
-    size_t codepoint_count;       /* Number of Unicode codepoints */
-    size_t grapheme_count;        /* Number of grapheme clusters */
-    lle_utf8_index_t *utf8_index; /* Fast UTF-8 position index */
-    bool utf8_index_valid;        /* UTF-8 index validity flag */
+    // UTF-8 and Unicode metadata
+    size_t codepoint_count;       /**< Number of Unicode codepoints */
+    size_t grapheme_count;        /**< Number of grapheme clusters */
+    lle_utf8_index_t *utf8_index; /**< Fast UTF-8 position index */
+    bool utf8_index_valid;        /**< UTF-8 index validity flag */
 
-    /* Line structure information */
-    lle_line_info_t *lines;                 /* Line structure array */
-    size_t line_count;                      /* Number of logical lines */
-    size_t line_capacity;                   /* Allocated line array capacity */
-    bool multiline_active;                  /* Multiline mode status */
-    lle_multiline_context_t *multiline_ctx; /* Multiline parsing context */
+    // Line structure information
+    lle_line_info_t *lines; /**< Line structure array */
+    size_t line_count;      /**< Number of logical lines */
+    size_t line_capacity;   /**< Allocated line array capacity */
+    bool multiline_active;  /**< Multiline mode status */
+    lle_multiline_context_t *multiline_ctx; /**< Multiline parsing context */
 
-    /* Cursor and selection */
-    lle_cursor_position_t cursor;     /* Current cursor position */
-    lle_selection_range_t *selection; /* Current selection range */
-    bool selection_active;            /* Selection status flag */
+    // Cursor and selection
+    lle_cursor_position_t cursor;     /**< Current cursor position */
+    lle_selection_range_t *selection; /**< Current selection range */
+    bool selection_active;            /**< Selection status flag */
 
-    /* Change tracking integration */
-    lle_change_sequence_t *current_sequence; /* Active change sequence */
-    uint32_t sequence_number;                /* Current sequence number */
-    bool change_tracking_enabled;            /* Change tracking status */
+    // Change tracking integration
+    lle_change_sequence_t *current_sequence; /**< Active change sequence */
+    uint32_t sequence_number;                /**< Current sequence number */
+    bool change_tracking_enabled;            /**< Change tracking status */
 
-    /* Performance optimization */
-    lle_buffer_cache_t *cache; /* Rendering and operation cache */
-    uint32_t cache_version;    /* Cache version counter */
-    bool cache_dirty;          /* Cache dirty flag */
+    // Performance optimization
+    lle_buffer_cache_t *cache; /**< Rendering and operation cache */
+    uint32_t cache_version;    /**< Cache version counter */
+    bool cache_dirty;          /**< Cache dirty flag */
 
-    /* Validation and integrity */
-    uint32_t checksum;        /* Buffer content checksum */
-    bool integrity_valid;     /* Integrity validation status */
-    lle_buffer_flags_t flags; /* Buffer status flags */
+    // Validation and integrity
+    uint32_t checksum;        /**< Buffer content checksum */
+    bool integrity_valid;     /**< Integrity validation status */
+    lle_buffer_flags_t flags; /**< Buffer status flags */
 
-    /* Memory management */
-    lle_buffer_pool_t *pool;         /* Associated buffer pool */
-    lush_memory_pool_t *memory_pool; /* Lush memory pool reference */
+    // Memory management
+    lle_buffer_pool_t *pool;         /**< Associated buffer pool */
+    lush_memory_pool_t *memory_pool; /**< Lush memory pool reference */
 
-    /* Security - Minimal Secure Mode (Spec 15 Phase 1) */
-    bool secure_mode_enabled; /* Secure mode active flag */
-    bool memory_locked;       /* Memory mlock status */
+    // Security - Minimal Secure Mode (Spec 15 Phase 1)
+    bool secure_mode_enabled; /**< Secure mode active flag */
+    bool memory_locked;       /**< Memory mlock status */
 };
 
 /**
@@ -375,25 +375,25 @@ struct lle_buffer_t {
  * Phase 3 will implement line structure management.
  */
 struct lle_line_info_t {
-    size_t start_offset;    /* Line start byte offset */
-    size_t end_offset;      /* Line end byte offset */
-    size_t length;          /* Line length in bytes */
-    size_t codepoint_count; /* Number of codepoints in line */
-    size_t grapheme_count;  /* Number of grapheme clusters */
-    size_t visual_width;    /* Visual display width */
+    size_t start_offset;    /**< Line start byte offset */
+    size_t end_offset;      /**< Line end byte offset */
+    size_t length;          /**< Line length in bytes */
+    size_t codepoint_count; /**< Number of codepoints in line */
+    size_t grapheme_count;  /**< Number of grapheme clusters */
+    size_t visual_width;    /**< Visual display width */
 
-    /* Line type and characteristics */
-    lle_line_type_t type;   /* Line type (command, continuation, etc.) */
-    lle_line_flags_t flags; /* Line status flags */
-    uint8_t indent_level;   /* Indentation level */
+    // Line type and characteristics
+    lle_line_type_t type;   /**< Line type (command, continuation, etc.) */
+    lle_line_flags_t flags; /**< Line status flags */
+    uint8_t indent_level;   /**< Indentation level */
 
-    /* Multiline context */
-    lle_multiline_state_t ml_state; /* Multiline parser state */
-    char *ml_context;               /* Multiline context string */
+    // Multiline context
+    lle_multiline_state_t ml_state; /**< Multiline parser state */
+    char *ml_context;               /**< Multiline context string */
 
-    /* Performance optimization */
-    uint32_t render_cache_key; /* Render cache key */
-    bool needs_revalidation;   /* Revalidation required flag */
+    // Performance optimization
+    uint32_t render_cache_key; /**< Render cache key */
+    bool needs_revalidation;   /**< Revalidation required flag */
 };
 
 /**
@@ -404,29 +404,29 @@ struct lle_line_info_t {
  * Contains all information needed for undo/redo.
  */
 struct lle_change_operation_t {
-    /* Operation metadata */
-    uint32_t operation_id;  /* Unique operation ID */
-    lle_change_type_t type; /* Operation type */
-    uint64_t timestamp;     /* Operation timestamp */
+    // Operation metadata
+    uint32_t operation_id;  /**< Unique operation ID */
+    lle_change_type_t type; /**< Operation type */
+    uint64_t timestamp;     /**< Operation timestamp */
 
-    /* Position information */
-    size_t start_position;  /* Start byte offset */
-    size_t end_position;    /* End byte offset */
-    size_t affected_length; /* Length of affected text */
+    // Position information
+    size_t start_position;  /**< Start byte offset */
+    size_t end_position;    /**< End byte offset */
+    size_t affected_length; /**< Length of affected text */
 
-    /* Operation data for undo/redo */
-    char *inserted_text;    /* Text that was inserted */
-    size_t inserted_length; /* Length of inserted text */
-    char *deleted_text;     /* Text that was deleted */
-    size_t deleted_length;  /* Length of deleted text */
+    // Operation data for undo/redo
+    char *inserted_text;    /**< Text that was inserted */
+    size_t inserted_length; /**< Length of inserted text */
+    char *deleted_text;     /**< Text that was deleted */
+    size_t deleted_length;  /**< Length of deleted text */
 
-    /* Cursor state preservation */
-    lle_cursor_position_t cursor_before; /* Cursor before operation */
-    lle_cursor_position_t cursor_after;  /* Cursor after operation */
+    // Cursor state preservation
+    lle_cursor_position_t cursor_before; /**< Cursor before operation */
+    lle_cursor_position_t cursor_after;  /**< Cursor after operation */
 
-    /* Operation linking */
-    struct lle_change_operation_t *next; /* Next in sequence */
-    struct lle_change_operation_t *prev; /* Previous in sequence */
+    // Operation linking
+    struct lle_change_operation_t *next; /**< Next in sequence */
+    struct lle_change_operation_t *prev; /**< Previous in sequence */
 };
 
 /**
@@ -436,25 +436,25 @@ struct lle_change_operation_t {
  * Groups related operations into a single undo/redo unit.
  */
 struct lle_change_sequence_t {
-    /* Sequence metadata */
-    uint32_t sequence_id; /* Unique sequence ID */
-    char description[64]; /* Human-readable description */
-    uint64_t start_time;  /* Sequence start time */
-    uint64_t end_time;    /* Sequence end time */
+    // Sequence metadata
+    uint32_t sequence_id; /**< Unique sequence ID */
+    char description[64]; /**< Human-readable description */
+    uint64_t start_time;  /**< Sequence start time */
+    uint64_t end_time;    /**< Sequence end time */
 
-    /* Operation chain */
-    lle_change_operation_t *first_op; /* First operation */
-    lle_change_operation_t *last_op;  /* Last operation */
-    size_t operation_count;           /* Number of operations */
+    // Operation chain
+    lle_change_operation_t *first_op; /**< First operation */
+    lle_change_operation_t *last_op;  /**< Last operation */
+    size_t operation_count;           /**< Number of operations */
 
-    /* Sequence state */
-    bool sequence_complete; /* Sequence is complete */
-    bool can_undo;          /* Can be undone */
-    bool can_redo;          /* Can be redone */
+    // Sequence state
+    bool sequence_complete; /**< Sequence is complete */
+    bool can_undo;          /**< Can be undone */
+    bool can_redo;          /**< Can be redone */
 
-    /* Sequence linking */
-    struct lle_change_sequence_t *next; /* Next in history */
-    struct lle_change_sequence_t *prev; /* Previous in history */
+    // Sequence linking
+    struct lle_change_sequence_t *next; /**< Next in history */
+    struct lle_change_sequence_t *prev; /**< Previous in history */
 };
 
 /**
@@ -463,32 +463,32 @@ struct lle_change_sequence_t {
  * Manages undo/redo history for a buffer.
  */
 struct lle_change_tracker_t {
-    /* Sequence history */
-    lle_change_sequence_t *first_sequence;   /* First in history */
-    lle_change_sequence_t *last_sequence;    /* Last in history */
-    lle_change_sequence_t *current_position; /* Current position */
-    size_t sequence_count;                   /* Total sequences */
+    // Sequence history
+    lle_change_sequence_t *first_sequence;   /**< First in history */
+    lle_change_sequence_t *last_sequence;    /**< Last in history */
+    lle_change_sequence_t *current_position; /**< Current position */
+    size_t sequence_count;                   /**< Total sequences */
 
-    /* Active sequence tracking */
-    lle_change_sequence_t *active_sequence; /* Building sequence */
-    bool sequence_in_progress;              /* Sequence in progress */
+    // Active sequence tracking
+    lle_change_sequence_t *active_sequence; /**< Building sequence */
+    bool sequence_in_progress;              /**< Sequence in progress */
 
-    /* Undo/redo limits */
-    size_t max_undo_levels; /* Maximum undo levels */
-    size_t max_redo_levels; /* Maximum redo levels */
+    // Undo/redo limits
+    size_t max_undo_levels; /**< Maximum undo levels */
+    size_t max_redo_levels; /**< Maximum redo levels */
 
-    /* Statistics */
-    uint32_t undo_count;      /* Undo operations */
-    uint32_t redo_count;      /* Redo operations */
-    uint32_t operation_count; /* Total operations */
+    // Statistics
+    uint32_t undo_count;      /**< Undo operations */
+    uint32_t redo_count;      /**< Redo operations */
+    uint32_t operation_count; /**< Total operations */
 
-    /* ID generation */
-    uint32_t next_sequence_id;  /* Next sequence ID */
-    uint32_t next_operation_id; /* Next operation ID */
+    // ID generation
+    uint32_t next_sequence_id;  /**< Next sequence ID */
+    uint32_t next_operation_id; /**< Next operation ID */
 
-    /* Memory management */
-    lush_memory_pool_t *memory_pool; /* Memory pool */
-    size_t memory_used;              /* Memory used */
+    // Memory management
+    lush_memory_pool_t *memory_pool; /**< Memory pool */
+    size_t memory_used;              /**< Memory used */
 };
 
 /**
@@ -500,26 +500,26 @@ struct lle_change_tracker_t {
  * when input is complete or needs continuation.
  */
 struct lle_multiline_context_t {
-    /* Core parser state (delegates to input_continuation.c) */
-    void *core_state; /* continuation_state_t wrapper */
+    // Core parser state (delegates to input_continuation.c)
+    void *core_state; /**< continuation_state_t wrapper */
 
-    /* LLE-specific tracking */
-    char *current_construct;       /* Current construct name */
-    size_t construct_start_line;   /* Starting line number */
-    size_t construct_start_offset; /* Starting byte offset */
-    uint8_t nesting_level;         /* Nesting depth */
+    // LLE-specific tracking
+    char *current_construct;       /**< Current construct name */
+    size_t construct_start_line;   /**< Starting line number */
+    size_t construct_start_offset; /**< Starting byte offset */
+    uint8_t nesting_level;         /**< Nesting depth */
 
-    /* Completion state */
-    bool construct_complete;   /* Construct is complete */
-    bool needs_continuation;   /* Needs continuation line */
-    char *expected_terminator; /* Expected terminator string */
+    // Completion state
+    bool construct_complete;   /**< Construct is complete */
+    bool needs_continuation;   /**< Needs continuation line */
+    char *expected_terminator; /**< Expected terminator string */
 
-    /* Performance optimization */
-    uint32_t cache_key; /* Cache key for results */
-    bool cache_valid;   /* Cache validity flag */
+    // Performance optimization
+    uint32_t cache_key; /**< Cache key for results */
+    bool cache_valid;   /**< Cache validity flag */
 
-    /* Memory management */
-    lush_memory_pool_t *memory_pool; /* Memory pool */
+    // Memory management
+    lush_memory_pool_t *memory_pool; /**< Memory pool */
 };
 
 /**
@@ -529,15 +529,15 @@ struct lle_multiline_context_t {
  * determine shell construct boundaries and continuation requirements.
  */
 struct lle_multiline_manager_t {
-    /* Configuration */
-    lush_memory_pool_t *memory_pool; /* Memory pool */
+    // Configuration
+    lush_memory_pool_t *memory_pool; /**< Memory pool */
 
-    /* Statistics */
-    uint64_t analysis_count; /* Analysis operations */
-    uint64_t line_updates;   /* Line updates */
+    // Statistics
+    uint64_t analysis_count; /**< Analysis operations */
+    uint64_t line_updates;   /**< Line updates */
 
-    /* Performance monitoring */
-    lle_performance_monitor_t *perf_monitor; /* Performance monitor */
+    // Performance monitoring
+    lle_performance_monitor_t *perf_monitor; /**< Performance monitor */
 };
 
 /* ============================================================================
@@ -1324,4 +1324,4 @@ lle_multiline_manager_analyze_buffer(lle_multiline_manager_t *manager,
 lle_result_t lle_multiline_manager_update_line_state(
     lle_multiline_manager_t *manager, lle_buffer_t *buffer, size_t line_index);
 
-#endif /* LLE_BUFFER_MANAGEMENT_H */
+#endif // LLE_BUFFER_MANAGEMENT_H

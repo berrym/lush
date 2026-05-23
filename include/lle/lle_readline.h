@@ -107,4 +107,4 @@ void lle_set_debug_prompt_active(bool active);
 }
 #endif
 
-#endif /* LLE_READLINE_H */
+#endif // LLE_READLINE_H

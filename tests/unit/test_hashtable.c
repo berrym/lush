@@ -26,7 +26,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * STRING-TO-STRING HASH TABLE TESTS
@@ -102,7 +102,7 @@ TEST(strstr_case_insensitive) {
 
     ht_strstr_insert(ht, "Key", "value1");
 
-    /* Case-insensitive lookup should work */
+    // Case-insensitive lookup should work
     const char *value = ht_strstr_get(ht, "KEY");
     ASSERT_NOT_NULL(value, "Case-insensitive lookup should work");
 
@@ -247,7 +247,7 @@ TEST(strdouble_precision) {
 
     double *result = ht_strdouble_get(ht, "precise");
     ASSERT_NOT_NULL(result, "Value should not be NULL");
-    /* Double has about 15-17 significant digits */
+    // Double has about 15-17 significant digits
     ASSERT(*result > 1.234567890123 && *result < 1.234567890124,
            "Double precision should be maintained");
 
@@ -262,7 +262,7 @@ TEST(strdouble_precision) {
 TEST(collision_handling) {
     ht_strstr_t *ht = ht_strstr_create(HT_STR_NONE);
 
-    /* Insert many keys to force collisions */
+    // Insert many keys to force collisions
     char key[32];
     char val[32];
     for (int i = 0; i < 100; i++) {
@@ -271,7 +271,7 @@ TEST(collision_handling) {
         ht_strstr_insert(ht, key, val);
     }
 
-    /* Verify all values can be retrieved */
+    // Verify all values can be retrieved
     for (int i = 0; i < 100; i++) {
         snprintf(key, sizeof(key), "key_%d", i);
         snprintf(val, sizeof(val), "value_%d", i);
@@ -384,7 +384,7 @@ TEST(strint_enumeration) {
  */
 
 TEST(fnv1a_hash_basic) {
-    /* Test that hash produces consistent results */
+    // Test that hash produces consistent results
     uint64_t hash1 = fnv1a_hash_str("test", 0);
     uint64_t hash2 = fnv1a_hash_str("test", 0);
     ASSERT(hash1 == hash2, "Same string should produce same hash");

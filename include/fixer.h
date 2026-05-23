@@ -414,4 +414,4 @@ fixer_response_t fixer_read_response(void);
 int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
                           const char *script_path);
 
-#endif /* FIXER_H */
+#endif // FIXER_H

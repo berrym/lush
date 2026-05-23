@@ -53,53 +53,53 @@ typedef enum {
  * via shell_mode_allows() to determine if it should be active.
  */
 typedef enum {
-    /* Arrays (Phase 1) */
+    // Arrays (Phase 1)
     FEATURE_INDEXED_ARRAYS,     /**< arr=(a b c), ${arr[0]} */
     FEATURE_ASSOCIATIVE_ARRAYS, /**< declare -A, ${arr[key]} */
     FEATURE_ARRAY_ZERO_INDEXED, /**< Bash: 0-indexed, Zsh: 1-indexed */
     FEATURE_ARRAY_APPEND,       /**< arr+=(value) syntax */
 
-    /* Arithmetic (Phase 1) */
+    // Arithmetic (Phase 1)
     FEATURE_ARITH_COMMAND, /**< (( expr )) as command */
     FEATURE_LET_BUILTIN,   /**< let builtin command */
 
-    /* Extended Tests (Phase 2) */
+    // Extended Tests (Phase 2)
     FEATURE_EXTENDED_TEST, /**< [[ ]] extended test */
     FEATURE_REGEX_MATCH,   /**< =~ regex matching */
     FEATURE_PATTERN_MATCH, /**< == pattern matching in [[ ]] */
 
-    /* Process Substitution (Phase 3) */
+    // Process Substitution (Phase 3)
     FEATURE_PROCESS_SUBSTITUTION, /**< <(cmd) and >(cmd) */
     FEATURE_PIPE_STDERR,          /**< |& pipe stderr too */
     FEATURE_APPEND_BOTH,          /**< &>> append both streams */
     FEATURE_COPROC,               /**< coproc command */
 
-    /* Extended Parameter Expansion (Phase 4) */
+    // Extended Parameter Expansion (Phase 4)
     FEATURE_CASE_MODIFICATION,    /**< ${var^^}, ${var,,} */
     FEATURE_SUBSTRING_EXPANSION,  /**< ${var:offset:length} */
     FEATURE_PATTERN_SUBSTITUTION, /**< ${var/pattern/replacement} */
     FEATURE_INDIRECT_EXPANSION,   /**< ${!var}, ${!prefix*} */
     FEATURE_PARAM_TRANSFORMATION, /**< ${var@Q}, ${var@E}, etc. */
 
-    /* Extended Globbing */
+    // Extended Globbing
     FEATURE_EXTENDED_GLOB, /**< extglob: ?(pat), *(pat), etc. */
     FEATURE_NULL_GLOB, /**< Null glob: unmatched patterns expand to nothing */
     FEATURE_DOT_GLOB,  /**< Include dotfiles in glob matches */
     FEATURE_GLOBSTAR,  /**< ** matches recursively through directories */
 
-    /* Brace Expansion */
+    // Brace Expansion
     FEATURE_BRACE_EXPANSION, /**< {a,b,c} and {1..10} brace expansion */
 
-    /* Quoting Extensions */
+    // Quoting Extensions
     FEATURE_ANSI_QUOTING,   /**< $'...' ANSI-C quoting with escape sequences */
     FEATURE_LOCALE_QUOTING, /**< $"..." locale-aware quoting (gettext) */
 
-    /* Control Flow Extensions (Phase 5) */
+    // Control Flow Extensions (Phase 5)
     FEATURE_CASE_FALLTHROUGH, /**< ;& and ;;& in case statements */
     FEATURE_SELECT_LOOP,      /**< select var in list; do ... done */
     FEATURE_TIME_KEYWORD,     /**< time command with TIMEFORMAT */
 
-    /* Behavior Defaults */
+    // Behavior Defaults
     FEATURE_WORD_SPLIT_DEFAULT, /**< Word splitting on by default (Bash) */
     FEATURE_AUTO_CD,          /**< Auto-cd to directories without cd command */
     FEATURE_AUTO_PUSHD,       /**< Auto-push directories to stack on cd */
@@ -114,7 +114,7 @@ typedef enum {
                          `xpg_echo` (bash shopt name) and inverted alias
                          `bsd_echo` (zsh setopt name). */
 
-    /* History Behavior */
+    // History Behavior
     FEATURE_HISTAPPEND, /**< Append to history file instead of overwrite */
     FEATURE_INC_APPEND_HISTORY, /**< Append each command immediately (better
                                    crash recovery) */
@@ -122,12 +122,12 @@ typedef enum {
     FEATURE_HIST_VERIFY,   /**< Verify history expansion before execution */
     FEATURE_CHECKJOBS,     /**< Warn about running jobs on exit */
 
-    /* Function Enhancements (Phase 6) */
+    // Function Enhancements (Phase 6)
     FEATURE_NAMEREF,             /**< local -n nameref variables */
     FEATURE_ANONYMOUS_FUNCTIONS, /**< Zsh () { } anonymous functions */
     FEATURE_RETURN_ANYWHERE,     /**< return from sourced scripts */
 
-    /* Zsh-Specific (Phase 7) */
+    // Zsh-Specific (Phase 7)
     FEATURE_GLOB_QUALIFIERS,    /**< Zsh glob qualifiers: *(.) *(/) */
     FEATURE_HOOK_FUNCTIONS,     /**< precmd, preexec, chpwd hooks */
     FEATURE_SIMPLE_HOOK_ARRAYS, /**< precmd+=(fn) in addition to
@@ -139,7 +139,7 @@ typedef enum {
     FEATURE_ZSH_PRINT_BUILTIN,  /**< Zsh `print` builtin (-l/-n/-r/-u/-f) */
     FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
 
-    /* Sentinel - must be last */
+    // Sentinel - must be last
     FEATURE_COUNT /**< Number of features (for array sizing) */
 } shell_feature_t;
 
@@ -431,4 +431,4 @@ void shell_mode_debug_print(void);
  */
 int shell_feature_describe(shell_feature_t feature, char *buffer, size_t size);
 
-#endif /* SHELL_MODE_H */
+#endif // SHELL_MODE_H

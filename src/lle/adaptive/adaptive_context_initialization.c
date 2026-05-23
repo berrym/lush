@@ -27,7 +27,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* Forward declarations from controller implementations */
+// Forward declarations from controller implementations
 extern lle_result_t
 lle_initialize_native_controller(lle_adaptive_context_t *context,
                                  lush_memory_pool_t *memory_pool);
@@ -93,11 +93,11 @@ lle_adaptive_interface_read_line(lle_adaptive_context_t *ctx,
         return lle_minimal_read_line(ctx->controller.minimal, prompt, line);
 
     case LLE_ADAPTIVE_MODE_NONE:
-        /* Non-interactive mode - no line editing available */
+        // Non-interactive mode - no line editing available
         return LLE_ERROR_FEATURE_NOT_AVAILABLE;
     }
 
-    /* Should never reach here */
+    // Should never reach here
     return LLE_ERROR_INVALID_STATE;
 }
 
@@ -118,8 +118,8 @@ lle_adaptive_interface_process_input(lle_adaptive_context_t *ctx,
     LLE_UNUSED(length);
     LLE_UNUSED(events);
 
-    /* This would be fully implemented with input event system */
-    /* For now, return success as input processing is handled in read_line */
+    // This would be fully implemented with input event system
+    // For now, return success as input processing is handled in read_line
     return LLE_SUCCESS;
 }
 
@@ -135,7 +135,7 @@ lle_adaptive_interface_update_display(lle_adaptive_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Display updates are mode-specific and mostly handled automatically */
+    // Display updates are mode-specific and mostly handled automatically
     return LLE_SUCCESS;
 }
 
@@ -149,16 +149,16 @@ lle_adaptive_interface_update_display(lle_adaptive_context_t *ctx) {
 static lle_result_t
 lle_adaptive_interface_handle_resize(lle_adaptive_context_t *ctx, int new_width,
                                      int new_height) {
-    (void)new_width; /* Reserved for dimension-aware resize handling */
+    (void)new_width; // Reserved for dimension-aware resize handling
     (void)new_height;
 
     if (!ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Update dimensions based on mode */
-    /* Native and multiplexer controllers track dimensions */
-    /* Enhanced and minimal modes are less sensitive to resize */
+    // Update dimensions based on mode
+    // Native and multiplexer controllers track dimensions
+    // Enhanced and minimal modes are less sensitive to resize
 
     return LLE_SUCCESS;
 }
@@ -172,13 +172,13 @@ lle_adaptive_interface_handle_resize(lle_adaptive_context_t *ctx, int new_width,
 static lle_result_t
 lle_adaptive_interface_set_configuration(lle_adaptive_context_t *ctx,
                                          void *config) {
-    (void)config; /* Reserved for configuration application */
+    (void)config; // Reserved for configuration application
 
     if (!ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Configuration changes would be applied here */
+    // Configuration changes would be applied here
     return LLE_SUCCESS;
 }
 
@@ -195,7 +195,7 @@ lle_adaptive_interface_get_status(lle_adaptive_context_t *ctx, void *status) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Status information would be populated here */
+    // Status information would be populated here
     return LLE_SUCCESS;
 }
 
@@ -239,13 +239,13 @@ lle_result_t lle_initialize_adaptive_context(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Create context */
+    // Create context
     lle_adaptive_context_t *ctx = calloc(1, sizeof(lle_adaptive_context_t));
     if (!ctx) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Clone detection result */
+    // Clone detection result
     ctx->detection_result = malloc(sizeof(lle_terminal_detection_result_t));
     if (!ctx->detection_result) {
         free(ctx);
@@ -259,7 +259,7 @@ lle_result_t lle_initialize_adaptive_context(
     ctx->healthy = true;
     ctx->error_count = 0;
 
-    /* Initialize mode-specific controller */
+    // Initialize mode-specific controller
     lle_result_t result;
     switch (ctx->mode) {
     case LLE_ADAPTIVE_MODE_NATIVE:
@@ -279,13 +279,13 @@ lle_result_t lle_initialize_adaptive_context(
         break;
 
     case LLE_ADAPTIVE_MODE_NONE:
-        /* Non-interactive mode - no controller to initialize */
+        // Non-interactive mode - no controller to initialize
         free(ctx->detection_result);
         free(ctx);
         return LLE_ERROR_FEATURE_NOT_AVAILABLE;
     }
 
-    /* Should never reach here - all cases handled */
+    // Should never reach here - all cases handled
     if (ctx->mode < LLE_ADAPTIVE_MODE_NONE ||
         ctx->mode > LLE_ADAPTIVE_MODE_MULTIPLEXED) {
         free(ctx->detection_result);
@@ -312,7 +312,7 @@ void lle_adaptive_context_destroy(lle_adaptive_context_t *context) {
         return;
     }
 
-    /* Cleanup mode-specific controller */
+    // Cleanup mode-specific controller
     switch (context->mode) {
     case LLE_ADAPTIVE_MODE_NATIVE:
         lle_cleanup_native_controller(context->controller.native);
@@ -352,13 +352,13 @@ void lle_adaptive_context_destroy(lle_adaptive_context_t *context) {
  */
 lle_result_t lle_create_adaptive_interface(lle_adaptive_interface_t **interface,
                                            void *config) {
-    (void)config; /* Reserved for configuration-driven initialization */
+    (void)config; // Reserved for configuration-driven initialization
 
     if (!interface) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Perform terminal detection */
+    // Perform terminal detection
     lle_terminal_detection_result_t *detection = NULL;
     lle_result_t result =
         lle_detect_terminal_capabilities_optimized(&detection);
@@ -366,7 +366,7 @@ lle_result_t lle_create_adaptive_interface(lle_adaptive_interface_t **interface,
         return result;
     }
 
-    /* Create adaptive context */
+    // Create adaptive context
     lle_adaptive_context_t *context = NULL;
     result = lle_initialize_adaptive_context(&context, detection, NULL);
 
@@ -377,9 +377,9 @@ lle_result_t lle_create_adaptive_interface(lle_adaptive_interface_t **interface,
         return result;
     }
 
-    /* Detection result is cached by the detection system, don't free it */
+    // Detection result is cached by the detection system, don't free it
 
-    /* Create interface wrapper */
+    // Create interface wrapper
     lle_adaptive_interface_t *iface =
         calloc(1, sizeof(lle_adaptive_interface_t));
     if (!iface) {
@@ -389,7 +389,7 @@ lle_result_t lle_create_adaptive_interface(lle_adaptive_interface_t **interface,
 
     iface->adaptive_context = context;
 
-    /* Assign function pointers */
+    // Assign function pointers
     lle_assign_interface_functions(iface);
 
     *interface = iface;
@@ -425,17 +425,17 @@ bool lle_adaptive_should_shell_be_interactive(bool forced_interactive,
                                               bool has_script_file,
                                               bool stdin_mode) {
 
-    /* Script execution is never interactive */
+    // Script execution is never interactive
     if (has_script_file) {
         return false;
     }
 
-    /* Forced interactive always wins */
+    // Forced interactive always wins
     if (forced_interactive) {
         return true;
     }
 
-    /* Stdin mode typically disables interactive features */
+    // Stdin mode typically disables interactive features
     if (stdin_mode) {
         return false;
     }
@@ -454,17 +454,17 @@ bool lle_adaptive_should_shell_be_interactive(bool forced_interactive,
      */
     struct stat stdin_stat;
     if (fstat(STDIN_FILENO, &stdin_stat) == 0) {
-        /* Pipes and FIFOs are never interactive */
+        // Pipes and FIFOs are never interactive
         if (S_ISFIFO(stdin_stat.st_mode)) {
             return false;
         }
-        /* Regular files (redirected input) are never interactive */
+        // Regular files (redirected input) are never interactive
         if (S_ISREG(stdin_stat.st_mode)) {
             return false;
         }
     }
 
-    /* Use enhanced detection for final decision */
+    // Use enhanced detection for final decision
     lle_terminal_detection_result_t *detection = NULL;
     lle_result_t result =
         lle_detect_terminal_capabilities_comprehensive(&detection);
@@ -472,8 +472,8 @@ bool lle_adaptive_should_shell_be_interactive(bool forced_interactive,
         return false;
     }
 
-    /* Interactive if mode is not NONE */
-    /* Also check force_interactive flag from signature */
+    // Interactive if mode is not NONE
+    // Also check force_interactive flag from signature
     bool interactive = (detection->recommended_mode != LLE_ADAPTIVE_MODE_NONE);
     if (!interactive && detection->matched_signature) {
         interactive = detection->matched_signature->force_interactive;
@@ -498,7 +498,7 @@ void lle_adaptive_get_recommended_config(
     lle_result_t result =
         lle_detect_terminal_capabilities_comprehensive(&detection);
     if (result != LLE_SUCCESS) {
-        /* Conservative defaults for detection failure */
+        // Conservative defaults for detection failure
         memset(config, 0, sizeof(lle_adaptive_config_recommendation_t));
         config->enable_lle = false;
         config->enable_tab_completion = true;
@@ -508,7 +508,7 @@ void lle_adaptive_get_recommended_config(
         return;
     }
 
-    /* Configure based on detected mode and capabilities */
+    // Configure based on detected mode and capabilities
     config->enable_lle =
         (detection->recommended_mode != LLE_ADAPTIVE_MODE_NONE);
     config->recommended_mode = detection->recommended_mode;
@@ -555,7 +555,7 @@ void lle_adaptive_get_recommended_config(
         break;
     }
 
-    /* Set color support level */
+    // Set color support level
     if (detection->supports_truecolor) {
         config->color_support_level = 3;
     } else if (detection->supports_256_colors) {
@@ -584,7 +584,7 @@ bool lle_adaptive_perform_health_check(lle_adaptive_context_t *context) {
         return false;
     }
 
-    /* Basic health check - more comprehensive checks would be added */
+    // Basic health check - more comprehensive checks would be added
     if (context->error_count > 100) {
         context->healthy = false;
         return false;
@@ -610,9 +610,9 @@ lle_result_t lle_adaptive_try_fallback_mode(lle_adaptive_context_t *context) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Determine fallback mode based on current mode */
+    // Determine fallback mode based on current mode
     lle_adaptive_mode_t fallback_mode =
-        LLE_ADAPTIVE_MODE_MINIMAL; /* Default fallback */
+        LLE_ADAPTIVE_MODE_MINIMAL; // Default fallback
     lle_adaptive_mode_t original_mode = context->mode;
 
     switch (context->mode) {
@@ -625,20 +625,20 @@ lle_result_t lle_adaptive_try_fallback_mode(lle_adaptive_context_t *context) {
         break;
 
     case LLE_ADAPTIVE_MODE_MULTIPLEXED:
-        /* Multiplexer failure: try native first, then enhanced */
+        // Multiplexer failure: try native first, then enhanced
         fallback_mode = LLE_ADAPTIVE_MODE_NATIVE;
         break;
 
     case LLE_ADAPTIVE_MODE_MINIMAL:
-        /* Already at minimal - no further fallback */
+        // Already at minimal - no further fallback
         return LLE_ERROR_FEATURE_NOT_AVAILABLE;
 
     case LLE_ADAPTIVE_MODE_NONE:
-        /* Non-interactive - cannot fallback */
+        // Non-interactive - cannot fallback
         return LLE_ERROR_FEATURE_NOT_AVAILABLE;
     }
 
-    /* Cleanup current controller before switching */
+    // Cleanup current controller before switching
     switch (original_mode) {
     case LLE_ADAPTIVE_MODE_NATIVE:
         lle_cleanup_native_controller(context->controller.native);
@@ -665,10 +665,10 @@ lle_result_t lle_adaptive_try_fallback_mode(lle_adaptive_context_t *context) {
         break;
     }
 
-    /* Update mode */
+    // Update mode
     context->mode = fallback_mode;
 
-    /* Initialize new controller */
+    // Initialize new controller
     lle_result_t result;
     switch (fallback_mode) {
     case LLE_ADAPTIVE_MODE_NATIVE:
@@ -691,25 +691,25 @@ lle_result_t lle_adaptive_try_fallback_mode(lle_adaptive_context_t *context) {
     }
 
     if (result != LLE_SUCCESS) {
-        /* Fallback initialization failed */
-        /* If we're not already at minimal, try that as last resort */
+        // Fallback initialization failed
+        // If we're not already at minimal, try that as last resort
         if (fallback_mode != LLE_ADAPTIVE_MODE_MINIMAL) {
             context->mode = LLE_ADAPTIVE_MODE_MINIMAL;
             result = lle_initialize_minimal_controller(context,
                                                        context->memory_pool);
             if (result != LLE_SUCCESS) {
-                /* Even minimal failed - mark context as unhealthy */
+                // Even minimal failed - mark context as unhealthy
                 context->healthy = false;
                 return result;
             }
         } else {
-            /* Minimal failed - no options left */
+            // Minimal failed - no options left
             context->healthy = false;
             return result;
         }
     }
 
-    /* Reset error count on successful fallback */
+    // Reset error count on successful fallback
     context->error_count = 0;
     context->healthy = true;
 

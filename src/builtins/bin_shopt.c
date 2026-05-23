@@ -32,14 +32,14 @@
  * @return 0 on success, 1 on error, 2 if -q and option is off
  */
 int bin_shopt(int argc, char **argv) {
-    bool set_mode = false;   /* -s: enable options */
-    bool unset_mode = false; /* -u: disable options */
-    bool query_mode = false; /* -q: query silently */
-    bool print_mode = false; /* -p: print format */
-    bool set_o_mode = false; /* -o: use set -o options */
+    bool set_mode = false;   // -s: enable options
+    bool unset_mode = false; // -u: disable options
+    bool query_mode = false; // -q: query silently
+    bool print_mode = false; // -p: print format
+    bool set_o_mode = false; // -o: use set -o options
     int opt_end = 1;
 
-    /* Parse flags */
+    // Parse flags
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-') {
             break;
@@ -49,7 +49,7 @@ int bin_shopt(int argc, char **argv) {
             break;
         }
 
-        /* Process each character in the option string */
+        // Process each character in the option string
         for (const char *p = argv[i] + 1; *p; p++) {
             switch (*p) {
             case 's':
@@ -109,7 +109,7 @@ int bin_shopt(int argc, char **argv) {
         opt_end = i + 1;
     }
 
-    /* -s and -u are mutually exclusive */
+    // -s and -u are mutually exclusive
     if (set_mode && unset_mode) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err = shell_error_create(
@@ -146,13 +146,13 @@ int bin_shopt(int argc, char **argv) {
         return 1;
     }
 
-    /* -o mode: operate on set -o options (not implemented, just note it) */
+    // -o mode: operate on set -o options (not implemented, just note it)
     if (set_o_mode) {
-        /* For now, -o options map to the same features */
-        /* In bash, -o uses different option namespace, but we unify them */
+        // For now, -o options map to the same features
+        // In bash, -o uses different option namespace, but we unify them
     }
 
-    /* No option names given - list all options */
+    // No option names given - list all options
     if (opt_end >= argc) {
         if (query_mode) {
             executor_error_report(current_executor, SHELL_ERR_MISSING_ARGUMENT,
@@ -161,13 +161,13 @@ int bin_shopt(int argc, char **argv) {
             return 1;
         }
 
-        /* List all features */
+        // List all features
         for (int i = 0; i < (int)FEATURE_COUNT; i++) {
             shell_feature_t feature = (shell_feature_t)i;
             const char *name = shell_feature_name(feature);
             bool enabled = shell_mode_allows(feature);
 
-            /* If -s or -u specified without names, filter by state */
+            // If -s or -u specified without names, filter by state
             if (set_mode && !enabled) {
                 continue;
             }
@@ -184,7 +184,7 @@ int bin_shopt(int argc, char **argv) {
         return 0;
     }
 
-    /* Process each option name */
+    // Process each option name
     int result = 0;
     for (int i = opt_end; i < argc; i++) {
         shell_feature_t feature;
@@ -207,12 +207,12 @@ int bin_shopt(int argc, char **argv) {
         bool effective = underlying ^ invert;
 
         if (query_mode) {
-            /* -q: return status based on option state (alias perspective) */
+            // -q: return status based on option state (alias perspective)
             if (!effective) {
                 result = 1;
             }
         } else if (set_mode) {
-            /* -s: enable the option (alias perspective) */
+            // -s: enable the option (alias perspective)
             bool target = !invert;
             if (target) {
                 shell_feature_enable(feature);
@@ -226,7 +226,7 @@ int bin_shopt(int argc, char **argv) {
                 config_registry_set_boolean(key, target);
             }
         } else if (unset_mode) {
-            /* -u: disable the option (alias perspective) */
+            // -u: disable the option (alias perspective)
             bool target = invert;
             if (target) {
                 shell_feature_enable(feature);

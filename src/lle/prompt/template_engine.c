@@ -15,7 +15,7 @@
 #include <string.h>
 
 /* ========================================================================== */
-/* Token Creation                                                             */
+// Token Creation
 /* ========================================================================== */
 
 /**
@@ -212,7 +212,7 @@ lle_template_token_t *lle_template_token_end(void) {
 void lle_template_token_free(lle_template_token_t *token) { free(token); }
 
 /* ========================================================================== */
-/* Template Helpers                                                           */
+// Template Helpers
 /* ========================================================================== */
 
 /**
@@ -266,7 +266,7 @@ static const char *template_find_closing_brace(const char *p) {
  * @return Allocated conditional token, or NULL on failure.
  */
 static lle_template_token_t *parse_conditional(const char *content) {
-    /* Format: ?segment:true:false or ?segment.prop:true:false */
+    // Format: ?segment:true:false or ?segment.prop:true:false
     char segment[LLE_TEMPLATE_SEGMENT_MAX] = {0};
     char property[LLE_TEMPLATE_PROPERTY_MAX] = {0};
     char true_val[LLE_TEMPLATE_LITERAL_MAX] = {0};
@@ -274,16 +274,16 @@ static lle_template_token_t *parse_conditional(const char *content) {
 
     const char *p = content;
 
-    /* Parse segment name (and optional property) */
+    // Parse segment name (and optional property)
     size_t seg_len = 0;
     while (*p && *p != ':' && *p != '.' && seg_len < sizeof(segment) - 1) {
         segment[seg_len++] = *p++;
     }
     segment[seg_len] = '\0';
 
-    /* Check for property */
+    // Check for property
     if (*p == '.') {
-        p++; /* Skip . */
+        p++; // Skip .
         size_t prop_len = 0;
         while (*p && *p != ':' && prop_len < sizeof(property) - 1) {
             property[prop_len++] = *p++;
@@ -291,7 +291,7 @@ static lle_template_token_t *parse_conditional(const char *content) {
         property[prop_len] = '\0';
     }
 
-    /* Skip to true value */
+    // Skip to true value
     if (*p == ':') {
         p++;
         size_t true_len = 0;
@@ -301,7 +301,7 @@ static lle_template_token_t *parse_conditional(const char *content) {
         true_val[true_len] = '\0';
     }
 
-    /* Skip to false value */
+    // Skip to false value
     if (*p == ':') {
         p++;
         size_t false_len = 0;
@@ -355,7 +355,7 @@ static lle_template_token_t *parse_color(const char *content) {
 static lle_template_token_t *parse_segment_or_property(const char *content) {
     const char *dot = strchr(content, '.');
     if (dot) {
-        /* Property access */
+        // Property access
         char segment[LLE_TEMPLATE_SEGMENT_MAX] = {0};
         char property[LLE_TEMPLATE_PROPERTY_MAX] = {0};
 
@@ -370,13 +370,13 @@ static lle_template_token_t *parse_segment_or_property(const char *content) {
 
         return lle_template_token_property(segment, property);
     } else {
-        /* Simple segment */
+        // Simple segment
         return lle_template_token_segment(content);
     }
 }
 
 /* ========================================================================== */
-/* Template Parsing                                                           */
+// Template Parsing
 /* ========================================================================== */
 
 /**
@@ -407,10 +407,10 @@ lle_result_t lle_template_parse(const char *template_str,
     size_t literal_pos = 0;
 
     while (*p) {
-        /* Check for escape sequences */
+        // Check for escape sequences
         if (*p == '\\' && *(p + 1)) {
             if (*(p + 1) == 'n') {
-                /* Flush literal buffer first */
+                // Flush literal buffer first
                 if (literal_pos > 0) {
                     lle_template_token_t *tok =
                         lle_template_token_literal(literal_buf, literal_pos);
@@ -423,7 +423,7 @@ lle_result_t lle_template_parse(const char *template_str,
                 p += 2;
                 continue;
             } else if (*(p + 1) == '$' || *(p + 1) == '\\') {
-                /* Escaped character - add to literal */
+                // Escaped character - add to literal
                 if (literal_pos < sizeof(literal_buf) - 1) {
                     literal_buf[literal_pos++] = *(p + 1);
                 }
@@ -432,9 +432,9 @@ lle_result_t lle_template_parse(const char *template_str,
             }
         }
 
-        /* Check for variable/segment reference ${...} */
+        // Check for variable/segment reference ${...}
         if (*p == '$' && *(p + 1) == '{') {
-            /* Flush literal buffer */
+            // Flush literal buffer
             if (literal_pos > 0) {
                 lle_template_token_t *tok =
                     lle_template_token_literal(literal_buf, literal_pos);
@@ -444,16 +444,16 @@ lle_result_t lle_template_parse(const char *template_str,
                 literal_pos = 0;
             }
 
-            p += 2; /* Skip ${ */
+            p += 2; // Skip ${
 
-            /* Find closing brace */
+            // Find closing brace
             const char *end = template_find_closing_brace(p);
             if (!end) {
                 lle_template_free(tmpl);
                 return LLE_ERROR_INPUT_PARSING;
             }
 
-            /* Extract content between braces */
+            // Extract content between braces
             size_t content_len = end - p;
             char content[LLE_TEMPLATE_LITERAL_MAX] = {0};
             if (content_len >= sizeof(content)) {
@@ -462,17 +462,17 @@ lle_result_t lle_template_parse(const char *template_str,
             memcpy(content, p, content_len);
             content[content_len] = '\0';
 
-            /* Parse the content based on type */
+            // Parse the content based on type
             lle_template_token_t *token = NULL;
 
             if (content[0] == '?') {
-                /* Conditional: ${?segment:true:false} */
+                // Conditional: ${?segment:true:false}
                 token = parse_conditional(content + 1);
             } else if (strchr(content, ':') && !strchr(content, '.')) {
-                /* Color: ${color:text} - colon present, no dot */
+                // Color: ${color:text} - colon present, no dot
                 token = parse_color(content);
             } else {
-                /* Segment or property: ${segment} or ${segment.property} */
+                // Segment or property: ${segment} or ${segment.property}
                 token = parse_segment_or_property(content);
             }
 
@@ -480,18 +480,18 @@ lle_result_t lle_template_parse(const char *template_str,
                 template_add_token(tmpl, token);
             }
 
-            p = end + 1; /* Skip } */
+            p = end + 1; // Skip }
             continue;
         }
 
-        /* Regular character */
+        // Regular character
         if (literal_pos < sizeof(literal_buf) - 1) {
             literal_buf[literal_pos++] = *p;
         }
         p++;
     }
 
-    /* Flush remaining literal */
+    // Flush remaining literal
     if (literal_pos > 0) {
         lle_template_token_t *tok =
             lle_template_token_literal(literal_buf, literal_pos);
@@ -500,7 +500,7 @@ lle_result_t lle_template_parse(const char *template_str,
         }
     }
 
-    /* Add end token */
+    // Add end token
     template_add_token(tmpl, lle_template_token_end());
 
     tmpl->valid = true;
@@ -547,7 +547,7 @@ bool lle_template_validate(const char *template_str) {
 
     while (*p) {
         if (*p == '\\' && *(p + 1)) {
-            /* Skip escaped character */
+            // Skip escaped character
             p += 2;
             continue;
         }
@@ -571,7 +571,7 @@ bool lle_template_validate(const char *template_str) {
 }
 
 /* ========================================================================== */
-/* Template Rendering                                                         */
+// Template Rendering
 /* ========================================================================== */
 
 /**
@@ -602,7 +602,7 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
     while (token && token->type != LLE_TOKEN_END && pos < output_size - 1) {
         switch (token->type) {
         case LLE_TOKEN_LITERAL:
-            /* Copy literal text */
+            // Copy literal text
             {
                 size_t avail = output_size - pos - 1;
                 size_t copy_len = token->data.literal.length;
@@ -621,7 +621,7 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
             break;
 
         case LLE_TOKEN_SEGMENT:
-            /* Render segment */
+            // Render segment
             if (render_ctx->get_segment) {
                 char *content =
                     render_ctx->get_segment(token->data.segment.segment_name,
@@ -640,7 +640,7 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
             break;
 
         case LLE_TOKEN_PROPERTY:
-            /* Render segment property */
+            // Render segment property
             if (render_ctx->get_segment) {
                 char *content = render_ctx->get_segment(
                     token->data.segment.segment_name,
@@ -659,7 +659,7 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
             break;
 
         case LLE_TOKEN_CONDITIONAL:
-            /* Evaluate conditional */
+            // Evaluate conditional
             {
                 bool condition_met = false;
 
@@ -691,7 +691,7 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
                             memcpy(output + pos, temp, len);
                             pos += len;
                         } else {
-                            /* Fallback: copy branch literally */
+                            // Fallback: copy branch literally
                             size_t len = strlen(branch);
                             if (len > avail) {
                                 len = avail;
@@ -706,7 +706,7 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
             break;
 
         case LLE_TOKEN_COLOR:
-            /* Apply color to text */
+            // Apply color to text
             {
                 const char *color_code = "";
                 if (render_ctx->get_color) {
@@ -717,14 +717,14 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
                     }
                 }
 
-                /* Add color code */
+                // Add color code
                 size_t color_len = strlen(color_code);
                 if (color_len > 0 && pos + color_len < output_size - 1) {
                     memcpy(output + pos, color_code, color_len);
                     pos += color_len;
                 }
 
-                /* Add text */
+                // Add text
                 size_t text_len = strlen(token->data.color.text);
                 size_t avail = output_size - pos - 1;
                 if (text_len > avail) {
@@ -733,7 +733,7 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
                 memcpy(output + pos, token->data.color.text, text_len);
                 pos += text_len;
 
-                /* Add reset if color was applied */
+                // Add reset if color was applied
                 if (color_len > 0) {
                     const char *reset = "\033[0m";
                     size_t reset_len = strlen(reset);

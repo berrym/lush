@@ -22,7 +22,7 @@
 /** Maximum depth of error context stack */
 #define EXECUTOR_CONTEXT_STACK_MAX 16
 
-/* Function parameter definition */
+// Function parameter definition
 typedef struct function_param {
     char *name;                  /**< Parameter name */
     char *default_value;         /**< Default value (NULL if required) */
@@ -30,7 +30,7 @@ typedef struct function_param {
     struct function_param *next; /**< Next parameter in list */
 } function_param_t;
 
-/* Function definition storage */
+// Function definition storage
 typedef struct function_def {
     char *name;                /**< Function name */
     node_t *body;              /**< Function body AST */
@@ -39,10 +39,10 @@ typedef struct function_def {
     struct function_def *next; /**< Next function in list */
 } function_def_t;
 
-/* Job states */
+// Job states
 typedef enum { JOB_RUNNING, JOB_STOPPED, JOB_DONE } job_state_t;
 
-/* Process in a job */
+// Process in a job
 typedef struct process {
     pid_t pid;
     char *command;
@@ -50,7 +50,7 @@ typedef struct process {
     struct process *next;
 } process_t;
 
-/* Job control structure */
+// Job control structure
 typedef struct job {
     int job_id;
     pid_t pgid;
@@ -62,14 +62,14 @@ typedef struct job {
     struct job *next;
 } job_t;
 
-/* Loop control states */
+// Loop control states
 typedef enum {
     LOOP_NORMAL,  /**< Normal execution */
     LOOP_BREAK,   /**< Break out of loop */
     LOOP_CONTINUE /**< Continue to next iteration */
 } loop_control_t;
 
-/* Execution context for maintaining state */
+// Execution context for maintaining state
 typedef struct executor {
     bool interactive;             /**< Interactive mode flag */
     bool debug;                   /**< Debug mode flag */
@@ -84,15 +84,15 @@ typedef struct executor {
     loop_control_t loop_control;  /**< Loop control state */
     int loop_depth;               /**< Current loop nesting depth */
 
-    /* Script execution context for breakpoint matching */
+    // Script execution context for breakpoint matching
     char *current_script_file; /**< Current script file being executed */
     bool in_script_execution;  /**< True if executing from script file */
 
-    /* Sourced script tracking (Phase 6: return from sourced scripts) */
+    // Sourced script tracking (Phase 6: return from sourced scripts)
     int source_depth; /**< Depth of nested source commands (0 = not sourced) */
     bool source_return; /**< True if return was called in sourced script */
 
-    /* Expansion error tracking */
+    // Expansion error tracking
     bool expansion_error;      /**< True if error occurred during expansion */
     int expansion_exit_status; /**< Exit status from expansion errors */
 
@@ -108,7 +108,7 @@ typedef struct executor {
     bool shell_exit_requested;
     int shell_exit_status;
 
-    /* Error context stack (Phase 3: context-aware error management) */
+    // Error context stack (Phase 3: context-aware error management)
     char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; /**< "while executing X" */
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
     size_t context_depth; /**< Current depth of context stack */
@@ -123,7 +123,7 @@ typedef struct executor {
      * currently executing. */
     source_location_t active_loc;
 
-    /* Process substitution fd tracking (for cleanup after command execution) */
+    // Process substitution fd tracking (for cleanup after command execution)
     int procsub_fds[32];    /**< File descriptors from process substitutions */
     pid_t procsub_pids[32]; /**< Child PIDs from process substitutions */
     int procsub_fd_count;   /**< Number of tracked fds/pids */
@@ -614,4 +614,4 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
 void executor_error_report(executor_t *executor, shell_error_code_t code,
                            source_location_t loc, const char *fmt, ...);
 
-#endif /* EXECUTOR_H */
+#endif // EXECUTOR_H

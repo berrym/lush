@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_edit_session_manager lle_edit_session_manager_t;
 typedef struct lle_edit_session lle_edit_session_t;
 typedef struct lle_history_core lle_history_core_t;
@@ -210,4 +210,4 @@ lle_result_t lle_edit_session_manager_get_default_config(
 }
 #endif
 
-#endif /* LLE_EDIT_SESSION_MANAGER_H */
+#endif // LLE_EDIT_SESSION_MANAGER_H

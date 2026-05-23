@@ -61,7 +61,7 @@ extern "C" {
  * ============================================================================
  */
 
-/* Context type used by generate/is_applicable callbacks */
+// Context type used by generate/is_applicable callbacks
 typedef struct lle_completion_context lle_completion_context_t;
 
 /* ============================================================================
@@ -279,7 +279,7 @@ typedef struct lle_command_source_config {
     char *suffix;            /**< Suffix to append after completion */
     int cache_seconds;       /**< Cache TTL in seconds (0 = no cache) */
 
-    /* Runtime state (managed internally) */
+    // Runtime state (managed internally)
     char **cached_results; /**< Cached completion results */
     size_t cached_count;   /**< Number of cached results */
     time_t cache_time;     /**< When cache was populated */
@@ -386,7 +386,7 @@ const char *lle_completion_get_custom_source_description(size_t index);
  * ============================================================================
  */
 
-/* Forward declaration for internal types */
+// Forward declaration for internal types
 typedef struct lle_source_manager lle_source_manager_t;
 typedef struct lle_memory_pool_t lle_memory_pool_t;
 
@@ -415,4 +415,4 @@ void lle_custom_source_shutdown(void);
 }
 #endif
 
-#endif /* LLE_CUSTOM_SOURCE_H */
+#endif // LLE_CUSTOM_SOURCE_H

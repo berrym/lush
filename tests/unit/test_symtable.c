@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * MANAGER LIFECYCLE TESTS
@@ -169,19 +169,19 @@ TEST(local_variable_shadowing) {
     symtable_manager_t *mgr = symtable_manager_new();
     ASSERT_NOT_NULL(mgr, "symtable_manager_new failed");
 
-    /* Set global variable */
+    // Set global variable
     symtable_set_var(mgr, "X", "global", SYMVAR_NONE);
 
-    /* Push function scope and set local */
+    // Push function scope and set local
     symtable_push_scope(mgr, SCOPE_FUNCTION, "func");
     symtable_set_local_var(mgr, "X", "local");
 
-    /* Local should shadow global */
+    // Local should shadow global
     char *value = symtable_get_var(mgr, "X");
     ASSERT_STR_EQ(value, "local", "Local should shadow global");
     free(value);
 
-    /* Pop scope - global should be visible again */
+    // Pop scope - global should be visible again
     symtable_pop_scope(mgr);
     value = symtable_get_var(mgr, "X");
     ASSERT_STR_EQ(value, "global", "Global should be visible after pop");
@@ -241,7 +241,7 @@ TEST(readonly_variable) {
     symvar_flags_t flags = symtable_get_flags(mgr, "CONST");
     ASSERT(flags & SYMVAR_READONLY, "Variable should have READONLY flag");
 
-    /* Attempting to overwrite readonly should fail */
+    // Attempting to overwrite readonly should fail
     int result = symtable_set_var(mgr, "CONST", "new_value", SYMVAR_NONE);
     /* Note: exact behavior depends on implementation - may return error or
      * silently fail */
@@ -261,7 +261,7 @@ TEST(get_environ) {
     char **env = symtable_get_environ(mgr);
     ASSERT_NOT_NULL(env, "symtable_get_environ should return non-NULL");
 
-    /* Verify exported vars are present */
+    // Verify exported vars are present
     bool found_var1 = false, found_var2 = false, found_var3 = false;
     for (int i = 0; env[i] != NULL; i++) {
         if (strstr(env[i], "VAR1=value1"))
@@ -289,14 +289,14 @@ TEST(nameref_basic) {
     symtable_manager_t *mgr = symtable_manager_new();
     ASSERT_NOT_NULL(mgr, "symtable_manager_new failed");
 
-    /* Set target variable */
+    // Set target variable
     symtable_set_var(mgr, "TARGET", "hello", SYMVAR_NONE);
 
-    /* Create nameref pointing to TARGET */
+    // Create nameref pointing to TARGET
     int result = symtable_set_nameref(mgr, "REF", "TARGET", SYMVAR_NONE);
     ASSERT_EQ(result, 0, "symtable_set_nameref should succeed");
 
-    /* Accessing REF should give TARGET's value */
+    // Accessing REF should give TARGET's value
     char *value = symtable_get_var(mgr, "REF");
     ASSERT_STR_EQ(value, "hello", "Nameref should resolve to target value");
     free(value);
@@ -433,7 +433,7 @@ TEST(global_convenience_api) {
 
     ASSERT(symtable_exists_global("TEST_VAR"), "Variable should exist");
 
-    /* Clean up */
+    // Clean up
     symtable_unset_var(mgr, "TEST_VAR");
 }
 

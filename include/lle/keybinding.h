@@ -33,7 +33,7 @@
 
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
-#include "lle/terminal_abstraction.h" /* For lle_special_key_t definition */
+#include "lle/terminal_abstraction.h" // For lle_special_key_t definition
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -111,8 +111,8 @@ typedef lle_result_t (*lle_action_context_t)(readline_context_t *ctx);
  * Action type discriminator
  */
 typedef enum {
-    LLE_ACTION_TYPE_SIMPLE, /* Simple action - operates on editor only */
-    LLE_ACTION_TYPE_CONTEXT /* Context-aware action - needs readline context */
+    LLE_ACTION_TYPE_SIMPLE, /**< Simple action - operates on editor only */
+    LLE_ACTION_TYPE_CONTEXT // Context-aware action - needs readline context
 } lle_action_type_t;
 
 /**
@@ -122,12 +122,12 @@ typedef enum {
  * The type field indicates which function pointer is valid.
  */
 typedef struct {
-    lle_action_type_t type; /* Action type (simple or context-aware) */
+    lle_action_type_t type; /**< Action type (simple or context-aware) */
     union {
-        lle_action_simple_t simple;   /* Simple action function */
-        lle_action_context_t context; /* Context-aware action function */
+        lle_action_simple_t simple;   /**< Simple action function */
+        lle_action_context_t context; /**< Context-aware action function */
     } func;
-    const char *name; /* Function name (for debugging/introspection) */
+    const char *name; /**< Function name (for debugging/introspection) */
 } lle_keybinding_action_t;
 
 /**
@@ -140,10 +140,10 @@ typedef lle_action_simple_t lle_keybinding_action_func_t;
  * Keybinding mode
  */
 typedef enum {
-    LLE_KEYMAP_EMACS,      /* GNU Emacs keybindings (default) */
-    LLE_KEYMAP_VI_INSERT,  /* Vi insert mode */
-    LLE_KEYMAP_VI_COMMAND, /* Vi command mode */
-    LLE_KEYMAP_CUSTOM      /* User-defined keybindings */
+    LLE_KEYMAP_EMACS,      /**< GNU Emacs keybindings (default) */
+    LLE_KEYMAP_VI_INSERT,  /**< Vi insert mode */
+    LLE_KEYMAP_VI_COMMAND, /**< Vi command mode */
+    LLE_KEYMAP_CUSTOM      // User-defined keybindings
 } lle_keymap_mode_t;
 
 /**
@@ -151,12 +151,12 @@ typedef enum {
  * Represents a single keypress or special key
  */
 typedef struct {
-    uint32_t codepoint;   /* Unicode codepoint for regular keys */
-    bool ctrl;            /* Ctrl modifier */
-    bool alt;             /* Alt/Meta modifier */
-    bool shift;           /* Shift modifier */
-    bool is_special;      /* True for arrow keys, function keys, etc. */
-    uint32_t special_key; /* Special key code (if is_special) */
+    uint32_t codepoint;   /**< Unicode codepoint for regular keys */
+    bool ctrl;            /**< Ctrl modifier */
+    bool alt;             /**< Alt/Meta modifier */
+    bool shift;           /**< Shift modifier */
+    bool is_special;      /**< True for arrow keys, function keys, etc. */
+    uint32_t special_key; /**< Special key code (if is_special) */
 } lle_key_event_t;
 
 /**
@@ -172,8 +172,8 @@ typedef struct {
     char key_sequence[LLE_MAX_KEY_SEQUENCE_LENGTH]; ///< Key sequence string in
                                                     ///< GNU Readline notation
     lle_keybinding_action_t
-        action;                /* Full action structure (type + func + name) */
-    const char *function_name; /* Legacy field (use action.name instead) */
+        action; /**< Full action structure (type + func + name) */
+    const char *function_name; /**< Legacy field (use action.name instead) */
     lle_keymap_mode_t mode;    ///< Keymap mode this binding belongs to
 } lle_keybinding_info_t;
 
@@ -519,4 +519,4 @@ lle_result_t lle_keybinding_manager_get_stats(lle_keybinding_manager_t *manager,
 lle_result_t
 lle_keybinding_manager_reset_stats(lle_keybinding_manager_t *manager);
 
-#endif /* LLE_KEYBINDING_H */
+#endif // LLE_KEYBINDING_H

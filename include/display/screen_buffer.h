@@ -466,4 +466,4 @@ int screen_buffer_get_rows_below_cursor(const screen_buffer_t *buffer);
 }
 #endif
 
-#endif /* SCREEN_BUFFER_H */
+#endif // SCREEN_BUFFER_H

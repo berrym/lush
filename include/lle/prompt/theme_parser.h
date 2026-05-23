@@ -370,4 +370,4 @@ lle_result_t lle_theme_parser_validate(const lle_theme_t *theme,
 }
 #endif
 
-#endif /* LLE_PROMPT_THEME_PARSER_H */
+#endif // LLE_PROMPT_THEME_PARSER_H

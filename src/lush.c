@@ -52,7 +52,7 @@ static bool is_background_command(const char *command) {
         return false;
     }
 
-    /* Find last non-whitespace character */
+    // Find last non-whitespace character
     size_t i = len;
     while (i > 0 && isspace((unsigned char)command[i - 1])) {
         i--;
@@ -62,12 +62,12 @@ static bool is_background_command(const char *command) {
         return false;
     }
 
-    /* Check if ends with '&' */
+    // Check if ends with '&'
     if (command[i - 1] != '&') {
         return false;
     }
 
-    /* Make sure it's not '&&' (logical AND) */
+    // Make sure it's not '&&' (logical AND)
     if (i >= 2 && command[i - 2] == '&') {
         return false;
     }

@@ -269,7 +269,7 @@ command_layer_error_t command_layer_set_command(command_layer_t *layer,
     bool command_changed = (strcmp(layer->command_text, command_text) != 0);
     bool cursor_changed = (layer->cursor_position != cursor_pos);
 
-    /* Always need initial render even if buffer is empty */
+    // Always need initial render even if buffer is empty
     bool is_first_render = (layer->update_sequence_number == 0);
 
     /* Check if completion menu or notification state changed (even if

@@ -197,4 +197,4 @@ lle_result_t lle_completion_menu_handle_char(lle_completion_menu_state_t *state,
 }
 #endif
 
-#endif /* LLE_COMPLETION_MENU_LOGIC_H */
+#endif // LLE_COMPLETION_MENU_LOGIC_H

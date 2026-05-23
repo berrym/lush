@@ -23,7 +23,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * CONTEXT INITIALIZATION TESTS
@@ -266,7 +266,7 @@ TEST(expand_ctx_mode_with_quotes) {
  */
 
 TEST(expand_flag_values) {
-    /* Verify flags are distinct powers of 2 */
+    // Verify flags are distinct powers of 2
     ASSERT_EQ(EXPAND_NORMAL, 0x00, "NORMAL should be 0");
     ASSERT_EQ(EXPAND_ALIAS, 0x01, "ALIAS should be 0x01");
     ASSERT_EQ(EXPAND_NOQUOTE, 0x02, "NOQUOTE should be 0x02");
@@ -276,7 +276,7 @@ TEST(expand_flag_values) {
 }
 
 TEST(expand_flags_orthogonal) {
-    /* Verify flags don't overlap */
+    // Verify flags don't overlap
     ASSERT((EXPAND_ALIAS & EXPAND_NOQUOTE) == 0,
            "ALIAS and NOQUOTE should be orthogonal");
     ASSERT((EXPAND_NOQUOTE & EXPAND_NOVAR) == 0,
@@ -295,12 +295,12 @@ TEST(expand_flags_orthogonal) {
 TEST(expand_ctx_reinit) {
     expand_ctx_t ctx;
 
-    /* First init */
+    // First init
     expand_ctx_init(&ctx, EXPAND_ALIAS);
     ctx.in_quotes = true;
     ctx.in_backticks = true;
 
-    /* Re-init should reset */
+    // Re-init should reset
     expand_ctx_init(&ctx, EXPAND_NOVAR);
 
     ASSERT_EQ(ctx.mode, EXPAND_NOVAR, "Mode should be new value");
@@ -312,7 +312,7 @@ TEST(expand_ctx_check_zero) {
     expand_ctx_t ctx;
     expand_ctx_init(&ctx, EXPAND_NOVAR);
 
-    /* Checking for flag 0 should always be false (nothing set) */
+    // Checking for flag 0 should always be false (nothing set)
     bool result = expand_ctx_check(&ctx, 0);
     ASSERT(!result, "Check for 0 should be false");
 }
@@ -325,7 +325,7 @@ TEST(expand_ctx_multiple_contexts) {
 
     ctx1.in_quotes = true;
 
-    /* Contexts should be independent */
+    // Contexts should be independent
     ASSERT(expand_ctx_check(&ctx1, EXPAND_ALIAS), "ctx1 should have ALIAS");
     ASSERT(!expand_ctx_check(&ctx2, EXPAND_ALIAS),
            "ctx2 should not have ALIAS");

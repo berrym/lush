@@ -386,7 +386,7 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    /* Clean variable name (remove $ prefix if present) */
+    // Clean variable name (remove $ prefix if present)
     const char *clean_name = (name[0] == '$') ? name + 1 : name;
 
     char frame_title[128];
@@ -399,7 +399,7 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    /* Arrays first -- they carry the richest type info (List vs Map). */
+    // Arrays first -- they carry the richest type info (List vs Map).
     array_value_t *array = symtable_get_array(clean_name);
     if (array) {
         debug_view_emit_line(
@@ -453,7 +453,7 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
     }
     free(owned_value);
 
-    /* Special-variable fallback. */
+    // Special-variable fallback.
     if (strcmp(clean_name, "?") == 0) {
         const char *exit_status = symtable_get_global("?") ?: "0";
         debug_view_emit_line(ctx, "Value: \"%s\" (last exit status)",

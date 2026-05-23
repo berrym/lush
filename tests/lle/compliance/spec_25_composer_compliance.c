@@ -25,7 +25,7 @@
 #include <string.h>
 
 /* ========================================================================== */
-/* Test Infrastructure                                                        */
+// Test Infrastructure
 /* ========================================================================== */
 
 static int tests_run = 0;
@@ -67,7 +67,7 @@ static int current_phase = 0;
     } while (0)
 
 /* ========================================================================== */
-/* Test Fixtures                                                              */
+// Test Fixtures
 /* ========================================================================== */
 
 static lle_prompt_composer_t g_composer;
@@ -95,7 +95,7 @@ static void teardown_full_composer(void) {
 }
 
 /* ========================================================================== */
-/* Phase 1: Composer Lifecycle Compliance                                     */
+// Phase 1: Composer Lifecycle Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_init_returns_success) {
@@ -128,7 +128,7 @@ TEST(spec25_composer_cleanup_releases_resources) {
     ASSERT_NULL(g_composer.cached_right_template);
     ASSERT_NULL(g_composer.cached_ps2_template);
 
-    /* Cleanup registries separately since composer doesn't own them */
+    // Cleanup registries separately since composer doesn't own them
     lle_segment_registry_cleanup(&g_segments);
     lle_theme_registry_cleanup(&g_themes);
 }
@@ -151,7 +151,7 @@ TEST(spec25_composer_configure_sets_options) {
 }
 
 /* ========================================================================== */
-/* Phase 2: Template Integration Compliance                                   */
+// Phase 2: Template Integration Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_renders_literal_templates) {
@@ -198,7 +198,7 @@ TEST(spec25_composer_renders_conditionals) {
     setup_full_composer();
 
     char output[256];
-    /* User segment is always visible */
+    // User segment is always visible
     lle_result_t result = lle_composer_render_template(
         &g_composer, "${?user:visible:hidden}", output, sizeof(output));
 
@@ -216,7 +216,7 @@ TEST(spec25_composer_handles_unknown_segments) {
         &g_composer, "before ${unknown} after", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    /* Unknown segments render as empty */
+    // Unknown segments render as empty
     ASSERT_STR_EQ(output, "before  after");
 
     teardown_full_composer();
@@ -239,7 +239,7 @@ TEST(spec25_composer_renders_multiple_segments) {
 }
 
 /* ========================================================================== */
-/* Phase 3: Theme Integration Compliance                                      */
+// Phase 3: Theme Integration Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_uses_active_theme) {
@@ -285,7 +285,7 @@ TEST(spec25_composer_theme_affects_output) {
     lle_composer_set_theme(&g_composer, "default");
     lle_composer_render(&g_composer, &out_default);
 
-    /* Different themes should produce different output */
+    // Different themes should produce different output
     int different = (out_minimal.ps1_len != out_default.ps1_len ||
                      strcmp(out_minimal.ps1, out_default.ps1) != 0);
     ASSERT_TRUE(different);
@@ -302,7 +302,7 @@ TEST(spec25_composer_color_rendering) {
         &g_composer, "${primary:colored}", output, sizeof(output));
 
     ASSERT_EQ(result, LLE_SUCCESS);
-    /* Should contain "colored" and ANSI escape sequences */
+    // Should contain "colored" and ANSI escape sequences
     ASSERT(strstr(output, "colored") != NULL);
 
     teardown_full_composer();
@@ -318,7 +318,7 @@ TEST(spec25_composer_invalid_theme_rejected) {
 }
 
 /* ========================================================================== */
-/* Phase 4: Context Management Compliance                                     */
+// Phase 4: Context Management Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_tracks_exit_code) {
@@ -355,14 +355,14 @@ TEST(spec25_composer_refreshes_directory) {
 TEST(spec25_composer_invalidates_caches) {
     setup_full_composer();
 
-    /* Should not crash and should invalidate segment caches */
+    // Should not crash and should invalidate segment caches
     lle_composer_invalidate_caches(&g_composer);
 
     teardown_full_composer();
 }
 
 /* ========================================================================== */
-/* Phase 5: Render Output Compliance                                          */
+// Phase 5: Render Output Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_generates_ps1) {
@@ -397,11 +397,11 @@ TEST(spec25_composer_calculates_visual_width) {
     lle_prompt_output_t output;
     lle_composer_render(&g_composer, &output);
 
-    /* Visual width should be calculated */
+    // Visual width should be calculated
     ASSERT(output.ps1_visual_width > 0);
     ASSERT(output.ps2_visual_width > 0);
 
-    /* Visual width should be <= byte length (ANSI codes don't count) */
+    // Visual width should be <= byte length (ANSI codes don't count)
     ASSERT(output.ps1_visual_width <= output.ps1_len);
 
     teardown_full_composer();
@@ -426,20 +426,20 @@ TEST(spec25_composer_tracks_render_count) {
 TEST(spec25_composer_detects_multiline) {
     setup_full_composer();
 
-    /* Set two-line theme which uses newlines */
+    // Set two-line theme which uses newlines
     lle_composer_set_theme(&g_composer, "two-line");
 
     lle_prompt_output_t output;
     lle_composer_render(&g_composer, &output);
 
-    /* Two-line theme should produce multiline PS1 */
+    // Two-line theme should produce multiline PS1
     ASSERT_TRUE(output.is_multiline);
 
     teardown_full_composer();
 }
 
 /* ========================================================================== */
-/* Phase 6: Error Handling Compliance                                         */
+// Phase 6: Error Handling Compliance
 /* ========================================================================== */
 
 TEST(spec25_composer_rejects_null_composer) {
@@ -466,12 +466,12 @@ TEST(spec25_composer_rejects_uninitialized) {
 }
 
 TEST(spec25_composer_handles_null_cleanup) {
-    /* Should not crash */
+    // Should not crash
     lle_composer_cleanup(NULL);
 }
 
 TEST(spec25_composer_handles_null_invalidate) {
-    /* Should not crash */
+    // Should not crash
     lle_composer_invalidate_caches(NULL);
 }
 
@@ -485,20 +485,20 @@ TEST(spec25_composer_render_ctx_null_safe) {
 }
 
 /* ========================================================================== */
-/* Main Test Runner                                                           */
+// Main Test Runner
 /* ========================================================================== */
 
 int main(void) {
     printf("=== Spec 25 Prompt Composer Compliance Tests ===\n");
 
-    /* Phase 1: Composer Lifecycle */
+    // Phase 1: Composer Lifecycle
     BEGIN_PHASE(1, "Composer Lifecycle Compliance");
     RUN_TEST(spec25_composer_init_returns_success);
     RUN_TEST(spec25_composer_init_with_registries);
     RUN_TEST(spec25_composer_cleanup_releases_resources);
     RUN_TEST(spec25_composer_configure_sets_options);
 
-    /* Phase 2: Template Integration */
+    // Phase 2: Template Integration
     BEGIN_PHASE(2, "Template Integration Compliance");
     RUN_TEST(spec25_composer_renders_literal_templates);
     RUN_TEST(spec25_composer_renders_segment_tokens);
@@ -507,7 +507,7 @@ int main(void) {
     RUN_TEST(spec25_composer_handles_unknown_segments);
     RUN_TEST(spec25_composer_renders_multiple_segments);
 
-    /* Phase 3: Theme Integration */
+    // Phase 3: Theme Integration
     BEGIN_PHASE(3, "Theme Integration Compliance");
     RUN_TEST(spec25_composer_uses_active_theme);
     RUN_TEST(spec25_composer_theme_switching);
@@ -515,14 +515,14 @@ int main(void) {
     RUN_TEST(spec25_composer_color_rendering);
     RUN_TEST(spec25_composer_invalid_theme_rejected);
 
-    /* Phase 4: Context Management */
+    // Phase 4: Context Management
     BEGIN_PHASE(4, "Context Management Compliance");
     RUN_TEST(spec25_composer_tracks_exit_code);
     RUN_TEST(spec25_composer_tracks_duration);
     RUN_TEST(spec25_composer_refreshes_directory);
     RUN_TEST(spec25_composer_invalidates_caches);
 
-    /* Phase 5: Render Output */
+    // Phase 5: Render Output
     BEGIN_PHASE(5, "Render Output Compliance");
     RUN_TEST(spec25_composer_generates_ps1);
     RUN_TEST(spec25_composer_generates_ps2);
@@ -530,7 +530,7 @@ int main(void) {
     RUN_TEST(spec25_composer_tracks_render_count);
     RUN_TEST(spec25_composer_detects_multiline);
 
-    /* Phase 6: Error Handling */
+    // Phase 6: Error Handling
     BEGIN_PHASE(6, "Error Handling Compliance");
     RUN_TEST(spec25_composer_rejects_null_composer);
     RUN_TEST(spec25_composer_rejects_null_output);

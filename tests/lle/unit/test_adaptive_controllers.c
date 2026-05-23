@@ -22,7 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 
-/* Test tracking */
+// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 
@@ -45,10 +45,10 @@ static int tests_passed = 0;
 TEST(context_initialization) {
     printf("\nContext Initialization Tests:\n");
 
-    /* Check if we have a TTY - some tests require interactive terminal */
+    // Check if we have a TTY - some tests require interactive terminal
     bool has_tty = isatty(STDIN_FILENO) || isatty(STDOUT_FILENO);
 
-    /* Test detection and context creation */
+    // Test detection and context creation
     lle_terminal_detection_result_t *detection = NULL;
     lle_result_t res =
         lle_detect_terminal_capabilities_comprehensive(&detection);
@@ -57,7 +57,7 @@ TEST(context_initialization) {
     TEST_ASSERT(detection != NULL, "Detection result is valid");
 
     if (detection) {
-        /* Test context initialization with detected mode */
+        // Test context initialization with detected mode
         lle_adaptive_context_t *context = NULL;
         res = lle_initialize_adaptive_context(&context, detection, NULL);
 
@@ -107,12 +107,12 @@ TEST(interface_creation) {
     lle_adaptive_interface_t *interface = NULL;
     lle_result_t res = lle_create_adaptive_interface(&interface, NULL);
 
-    /* In non-TTY environments (CI), interface creation may fail */
+    // In non-TTY environments (CI), interface creation may fail
     if (has_tty) {
         TEST_ASSERT(res == LLE_SUCCESS, "Interface creation succeeds");
         TEST_ASSERT(interface != NULL, "Interface is created");
     } else {
-        /* Non-TTY - interface creation returns feature not available */
+        // Non-TTY - interface creation returns feature not available
         TEST_ASSERT(res == LLE_ERROR_FEATURE_NOT_AVAILABLE ||
                         res == LLE_SUCCESS,
                     "Interface creation handles non-TTY correctly");
@@ -214,13 +214,13 @@ TEST(config_recommendations) {
                     config.color_support_level <= 3,
                 "Color support level is valid (0-3)");
 
-    /* Check consistency - if colors are enabled, level should be > 0 */
+    // Check consistency - if colors are enabled, level should be > 0
     if (config.enable_syntax_highlighting) {
         TEST_ASSERT(config.color_support_level > 0,
                     "Syntax highlighting requires colors");
     }
 
-    /* Check consistency - advanced features require LLE */
+    // Check consistency - advanced features require LLE
     if (config.enable_autosuggestions || config.enable_multiline_editing) {
         TEST_ASSERT(config.enable_lle == true,
                     "Advanced features require LLE enabled");
@@ -239,23 +239,23 @@ TEST(config_recommendations) {
 TEST(shell_integration) {
     printf("\nShell Integration Tests:\n");
 
-    /* Test 1: Script file should never be interactive */
+    // Test 1: Script file should never be interactive
     bool interactive =
         lle_adaptive_should_shell_be_interactive(false, true, false);
     TEST_ASSERT(interactive == false, "Script file is not interactive");
 
-    /* Test 2: Forced interactive should always be interactive */
+    // Test 2: Forced interactive should always be interactive
     interactive = lle_adaptive_should_shell_be_interactive(true, false, false);
     TEST_ASSERT(interactive == true, "Forced interactive flag works");
 
-    /* Test 3: Stdin mode typically disables interactive */
+    // Test 3: Stdin mode typically disables interactive
     interactive = lle_adaptive_should_shell_be_interactive(false, false, true);
     TEST_ASSERT(interactive == false, "Stdin mode disables interactive");
 
-    /* Test 4: Normal case - depends on detection */
+    // Test 4: Normal case - depends on detection
     interactive = lle_adaptive_should_shell_be_interactive(false, false, false);
     printf("  Normal detection interactive: %s\n", interactive ? "yes" : "no");
-    /* Don't assert - depends on environment */
+    // Don't assert - depends on environment
 }
 
 /* ============================================================================
@@ -266,7 +266,7 @@ TEST(shell_integration) {
 TEST(health_monitoring) {
     printf("\nHealth Monitoring Tests:\n");
 
-    /* Check if we have a TTY */
+    // Check if we have a TTY
     bool has_tty = isatty(STDIN_FILENO) || isatty(STDOUT_FILENO);
 
     lle_terminal_detection_result_t *detection = NULL;
@@ -274,7 +274,7 @@ TEST(health_monitoring) {
         lle_detect_terminal_capabilities_comprehensive(&detection);
 
     if (res == LLE_SUCCESS && detection) {
-        /* Skip context-dependent tests in non-TTY environments */
+        // Skip context-dependent tests in non-TTY environments
         if (!has_tty && detection->recommended_mode == LLE_ADAPTIVE_MODE_NONE) {
             printf("  [SKIP] Health monitoring tests skipped (no TTY)\n");
             free(detection);
@@ -290,13 +290,13 @@ TEST(health_monitoring) {
             TEST_ASSERT(context->healthy == true,
                         "Context health flag is true");
 
-            /* Simulate errors */
+            // Simulate errors
             context->error_count = 50;
             healthy = lle_adaptive_perform_health_check(context);
             TEST_ASSERT(healthy == true,
                         "Context healthy with moderate errors");
 
-            /* Simulate many errors */
+            // Simulate many errors
             context->error_count = 150;
             healthy = lle_adaptive_perform_health_check(context);
             TEST_ASSERT(healthy == false, "Context unhealthy with many errors");
@@ -318,7 +318,7 @@ TEST(health_monitoring) {
 TEST(controller_operations) {
     printf("\nController Operation Tests:\n");
 
-    /* Check if we have a TTY */
+    // Check if we have a TTY
     bool has_tty = isatty(STDIN_FILENO) || isatty(STDOUT_FILENO);
 
     lle_adaptive_interface_t *interface = NULL;
@@ -336,15 +336,15 @@ TEST(controller_operations) {
 
         printf("  Current mode: %s\n", lle_adaptive_mode_to_string(ctx->mode));
 
-        /* Test display update (should succeed in all modes) */
+        // Test display update (should succeed in all modes)
         res = interface->update_display(ctx);
         TEST_ASSERT(res == LLE_SUCCESS, "Display update succeeds");
 
-        /* Test resize handling (should succeed in all modes) */
+        // Test resize handling (should succeed in all modes)
         res = interface->handle_resize(ctx, 100, 40);
         TEST_ASSERT(res == LLE_SUCCESS, "Resize handling succeeds");
 
-        /* Test get status (should succeed in all modes) */
+        // Test get status (should succeed in all modes)
         int status = 0;
         res = interface->get_status(ctx, &status);
         TEST_ASSERT(res == LLE_SUCCESS, "Get status succeeds");
@@ -363,22 +363,22 @@ TEST(error_handling) {
 
     lle_result_t res;
 
-    /* Test NULL parameter handling in context creation */
+    // Test NULL parameter handling in context creation
     lle_adaptive_context_t *context = NULL;
     res = lle_initialize_adaptive_context(&context, NULL, NULL);
     TEST_ASSERT(res == LLE_ERROR_INVALID_PARAMETER,
                 "Context init rejects NULL detection");
 
-    /* Test NULL parameter handling in interface creation */
+    // Test NULL parameter handling in interface creation
     res = lle_create_adaptive_interface(NULL, NULL);
     TEST_ASSERT(res == LLE_ERROR_INVALID_PARAMETER,
                 "Interface creation rejects NULL output");
 
-    /* Test NULL parameter handling in health check */
+    // Test NULL parameter handling in health check
     bool healthy = lle_adaptive_perform_health_check(NULL);
     TEST_ASSERT(healthy == false, "Health check rejects NULL context");
 
-    /* Test NULL parameter handling in fallback */
+    // Test NULL parameter handling in fallback
     res = lle_adaptive_try_fallback_mode(NULL);
     TEST_ASSERT(res == LLE_ERROR_INVALID_PARAMETER,
                 "Fallback rejects NULL context");

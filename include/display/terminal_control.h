@@ -736,7 +736,7 @@ static inline void terminal_control_get_version(int *major, int *minor,
 }
 #endif
 
-#endif /* TERMINAL_CONTROL_H */
+#endif // TERMINAL_CONTROL_H
 
 // ============================================================================
 // USAGE EXAMPLES

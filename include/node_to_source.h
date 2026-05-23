@@ -38,4 +38,4 @@ char *node_to_source(node_t *node);
  */
 int node_equals(node_t *a, node_t *b);
 
-#endif /* NODE_TO_SOURCE_H */
+#endif // NODE_TO_SOURCE_H

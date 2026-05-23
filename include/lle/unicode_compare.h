@@ -178,4 +178,4 @@ bool lle_unicode_is_prefix(const char *prefix, size_t prefix_len,
 bool lle_unicode_is_prefix_z(const char *prefix, const char *str,
                              const lle_unicode_compare_options_t *options);
 
-#endif /* LLE_UNICODE_COMPARE_H */
+#endif // LLE_UNICODE_COMPARE_H

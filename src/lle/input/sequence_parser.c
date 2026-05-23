@@ -634,12 +634,12 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
 
     *parsed_input = NULL;
 
-    /* Only check timeout if parser is accumulating a sequence */
+    // Only check timeout if parser is accumulating a sequence
     if (parser->state == LLE_PARSER_STATE_NORMAL) {
-        return LLE_ERROR_NOT_FOUND; /* Not accumulating, no timeout to check */
+        return LLE_ERROR_NOT_FOUND; // Not accumulating, no timeout to check
     }
 
-    /* Check if we have a sequence start time */
+    // Check if we have a sequence start time
     if (parser->sequence_start_time == 0) {
         return LLE_ERROR_NOT_FOUND;
     }
@@ -648,7 +648,7 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
     uint64_t elapsed = current_time - parser->sequence_start_time;
 
     if (elapsed < timeout_us) {
-        return LLE_ERROR_NOT_FOUND; /* Timeout not yet exceeded */
+        return LLE_ERROR_NOT_FOUND; // Timeout not yet exceeded
     }
 
     /* Timeout exceeded - if in ESCAPE state with just ESC buffered, return ESC
@@ -656,7 +656,7 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
     if (parser->state == LLE_PARSER_STATE_ESCAPE && parser->buffer_pos == 1 &&
         parser->buffer[0] == 0x1B) {
 
-        /* Create ESC key event */
+        // Create ESC key event
         lle_parsed_input_t *result = lle_pool_alloc(sizeof(lle_parsed_input_t));
         if (!result) {
             return LLE_ERROR_OUT_OF_MEMORY;
@@ -665,13 +665,13 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
         memset(result, 0, sizeof(lle_parsed_input_t));
         result->type = LLE_PARSED_INPUT_TYPE_KEY;
         result->data.key_info.type = LLE_KEY_TYPE_SPECIAL;
-        result->data.key_info.keycode = 27; /* ESC */
+        result->data.key_info.keycode = 27; // ESC
         result->data.key_info.modifiers = 0;
         result->data.key_info.timestamp = current_time;
         result->handled = false;
         result->parse_time_us = 0;
 
-        /* Reset parser state */
+        // Reset parser state
         parser->timeout_sequences++;
         lle_sequence_parser_reset_state(parser);
 
@@ -679,7 +679,7 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
         return LLE_SUCCESS;
     }
 
-    /* Timeout in other state - reset parser and discard partial sequence */
+    // Timeout in other state - reset parser and discard partial sequence
     parser->timeout_sequences++;
     lle_sequence_parser_reset_state(parser);
 

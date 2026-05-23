@@ -22,10 +22,10 @@
 #include <stdint.h>
 #include <time.h>
 
-/* Include LLE error handling */
+// Include LLE error handling
 #include "lle/error_handling.h"
 
-/* Include Lush memory pool for integration */
+// Include Lush memory pool for integration
 #include "lush_memory_pool.h"
 
 #ifdef __cplusplus
@@ -37,10 +37,10 @@ extern "C" {
  * ============================================================================
  */
 
-/* Lush types from lush_memory_pool.h are included via header */
+// Lush types from lush_memory_pool.h are included via header
 /* Spec uses lush_memory_pool_t but actual Lush uses
  * lush_memory_pool_system_t */
-/* Create alias to match spec naming */
+// Create alias to match spec naming
 typedef lush_memory_pool_system_t lush_memory_pool_t;
 
 typedef struct lush_memory_system_t lush_memory_system_t;
@@ -54,7 +54,7 @@ typedef struct lle_buffer_config_t lle_buffer_config_t;
  * ============================================================================
  */
 
-/* Memory pool configuration */
+// Memory pool configuration
 #define LLE_MAX_BUFFER_BLOCKS 256
 #define LLE_STRING_CACHE_SIZE 128
 #define LLE_EVENT_POOL_SIZE 512
@@ -81,14 +81,14 @@ typedef struct lle_buffer_config_t lle_buffer_config_t;
 #define LLE_SYSTEM_EVENT_CACHE_SIZE 32
 #define LUSH_POOL_COUNT 4
 
-/* Performance targets */
+// Performance targets
 #define LLE_ALLOCATION_TIME_TARGET_US 100
 #define LLE_GC_CYCLE_TIME_TARGET_MS 5
 #define LLE_PRESSURE_DETECTION_TIME_US 1000
 #define LLE_BOUNDS_CHECK_TIME_US 50
 #define LLE_CRYPTO_OPERATION_TIME_US 200
 
-/* Efficiency targets */
+// Efficiency targets
 #define LLE_MEMORY_UTILIZATION_TARGET 0.90
 #define LLE_FRAGMENTATION_LIMIT 0.15
 #define LLE_CACHE_HIT_RATE_TARGET 0.85
@@ -293,7 +293,7 @@ typedef struct lle_display_memory_coordination_t
     lle_display_memory_coordination_t;
 typedef struct lle_memory_test_framework_t lle_memory_test_framework_t;
 
-/* Types needed for complete structure definitions */
+// Types needed for complete structure definitions
 typedef struct {
     int error_code;          ///< Numeric error code
     char error_message[256]; ///< Human-readable error message
@@ -389,7 +389,7 @@ typedef struct {
  * ============================================================================
  */
 
-/* Primary allocation/deallocation */
+// Primary allocation/deallocation
 /**
  * @brief Allocate memory from the default LLE pool
  *
@@ -437,7 +437,7 @@ void *lle_pool_allocate_fast(lle_memory_pool_t *pool, size_t size);
  */
 void lle_pool_free_fast(lle_memory_pool_t *pool, void *ptr);
 
-/* Lush Memory Pool Integration Bridge */
+// Lush Memory Pool Integration Bridge
 /**
  * @brief Create an LLE memory pool that wraps an existing Lush memory pool
  *
@@ -456,7 +456,7 @@ lle_result_t lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
  */
 void lle_memory_pool_destroy(lle_memory_pool_t *pool);
 
-/* Memory State Management */
+// Memory State Management
 /**
  * @brief Transition the memory manager to a new lifecycle state
  *
@@ -524,7 +524,7 @@ lle_result_t lle_memory_handle_error_state(lle_memory_manager_t *manager);
  */
 lle_result_t lle_memory_shutdown_pools(lle_memory_manager_t *manager);
 
-/* Lush Integration */
+// Lush Integration
 /**
  * @brief Integrate the LLE memory manager with the host Lush memory subsystem
  *
@@ -591,7 +591,7 @@ lle_initialize_cross_allocation_tables(lle_memory_manager_t *manager);
  */
 lle_result_t lle_start_integration_monitoring(lle_memory_manager_t *manager);
 
-/* Shared Memory Pool */
+// Shared Memory Pool
 /**
  * @brief Allocate memory from a shared pool tagged with an owning pool type
  *
@@ -632,7 +632,7 @@ void lle_remove_fragment(void *pool, int fragment_index);
  */
 struct timespec lle_get_current_time(void);
 
-/* Buffer Memory Pool */
+// Buffer Memory Pool
 /**
  * @brief Allocate a typed buffer from a buffer memory pool
  *
@@ -676,7 +676,7 @@ size_t lle_optimize_buffer_allocation_size(size_t size,
  */
 void lle_initialize_edit_buffer(void *buffer, size_t size);
 
-/* Hierarchical Allocation */
+// Hierarchical Allocation
 /**
  * @brief Allocate memory through the hierarchical pool fallback chain
  *
@@ -745,7 +745,7 @@ void lle_handle_allocation_failure(lle_memory_pool_hierarchy_t *hierarchy,
                                    size_t size,
                                    lle_memory_pool_type_t preferred_type);
 
-/* Dynamic Pool Resizing */
+// Dynamic Pool Resizing
 /**
  * @brief Run one dynamic-resize evaluation pass on a pool
  *
@@ -838,7 +838,7 @@ void lle_recalculate_free_space(lle_memory_pool_t *pool);
 void lle_notify_pool_resize_listeners(lle_memory_pool_t *pool, size_t old_size,
                                       size_t new_size);
 
-/* Garbage Collection */
+// Garbage Collection
 /**
  * @brief Run a complete garbage-collection cycle
  *
@@ -899,7 +899,7 @@ void lle_update_gc_performance_stats(lle_garbage_collector_t *gc,
                                      struct timespec gc_duration,
                                      size_t memory_freed);
 
-/* Buffer Memory Management */
+// Buffer Memory Management
 /**
  * @brief Initialize a buffer memory descriptor from a configuration
  *
@@ -934,7 +934,7 @@ lle_result_t lle_initialize_utf8_management(lle_buffer_memory_t *buffer_mem,
  */
 size_t lle_calculate_scratch_buffer_size(const lle_buffer_config_t *config);
 
-/* Multiline Buffer Management */
+// Multiline Buffer Management
 /**
  * @brief Insert a line into a multiline buffer at the given index
  *
@@ -1002,7 +1002,7 @@ void lle_mark_line_modified(lle_multiline_buffer_t *multiline_buffer,
 void lle_update_utf8_tracking_after_insertion(
     lle_buffer_memory_t *buffer_memory, size_t offset, size_t size);
 
-/* Event Memory Integration */
+// Event Memory Integration
 /**
  * @brief Fast-path allocation for an event of a given type
  *
@@ -1076,7 +1076,7 @@ bool lle_return_to_display_cache(lle_event_memory_integration_t *integration,
 bool lle_return_to_system_cache(lle_event_memory_integration_t *integration,
                                 void *event_ptr);
 
-/* Memory Access Pattern Optimization */
+// Memory Access Pattern Optimization
 /**
  * @brief Analyze recent memory access patterns and update optimizer state
  *
@@ -1148,7 +1148,7 @@ lle_optimize_memory_layout(lle_memory_access_optimizer_t *optimizer);
 void lle_log_memory_analysis_performance(
     struct timespec duration, lle_access_pattern_analysis_t *pattern_analysis);
 
-/* Memory Pool Performance Tuning */
+// Memory Pool Performance Tuning
 /**
  * @brief Run one tuning pass over the pools managed by a tuner
  *
@@ -1220,7 +1220,7 @@ void lle_rollback_tuning_actions(lle_memory_pool_tuner_t *tuner,
 void lle_update_average_time(struct timespec *average,
                              struct timespec new_sample, size_t sample_count);
 
-/* Error Detection and Recovery */
+// Error Detection and Recovery
 /**
  * @brief Run all enabled memory-error detection passes
  *
@@ -1370,7 +1370,7 @@ lle_recover_from_use_after_free(lle_memory_error_handler_t *error_handler,
                                 lle_memory_error_t *error,
                                 lle_memory_manager_t *memory_manager);
 
-/* Buffer Overflow Protection */
+// Buffer Overflow Protection
 /**
  * @brief Check whether an access fits within the bounds of a tracked buffer
  *
@@ -1401,7 +1401,7 @@ uint32_t lle_access_type_to_permissions(lle_access_type_t access_type);
 void lle_log_security_incident(lle_security_incident_t incident_type,
                                void *address, size_t size);
 
-/* Memory Encryption */
+// Memory Encryption
 /**
  * @brief Encrypt a memory allocation according to a sensitivity level
  *
@@ -1428,7 +1428,7 @@ lle_result_t lle_encrypt_data_in_place(void *data, size_t size, uint8_t *key,
                                        size_t key_size,
                                        lle_encryption_algorithm_t algorithm);
 
-/* Complete Integration */
+// Complete Integration
 /**
  * @brief Initialize the complete LLE-Lush memory integration subsystem
  *
@@ -1473,7 +1473,7 @@ lle_result_t lle_configure_integration_mode(
 void lle_cleanup_shared_memory_regions(
     lle_lush_memory_integration_complete_t *integration);
 
-/* Display Memory Coordination */
+// Display Memory Coordination
 /**
  * @brief Allocate display memory using the optimized coordination path
  *
@@ -1511,7 +1511,7 @@ double lle_calculate_memory_pressure(lle_display_memory_coordination_t *coord);
  */
 void lle_apply_memory_pressure_relief(lle_display_memory_coordination_t *coord);
 
-/* Testing and Validation */
+// Testing and Validation
 /**
  * @brief Run the full suite of memory tests against a memory manager
  *
@@ -1597,4 +1597,4 @@ void lle_generate_memory_test_report(
 }
 #endif
 
-#endif /* LLE_MEMORY_MANAGEMENT_H */
+#endif // LLE_MEMORY_MANAGEMENT_H

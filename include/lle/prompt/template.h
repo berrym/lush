@@ -129,7 +129,7 @@ typedef struct lle_parsed_template {
     bool valid;                      /**< Parse succeeded */
 } lle_parsed_template_t;
 
-/* Forward declarations for render context */
+// Forward declarations for render context
 struct lle_segment_registry;
 struct lle_prompt_context;
 struct lle_theme;
@@ -331,4 +331,4 @@ void lle_template_token_free(lle_template_token_t *token);
 }
 #endif
 
-#endif /* LLE_PROMPT_TEMPLATE_H */
+#endif // LLE_PROMPT_TEMPLATE_H

@@ -92,28 +92,28 @@ typedef struct {
  * Native terminal controller structure.
  */
 struct lle_native_controller_t {
-    /* Terminal state tracking */
+    // Terminal state tracking
     lle_terminal_state_t *terminal_state;
 
-    /* Raw mode management */
+    // Raw mode management
     struct termios original_termios;
     struct termios raw_termios;
     bool raw_mode_active;
     bool termios_saved;
 
-    /* Capability-specific optimization */
+    // Capability-specific optimization
     lle_native_capabilities_t *capabilities;
     lle_native_optimization_flags_t optimization_flags;
 
-    /* Output buffering */
+    // Output buffering
     char *output_buffer;
     size_t buffer_capacity;
     size_t buffer_used;
 
-    /* Performance monitoring */
+    // Performance monitoring
     lle_terminal_performance_stats_t *perf_stats;
 
-    /* Memory management */
+    // Memory management
     lush_memory_pool_t *memory_pool;
 };
 
@@ -136,7 +136,7 @@ static lle_terminal_state_t *lle_terminal_state_create(void) {
         return NULL;
     }
 
-    /* Get terminal dimensions */
+    // Get terminal dimensions
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
         state->terminal_width = ws.ws_col;
@@ -231,7 +231,7 @@ static lle_result_t lle_native_enter_raw_mode(lle_native_controller_t *native) {
         return LLE_SUCCESS;
     }
 
-    /* Save original terminal settings */
+    // Save original terminal settings
     if (!native->termios_saved) {
         if (tcgetattr(STDIN_FILENO, &native->original_termios) != 0) {
             return LLE_ERROR_TERMINAL_ABSTRACTION;
@@ -239,7 +239,7 @@ static lle_result_t lle_native_enter_raw_mode(lle_native_controller_t *native) {
         native->termios_saved = true;
     }
 
-    /* Configure raw mode */
+    // Configure raw mode
     native->raw_termios = native->original_termios;
     native->raw_termios.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     native->raw_termios.c_oflag &= ~(OPOST);
@@ -248,7 +248,7 @@ static lle_result_t lle_native_enter_raw_mode(lle_native_controller_t *native) {
     native->raw_termios.c_cc[VMIN] = 1;
     native->raw_termios.c_cc[VTIME] = 0;
 
-    /* Apply raw mode */
+    // Apply raw mode
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &native->raw_termios) != 0) {
         return LLE_ERROR_TERMINAL_ABSTRACTION;
     }
@@ -273,7 +273,7 @@ static lle_result_t lle_native_exit_raw_mode(lle_native_controller_t *native) {
         return LLE_SUCCESS;
     }
 
-    /* Restore original terminal settings */
+    // Restore original terminal settings
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &native->original_termios) != 0) {
         return LLE_ERROR_TERMINAL_ABSTRACTION;
     }
@@ -302,7 +302,7 @@ static lle_result_t lle_native_exit_raw_mode(lle_native_controller_t *native) {
 static lle_result_t lle_native_buffer_append(lle_native_controller_t *native,
                                              const char *data, size_t length) {
 
-    /* Ensure capacity */
+    // Ensure capacity
     size_t needed = native->buffer_used + length;
     if (needed >= native->buffer_capacity) {
         size_t new_capacity = native->buffer_capacity;
@@ -569,10 +569,10 @@ static lle_result_t lle_apply_capability_optimizations(
 static size_t lle_calculate_optimal_buffer_size(
     const lle_terminal_detection_result_t *detection) {
 
-    /* Base size: 16KB */
+    // Base size: 16KB
     size_t base_size = 16384;
 
-    /* Adjust based on capability level */
+    // Adjust based on capability level
     switch (detection->capability_level) {
     case LLE_CAPABILITY_PREMIUM:
         return base_size * 2;
@@ -609,14 +609,14 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Create terminal state */
+    // Create terminal state
     native->terminal_state = lle_terminal_state_create();
     if (!native->terminal_state) {
         free(native);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Create capabilities structure */
+    // Create capabilities structure
     native->capabilities = calloc(1, sizeof(lle_native_capabilities_t));
     if (!native->capabilities) {
         lle_terminal_state_destroy(native->terminal_state);
@@ -624,7 +624,7 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Configure capabilities from detection */
+    // Configure capabilities from detection
     native->capabilities->has_colors =
         context->detection_result->supports_colors;
     native->capabilities->has_256_colors =
@@ -642,7 +642,7 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
     native->capabilities->has_unicode =
         context->detection_result->supports_unicode;
 
-    /* Apply capability optimizations */
+    // Apply capability optimizations
     lle_result_t result =
         lle_apply_capability_optimizations(native, context->detection_result);
     if (result != LLE_SUCCESS) {
@@ -652,7 +652,7 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
         return result;
     }
 
-    /* Create output buffer */
+    // Create output buffer
     native->buffer_capacity =
         lle_calculate_optimal_buffer_size(context->detection_result);
     native->output_buffer = malloc(native->buffer_capacity);
@@ -663,7 +663,7 @@ lle_result_t lle_initialize_native_controller(lle_adaptive_context_t *context,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Create performance statistics */
+    // Create performance statistics
     native->perf_stats = lle_terminal_performance_stats_create();
     if (!native->perf_stats) {
         free(native->output_buffer);
@@ -691,7 +691,7 @@ void lle_cleanup_native_controller(lle_native_controller_t *native) {
         return;
     }
 
-    /* Restore terminal state if needed */
+    // Restore terminal state if needed
     if (native->raw_mode_active) {
         lle_native_exit_raw_mode(native);
     }
@@ -721,16 +721,16 @@ lle_result_t lle_native_read_line(lle_native_controller_t *native,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Enter raw mode */
+    // Enter raw mode
     lle_result_t result = lle_native_enter_raw_mode(native);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Display prompt with color */
+    // Display prompt with color
     lle_native_buffer_clear(native);
     if (native->capabilities->has_colors) {
-        lle_native_set_fg_color(native, 2); /* Green */
+        lle_native_set_fg_color(native, 2); // Green
     }
     lle_native_buffer_append(native, prompt, strlen(prompt));
     if (native->capabilities->has_colors) {
@@ -745,12 +745,12 @@ lle_result_t lle_native_read_line(lle_native_controller_t *native,
     char buffer[4096];
     if (!fgets(buffer, sizeof(buffer), stdin)) {
         if (feof(stdin)) {
-            return LLE_ERROR_OUT_OF_MEMORY; /* EOF treated as error */
+            return LLE_ERROR_OUT_OF_MEMORY; // EOF treated as error
         }
         return LLE_ERROR_INPUT_PARSING;
     }
 
-    /* Remove trailing newline */
+    // Remove trailing newline
     size_t len = strlen(buffer);
     if (len > 0 && buffer[len - 1] == '\n') {
         buffer[len - 1] = '\0';

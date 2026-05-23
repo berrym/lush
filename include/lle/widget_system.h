@@ -48,7 +48,7 @@
 extern "C" {
 #endif
 
-/* Forward declaration to avoid circular dependency */
+// Forward declaration to avoid circular dependency
 typedef struct lle_editor lle_editor_t;
 
 /* ============================================================================
@@ -90,15 +90,15 @@ typedef struct lle_widget {
     lle_widget_type_t type;         /**< Widget type */
     void *user_data;                /**< Optional user data */
 
-    /* Performance tracking */
+    // Performance tracking
     uint64_t execution_count; /**< Times executed */
     uint64_t
         total_execution_time_us; /**< Total execution time in microseconds */
 
-    /* State */
+    // State
     bool enabled; /**< Widget enabled state */
 
-    /* Linked list for iteration */
+    // Linked list for iteration
     struct lle_widget *next; /**< Next widget in list */
 } lle_widget_t;
 
@@ -299,4 +299,4 @@ lle_result_t lle_widget_disable(lle_widget_registry_t *registry,
 }
 #endif
 
-#endif /* LLE_WIDGET_SYSTEM_H */
+#endif // LLE_WIDGET_SYSTEM_H

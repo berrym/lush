@@ -44,18 +44,18 @@ lle_result_t lle_multiline_context_init(lle_multiline_context_t **ctx,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate context structure */
+    // Allocate context structure
     lle_multiline_context_t *context =
         lle_pool_alloc(sizeof(lle_multiline_context_t));
     if (!context) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize fields */
+    // Initialize fields
     memset(context, 0, sizeof(lle_multiline_context_t));
     context->memory_pool = memory_pool;
 
-    /* Allocate and initialize core parser state */
+    // Allocate and initialize core parser state
     continuation_state_t *core_state =
         lle_pool_alloc(sizeof(continuation_state_t));
     if (!core_state) {
@@ -66,7 +66,7 @@ lle_result_t lle_multiline_context_init(lle_multiline_context_t **ctx,
     continuation_state_init(core_state);
     context->core_state = core_state;
 
-    /* Initialize LLE-specific fields */
+    // Initialize LLE-specific fields
     context->current_construct = NULL;
     context->construct_start_line = 0;
     context->construct_start_offset = 0;
@@ -91,13 +91,13 @@ lle_result_t lle_multiline_context_destroy(lle_multiline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Clean up core parser state */
+    // Clean up core parser state
     if (ctx->core_state) {
         continuation_state_cleanup((continuation_state_t *)ctx->core_state);
         lle_pool_free(ctx->core_state);
     }
 
-    /* Free allocated strings */
+    // Free allocated strings
     if (ctx->current_construct) {
         lle_pool_free(ctx->current_construct);
     }
@@ -105,7 +105,7 @@ lle_result_t lle_multiline_context_destroy(lle_multiline_context_t *ctx) {
         lle_pool_free(ctx->expected_terminator);
     }
 
-    /* Free context itself */
+    // Free context itself
     lle_pool_free(ctx);
 
     return LLE_SUCCESS;
@@ -121,13 +121,13 @@ lle_result_t lle_multiline_context_reset(lle_multiline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Reset core parser state */
+    // Reset core parser state
     if (ctx->core_state) {
         continuation_state_cleanup((continuation_state_t *)ctx->core_state);
         continuation_state_init((continuation_state_t *)ctx->core_state);
     }
 
-    /* Free and reset LLE-specific fields */
+    // Free and reset LLE-specific fields
     if (ctx->current_construct) {
         lle_pool_free(ctx->current_construct);
         ctx->current_construct = NULL;
@@ -163,7 +163,7 @@ static const char *get_construct_name(const continuation_state_t *state) {
         return NULL;
     }
 
-    /* Check quote states first (highest priority) */
+    // Check quote states first (highest priority)
     if (state->in_single_quote) {
         return "single quote";
     }
@@ -174,12 +174,12 @@ static const char *get_construct_name(const continuation_state_t *state) {
         return "backtick";
     }
 
-    /* Check here document */
+    // Check here document
     if (state->in_here_doc) {
         return "here document";
     }
 
-    /* Check control structures */
+    // Check control structures
     if (state->in_function_definition) {
         return "function definition";
     }
@@ -199,7 +199,7 @@ static const char *get_construct_name(const continuation_state_t *state) {
         return "until loop";
     }
 
-    /* Check brackets/braces */
+    // Check brackets/braces
     if (state->brace_count > 0) {
         return "brace group";
     }
@@ -210,7 +210,7 @@ static const char *get_construct_name(const continuation_state_t *state) {
         return "bracket expression";
     }
 
-    /* Check command substitution */
+    // Check command substitution
     if (state->in_command_substitution) {
         return "command substitution";
     }
@@ -218,7 +218,7 @@ static const char *get_construct_name(const continuation_state_t *state) {
         return "arithmetic expansion";
     }
 
-    /* Check continuation */
+    // Check continuation
     if (state->has_continuation) {
         return "line continuation";
     }
@@ -238,13 +238,13 @@ static uint8_t get_nesting_level(const continuation_state_t *state) {
 
     uint8_t level = 0;
 
-    /* Count nesting from various constructs */
+    // Count nesting from various constructs
     level += state->paren_count;
     level += state->brace_count;
     level += state->bracket_count;
     level += state->compound_command_depth;
 
-    /* Quote states don't nest but contribute to depth */
+    // Quote states don't nest but contribute to depth
     if (state->in_single_quote || state->in_double_quote ||
         state->in_backtick) {
         level += 1;
@@ -262,7 +262,7 @@ static uint8_t get_nesting_level(const continuation_state_t *state) {
  */
 lle_result_t lle_multiline_analyze_line(lle_multiline_context_t *ctx,
                                         const char *line, size_t length) {
-    (void)length; /* Reserved for length-aware analysis */
+    (void)length; // Reserved for length-aware analysis
     if (!ctx || !line) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
@@ -272,13 +272,13 @@ lle_result_t lle_multiline_analyze_line(lle_multiline_context_t *ctx,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Delegate core parsing to shared parser */
+    // Delegate core parsing to shared parser
     continuation_analyze_line(line, state);
 
-    /* Extract and cache LLE-specific state */
+    // Extract and cache LLE-specific state
     const char *construct = get_construct_name(state);
     if (construct) {
-        /* Allocate and copy construct name if changed */
+        // Allocate and copy construct name if changed
         if (!ctx->current_construct ||
             strcmp(ctx->current_construct, construct) != 0) {
             if (ctx->current_construct) {
@@ -291,21 +291,21 @@ lle_result_t lle_multiline_analyze_line(lle_multiline_context_t *ctx,
             }
         }
     } else {
-        /* No construct - clear */
+        // No construct - clear
         if (ctx->current_construct) {
             lle_pool_free(ctx->current_construct);
             ctx->current_construct = NULL;
         }
     }
 
-    /* Update nesting level */
+    // Update nesting level
     ctx->nesting_level = get_nesting_level(state);
 
-    /* Update completion state */
+    // Update completion state
     ctx->construct_complete = continuation_is_complete(state);
     ctx->needs_continuation = continuation_needs_continuation(state);
 
-    /* Invalidate cache since state changed */
+    // Invalidate cache since state changed
     ctx->cache_valid = false;
 
     return LLE_SUCCESS;
@@ -323,7 +323,7 @@ lle_result_t lle_multiline_analyze_line(lle_multiline_context_t *ctx,
  */
 bool lle_multiline_is_complete(const lle_multiline_context_t *ctx) {
     if (!ctx || !ctx->core_state) {
-        return true; /* No context = complete */
+        return true; // No context = complete
     }
 
     return continuation_is_complete(
@@ -337,7 +337,7 @@ bool lle_multiline_is_complete(const lle_multiline_context_t *ctx) {
  */
 bool lle_multiline_needs_continuation(const lle_multiline_context_t *ctx) {
     if (!ctx || !ctx->core_state) {
-        return false; /* No context = no continuation */
+        return false; // No context = no continuation
     }
 
     return continuation_needs_continuation(
@@ -351,7 +351,7 @@ bool lle_multiline_needs_continuation(const lle_multiline_context_t *ctx) {
  */
 const char *lle_multiline_get_prompt(const lle_multiline_context_t *ctx) {
     if (!ctx || !ctx->core_state) {
-        return "> "; /* Default prompt */
+        return "> "; // Default prompt
     }
 
     return continuation_get_prompt(
@@ -388,19 +388,19 @@ lle_result_t lle_multiline_manager_init(lle_multiline_manager_t **manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate manager structure */
+    // Allocate manager structure
     lle_multiline_manager_t *mgr =
         lle_pool_alloc(sizeof(lle_multiline_manager_t));
     if (!mgr) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize fields */
+    // Initialize fields
     memset(mgr, 0, sizeof(lle_multiline_manager_t));
     mgr->memory_pool = memory_pool;
     mgr->analysis_count = 0;
     mgr->line_updates = 0;
-    mgr->perf_monitor = NULL; /* Optional - can be set later */
+    mgr->perf_monitor = NULL; // Optional - can be set later
 
     *manager = mgr;
     return LLE_SUCCESS;
@@ -417,7 +417,7 @@ lle_result_t lle_multiline_manager_destroy(lle_multiline_manager_t *manager) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Free manager structure */
+    // Free manager structure
     lle_pool_free(manager);
 
     return LLE_SUCCESS;
@@ -439,7 +439,7 @@ convert_to_lle_state(const continuation_state_t *state) {
         return LLE_MULTILINE_STATE_NONE;
     }
 
-    /* Priority order matches input_continuation.c logic */
+    // Priority order matches input_continuation.c logic
     if (state->in_single_quote) {
         return LLE_MULTILINE_STATE_QUOTE_SINGLE;
     }
@@ -491,7 +491,7 @@ lle_multiline_manager_analyze_buffer(lle_multiline_manager_t *manager,
 
     lle_result_t result = LLE_SUCCESS;
 
-    /* Step 1: Initialize or reset multiline context */
+    // Step 1: Initialize or reset multiline context
     if (!buffer->multiline_ctx) {
         result = lle_multiline_context_init(&buffer->multiline_ctx,
                                             manager->memory_pool);
@@ -505,13 +505,13 @@ lle_multiline_manager_analyze_buffer(lle_multiline_manager_t *manager,
         }
     }
 
-    /* Step 2: Analyze each line in the buffer */
+    // Step 2: Analyze each line in the buffer
     if (buffer->line_count > 0) {
-        /* Buffer has line structure - analyze each line */
+        // Buffer has line structure - analyze each line
         for (size_t line_idx = 0; line_idx < buffer->line_count; line_idx++) {
             lle_line_info_t *line = &buffer->lines[line_idx];
 
-            /* Extract line content */
+            // Extract line content
             if (line->start_offset + line->length > buffer->length) {
                 return LLE_ERROR_BUFFER_OVERFLOW;
             }
@@ -520,19 +520,19 @@ lle_multiline_manager_analyze_buffer(lle_multiline_manager_t *manager,
                 (const char *)(buffer->data + line->start_offset);
             size_t line_length = line->length;
 
-            /* Analyze line */
+            // Analyze line
             result = lle_multiline_analyze_line(buffer->multiline_ctx,
                                                 line_content, line_length);
             if (result != LLE_SUCCESS) {
                 return result;
             }
 
-            /* Update line multiline state */
+            // Update line multiline state
             continuation_state_t *state =
                 (continuation_state_t *)buffer->multiline_ctx->core_state;
             line->ml_state = convert_to_lle_state(state);
 
-            /* Update line flags */
+            // Update line flags
             if (buffer->multiline_ctx->needs_continuation) {
                 line->flags |= LLE_LINE_FLAG_CONTINUATION;
             } else {
@@ -552,10 +552,10 @@ lle_multiline_manager_analyze_buffer(lle_multiline_manager_t *manager,
         manager->line_updates++;
     }
 
-    /* Step 3: Update buffer-wide multiline status */
+    // Step 3: Update buffer-wide multiline status
     buffer->multiline_active = !buffer->multiline_ctx->construct_complete;
 
-    /* Update statistics */
+    // Update statistics
     manager->analysis_count++;
 
     return LLE_SUCCESS;

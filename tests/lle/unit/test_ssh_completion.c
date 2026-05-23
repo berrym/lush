@@ -36,14 +36,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* Fixture management -------------------------------------------------- */
+// Fixture management --------------------------------------------------
 
 /* Make a temp $HOME with $HOME/.ssh/config populated by `config_body`.
  * Caller must ssh_test_teardown() the result to restore environment and
  * reclaim disk fixtures. */
 typedef struct {
-    char *home;       /* heap-allocated; freed by teardown */
-    char *saved_home; /* prior $HOME (or NULL); restored by teardown */
+    char *home;       /**< heap-allocated; freed by teardown */
+    char *saved_home; /**< prior $HOME (or NULL); restored by teardown */
 } ssh_test_fixture_t;
 
 static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
@@ -75,7 +75,7 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
     fputs(config_body, fp);
     fclose(fp);
 
-    /* Force the cache to re-read from the fixture HOME. */
+    // Force the cache to re-read from the fixture HOME.
     ssh_hosts_cleanup();
 
     const char *prior = getenv("HOME");
@@ -89,12 +89,12 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
 }
 
 static void ssh_test_teardown(ssh_test_fixture_t *fx) {
-    /* Cleanup cache before the fixture filesystem disappears. */
+    // Cleanup cache before the fixture filesystem disappears.
     ssh_hosts_cleanup();
 
     if (fx->home) {
         char ssh_dir[1024];
-        char config_path[1040]; /* see ssh_test_setup sizing rationale */
+        char config_path[1040]; // see ssh_test_setup sizing rationale
         snprintf(ssh_dir, sizeof(ssh_dir), "%s/.ssh", fx->home);
         snprintf(config_path, sizeof(config_path), "%s/config", ssh_dir);
         unlink(config_path);
@@ -119,17 +119,17 @@ static void make_context(lle_word_context_t *ctx, const char *prefix) {
     ctx->dequoted_filename_prefix = (char *)prefix;
 }
 
-/* Tests --------------------------------------------------------------- */
+// Tests ---------------------------------------------------------------
 
 TEST(ssh_source_emits_configured_host) {
-    /* Single Host stanza; bare prefix `exa` should match `example.com`. */
+    // Single Host stanza; bare prefix `exa` should match `example.com`.
     ssh_test_fixture_t fx = {0};
     if (ssh_test_setup(&fx, "Host example.com\n  User alice\n") != 0) {
         TEST_FAIL_MSG("could not set up SSH fixture");
         return;
     }
 
-    lle_memory_pool_t *pool = (lle_memory_pool_t *)1; /* LLE pool sentinel */
+    lle_memory_pool_t *pool = (lle_memory_pool_t *)1; // LLE pool sentinel
     lle_completion_result_t *result = NULL;
     lle_result_t r = lle_completion_result_create(pool, 8, &result);
     ASSERT(r == LLE_SUCCESS);
@@ -227,7 +227,7 @@ TEST(ssh_source_skips_remote_path_syntax) {
     ssh_test_teardown(&fx);
 }
 
-/* /etc/hosts parser tests ------------------------------------------------ */
+// /etc/hosts parser tests ------------------------------------------------
 
 /* Write `body` to a fresh temp file and return its path (heap-allocated;
  * caller frees and unlinks). NULL on failure. */
@@ -332,7 +332,7 @@ TEST(etc_hosts_dedupes_against_higher_priority_source) {
 
     ssh_host_cache_t *cache = ssh_host_cache_create(64);
 
-    /* Pre-populate with a fake higher-priority entry. */
+    // Pre-populate with a fake higher-priority entry.
     ssh_host_t existing = {0};
     strncpy(existing.hostname, "production-host", SSH_MAX_HOSTNAME_LEN - 1);
     existing.priority = 100;

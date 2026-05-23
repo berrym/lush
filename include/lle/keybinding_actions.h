@@ -699,4 +699,4 @@ lle_result_t lle_keybinding_load_emacs_preset(lle_editor_t *editor);
  */
 lle_result_t lle_keybinding_load_vi_preset(lle_editor_t *editor);
 
-#endif /* LLE_KEYBINDING_ACTIONS_H */
+#endif // LLE_KEYBINDING_ACTIONS_H

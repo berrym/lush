@@ -29,10 +29,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Mock memory pool instance - just a non-NULL pointer for validation */
+// Mock memory pool instance - just a non-NULL pointer for validation
 /* The test_memory_mock.c provides lle_pool_alloc/free that don't actually use
  * this */
-/* We cast a dummy value to satisfy the pointer requirement */
+// We cast a dummy value to satisfy the pointer requirement
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
@@ -40,10 +40,10 @@ static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
 /* ========================================================================== */
-/*                            MOCK OBJECTS                                    */
+// MOCK OBJECTS
 /* ========================================================================== */
 
-/* Note: display_controller_get_event_system is provided by libdisplay.a */
+// Note: display_controller_get_event_system is provided by libdisplay.a
 
 /**
  * Mock display controller for testing
@@ -54,14 +54,14 @@ static display_controller_t *create_mock_display_controller(void) {
     if (!display)
         return NULL;
 
-    /* Create mock composition engine */
+    // Create mock composition engine
     display->compositor = calloc(1, sizeof(composition_engine_t));
     if (!display->compositor) {
         free(display);
         return NULL;
     }
 
-    /* Create mock command_layer - required by display_bridge */
+    // Create mock command_layer - required by display_bridge
     display->compositor->command_layer = calloc(1, sizeof(command_layer_t));
     if (!display->compositor->command_layer) {
         free(display->compositor);
@@ -69,7 +69,7 @@ static display_controller_t *create_mock_display_controller(void) {
         return NULL;
     }
 
-    /* Initialize minimal compositor state */
+    // Initialize minimal compositor state
     display->compositor->initialized = false;
 
     return display;
@@ -91,13 +91,13 @@ static void destroy_mock_display_controller(display_controller_t *display) {
  * Mock editor context (opaque pointer for testing)
  */
 static void *create_mock_editor(void) {
-    /* Just return a non-NULL pointer for validation tests */
+    // Just return a non-NULL pointer for validation tests
     static int dummy = 42;
     return &dummy;
 }
 
 /* ========================================================================== */
-/*                          INITIALIZATION TESTS                              */
+// INITIALIZATION TESTS
 /* ========================================================================== */
 
 TEST(bridge_init_success) {
@@ -107,14 +107,14 @@ TEST(bridge_init_success) {
 
     ASSERT_NOT_NULL(display, "Mock display creation failed");
 
-    /* Test successful initialization */
+    // Test successful initialization
     lle_result_t result =
         lle_display_bridge_init(&bridge, editor, display, mock_pool);
 
     ASSERT_EQ(result, LLE_SUCCESS, "Bridge init should succeed");
     ASSERT_NOT_NULL(bridge, "Bridge should be allocated");
 
-    /* Verify bridge state */
+    // Verify bridge state
     ASSERT_NOT_NULL(bridge->composition_engine,
                     "Composition engine should be set");
     ASSERT_EQ(bridge->sync_state, LLE_DISPLAY_SYNC_IDLE,
@@ -127,7 +127,7 @@ TEST(bridge_init_success) {
     ASSERT_NOT_NULL(bridge->error_context,
                     "Error context should be initialized");
 
-    /* Cleanup */
+    // Cleanup
     lle_display_bridge_cleanup(bridge);
     lle_pool_free(bridge);
     destroy_mock_display_controller(display);
@@ -139,14 +139,14 @@ TEST(bridge_init_null_bridge_pointer) {
 
     ASSERT_NOT_NULL(display, "Mock display creation failed");
 
-    /* Test NULL bridge pointer */
+    // Test NULL bridge pointer
     lle_result_t result =
         lle_display_bridge_init(NULL, editor, display, mock_pool);
 
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
               "Should fail with NULL bridge pointer");
 
-    /* Cleanup */
+    // Cleanup
     destroy_mock_display_controller(display);
 }
 
@@ -156,14 +156,14 @@ TEST(bridge_init_null_editor) {
 
     ASSERT_NOT_NULL(display, "Mock display creation failed");
 
-    /* Test NULL editor - now allowed since editor is set per readline call */
+    // Test NULL editor - now allowed since editor is set per readline call
     lle_result_t result =
         lle_display_bridge_init(&bridge, NULL, display, mock_pool);
 
     ASSERT_EQ(result, LLE_SUCCESS, "Should succeed with NULL editor");
     ASSERT_NOT_NULL(bridge, "Bridge should be allocated");
 
-    /* Cleanup */
+    // Cleanup
     lle_display_bridge_cleanup(bridge);
     destroy_mock_display_controller(display);
 }
@@ -172,7 +172,7 @@ TEST(bridge_init_null_display) {
     lle_display_bridge_t *bridge = NULL;
     void *editor = create_mock_editor();
 
-    /* Test NULL display */
+    // Test NULL display
     lle_result_t result =
         lle_display_bridge_init(&bridge, editor, NULL, mock_pool);
 
@@ -188,7 +188,7 @@ TEST(bridge_init_null_memory_pool) {
 
     ASSERT_NOT_NULL(display, "Mock display creation failed");
 
-    /* Test NULL memory pool */
+    // Test NULL memory pool
     lle_result_t result =
         lle_display_bridge_init(&bridge, editor, display, NULL);
 
@@ -196,7 +196,7 @@ TEST(bridge_init_null_memory_pool) {
               "Should fail with NULL memory pool");
     ASSERT_NULL(bridge, "Bridge should not be allocated on failure");
 
-    /* Cleanup */
+    // Cleanup
     destroy_mock_display_controller(display);
 }
 
@@ -207,7 +207,7 @@ TEST(bridge_init_invalid_display_no_compositor) {
 
     ASSERT_NOT_NULL(display, "Display allocation failed");
 
-    /* Display has no compositor - should fail */
+    // Display has no compositor - should fail
     display->compositor = NULL;
 
     lle_result_t result =
@@ -217,12 +217,12 @@ TEST(bridge_init_invalid_display_no_compositor) {
               "Should fail with invalid display state");
     ASSERT_NULL(bridge, "Bridge should not be allocated on failure");
 
-    /* Cleanup */
+    // Cleanup
     free(display);
 }
 
 /* ========================================================================== */
-/*                            CLEANUP TESTS                                   */
+// CLEANUP TESTS
 /* ========================================================================== */
 
 TEST(bridge_cleanup_success) {
@@ -232,30 +232,30 @@ TEST(bridge_cleanup_success) {
 
     ASSERT_NOT_NULL(display, "Mock display creation failed");
 
-    /* Initialize bridge */
+    // Initialize bridge
     lle_result_t result =
         lle_display_bridge_init(&bridge, editor, display, mock_pool);
     ASSERT_EQ(result, LLE_SUCCESS, "Bridge init should succeed");
     ASSERT_NOT_NULL(bridge, "Bridge should be allocated");
 
-    /* Test cleanup */
+    // Test cleanup
     result = lle_display_bridge_cleanup(bridge);
     ASSERT_EQ(result, LLE_SUCCESS, "Bridge cleanup should succeed");
 
-    /* Verify all resources are cleared */
+    // Verify all resources are cleared
     ASSERT_NULL(bridge->error_context, "Error context should be cleared");
     ASSERT_NULL(bridge->diff_tracker, "Diff tracker should be cleared");
     ASSERT_NULL(bridge->render_queue, "Render queue should be cleared");
     ASSERT_NULL(bridge->composition_engine,
                 "Composition engine ref should be cleared");
 
-    /* Cleanup */
+    // Cleanup
     lle_pool_free(bridge);
     destroy_mock_display_controller(display);
 }
 
 TEST(bridge_cleanup_null_bridge) {
-    /* Test cleanup with NULL pointer - should handle gracefully */
+    // Test cleanup with NULL pointer - should handle gracefully
     lle_result_t result = lle_display_bridge_cleanup(NULL);
 
     ASSERT_EQ(result, LLE_ERROR_INVALID_PARAMETER,
@@ -263,7 +263,7 @@ TEST(bridge_cleanup_null_bridge) {
 }
 
 /* ========================================================================== */
-/*                        CONVENIENCE WRAPPER TEST                            */
+// CONVENIENCE WRAPPER TEST
 /* ========================================================================== */
 
 TEST(bridge_create_wrapper) {
@@ -273,21 +273,21 @@ TEST(bridge_create_wrapper) {
 
     ASSERT_NOT_NULL(display, "Mock display creation failed");
 
-    /* Test convenience wrapper function */
+    // Test convenience wrapper function
     lle_result_t result =
         lle_display_create_bridge(&bridge, editor, display, mock_pool);
 
     ASSERT_EQ(result, LLE_SUCCESS, "Bridge create wrapper should succeed");
     ASSERT_NOT_NULL(bridge, "Bridge should be allocated");
 
-    /* Cleanup */
+    // Cleanup
     lle_display_bridge_cleanup(bridge);
     lle_pool_free(bridge);
     destroy_mock_display_controller(display);
 }
 
 /* ========================================================================== */
-/*                             TEST RUNNER                                    */
+// TEST RUNNER
 /* ========================================================================== */
 
 int main(void) {
@@ -297,7 +297,7 @@ int main(void) {
     printf("================================================================="
            "\n\n");
 
-    /* Initialization tests */
+    // Initialization tests
     printf("Initialization Tests:\n");
     printf(
         "-----------------------------------------------------------------\n");
@@ -308,14 +308,14 @@ int main(void) {
     RUN_TEST(bridge_init_null_memory_pool);
     RUN_TEST(bridge_init_invalid_display_no_compositor);
 
-    /* Cleanup tests */
+    // Cleanup tests
     printf("\nCleanup Tests:\n");
     printf(
         "-----------------------------------------------------------------\n");
     RUN_TEST(bridge_cleanup_success);
     RUN_TEST(bridge_cleanup_null_bridge);
 
-    /* Convenience wrapper tests */
+    // Convenience wrapper tests
     printf("\nConvenience Wrapper Tests:\n");
     printf(
         "-----------------------------------------------------------------\n");

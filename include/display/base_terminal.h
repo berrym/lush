@@ -52,7 +52,7 @@ extern "C" {
 #endif
 #endif
 
-/* Macro to explicitly mark a parameter/variable as intentionally unused */
+// Macro to explicitly mark a parameter/variable as intentionally unused
 #ifndef UNUSED
 #define UNUSED(x) (void)(x)
 #endif
@@ -419,7 +419,7 @@ static inline void base_terminal_get_version(int *major, int *minor,
 }
 #endif
 
-#endif /* BASE_TERMINAL_H */
+#endif // BASE_TERMINAL_H
 
 // ============================================================================
 // USAGE EXAMPLES

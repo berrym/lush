@@ -522,7 +522,7 @@ prompt_layer_error_t prompt_layer_run_tests(prompt_layer_t *layer);
 }
 #endif
 
-#endif /* PROMPT_LAYER_H */
+#endif // PROMPT_LAYER_H
 
 /*
  * ============================================================================

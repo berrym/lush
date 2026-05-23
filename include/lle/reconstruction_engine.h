@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_reconstruction_engine lle_reconstruction_engine_t;
 typedef struct lle_structure_analyzer lle_structure_analyzer_t;
 typedef struct lle_multiline_parser lle_multiline_parser_t;
@@ -149,4 +149,4 @@ lle_result_t lle_reconstruction_engine_set_options(
 }
 #endif
 
-#endif /* LLE_RECONSTRUCTION_ENGINE_H */
+#endif // LLE_RECONSTRUCTION_ENGINE_H

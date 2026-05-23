@@ -93,28 +93,28 @@ typedef struct lle_arena_chunk_t {
  * destroys all children. This matches natural program scopes.
  */
 typedef struct lle_arena_t {
-    /* Arena identity and hierarchy */
+    // Arena identity and hierarchy
     const char *name;                /**< Debug name (e.g., "edit_session") */
     struct lle_arena_t *parent;      /**< Parent arena (NULL for root) */
     struct lle_arena_t *first_child; /**< First child arena */
     struct lle_arena_t
         *next_sibling; /**< Next sibling in parent's child list */
 
-    /* Memory management */
+    // Memory management
     lle_arena_chunk_t *first_chunk;   /**< First chunk (always present) */
     lle_arena_chunk_t *current_chunk; /**< Current allocation chunk */
     size_t default_chunk_size;        /**< Size for new chunks */
     size_t alignment;                 /**< Default alignment requirement */
 
 #if LLE_ARENA_STATS
-    /* Statistics (optional, can be compiled out) */
+    // Statistics (optional, can be compiled out)
     size_t total_allocated;  /**< Total bytes allocated from this arena */
     size_t allocation_count; /**< Number of allocations made */
     size_t chunk_count;      /**< Number of chunks allocated */
     size_t peak_usage;       /**< High water mark for usage */
 #endif
 
-    /* Flags */
+    // Flags
     uint32_t flags; /**< Arena configuration flags */
 } lle_arena_t;
 
@@ -417,4 +417,4 @@ void lle_arena_scratch_end(lle_arena_scratch_t *scratch);
 }
 #endif
 
-#endif /* LLE_ARENA_H */
+#endif // LLE_ARENA_H

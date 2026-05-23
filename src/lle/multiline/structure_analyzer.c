@@ -18,11 +18,11 @@
 #include <ctype.h>
 #include <string.h>
 
-/* Default configuration values */
+// Default configuration values
 #define DEFAULT_MAX_NESTING_DEPTH 50
-#define DEFAULT_MAX_COMMAND_LENGTH 1048576 /* 1MB */
+#define DEFAULT_MAX_COMMAND_LENGTH 1048576 // 1MB
 
-/* Keyword definitions */
+// Keyword definitions
 typedef struct keyword_definition {
     const char *text;
     size_t length;
@@ -48,7 +48,7 @@ static const keyword_definition_t SHELL_KEYWORDS[] = {
     {      NULL, 0,     LLE_KEYWORD_NONE, false}
 };
 
-/* Structure analyzer implementation */
+// Structure analyzer implementation
 struct lle_structure_analyzer {
     lle_memory_pool_t *memory_pool;
     lle_analyzer_config_t config;
@@ -56,7 +56,7 @@ struct lle_structure_analyzer {
     bool active;
 };
 
-/* Forward declarations for internal functions */
+// Forward declarations for internal functions
 static bool is_word_boundary(char c);
 static bool is_keyword_at_position(const char *text, size_t pos,
                                    size_t text_len,
@@ -114,7 +114,7 @@ lle_structure_analyzer_create(lle_structure_analyzer_t **analyzer,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* memory_pool can be NULL - will use global pool */
+    // memory_pool can be NULL - will use global pool
 
     lle_structure_analyzer_t *new_analyzer =
         lle_pool_alloc(sizeof(lle_structure_analyzer_t));
@@ -122,7 +122,7 @@ lle_structure_analyzer_create(lle_structure_analyzer_t **analyzer,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    new_analyzer->memory_pool = memory_pool; /* Can be NULL */
+    new_analyzer->memory_pool = memory_pool; // Can be NULL
 
     if (config) {
         memcpy(&new_analyzer->config, config, sizeof(lle_analyzer_config_t));
@@ -150,7 +150,7 @@ lle_structure_analyzer_destroy(lle_structure_analyzer_t *analyzer) {
     }
 
     analyzer->active = false;
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -197,21 +197,21 @@ lle_result_t lle_structure_analyzer_detect_keywords(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Reset context for new analysis */
+    // Reset context for new analysis
     memset(&analyzer->context, 0, sizeof(lle_analysis_context_t));
 
-    /* Count keywords first pass */
+    // Count keywords first pass
     size_t count = 0;
     for (size_t i = 0; i < command_length; i++) {
         update_context_for_char(&analyzer->context, command_text[i]);
 
-        /* Skip if we're inside quotes or comments */
+        // Skip if we're inside quotes or comments
         if (analyzer->context.in_quoted_string ||
             analyzer->context.in_comment) {
             continue;
         }
 
-        /* Check each keyword definition */
+        // Check each keyword definition
         for (const keyword_definition_t *kw = SHELL_KEYWORDS; kw->text != NULL;
              kw++) {
             bool at_start = false;
@@ -219,7 +219,7 @@ lle_result_t lle_structure_analyzer_detect_keywords(
                                        &at_start)) {
                 if (!kw->requires_command_start || at_start) {
                     count++;
-                    i += kw->length - 1; /* Skip past keyword */
+                    i += kw->length - 1; // Skip past keyword
                     break;
                 }
             }
@@ -232,34 +232,34 @@ lle_result_t lle_structure_analyzer_detect_keywords(
         return LLE_SUCCESS;
     }
 
-    /* Allocate keyword array */
+    // Allocate keyword array
     lle_keyword_match_t *kw_array =
         lle_pool_alloc(count * sizeof(lle_keyword_match_t));
     if (!kw_array) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Second pass: extract keywords */
+    // Second pass: extract keywords
     memset(&analyzer->context, 0, sizeof(lle_analysis_context_t));
     size_t kw_idx = 0;
 
     for (size_t i = 0; i < command_length; i++) {
         char c = command_text[i];
 
-        /* Track line numbers */
+        // Track line numbers
         if (c == '\n') {
             analyzer->context.current_line++;
         }
 
         update_context_for_char(&analyzer->context, c);
 
-        /* Skip if we're inside quotes or comments */
+        // Skip if we're inside quotes or comments
         if (analyzer->context.in_quoted_string ||
             analyzer->context.in_comment) {
             continue;
         }
 
-        /* Check each keyword definition */
+        // Check each keyword definition
         for (const keyword_definition_t *kw = SHELL_KEYWORDS; kw->text != NULL;
              kw++) {
             bool at_start = false;
@@ -276,7 +276,7 @@ lle_result_t lle_structure_analyzer_detect_keywords(
                            sizeof(kw_array[kw_idx].reserved));
 
                     kw_idx++;
-                    i += kw->length - 1; /* Skip past keyword */
+                    i += kw->length - 1; // Skip past keyword
                     break;
                 }
             }
@@ -319,7 +319,7 @@ lle_result_t lle_structure_analyzer_detect_type(
         return LLE_SUCCESS;
     }
 
-    /* Determine type from first keyword */
+    // Determine type from first keyword
     *construct_type = determine_construct_type(keywords[0].type);
 
     return LLE_SUCCESS;
@@ -361,7 +361,7 @@ lle_structure_analyzer_check_complete(lle_structure_analyzer_t *analyzer,
         return LLE_SUCCESS;
     }
 
-    /* Stack-based matching of opening/closing keywords */
+    // Stack-based matching of opening/closing keywords
     typedef struct {
         lle_keyword_type_t opening;
         lle_keyword_type_t closing;
@@ -377,14 +377,14 @@ lle_structure_analyzer_check_complete(lle_structure_analyzer_t *analyzer,
         {  LLE_KEYWORD_NONE, LLE_KEYWORD_NONE}
     };
 
-    /* Simple stack to track unclosed keywords */
+    // Simple stack to track unclosed keywords
     lle_keyword_type_t stack[DEFAULT_MAX_NESTING_DEPTH];
     size_t stack_size = 0;
 
     for (size_t i = 0; i < keyword_count; i++) {
         lle_keyword_type_t kw_type = keywords[i].type;
 
-        /* Check if it's an opening keyword */
+        // Check if it's an opening keyword
         bool is_opening = false;
         lle_keyword_type_t expected_closing = LLE_KEYWORD_NONE;
 
@@ -403,7 +403,7 @@ lle_structure_analyzer_check_complete(lle_structure_analyzer_t *analyzer,
             }
             stack[stack_size++] = expected_closing;
         } else {
-            /* Check if it's a closing keyword */
+            // Check if it's a closing keyword
             bool is_closing = false;
             for (const keyword_pair_t *pair = pairs;
                  pair->opening != LLE_KEYWORD_NONE; pair++) {
@@ -415,7 +415,7 @@ lle_structure_analyzer_check_complete(lle_structure_analyzer_t *analyzer,
 
             if (is_closing) {
                 if (stack_size == 0) {
-                    /* Closing without opening */
+                    // Closing without opening
                     *is_complete = false;
                     if (missing_keyword) {
                         *missing_keyword = LLE_KEYWORD_NONE;
@@ -424,7 +424,7 @@ lle_structure_analyzer_check_complete(lle_structure_analyzer_t *analyzer,
                 }
 
                 if (stack[stack_size - 1] != kw_type) {
-                    /* Mismatched closing */
+                    // Mismatched closing
                     *is_complete = false;
                     if (missing_keyword) {
                         *missing_keyword = stack[stack_size - 1];
@@ -473,7 +473,7 @@ lle_result_t lle_structure_analyzer_calculate_indentation(
 
     memset(info, 0, sizeof(lle_indentation_info_t));
 
-    /* Count lines */
+    // Count lines
     size_t line_count = 1;
     for (size_t i = 0; i < command_length; i++) {
         if (command_text[i] == '\n') {
@@ -482,32 +482,32 @@ lle_result_t lle_structure_analyzer_calculate_indentation(
     }
 
     info->line_count = line_count;
-    info->spaces_per_level = 2; /* Default to 2 spaces */
+    info->spaces_per_level = 2; // Default to 2 spaces
     info->use_tabs = false;
     info->indent_char = ' ';
 
-    /* Allocate line indentation array */
+    // Allocate line indentation array
     info->level_per_line = lle_pool_alloc(line_count * sizeof(size_t));
     if (!info->level_per_line) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Calculate indentation for each line */
+    // Calculate indentation for each line
     size_t current_line = 0;
     size_t line_start = 0;
 
     for (size_t i = 0; i <= command_length; i++) {
         if (i == command_length || command_text[i] == '\n') {
-            /* Calculate indentation for this line */
+            // Calculate indentation for this line
             size_t indent = 0;
             for (size_t j = line_start; j < i; j++) {
                 if (command_text[j] == ' ') {
                     indent++;
                 } else if (command_text[j] == '\t') {
-                    indent += 4; /* Tab = 4 spaces */
+                    indent += 4; // Tab = 4 spaces
                     info->use_tabs = true;
                 } else {
-                    break; /* Non-whitespace found */
+                    break; // Non-whitespace found
                 }
             }
 
@@ -537,14 +537,14 @@ lle_structure_analyzer_analyze(lle_structure_analyzer_t *analyzer,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Create command structure */
+    // Create command structure
     lle_result_t result =
         lle_command_structure_create(structure, analyzer->memory_pool);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    /* Detect keywords */
+    // Detect keywords
     lle_keyword_match_t *keywords = NULL;
     size_t keyword_count = 0;
 
@@ -557,11 +557,11 @@ lle_structure_analyzer_analyze(lle_structure_analyzer_t *analyzer,
         return result;
     }
 
-    /* Add keywords to structure */
+    // Add keywords to structure
     for (size_t i = 0; i < keyword_count; i++) {
         result = lle_command_structure_add_keyword(
             *structure, keywords[i].type, keywords[i].start_offset,
-            keywords[i].line_number, 0 /* Indent level calculated separately */
+            keywords[i].line_number, 0 // Indent level calculated separately
         );
 
         if (result != LLE_SUCCESS) {
@@ -571,14 +571,14 @@ lle_structure_analyzer_analyze(lle_structure_analyzer_t *analyzer,
         }
     }
 
-    /* Determine primary construct type */
+    // Determine primary construct type
     if (keyword_count > 0) {
         (*structure)->primary_type = determine_construct_type(keywords[0].type);
     } else {
         (*structure)->primary_type = LLE_CONSTRUCT_SIMPLE;
     }
 
-    /* Check completeness */
+    // Check completeness
     bool is_complete = false;
     result = lle_structure_analyzer_check_complete(
         analyzer, command_text, command_length, &is_complete, NULL);
@@ -587,7 +587,7 @@ lle_structure_analyzer_analyze(lle_structure_analyzer_t *analyzer,
         (*structure)->is_complete = is_complete;
     }
 
-    /* Calculate indentation if enabled */
+    // Calculate indentation if enabled
     if (analyzer->config.track_indentation) {
         lle_indentation_info_t *indent_info = NULL;
         result = lle_structure_analyzer_calculate_indentation(
@@ -599,7 +599,7 @@ lle_structure_analyzer_analyze(lle_structure_analyzer_t *analyzer,
         }
     }
 
-    /* Build construct tree */
+    // Build construct tree
     result = build_construct_tree(analyzer, *structure);
     if (result != LLE_SUCCESS) {
         lle_command_structure_destroy(*structure);
@@ -639,17 +639,17 @@ static bool is_keyword_at_position(const char *text, size_t pos,
                                    size_t text_len,
                                    const keyword_definition_t *keyword,
                                    bool *at_start) {
-    /* Check if we have enough characters */
+    // Check if we have enough characters
     if (pos + keyword->length > text_len) {
         return false;
     }
 
-    /* Check if keyword matches */
+    // Check if keyword matches
     if (strncmp(&text[pos], keyword->text, keyword->length) != 0) {
         return false;
     }
 
-    /* Check word boundaries */
+    // Check word boundaries
     if (pos > 0 && !is_word_boundary(text[pos - 1])) {
         return false;
     }
@@ -659,11 +659,11 @@ static bool is_keyword_at_position(const char *text, size_t pos,
         return false;
     }
 
-    /* Check if at command/line start */
+    // Check if at command/line start
     if (at_start) {
         *at_start = (pos == 0);
         if (!*at_start) {
-            /* Check if we're at the start of a line */
+            // Check if we're at the start of a line
             for (size_t i = pos; i > 0; i--) {
                 if (text[i - 1] == '\n') {
                     *at_start = true;
@@ -766,7 +766,7 @@ static lle_result_t build_construct_tree(lle_structure_analyzer_t *analyzer,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Count keywords to determine max depth */
+    // Count keywords to determine max depth
     size_t keyword_count = 0;
     lle_result_t result = lle_command_structure_count_keywords(
         structure, LLE_KEYWORD_NONE, &keyword_count);
@@ -776,9 +776,9 @@ static lle_result_t build_construct_tree(lle_structure_analyzer_t *analyzer,
     }
 
     structure->keyword_count = keyword_count;
-    structure->max_depth = 0; /* Will be calculated during tree building */
+    structure->max_depth = 0; // Will be calculated during tree building
 
-    /* Tree building implementation placeholder for future enhancement */
+    // Tree building implementation placeholder for future enhancement
     /* For now, we have the flat keyword list which is sufficient for basic
      * analysis */
 

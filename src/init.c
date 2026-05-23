@@ -195,7 +195,7 @@ static void ensure_bottom_margin(void) {
         rows = 24;
     }
 
-    /* Save cursor, move to bottom, scroll, restore */
+    // Save cursor, move to bottom, scroll, restore
     char cmd[64];
     int len = snprintf(cmd, sizeof(cmd), "\x1b[s\x1b[%d;1H\n\x1b[u", rows);
     if (len > 0 && (size_t)len < sizeof(cmd)) {
@@ -228,7 +228,7 @@ static void ensure_bottom_margin(void) {
  * @return Initial shell mode.
  */
 static shell_mode_t detect_initial_mode(int argc, char **argv, size_t optind) {
-    /* CLI flag: highest priority. */
+    // CLI flag: highest priority.
     if (shell_opts.cli_mode_override_set) {
         return (shell_mode_t)shell_opts.cli_mode_override;
     }
@@ -253,7 +253,7 @@ static shell_mode_t detect_initial_mode(int argc, char **argv, size_t optind) {
         }
     }
 
-    /* Default. */
+    // Default.
     return SHELL_MODE_LUSH;
 }
 
@@ -507,7 +507,7 @@ int init(int argc, char **argv, FILE **in) {
         // Note: detection result is cached, no need to destroy here
     }
 
-    /* Theme system removed - LLE prompt composer handles themes now */
+    // Theme system removed - LLE prompt composer handles themes now
 
     // Set up auto-correction configuration from config system
     autocorrect_config_t autocorrect_cfg;
@@ -768,7 +768,7 @@ int init(int argc, char **argv, FILE **in) {
             }
         }
 
-        /* Generate initial prompt */
+        // Generate initial prompt
         lle_shell_update_prompt();
     }
 

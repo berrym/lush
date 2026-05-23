@@ -17,7 +17,7 @@
 
 // Simple, clean token classification for parser
 typedef enum {
-    /* Basic token types */
+    // Basic token types
     TOK_EOF,    /**< End of input */
     TOK_WORD,   /**< Regular word (command, argument, variable name) */
     TOK_STRING, /**< Quoted string ('...' - literal) */
@@ -28,7 +28,7 @@ typedef enum {
     TOK_NUMBER,   /**< Numeric literal */
     TOK_VARIABLE, /**< Variable reference ($var, ${var}, etc.) */
 
-    /* Operators and separators */
+    // Operators and separators
     TOK_SEMICOLON,         /**< ; */
     TOK_PIPE,              /**< | */
     TOK_AND,               /**< & */
@@ -67,7 +67,7 @@ typedef enum {
     TOK_ARITH_EXP,   /**< $((...)) */
     TOK_BACKQUOTE,   /**< ` */
 
-    /* Delimiters */
+    // Delimiters
     TOK_LPAREN,          /**< ( */
     TOK_RPAREN,          /**< ) */
     TOK_DOUBLE_LPAREN,   /**< (( - arithmetic command start */
@@ -79,22 +79,22 @@ typedef enum {
     TOK_DOUBLE_LBRACKET, /**< [[ - extended test start */
     TOK_DOUBLE_RBRACKET, /**< ]] - extended test end */
 
-    /* Extended operators (Phase 1-2) */
+    // Extended operators (Phase 1-2)
     TOK_PLUS_ASSIGN, /**< += - append to array or add to integer */
     TOK_REGEX_MATCH, /**< =~ - regex match operator in [[ ]] */
 
-    /* Process substitution and extended pipes (Phase 3) */
+    // Process substitution and extended pipes (Phase 3)
     TOK_PROC_SUB_IN,  /**< <( - process substitution input */
     TOK_PROC_SUB_OUT, /**< >( - process substitution output */
     TOK_PIPE_STDERR,  /**< |& - pipe both stdout and stderr */
     TOK_APPEND_BOTH,  /**< &>> - append both stdout and stderr */
 
-    /* Control flow extensions (Phase 5) */
+    // Control flow extensions (Phase 5)
     TOK_CASE_FALLTHROUGH, /**< ;& - case fall-through (execute next without
                              test) */
     TOK_CASE_CONTINUE,    /**< ;;& - case continue (test next pattern) */
 
-    /* Keywords (recognized contextually) */
+    // Keywords (recognized contextually)
     TOK_IF,
     TOK_THEN,
     TOK_ELSE,
@@ -114,7 +114,7 @@ typedef enum {
     TOK_COPROC, /**< coproc keyword for coprocesses */
     TOK_REPEAT, /**< zsh repeat keyword (#103) */
 
-    /* Special */
+    // Special
     TOK_NEWLINE,    /**< \n (significant in shell) */
     TOK_WHITESPACE, /**< Spaces, tabs (usually ignored) */
     TOK_COMMENT,    /**< # comment */

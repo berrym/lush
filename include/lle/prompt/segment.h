@@ -92,18 +92,18 @@ typedef struct lle_segment_output {
  * Contains all environmental information needed to render segments.
  */
 typedef struct lle_prompt_context {
-    /* Shell state */
+    // Shell state
     int last_exit_code;            /**< Exit code of last command */
     uint64_t last_cmd_duration_ms; /**< Duration of last command */
     int background_job_count;      /**< Number of background jobs */
 
-    /* User information */
+    // User information
     char username[64];  /**< Current username */
     char hostname[256]; /**< Hostname */
     uid_t uid;          /**< User ID */
     bool is_root;       /**< Running as root */
 
-    /* Directory information */
+    // Directory information
     char cwd[PATH_MAX];         /**< Current working directory */
     char cwd_display[PATH_MAX]; /**< Display version (~ for home) */
     char home_dir[PATH_MAX];    /**< Home directory path */
@@ -112,26 +112,26 @@ typedef struct lle_prompt_context {
     bool cwd_is_writable;       /**< CWD is writable */
     bool cwd_is_git_repo;       /**< CWD is in a git repo */
 
-    /* Terminal information */
+    // Terminal information
     int terminal_width;  /**< Terminal width in columns */
     int terminal_height; /**< Terminal height in rows */
     bool has_true_color; /**< Terminal supports true color */
     bool has_256_color;  /**< Terminal supports 256 colors */
     bool has_unicode;    /**< Terminal supports Unicode */
 
-    /* Time information */
+    // Time information
     time_t current_time;  /**< Current time */
     struct tm current_tm; /**< Current time broken down */
 
-    /* Shell-specific */
+    // Shell-specific
     int shlvl;           /**< Shell nesting level */
     bool is_ssh_session; /**< Running in SSH session */
 
-    /* Keymap state (for vi mode indicator) */
+    // Keymap state (for vi mode indicator)
     char keymap[32]; /**< "viins", "vicmd", "emacs" */
 } lle_prompt_context_t;
 
-/* Forward declarations */
+// Forward declarations
 struct lle_prompt_segment;
 struct lle_theme;
 
@@ -212,35 +212,35 @@ typedef void (*lle_segment_invalidate_fn)(struct lle_prompt_segment *self);
  * @brief Complete segment definition
  */
 typedef struct lle_prompt_segment {
-    /* Identity */
+    // Identity
     char name[LLE_SEGMENT_NAME_MAX];        /**< Segment name */
     char description[LLE_SEGMENT_DESC_MAX]; /**< Segment description */
 
-    /* Capabilities */
+    // Capabilities
     uint32_t capabilities; /**< lle_segment_capability_t flags */
 
-    /* Lifecycle functions */
+    // Lifecycle functions
     lle_segment_init_fn init;       /**< Initialize segment */
     lle_segment_cleanup_fn cleanup; /**< Cleanup segment */
 
-    /* Visibility */
+    // Visibility
     lle_segment_is_enabled_fn is_enabled; /**< Check if enabled */
     lle_segment_is_visible_fn is_visible; /**< Check if visible */
 
-    /* Rendering */
+    // Rendering
     lle_segment_render_fn render; /**< Render segment */
 
-    /* Property access */
+    // Property access
     lle_segment_get_property_fn get_property; /**< Get property value */
 
-    /* Cache control */
+    // Cache control
     lle_segment_cache_valid_fn is_cache_valid;  /**< Check cache validity */
     lle_segment_invalidate_fn invalidate_cache; /**< Invalidate cache */
 
-    /* Segment-private state */
+    // Segment-private state
     void *state; /**< Private segment state */
 
-    /* Statistics */
+    // Statistics
     uint64_t total_render_time_ns; /**< Total render time */
     uint64_t render_count;         /**< Number of renders */
     uint64_t cache_hit_count;      /**< Cache hit count */
@@ -532,4 +532,4 @@ lle_prompt_segment_t *lle_segment_create_kubernetes(void);
 }
 #endif
 
-#endif /* LLE_PROMPT_SEGMENT_H */
+#endif // LLE_PROMPT_SEGMENT_H

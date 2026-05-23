@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_formatting_engine lle_formatting_engine_t;
 typedef struct lle_structure_analyzer lle_structure_analyzer_t;
 
@@ -174,4 +174,4 @@ lle_formatting_engine_set_options(lle_formatting_engine_t *engine,
 }
 #endif
 
-#endif /* LLE_FORMATTING_ENGINE_H */
+#endif // LLE_FORMATTING_ENGINE_H

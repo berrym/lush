@@ -25,7 +25,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * STRING ALLOCATION TESTS
@@ -40,7 +40,7 @@ TEST(alloc_str_basic) {
 
 TEST(alloc_str_zero) {
     char *s = alloc_str(0, false);
-    /* Implementation may return NULL or minimal buffer */
+    // Implementation may return NULL or minimal buffer
     if (s != NULL) {
         free_str(s);
     }
@@ -49,7 +49,7 @@ TEST(alloc_str_zero) {
 TEST(alloc_str_large) {
     char *s = alloc_str(10000, false);
     ASSERT_NOT_NULL(s, "Large allocation should succeed");
-    /* Write to verify it's usable */
+    // Write to verify it's usable
     memset(s, 'x', 9999);
     s[9999] = '\0';
     ASSERT_EQ(strlen(s), 9999, "Buffer should hold data");
@@ -199,7 +199,7 @@ TEST(str_skip_whitespace_none) {
 TEST(str_strip_leading_whitespace_basic) {
     char s[] = "   hello";
     size_t result = str_strip_leading_whitespace(s);
-    /* Function returns total offset processed, not count removed */
+    // Function returns total offset processed, not count removed
     ASSERT(result > 0, "Should report non-zero on success");
     ASSERT_STR_EQ(s, "hello", "Leading whitespace should be removed");
 }
@@ -207,7 +207,7 @@ TEST(str_strip_leading_whitespace_basic) {
 TEST(str_strip_trailing_whitespace_basic) {
     char s[] = "hello   ";
     ssize_t offset = str_strip_trailing_whitespace(s);
-    /* Function returns negative offset (count of removed chars) */
+    // Function returns negative offset (count of removed chars)
     ASSERT(offset < 0, "Should report negative offset for removed chars");
     ASSERT_STR_EQ(s, "hello", "Trailing whitespace should be removed");
 }
@@ -225,10 +225,10 @@ TEST(str_strip_trailing_whitespace_none) {
  */
 
 TEST(null_replace_newline_basic) {
-    /* Function only removes trailing newline, not newlines in middle */
+    // Function only removes trailing newline, not newlines in middle
     char s[] = "hello\nworld";
     null_replace_newline(s);
-    /* No trailing newline, so string unchanged */
+    // No trailing newline, so string unchanged
     ASSERT_STR_EQ(s, "hello\nworld",
                   "String without trailing newline should be unchanged");
 }
@@ -331,7 +331,7 @@ TEST(find_closing_quote_double) {
 TEST(find_closing_quote_escaped) {
     char s[] = "\"hello\\\"world\"";
     size_t pos = find_closing_quote(s);
-    /* Should find the final quote, not the escaped one */
+    // Should find the final quote, not the escaped one
     ASSERT(pos > 6, "Should skip escaped quote");
 }
 
@@ -373,7 +373,7 @@ TEST(quote_val_simple) {
     char val[] = "hello";
     char *result = quote_val(val, true);
     ASSERT_NOT_NULL(result, "quote_val should return non-NULL");
-    /* Should be quoted appropriately */
+    // Should be quoted appropriately
     ASSERT(strchr(result, '\'') != NULL || strchr(result, '"') != NULL,
            "Result should contain quotes");
     free(result);
@@ -393,7 +393,7 @@ TEST(quote_val_with_special_chars) {
     free(result);
 }
 
-/* Note: substitute_str tests removed - function declared but not implemented */
+// Note: substitute_str tests removed - function declared but not implemented
 
 /* ============================================================================
  * ESCAPE PROCESSING TESTS
@@ -485,14 +485,14 @@ TEST(free_argv_basic) {
     argv[0] = strdup("arg0");
     argv[1] = strdup("arg1");
     argv[2] = strdup("arg2");
-    /* Should not crash */
+    // Should not crash
     free_argv(3, argv);
 }
 
 TEST(free_argv_empty) {
     char **argv = malloc(1 * sizeof(char *));
     argv[0] = NULL;
-    /* Should not crash */
+    // Should not crash
     free_argv(0, NULL);
     free(argv);
 }
@@ -571,7 +571,7 @@ int main(void) {
     RUN_TEST(quote_val_with_special_chars);
 
     printf("\nString Substitution Tests:\n");
-    /* substitute_str tests removed - function not implemented */
+    // substitute_str tests removed - function not implemented
 
     printf("\nEscape Processing Tests:\n");
     RUN_TEST(process_token_escapes_newline);

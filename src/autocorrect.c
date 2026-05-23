@@ -45,7 +45,7 @@ static bool debug_enabled = false;
 static char *learned_commands[MAX_LEARNED_COMMANDS];
 static int learned_commands_count = 0;
 
-/* Forward declarations for internal helper functions */
+// Forward declarations for internal helper functions
 static void sort_corrections_by_score(correction_t *corrections, int count);
 static bool is_executable_file(const char *path);
 
@@ -311,8 +311,8 @@ bool autocorrect_prompt_user(const correction_results_t *results,
     bool term_modified = false;
     if (tcgetattr(STDIN_FILENO, &orig_term) == 0) {
         cooked_term = orig_term;
-        cooked_term.c_iflag |= ICRNL;           /* Translate CR to NL */
-        cooked_term.c_lflag |= (ICANON | ECHO); /* Canonical mode with echo */
+        cooked_term.c_iflag |= ICRNL;           // Translate CR to NL
+        cooked_term.c_lflag |= (ICANON | ECHO); // Canonical mode with echo
         if (tcsetattr(STDIN_FILENO, TCSANOW, &cooked_term) == 0) {
             term_modified = true;
         }
@@ -326,7 +326,7 @@ bool autocorrect_prompt_user(const correction_results_t *results,
         return false;
     }
 
-    /* Restore original terminal state */
+    // Restore original terminal state
     if (term_modified) {
         tcsetattr(STDIN_FILENO, TCSANOW, &orig_term);
     }
@@ -382,10 +382,10 @@ int autocorrect_similarity_score(const char *command1, const char *command2,
         return 0;
     }
 
-    /* Use libfuzzy with appropriate options */
+    // Use libfuzzy with appropriate options
     fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
     opts.case_sensitive = case_sensitive;
-    /* Unicode normalization enabled by default for proper matching */
+    // Unicode normalization enabled by default for proper matching
 
     return fuzzy_match_score(command1, command2, &opts);
 }
@@ -473,7 +473,7 @@ bool autocorrect_command_exists(executor_t *executor, const char *command) {
  * Now delegates to libfuzzy for Unicode-aware matching
  */
 int autocorrect_levenshtein_distance(const char *s1, const char *s2) {
-    /* Use libfuzzy with case-insensitive matching (original behavior) */
+    // Use libfuzzy with case-insensitive matching (original behavior)
     fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
     opts.case_sensitive = false;
     return fuzzy_levenshtein_distance(s1, s2, &opts);
@@ -484,7 +484,7 @@ int autocorrect_levenshtein_distance(const char *s1, const char *s2) {
  * Now delegates to libfuzzy for Unicode-aware matching
  */
 int autocorrect_jaro_winkler_score(const char *s1, const char *s2) {
-    /* Use libfuzzy with case-insensitive matching (original behavior) */
+    // Use libfuzzy with case-insensitive matching (original behavior)
     fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
     opts.case_sensitive = false;
     return fuzzy_jaro_winkler_score(s1, s2, &opts);
@@ -587,7 +587,7 @@ static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
 
-    /* Quick length check */
+    // Quick length check
     if (len1 > 32 || len2 > 32)
         return max_dist + 1;
     int len_diff = (int)len1 - (int)len2;
@@ -609,7 +609,7 @@ static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
         int row_min = (int)i;
 
         for (size_t j = 1; j <= len2; j++) {
-            /* Case-insensitive comparison */
+            // Case-insensitive comparison
             char c1 = s1[i - 1];
             char c2 = s2[j - 1];
             if (c1 >= 'A' && c1 <= 'Z')
@@ -625,7 +625,7 @@ static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
             int min_val =
                 del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
 
-            /* Check for transposition (Damerau extension) */
+            // Check for transposition (Damerau extension)
             if (i > 1 && j > 1) {
                 char prev_c1 = s1[i - 2];
                 char prev_c2 = s2[j - 2];
@@ -646,7 +646,7 @@ static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
                 row_min = min_val;
         }
 
-        /* Early termination if entire row exceeds threshold */
+        // Early termination if entire row exceeds threshold
         if (row_min > max_dist)
             return max_dist + 1;
     }
@@ -669,7 +669,7 @@ int autocorrect_suggest_path_commands(const char *command,
         return 0;
     }
 
-    /* Pre-filter threshold: commands within 3 edits are candidates */
+    // Pre-filter threshold: commands within 3 edits are candidates
     const int prefilter_max_dist = 3;
 
     /* Collect more candidates than requested, then sort and take best.
@@ -689,10 +689,10 @@ int autocorrect_suggest_path_commands(const char *command,
         struct dirent *entry;
         while ((entry = readdir(dp)) && candidate_count < max_candidates) {
             if (entry->d_name[0] == '.') {
-                continue; /* Skip hidden files */
+                continue; // Skip hidden files
             }
 
-            /* Fast pre-filter: skip if edit distance > threshold */
+            // Fast pre-filter: skip if edit distance > threshold
             int edit_dist =
                 fast_edit_distance(command, entry->d_name, prefilter_max_dist);
             if (edit_dist > prefilter_max_dist) {
@@ -723,17 +723,17 @@ int autocorrect_suggest_path_commands(const char *command,
 
     free(path_copy);
 
-    /* Sort candidates by score (descending) */
+    // Sort candidates by score (descending)
     sort_corrections_by_score(candidates, candidate_count);
 
-    /* Copy top results to caller's buffer */
+    // Copy top results to caller's buffer
     int result_count =
         candidate_count < max_suggestions ? candidate_count : max_suggestions;
     for (int i = 0; i < result_count; i++) {
         suggestions[i] = candidates[i];
     }
 
-    /* Free unused candidates */
+    // Free unused candidates
     for (int i = result_count; i < candidate_count; i++) {
         free(candidates[i].command);
     }

@@ -12,7 +12,7 @@
  * Week 8: Production Validation
  */
 
-/* macOS compatibility: Enable full POSIX + BSD extensions for rusage */
+// macOS compatibility: Enable full POSIX + BSD extensions for rusage
 #if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
 #define _DARWIN_C_SOURCE
 #endif
@@ -27,13 +27,13 @@
 #include <sys/time.h>
 #include <time.h>
 
-/* Mock memory pools - uses liblle.a implementations via linking */
+// Mock memory pools - uses liblle.a implementations via linking
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 static lush_memory_pool_t *mock_lush_pool =
     (lush_memory_pool_t *)&mock_pool_dummy;
 
-/* Helper functions */
+// Helper functions
 static uint64_t get_nanos(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -44,15 +44,15 @@ static size_t get_memory_usage_kb(void) {
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
 #ifdef __APPLE__
-    /* macOS returns ru_maxrss in bytes, convert to KB */
+    // macOS returns ru_maxrss in bytes, convert to KB
     return (size_t)(usage.ru_maxrss / 1024);
 #else
-    /* Linux returns ru_maxrss in KB */
+    // Linux returns ru_maxrss in KB
     return (size_t)usage.ru_maxrss;
 #endif
 }
 
-/* Test tracking */
+// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -78,7 +78,7 @@ static int tests_failed = 0;
     } while (0)
 
 /* ========================================================================== */
-/*                    STRESS TEST 1: HIGH-FREQUENCY UPDATES                   */
+// STRESS TEST 1: HIGH-FREQUENCY UPDATES
 /* ========================================================================== */
 
 void stress_test_high_frequency_updates(void) {
@@ -92,7 +92,7 @@ void stress_test_high_frequency_updates(void) {
     lle_display_cache_init(&cache, mock_pool);
     lle_dirty_tracker_init(&tracker, mock_pool);
 
-    /* Create buffer */
+    // Create buffer
     lle_buffer_t *buffer = NULL;
     lle_buffer_create(&buffer, mock_lush_pool, 0);
     const char *text = "echo 'stress test'";
@@ -107,10 +107,10 @@ void stress_test_high_frequency_updates(void) {
     int cache_misses = 0;
 
     for (int i = 0; i < 10000; i++) {
-        /* Try cache lookup */
+        // Try cache lookup
         void *cached_data = NULL;
         size_t cached_size = 0;
-        uint64_t key = (uint64_t)i % 100; /* Reuse keys for cache hits */
+        uint64_t key = (uint64_t)i % 100; // Reuse keys for cache hits
 
         if (lle_display_cache_lookup(cache, key, &cached_data, &cached_size) ==
             LLE_SUCCESS) {
@@ -121,7 +121,7 @@ void stress_test_high_frequency_updates(void) {
         } else {
             cache_misses++;
 
-            /* Render */
+            // Render
             lle_render_context_t context = {0};
             context.buffer = buffer;
 
@@ -134,7 +134,7 @@ void stress_test_high_frequency_updates(void) {
             }
         }
 
-        /* Mark dirty and clear */
+        // Mark dirty and clear
         lle_dirty_tracker_mark_region(tracker, (size_t)(i % 100));
         if (i % 100 == 0) {
             lle_dirty_tracker_clear(tracker);
@@ -156,7 +156,7 @@ void stress_test_high_frequency_updates(void) {
     printf("  Cache misses: %d\n", cache_misses);
     printf("  Memory delta: %zu KB\n", mem_delta);
 
-    /* Validate performance targets */
+    // Validate performance targets
     if (elapsed_ms > 1000.0) {
         FAIL("Took longer than 1 second");
     } else if (cache_hit_rate < 75.0) {
@@ -174,7 +174,7 @@ void stress_test_high_frequency_updates(void) {
 }
 
 /* ========================================================================== */
-/*                    STRESS TEST 2: LARGE BUFFER RENDERING                   */
+// STRESS TEST 2: LARGE BUFFER RENDERING
 /* ========================================================================== */
 
 void stress_test_large_buffers(void) {
@@ -183,7 +183,7 @@ void stress_test_large_buffers(void) {
     lle_render_pipeline_t *pipeline = NULL;
     lle_render_pipeline_init(&pipeline, mock_pool);
 
-    /* Create large buffer (10KB) */
+    // Create large buffer (10KB)
     lle_buffer_t *buffer = NULL;
     lle_buffer_create(&buffer, mock_lush_pool, 0);
 
@@ -237,7 +237,7 @@ void stress_test_large_buffers(void) {
 }
 
 /* ========================================================================== */
-/*                    STRESS TEST 3: CACHE CHURN                              */
+// STRESS TEST 3: CACHE CHURN
 /* ========================================================================== */
 
 void stress_test_cache_churn(void) {
@@ -258,21 +258,21 @@ void stress_test_cache_churn(void) {
     int store_failures = 0;
 
     for (int i = 0; i < 1000; i++) {
-        /* Create unique content */
+        // Create unique content
         char content[64];
         snprintf(content, sizeof(content), "echo 'test %d'", i);
 
         lle_buffer_clear(buffer);
         lle_buffer_insert_text(buffer, 0, content, strlen(content));
 
-        /* Render */
+        // Render
         lle_render_context_t context = {0};
         context.buffer = buffer;
 
         lle_render_output_t *output = NULL;
         if (lle_render_pipeline_execute(pipeline, &context, &output) ==
             LLE_SUCCESS) {
-            /* Store with unique key */
+            // Store with unique key
             lle_result_t result = lle_display_cache_store(
                 cache, (uint64_t)i, output->content, output->content_length);
             if (result != LLE_SUCCESS) {
@@ -290,7 +290,7 @@ void stress_test_cache_churn(void) {
     printf("  Store failures: %d\n", store_failures);
     printf("  Average store time: %.2f μs\n", (elapsed_ms * 1000.0) / 1000.0);
 
-    /* Verify cache still works after churn */
+    // Verify cache still works after churn
     void *data = NULL;
     size_t size = 0;
     int recent_hits = 0;
@@ -322,7 +322,7 @@ void stress_test_cache_churn(void) {
 }
 
 /* ========================================================================== */
-/*                    STRESS TEST 4: DIRTY TRACKER PRESSURE                   */
+// STRESS TEST 4: DIRTY TRACKER PRESSURE
 /* ========================================================================== */
 
 void stress_test_dirty_tracker_pressure(void) {
@@ -341,7 +341,7 @@ void stress_test_dirty_tracker_pressure(void) {
 
     uint64_t time_mid = get_nanos();
 
-    /* Query all regions */
+    // Query all regions
     int dirty_count = 0;
     for (int i = 0; i < 10000; i++) {
         if (lle_dirty_tracker_is_region_dirty(tracker, (size_t)(i * 10))) {
@@ -361,7 +361,7 @@ void stress_test_dirty_tracker_pressure(void) {
            query_time_us / 10000.0);
     printf("  Dirty regions found: %d/10000\n", dirty_count);
 
-    /* Clear and verify */
+    // Clear and verify
     lle_dirty_tracker_clear(tracker);
 
     int clean_count = 0;
@@ -385,7 +385,7 @@ void stress_test_dirty_tracker_pressure(void) {
 }
 
 /* ========================================================================== */
-/*                    STRESS TEST 5: ERROR RECOVERY                           */
+// STRESS TEST 5: ERROR RECOVERY
 /* ========================================================================== */
 
 void stress_test_error_recovery(void) {
@@ -404,7 +404,7 @@ void stress_test_error_recovery(void) {
     int errors_handled = 0;
     int total_tests = 0;
 
-    /* Test 1: NULL buffer to pipeline */
+    // Test 1: NULL buffer to pipeline
     total_tests++;
     lle_render_context_t context = {0};
     context.buffer = NULL;
@@ -416,7 +416,7 @@ void stress_test_error_recovery(void) {
         printf("  ✓ NULL buffer rejected\n");
     }
 
-    /* Test 2: NULL cache lookup */
+    // Test 2: NULL cache lookup
     total_tests++;
     void *data = NULL;
     size_t size = 0;
@@ -425,15 +425,15 @@ void stress_test_error_recovery(void) {
         printf("  ✓ NULL cache rejected\n");
     }
 
-    /* Test 3: NULL tracker query */
+    // Test 3: NULL tracker query
     total_tests++;
     bool result = lle_dirty_tracker_is_region_dirty(NULL, 100);
-    if (result == true) { /* Safe default */
+    if (result == true) { // Safe default
         errors_handled++;
         printf("  ✓ NULL tracker returns safe default (true)\n");
     }
 
-    /* Test 4: Invalid cache key lookup */
+    // Test 4: Invalid cache key lookup
     total_tests++;
     if (lle_display_cache_lookup(cache, 99999999, &data, &size) !=
         LLE_SUCCESS) {
@@ -441,7 +441,7 @@ void stress_test_error_recovery(void) {
         printf("  ✓ Invalid cache key handled\n");
     }
 
-    /* Test 5: System continues after errors */
+    // Test 5: System continues after errors
     total_tests++;
     lle_buffer_t *buffer = NULL;
     lle_buffer_create(&buffer, mock_lush_pool, 0);
@@ -471,7 +471,7 @@ void stress_test_error_recovery(void) {
 }
 
 /* ========================================================================== */
-/*                    STRESS TEST 6: MEMORY LEAK VALIDATION                   */
+// STRESS TEST 6: MEMORY LEAK VALIDATION
 /* ========================================================================== */
 
 void stress_test_memory_leaks(void) {
@@ -492,7 +492,7 @@ void stress_test_memory_leaks(void) {
         lle_display_cache_init(&cache, mock_pool);
         lle_dirty_tracker_init(&tracker, mock_pool);
 
-        /* Do some work */
+        // Do some work
         lle_buffer_t *buffer = NULL;
         lle_buffer_create(&buffer, mock_lush_pool, 0);
         lle_buffer_insert_text(buffer, 0, "test", 4);
@@ -509,7 +509,7 @@ void stress_test_memory_leaks(void) {
         }
         lle_dirty_tracker_mark_region(tracker, (size_t)i);
 
-        /* Cleanup */
+        // Cleanup
         lle_buffer_destroy(buffer);
         lle_dirty_tracker_cleanup(tracker);
         lle_display_cache_cleanup(cache);
@@ -535,7 +535,7 @@ void stress_test_memory_leaks(void) {
 }
 
 /* ========================================================================== */
-/*                             MAIN TEST RUNNER                               */
+// MAIN TEST RUNNER
 /* ========================================================================== */
 
 int main(void) {
@@ -553,7 +553,7 @@ int main(void) {
     printf(
         "#################################################################\n");
 
-    /* Run all stress tests */
+    // Run all stress tests
     stress_test_high_frequency_updates();
     stress_test_large_buffers();
     stress_test_cache_churn();
@@ -561,7 +561,7 @@ int main(void) {
     stress_test_error_recovery();
     stress_test_memory_leaks();
 
-    /* Summary */
+    // Summary
     printf("\n");
     printf(
         "=================================================================\n");

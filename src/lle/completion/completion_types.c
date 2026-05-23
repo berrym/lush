@@ -35,51 +35,51 @@ static const lle_completion_type_info_t TYPE_INFO_DATABASE[] = {
     {  .type = LLE_COMPLETION_TYPE_BUILTIN,
      .type_name = "Built-in",
      .category_name = "BUILT-INS",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 900},
     {  .type = LLE_COMPLETION_TYPE_COMMAND,
      .type_name = "Command",
      .category_name = "COMMANDS",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 800},
     {     .type = LLE_COMPLETION_TYPE_FILE,
      .type_name = "File",
      .category_name = "FILES",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 600},
     {.type = LLE_COMPLETION_TYPE_DIRECTORY,
      .type_name = "Directory",
      .category_name = "DIRECTORIES",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 700},
     { .type = LLE_COMPLETION_TYPE_VARIABLE,
      .type_name = "Variable",
      .category_name = "VARIABLES",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 500},
     {    .type = LLE_COMPLETION_TYPE_ALIAS,
      .type_name = "Alias",
      .category_name = "ALIASES",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 950},
     {  .type = LLE_COMPLETION_TYPE_HISTORY,
      .type_name = "History",
      .category_name = "HISTORY",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 400},
     {   .type = LLE_COMPLETION_TYPE_CUSTOM,
      .type_name = "Custom",
      .category_name = "CUSTOM",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 600},
     {  .type = LLE_COMPLETION_TYPE_UNKNOWN,
      .type_name = "Other",
      .category_name = "OTHER",
-     .indicator = "", /* No symbols by default - user customizable via theme */
+     .indicator = "", // No symbols by default - user customizable via theme
  .default_priority = 100}
 };
 
-/* Note: TYPE_INFO_COUNT not currently used but kept for future validation */
+// Note: TYPE_INFO_COUNT not currently used but kept for future validation
 #define TYPE_INFO_COUNT                                                        \
     (sizeof(TYPE_INFO_DATABASE) / sizeof(TYPE_INFO_DATABASE[0]))
 

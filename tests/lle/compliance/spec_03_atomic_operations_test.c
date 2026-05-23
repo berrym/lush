@@ -74,10 +74,10 @@ static int tests_failed = 0;
         }                                                                      \
     } while (0)
 
-/* Global memory pool for tests */
+// Global memory pool for tests
 static lush_memory_pool_t *test_memory_pool = NULL;
 
-/* Test: Buffer insert operation */
+// Test: Buffer insert operation
 static void test_buffer_insert() {
     TEST("Buffer insert operation");
 
@@ -86,7 +86,7 @@ static void test_buffer_insert() {
     ASSERT_SUCCESS(result, "Buffer creation failed");
     ASSERT_TRUE(buffer != NULL, "Buffer is NULL");
 
-    /* Insert text at position 0 */
+    // Insert text at position 0
     const char *text = "Hello";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "Insert failed");
@@ -94,7 +94,7 @@ static void test_buffer_insert() {
     ASSERT_EQ(buffer->length, 5, "Buffer length incorrect");
     ASSERT_STR_EQ(buffer->data, "Hello", "Buffer content incorrect");
 
-    /* Insert more text */
+    // Insert more text
     result = lle_buffer_insert_text(buffer, 5, " World", 6);
     ASSERT_SUCCESS(result, "Second insert failed");
 
@@ -106,7 +106,7 @@ static void test_buffer_insert() {
     PASS();
 }
 
-/* Test: Buffer delete operation */
+// Test: Buffer delete operation
 static void test_buffer_delete() {
     TEST("Buffer delete operation");
 
@@ -114,11 +114,11 @@ static void test_buffer_delete() {
     lle_result_t result = lle_buffer_create(&buffer, test_memory_pool, 256);
     ASSERT_SUCCESS(result, "Buffer creation failed");
 
-    /* Insert initial text */
+    // Insert initial text
     result = lle_buffer_insert_text(buffer, 0, "Hello World", 11);
     ASSERT_SUCCESS(result, "Initial insert failed");
 
-    /* Delete " World" */
+    // Delete " World"
     result = lle_buffer_delete_text(buffer, 5, 6);
     ASSERT_SUCCESS(result, "Delete failed");
 
@@ -129,7 +129,7 @@ static void test_buffer_delete() {
     PASS();
 }
 
-/* Test: Buffer replace operation */
+// Test: Buffer replace operation
 static void test_buffer_replace() {
     TEST("Buffer replace operation");
 
@@ -137,11 +137,11 @@ static void test_buffer_replace() {
     lle_result_t result = lle_buffer_create(&buffer, test_memory_pool, 256);
     ASSERT_SUCCESS(result, "Buffer creation failed");
 
-    /* Insert initial text */
+    // Insert initial text
     result = lle_buffer_insert_text(buffer, 0, "Hello World", 11);
     ASSERT_SUCCESS(result, "Initial insert failed");
 
-    /* Replace "World" with "Claude" */
+    // Replace "World" with "Claude"
     result = lle_buffer_replace_text(buffer, 6, 5, "Claude", 6);
     ASSERT_SUCCESS(result, "Replace failed");
 
@@ -152,7 +152,7 @@ static void test_buffer_replace() {
     PASS();
 }
 
-/* Test: Change tracker initialization */
+// Test: Change tracker initialization
 static void test_change_tracker_init() {
     TEST("Change tracker initialization");
 
@@ -171,7 +171,7 @@ static void test_change_tracker_init() {
     PASS();
 }
 
-/* Test: Basic undo operation */
+// Test: Basic undo operation
 static void test_basic_undo() {
     TEST("Basic undo operation");
 
@@ -184,17 +184,17 @@ static void test_basic_undo() {
     result = lle_change_tracker_init(&tracker, test_memory_pool, 100);
     ASSERT_SUCCESS(result, "Tracker init failed");
 
-    /* Enable change tracking */
+    // Enable change tracking
     buffer->change_tracking_enabled = true;
 
-    /* Create a sequence for the operation */
+    // Create a sequence for the operation
     lle_change_sequence_t *seq = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "Insert text", &seq);
     ASSERT_SUCCESS(result, "Begin sequence failed");
 
     buffer->current_sequence = seq;
 
-    /* Insert text */
+    // Insert text
     result = lle_buffer_insert_text(buffer, 0, "Hello", 5);
     ASSERT_SUCCESS(result, "Insert failed");
 
@@ -203,7 +203,7 @@ static void test_basic_undo() {
 
     ASSERT_STR_EQ(buffer->data, "Hello", "Buffer before undo");
 
-    /* Undo the operation */
+    // Undo the operation
     ASSERT_TRUE(lle_change_tracker_can_undo(tracker), "Should be able to undo");
 
     result = lle_change_tracker_undo(tracker, buffer);
@@ -217,7 +217,7 @@ static void test_basic_undo() {
     PASS();
 }
 
-/* Test: Undo/Redo cycle */
+// Test: Undo/Redo cycle
 static void test_undo_redo_cycle() {
     TEST("Undo/Redo cycle");
 
@@ -232,7 +232,7 @@ static void test_undo_redo_cycle() {
 
     buffer->change_tracking_enabled = true;
 
-    /* First operation: Insert "Hello" */
+    // First operation: Insert "Hello"
     lle_change_sequence_t *seq1 = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "Insert Hello", &seq1);
     ASSERT_SUCCESS(result, "Begin sequence 1 failed");
@@ -246,12 +246,12 @@ static void test_undo_redo_cycle() {
 
     ASSERT_STR_EQ(buffer->data, "Hello", "After first insert");
 
-    /* Undo */
+    // Undo
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo failed");
     ASSERT_STR_EQ(buffer->data, "", "After undo");
 
-    /* Redo */
+    // Redo
     ASSERT_TRUE(lle_change_tracker_can_redo(tracker), "Should be able to redo");
     result = lle_change_tracker_redo(tracker, buffer);
     ASSERT_SUCCESS(result, "Redo failed");
@@ -268,24 +268,24 @@ int main(void) {
     printf("Spec 03: Atomic Operations and Undo/Redo Tests\n");
     printf("=================================================\n\n");
 
-    /* Initialize memory pool for tests */
+    // Initialize memory pool for tests
     lush_memory_pool_system_t pool_system;
     memset(&pool_system, 0, sizeof(pool_system));
     test_memory_pool = &pool_system;
 
-    /* Buffer Operations Tests */
+    // Buffer Operations Tests
     printf("Atomic Buffer Operations:\n");
     test_buffer_insert();
     test_buffer_delete();
     test_buffer_replace();
 
-    /* Change Tracking Tests */
+    // Change Tracking Tests
     printf("\nChange Tracking and Undo/Redo:\n");
     test_change_tracker_init();
     test_basic_undo();
     test_undo_redo_cycle();
 
-    /* Summary */
+    // Summary
     printf("\n");
     printf("=================================================\n");
     printf("Test Summary:\n");

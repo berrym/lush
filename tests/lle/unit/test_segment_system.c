@@ -28,7 +28,7 @@
 #define PASS() ((void)0)
 
 /* ========================================================================== */
-/* Registry Tests                                                             */
+// Registry Tests
 /* ========================================================================== */
 
 TEST(registry_init) {
@@ -92,7 +92,7 @@ TEST(registry_duplicate_name_rejected) {
     ASSERT_EQ(lle_segment_registry_register(&registry, seg2),
               LLE_ERROR_INVALID_STATE);
 
-    lle_segment_free(seg2); /* Not registered, must free manually */
+    lle_segment_free(seg2); // Not registered, must free manually
     lle_segment_registry_cleanup(&registry);
     PASS();
 }
@@ -117,7 +117,7 @@ TEST(registry_list_segments) {
 }
 
 /* ========================================================================== */
-/* Prompt Context Tests                                                       */
+// Prompt Context Tests
 /* ========================================================================== */
 
 TEST(context_init) {
@@ -155,7 +155,7 @@ TEST(context_cwd_display_home) {
     lle_prompt_context_t ctx;
     lle_prompt_context_init(&ctx);
 
-    /* The cwd_display should contain ~ if we're under home */
+    // The cwd_display should contain ~ if we're under home
     if (strncmp(ctx.cwd, ctx.home_dir, strlen(ctx.home_dir)) == 0) {
         ASSERT(ctx.cwd_display[0] == '~');
     }
@@ -163,7 +163,7 @@ TEST(context_cwd_display_home) {
 }
 
 /* ========================================================================== */
-/* Segment Creation Tests                                                     */
+// Segment Creation Tests
 /* ========================================================================== */
 
 TEST(segment_create) {
@@ -186,7 +186,7 @@ TEST(segment_create_null_name) {
 }
 
 /* ========================================================================== */
-/* Built-in Segment Tests                                                     */
+// Built-in Segment Tests
 /* ========================================================================== */
 
 TEST(builtin_directory_segment) {
@@ -195,12 +195,12 @@ TEST(builtin_directory_segment) {
     ASSERT_STR_EQ(seg->name, "directory");
     ASSERT(seg->render != NULL);
 
-    /* Initialize */
+    // Initialize
     if (seg->init) {
         ASSERT_EQ(seg->init(seg), LLE_SUCCESS);
     }
 
-    /* Render */
+    // Render
     lle_prompt_context_t ctx;
     lle_prompt_context_init(&ctx);
 
@@ -256,7 +256,7 @@ TEST(builtin_time_segment) {
     lle_segment_output_t output = {0};
     ASSERT_EQ(seg->render(seg, &ctx, NULL, &output), LLE_SUCCESS);
     ASSERT(!output.is_empty);
-    /* Time format: HH:MM:SS */
+    // Time format: HH:MM:SS
     ASSERT_EQ(strlen(output.content), 8);
     ASSERT(output.content[2] == ':');
     ASSERT(output.content[5] == ':');
@@ -273,7 +273,7 @@ TEST(builtin_status_segment_zero) {
     lle_prompt_context_init(&ctx);
     ctx.last_exit_code = 0;
 
-    /* Status segment hidden when exit code is 0 */
+    // Status segment hidden when exit code is 0
     ASSERT(!seg->is_visible(seg, &ctx));
 
     lle_segment_free(seg);
@@ -369,7 +369,7 @@ TEST(builtin_git_segment) {
     ASSERT(seg->capabilities & LLE_SEG_CAP_ASYNC);
     ASSERT(seg->capabilities & LLE_SEG_CAP_CACHEABLE);
 
-    /* Initialize */
+    // Initialize
     if (seg->init) {
         ASSERT_EQ(seg->init(seg), LLE_SUCCESS);
     }
@@ -383,10 +383,10 @@ TEST(register_builtins) {
     lle_segment_registry_init(&registry);
 
     size_t count = lle_segment_register_builtins(&registry);
-    ASSERT(count >= 7); /* At least 7 built-in segments */
+    ASSERT(count >= 7); // At least 7 built-in segments
     ASSERT_EQ(registry.count, count);
 
-    /* Verify some key segments exist */
+    // Verify some key segments exist
     ASSERT(lle_segment_registry_find(&registry, "directory") != NULL);
     ASSERT(lle_segment_registry_find(&registry, "user") != NULL);
     ASSERT(lle_segment_registry_find(&registry, "host") != NULL);
@@ -403,7 +403,7 @@ TEST(invalidate_all_caches) {
 
     lle_segment_register_builtins(&registry);
 
-    /* Should not crash */
+    // Should not crash
     lle_segment_registry_invalidate_all(&registry);
 
     lle_segment_registry_cleanup(&registry);
@@ -411,7 +411,7 @@ TEST(invalidate_all_caches) {
 }
 
 /* ========================================================================== */
-/* Main test runner                                                           */
+// Main test runner
 /* ========================================================================== */
 
 int main(void) {
@@ -419,7 +419,7 @@ int main(void) {
     printf("    LLE Segment System Unit Tests\n");
     printf("===========================================\n\n");
 
-    /* Registry tests */
+    // Registry tests
     RUN_TEST(registry_init);
     RUN_TEST(registry_init_null);
     RUN_TEST(registry_register_segment);
@@ -427,17 +427,17 @@ int main(void) {
     RUN_TEST(registry_duplicate_name_rejected);
     RUN_TEST(registry_list_segments);
 
-    /* Context tests */
+    // Context tests
     RUN_TEST(context_init);
     RUN_TEST(context_init_null);
     RUN_TEST(context_update);
     RUN_TEST(context_cwd_display_home);
 
-    /* Segment creation tests */
+    // Segment creation tests
     RUN_TEST(segment_create);
     RUN_TEST(segment_create_null_name);
 
-    /* Built-in segment tests */
+    // Built-in segment tests
     RUN_TEST(builtin_directory_segment);
     RUN_TEST(builtin_user_segment);
     RUN_TEST(builtin_host_segment);

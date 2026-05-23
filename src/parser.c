@@ -105,21 +105,21 @@ parser_t *parser_new_with_source(const char *input, const char *source_name,
     parser->error_message = NULL;
     parser->has_error = false;
 
-    /* Initialize structured error collection */
+    // Initialize structured error collection
     parser->source_name = source_name ? source_name : "<stdin>";
     parser->error_collector =
         shell_error_collector_new(input, strlen(input), parser->source_name, 0);
 
-    /* Initialize parser context stack */
+    // Initialize parser context stack
     parser->context_depth = 0;
     for (size_t i = 0; i < PARSER_CONTEXT_MAX; i++) {
         parser->context_stack[i] = NULL;
     }
 
-    /* Initialize recursion depth tracking */
+    // Initialize recursion depth tracking
     parser->recursion_depth = 0;
 
-    /* No heredocs pending body collection yet */
+    // No heredocs pending body collection yet
     parser->pending_heredoc_count = 0;
 
     return parser;
@@ -131,7 +131,7 @@ void parser_set_source_name(parser_t *parser, const char *source_name) {
     }
     parser->source_name = source_name ? source_name : "<stdin>";
 
-    /* Update error collector's source_name too if it exists */
+    // Update error collector's source_name too if it exists
     if (parser->error_collector) {
         parser->error_collector->source_name = parser->source_name;
     }
@@ -224,12 +224,12 @@ void parser_error_add(parser_t *parser, shell_error_code_t code,
         return;
     }
 
-    /* Get current token for location */
+    // Get current token for location
     token_t *current = tokenizer_current(parser->tokenizer);
     source_location_t loc =
         token_to_source_location(current, parser->source_name);
 
-    /* Create the error */
+    // Create the error
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -237,12 +237,12 @@ void parser_error_add(parser_t *parser, shell_error_code_t code,
     va_end(args);
 
     if (!error) {
-        /* Fallback to legacy error system */
+        // Fallback to legacy error system
         set_parser_error(parser, "parse error");
         return;
     }
 
-    /* Try to get source line for context display */
+    // Try to get source line for context display
     if (parser->error_collector && loc.line > 0) {
         char *source_line =
             shell_error_collector_get_line(parser->error_collector, loc.line);
@@ -254,17 +254,17 @@ void parser_error_add(parser_t *parser, shell_error_code_t code,
         }
     }
 
-    /* Add to collector if available */
+    // Add to collector if available
     if (parser->error_collector) {
         shell_error_collector_add(parser->error_collector, error);
     } else {
-        /* Fallback: just set legacy error and free */
+        // Fallback: just set legacy error and free
         set_parser_error(parser,
                          error->message ? error->message : "parse error");
         shell_error_free(error);
     }
 
-    /* Also set legacy error flag for compatibility */
+    // Also set legacy error flag for compatibility
     parser->has_error = true;
 }
 
@@ -277,7 +277,7 @@ void parser_error_add(parser_t *parser, shell_error_code_t code,
  */
 void parser_display_errors(parser_t *parser, FILE *out, bool use_color) {
     if (!parser || !parser->error_collector) {
-        /* Fallback to legacy error display */
+        // Fallback to legacy error display
         if (parser && parser->error_message) {
             fprintf(out, "lush: %s\n", parser->error_message);
         }
@@ -368,7 +368,7 @@ void parser_exit_recursion(parser_t *parser) {
         return;
     }
 
-    /* Assert that we're not underflowing - indicates mismatched enter/exit */
+    // Assert that we're not underflowing - indicates mismatched enter/exit
     if (parser->recursion_depth == 0) {
         /* In debug builds this would be an assertion failure.
          * In release, we just prevent underflow. */
@@ -423,8 +423,8 @@ size_t parser_get_recursion_depth(parser_t *parser) {
 #define PARSER_LOOP_MAX_NO_PROGRESS 16
 
 typedef struct parser_loop_guard {
-    size_t last_pos;    /* current token's start position last iteration */
-    size_t no_progress; /* iterations seen at the same position */
+    size_t last_pos;    /**< current token's start position last iteration */
+    size_t no_progress; /**< iterations seen at the same position */
 } parser_loop_guard_t;
 
 #define PARSER_LOOP_GUARD_INIT {.last_pos = SIZE_MAX, .no_progress = 0}
@@ -475,7 +475,7 @@ void parser_error_add_with_help_at(parser_t *parser, shell_error_code_t code,
         return;
     }
 
-    /* Create the error at the caller-supplied location */
+    // Create the error at the caller-supplied location
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -483,12 +483,12 @@ void parser_error_add_with_help_at(parser_t *parser, shell_error_code_t code,
     va_end(args);
 
     if (!error) {
-        /* Fallback to legacy error system */
+        // Fallback to legacy error system
         set_parser_error(parser, "parse error");
         return;
     }
 
-    /* Try to get source line for context display */
+    // Try to get source line for context display
     if (parser->error_collector && loc.line > 0) {
         char *source_line =
             shell_error_collector_get_line(parser->error_collector, loc.line);
@@ -500,27 +500,27 @@ void parser_error_add_with_help_at(parser_t *parser, shell_error_code_t code,
         }
     }
 
-    /* Add parser context stack to error */
+    // Add parser context stack to error
     for (size_t i = 0; i < parser->context_depth; i++) {
         shell_error_push_context(error, "%s", parser->context_stack[i]);
     }
 
-    /* Add help suggestion if provided */
+    // Add help suggestion if provided
     if (help) {
         shell_error_set_suggestion(error, help);
     }
 
-    /* Add to collector if available */
+    // Add to collector if available
     if (parser->error_collector) {
         shell_error_collector_add(parser->error_collector, error);
     } else {
-        /* Fallback: just set legacy error and free */
+        // Fallback: just set legacy error and free
         set_parser_error(parser,
                          error->message ? error->message : "parse error");
         shell_error_free(error);
     }
 
-    /* Also set legacy error flag for compatibility */
+    // Also set legacy error flag for compatibility
     parser->has_error = true;
 }
 
@@ -794,7 +794,7 @@ static node_t *parse_if_body(parser_t *parser) {
  * @return AST node for logical expression
  */
 static node_t *parse_logical_expression(parser_t *parser) {
-    /* Track recursion depth for stack overflow protection */
+    // Track recursion depth for stack overflow protection
     if (!parser_enter_recursion(parser)) {
         return NULL;
     }
@@ -908,7 +908,7 @@ static node_t *parse_command_list(parser_t *parser) {
  * @return Pipeline AST node
  */
 static node_t *parse_pipeline(parser_t *parser) {
-    /* Track recursion depth for stack overflow protection */
+    // Track recursion depth for stack overflow protection
     if (!parser_enter_recursion(parser)) {
         return NULL;
     }
@@ -1154,14 +1154,14 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         tokenizer_advance(parser->tokenizer);
         token_t *next_token = tokenizer_current(parser->tokenizer);
 
-        /* Stop collecting if next token has whitespace before it. */
+        // Stop collecting if next token has whitespace before it.
         if (next_token && next_token->position != last_end_pos) {
             break;
         }
         arg_token = next_token;
     }
 
-    /* Build a single arg node from collected tokens. */
+    // Build a single arg node from collected tokens.
     if (token_count == 1) {
         node_t *arg_node = NULL;
         switch (collected_tokens[0].type) {
@@ -1235,7 +1235,7 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
                 dequoted[i] = strdup(collected_tokens[i].text);
                 break;
             default:
-                /* Word-like tokens: word-context backslashes collapse. */
+                // Word-like tokens: word-context backslashes collapse.
                 dequoted[i] = posix_unquoted_dequote(collected_tokens[i].text);
                 break;
             }
@@ -1581,7 +1581,7 @@ static node_t *parse_simple_command(parser_t *parser) {
         return NULL;
     }
 
-    /* Create command node with source location from current token */
+    // Create command node with source location from current token
     source_location_t cmd_loc =
         token_to_source_location(current, parser->source_name);
     node_t *command = new_node_at(NODE_COMMAND, cmd_loc);
@@ -2168,7 +2168,7 @@ static node_t *finish_assignment_or_prefix(parser_t *parser,
  * @return Brace group AST node
  */
 static node_t *parse_brace_group(parser_t *parser) {
-    /* Track recursion depth for stack overflow protection */
+    // Track recursion depth for stack overflow protection
     if (!parser_enter_recursion(parser)) {
         return NULL;
     }
@@ -2183,11 +2183,11 @@ static node_t *parse_brace_group(parser_t *parser) {
         return NULL;
     }
 
-    /* Capture location for brace group */
+    // Capture location for brace group
     source_location_t brace_loc =
         token_to_source_location(current, parser->source_name);
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing brace group");
 
     // Create brace group node
@@ -2264,7 +2264,7 @@ static node_t *parse_brace_group(parser_t *parser) {
  * @return Subshell AST node
  */
 static node_t *parse_subshell(parser_t *parser) {
-    /* Track recursion depth for stack overflow protection */
+    // Track recursion depth for stack overflow protection
     if (!parser_enter_recursion(parser)) {
         return NULL;
     }
@@ -2278,11 +2278,11 @@ static node_t *parse_subshell(parser_t *parser) {
         return NULL;
     }
 
-    /* Capture location for subshell */
+    // Capture location for subshell
     source_location_t subshell_loc =
         token_to_source_location(current, parser->source_name);
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing subshell");
 
     // Create subshell node
@@ -2473,7 +2473,7 @@ static node_t *parse_redirection(parser_t *parser) {
         return NULL;
     }
 
-    /* Capture location for redirection */
+    // Capture location for redirection
     source_location_t redir_loc =
         token_to_source_location(redir_token, parser->source_name);
     node_t *redir_node = new_node_at(node_type, redir_loc);
@@ -2607,7 +2607,7 @@ static node_t *parse_redirection(parser_t *parser) {
         pending_heredoc_t *ph =
             &parser->pending_heredocs[parser->pending_heredoc_count++];
         ph->redir_node = redir_node;
-        ph->delimiter = redir_node->val.str; /* borrowed; node owns it */
+        ph->delimiter = redir_node->val.str; // borrowed; node owns it
         ph->strip_tabs = strip_tabs;
         ph->expand_variables = expand_variables;
         ph->op_loc = op_loc;
@@ -2734,7 +2734,7 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
      * the byte just past the previous heredoc's terminator. No
      * scanning for the operator or the delimiter spec is needed here:
      * deferral guarantees we are always positioned at a body start. */
-    (void)op_loc; /* retained only for the unterminated-heredoc error */
+    (void)op_loc; // retained only for the unterminated-heredoc error
 
     // Collect lines until we find the delimiter
     size_t content_size = 0;
@@ -2852,7 +2852,7 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
         if (unquoted_delimiter) {
             free(unquoted_delimiter);
         }
-        /* All input consumed scanning for the missing terminator. */
+        // All input consumed scanning for the missing terminator.
         *body_end = tokenizer->input_length;
         return NULL;
     }
@@ -2900,7 +2900,7 @@ static bool collect_pending_heredocs(parser_t *parser) {
     size_t base_offset;
     size_t base_line;
     if (cur && cur->type == TOK_NEWLINE) {
-        scan = cur->position + 1; /* past the '\n' */
+        scan = cur->position + 1; // past the '\n'
         base_line = cur->line + 1;
     } else if (cur) {
         scan = cur->position;
@@ -2977,7 +2977,7 @@ static bool collect_pending_heredocs(parser_t *parser) {
  * @return If statement AST node
  */
 static node_t *parse_if_statement(parser_t *parser) {
-    /* Capture location before consuming 'if' token */
+    // Capture location before consuming 'if' token
     token_t *if_token = tokenizer_current(parser->tokenizer);
     source_location_t if_loc =
         token_to_source_location(if_token, parser->source_name);
@@ -2986,7 +2986,7 @@ static node_t *parse_if_statement(parser_t *parser) {
         return NULL;
     }
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing if statement");
 
     node_t *if_node = new_node_at(NODE_IF, if_loc);
@@ -3130,7 +3130,7 @@ static node_t *parse_if_statement(parser_t *parser) {
  * @return While loop AST node
  */
 static node_t *parse_while_statement(parser_t *parser) {
-    /* Capture location before consuming 'while' token */
+    // Capture location before consuming 'while' token
     token_t *while_token = tokenizer_current(parser->tokenizer);
     source_location_t while_loc =
         token_to_source_location(while_token, parser->source_name);
@@ -3139,7 +3139,7 @@ static node_t *parse_while_statement(parser_t *parser) {
         return NULL;
     }
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing while loop");
 
     node_t *while_node = new_node_at(NODE_WHILE, while_loc);
@@ -3252,7 +3252,7 @@ static node_t *parse_repeat_statement(parser_t *parser) {
 
     skip_separators(parser);
 
-    /* Body: either `do ... done` or `{ ... }`. */
+    // Body: either `do ... done` or `{ ... }`.
     token_t *body_open = tokenizer_current(parser->tokenizer);
     node_t *body = NULL;
 
@@ -3324,7 +3324,7 @@ static node_t *parse_until_statement(parser_t *parser) {
         return NULL;
     }
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing until loop");
 
     node_t *until_node = new_node(NODE_UNTIL);
@@ -3401,7 +3401,7 @@ static node_t *parse_until_statement(parser_t *parser) {
  * @return For loop AST node with variable name in val.str
  */
 static node_t *parse_for_statement(parser_t *parser) {
-    /* Capture location before consuming 'for' token */
+    // Capture location before consuming 'for' token
     token_t *for_token = tokenizer_current(parser->tokenizer);
     source_location_t for_loc =
         token_to_source_location(for_token, parser->source_name);
@@ -3410,7 +3410,7 @@ static node_t *parse_for_statement(parser_t *parser) {
         return NULL;
     }
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing for loop");
 
     // Check for C-style for loop: for ((init; test; update))
@@ -3956,7 +3956,7 @@ static node_t *parse_select_statement(parser_t *parser) {
         return NULL;
     }
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing select statement");
 
     node_t *select_node = new_node(NODE_SELECT);
@@ -4253,7 +4253,7 @@ static node_t *parse_anonymous_function(parser_t *parser) {
      * helper stops naturally at non-arg tokens (NEWLINE, SEMI, EOF,
      * AMP, PIPE, redirection tokens, etc.). */
     while (collect_word_argument(parser, anon_node)) {
-        /* Loop until helper returns false (non-arg token or alloc failure). */
+        // Loop until helper returns false (non-arg token or alloc failure).
     }
     if (parser->has_error) {
         free_node_tree(anon_node);
@@ -4277,7 +4277,7 @@ static node_t *parse_case_statement(parser_t *parser) {
         return NULL;
     }
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing case statement");
 
     node_t *case_node = new_node(NODE_CASE);
@@ -4738,7 +4738,7 @@ static node_t *parse_function_definition(parser_t *parser) {
         current = tokenizer_current(parser->tokenizer);
     }
 
-    /* Push context for better error messages */
+    // Push context for better error messages
     parser_push_context(parser, "parsing function definition");
 
     if (!current || !token_is_word_like(current->type)) {
@@ -4800,7 +4800,7 @@ static node_t *parse_function_definition(parser_t *parser) {
     function_param_t *params = NULL;
     function_param_t *last_param = NULL;
     int param_count = 0;
-    (void)param_count; /* Reserved for parameter limit validation */
+    (void)param_count; // Reserved for parameter limit validation
 
     // Check if we have parameters (not immediate ')')
     current = tokenizer_current(parser->tokenizer);
@@ -5100,7 +5100,7 @@ static node_t *parse_arithmetic_command(parser_t *parser) {
         return NULL;
     }
 
-    /* Capture location for arithmetic command */
+    // Capture location for arithmetic command
     source_location_t arith_loc =
         token_to_source_location(current, parser->source_name);
 
@@ -5239,7 +5239,7 @@ static node_t *parse_array_literal(parser_t *parser) {
         return NULL;
     }
 
-    /* Capture location for array literal */
+    // Capture location for array literal
     source_location_t array_loc =
         token_to_source_location(current, parser->source_name);
 

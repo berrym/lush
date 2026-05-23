@@ -29,11 +29,11 @@ int display_lle_completion(int argc, char **argv) {
         const char *sources_subcmd = (argc >= 3) ? argv[2] : "list";
 
         if (strcmp(sources_subcmd, "list") == 0) {
-            /* List all completion sources */
+            // List all completion sources
             printf("LLE Completion Sources\n");
             printf("======================\n\n");
 
-            /* Built-in sources */
+            // Built-in sources
             printf("Built-in Sources:\n");
             size_t total = lle_completion_get_source_count();
             for (size_t i = 0; i < total; i++) {
@@ -43,7 +43,7 @@ int display_lle_completion(int argc, char **argv) {
                 }
             }
 
-            /* Custom sources */
+            // Custom sources
             size_t custom_count = lle_completion_get_custom_source_count();
             if (custom_count > 0) {
                 printf("\nCustom Sources:\n");
@@ -61,7 +61,7 @@ int display_lle_completion(int argc, char **argv) {
                 printf("\nNo custom sources registered.\n");
             }
 
-            /* Config file info */
+            // Config file info
             const lle_completion_config_t *cfg = lle_completion_get_config();
             if (cfg && cfg->config_path) {
                 printf("\nConfig file: %s\n", cfg->config_path);
@@ -75,7 +75,7 @@ int display_lle_completion(int argc, char **argv) {
             return 0;
 
         } else if (strcmp(sources_subcmd, "reload") == 0) {
-            /* Reload completion config */
+            // Reload completion config
             printf("Reloading completion config...\n");
             lle_result_t result = lle_completion_reload_config();
             if (result == LLE_SUCCESS) {

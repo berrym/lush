@@ -62,14 +62,14 @@ static int tests_failed = 0;
         }                                                                      \
     } while (0)
 
-/* Test: Cursor position structure fields */
+// Test: Cursor position structure fields
 static void test_cursor_position_structure() {
     TEST("Cursor position structure has all required fields");
 
     lle_cursor_position_t pos;
     memset(&pos, 0, sizeof(pos));
 
-    /* Verify all fields exist and can be set */
+    // Verify all fields exist and can be set
     pos.byte_offset = 0;
     pos.codepoint_index = 0;
     pos.grapheme_index = 0;
@@ -91,14 +91,14 @@ static void test_cursor_position_structure() {
     PASS();
 }
 
-/* Test: Cursor manager structure fields */
+// Test: Cursor manager structure fields
 static void test_cursor_manager_structure() {
     TEST("Cursor manager structure has all required fields");
 
     lle_cursor_manager_t mgr;
     memset(&mgr, 0, sizeof(mgr));
 
-    /* Verify all fields exist */
+    // Verify all fields exist
     mgr.sticky_column = true;
     mgr.preferred_visual_column = 0;
     mgr.buffer = NULL;
@@ -112,7 +112,7 @@ static void test_cursor_manager_structure() {
     PASS();
 }
 
-/* Test: Cursor manager initialization */
+// Test: Cursor manager initialization
 static void test_cursor_manager_init() {
     TEST("Cursor manager initialization");
 
@@ -127,7 +127,7 @@ static void test_cursor_manager_init() {
     PASS();
 }
 
-/* Test: Verify cursor position has correct field count */
+// Test: Verify cursor position has correct field count
 static void test_cursor_position_field_count() {
     TEST("Cursor position has complete field set");
 
@@ -145,15 +145,15 @@ static void test_cursor_position_field_count() {
     PASS();
 }
 
-/* Test: Cursor manager has buffer reference */
+// Test: Cursor manager has buffer reference
 static void test_cursor_manager_buffer_ref() {
     TEST("Cursor manager has buffer reference");
 
     lle_cursor_manager_t mgr;
     memset(&mgr, 0, sizeof(mgr));
 
-    /* Should be able to set buffer reference */
-    mgr.buffer = (lle_buffer_t *)0x1; /* Dummy non-NULL */
+    // Should be able to set buffer reference
+    mgr.buffer = (lle_buffer_t *)0x1; // Dummy non-NULL
 
     ASSERT_TRUE(mgr.buffer != NULL, "Buffer reference can be set");
 
@@ -166,7 +166,7 @@ int main(void) {
     printf("Spec 03: Cursor Manager Structure Verification\n");
     printf("=================================================\n\n");
 
-    /* Structure Verification Tests */
+    // Structure Verification Tests
     printf("Cursor Manager Structure Tests:\n");
     test_cursor_position_structure();
     test_cursor_manager_structure();
@@ -174,7 +174,7 @@ int main(void) {
     test_cursor_position_field_count();
     test_cursor_manager_buffer_ref();
 
-    /* Summary */
+    // Summary
     printf("\n");
     printf("=================================================\n");
     printf("Test Summary:\n");

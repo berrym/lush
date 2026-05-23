@@ -1541,7 +1541,7 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
 
     const char *key, *serialized;
     while (ht_strstr_enum_next(enum_iter, &key, &serialized)) {
-        /* Deserialize to get clean value */
+        // Deserialize to get clean value
         symvar_t *var = deserialize_variable(key, serialized);
         if (var && !(var->flags & SYMVAR_UNSET)) {
             callback(key, var->value, userdata);

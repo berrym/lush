@@ -228,7 +228,7 @@ void terminal_control_destroy(terminal_control_t *control) {
 
     terminal_control_cleanup(control);
 
-    /* Destroy base terminal if we own it */
+    // Destroy base terminal if we own it
     if (control->base_terminal) {
         base_terminal_destroy(control->base_terminal);
         control->base_terminal = NULL;
@@ -904,7 +904,7 @@ bool terminal_control_validate_color(terminal_control_t *control,
         return color.value.basic < 16;
 
     case TERMINAL_COLOR_TYPE_256:
-        /* palette is uint8_t, so always < 256 - just check capability */
+        // palette is uint8_t, so always < 256 - just check capability
         return terminal_control_has_capability(control, TERMINAL_CAP_COLOR_256);
 
     case TERMINAL_COLOR_TYPE_RGB:

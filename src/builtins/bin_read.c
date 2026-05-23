@@ -411,7 +411,7 @@ int bin_read(int argc, char **argv) {
         const char *ifs = ifs_val ? ifs_val : " \t\n";
 
         for (int i = 0; i < n_varnames - 1; i++) {
-            /* Skip leading IFS whitespace before each field. */
+            // Skip leading IFS whitespace before each field.
             while (*src && strchr(ifs, *src)) {
                 src++;
             }

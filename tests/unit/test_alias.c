@@ -25,9 +25,9 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
-/* Helper to setup and teardown aliases for each test */
+// Helper to setup and teardown aliases for each test
 static void setup_aliases(void) { init_aliases(); }
 
 static void teardown_aliases(void) { free_aliases(); }
@@ -44,7 +44,7 @@ TEST(init_aliases_basic) {
 }
 
 TEST(free_aliases_null) {
-    /* Should not crash if called before init */
+    // Should not crash if called before init
     free_aliases();
 }
 
@@ -88,9 +88,9 @@ TEST(valid_alias_name_empty) {
 }
 
 TEST(valid_alias_name_with_dash) {
-    /* Dashes may or may not be valid depending on implementation */
+    // Dashes may or may not be valid depending on implementation
     bool result = valid_alias_name("my-alias");
-    /* Just ensure it doesn't crash */
+    // Just ensure it doesn't crash
     (void)result;
 }
 
@@ -99,7 +99,7 @@ TEST(valid_alias_name_with_space) {
      * point, so "my alias" is considered valid (as "my") by the implementation
      */
     bool result = valid_alias_name("my alias");
-    (void)result; /* Just ensure it doesn't crash */
+    (void)result; // Just ensure it doesn't crash
 }
 
 TEST(valid_alias_name_with_equals) {
@@ -167,7 +167,7 @@ TEST(unset_alias_basic) {
 TEST(unset_alias_nonexistent) {
     setup_aliases();
 
-    /* Should not crash */
+    // Should not crash
     unset_alias("nonexistent");
 
     teardown_aliases();
@@ -196,7 +196,7 @@ TEST(set_multiple_aliases) {
 TEST(print_aliases_empty) {
     setup_aliases();
 
-    /* Should not crash */
+    // Should not crash
     FILE *old_stdout = stdout;
     FILE *null_out = fopen("/dev/null", "w");
     if (null_out) {
@@ -235,7 +235,7 @@ TEST(print_aliases_with_content) {
 TEST(expand_aliases_recursive_simple) {
     setup_aliases();
 
-    /* Use a unique command name that won't have existing aliases */
+    // Use a unique command name that won't have existing aliases
     set_alias("mytest", "mycommand --option");
     char *expanded = expand_aliases_recursive("mytest", 10);
     ASSERT_NOT_NULL(expanded, "Expansion should succeed");
@@ -253,7 +253,7 @@ TEST(expand_aliases_recursive_chain) {
     set_alias("ll", "l -l");
     char *expanded = expand_aliases_recursive("ll", 10);
     ASSERT_NOT_NULL(expanded, "Chain expansion should succeed");
-    /* Should expand ll -> l -l -> ls -l */
+    // Should expand ll -> l -l -> ls -l
     ASSERT(strstr(expanded, "ls") != NULL, "Chain should expand to ls");
     free(expanded);
 
@@ -264,7 +264,7 @@ TEST(expand_aliases_recursive_nonexistent) {
     setup_aliases();
 
     char *expanded = expand_aliases_recursive("notanalias", 10);
-    /* Should return NULL or original */
+    // Should return NULL or original
     if (expanded != NULL) {
         free(expanded);
     }
@@ -275,16 +275,16 @@ TEST(expand_aliases_recursive_nonexistent) {
 TEST(expand_aliases_recursive_depth_limit) {
     setup_aliases();
 
-    /* Create a deep chain */
+    // Create a deep chain
     set_alias("a", "b");
     set_alias("b", "c");
     set_alias("c", "d");
     set_alias("d", "e");
     set_alias("e", "f");
 
-    /* With depth 2, should not fully expand */
+    // With depth 2, should not fully expand
     char *expanded = expand_aliases_recursive("a", 2);
-    /* Should have stopped early */
+    // Should have stopped early
     if (expanded != NULL) {
         free(expanded);
     }
@@ -295,13 +295,13 @@ TEST(expand_aliases_recursive_depth_limit) {
 TEST(expand_aliases_recursive_circular) {
     setup_aliases();
 
-    /* Create circular aliases */
+    // Create circular aliases
     set_alias("a", "b");
     set_alias("b", "a");
 
-    /* Should handle circular reference without infinite loop */
+    // Should handle circular reference without infinite loop
     char *expanded = expand_aliases_recursive("a", 10);
-    /* Should terminate */
+    // Should terminate
     if (expanded != NULL) {
         free(expanded);
     }
@@ -346,7 +346,7 @@ TEST(expand_first_word_alias_only_first) {
 
     char *expanded = expand_first_word_alias("ll home");
     ASSERT_NOT_NULL(expanded, "Expansion should succeed");
-    /* Should expand ll but not home */
+    // Should expand ll but not home
     ASSERT(strstr(expanded, "ls -l") != NULL, "Should expand first word");
     ASSERT(strstr(expanded, "home") != NULL, "Should not expand second word");
     free(expanded);
@@ -402,7 +402,7 @@ TEST(contains_shell_operators_none) {
 /* Note: is_special_alias_char is actually an alias for valid_alias_name_char,
  * checking if char is valid in alias names, not shell operators */
 TEST(is_special_alias_char_valid_chars) {
-    /* Alphanumeric chars are valid */
+    // Alphanumeric chars are valid
     ASSERT(is_special_alias_char('a'), "Letter should be valid");
     ASSERT(is_special_alias_char('A'), "Uppercase should be valid");
     ASSERT(is_special_alias_char('0'), "Digit should be valid");
@@ -412,7 +412,7 @@ TEST(is_special_alias_char_valid_chars) {
 }
 
 TEST(is_special_alias_char_invalid_chars) {
-    /* Shell operators are NOT valid alias name chars */
+    // Shell operators are NOT valid alias name chars
     ASSERT(!is_special_alias_char('|'), "Pipe should not be valid alias char");
     ASSERT(!is_special_alias_char('>'), "> should not be valid alias char");
     ASSERT(!is_special_alias_char('<'), "< should not be valid alias char");
@@ -465,7 +465,7 @@ TEST(expand_alias_with_shell_operators_in_value) {
  */
 
 TEST(alias_usage) {
-    /* Should not crash */
+    // Should not crash
     FILE *old_stdout = stdout;
     FILE *null_out = fopen("/dev/null", "w");
     if (null_out) {
@@ -477,7 +477,7 @@ TEST(alias_usage) {
 }
 
 TEST(unalias_usage) {
-    /* Should not crash */
+    // Should not crash
     FILE *old_stdout = stdout;
     FILE *null_out = fopen("/dev/null", "w");
     if (null_out) {
@@ -528,7 +528,7 @@ TEST(alias_empty_value) {
 TEST(many_aliases) {
     setup_aliases();
 
-    /* Add many aliases */
+    // Add many aliases
     char name[32];
     char value[64];
     for (int i = 0; i < 100; i++) {
@@ -537,7 +537,7 @@ TEST(many_aliases) {
         set_alias(name, value);
     }
 
-    /* Verify some */
+    // Verify some
     ASSERT_STR_EQ(lookup_alias("alias0"), "command0 --option", "First alias");
     ASSERT_STR_EQ(lookup_alias("alias50"), "command50 --option",
                   "Middle alias");

@@ -9,7 +9,7 @@
 #include "builtins.h"
 #include "lush.h"
 
-/* Forward declaration -- defined in src/posix_opts.c */
+// Forward declaration -- defined in src/posix_opts.c
 bool is_posix_mode_enabled(void);
 
 /**

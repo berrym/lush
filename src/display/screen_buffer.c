@@ -124,7 +124,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
         return;
     }
 
-    /* Clear RPROMPT state */
+    // Clear RPROMPT state
     buffer->rprompt_text[0] = '\0';
     buffer->rprompt_visual_width = 0;
     buffer->rprompt_fits = false;
@@ -134,7 +134,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
         return;
     }
 
-    /* Copy RPROMPT text (truncate if necessary) */
+    // Copy RPROMPT text (truncate if necessary)
     size_t len = strlen(rprompt_text);
     if (len >= sizeof(buffer->rprompt_text)) {
         len = sizeof(buffer->rprompt_text) - 1;
@@ -142,7 +142,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
     memcpy(buffer->rprompt_text, rprompt_text, len);
     buffer->rprompt_text[len] = '\0';
 
-    /* Calculate visual width (excludes ANSI escape codes) */
+    // Calculate visual width (excludes ANSI escape codes)
     buffer->rprompt_visual_width =
         (int)screen_buffer_visual_width(rprompt_text, strlen(rprompt_text));
 
@@ -162,7 +162,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
      */
     int rightmost_col = buffer->command_start_col;
     if (buffer->command_end_row == buffer->command_start_row) {
-        /* Command hasn't wrapped — use the actual end of typed text */
+        // Command hasn't wrapped — use the actual end of typed text
         rightmost_col = buffer->command_end_col;
     }
 
@@ -682,9 +682,9 @@ void screen_buffer_render_with_continuation(
 
         // Track current line for continuation callback
         int logical_line = 0;
-        (void)logical_line;         /* Reserved for multi-line tracking */
+        (void)logical_line;         // Reserved for multi-line tracking
         size_t line_start_byte = 0; // Start of current line in command_text
-        (void)line_start_byte;      /* Reserved for line position tracking */
+        (void)line_start_byte;      // Reserved for line position tracking
 
         // Buffer for plain text of current line (ANSI stripped)
         char plain_line[4096];

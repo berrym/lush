@@ -15,12 +15,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/* Test result tracking */
+// Test result tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Helper macros */
+// Helper macros
 #define TEST_START(name)                                                       \
     do {                                                                       \
         tests_run++;                                                           \
@@ -82,16 +82,16 @@ void test_forensic_context_capture(void) {
     lle_result_t result = lle_forensic_capture_context(&ctx);
     ASSERT_EQ(result, LLE_SUCCESS, "Capture should succeed");
 
-    /* Verify process context */
+    // Verify process context
     ASSERT_TRUE(ctx.process_id > 0, "Process ID should be captured");
-    /* UID and GID are unsigned types, so they're always >= 0 */
-    (void)ctx.user_id;  /* Suppress unused warning */
-    (void)ctx.group_id; /* Suppress unused warning */
+    // UID and GID are unsigned types, so they're always >= 0
+    (void)ctx.user_id;  // Suppress unused warning
+    (void)ctx.group_id; // Suppress unused warning
 
-    /* Verify timestamp */
+    // Verify timestamp
     ASSERT_TRUE(ctx.timestamp_ns > 0, "Timestamp should be captured");
 
-    /* Cleanup */
+    // Cleanup
     lle_forensic_free_context(&ctx);
 
     TEST_PASS();
@@ -100,14 +100,14 @@ void test_forensic_context_capture(void) {
 void test_forensic_apply_to_entry(void) {
     TEST_START("Forensic Apply to Entry");
 
-    /* Create entry */
+    // Create entry
     lle_history_entry_t *entry = NULL;
     lle_result_t result =
         lle_history_entry_create(&entry, "test command", NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
     ASSERT_NOT_NULL(entry, "Entry should not be NULL");
 
-    /* Capture and apply forensic context */
+    // Capture and apply forensic context
     lle_forensic_context_t ctx;
     result = lle_forensic_capture_context(&ctx);
     ASSERT_EQ(result, LLE_SUCCESS, "Context capture should succeed");
@@ -115,12 +115,12 @@ void test_forensic_apply_to_entry(void) {
     result = lle_forensic_apply_to_entry(entry, &ctx);
     ASSERT_EQ(result, LLE_SUCCESS, "Apply should succeed");
 
-    /* Verify forensic fields populated */
+    // Verify forensic fields populated
     ASSERT_EQ(entry->process_id, ctx.process_id, "Process ID should match");
     ASSERT_EQ(entry->user_id, ctx.user_id, "User ID should match");
     ASSERT_EQ(entry->group_id, ctx.group_id, "Group ID should match");
 
-    /* Cleanup */
+    // Cleanup
     lle_forensic_free_context(&ctx);
     lle_history_entry_destroy(entry, NULL);
 
@@ -130,30 +130,30 @@ void test_forensic_apply_to_entry(void) {
 void test_forensic_timing(void) {
     TEST_START("Forensic Timing Markers");
 
-    /* Create entry */
+    // Create entry
     lle_history_entry_t *entry = NULL;
     lle_result_t result = lle_history_entry_create(&entry, "sleep 1", NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
 
-    /* Mark start */
+    // Mark start
     result = lle_forensic_mark_start(entry);
     ASSERT_EQ(result, LLE_SUCCESS, "Mark start should succeed");
     ASSERT_TRUE(entry->start_time_ns > 0, "Start time should be set");
 
-    /* Simulate some work */
-    usleep(10000); /* 10ms */
+    // Simulate some work
+    usleep(10000); // 10ms
 
-    /* Mark end */
+    // Mark end
     result = lle_forensic_mark_end(entry);
     ASSERT_EQ(result, LLE_SUCCESS, "Mark end should succeed");
     ASSERT_TRUE(entry->end_time_ns > entry->start_time_ns,
                 "End time should be after start");
 
-    /* Verify duration calculated */
+    // Verify duration calculated
     uint64_t duration_ns = entry->end_time_ns - entry->start_time_ns;
     ASSERT_TRUE(duration_ns >= 10000000, "Duration should be at least 10ms");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(entry, NULL);
 
     TEST_PASS();
@@ -162,15 +162,15 @@ void test_forensic_timing(void) {
 void test_forensic_usage_tracking(void) {
     TEST_START("Forensic Usage Tracking");
 
-    /* Create entry */
+    // Create entry
     lle_history_entry_t *entry = NULL;
     lle_result_t result = lle_history_entry_create(&entry, "ls -la", NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
 
-    /* Initial usage count should be 0 */
+    // Initial usage count should be 0
     ASSERT_EQ(entry->usage_count, 0, "Initial usage count should be 0");
 
-    /* Increment usage */
+    // Increment usage
     for (int i = 1; i <= 5; i++) {
         result = lle_forensic_increment_usage(entry);
         ASSERT_EQ(result, LLE_SUCCESS, "Increment should succeed");
@@ -178,7 +178,7 @@ void test_forensic_usage_tracking(void) {
                   "Usage count should increment");
     }
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(entry, NULL);
 
     TEST_PASS();
@@ -192,19 +192,19 @@ void test_forensic_usage_tracking(void) {
 void test_dedup_engine_creation(void) {
     TEST_START("Dedup Engine Creation");
 
-    /* Create history core */
+    // Create history core
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
 
-    /* Create dedup engine */
+    // Create dedup engine
     lle_history_dedup_engine_t *dedup = NULL;
     result = lle_history_dedup_create(&dedup, core, LLE_DEDUP_KEEP_RECENT,
                                       LLE_HISTORY_DEDUP_SCOPE_SESSION);
     ASSERT_EQ(result, LLE_SUCCESS, "Dedup creation should succeed");
     ASSERT_NOT_NULL(dedup, "Dedup engine should not be NULL");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_dedup_destroy(dedup);
     lle_history_core_destroy(core);
 
@@ -214,34 +214,34 @@ void test_dedup_engine_creation(void) {
 void test_dedup_duplicate_detection(void) {
     TEST_START("Dedup Duplicate Detection");
 
-    /* Create history core */
+    // Create history core
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
 
-    /* Create dedup engine */
+    // Create dedup engine
     lle_history_dedup_engine_t *dedup = NULL;
     result = lle_history_dedup_create(&dedup, core, LLE_DEDUP_KEEP_RECENT,
                                       LLE_HISTORY_DEDUP_SCOPE_SESSION);
     ASSERT_EQ(result, LLE_SUCCESS, "Dedup creation should succeed");
 
-    /* Add first entry */
+    // Add first entry
     uint64_t id1 = 0;
     result = lle_history_add_entry(core, "ls -la", 0, &id1);
     ASSERT_EQ(result, LLE_SUCCESS, "First add should succeed");
 
-    /* Create duplicate entry */
+    // Create duplicate entry
     lle_history_entry_t *dup_entry = NULL;
     result = lle_history_entry_create(&dup_entry, "ls -la", NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Dup entry creation should succeed");
 
-    /* Check for duplicate */
+    // Check for duplicate
     lle_history_entry_t *found_dup = NULL;
     result = lle_history_dedup_check(dedup, dup_entry, &found_dup);
     ASSERT_EQ(result, LLE_SUCCESS, "Duplicate should be found");
     ASSERT_NOT_NULL(found_dup, "Found duplicate should not be NULL");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(dup_entry, NULL);
     lle_history_dedup_destroy(dedup);
     lle_history_core_destroy(core);
@@ -252,22 +252,22 @@ void test_dedup_duplicate_detection(void) {
 void test_dedup_strategies(void) {
     TEST_START("Dedup Strategy Testing");
 
-    /* Create history core */
+    // Create history core
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
 
-    /* Test LLE_DEDUP_IGNORE strategy */
+    // Test LLE_DEDUP_IGNORE strategy
     lle_history_dedup_engine_t *dedup = NULL;
     result = lle_history_dedup_create(&dedup, core, LLE_DEDUP_IGNORE,
                                       LLE_HISTORY_DEDUP_SCOPE_SESSION);
     ASSERT_EQ(result, LLE_SUCCESS, "Dedup creation should succeed");
 
-    /* Add entry */
+    // Add entry
     result = lle_history_add_entry(core, "echo test", 0, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Add should succeed");
 
-    /* Create duplicate and apply strategy */
+    // Create duplicate and apply strategy
     lle_history_entry_t *dup = NULL;
     result = lle_history_entry_create(&dup, "echo test", NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
@@ -277,7 +277,7 @@ void test_dedup_strategies(void) {
     ASSERT_EQ(result, LLE_SUCCESS, "Apply should succeed");
     ASSERT_TRUE(rejected, "Duplicate should be rejected with IGNORE strategy");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(dup, NULL);
     lle_history_dedup_destroy(dedup);
     lle_history_core_destroy(core);
@@ -288,7 +288,7 @@ void test_dedup_strategies(void) {
 void test_dedup_statistics(void) {
     TEST_START("Dedup Statistics");
 
-    /* Create history core and dedup */
+    // Create history core and dedup
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
@@ -298,24 +298,24 @@ void test_dedup_statistics(void) {
                                       LLE_HISTORY_DEDUP_SCOPE_SESSION);
     ASSERT_EQ(result, LLE_SUCCESS, "Dedup creation should succeed");
 
-    /* Add some entries */
+    // Add some entries
     result = lle_history_add_entry(core, "command1", 0, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Add should succeed");
 
-    /* Create and check duplicates */
+    // Create and check duplicates
     lle_history_entry_t *dup1 = NULL;
     result = lle_history_entry_create(&dup1, "command1", NULL);
     lle_history_entry_t *found = NULL;
     result = lle_history_dedup_check(dedup, dup1, &found);
 
-    /* Get statistics */
+    // Get statistics
     lle_history_dedup_stats_t stats;
     result = lle_history_dedup_get_stats(dedup, &stats);
     ASSERT_EQ(result, LLE_SUCCESS, "Get stats should succeed");
     ASSERT_TRUE(stats.duplicates_detected > 0,
                 "Should have detected duplicates");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(dup1, NULL);
     lle_history_dedup_destroy(dedup);
     lle_history_core_destroy(core);
@@ -331,14 +331,14 @@ void test_dedup_statistics(void) {
 void test_multiline_detection(void) {
     TEST_START("Multiline Detection");
 
-    /* Test single-line */
+    // Test single-line
     bool is_multiline = true;
     lle_result_t result =
         lle_history_detect_multiline("echo test", &is_multiline);
     ASSERT_EQ(result, LLE_SUCCESS, "Detection should succeed");
     ASSERT_TRUE(!is_multiline, "Single line should not be multiline");
 
-    /* Test multiline */
+    // Test multiline
     result =
         lle_history_detect_multiline("echo test\necho test2", &is_multiline);
     ASSERT_EQ(result, LLE_SUCCESS, "Detection should succeed");
@@ -372,12 +372,12 @@ void test_multiline_preservation(void) {
 
     const char *multiline_cmd = "if [ -f test ]; then\n    echo exists\nfi";
 
-    /* Create entry */
+    // Create entry
     lle_history_entry_t *entry = NULL;
     lle_result_t result = lle_history_entry_create(&entry, multiline_cmd, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
 
-    /* Preserve multiline */
+    // Preserve multiline
     result = lle_history_preserve_multiline(entry, multiline_cmd);
     ASSERT_EQ(result, LLE_SUCCESS, "Preservation should succeed");
 
@@ -386,12 +386,12 @@ void test_multiline_preservation(void) {
     ASSERT_TRUE(strcmp(entry->original_multiline, multiline_cmd) == 0,
                 "Original should match input");
 
-    /* Verify flattened command */
+    // Verify flattened command
     ASSERT_NOT_NULL(entry->command, "Flattened command should exist");
     ASSERT_TRUE(strchr(entry->command, '\n') == NULL,
                 "Flattened should not have newlines");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(entry, NULL);
 
     TEST_PASS();
@@ -402,7 +402,7 @@ void test_multiline_reconstruction(void) {
 
     const char *original = "for i in 1 2 3; do\n    echo $i\ndone";
 
-    /* Create and preserve */
+    // Create and preserve
     lle_history_entry_t *entry = NULL;
     lle_result_t result = lle_history_entry_create(&entry, original, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
@@ -410,21 +410,21 @@ void test_multiline_reconstruction(void) {
     result = lle_history_preserve_multiline(entry, original);
     ASSERT_EQ(result, LLE_SUCCESS, "Preservation should succeed");
 
-    /* Reconstruct in original format */
+    // Reconstruct in original format
     char buffer[1024];
     result = lle_history_reconstruct_multiline(entry, buffer, sizeof(buffer),
                                                LLE_MULTILINE_FORMAT_ORIGINAL);
     ASSERT_EQ(result, LLE_SUCCESS, "Reconstruction should succeed");
     ASSERT_TRUE(strcmp(buffer, original) == 0, "Should match original");
 
-    /* Reconstruct in flattened format */
+    // Reconstruct in flattened format
     result = lle_history_reconstruct_multiline(entry, buffer, sizeof(buffer),
                                                LLE_MULTILINE_FORMAT_FLATTENED);
     ASSERT_EQ(result, LLE_SUCCESS, "Flattened reconstruction should succeed");
     ASSERT_TRUE(strchr(buffer, '\n') == NULL,
                 "Flattened should not have newlines");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(entry, NULL);
 
     TEST_PASS();
@@ -444,7 +444,7 @@ void test_multiline_line_analysis(void) {
     ASSERT_EQ(line_count, 3, "Should have 3 lines");
     ASSERT_NOT_NULL(lines, "Lines array should not be NULL");
 
-    /* Verify line information */
+    // Verify line information
     ASSERT_EQ(lines[0].line_number, 1, "First line number should be 1");
     ASSERT_EQ(lines[0].indentation, 0, "First line should have no indent");
 
@@ -454,7 +454,7 @@ void test_multiline_line_analysis(void) {
     ASSERT_EQ(lines[2].line_number, 3, "Third line number should be 3");
     ASSERT_EQ(lines[2].indentation, 4, "Third line should have 4 spaces");
 
-    /* Cleanup */
+    // Cleanup
     lle_history_free_multiline_lines(lines);
 
     TEST_PASS();
@@ -468,32 +468,32 @@ void test_multiline_line_analysis(void) {
 void test_forensics_and_dedup_integration(void) {
     TEST_START("Forensics + Dedup Integration");
 
-    /* Create history core with dedup DISABLED for debugging */
+    // Create history core with dedup DISABLED for debugging
     lle_history_config_t config;
     memset(&config, 0, sizeof(config));
     config.max_entries = 1000;
-    config.ignore_duplicates = false; /* DISABLE dedup to isolate issue */
+    config.ignore_duplicates = false; // DISABLE dedup to isolate issue
 
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, &config);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
-    /* Skip dedup engine check since it's disabled */
+    // Skip dedup engine check since it's disabled
 
-    /* Add SINGLE entry with forensics */
+    // Add SINGLE entry with forensics
     uint64_t id1 = 0;
     result = lle_history_add_entry(core, "test command", 0, &id1);
     ASSERT_EQ(result, LLE_SUCCESS, "Add should succeed");
 
-    /* Get entry and verify forensics captured */
+    // Get entry and verify forensics captured
     lle_history_entry_t *entry = NULL;
     result = lle_history_get_entry_by_id(core, id1, &entry);
     ASSERT_EQ(result, LLE_SUCCESS, "Get should succeed");
     ASSERT_NOT_NULL(entry, "Entry should exist");
     ASSERT_TRUE(entry->process_id > 0, "Forensics should be captured");
 
-    /* SKIP adding duplicate to isolate the bug */
+    // SKIP adding duplicate to isolate the bug
 
-    /* Cleanup */
+    // Cleanup
     lle_history_core_destroy(core);
 
     TEST_PASS();
@@ -504,21 +504,21 @@ void test_forensics_and_multiline_integration(void) {
 
     const char *multiline = "function test() {\n    echo hello\n}";
 
-    /* Create core */
+    // Create core
     lle_history_core_t *core = NULL;
     lle_result_t result = lle_history_core_create(&core, NULL, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
 
-    /* Create multiline entry */
+    // Create multiline entry
     lle_history_entry_t *entry = NULL;
     result = lle_history_entry_create(&entry, multiline, NULL);
     ASSERT_EQ(result, LLE_SUCCESS, "Entry creation should succeed");
 
-    /* Preserve multiline */
+    // Preserve multiline
     result = lle_history_preserve_multiline(entry, multiline);
     ASSERT_EQ(result, LLE_SUCCESS, "Preservation should succeed");
 
-    /* Apply forensics */
+    // Apply forensics
     lle_forensic_context_t ctx;
     result = lle_forensic_capture_context(&ctx);
     ASSERT_EQ(result, LLE_SUCCESS, "Forensic capture should succeed");
@@ -526,12 +526,12 @@ void test_forensics_and_multiline_integration(void) {
     result = lle_forensic_apply_to_entry(entry, &ctx);
     ASSERT_EQ(result, LLE_SUCCESS, "Forensic apply should succeed");
 
-    /* Verify both multiline and forensics */
+    // Verify both multiline and forensics
     ASSERT_TRUE(entry->is_multiline, "Should be multiline");
     ASSERT_NOT_NULL(entry->original_multiline, "Original should be stored");
     ASSERT_TRUE(entry->process_id > 0, "Forensics should be applied");
 
-    /* Cleanup */
+    // Cleanup
     lle_forensic_free_context(&ctx);
     lle_history_entry_destroy(entry, NULL);
     lle_history_core_destroy(core);
@@ -542,7 +542,7 @@ void test_forensics_and_multiline_integration(void) {
 void test_all_phase4_features_together(void) {
     TEST_START("All Phase 4 Features Together");
 
-    /* Create fully configured core */
+    // Create fully configured core
     lle_history_config_t config;
     memset(&config, 0, sizeof(config));
     config.max_entries = 1000;
@@ -553,20 +553,20 @@ void test_all_phase4_features_together(void) {
     lle_result_t result = lle_history_core_create(&core, NULL, &config);
     ASSERT_EQ(result, LLE_SUCCESS, "Core creation should succeed");
 
-    /* Add multiline command */
+    // Add multiline command
     const char *multiline = "while true; do\n    echo loop\n    sleep 1\ndone";
 
     uint64_t id = 0;
     result = lle_history_add_entry(core, multiline, 0, &id);
     ASSERT_EQ(result, LLE_SUCCESS, "Add should succeed");
 
-    /* Get entry */
+    // Get entry
     lle_history_entry_t *entry = NULL;
     result = lle_history_get_entry_by_id(core, id, &entry);
     ASSERT_EQ(result, LLE_SUCCESS, "Get should succeed");
     ASSERT_NOT_NULL(entry, "Entry should exist");
 
-    /* Preserve multiline format */
+    // Preserve multiline format
     result = lle_history_preserve_multiline(entry, multiline);
     ASSERT_EQ(result, LLE_SUCCESS, "Multiline preservation should succeed");
 
@@ -580,12 +580,12 @@ void test_all_phase4_features_together(void) {
     ASSERT_NOT_NULL(entry->original_multiline, "Original preserved");
     ASSERT_NOT_NULL(core->dedup_engine, "Dedup engine exists");
 
-    /* Test duplicate handling */
+    // Test duplicate handling
     uint64_t id2 = 0;
     result = lle_history_add_entry(core, multiline, 0, &id2);
-    /* Should be handled by dedup */
+    // Should be handled by dedup
 
-    /* Cleanup */
+    // Cleanup
     lle_history_core_destroy(core);
 
     TEST_PASS();

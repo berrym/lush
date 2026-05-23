@@ -15,12 +15,12 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Mock editor structure for testing */
+// Mock editor structure for testing
 struct lle_editor {
-    int dummy; /* Placeholder */
+    int dummy; /**< Placeholder */
 };
 
-/* Test action functions */
+// Test action functions
 static int g_action_called = 0;
 
 static lle_result_t test_action(lle_editor_t *editor) {
@@ -45,12 +45,12 @@ TEST(create_destroy) {
     lle_keybinding_manager_t *manager = NULL;
     lle_result_t result;
 
-    /* Create manager */
+    // Create manager
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
     ASSERT(manager != NULL, "Manager is NULL");
 
-    /* Verify initial state */
+    // Verify initial state
     lle_keymap_mode_t mode;
     result = lle_keybinding_manager_get_mode(manager, &mode);
     ASSERT(result == LLE_SUCCESS, "Get mode failed");
@@ -61,7 +61,7 @@ TEST(create_destroy) {
     ASSERT(result == LLE_SUCCESS, "Get count failed");
     ASSERT_EQ(count, 0, "Initial count not 0");
 
-    /* Destroy */
+    // Destroy
     result = lle_keybinding_manager_destroy(manager);
     ASSERT(result == LLE_SUCCESS, "Destroy failed");
 }
@@ -69,11 +69,11 @@ TEST(create_destroy) {
 TEST(null_pointer_checks) {
     lle_result_t result;
 
-    /* Create with NULL pointer */
+    // Create with NULL pointer
     result = lle_keybinding_manager_create(NULL, NULL);
     ASSERT(result == LLE_ERROR_NULL_POINTER, "Create accepted NULL");
 
-    /* Destroy with NULL */
+    // Destroy with NULL
     result = lle_keybinding_manager_destroy(NULL);
     ASSERT(result == LLE_ERROR_NULL_POINTER, "Destroy accepted NULL");
 }
@@ -87,7 +87,7 @@ TEST(parse_simple_key) {
     lle_key_event_t key;
     lle_result_t result;
 
-    /* Parse 'a' */
+    // Parse 'a'
     result = lle_key_sequence_parse("a", &key);
     ASSERT(result == LLE_SUCCESS, "Parse 'a' failed");
     ASSERT(key.codepoint == 'a', "Codepoint incorrect");
@@ -100,7 +100,7 @@ TEST(parse_ctrl_key) {
     lle_key_event_t key;
     lle_result_t result;
 
-    /* Parse 'C-a' */
+    // Parse 'C-a'
     result = lle_key_sequence_parse("C-a", &key);
     ASSERT(result == LLE_SUCCESS, "Parse 'C-a' failed");
     ASSERT(key.codepoint == 'A', "Ctrl-a codepoint incorrect");
@@ -112,7 +112,7 @@ TEST(parse_meta_key) {
     lle_key_event_t key;
     lle_result_t result;
 
-    /* Parse 'M-f' */
+    // Parse 'M-f'
     result = lle_key_sequence_parse("M-f", &key);
     ASSERT(result == LLE_SUCCESS, "Parse 'M-f' failed");
     ASSERT(key.codepoint == 'f', "Meta-f codepoint incorrect");
@@ -124,7 +124,7 @@ TEST(parse_ctrl_meta_key) {
     lle_key_event_t key;
     lle_result_t result;
 
-    /* Parse 'C-M-x' */
+    // Parse 'C-M-x'
     result = lle_key_sequence_parse("C-M-x", &key);
     ASSERT(result == LLE_SUCCESS, "Parse 'C-M-x' failed");
     ASSERT(key.ctrl, "Ctrl not set");
@@ -135,19 +135,19 @@ TEST(parse_special_keys) {
     lle_key_event_t key;
     lle_result_t result;
 
-    /* Parse RET */
+    // Parse RET
     result = lle_key_sequence_parse("RET", &key);
     ASSERT(result == LLE_SUCCESS, "Parse RET failed");
     ASSERT(key.is_special, "RET not marked as special");
     ASSERT(key.special_key == LLE_KEY_ENTER, "RET key code incorrect");
 
-    /* Parse TAB */
+    // Parse TAB
     result = lle_key_sequence_parse("TAB", &key);
     ASSERT(result == LLE_SUCCESS, "Parse TAB failed");
     ASSERT(key.is_special, "TAB not marked as special");
     ASSERT(key.special_key == LLE_KEY_TAB, "TAB key code incorrect");
 
-    /* Parse UP */
+    // Parse UP
     result = lle_key_sequence_parse("UP", &key);
     ASSERT(result == LLE_SUCCESS, "Parse UP failed");
     ASSERT(key.is_special, "UP not marked as special");
@@ -158,13 +158,13 @@ TEST(parse_function_keys) {
     lle_key_event_t key;
     lle_result_t result;
 
-    /* Parse F1 */
+    // Parse F1
     result = lle_key_sequence_parse("F1", &key);
     ASSERT(result == LLE_SUCCESS, "Parse F1 failed");
     ASSERT(key.is_special, "F1 not marked as special");
     ASSERT(key.special_key == LLE_KEY_F1, "F1 key code incorrect");
 
-    /* Parse F12 */
+    // Parse F12
     result = lle_key_sequence_parse("F12", &key);
     ASSERT(result == LLE_SUCCESS, "Parse F12 failed");
     ASSERT(key.is_special, "F12 not marked as special");
@@ -176,7 +176,7 @@ TEST(key_event_to_string) {
     char buffer[64];
     lle_result_t result;
 
-    /* C-a */
+    // C-a
     memset(&key, 0, sizeof(key));
     key.ctrl = true;
     key.codepoint = 'A';
@@ -184,7 +184,7 @@ TEST(key_event_to_string) {
     ASSERT(result == LLE_SUCCESS, "Key to string failed");
     ASSERT(strcmp(buffer, "C-a") == 0, "C-a string incorrect");
 
-    /* M-f */
+    // M-f
     memset(&key, 0, sizeof(key));
     key.alt = true;
     key.codepoint = 'f';
@@ -205,12 +205,12 @@ TEST(bind_and_lookup) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Bind C-a to test_action */
+    // Bind C-a to test_action
     result = lle_keybinding_manager_bind(manager, "C-a", test_action,
                                          "beginning-of-line");
     ASSERT(result == LLE_SUCCESS, "Bind failed");
 
-    /* Lookup */
+    // Lookup
     lle_keybinding_action_t *action = NULL;
     result = lle_keybinding_manager_lookup(manager, "C-a", &action);
     ASSERT(result == LLE_SUCCESS, "Lookup failed");
@@ -218,7 +218,7 @@ TEST(bind_and_lookup) {
                action->func.simple == test_action,
            "Action pointer incorrect");
 
-    /* Verify count */
+    // Verify count
     size_t count;
     result = lle_keybinding_manager_get_count(manager, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
@@ -234,7 +234,7 @@ TEST(bind_multiple_keys) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Bind multiple keys */
+    // Bind multiple keys
     result = lle_keybinding_manager_bind(manager, "C-a", test_action,
                                          "beginning-of-line");
     ASSERT(result == LLE_SUCCESS, "Bind C-a failed");
@@ -247,7 +247,7 @@ TEST(bind_multiple_keys) {
                                          "forward-word");
     ASSERT(result == LLE_SUCCESS, "Bind M-f failed");
 
-    /* Verify count */
+    // Verify count
     size_t count;
     result = lle_keybinding_manager_get_count(manager, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
@@ -263,14 +263,14 @@ TEST(unbind_key) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Bind and unbind */
+    // Bind and unbind
     result = lle_keybinding_manager_bind(manager, "C-a", test_action, "test");
     ASSERT(result == LLE_SUCCESS, "Bind failed");
 
     result = lle_keybinding_manager_unbind(manager, "C-a");
     ASSERT(result == LLE_SUCCESS, "Unbind failed");
 
-    /* Verify removed */
+    // Verify removed
     lle_keybinding_action_t *action = NULL;
     result = lle_keybinding_manager_lookup(manager, "C-a", &action);
     ASSERT(result == LLE_ERROR_NOT_FOUND, "Lookup should fail after unbind");
@@ -290,7 +290,7 @@ TEST(lookup_nonexistent_key) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Lookup non-existent key */
+    // Lookup non-existent key
     lle_keybinding_action_t *action = NULL;
     result = lle_keybinding_manager_lookup(manager, "C-z", &action);
     ASSERT(result == LLE_ERROR_NOT_FOUND, "Lookup should return NOT_FOUND");
@@ -311,16 +311,16 @@ TEST(process_key_executes_action) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Bind action */
+    // Bind action
     result = lle_keybinding_manager_bind(manager, "C-a", test_action, "test");
     ASSERT(result == LLE_SUCCESS, "Bind failed");
 
-    /* Create key event */
+    // Create key event
     lle_key_event_t key;
     result = lle_key_sequence_parse("C-a", &key);
     ASSERT(result == LLE_SUCCESS, "Parse failed");
 
-    /* Process key */
+    // Process key
     g_action_called = 0;
     result = lle_keybinding_manager_process_key(manager, &editor, &key);
     ASSERT(result == LLE_SUCCESS, "Process key failed");
@@ -337,12 +337,12 @@ TEST(process_unbound_key) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Create unbound key event */
+    // Create unbound key event
     lle_key_event_t key;
     result = lle_key_sequence_parse("C-z", &key);
     ASSERT(result == LLE_SUCCESS, "Parse failed");
 
-    /* Process should fail */
+    // Process should fail
     g_action_called = 0;
     result = lle_keybinding_manager_process_key(manager, &editor, &key);
     ASSERT(result == LLE_ERROR_NOT_FOUND, "Process should return NOT_FOUND");
@@ -363,13 +363,13 @@ TEST(mode_switching) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Default should be EMACS */
+    // Default should be EMACS
     lle_keymap_mode_t mode;
     result = lle_keybinding_manager_get_mode(manager, &mode);
     ASSERT(result == LLE_SUCCESS, "Get mode failed");
     ASSERT(mode == LLE_KEYMAP_EMACS, "Default mode not EMACS");
 
-    /* Switch to VI */
+    // Switch to VI
     result = lle_keybinding_manager_set_mode(manager, LLE_KEYMAP_VI_INSERT);
     ASSERT(result == LLE_SUCCESS, "Set mode failed");
 
@@ -393,11 +393,11 @@ TEST(performance_tracking) {
     result = lle_keybinding_manager_create(&manager, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Bind action */
+    // Bind action
     result = lle_keybinding_manager_bind(manager, "C-a", test_action, "test");
     ASSERT(result == LLE_SUCCESS, "Bind failed");
 
-    /* Process key multiple times */
+    // Process key multiple times
     lle_key_event_t key;
     result = lle_key_sequence_parse("C-a", &key);
     ASSERT(result == LLE_SUCCESS, "Parse failed");
@@ -407,16 +407,16 @@ TEST(performance_tracking) {
         ASSERT(result == LLE_SUCCESS, "Process key failed");
     }
 
-    /* Check stats */
+    // Check stats
     uint64_t avg_time, max_time;
     result = lle_keybinding_manager_get_stats(manager, &avg_time, &max_time);
     ASSERT(result == LLE_SUCCESS, "Get stats failed");
 
-    /* Verify performance requirement (<50us) */
+    // Verify performance requirement (<50us)
     ASSERT(avg_time < LLE_KEYBINDING_LOOKUP_MAX_US,
            "Average lookup time exceeds 50us requirement");
 
-    /* Reset stats */
+    // Reset stats
     result = lle_keybinding_manager_reset_stats(manager);
     ASSERT(result == LLE_SUCCESS, "Reset stats failed");
 

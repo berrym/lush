@@ -286,7 +286,7 @@ size_t compat_check_line(const char *line, shell_mode_t target,
 size_t compat_check_script(const char *script, shell_mode_t target,
                            compat_result_t *results, size_t max_results);
 
-/* Forward declaration for AST node */
+// Forward declaration for AST node
 struct node;
 
 /**
@@ -298,10 +298,10 @@ struct node;
 typedef struct {
     int line;
     int column;
-    const char *severity;   /* Static string, not owned */
-    const char *message;    /* Static string from TOML, not owned */
-    const char *suggestion; /* Static string from TOML, not owned */
-    const char *feature;    /* Static string, not owned */
+    const char *severity;   /**< Static string, not owned */
+    const char *message;    /**< Static string from TOML, not owned */
+    const char *suggestion; /**< Static string from TOML, not owned */
+    const char *feature;    /**< Static string, not owned */
 } compat_ast_issue_t;
 
 /**
@@ -500,4 +500,4 @@ void compat_debug_print_stats(void);
  */
 void compat_debug_print_entry(const compat_entry_t *entry);
 
-#endif /* COMPAT_H */
+#endif // COMPAT_H

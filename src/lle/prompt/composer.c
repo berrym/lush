@@ -61,7 +61,7 @@ static void get_terminal_color_capabilities(bool *has_256, bool *has_true) {
             g_terminal_color_caps.has_true_color =
                 detection->supports_truecolor;
         } else {
-            /* Default to 256 colors if detection fails */
+            // Default to 256 colors if detection fails
             g_terminal_color_caps.has_256_color = true;
             g_terminal_color_caps.has_true_color = false;
         }
@@ -104,7 +104,7 @@ static const lle_color_t *get_segment_color(const lle_theme_t *theme,
         return NULL;
     }
 
-    /* Map segment names to semantic theme colors */
+    // Map segment names to semantic theme colors
     if (strcmp(segment_name, "user") == 0) {
         return &theme->colors.primary;
     } else if (strcmp(segment_name, "host") == 0) {
@@ -166,14 +166,14 @@ static char *composer_get_segment(const char *segment_name,
 
     lle_prompt_composer_t *composer = ctx->composer;
 
-    /* Find segment in registry */
+    // Find segment in registry
     lle_prompt_segment_t *segment =
         lle_segment_registry_find(composer->segments, segment_name);
     if (!segment) {
         return NULL;
     }
 
-    /* Handle property access */
+    // Handle property access
     if (property && segment->get_property) {
         const char *value = segment->get_property(segment, property);
         if (value) {
@@ -182,7 +182,7 @@ static char *composer_get_segment(const char *segment_name,
         return NULL;
     }
 
-    /* Render full segment */
+    // Render full segment
     lle_segment_output_t output;
     memset(&output, 0, sizeof(output));
 
@@ -193,26 +193,26 @@ static char *composer_get_segment(const char *segment_name,
             return NULL;
         }
 
-        /* Check if theme provides a color for this segment */
+        // Check if theme provides a color for this segment
         const lle_color_t *color = get_segment_color(ctx->theme, segment_name);
         if (color && color->mode != LLE_COLOR_MODE_NONE) {
-            /* Get terminal color capabilities for adaptive color support */
+            // Get terminal color capabilities for adaptive color support
             bool has_256_color = false;
             bool has_true_color = false;
             get_terminal_color_capabilities(&has_256_color, &has_true_color);
 
-            /* Downgrade color to match terminal capabilities */
+            // Downgrade color to match terminal capabilities
             lle_color_t adapted_color =
                 lle_color_downgrade(color, has_true_color, has_256_color);
 
-            /* Wrap content with color escape sequences */
+            // Wrap content with color escape sequences
             char color_start[LLE_COLOR_CODE_MAX];
             static const char *color_reset = "\033[0m";
 
             lle_color_to_ansi(&adapted_color, true, color_start,
                               sizeof(color_start));
 
-            /* Allocate buffer for colored output */
+            // Allocate buffer for colored output
             size_t total_len = strlen(color_start) + output.content_len +
                                strlen(color_reset) + 1;
             char *colored = malloc(total_len);
@@ -262,7 +262,7 @@ static bool composer_is_visible(const char *segment_name, const char *property,
         }
     }
 
-    /* Check per-segment show flag from theme config */
+    // Check per-segment show flag from theme config
     if (theme) {
         for (size_t i = 0; i < theme->segment_config_count; i++) {
             if (strcmp(theme->segment_configs[i].name, segment_name) == 0 &&
@@ -273,26 +273,26 @@ static bool composer_is_visible(const char *segment_name, const char *property,
         }
     }
 
-    /* Find segment in registry */
+    // Find segment in registry
     lle_prompt_segment_t *segment =
         lle_segment_registry_find(composer->segments, segment_name);
     if (!segment) {
         return false;
     }
 
-    /* Check if segment is enabled */
+    // Check if segment is enabled
     if (segment->is_enabled && !segment->is_enabled(segment)) {
         return false;
     }
 
-    /* Check if segment is visible in current context */
+    // Check if segment is visible in current context
     if (segment->is_visible) {
         if (!segment->is_visible(segment, &composer->context)) {
             return false;
         }
     }
 
-    /* For property check, verify property exists */
+    // For property check, verify property exists
     if (property && segment->get_property) {
         const char *value = segment->get_property(segment, property);
         return (value != NULL && strlen(value) > 0);
@@ -318,7 +318,7 @@ static const char *composer_get_color(const char *color_name, void *user_data) {
     const lle_color_t *color = NULL;
     static char ansi_buf[LLE_COLOR_CODE_MAX];
 
-    /* Map semantic color names to theme colors */
+    // Map semantic color names to theme colors
     if (strcmp(color_name, "primary") == 0) {
         color = &theme->colors.primary;
     } else if (strcmp(color_name, "secondary") == 0) {
@@ -377,16 +377,16 @@ static const char *composer_get_color(const char *color_name, void *user_data) {
         return "";
     }
 
-    /* Get terminal color capabilities for adaptive color support */
+    // Get terminal color capabilities for adaptive color support
     bool has_256_color = false;
     bool has_true_color = false;
     get_terminal_color_capabilities(&has_256_color, &has_true_color);
 
-    /* Downgrade color to match terminal capabilities */
+    // Downgrade color to match terminal capabilities
     lle_color_t adapted_color =
         lle_color_downgrade(color, has_true_color, has_256_color);
 
-    /* Convert color to ANSI escape sequence (foreground) */
+    // Convert color to ANSI escape sequence (foreground)
     lle_color_to_ansi(&adapted_color, true, ansi_buf, sizeof(ansi_buf));
     return ansi_buf;
 }
@@ -420,23 +420,23 @@ lle_result_t lle_composer_init(lle_prompt_composer_t *composer,
     composer->segments = segments;
     composer->themes = themes;
 
-    /* Initialize prompt context */
+    // Initialize prompt context
     if (segments) {
         lle_prompt_context_init(&composer->context);
     }
 
-    /* Default configuration */
+    // Default configuration
     composer->config.enable_right_prompt = false;
     composer->config.enable_transient =
-        true; /* Transient prompts enabled by default */
+        true; // Transient prompts enabled by default
     composer->config.respect_user_ps1 = true;
     composer->config.use_external_prompt = false;
 
-    /* PS1/PS2 ownership: theme owns until user overrides (Spec 28) */
+    // PS1/PS2 ownership: theme owns until user overrides (Spec 28)
     composer->ps1_owner = PS1_OWNER_THEME;
     composer->ps2_owner = PS1_OWNER_THEME;
 
-    /* Initialize transient prompt state (Spec 25 Section 12) */
+    // Initialize transient prompt state (Spec 25 Section 12)
     lle_transient_init(&composer->transient);
 
     composer->initialized = true;
@@ -456,7 +456,7 @@ void lle_composer_cleanup(lle_prompt_composer_t *composer) {
         return;
     }
 
-    /* Free cached templates */
+    // Free cached templates
     if (composer->cached_left_template) {
         lle_template_free(composer->cached_left_template);
         composer->cached_left_template = NULL;
@@ -558,26 +558,26 @@ static size_t calculate_visual_width(const char *str) {
             continue;
         }
 
-        /* Count UTF-8 character width */
+        // Count UTF-8 character width
         unsigned char c = (unsigned char)*p;
         if ((c & 0x80) == 0) {
-            /* ASCII */
+            // ASCII
             width++;
             p++;
         } else if ((c & 0xE0) == 0xC0) {
-            /* 2-byte UTF-8 */
+            // 2-byte UTF-8
             width++;
             p += 2;
         } else if ((c & 0xF0) == 0xE0) {
-            /* 3-byte UTF-8 (CJK characters are typically double-width) */
+            // 3-byte UTF-8 (CJK characters are typically double-width)
             width += 2;
             p += 3;
         } else if ((c & 0xF8) == 0xF0) {
-            /* 4-byte UTF-8 */
+            // 4-byte UTF-8
             width += 2;
             p += 4;
         } else {
-            /* Invalid or continuation byte, skip */
+            // Invalid or continuation byte, skip
             p++;
         }
     }
@@ -622,13 +622,13 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
 
     memset(output, 0, sizeof(*output));
 
-    /* Get active theme */
+    // Get active theme
     lle_theme_t *theme = NULL;
     if (composer->themes) {
         theme = lle_theme_registry_get_active(composer->themes);
     }
 
-    /* Use default template if no theme */
+    // Use default template if no theme
     const char *left_format = "${directory} ${symbol} ";
     const char *ps2_format = "> ";
     const char *right_format = "";
@@ -646,20 +646,20 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
         }
     }
 
-    /* Powerline rendering path */
+    // Powerline rendering path
     if (theme && theme->layout.style == LLE_PROMPT_STYLE_POWERLINE &&
         theme->enabled_segment_count > 0) {
         lle_result_t pl_result;
         size_t ps1_offset = 0;
 
-        /* Prepend newline if configured (compact_mode suppresses) */
+        // Prepend newline if configured (compact_mode suppresses)
         if (composer->config.newline_before_prompt &&
             !theme->layout.compact_mode) {
             output->ps1[0] = '\n';
             ps1_offset = 1;
         }
 
-        /* Render powerline PS1 */
+        // Render powerline PS1
         pl_result = lle_powerline_render(
             theme, composer->segments, &composer->context,
             LLE_POWERLINE_LEFT_TO_RIGHT, output->ps1 + ps1_offset,
@@ -668,14 +668,14 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
             snprintf(output->ps1, sizeof(output->ps1), "$ ");
         }
 
-        /* Append trailing space for cursor separation */
+        // Append trailing space for cursor separation
         output->ps1_len = strlen(output->ps1);
         if (output->ps1_len + 1 < sizeof(output->ps1)) {
             output->ps1[output->ps1_len++] = ' ';
             output->ps1[output->ps1_len] = '\0';
         }
 
-        /* Strip newlines when multiline is disabled */
+        // Strip newlines when multiline is disabled
         if (!theme->layout.enable_multiline) {
             output->ps1_len = strip_newlines(output->ps1);
         }
@@ -683,7 +683,7 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
         output->ps1_visual_width = calculate_visual_width(output->ps1);
         output->is_multiline = (strchr(output->ps1, '\n') != NULL);
 
-        /* Powerline RPROMPT */
+        // Powerline RPROMPT
         if (theme->layout.enable_right_prompt) {
             pl_result = lle_powerline_render(
                 theme, composer->segments, &composer->context,
@@ -697,7 +697,7 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
             }
         }
 
-        /* PS2 still uses template engine */
+        // PS2 still uses template engine
         lle_template_render_ctx_t render_ctx =
             lle_composer_create_render_ctx(composer);
         pl_result = lle_template_evaluate(ps2_format, &render_ctx, output->ps2,
@@ -712,11 +712,11 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
         return LLE_SUCCESS;
     }
 
-    /* Create render context */
+    // Create render context
     lle_template_render_ctx_t render_ctx =
         lle_composer_create_render_ctx(composer);
 
-    /* Render PS1 */
+    // Render PS1
     lle_result_t result;
 
     /* Prepend newline for visual separation if enabled (compact_mode
@@ -751,17 +751,17 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
         output->ps1[output->ps1_len] = '\0';
     }
 
-    /* Strip newlines when multiline is disabled */
+    // Strip newlines when multiline is disabled
     if (theme && !theme->layout.enable_multiline) {
         output->ps1_len = strip_newlines(output->ps1);
     }
 
     output->ps1_visual_width = calculate_visual_width(output->ps1);
 
-    /* Check for multiline */
+    // Check for multiline
     output->is_multiline = (strchr(output->ps1, '\n') != NULL);
 
-    /* Render PS2 */
+    // Render PS2
     result = lle_template_evaluate(ps2_format, &render_ctx, output->ps2,
                                    sizeof(output->ps2));
     if (result != LLE_SUCCESS) {
@@ -770,7 +770,7 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
     output->ps2_len = strlen(output->ps2);
     output->ps2_visual_width = calculate_visual_width(output->ps2);
 
-    /* Render RPROMPT if enabled */
+    // Render RPROMPT if enabled
     if (composer->config.enable_right_prompt && strlen(right_format) > 0) {
         result =
             lle_template_evaluate(right_format, &render_ctx, output->rprompt,
@@ -855,7 +855,7 @@ lle_result_t lle_composer_refresh_directory(lle_prompt_composer_t *composer) {
     lle_result_t result =
         lle_prompt_context_refresh_directory(&composer->context);
 
-    /* Invalidate caches on directory change */
+    // Invalidate caches on directory change
     if (result == LLE_SUCCESS && composer->segments) {
         lle_segment_registry_invalidate_all(composer->segments);
     }
@@ -909,7 +909,7 @@ lle_result_t lle_composer_set_theme(lle_prompt_composer_t *composer,
         return result;
     }
 
-    /* Clear cached templates since theme changed */
+    // Clear cached templates since theme changed
     if (composer->cached_left_template) {
         lle_template_free(composer->cached_left_template);
         composer->cached_left_template = NULL;
@@ -923,11 +923,11 @@ lle_result_t lle_composer_set_theme(lle_prompt_composer_t *composer,
         composer->cached_ps2_template = NULL;
     }
 
-    /* Theme switch always takes ownership of PS1/PS2 (Spec 28) */
+    // Theme switch always takes ownership of PS1/PS2 (Spec 28)
     composer->ps1_owner = PS1_OWNER_THEME;
     composer->ps2_owner = PS1_OWNER_THEME;
 
-    /* Apply syntax colors from the new LLE theme */
+    // Apply syntax colors from the new LLE theme
     lle_display_integration_t *integration =
         lle_display_integration_get_global();
     if (integration && integration->display_bridge &&
@@ -995,7 +995,7 @@ void lle_prompt_notify_ps2_changed(lle_prompt_composer_t *composer) {
  */
 static void composer_on_directory_changed(void *event_data, void *user_data) {
     lle_prompt_composer_t *composer = (lle_prompt_composer_t *)user_data;
-    (void)event_data; /* old_dir/new_dir available if needed */
+    (void)event_data; // old_dir/new_dir available if needed
 
     if (!composer || !composer->initialized) {
         return;
@@ -1005,12 +1005,12 @@ static void composer_on_directory_changed(void *event_data, void *user_data) {
      * This also invalidates all segment caches. */
     lle_composer_refresh_directory(composer);
 
-    /* Invalidate all segment caches - git status, directory display, etc. */
+    // Invalidate all segment caches - git status, directory display, etc.
     if (composer->segments) {
         lle_segment_registry_invalidate_all(composer->segments);
     }
 
-    /* Mark prompt for regeneration on next render */
+    // Mark prompt for regeneration on next render
     composer->needs_regeneration = true;
     composer->event_triggered_refreshes++;
 }
@@ -1032,7 +1032,7 @@ static void composer_on_pre_command(void *event_data, void *user_data) {
         return;
     }
 
-    /* Save command info for post-command handling */
+    // Save command info for post-command handling
     composer->current_command = event->command;
     composer->current_command_is_bg = event->is_background;
 
@@ -1066,12 +1066,12 @@ static void composer_on_post_command(void *event_data, void *user_data) {
         return;
     }
 
-    /* Update context with command results */
+    // Update context with command results
     uint64_t duration_ms = event->duration_us / 1000;
     lle_prompt_context_update(&composer->context, event->exit_code,
                               duration_ms);
 
-    /* Clear current command state */
+    // Clear current command state
     composer->current_command = NULL;
     composer->current_command_is_bg = false;
 
@@ -1081,7 +1081,7 @@ static void composer_on_post_command(void *event_data, void *user_data) {
         lle_segment_registry_invalidate_all(composer->segments);
     }
 
-    /* Mark prompt for regeneration - exit code/duration affects display */
+    // Mark prompt for regeneration - exit code/duration affects display
     composer->needs_regeneration = true;
     composer->event_triggered_refreshes++;
 }
@@ -1115,13 +1115,13 @@ lle_composer_register_shell_events(lle_prompt_composer_t *composer,
     }
 
     if (composer->events_registered) {
-        /* Already registered */
+        // Already registered
         return LLE_SUCCESS;
     }
 
     lle_result_t result;
 
-    /* Register directory change handler (Issue #16 fix) */
+    // Register directory change handler (Issue #16 fix)
     result = lle_shell_event_hub_register(
         event_hub, LLE_SHELL_EVENT_DIRECTORY_CHANGED,
         composer_on_directory_changed, composer, "prompt_composer_dir");
@@ -1130,26 +1130,26 @@ lle_composer_register_shell_events(lle_prompt_composer_t *composer,
         return result;
     }
 
-    /* Register pre-command handler (transient prompt support) */
+    // Register pre-command handler (transient prompt support)
     result = lle_shell_event_hub_register(
         event_hub, LLE_SHELL_EVENT_PRE_COMMAND, composer_on_pre_command,
         composer, "prompt_composer_pre");
 
     if (result != LLE_SUCCESS) {
-        /* Rollback directory handler */
+        // Rollback directory handler
         lle_shell_event_hub_unregister(event_hub,
                                        LLE_SHELL_EVENT_DIRECTORY_CHANGED,
                                        "prompt_composer_dir");
         return result;
     }
 
-    /* Register post-command handler (exit code, duration) */
+    // Register post-command handler (exit code, duration)
     result = lle_shell_event_hub_register(
         event_hub, LLE_SHELL_EVENT_POST_COMMAND, composer_on_post_command,
         composer, "prompt_composer_post");
 
     if (result != LLE_SUCCESS) {
-        /* Rollback previous handlers */
+        // Rollback previous handlers
         lle_shell_event_hub_unregister(event_hub,
                                        LLE_SHELL_EVENT_DIRECTORY_CHANGED,
                                        "prompt_composer_dir");
@@ -1158,7 +1158,7 @@ lle_composer_register_shell_events(lle_prompt_composer_t *composer,
         return result;
     }
 
-    /* Store reference and mark as registered */
+    // Store reference and mark as registered
     composer->shell_event_hub = event_hub;
     composer->events_registered = true;
 
@@ -1181,13 +1181,13 @@ lle_composer_unregister_shell_events(lle_prompt_composer_t *composer) {
     }
 
     if (!composer->events_registered || !composer->shell_event_hub) {
-        /* Nothing to unregister */
+        // Nothing to unregister
         return LLE_SUCCESS;
     }
 
     lle_shell_event_hub_t *hub = composer->shell_event_hub;
 
-    /* Unregister all handlers */
+    // Unregister all handlers
     lle_shell_event_hub_unregister(hub, LLE_SHELL_EVENT_DIRECTORY_CHANGED,
                                    "prompt_composer_dir");
     lle_shell_event_hub_unregister(hub, LLE_SHELL_EVENT_PRE_COMMAND,

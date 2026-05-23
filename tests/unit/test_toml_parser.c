@@ -36,7 +36,7 @@ typedef struct {
     char keys[32][64];
     toml_value_t values[32];
     size_t count;
-    toml_result_t abort_on_key; /* Set to abort when specific key seen */
+    toml_result_t abort_on_key; /**< Set to abort when specific key seen */
     const char *abort_key_name;
 } test_ctx_t;
 
@@ -52,10 +52,10 @@ static toml_result_t test_callback(const char *section, const char *key,
              section ? section : "");
     snprintf(ctx->keys[ctx->count], sizeof(ctx->keys[0]), "%s", key);
 
-    /* Deep copy the value */
+    // Deep copy the value
     ctx->values[ctx->count] = *value;
 
-    /* For arrays, we need to copy items (or set to NULL for empty arrays) */
+    // For arrays, we need to copy items (or set to NULL for empty arrays)
     if (value->type == TOML_VALUE_ARRAY) {
         if (value->data.array.count > 0 && value->data.array.items) {
             ctx->values[ctx->count].data.array.items =
@@ -66,12 +66,12 @@ static toml_result_t test_callback(const char *section, const char *key,
                        value->data.array.count * sizeof(toml_value_t));
             }
         } else {
-            /* Empty array - ensure items is NULL */
+            // Empty array - ensure items is NULL
             ctx->values[ctx->count].data.array.items = NULL;
         }
     }
 
-    /* For inline tables, we need to deep copy entry values */
+    // For inline tables, we need to deep copy entry values
     if (value->type == TOML_VALUE_TABLE) {
         for (size_t i = 0; i < value->data.table.count; i++) {
             if (value->data.table.entries[i].value) {
@@ -88,7 +88,7 @@ static toml_result_t test_callback(const char *section, const char *key,
 
     ctx->count++;
 
-    /* Check if we should abort */
+    // Check if we should abort
     if (ctx->abort_key_name && strcmp(key, ctx->abort_key_name) == 0) {
         return ctx->abort_on_key;
     }
@@ -212,11 +212,11 @@ TEST(parse_empty_string) {
 }
 
 TEST(parse_unicode_escape_bmp) {
-    /* Test \uXXXX escape for Basic Multilingual Plane characters */
+    // Test \uXXXX escape for Basic Multilingual Plane characters
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    /* \u00E9 = é (Latin Small Letter E with Acute) */
+    // \u00E9 = é (Latin Small Letter E with Acute)
     toml_parser_init(&parser, "text = \"caf\\u00E9\"");
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
@@ -229,17 +229,17 @@ TEST(parse_unicode_escape_bmp) {
 }
 
 TEST(parse_unicode_escape_emoji) {
-    /* Test \UXXXXXXXX escape for characters outside BMP (emoji) */
+    // Test \UXXXXXXXX escape for characters outside BMP (emoji)
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    /* \U0001F600 = 😀 (Grinning Face) - requires 4 UTF-8 bytes */
+    // \U0001F600 = 😀 (Grinning Face) - requires 4 UTF-8 bytes
     toml_parser_init(&parser, "emoji = \"\\U0001F600\"");
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.count, 1);
-    /* UTF-8: F0 9F 98 80 */
+    // UTF-8: F0 9F 98 80
     ASSERT_STR_EQ(ctx.values[0].data.string, "😀");
 
     free_test_ctx(&ctx);
@@ -247,11 +247,11 @@ TEST(parse_unicode_escape_emoji) {
 }
 
 TEST(parse_unicode_escape_mixed) {
-    /* Test mixing regular chars, escapes, and unicode escapes */
+    // Test mixing regular chars, escapes, and unicode escapes
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    /* Hello + \u4E16\u754C (世界 = "world" in Chinese) + ! */
+    // Hello + \u4E16\u754C (世界 = "world" in Chinese) + !
     toml_parser_init(&parser, "msg = \"Hello \\u4E16\\u754C!\"");
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
@@ -264,11 +264,11 @@ TEST(parse_unicode_escape_mixed) {
 }
 
 TEST(error_unicode_escape_incomplete) {
-    /* Test incomplete unicode escape */
+    // Test incomplete unicode escape
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    toml_parser_init(&parser, "bad = \"\\u00E\""); /* Only 3 hex digits */
+    toml_parser_init(&parser, "bad = \"\\u00E\""); // Only 3 hex digits
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_ERROR_INVALID_FORMAT);
@@ -278,11 +278,11 @@ TEST(error_unicode_escape_incomplete) {
 }
 
 TEST(error_unicode_escape_invalid_hex) {
-    /* Test invalid hex digit in unicode escape */
+    // Test invalid hex digit in unicode escape
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    toml_parser_init(&parser, "bad = \"\\u00GG\""); /* G is not hex */
+    toml_parser_init(&parser, "bad = \"\\u00GG\""); // G is not hex
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_ERROR_INVALID_FORMAT);
@@ -292,11 +292,11 @@ TEST(error_unicode_escape_invalid_hex) {
 }
 
 TEST(error_unicode_escape_surrogate) {
-    /* Test surrogate codepoint rejection (D800-DFFF) */
+    // Test surrogate codepoint rejection (D800-DFFF)
     toml_parser_t parser;
     test_ctx_t ctx = {0};
 
-    toml_parser_init(&parser, "bad = \"\\uD800\""); /* High surrogate */
+    toml_parser_init(&parser, "bad = \"\\uD800\""); // High surrogate
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_ERROR_INVALID_FORMAT);
@@ -493,7 +493,7 @@ TEST(parse_inline_table) {
     ASSERT_EQ(ctx.values[0].type, TOML_VALUE_TABLE);
     ASSERT_EQ(ctx.values[0].data.table.count, 2);
 
-    /* Verify table entries */
+    // Verify table entries
     ASSERT_STR_EQ(ctx.values[0].data.table.entries[0].key, "x");
     ASSERT_EQ(ctx.values[0].data.table.entries[0].value->data.integer, 10);
     ASSERT_STR_EQ(ctx.values[0].data.table.entries[1].key, "y");
@@ -611,7 +611,7 @@ TEST(parse_keys_before_section) {
 
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.count, 2);
-    ASSERT_STR_EQ(ctx.sections[0], ""); /* Empty section for global keys */
+    ASSERT_STR_EQ(ctx.sections[0], ""); // Empty section for global keys
     ASSERT_STR_EQ(ctx.sections[1], "section");
 
     free_test_ctx(&ctx);
@@ -766,7 +766,7 @@ TEST(callback_abort) {
     toml_result_t result = toml_parser_parse(&parser, test_callback, &ctx);
 
     ASSERT_EQ(result, TOML_ERROR_CALLBACK_ABORT);
-    ASSERT_EQ(ctx.count, 2); /* Parsed first and stop, but not never_reached */
+    ASSERT_EQ(ctx.count, 2); // Parsed first and stop, but not never_reached
 
     free_test_ctx(&ctx);
     toml_parser_cleanup(&parser);
@@ -818,7 +818,7 @@ TEST(value_table_get_string) {
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_STR_EQ(buf, "test");
 
-    /* Test not found */
+    // Test not found
     result = toml_value_table_get_string(&ctx.values[0], "missing", buf,
                                          sizeof(buf));
     ASSERT_EQ(result, TOML_ERROR_NOT_FOUND);
@@ -889,7 +889,7 @@ TEST(value_get_string_convenience) {
     ASSERT(result != NULL);
     ASSERT_STR_EQ(result, "hello");
 
-    /* Wrong type returns NULL */
+    // Wrong type returns NULL
     value.type = TOML_VALUE_INTEGER;
     ASSERT(toml_value_get_string(&value) == NULL);
 }
@@ -927,13 +927,13 @@ TEST(parse_complex_document) {
     ASSERT_EQ(result, TOML_SUCCESS);
     ASSERT_EQ(ctx.count, 8);
 
-    /* Verify sections */
+    // Verify sections
     ASSERT_STR_EQ(ctx.sections[0], "shell");
     ASSERT_STR_EQ(ctx.sections[2], "shell.features");
     ASSERT_STR_EQ(ctx.sections[4], "history");
     ASSERT_STR_EQ(ctx.sections[6], "display");
 
-    /* Verify some values */
+    // Verify some values
     ASSERT_STR_EQ(ctx.keys[0], "mode");
     ASSERT_STR_EQ(ctx.values[0].data.string, "lush");
 

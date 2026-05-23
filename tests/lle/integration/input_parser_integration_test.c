@@ -22,7 +22,7 @@
 #include "lle/input_parsing.h"
 
 /* ========================================================================== */
-/*                              TEST UTILITIES                                */
+// TEST UTILITIES
 /* ========================================================================== */
 
 #define TEST_ASSERT(condition, message)                                        \
@@ -44,7 +44,7 @@ static int test_count = 0;
 static int pass_count = 0;
 static int fail_count = 0;
 
-/* Helper to run a test */
+// Helper to run a test
 #define RUN_TEST(test_func)                                                    \
     do {                                                                       \
         test_count++;                                                          \
@@ -57,7 +57,7 @@ static int fail_count = 0;
     } while (0)
 
 /* ========================================================================== */
-/*                         ERROR RECOVERY TESTS                               */
+// ERROR RECOVERY TESTS
 /* ========================================================================== */
 
 /**
@@ -68,7 +68,7 @@ static int test_parser_reset(void) {
     lle_key_detector_t key_detector = {0};
     lle_utf8_processor_t utf8_proc = {0};
 
-    /* Set up dirty state */
+    // Set up dirty state
     seq_parser.state = LLE_PARSER_STATE_ESCAPE;
     seq_parser.buffer_pos = 10;
     seq_parser.parameter_count = 5;
@@ -85,12 +85,12 @@ static int test_parser_reset(void) {
     parser_sys.key_detector = &key_detector;
     parser_sys.utf8_processor = &utf8_proc;
 
-    /* Recover from timeout - this should reset all parsers */
+    // Recover from timeout - this should reset all parsers
     lle_result_t result = lle_input_parser_recover_from_error(
         &parser_sys, LLE_ERROR_TIMEOUT, NULL, 0);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to recover from timeout");
 
-    /* Verify all parsers were reset */
+    // Verify all parsers were reset
     TEST_ASSERT(seq_parser.state == LLE_PARSER_STATE_NORMAL,
                 "Sequence parser state not reset");
     TEST_ASSERT(seq_parser.buffer_pos == 0, "Sequence buffer not reset");
@@ -114,25 +114,25 @@ static int test_parser_reset(void) {
 static int test_utf8_validation_valid(void) {
     size_t valid_len = 0;
 
-    /* Valid ASCII */
+    // Valid ASCII
     lle_result_t result =
         lle_input_parser_validate_utf8("Hello", 5, &valid_len);
     TEST_ASSERT(result == LLE_SUCCESS, "Valid ASCII rejected");
     TEST_ASSERT(valid_len == 5, "Invalid length for ASCII");
 
-    /* Valid 2-byte UTF-8 (é = 0xC3 0xA9) */
+    // Valid 2-byte UTF-8 (é = 0xC3 0xA9)
     const char utf8_2byte[] = "\xC3\xA9";
     result = lle_input_parser_validate_utf8(utf8_2byte, 2, &valid_len);
     TEST_ASSERT(result == LLE_SUCCESS, "Valid 2-byte UTF-8 rejected");
     TEST_ASSERT(valid_len == 2, "Invalid length for 2-byte UTF-8");
 
-    /* Valid 3-byte UTF-8 (€ = 0xE2 0x82 0xAC) */
+    // Valid 3-byte UTF-8 (€ = 0xE2 0x82 0xAC)
     const char utf8_3byte[] = "\xE2\x82\xAC";
     result = lle_input_parser_validate_utf8(utf8_3byte, 3, &valid_len);
     TEST_ASSERT(result == LLE_SUCCESS, "Valid 3-byte UTF-8 rejected");
     TEST_ASSERT(valid_len == 3, "Invalid length for 3-byte UTF-8");
 
-    /* Valid 4-byte UTF-8 (𝄞 = 0xF0 0x9D 0x84 0x9E) */
+    // Valid 4-byte UTF-8 (𝄞 = 0xF0 0x9D 0x84 0x9E)
     const char utf8_4byte[] = "\xF0\x9D\x84\x9E";
     result = lle_input_parser_validate_utf8(utf8_4byte, 4, &valid_len);
     TEST_ASSERT(result == LLE_SUCCESS, "Valid 4-byte UTF-8 rejected");
@@ -147,29 +147,29 @@ static int test_utf8_validation_valid(void) {
 static int test_utf8_validation_invalid(void) {
     size_t valid_len = 0;
 
-    /* Invalid start byte */
+    // Invalid start byte
     const char invalid_start[] = "\xFF\x80";
     lle_result_t result =
         lle_input_parser_validate_utf8(invalid_start, 2, &valid_len);
     TEST_ASSERT(result == LLE_ERROR_INVALID_ENCODING,
                 "Invalid start byte not detected");
 
-    /* Invalid continuation byte */
+    // Invalid continuation byte
     const char invalid_cont[] = "\xC3\x20";
     result = lle_input_parser_validate_utf8(invalid_cont, 2, &valid_len);
     TEST_ASSERT(result == LLE_ERROR_INVALID_ENCODING,
                 "Invalid continuation not detected");
 
-    /* Incomplete sequence */
+    // Incomplete sequence
     const char incomplete[] = "\xC3";
     result = lle_input_parser_validate_utf8(incomplete, 1, &valid_len);
     TEST_ASSERT(result == LLE_ERROR_INVALID_ENCODING,
                 "Incomplete sequence not detected");
 
-    /* Overlong encoding (should be invalid) */
+    // Overlong encoding (should be invalid)
     const char overlong[] = "\xC0\x80";
     result = lle_input_parser_validate_utf8(overlong, 2, &valid_len);
-    /* Note: Our simple validator may not catch all overlong encodings */
+    // Note: Our simple validator may not catch all overlong encodings
 
     TEST_PASS();
 }
@@ -187,7 +187,7 @@ static int test_sequence_timeout_none(void) {
 
     uint64_t current_time = lle_event_get_timestamp_us();
 
-    /* No partial data - no timeout */
+    // No partial data - no timeout
     seq_parser.buffer_pos = 0;
     key_detector.sequence_pos = 0;
     bool timeout =
@@ -210,9 +210,9 @@ static int test_sequence_timeout_within_window(void) {
 
     uint64_t current_time = lle_event_get_timestamp_us();
 
-    /* Partial sequence within timeout */
+    // Partial sequence within timeout
     seq_parser.buffer_pos = 5;
-    seq_parser.sequence_start_time = current_time - 50000; /* 50ms ago */
+    seq_parser.sequence_start_time = current_time - 50000; // 50ms ago
     bool timeout =
         lle_input_parser_check_sequence_timeout(&parser_sys, current_time);
     TEST_ASSERT(!timeout, "False timeout within window");
@@ -236,7 +236,7 @@ static int test_sequence_timeout_exceeded(void) {
     /* Partial sequence exceeded timeout (must be > LLE_MAX_SEQUENCE_TIMEOUT_US
      * = 400ms) */
     seq_parser.buffer_pos = 5;
-    seq_parser.sequence_start_time = current_time - 500000; /* 500ms ago */
+    seq_parser.sequence_start_time = current_time - 500000; // 500ms ago
     bool timeout =
         lle_input_parser_check_sequence_timeout(&parser_sys, current_time);
     TEST_ASSERT(timeout, "Timeout not detected");
@@ -252,7 +252,7 @@ static int test_timeout_handling(void) {
     lle_key_detector_t key_detector = {0};
     lle_utf8_processor_t utf8_proc = {0};
 
-    /* Set up state that should be cleared */
+    // Set up state that should be cleared
     seq_parser.buffer_pos = 10;
     key_detector.sequence_pos = 5;
     utf8_proc.utf8_pos = 2;
@@ -262,11 +262,11 @@ static int test_timeout_handling(void) {
     parser_sys.key_detector = &key_detector;
     parser_sys.utf8_processor = &utf8_proc;
 
-    /* Handle timeout */
+    // Handle timeout
     lle_result_t result = lle_input_parser_handle_timeout(&parser_sys);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to handle timeout");
 
-    /* Verify state was cleared */
+    // Verify state was cleared
     TEST_ASSERT(seq_parser.buffer_pos == 0, "Sequence buffer not cleared");
     TEST_ASSERT(key_detector.sequence_pos == 0, "Key buffer not cleared");
     TEST_ASSERT(utf8_proc.utf8_pos == 0, "UTF-8 buffer not cleared");
@@ -316,7 +316,7 @@ static int test_invalid_state_recovery(void) {
     lle_input_parser_system_t parser_sys = {0};
     parser_sys.sequence_parser = &seq_parser;
 
-    /* Recover from invalid state */
+    // Recover from invalid state
     lle_result_t result = lle_input_parser_recover_from_error(
         &parser_sys, LLE_ERROR_INVALID_STATE, NULL, 0);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to recover from invalid state");
@@ -332,7 +332,7 @@ static int test_invalid_state_recovery(void) {
 static int test_multiple_error_types(void) {
     lle_input_parser_system_t parser_sys = {0};
 
-    /* Test various error codes */
+    // Test various error codes
     lle_result_t result;
 
     result = lle_input_parser_recover_from_error(
@@ -347,7 +347,7 @@ static int test_multiple_error_types(void) {
         &parser_sys, LLE_ERROR_INPUT_PARSING, NULL, 0);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to handle INPUT_PARSING");
 
-    /* Unknown error should still recover gracefully */
+    // Unknown error should still recover gracefully
     result = lle_input_parser_recover_from_error(&parser_sys,
                                                  LLE_ERROR_CACHE_MISS, NULL, 0);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to handle unknown error");
@@ -356,7 +356,7 @@ static int test_multiple_error_types(void) {
 }
 
 /* ========================================================================== */
-/*                              MAIN TEST RUNNER                              */
+// MAIN TEST RUNNER
 /* ========================================================================== */
 
 int main(void) {
@@ -365,32 +365,32 @@ int main(void) {
     printf("Phase 7-9: Error Recovery Focus\n");
     printf("========================================\n");
 
-    /* Parser reset tests */
+    // Parser reset tests
     printf("\n=== Parser Reset Tests ===\n");
     RUN_TEST(test_parser_reset);
     RUN_TEST(test_invalid_state_recovery);
 
-    /* UTF-8 validation tests */
+    // UTF-8 validation tests
     printf("\n=== UTF-8 Validation Tests ===\n");
     RUN_TEST(test_utf8_validation_valid);
     RUN_TEST(test_utf8_validation_invalid);
 
-    /* Timeout detection tests */
+    // Timeout detection tests
     printf("\n=== Timeout Detection Tests ===\n");
     RUN_TEST(test_sequence_timeout_none);
     RUN_TEST(test_sequence_timeout_within_window);
     RUN_TEST(test_sequence_timeout_exceeded);
     RUN_TEST(test_timeout_handling);
 
-    /* Error statistics tests */
+    // Error statistics tests
     printf("\n=== Error Statistics Tests ===\n");
     RUN_TEST(test_error_statistics);
 
-    /* Multiple error types test */
+    // Multiple error types test
     printf("\n=== Error Recovery Tests ===\n");
     RUN_TEST(test_multiple_error_types);
 
-    /* Summary */
+    // Summary
     printf("\n========================================\n");
     printf("Test Results:\n");
     printf("  Total:  %d\n", test_count);

@@ -201,4 +201,4 @@ lle_notification_get_trigger_action(const lle_notification_state_t *state);
 }
 #endif
 
-#endif /* LLE_NOTIFICATION_H */
+#endif // LLE_NOTIFICATION_H

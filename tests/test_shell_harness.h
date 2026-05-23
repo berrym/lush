@@ -198,10 +198,10 @@ static inline void lush_harness_drain_fd(int fd, char *buf, size_t cap) {
         n += (size_t)r;
     }
     buf[n] = '\0';
-    /* Drain anything remaining so the child's writes do not block. */
+    // Drain anything remaining so the child's writes do not block.
     char scratch[1024];
     while (read(fd, scratch, sizeof(scratch)) > 0) {
-        /* discard */
+        // discard
     }
 }
 
@@ -246,7 +246,7 @@ static inline run_result_t run_shell_subprocess(const char *src) {
     }
 
     if (pid == 0) {
-        /* Child: rewire stdio to the pipe write ends, exec lush -c. */
+        // Child: rewire stdio to the pipe write ends, exec lush -c.
         dup2(out_pipe[1], STDOUT_FILENO);
         dup2(err_pipe[1], STDERR_FILENO);
         close(out_pipe[0]);
@@ -256,10 +256,10 @@ static inline run_result_t run_shell_subprocess(const char *src) {
 
         const char *bin = lush_test_binary_path();
         execl(bin, bin, "-c", src, (char *)NULL);
-        _exit(127); /* exec failed */
+        _exit(127); // exec failed
     }
 
-    /* Parent: close write ends, drain read ends, reap child. */
+    // Parent: close write ends, drain read ends, reap child.
     close(out_pipe[1]);
     close(err_pipe[1]);
     lush_harness_drain_fd(out_pipe[0], r.out, sizeof(r.out));
@@ -389,4 +389,4 @@ static inline const char *node_first_arg(const node_t *n) {
 #define ASSERT_NODE_CHILD_COUNT(node, expected)                                \
     ASSERT_EQ(node_child_count(node), (expected), "child count")
 
-#endif /* LUSH_TEST_SHELL_HARNESS_H */
+#endif // LUSH_TEST_SHELL_HARNESS_H

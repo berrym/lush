@@ -35,7 +35,7 @@ int bin_analyze(int argc, char **argv) {
     const char *target_shell = NULL;
     const char *script_file = NULL;
 
-    /* Parse arguments */
+    // Parse arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("Usage: %s [OPTIONS] <script>\n", argv[0]);
@@ -81,30 +81,30 @@ int bin_analyze(int argc, char **argv) {
         return 1;
     }
 
-    /* Set target shell if specified (stored as string for flexibility) */
+    // Set target shell if specified (stored as string for flexibility)
     if (target_shell) {
         compat_set_target(target_shell);
     }
 
-    /* Set strict mode if requested */
+    // Set strict mode if requested
     if (strict_mode) {
         compat_set_strict(true);
     }
 
-    /* Initialize debug context for analysis */
+    // Initialize debug context for analysis
     debug_context_t *ctx = debug_init();
     if (!ctx) {
         fprintf(stderr, "%s: failed to initialize analysis context\n", argv[0]);
         return 1;
     }
 
-    /* Enable context so debug_printf works for output */
+    // Enable context so debug_printf works for output
     debug_enable(ctx, true);
 
-    /* Run analysis (includes report output) */
+    // Run analysis (includes report output)
     debug_analyze_script(ctx, script_file);
 
-    /* Determine exit code based on issues found */
+    // Determine exit code based on issues found
     int exit_status = 0;
     if (ctx->issue_count > 0) {
         analysis_issue_t *issue = ctx->analysis_issues;
@@ -119,16 +119,16 @@ int bin_analyze(int argc, char **argv) {
             issue = issue->next;
         }
 
-        /* In strict mode, warnings become errors */
+        // In strict mode, warnings become errors
         if (strict_mode && exit_status == 1) {
             exit_status = 2;
         }
     }
 
-    /* Cleanup */
+    // Cleanup
     debug_cleanup(ctx);
 
-    /* Reset strict mode */
+    // Reset strict mode
     if (strict_mode) {
         compat_set_strict(false);
     }

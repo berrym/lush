@@ -24,7 +24,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/* Forward declaration for portability (see ht_fnv1a.c) */
+// Forward declaration for portability (see ht_fnv1a.c)
 int strcasecmp(const char *s1, const char *s2);
 
 /* ============================================================================
@@ -47,7 +47,7 @@ static lle_result_t read_file_contents(const char *filepath, char **content,
         return LLE_ERROR_IO_ERROR;
     }
 
-    /* Get file size */
+    // Get file size
     if (fseek(fp, 0, SEEK_END) != 0) {
         fclose(fp);
         return LLE_ERROR_IO_ERROR;
@@ -69,14 +69,14 @@ static lle_result_t read_file_contents(const char *filepath, char **content,
         return LLE_ERROR_IO_ERROR;
     }
 
-    /* Allocate buffer */
+    // Allocate buffer
     char *buffer = malloc((size_t)file_size + 1);
     if (!buffer) {
         fclose(fp);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Read file */
+    // Read file
     size_t bytes_read = fread(buffer, 1, (size_t)file_size, fp);
     fclose(fp);
 
@@ -123,7 +123,7 @@ static const char *get_home_dir(void) {
         return home;
     }
 
-    /* Fallback to passwd entry */
+    // Fallback to passwd entry
     struct passwd *pw = getpwuid(getuid());
     if (pw && pw->pw_dir) {
         return pw->pw_dir;
@@ -189,13 +189,13 @@ lle_result_t lle_theme_load_from_file(const char *filepath, lle_theme_t *theme,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize result if provided */
+    // Initialize result if provided
     if (result) {
         memset(result, 0, sizeof(*result));
         snprintf(result->filepath, sizeof(result->filepath), "%s", filepath);
     }
 
-    /* Read file contents */
+    // Read file contents
     char *content = NULL;
     size_t content_len = 0;
     lle_result_t status = read_file_contents(filepath, &content, &content_len);
@@ -209,15 +209,15 @@ lle_result_t lle_theme_load_from_file(const char *filepath, lle_theme_t *theme,
         return status;
     }
 
-    /* Parse the content */
+    // Parse the content
     status = lle_theme_load_from_string(content, theme, result);
     free(content);
 
     if (status == LLE_SUCCESS) {
-        /* Mark theme source as USER (loaded from file) */
+        // Mark theme source as USER (loaded from file)
         theme->source = LLE_THEME_SOURCE_USER;
 
-        /* Store source filepath for hot-reload */
+        // Store source filepath for hot-reload
         snprintf(theme->filepath, sizeof(theme->filepath), "%s", filepath);
 
         if (result) {
@@ -246,11 +246,11 @@ lle_result_t lle_theme_load_from_string(const char *content, lle_theme_t *theme,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize theme */
+    // Initialize theme
     memset(theme, 0, sizeof(*theme));
     lle_symbol_set_init_unicode(&theme->symbols);
 
-    /* Initialize parser */
+    // Initialize parser
     lle_theme_parser_t parser;
     lle_result_t status = lle_theme_parser_init(&parser, content);
 
@@ -263,7 +263,7 @@ lle_result_t lle_theme_load_from_string(const char *content, lle_theme_t *theme,
         return status;
     }
 
-    /* Parse into theme */
+    // Parse into theme
     status = lle_theme_parser_parse_to_theme(&parser, theme);
 
     if (status != LLE_SUCCESS) {
@@ -277,7 +277,7 @@ lle_result_t lle_theme_load_from_string(const char *content, lle_theme_t *theme,
         return status;
     }
 
-    /* Validate theme */
+    // Validate theme
     char validation_error[256];
     status = lle_theme_parser_validate(theme, validation_error,
                                        sizeof(validation_error));
@@ -318,7 +318,7 @@ size_t lle_theme_load_directory(const char *dirpath,
         return 0;
     }
 
-    /* Initialize result if provided */
+    // Initialize result if provided
     if (result) {
         result->total_files = 0;
         result->loaded_count = 0;
@@ -326,7 +326,7 @@ size_t lle_theme_load_directory(const char *dirpath,
         result->skipped_count = 0;
     }
 
-    /* Open directory */
+    // Open directory
     DIR *dir = opendir(dirpath);
     if (!dir) {
         return 0;
@@ -337,7 +337,7 @@ size_t lle_theme_load_directory(const char *dirpath,
     struct dirent *entry;
 
     while ((entry = readdir(dir)) != NULL) {
-        /* Skip non-TOML files */
+        // Skip non-TOML files
         if (!has_toml_extension(entry->d_name)) {
             continue;
         }
@@ -346,17 +346,17 @@ size_t lle_theme_load_directory(const char *dirpath,
             result->total_files++;
         }
 
-        /* Build full path */
+        // Build full path
         char filepath[LLE_THEME_PATH_MAX];
         snprintf(filepath, sizeof(filepath), "%s/%s", dirpath, entry->d_name);
 
-        /* Check if it's a regular file */
+        // Check if it's a regular file
         struct stat st;
         if (stat(filepath, &st) != 0 || !S_ISREG(st.st_mode)) {
             continue;
         }
 
-        /* Allocate theme */
+        // Allocate theme
         lle_theme_t *theme = calloc(1, sizeof(lle_theme_t));
         if (!theme) {
             if (result) {
@@ -365,14 +365,14 @@ size_t lle_theme_load_directory(const char *dirpath,
             continue;
         }
 
-        /* Get result slot if available */
+        // Get result slot if available
         lle_theme_load_result_t *load_result = NULL;
         if (result && result->results &&
             result_idx < result->results_capacity) {
             load_result = &result->results[result_idx++];
         }
 
-        /* Load theme */
+        // Load theme
         lle_result_t status =
             lle_theme_load_from_file(filepath, theme, load_result);
 
@@ -384,7 +384,7 @@ size_t lle_theme_load_directory(const char *dirpath,
             continue;
         }
 
-        /* Check if theme already exists */
+        // Check if theme already exists
         if (lle_theme_registry_find(registry, theme->name)) {
             if (result) {
                 result->skipped_count++;
@@ -398,7 +398,7 @@ size_t lle_theme_load_directory(const char *dirpath,
             continue;
         }
 
-        /* Register theme */
+        // Register theme
         status = lle_theme_registry_register(registry, theme);
         if (status != LLE_SUCCESS) {
             free(theme);
@@ -439,13 +439,13 @@ size_t lle_theme_load_user_themes(lle_theme_registry_t *registry) {
 
     size_t total_loaded = 0;
 
-    /* Load from user directory */
+    // Load from user directory
     char user_dir[LLE_THEME_PATH_MAX];
     if (lle_theme_get_user_dir(user_dir, sizeof(user_dir)) == LLE_SUCCESS) {
         total_loaded += lle_theme_load_directory(user_dir, registry, NULL);
     }
 
-    /* Load from system directory */
+    // Load from system directory
     char system_dir[LLE_THEME_PATH_MAX];
     if (lle_theme_get_system_dir(system_dir, sizeof(system_dir)) ==
         LLE_SUCCESS) {
@@ -476,17 +476,17 @@ size_t lle_theme_reload_user_themes(lle_theme_registry_t *registry) {
 
     size_t reloaded = 0;
 
-    /* Get list of current user themes to potentially update */
-    /* For now, we just load new themes - existing themes are not replaced */
-    /* A more sophisticated implementation would track file paths and update */
+    // Get list of current user themes to potentially update
+    // For now, we just load new themes - existing themes are not replaced
+    // A more sophisticated implementation would track file paths and update
 
-    /* Load from user directory */
+    // Load from user directory
     char user_dir[LLE_THEME_PATH_MAX];
     if (lle_theme_get_user_dir(user_dir, sizeof(user_dir)) == LLE_SUCCESS) {
         reloaded += lle_theme_load_directory(user_dir, registry, NULL);
     }
 
-    /* Load from system directory */
+    // Load from system directory
     char system_dir[LLE_THEME_PATH_MAX];
     if (lle_theme_get_system_dir(system_dir, sizeof(system_dir)) ==
         LLE_SUCCESS) {
@@ -512,34 +512,34 @@ lle_result_t lle_theme_reload_by_name(lle_theme_registry_t *registry,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Find existing theme */
+    // Find existing theme
     lle_theme_t *existing = lle_theme_registry_find(registry, name);
     if (!existing) {
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Only reload user themes */
+    // Only reload user themes
     if (existing->source != LLE_THEME_SOURCE_USER) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Search for theme file */
+    // Search for theme file
     char user_dir[LLE_THEME_PATH_MAX];
     char filepath[LLE_THEME_PATH_MAX];
 
     if (lle_theme_get_user_dir(user_dir, sizeof(user_dir)) == LLE_SUCCESS) {
-        /* Limit components to prevent truncation: path + "/" + name + ext */
+        // Limit components to prevent truncation: path + "/" + name + ext
         snprintf(filepath, sizeof(filepath), "%.4020s/%.64s%s", user_dir, name,
                  LLE_THEME_FILE_EXTENSION);
 
         if (lle_theme_file_exists(filepath)) {
-            /* Load into temporary theme */
+            // Load into temporary theme
             lle_theme_t temp_theme;
             lle_result_t status =
                 lle_theme_load_from_file(filepath, &temp_theme, NULL);
 
             if (status == LLE_SUCCESS) {
-                /* Copy updated values to existing theme */
+                // Copy updated values to existing theme
                 bool was_active = existing->is_active;
                 memcpy(existing, &temp_theme, sizeof(lle_theme_t));
                 existing->is_active = was_active;
@@ -572,12 +572,12 @@ bool lle_theme_check_hot_reload(lle_theme_registry_t *registry) {
         return false;
     }
 
-    /* No filepath means no file to watch */
+    // No filepath means no file to watch
     if (!active->filepath[0]) {
         return false;
     }
 
-    /* If the active theme changed (different path), reset cache */
+    // If the active theme changed (different path), reset cache
     if (strcmp(s_hot_reload_path, active->filepath) != 0) {
         snprintf(s_hot_reload_path, sizeof(s_hot_reload_path), "%s",
                  active->filepath);
@@ -586,20 +586,20 @@ bool lle_theme_check_hot_reload(lle_theme_registry_t *registry) {
         if (stat(s_hot_reload_path, &st) == 0) {
             s_hot_reload_mtime = st.st_mtime;
         }
-        return false; /* First check after switch — just cache, don't reload */
+        return false; // First check after switch — just cache, don't reload
     }
 
-    /* stat() the file and compare mtime */
+    // stat() the file and compare mtime
     struct stat st;
     if (stat(s_hot_reload_path, &st) != 0) {
-        return false; /* File gone or inaccessible */
+        return false; // File gone or inaccessible
     }
 
     if (st.st_mtime == s_hot_reload_mtime) {
-        return false; /* No change */
+        return false; // No change
     }
 
-    /* File modified — reload */
+    // File modified — reload
     s_hot_reload_mtime = st.st_mtime;
 
     lle_result_t result = lle_theme_reload_by_name(registry, active->name);
@@ -717,7 +717,7 @@ static size_t format_color_toml(const lle_color_t *color, char *output,
         return 0;
     }
 
-    /* Build inline table */
+    // Build inline table
     int len = snprintf(output, output_size, "{ fg = %s", fg_str);
 
     if (color->bold && (size_t)len < output_size - 20) {
@@ -799,11 +799,11 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
         }                                                                      \
     } while (0)
 
-    /* Header comment */
+    // Header comment
     APPEND("# LLE Theme File\n");
     APPEND("# Generated by lush theme system\n\n");
 
-    /* [theme] section */
+    // [theme] section
     APPEND("[theme]\n");
 
     toml_escape_string(theme->name, escaped, sizeof(escaped));
@@ -833,7 +833,7 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
 
     APPEND("\n");
 
-    /* [capabilities] section */
+    // [capabilities] section
     APPEND("[capabilities]\n");
     if (theme->capabilities & LLE_THEME_CAP_UNICODE) {
         APPEND("unicode = true\n");
@@ -867,7 +867,7 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
     }
     APPEND("\n");
 
-    /* [layout] section */
+    // [layout] section
     APPEND("[layout]\n");
 
     if (strlen(theme->layout.ps1_format) > 0) {
@@ -908,7 +908,7 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
     }
     APPEND("\n");
 
-    /* [segments] section */
+    // [segments] section
     if (theme->enabled_segment_count > 0) {
         APPEND("[segments]\n");
         APPEND("enabled = [");
@@ -921,7 +921,7 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
         APPEND("]\n\n");
     }
 
-    /* [segments.<name>] subsections */
+    // [segments.<name>] subsections
     for (size_t si = 0; si < theme->segment_config_count; si++) {
         const lle_segment_config_t *seg = &theme->segment_configs[si];
         if (!seg->configured) {
@@ -974,7 +974,7 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
         APPEND("\n");
     }
 
-    /* [colors] section */
+    // [colors] section
     APPEND("[colors]\n");
 
 #define EXPORT_COLOR(name, field)                                              \
@@ -1018,7 +1018,7 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
 
     APPEND("\n");
 
-    /* [symbols] section */
+    // [symbols] section
     APPEND("[symbols]\n");
 
 #define EXPORT_SYMBOL(name, field)                                             \
@@ -1052,11 +1052,11 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
 
 #undef EXPORT_SYMBOL
 
-    /* [syntax] section - only if theme has syntax colors */
+    // [syntax] section - only if theme has syntax colors
     if (theme->has_syntax_colors) {
         APPEND("\n[syntax]\n");
 
-        /* Helper macro to export RGB color as hex */
+        // Helper macro to export RGB color as hex
 #define EXPORT_SYNTAX_COLOR(name, field)                                       \
     do {                                                                       \
         if (theme->syntax_colors.field != 0) {                                 \
@@ -1093,21 +1093,21 @@ size_t lle_theme_export_to_toml(const lle_theme_t *theme, char *output,
         EXPORT_SYNTAX_COLOR("glob", glob);
         EXPORT_SYNTAX_COLOR("argument", argument);
         EXPORT_SYNTAX_COLOR("error", error);
-        /* Here-documents and here-strings */
+        // Here-documents and here-strings
         EXPORT_SYNTAX_COLOR("heredoc_op", heredoc_op);
         EXPORT_SYNTAX_COLOR("heredoc_delim", heredoc_delim);
         EXPORT_SYNTAX_COLOR("heredoc_content", heredoc_content);
         EXPORT_SYNTAX_COLOR("herestring", herestring);
-        /* Process substitution */
+        // Process substitution
         EXPORT_SYNTAX_COLOR("procsub", procsub);
-        /* ANSI-C quoting */
+        // ANSI-C quoting
         EXPORT_SYNTAX_COLOR("string_ansic", string_ansic);
-        /* Arithmetic expansion */
+        // Arithmetic expansion
         EXPORT_SYNTAX_COLOR("arithmetic", arithmetic);
 
 #undef EXPORT_SYNTAX_COLOR
 
-        /* Export text attributes */
+        // Export text attributes
         if (theme->syntax_colors.keyword_bold) {
             APPEND("keyword_bold = true\n");
         }
@@ -1145,7 +1145,7 @@ lle_result_t lle_theme_export_to_file(const lle_theme_t *theme,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Generate TOML content */
+    // Generate TOML content
     char *buffer = malloc(LLE_THEME_FILE_MAX_SIZE);
     if (!buffer) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -1158,7 +1158,7 @@ lle_result_t lle_theme_export_to_file(const lle_theme_t *theme,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Write to file */
+    // Write to file
     FILE *fp = fopen(filepath, "w");
     if (!fp) {
         free(buffer);
@@ -1196,14 +1196,14 @@ lle_result_t lle_theme_get_user_dir(char *buffer, size_t size) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check XDG_CONFIG_HOME first */
+    // Check XDG_CONFIG_HOME first
     const char *xdg_config = getenv("XDG_CONFIG_HOME");
     if (xdg_config && xdg_config[0] != '\0') {
         snprintf(buffer, size, "%s/%s", xdg_config, LLE_THEME_USER_DIR);
         return LLE_SUCCESS;
     }
 
-    /* Fall back to ~/.config */
+    // Fall back to ~/.config
     const char *home = get_home_dir();
     if (!home) {
         return LLE_ERROR_NOT_FOUND;

@@ -281,4 +281,4 @@ lle_result_t lle_widget_hooks_disable(lle_widget_hooks_manager_t *manager);
 }
 #endif
 
-#endif /* LLE_WIDGET_HOOKS_H */
+#endif // LLE_WIDGET_HOOKS_H

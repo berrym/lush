@@ -67,4 +67,4 @@ void expand_ctx_init(expand_ctx_t *ctx, int mode);
  */
 bool expand_ctx_check(expand_ctx_t *ctx, int mode_flag);
 
-#endif /* EXPAND_H */
+#endif // EXPAND_H

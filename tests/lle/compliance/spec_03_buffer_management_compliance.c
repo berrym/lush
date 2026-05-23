@@ -25,15 +25,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Include only the buffer management header */
+// Include only the buffer management header
 #include "lle/buffer_management.h"
 
-/* Test tracking */
+// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Simple assertion macros */
+// Simple assertion macros
 #define ASSERT_EQ(expected, actual, message)                                   \
     do {                                                                       \
         tests_run++;                                                           \
@@ -269,7 +269,7 @@ static bool test_change_type_enum(void) {
 
     ASSERT_EQ(1, LLE_CHANGE_TYPE_INSERT, "LLE_CHANGE_TYPE_INSERT must equal 1");
 
-    /* Verify all change types exist and are accessible */
+    // Verify all change types exist and are accessible
     int change_types[] = {
         LLE_CHANGE_TYPE_INSERT,    LLE_CHANGE_TYPE_DELETE,
         LLE_CHANGE_TYPE_REPLACE,   LLE_CHANGE_TYPE_CURSOR_MOVE,
@@ -287,7 +287,7 @@ static bool test_change_type_enum(void) {
 static bool test_line_type_enum(void) {
     printf("  Testing line type enumeration...\n");
 
-    /* Verify all line types exist and are accessible */
+    // Verify all line types exist and are accessible
     int line_types[] = {LLE_LINE_TYPE_COMMAND, LLE_LINE_TYPE_CONTINUATION,
                         LLE_LINE_TYPE_HEREDOC, LLE_LINE_TYPE_QUOTED,
                         LLE_LINE_TYPE_COMMENT};
@@ -304,7 +304,7 @@ static bool test_line_type_enum(void) {
 static bool test_multiline_state_enum(void) {
     printf("  Testing multiline state enumeration...\n");
 
-    /* Verify all multiline states exist and are accessible */
+    // Verify all multiline states exist and are accessible
     int multiline_states[] = {
         LLE_MULTILINE_STATE_NONE,         LLE_MULTILINE_STATE_QUOTE_SINGLE,
         LLE_MULTILINE_STATE_QUOTE_DOUBLE, LLE_MULTILINE_STATE_QUOTE_BACKTICK,
@@ -328,7 +328,7 @@ static bool test_multiline_state_enum(void) {
 static bool test_buffer_structure_defined(void) {
     printf("  Testing lle_buffer_t structure is defined...\n");
 
-    /* This will fail to compile if structure is not defined */
+    // This will fail to compile if structure is not defined
     ASSERT_TRUE(sizeof(lle_buffer_t) > 0,
                 "lle_buffer_t structure must be defined");
 
@@ -384,7 +384,7 @@ int main(void) {
     printf(
         "==============================================================\n\n");
 
-    /* Run all compliance tests */
+    // Run all compliance tests
     test_buffer_size_constants();
     test_memory_alignment_constant();
     test_line_structure_constants();
@@ -403,7 +403,7 @@ int main(void) {
     test_cursor_position_structure_defined();
     test_selection_range_structure_defined();
 
-    /* Print results */
+    // Print results
     printf("\n");
     printf("==============================================================\n");
     printf("Tests run:    %d\n", tests_run);

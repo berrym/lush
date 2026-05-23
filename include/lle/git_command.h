@@ -82,4 +82,4 @@ git_cmd_result_t git_command_in_dir(const char *dir, const char *args,
 }
 #endif
 
-#endif /* LLE_GIT_COMMAND_H */
+#endif // LLE_GIT_COMMAND_H

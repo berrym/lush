@@ -73,7 +73,7 @@ typedef struct lle_completion_item {
     int32_t relevance_score;    /**< Relevance ranking (0-1000) */
     char *description;          /**< Optional description (may be NULL) */
 
-    /* Memory management flags */
+    // Memory management flags
     bool owns_text;        /**< Whether this struct owns text memory */
     bool owns_suffix;      /**< Whether this struct owns suffix memory */
     bool owns_description; /**< Whether this struct owns description memory */
@@ -87,7 +87,7 @@ typedef struct lle_completion_result {
     size_t count;                 /**< Number of items in array */
     size_t capacity;              /**< Allocated capacity */
 
-    /* Category statistics for display */
+    // Category statistics for display
     size_t builtin_count;   /**< Number of builtin completions */
     size_t command_count;   /**< Number of command completions */
     size_t file_count;      /**< Number of file completions */
@@ -97,7 +97,7 @@ typedef struct lle_completion_result {
     size_t history_count;   /**< Number of history completions */
     size_t custom_count;    /**< Number of custom completions */
 
-    /* Memory pool for allocations */
+    // Memory pool for allocations
     lle_memory_pool_t *memory_pool; /**< Memory pool for allocations */
 } lle_completion_result_t;
 
@@ -342,4 +342,4 @@ lle_completion_result_get_item(const lle_completion_result_t *result,
 }
 #endif
 
-#endif /* LLE_COMPLETION_TYPES_H */
+#endif // LLE_COMPLETION_TYPES_H

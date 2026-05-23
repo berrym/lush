@@ -69,15 +69,15 @@ typedef struct {
 typedef struct lle_builtin_subcommand {
     const char *name; /**< Subcommand name */
 
-    /* Nested subcommands (for hierarchies like display lle theme) */
+    // Nested subcommands (for hierarchies like display lle theme)
     const struct lle_builtin_subcommand *subcommands; /**< Child subcommands */
     size_t subcommand_count; /**< Number of subcommands */
 
-    /* Options for this subcommand */
+    // Options for this subcommand
     const lle_builtin_option_t *options; /**< Options array */
     size_t option_count;                 /**< Number of options */
 
-    /* Dynamic argument type for this subcommand */
+    // Dynamic argument type for this subcommand
     lle_builtin_arg_type_t arg_type; /**< Type of arguments to complete */
 } lle_builtin_subcommand_t;
 
@@ -91,15 +91,15 @@ typedef struct lle_builtin_subcommand {
 typedef struct {
     const char *name; /**< Builtin command name */
 
-    /* Top-level options */
+    // Top-level options
     const lle_builtin_option_t *options; /**< Options array */
     size_t option_count;                 /**< Number of options */
 
-    /* Subcommands (for complex builtins like display, debug) */
+    // Subcommands (for complex builtins like display, debug)
     const lle_builtin_subcommand_t *subcommands; /**< Subcommands array */
     size_t subcommand_count;                     /**< Number of subcommands */
 
-    /* Default argument type when no subcommand matches */
+    // Default argument type when no subcommand matches
     lle_builtin_arg_type_t default_arg_type; /**< Default argument type */
 } lle_builtin_completion_spec_t;
 
@@ -161,4 +161,4 @@ size_t lle_builtin_get_spec_count(void);
 }
 #endif
 
-#endif /* LLE_BUILTIN_COMPLETIONS_H */
+#endif // LLE_BUILTIN_COMPLETIONS_H

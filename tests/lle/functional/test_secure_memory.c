@@ -17,7 +17,7 @@
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 
-/* Test result tracking */
+// Test result tracking
 static int tests_passed = 0;
 static int tests_failed = 0;
 

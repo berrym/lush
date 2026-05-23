@@ -110,12 +110,12 @@ lle_result_t lle_shell_event_hub_create(lle_shell_event_hub_t **hub_out) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize handler counts */
+    // Initialize handler counts
     for (int i = 0; i < LLE_SHELL_EVENT_TYPE_COUNT; i++) {
         hub->handler_counts[i] = 0;
     }
 
-    /* Capture current working directory */
+    // Capture current working directory
     if (getcwd(hub->current_dir, sizeof(hub->current_dir)) == NULL) {
         hub->current_dir[0] = '\0';
     }
@@ -182,7 +182,7 @@ lle_result_t lle_shell_event_hub_register(lle_shell_event_hub_t *hub,
         return LLE_ERROR_RESOURCE_EXHAUSTED;
     }
 
-    /* Add handler at next available slot */
+    // Add handler at next available slot
     hub->handlers[event_type][count].handler = handler;
     hub->handlers[event_type][count].user_data = user_data;
     hub->handlers[event_type][count].name = name;
@@ -217,7 +217,7 @@ lle_result_t lle_shell_event_hub_unregister(lle_shell_event_hub_t *hub,
     for (size_t i = 0; i < count; i++) {
         if (hub->handlers[event_type][i].name &&
             strcmp(hub->handlers[event_type][i].name, name) == 0) {
-            /* Found - shift remaining handlers down */
+            // Found - shift remaining handlers down
             for (size_t j = i; j < count - 1; j++) {
                 hub->handlers[event_type][j] = hub->handlers[event_type][j + 1];
             }
@@ -267,10 +267,10 @@ void lle_shell_event_hub_fire(lle_shell_event_hub_t *hub,
         return;
     }
 
-    /* Update statistics */
+    // Update statistics
     hub->events_fired++;
 
-    /* Call all registered handlers */
+    // Call all registered handlers
     size_t count = hub->handler_counts[event_type];
     if (lle_event_debug_enabled()) {
         fprintf(stderr, "[LLE_EVENT] Firing %s to %zu handlers\n",
@@ -307,7 +307,7 @@ void lle_shell_event_hub_fire(lle_shell_event_hub_t *hub,
  * @param new_dir New directory (NULL to use getcwd)
  */
 void lle_fire_directory_changed(const char *old_dir, const char *new_dir) {
-    /* Get global shell integration */
+    // Get global shell integration
     if (!g_lle_integration || !g_lle_integration->event_hub) {
         if (lle_event_debug_enabled()) {
             fprintf(stderr,
@@ -323,10 +323,10 @@ void lle_fire_directory_changed(const char *old_dir, const char *new_dir) {
     lle_shell_event_hub_t *hub = g_lle_integration->event_hub;
     char new_dir_buf[PATH_MAX];
 
-    /* Use provided old_dir or hub's tracked current_dir */
+    // Use provided old_dir or hub's tracked current_dir
     const char *actual_old_dir = old_dir ? old_dir : hub->current_dir;
 
-    /* Get new directory if not provided */
+    // Get new directory if not provided
     const char *actual_new_dir = new_dir;
     if (!actual_new_dir) {
         if (getcwd(new_dir_buf, sizeof(new_dir_buf)) != NULL) {
@@ -338,22 +338,22 @@ void lle_fire_directory_changed(const char *old_dir, const char *new_dir) {
                         "getcwd() failed: %s\n",
                         strerror(errno));
             }
-            return; /* Can't determine new directory */
+            return; // Can't determine new directory
         }
     }
 
-    /* Create event data */
+    // Create event data
     lle_directory_changed_event_t event = {.old_dir = actual_old_dir,
                                            .new_dir = actual_new_dir};
 
-    /* Update hub's current directory tracking */
+    // Update hub's current directory tracking
     strncpy(hub->current_dir, actual_new_dir, sizeof(hub->current_dir) - 1);
     hub->current_dir[sizeof(hub->current_dir) - 1] = '\0';
 
-    /* Update statistics */
+    // Update statistics
     hub->directory_changes++;
 
-    /* Fire to registered handlers */
+    // Fire to registered handlers
     lle_shell_event_hub_fire(hub, LLE_SHELL_EVENT_DIRECTORY_CHANGED, &event);
 }
 
@@ -367,7 +367,7 @@ void lle_fire_directory_changed(const char *old_dir, const char *new_dir) {
  * @param is_background True if command will run in background
  */
 void lle_fire_pre_command(const char *command, bool is_background) {
-    /* Get global shell integration */
+    // Get global shell integration
     if (!g_lle_integration || !g_lle_integration->event_hub) {
         if (lle_event_debug_enabled()) {
             fprintf(stderr,
@@ -389,10 +389,10 @@ void lle_fire_pre_command(const char *command, bool is_background) {
 
     lle_shell_event_hub_t *hub = g_lle_integration->event_hub;
 
-    /* Record command start time */
+    // Record command start time
     hub->command_start_time_us = lle_shell_event_get_timestamp_us();
 
-    /* Store command for post-command event */
+    // Store command for post-command event
     if (command) {
         strncpy(hub->current_command, command,
                 sizeof(hub->current_command) - 1);
@@ -401,11 +401,11 @@ void lle_fire_pre_command(const char *command, bool is_background) {
         hub->current_command[0] = '\0';
     }
 
-    /* Create event data */
+    // Create event data
     lle_pre_command_event_t event = {.command = command,
                                      .is_background = is_background};
 
-    /* Fire to registered handlers */
+    // Fire to registered handlers
     lle_shell_event_hub_fire(hub, LLE_SHELL_EVENT_PRE_COMMAND, &event);
 }
 
@@ -420,7 +420,7 @@ void lle_fire_pre_command(const char *command, bool is_background) {
  */
 void lle_fire_post_command(const char *command, int exit_code,
                            uint64_t duration_us) {
-    /* Get global shell integration */
+    // Get global shell integration
     if (!g_lle_integration || !g_lle_integration->event_hub) {
         if (lle_event_debug_enabled()) {
             fprintf(stderr,
@@ -442,28 +442,28 @@ void lle_fire_post_command(const char *command, int exit_code,
 
     lle_shell_event_hub_t *hub = g_lle_integration->event_hub;
 
-    /* Calculate duration if not provided */
+    // Calculate duration if not provided
     uint64_t actual_duration = duration_us;
     if (actual_duration == 0 && hub->command_start_time_us > 0) {
         uint64_t end_time = lle_shell_event_get_timestamp_us();
         actual_duration = end_time - hub->command_start_time_us;
     }
 
-    /* Use stored command if not provided */
+    // Use stored command if not provided
     const char *actual_command = command ? command : hub->current_command;
 
-    /* Create event data */
+    // Create event data
     lle_post_command_event_t event = {.command = actual_command,
                                       .exit_code = exit_code,
                                       .duration_us = actual_duration};
 
-    /* Update statistics */
+    // Update statistics
     hub->commands_executed++;
 
-    /* Reset command tracking */
+    // Reset command tracking
     hub->command_start_time_us = 0;
     hub->current_command[0] = '\0';
 
-    /* Fire to registered handlers */
+    // Fire to registered handlers
     lle_shell_event_hub_fire(hub, LLE_SHELL_EVENT_POST_COMMAND, &event);
 }

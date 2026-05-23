@@ -137,17 +137,17 @@ lush_plugin_manager_create(lush_plugin_manager_t **manager,
         return LUSH_PLUGIN_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Apply configuration */
+    // Apply configuration
     if (config) {
         mgr->config = *config;
     } else {
-        /* Default configuration */
+        // Default configuration
         mgr->config.auto_load = false;
         mgr->config.default_permissions = LUSH_PLUGIN_PERM_REGISTER_BUILTIN |
                                           LUSH_PLUGIN_PERM_REGISTER_HOOK |
                                           LUSH_PLUGIN_PERM_READ_VARS;
         mgr->config.enable_sandbox = true;
-        mgr->config.max_plugins = 0; /* unlimited */
+        mgr->config.max_plugins = 0; // unlimited
     }
 
     mgr->plugins = NULL;
@@ -166,18 +166,18 @@ void lush_plugin_manager_destroy(lush_plugin_manager_t *manager) {
 
     manager->active = false;
 
-    /* Unload all plugins */
+    // Unload all plugins
     lush_plugin_t *plugin = manager->plugins;
     while (plugin) {
         lush_plugin_t *next = plugin->next;
 
-        /* Call cleanup if active */
+        // Call cleanup if active
         if (plugin->state == LUSH_PLUGIN_STATE_ACTIVE && plugin->def &&
             plugin->def->cleanup) {
             plugin->def->cleanup(plugin->ctx);
         }
 
-        /* Free registered builtins list */
+        // Free registered builtins list
         if (plugin->registered_builtins) {
             for (size_t i = 0; i < plugin->registered_builtin_count; i++) {
                 free(plugin->registered_builtins[i]);
@@ -185,15 +185,15 @@ void lush_plugin_manager_destroy(lush_plugin_manager_t *manager) {
             free(plugin->registered_builtins);
         }
 
-        /* Free context */
+        // Free context
         free(plugin->ctx);
 
-        /* Close shared object */
+        // Close shared object
         if (plugin->handle) {
             dlclose(plugin->handle);
         }
 
-        /* Free plugin data */
+        // Free plugin data
         free(plugin->path);
         free(plugin->error_message);
         free(plugin);
@@ -229,13 +229,13 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR;
     }
 
-    /* Check plugin limit */
+    // Check plugin limit
     if (manager->config.max_plugins > 0 &&
         manager->plugin_count >= manager->config.max_plugins) {
         return LUSH_PLUGIN_ERROR;
     }
 
-    /* Allocate plugin structure */
+    // Allocate plugin structure
     lush_plugin_t *plugin = calloc(1, sizeof(lush_plugin_t));
     if (!plugin) {
         return LUSH_PLUGIN_ERROR_OUT_OF_MEMORY;
@@ -248,7 +248,7 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Open shared object */
+    // Open shared object
     plugin->handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
     if (!plugin->handle) {
         set_plugin_error(plugin, "dlopen failed: %s", dlerror());
@@ -259,8 +259,8 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR_LOAD_FAILED;
     }
 
-    /* Find plugin definition symbol */
-    dlerror(); /* Clear any existing error */
+    // Find plugin definition symbol
+    dlerror(); // Clear any existing error
     const lush_plugin_def_t *def =
         (const lush_plugin_def_t *)dlsym(plugin->handle, LUSH_PLUGIN_SYMBOL);
     char *error = dlerror();
@@ -275,7 +275,7 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR_SYMBOL_NOT_FOUND;
     }
 
-    /* Validate plugin definition */
+    // Validate plugin definition
     if (!def->name || !def->version || !def->init) {
         set_plugin_error(plugin, "Invalid plugin: missing required fields");
         plugin->state = LUSH_PLUGIN_STATE_ERROR;
@@ -286,7 +286,7 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR_INVALID_PLUGIN;
     }
 
-    /* Check API version */
+    // Check API version
     if (def->api_version < LUSH_PLUGIN_API_VERSION_MIN ||
         def->api_version > LUSH_PLUGIN_API_VERSION) {
         set_plugin_error(plugin, "API version %u not supported (need %u-%u)",
@@ -300,7 +300,7 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR_VERSION_MISMATCH;
     }
 
-    /* Check if already loaded */
+    // Check if already loaded
     if (lush_plugin_manager_find(manager, def->name)) {
         set_plugin_error(plugin, "Plugin '%s' already loaded", def->name);
         plugin->state = LUSH_PLUGIN_STATE_ERROR;
@@ -315,7 +315,7 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
     plugin->state = LUSH_PLUGIN_STATE_LOADED;
     plugin->load_time = get_time_ns();
 
-    /* Create plugin context */
+    // Create plugin context
     plugin->ctx = calloc(1, sizeof(lush_plugin_context_t));
     if (!plugin->ctx) {
         dlclose(plugin->handle);
@@ -330,11 +330,11 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
     plugin->ctx->symtable = manager->symtable;
     plugin->ctx->user_data = NULL;
 
-    /* Grant permissions (intersection of required and default) */
+    // Grant permissions (intersection of required and default)
     plugin->ctx->granted_permissions =
         def->required_permissions & manager->config.default_permissions;
 
-    /* Check if all required permissions are granted */
+    // Check if all required permissions are granted
     if ((plugin->ctx->granted_permissions & def->required_permissions) !=
         def->required_permissions) {
         set_plugin_error(plugin, "Required permissions not granted");
@@ -347,14 +347,14 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR_PERMISSION_DENIED;
     }
 
-    /* Initialize plugin */
+    // Initialize plugin
     plugin->state = LUSH_PLUGIN_STATE_INITIALIZING;
     int init_result = def->init(plugin->ctx);
     if (init_result != 0) {
         set_plugin_error(plugin, "init() returned %d", init_result);
         plugin->state = LUSH_PLUGIN_STATE_ERROR;
 
-        /* Free registered builtins */
+        // Free registered builtins
         if (plugin->registered_builtins) {
             for (size_t i = 0; i < plugin->registered_builtin_count; i++) {
                 free(plugin->registered_builtins[i]);
@@ -372,7 +372,7 @@ lush_plugin_result_t lush_plugin_manager_load(lush_plugin_manager_t *manager,
 
     plugin->state = LUSH_PLUGIN_STATE_ACTIVE;
 
-    /* Add to manager's list */
+    // Add to manager's list
     plugin->next = manager->plugins;
     manager->plugins = plugin;
     manager->plugin_count++;
@@ -391,25 +391,25 @@ lush_plugin_manager_load_by_name(lush_plugin_manager_t *manager,
         return LUSH_PLUGIN_ERROR;
     }
 
-    /* Check if already loaded */
+    // Check if already loaded
     if (lush_plugin_manager_find(manager, name)) {
         return LUSH_PLUGIN_ERROR_ALREADY_LOADED;
     }
 
-    /* Try search paths */
+    // Try search paths
     if (manager->config.search_paths) {
         for (const char **path = manager->config.search_paths; *path; path++) {
             char full_path[4096];
             snprintf(full_path, sizeof(full_path), "%s/%s.so", *path, name);
 
-            /* Check if file exists */
+            // Check if file exists
             FILE *f = fopen(full_path, "r");
             if (f) {
                 fclose(f);
                 return lush_plugin_manager_load(manager, full_path, plugin);
             }
 
-            /* Try with lib prefix */
+            // Try with lib prefix
             snprintf(full_path, sizeof(full_path), "%s/lib%s.so", *path, name);
             f = fopen(full_path, "r");
             if (f) {
@@ -419,7 +419,7 @@ lush_plugin_manager_load_by_name(lush_plugin_manager_t *manager,
         }
     }
 
-    /* Try current directory */
+    // Try current directory
     char local_path[4096];
     snprintf(local_path, sizeof(local_path), "./%s.so", name);
     FILE *f = fopen(local_path, "r");
@@ -455,12 +455,12 @@ lush_plugin_result_t lush_plugin_manager_unload(lush_plugin_manager_t *manager,
 
     plugin->state = LUSH_PLUGIN_STATE_UNLOADING;
 
-    /* Call cleanup */
+    // Call cleanup
     if (plugin->def && plugin->def->cleanup) {
         plugin->def->cleanup(plugin->ctx);
     }
 
-    /* Remove from list */
+    // Remove from list
     if (prev) {
         prev->next = plugin->next;
     } else {
@@ -468,7 +468,7 @@ lush_plugin_result_t lush_plugin_manager_unload(lush_plugin_manager_t *manager,
     }
     manager->plugin_count--;
 
-    /* Free registered builtins */
+    // Free registered builtins
     if (plugin->registered_builtins) {
         for (size_t i = 0; i < plugin->registered_builtin_count; i++) {
             free(plugin->registered_builtins[i]);
@@ -476,15 +476,15 @@ lush_plugin_result_t lush_plugin_manager_unload(lush_plugin_manager_t *manager,
         free(plugin->registered_builtins);
     }
 
-    /* Free context */
+    // Free context
     free(plugin->ctx);
 
-    /* Close shared object */
+    // Close shared object
     if (plugin->handle) {
         dlclose(plugin->handle);
     }
 
-    /* Free plugin data */
+    // Free plugin data
     free(plugin->path);
     free(plugin->error_message);
     free(plugin);
@@ -583,7 +583,7 @@ lush_plugin_result_t lush_plugin_register_builtin(lush_plugin_context_t *ctx,
         return LUSH_PLUGIN_ERROR;
     }
 
-    /* Track registered builtin for cleanup */
+    // Track registered builtin for cleanup
     size_t new_count = plugin->registered_builtin_count + 1;
     char **new_builtins =
         realloc(plugin->registered_builtins, new_count * sizeof(char *));
@@ -621,12 +621,12 @@ lush_plugin_result_t lush_plugin_unregister_builtin(lush_plugin_context_t *ctx,
         return LUSH_PLUGIN_ERROR;
     }
 
-    /* Remove from tracked list */
+    // Remove from tracked list
     for (size_t i = 0; i < plugin->registered_builtin_count; i++) {
         if (plugin->registered_builtins[i] &&
             strcmp(plugin->registered_builtins[i], name) == 0) {
             free(plugin->registered_builtins[i]);
-            /* Move last element to this position */
+            // Move last element to this position
             plugin->registered_builtins[i] =
                 plugin
                     ->registered_builtins[plugin->registered_builtin_count - 1];
@@ -635,7 +635,7 @@ lush_plugin_result_t lush_plugin_unregister_builtin(lush_plugin_context_t *ctx,
         }
     }
 
-    /* NOTE: Actual unregistration would happen here */
+    // NOTE: Actual unregistration would happen here
 
     return LUSH_PLUGIN_OK;
 }
@@ -673,7 +673,7 @@ lush_plugin_register_completion(lush_plugin_context_t *ctx, const char *name,
         return LUSH_PLUGIN_ERROR_PERMISSION_DENIED;
     }
 
-    /* NOTE: Integration with LLE completion system would happen here */
+    // NOTE: Integration with LLE completion system would happen here
 
     return LUSH_PLUGIN_OK;
 }
@@ -681,7 +681,7 @@ lush_plugin_register_completion(lush_plugin_context_t *ctx, const char *name,
 lush_plugin_result_t lush_plugin_subscribe_event(lush_plugin_context_t *ctx,
                                                  int event_type,
                                                  lush_plugin_event_fn fn) {
-    (void)event_type; /* Used when integrating with LLE event system */
+    (void)event_type; // Used when integrating with LLE event system
 
     if (!ctx || !fn) {
         return LUSH_PLUGIN_ERROR;
@@ -691,7 +691,7 @@ lush_plugin_result_t lush_plugin_subscribe_event(lush_plugin_context_t *ctx,
         return LUSH_PLUGIN_ERROR_PERMISSION_DENIED;
     }
 
-    /* NOTE: Integration with LLE event system would happen here */
+    // NOTE: Integration with LLE event system would happen here
 
     return LUSH_PLUGIN_OK;
 }
@@ -719,7 +719,7 @@ const char *lush_plugin_get_var(lush_plugin_context_t *ctx, const char *name) {
 
 lush_plugin_result_t lush_plugin_set_var(lush_plugin_context_t *ctx,
                                          const char *name, const char *value) {
-    (void)value; /* Used when integrating with symtable */
+    (void)value; // Used when integrating with symtable
 
     if (!ctx || !name) {
         return LUSH_PLUGIN_ERROR;

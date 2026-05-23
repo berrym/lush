@@ -164,7 +164,7 @@ typedef struct lle_word_context_branch {
  */
 typedef struct lle_word_context {
 
-    /* Buffer coordinates -------------------------------------------------- */
+    // Buffer coordinates --------------------------------------------------
     size_t word_start;             /**< Byte offset where the current
                                         shell-word begins, including any
                                         open quote character.               */
@@ -183,11 +183,11 @@ typedef struct lle_word_context {
                                         when an open quote/escape consumes
                                         leading bytes).                     */
 
-    /* Lexical state at cursor -------------------------------------------- */
+    // Lexical state at cursor --------------------------------------------
     lle_quote_state_t quote_state;       ///< Quote/escape state at the cursor
     lle_expansion_kind_t expansion_kind; ///< In-progress expansion kind, if any
 
-    /* Surrounding-command context --------------------------------------- */
+    // Surrounding-command context ---------------------------------------
     lle_word_context_type_t context_type; ///< Where the word sits structurally
     char *command_name;                   /**< Owner command for builtin-arg
                                                dispatch (e.g., "cd", "set"). NULL
@@ -207,7 +207,7 @@ typedef struct lle_word_context {
                                                exist.                              */
     size_t argument_count; /**< Number of entries in arguments[]. */
 
-    /* Resolved data for sources ------------------------------------------ */
+    // Resolved data for sources ------------------------------------------
     char *expanded_directory;       /**< Absolute path to scan when the word
                                          is path-shaped and produces a
                                          single resolved directory. NULL for
@@ -218,13 +218,13 @@ typedef struct lle_word_context {
                                          prefix-matching against
                                          candidates.                         */
 
-    /* Multi-value expansion (brace only currently) ----------------------- */
+    // Multi-value expansion (brace only currently) -----------------------
     lle_word_context_branch_t *branches; /**< Array of per-branch resolved
                                               directory + prefix pairs.
                                               NULL when single-value.       */
     size_t branch_count;                 ///< Number of entries in branches[]
 
-    /* Bookkeeping -------------------------------------------------------- */
+    // Bookkeeping --------------------------------------------------------
     lle_memory_pool_t *pool; /**< Pool used for all allocations.      */
 } lle_word_context_t;
 
@@ -300,4 +300,4 @@ const char *lle_word_context_type_name(lle_word_context_type_t type);
 }
 #endif
 
-#endif /* LLE_WORD_CONTEXT_H */
+#endif // LLE_WORD_CONTEXT_H

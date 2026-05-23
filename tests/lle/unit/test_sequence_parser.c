@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Mock terminal capabilities and memory pool */
+// Mock terminal capabilities and memory pool
 static int mock_terminal_dummy = 42;
 static int mock_pool_dummy = 43;
 static lle_terminal_capabilities_t *mock_terminal =

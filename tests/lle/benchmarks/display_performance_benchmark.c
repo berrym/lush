@@ -19,21 +19,21 @@
 #include <string.h>
 #include <time.h>
 
-/* Mock memory pool - uses liblle.a implementations via linking */
+// Mock memory pool - uses liblle.a implementations via linking
 static int mock_pool_dummy = 42;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
-/* Helper to get nanoseconds */
+// Helper to get nanoseconds
 static uint64_t get_nanos(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-/* Spec requirements (in nanoseconds) */
-#define SPEC_CACHE_LOOKUP_MAX_NS 10000ULL   /* 10μs */
-#define SPEC_PIPELINE_EXEC_MAX_NS 500000ULL /* 500μs */
-#define SPEC_CACHE_HIT_RATE_MIN 0.75        /* 75% */
+// Spec requirements (in nanoseconds)
+#define SPEC_CACHE_LOOKUP_MAX_NS 10000ULL   // 10μs
+#define SPEC_PIPELINE_EXEC_MAX_NS 500000ULL // 500μs
+#define SPEC_CACHE_HIT_RATE_MIN 0.75        // 75%
 
 #define BENCHMARK(name)                                                        \
     printf("\n===============================================================" \
@@ -60,7 +60,7 @@ static uint64_t get_nanos(void) {
     } while (0)
 
 /* ========================================================================== */
-/*                    BENCHMARK 1: CACHE PERFORMANCE                          */
+// BENCHMARK 1: CACHE PERFORMANCE
 /* ========================================================================== */
 
 static void benchmark_cache_operations(void) {
@@ -73,7 +73,7 @@ static void benchmark_cache_operations(void) {
         return;
     }
 
-    /* Benchmark 1a: Cache store performance */
+    // Benchmark 1a: Cache store performance
     printf("\n1a. Cache Store Operations\n");
     printf("  Storing 100 entries...\n");
 
@@ -90,7 +90,7 @@ static void benchmark_cache_operations(void) {
 
     REPORT_TIME("Average store time", store_avg, 0);
 
-    /* Benchmark 1b: Cache lookup performance (hits) */
+    // Benchmark 1b: Cache lookup performance (hits)
     printf("\n1b. Cache Lookup Performance (Cache Hits)\n");
     printf("  Looking up 100 entries (all should hit)...\n");
 
@@ -106,7 +106,7 @@ static void benchmark_cache_operations(void) {
 
     REPORT_TIME("Average lookup time", lookup_avg, SPEC_CACHE_LOOKUP_MAX_NS);
 
-    /* Benchmark 1c: Cache hit rate test */
+    // Benchmark 1c: Cache hit rate test
     printf("\n1c. Cache Hit Rate Test\n");
     printf("  100 lookups: 80 hits, 20 misses expected\n");
 
@@ -116,9 +116,9 @@ static void benchmark_cache_operations(void) {
     for (int i = 0; i < 100; i++) {
         void *data = NULL;
         size_t size = 0;
-        uint64_t key =
-            (i < 80) ? (uint64_t)i
-                     : (uint64_t)(i + 100); /* First 80 hit, last 20 miss */
+        uint64_t key = (i < 80)
+                           ? (uint64_t)i
+                           : (uint64_t)(i + 100); // First 80 hit, last 20 miss
         result = lle_display_cache_lookup(cache, key, &data, &size);
         if (result == LLE_SUCCESS) {
             hits++;
@@ -140,7 +140,7 @@ static void benchmark_cache_operations(void) {
                (SPEC_CACHE_HIT_RATE_MIN - hit_rate) * 100.0);
     }
 
-    /* Benchmark 1d: Cache invalidation performance */
+    // Benchmark 1d: Cache invalidation performance
     printf("\n1d. Cache Invalidation Performance\n");
 
     uint64_t inval_start = get_nanos();
@@ -157,7 +157,7 @@ static void benchmark_cache_operations(void) {
 }
 
 /* ========================================================================== */
-/*                    BENCHMARK 2: PIPELINE PERFORMANCE                       */
+// BENCHMARK 2: PIPELINE PERFORMANCE
 /* ========================================================================== */
 
 static void benchmark_pipeline_operations(void) {
@@ -170,7 +170,7 @@ static void benchmark_pipeline_operations(void) {
         return;
     }
 
-    /* Benchmark 2a: Pipeline execution with small content */
+    // Benchmark 2a: Pipeline execution with small content
     printf("\n2a. Pipeline Execution (Small Content)\n");
     printf("  Executing pipeline 100 times with 50-char content...\n");
 
@@ -186,7 +186,7 @@ static void benchmark_pipeline_operations(void) {
 
     REPORT_TIME("Average execution time", exec_avg, SPEC_PIPELINE_EXEC_MAX_NS);
 
-    /* Benchmark 2b: Pipeline execution with medium content */
+    // Benchmark 2b: Pipeline execution with medium content
     printf("\n2b. Pipeline Execution (Medium Content)\n");
     printf("  Executing pipeline 50 times with 500-char content...\n");
 
@@ -206,7 +206,7 @@ static void benchmark_pipeline_operations(void) {
 }
 
 /* ========================================================================== */
-/*                    BENCHMARK 3: DIRTY TRACKER PERFORMANCE                  */
+// BENCHMARK 3: DIRTY TRACKER PERFORMANCE
 /* ========================================================================== */
 
 static void benchmark_dirty_tracker_operations(void) {
@@ -219,7 +219,7 @@ static void benchmark_dirty_tracker_operations(void) {
         return;
     }
 
-    /* Benchmark 3a: Mark region performance */
+    // Benchmark 3a: Mark region performance
     printf("\n3a. Mark Region Operations\n");
     printf("  Marking 1000 individual regions...\n");
 
@@ -233,7 +233,7 @@ static void benchmark_dirty_tracker_operations(void) {
 
     REPORT_TIME("Average mark time", mark_avg, 0);
 
-    /* Benchmark 3b: Query performance */
+    // Benchmark 3b: Query performance
     printf("\n3b. Dirty Query Operations\n");
     printf("  Querying 1000 regions...\n");
 
@@ -247,7 +247,7 @@ static void benchmark_dirty_tracker_operations(void) {
 
     REPORT_TIME("Average query time", query_avg, 0);
 
-    /* Benchmark 3c: Clear performance */
+    // Benchmark 3c: Clear performance
     printf("\n3c. Clear Operations\n");
     printf("  Clearing tracker 100 times...\n");
 
@@ -265,7 +265,7 @@ static void benchmark_dirty_tracker_operations(void) {
 }
 
 /* ========================================================================== */
-/*                             MAIN BENCHMARK RUNNER                          */
+// MAIN BENCHMARK RUNNER
 /* ========================================================================== */
 
 int main(void) {
@@ -281,12 +281,12 @@ int main(void) {
     printf(
         "#################################################################\n");
 
-    /* Run all benchmarks */
+    // Run all benchmarks
     benchmark_cache_operations();
     benchmark_pipeline_operations();
     benchmark_dirty_tracker_operations();
 
-    /* Summary */
+    // Summary
     printf("\n");
     printf(
         "=================================================================\n");

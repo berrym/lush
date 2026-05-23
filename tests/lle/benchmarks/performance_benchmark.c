@@ -16,20 +16,20 @@
 #include <string.h>
 #include <time.h>
 
-/* External global from test_memory_mock.c */
+// External global from test_memory_mock.c
 extern lush_memory_pool_t *global_memory_pool;
 
-/* Helper to get nanoseconds */
+// Helper to get nanoseconds
 static uint64_t get_nanos(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-/* Spec requirements (in nanoseconds) */
-#define SPEC_INSERT_MAX_NS 500000ULL    /* 0.5ms */
-#define SPEC_DELETE_MAX_NS 500000ULL    /* 0.5ms */
-#define SPEC_UTF8_CALC_MAX_NS 100000ULL /* 0.1ms */
+// Spec requirements (in nanoseconds)
+#define SPEC_INSERT_MAX_NS 500000ULL    // 0.5ms
+#define SPEC_DELETE_MAX_NS 500000ULL    // 0.5ms
+#define SPEC_UTF8_CALC_MAX_NS 100000ULL // 0.1ms
 
 #define BENCHMARK(name, iterations)                                            \
     printf("\n[ BENCHMARK ] %s\n", name);                                      \
@@ -97,7 +97,7 @@ int main(void) {
         return 1;
     }
 
-    /* Populate buffer first */
+    // Populate buffer first
     for (int i = 0; i < 1000; i++) {
         lle_buffer_insert_text(buffer, buffer->length, "test", 4);
     }
@@ -125,7 +125,7 @@ int main(void) {
         return 1;
     }
 
-    /* Insert text with UTF-8 */
+    // Insert text with UTF-8
     const char *utf8_text =
         "Hello 🌍 World! This is a test with émojis and spëcial çharacters.";
     size_t text_len = strlen(utf8_text);
@@ -135,7 +135,7 @@ int main(void) {
     RUN_BENCHMARK(
         {
             for (int i = 0; i < 100; i++) {
-                /* Rebuild UTF-8 index */
+                // Rebuild UTF-8 index
                 if (buffer->utf8_index) {
                     lle_utf8_index_rebuild(buffer->utf8_index,
                                            (const char *)buffer->data,
@@ -167,7 +167,7 @@ int main(void) {
         return 1;
     }
 
-    /* Insert test text */
+    // Insert test text
     lle_buffer_insert_text(buffer, 0,
                            "This is a test string for cursor movement", 42);
 
@@ -207,7 +207,7 @@ int main(void) {
 
     buffer->change_tracking_enabled = true;
 
-    /* Create 100 changes */
+    // Create 100 changes
     for (int i = 0; i < 100; i++) {
         lle_change_sequence_t *seq = NULL;
         lle_change_tracker_begin_sequence(tracker, "operation", &seq);
@@ -218,17 +218,17 @@ int main(void) {
 
     RUN_BENCHMARK(
         {
-            /* Undo all */
+            // Undo all
             for (int i = 0; i < 100; i++) {
                 lle_change_tracker_undo(tracker, buffer);
             }
 
-            /* Redo all */
+            // Redo all
             for (int i = 0; i < 100; i++) {
                 lle_change_tracker_redo(tracker, buffer);
             }
         },
-        SPEC_INSERT_MAX_NS * 2); /* Allow 1ms for 200 operations */
+        SPEC_INSERT_MAX_NS * 2); // Allow 1ms for 200 operations
 
     lle_change_tracker_destroy(tracker);
     lle_buffer_destroy(buffer);
@@ -253,7 +253,7 @@ int main(void) {
         return 1;
     }
 
-    /* Insert some text */
+    // Insert some text
     lle_buffer_insert_text(buffer, 0,
                            "Test validation performance with UTF-8: 🌍", 46);
 

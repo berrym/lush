@@ -129,7 +129,7 @@ static bool parse_key(const char *key, char *section, size_t section_len,
 
     const char *dot = strchr(key, '.');
     if (!dot) {
-        /* No section, just option name - use empty section */
+        // No section, just option name - use empty section
         section[0] = '\0';
         snprintf(option, option_len, "%s", key);
         return true;
@@ -176,7 +176,7 @@ static stored_option_t *find_option(const char *key) {
     }
 
     for (size_t i = 0; i < section->option_count; i++) {
-        /* Compare just the option part of the stored key */
+        // Compare just the option part of the stored key
         const char *stored_dot = strchr(section->options[i].key, '.');
         const char *stored_option =
             stored_dot ? stored_dot + 1 : section->options[i].key;
@@ -198,22 +198,22 @@ static bool pattern_matches(const char *pattern, const char *key) {
         return false;
     }
 
-    /* Global wildcard */
+    // Global wildcard
     if (unicode_streq(pattern, "*")) {
         return true;
     }
 
-    /* Section wildcard (e.g., "shell.*") */
+    // Section wildcard (e.g., "shell.*")
     size_t plen = strlen(pattern);
     if (plen >= 2 && pattern[plen - 1] == '*' && pattern[plen - 2] == '.') {
-        /* Extract prefix without the trailing '*' (keep the dot) */
-        /* e.g., "shell.*" -> match prefix "shell." against key */
-        size_t prefix_len = plen - 1; /* Length without the '*' */
+        // Extract prefix without the trailing '*' (keep the dot)
+        // e.g., "shell.*" -> match prefix "shell." against key
+        size_t prefix_len = plen - 1; // Length without the '*'
         return lle_unicode_is_prefix(pattern, prefix_len, key, strlen(key),
                                      &LLE_UNICODE_COMPARE_DEFAULT);
     }
 
-    /* Exact match with Unicode normalization */
+    // Exact match with Unicode normalization
     return unicode_streq(pattern, key);
 }
 
@@ -247,7 +247,7 @@ static void notify_change(const char *key, const creg_value_t *old_value,
 
 creg_result_t config_registry_init(void) {
     if (g_registry.initialized) {
-        return CREG_SUCCESS; /* Already initialized */
+        return CREG_SUCCESS; // Already initialized
     }
 
     memset(&g_registry, 0, sizeof(g_registry));
@@ -276,21 +276,21 @@ creg_result_t config_registry_register_section(const creg_section_t *section) {
         return CREG_ERROR_INVALID_PARAM;
     }
 
-    /* Check for duplicate */
+    // Check for duplicate
     if (find_section(section->name) != NULL) {
-        return CREG_SUCCESS; /* Already registered */
+        return CREG_SUCCESS; // Already registered
     }
 
     if (g_registry.section_count >= CREG_SECTION_MAX) {
         return CREG_ERROR_SECTION_FULL;
     }
 
-    /* Create new registered section */
+    // Create new registered section
     registered_section_t *reg = &g_registry.sections[g_registry.section_count];
     reg->section = *section;
     reg->option_count = 0;
 
-    /* Register all options with default values */
+    // Register all options with default values
     for (size_t i = 0; i < section->option_count; i++) {
         if (reg->option_count >= CREG_OPTIONS_PER_SECTION_MAX) {
             return CREG_ERROR_OPTION_FULL;
@@ -299,7 +299,7 @@ creg_result_t config_registry_register_section(const creg_section_t *section) {
         const creg_option_t *opt = &section->options[i];
         stored_option_t *stored = &reg->options[reg->option_count];
 
-        /* Build full key path */
+        // Build full key path
         snprintf(stored->key, sizeof(stored->key), "%s.%s", section->name,
                  opt->name);
 
@@ -339,24 +339,24 @@ creg_result_t config_registry_set(const char *key, const creg_value_t *value) {
         return CREG_ERROR_NOT_FOUND;
     }
 
-    /* Check type compatibility (allow setting any type if option accepts it) */
+    // Check type compatibility (allow setting any type if option accepts it)
     if (opt->option_def && opt->option_def->type != CREG_VALUE_NONE &&
         opt->option_def->type != value->type) {
         return CREG_ERROR_TYPE_MISMATCH;
     }
 
-    /* Check if value actually changed */
+    // Check if value actually changed
     if (creg_value_equal(&opt->value, value)) {
-        return CREG_SUCCESS; /* No change */
+        return CREG_SUCCESS; // No change
     }
 
-    /* Store old value for notification */
+    // Store old value for notification
     creg_value_t old_value = opt->value;
 
-    /* Update value */
+    // Update value
     opt->value = *value;
 
-    /* Notify subscribers */
+    // Notify subscribers
     notify_change(key, &old_value, value);
 
     return CREG_SUCCESS;
@@ -481,7 +481,7 @@ creg_result_t config_registry_subscribe(const char *pattern,
         return CREG_ERROR_INVALID_PARAM;
     }
 
-    /* Find free slot or reuse inactive slot */
+    // Find free slot or reuse inactive slot
     subscriber_t *slot = NULL;
     for (size_t i = 0; i < g_registry.subscriber_count; i++) {
         if (!g_registry.subscribers[i].active) {
@@ -540,7 +540,7 @@ static toml_result_t load_callback(const char *section, const char *key,
                                    const toml_value_t *value, void *user_data) {
     load_context_t *ctx = (load_context_t *)user_data;
 
-    /* Build full key path */
+    // Build full key path
     char full_key[CREG_KEY_MAX];
     if (section && section[0]) {
         snprintf(full_key, sizeof(full_key), "%s.%s", section, key);
@@ -548,7 +548,7 @@ static toml_result_t load_callback(const char *section, const char *key,
         snprintf(full_key, sizeof(full_key), "%s", key);
     }
 
-    /* Convert TOML value to config value */
+    // Convert TOML value to config value
     creg_value_t config_val = {0};
 
     switch (value->type) {
@@ -569,11 +569,11 @@ static toml_result_t load_callback(const char *section, const char *key,
         break;
 
     default:
-        /* Skip unsupported types (arrays, tables) */
+        // Skip unsupported types (arrays, tables)
         return TOML_SUCCESS;
     }
 
-    /* Try to set the value (ignore errors for unknown keys) */
+    // Try to set the value (ignore errors for unknown keys)
     creg_result_t result = config_registry_set(full_key, &config_val);
     if (result != CREG_SUCCESS && result != CREG_ERROR_NOT_FOUND) {
         ctx->result = result;
@@ -598,7 +598,7 @@ creg_result_t config_registry_load(const char *path) {
         return CREG_ERROR_INVALID_PARAM;
     }
 
-    /* Read file contents */
+    // Read file contents
     FILE *file = fopen(path, "r");
     if (!file) {
         return CREG_ERROR_IO_FAILED;
@@ -610,7 +610,7 @@ creg_result_t config_registry_load(const char *path) {
 
     if (size <= 0) {
         fclose(file);
-        return CREG_SUCCESS; /* Empty file is valid */
+        return CREG_SUCCESS; // Empty file is valid
     }
 
     char *content = malloc((size_t)size + 1);
@@ -623,7 +623,7 @@ creg_result_t config_registry_load(const char *path) {
     content[read] = '\0';
     fclose(file);
 
-    /* Parse TOML */
+    // Parse TOML
     toml_parser_t parser;
     toml_result_t toml_result = toml_parser_init(&parser, content);
     if (toml_result != TOML_SUCCESS) {
@@ -641,7 +641,7 @@ creg_result_t config_registry_load(const char *path) {
         return CREG_ERROR_PARSE_FAILED;
     }
 
-    /* Call on_load hooks for all sections */
+    // Call on_load hooks for all sections
     for (size_t i = 0; i < g_registry.section_count; i++) {
         if (g_registry.sections[i].section.on_load) {
             g_registry.sections[i].section.on_load();
@@ -668,12 +668,12 @@ creg_result_t config_registry_save(const char *path) {
     fprintf(file, "# Lush Shell Configuration\n");
     fprintf(file, "# Generated by lush - edit with care\n\n");
 
-    /* Write each section */
+    // Write each section
     for (size_t i = 0; i < g_registry.section_count; i++) {
         registered_section_t *reg = &g_registry.sections[i];
         bool section_written = false;
 
-        /* Check if section has custom save hook */
+        // Check if section has custom save hook
         if (reg->section.on_save) {
             fprintf(file, "[%s]\n", reg->section.name);
             reg->section.on_save(file);
@@ -681,31 +681,31 @@ creg_result_t config_registry_save(const char *path) {
             continue;
         }
 
-        /* Write non-default, persisted values */
+        // Write non-default, persisted values
         for (size_t j = 0; j < reg->option_count; j++) {
             stored_option_t *opt = &reg->options[j];
 
-            /* Skip non-persisted options */
+            // Skip non-persisted options
             if (!opt->persisted) {
                 continue;
             }
 
-            /* Skip options with default values (sparse format) */
+            // Skip options with default values (sparse format)
             if (creg_value_equal(&opt->value, &opt->default_val)) {
                 continue;
             }
 
-            /* Write section header if not yet written */
+            // Write section header if not yet written
             if (!section_written) {
                 fprintf(file, "[%s]\n", reg->section.name);
                 section_written = true;
             }
 
-            /* Extract just the option name from full key */
+            // Extract just the option name from full key
             const char *dot = strchr(opt->key, '.');
             const char *option_name = dot ? dot + 1 : opt->key;
 
-            /* Write value based on type */
+            // Write value based on type
             switch (opt->value.type) {
             case CREG_VALUE_STRING:
                 fprintf(file, "%s = \"%s\"\n", option_name,
@@ -769,11 +769,11 @@ creg_result_t config_registry_reset(const char *key) {
         return CREG_ERROR_NOT_FOUND;
     }
 
-    /* Restore default value */
+    // Restore default value
     creg_value_t old_value = opt->value;
     opt->value = opt->default_val;
 
-    /* Notify if changed */
+    // Notify if changed
     if (!creg_value_equal(&old_value, &opt->value)) {
         notify_change(key, &old_value, &opt->value);
     }
@@ -824,7 +824,7 @@ creg_result_t config_registry_set_mode_default(const char *key,
         return CREG_ERROR_INVALID_PARAM;
     }
 
-    /* Verify the option exists and that the type matches. */
+    // Verify the option exists and that the type matches.
     creg_value_t probe;
     creg_result_t probe_result = config_registry_get_default(key, &probe);
     if (probe_result != CREG_SUCCESS) {
@@ -834,7 +834,7 @@ creg_result_t config_registry_set_mode_default(const char *key,
         return CREG_ERROR_TYPE_MISMATCH;
     }
 
-    /* Replace if a (key, mode) entry already exists. */
+    // Replace if a (key, mode) entry already exists.
     for (size_t i = 0; i < g_registry.mode_default_count; i++) {
         mode_default_t *md = &g_registry.mode_defaults[i];
         if (md->active && md->mode == mode && unicode_streq(md->key, key)) {
@@ -862,7 +862,7 @@ creg_result_t config_registry_apply_mode_defaults(shell_mode_t mode) {
         return CREG_ERROR_INVALID_PARAM;
     }
     if (!g_registry.initialized) {
-        return CREG_SUCCESS; /* nothing to do */
+        return CREG_SUCCESS; // nothing to do
     }
 
     for (size_t i = 0; i < g_registry.mode_default_count; i++) {
@@ -921,7 +921,7 @@ bool creg_value_equal(const creg_value_t *a, const creg_value_t *b) {
         return true;
 
     case CREG_VALUE_STRING:
-        /* Use Unicode-aware comparison for string values */
+        // Use Unicode-aware comparison for string values
         return unicode_streq(a->data.string, b->data.string);
 
     case CREG_VALUE_INTEGER:

@@ -25,25 +25,25 @@ TEST(create_destroy) {
     lle_kill_ring_t *ring = NULL;
     lle_result_t result;
 
-    /* Create with default size */
+    // Create with default size
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create with default size failed");
     ASSERT(ring != NULL, "Ring is NULL after creation");
 
-    /* Verify capacity is default */
+    // Verify capacity is default
     size_t capacity;
     result = lle_kill_ring_get_capacity(ring, &capacity);
     ASSERT(result == LLE_SUCCESS, "Get capacity failed");
     ASSERT_EQ(capacity, LLE_KILL_RING_DEFAULT_SIZE,
               "Capacity not default size");
 
-    /* Verify empty */
+    // Verify empty
     bool empty;
     result = lle_kill_ring_is_empty(ring, &empty);
     ASSERT(result == LLE_SUCCESS, "Is empty check failed");
     ASSERT(empty, "New ring not empty");
 
-    /* Destroy */
+    // Destroy
     result = lle_kill_ring_destroy(ring);
     ASSERT(result == LLE_SUCCESS, "Destroy failed");
 }
@@ -52,7 +52,7 @@ TEST(create_custom_size) {
     lle_kill_ring_t *ring = NULL;
     lle_result_t result;
 
-    /* Create with custom size */
+    // Create with custom size
     result = lle_kill_ring_create(&ring, 64, NULL);
     ASSERT(result == LLE_SUCCESS, "Create with custom size failed");
 
@@ -68,7 +68,7 @@ TEST(create_max_size_clamping) {
     lle_kill_ring_t *ring = NULL;
     lle_result_t result;
 
-    /* Create with size exceeding max */
+    // Create with size exceeding max
     result = lle_kill_ring_create(&ring, 1000, NULL);
     ASSERT(result == LLE_SUCCESS, "Create with excessive size failed");
 
@@ -83,12 +83,12 @@ TEST(create_max_size_clamping) {
 TEST(null_pointer_checks) {
     lle_result_t result;
 
-    /* Create with NULL ring pointer */
+    // Create with NULL ring pointer
     result = lle_kill_ring_create(NULL, 0, NULL);
     ASSERT(result == LLE_ERROR_NULL_POINTER,
            "Create accepted NULL ring pointer");
 
-    /* Destroy with NULL */
+    // Destroy with NULL
     result = lle_kill_ring_destroy(NULL);
     ASSERT(result == LLE_ERROR_NULL_POINTER, "Destroy accepted NULL");
 }
@@ -105,17 +105,17 @@ TEST(add_single_kill) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add text */
+    // Add text
     result = lle_kill_ring_add(ring, "hello", false);
     ASSERT(result == LLE_SUCCESS, "Add failed");
 
-    /* Verify count */
+    // Verify count
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
     ASSERT_EQ(count, 1, "Count not 1 after add");
 
-    /* Verify not empty */
+    // Verify not empty
     bool empty;
     result = lle_kill_ring_is_empty(ring, &empty);
     ASSERT(result == LLE_SUCCESS, "Is empty check failed");
@@ -131,7 +131,7 @@ TEST(add_multiple_kills) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add three separate kills */
+    // Add three separate kills
     result = lle_kill_ring_add(ring, "first", false);
     ASSERT(result == LLE_SUCCESS, "Add first failed");
 
@@ -141,7 +141,7 @@ TEST(add_multiple_kills) {
     result = lle_kill_ring_add(ring, "third", false);
     ASSERT(result == LLE_SUCCESS, "Add third failed");
 
-    /* Verify count */
+    // Verify count
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
@@ -157,21 +157,21 @@ TEST(add_with_append) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add initial text */
+    // Add initial text
     result = lle_kill_ring_add(ring, "hello", false);
     ASSERT(result == LLE_SUCCESS, "Add initial failed");
 
-    /* Append to same entry */
+    // Append to same entry
     result = lle_kill_ring_add(ring, " world", true);
     ASSERT(result == LLE_SUCCESS, "Add append failed");
 
-    /* Verify still one entry */
+    // Verify still one entry
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
     ASSERT_EQ(count, 1, "Count not 1 after append");
 
-    /* Verify text is concatenated */
+    // Verify text is concatenated
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Get current failed");
@@ -187,7 +187,7 @@ TEST(add_successive_kills_with_append) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Simulate C-k, C-k, C-k (successive kills) */
+    // Simulate C-k, C-k, C-k (successive kills)
     result = lle_kill_ring_add(ring, "line1", false);
     ASSERT(result == LLE_SUCCESS, "Add line1 failed");
 
@@ -197,13 +197,13 @@ TEST(add_successive_kills_with_append) {
     result = lle_kill_ring_add(ring, "line2", true);
     ASSERT(result == LLE_SUCCESS, "Append line2 failed");
 
-    /* Verify single entry */
+    // Verify single entry
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
     ASSERT_EQ(count, 1, "Count not 1 after successive kills");
 
-    /* Verify accumulated text */
+    // Verify accumulated text
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Get current failed");
@@ -219,15 +219,15 @@ TEST(prepend_operation) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add initial text */
+    // Add initial text
     result = lle_kill_ring_add(ring, "world", false);
     ASSERT(result == LLE_SUCCESS, "Add failed");
 
-    /* Prepend */
+    // Prepend
     result = lle_kill_ring_prepend(ring, "hello ");
     ASSERT(result == LLE_SUCCESS, "Prepend failed");
 
-    /* Verify text order */
+    // Verify text order
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Get current failed");
@@ -240,11 +240,11 @@ TEST(circular_buffer_overflow) {
     lle_kill_ring_t *ring = NULL;
     lle_result_t result;
 
-    /* Create small ring */
+    // Create small ring
     result = lle_kill_ring_create(&ring, 3, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add more entries than capacity */
+    // Add more entries than capacity
     result = lle_kill_ring_add(ring, "first", false);
     ASSERT(result == LLE_SUCCESS, "Add 1 failed");
 
@@ -257,13 +257,13 @@ TEST(circular_buffer_overflow) {
     result = lle_kill_ring_add(ring, "fourth", false);
     ASSERT(result == LLE_SUCCESS, "Add 4 failed");
 
-    /* Count should be capped at capacity */
+    // Count should be capped at capacity
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
     ASSERT_EQ(count, 3, "Count exceeded capacity");
 
-    /* Most recent should be accessible */
+    // Most recent should be accessible
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Get current failed");
@@ -284,7 +284,7 @@ TEST(yank_from_empty_ring) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Try to yank from empty ring */
+    // Try to yank from empty ring
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_ERROR_QUEUE_EMPTY,
@@ -300,7 +300,7 @@ TEST(yank_single_entry) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add and yank */
+    // Add and yank
     result = lle_kill_ring_add(ring, "test text", false);
     ASSERT(result == LLE_SUCCESS, "Add failed");
 
@@ -319,7 +319,7 @@ TEST(yank_returns_most_recent) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add multiple entries */
+    // Add multiple entries
     result = lle_kill_ring_add(ring, "first", false);
     ASSERT(result == LLE_SUCCESS, "Add first failed");
 
@@ -329,7 +329,7 @@ TEST(yank_returns_most_recent) {
     result = lle_kill_ring_add(ring, "third", false);
     ASSERT(result == LLE_SUCCESS, "Add third failed");
 
-    /* Yank should return most recent */
+    // Yank should return most recent
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Yank failed");
@@ -348,7 +348,7 @@ TEST(yank_pop_without_yank_fails) {
     result = lle_kill_ring_add(ring, "test", false);
     ASSERT(result == LLE_SUCCESS, "Add failed");
 
-    /* Try yank-pop without yank first */
+    // Try yank-pop without yank first
     const char *text;
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_ERROR_INVALID_STATE,
@@ -364,7 +364,7 @@ TEST(yank_pop_cycles_through_ring) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add three entries */
+    // Add three entries
     result = lle_kill_ring_add(ring, "first", false);
     ASSERT(result == LLE_SUCCESS, "Add first failed");
 
@@ -374,23 +374,23 @@ TEST(yank_pop_cycles_through_ring) {
     result = lle_kill_ring_add(ring, "third", false);
     ASSERT(result == LLE_SUCCESS, "Add third failed");
 
-    /* Initial yank */
+    // Initial yank
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Initial yank failed");
     ASSERT_STR_EQ(text, "third", "Initial yank incorrect");
 
-    /* Yank-pop should give second */
+    // Yank-pop should give second
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_SUCCESS, "First yank-pop failed");
     ASSERT_STR_EQ(text, "second", "First yank-pop incorrect");
 
-    /* Yank-pop should give first */
+    // Yank-pop should give first
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Second yank-pop failed");
     ASSERT_STR_EQ(text, "first", "Second yank-pop incorrect");
 
-    /* Yank-pop should wrap to third */
+    // Yank-pop should wrap to third
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Third yank-pop (wrap) failed");
     ASSERT_STR_EQ(text, "third", "Wrap-around yank-pop incorrect");
@@ -413,27 +413,27 @@ TEST(reset_yank_state) {
     result = lle_kill_ring_add(ring, "test", false);
     ASSERT(result == LLE_SUCCESS, "Add failed");
 
-    /* Yank to set yank state */
+    // Yank to set yank state
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Yank failed");
 
-    /* Verify yank state set */
+    // Verify yank state set
     bool was_yank;
     result = lle_kill_ring_was_last_yank(ring, &was_yank);
     ASSERT(result == LLE_SUCCESS, "Check yank state failed");
     ASSERT(was_yank, "Yank state not set after yank");
 
-    /* Reset yank state */
+    // Reset yank state
     result = lle_kill_ring_reset_yank_state(ring);
     ASSERT(result == LLE_SUCCESS, "Reset yank state failed");
 
-    /* Verify yank state cleared */
+    // Verify yank state cleared
     result = lle_kill_ring_was_last_yank(ring, &was_yank);
     ASSERT(result == LLE_SUCCESS, "Check yank state failed");
     ASSERT(!was_yank, "Yank state not cleared after reset");
 
-    /* Yank-pop should now fail */
+    // Yank-pop should now fail
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_ERROR_INVALID_STATE, "Yank-pop succeeded after reset");
 
@@ -447,18 +447,18 @@ TEST(clear_ring) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Add entries */
+    // Add entries
     result = lle_kill_ring_add(ring, "first", false);
     ASSERT(result == LLE_SUCCESS, "Add failed");
 
     result = lle_kill_ring_add(ring, "second", false);
     ASSERT(result == LLE_SUCCESS, "Add failed");
 
-    /* Clear */
+    // Clear
     result = lle_kill_ring_clear(ring);
     ASSERT(result == LLE_SUCCESS, "Clear failed");
 
-    /* Verify empty */
+    // Verify empty
     bool empty;
     result = lle_kill_ring_is_empty(ring, &empty);
     ASSERT(result == LLE_SUCCESS, "Is empty check failed");
@@ -479,28 +479,28 @@ TEST(last_was_kill_tracking) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Set last was kill */
+    // Set last was kill
     result = lle_kill_ring_set_last_was_kill(ring, true);
     ASSERT(result == LLE_SUCCESS, "Set last was kill failed");
 
-    /* Add with append - should append since last was kill */
+    // Add with append - should append since last was kill
     result = lle_kill_ring_add(ring, "first", false);
     ASSERT(result == LLE_SUCCESS, "Add first failed");
 
     result = lle_kill_ring_add(ring, "second", true);
     ASSERT(result == LLE_SUCCESS, "Add with append failed");
 
-    /* Verify appended */
+    // Verify appended
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");
     ASSERT_EQ(count, 1, "Append didn't work with last_was_kill");
 
-    /* Clear last was kill */
+    // Clear last was kill
     result = lle_kill_ring_set_last_was_kill(ring, false);
     ASSERT(result == LLE_SUCCESS, "Clear last was kill failed");
 
-    /* Add with append - should create new entry */
+    // Add with append - should create new entry
     result = lle_kill_ring_add(ring, "third", true);
     ASSERT(result == LLE_SUCCESS, "Add after clear failed");
 
@@ -523,7 +523,7 @@ TEST(readline_compat_successive_kill_line) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Simulate successive C-k (kill-line) operations */
+    // Simulate successive C-k (kill-line) operations
     result = lle_kill_ring_add(ring, "first line", false);
     ASSERT(result == LLE_SUCCESS, "First C-k failed");
 
@@ -533,7 +533,7 @@ TEST(readline_compat_successive_kill_line) {
     result = lle_kill_ring_add(ring, "second line", true);
     ASSERT(result == LLE_SUCCESS, "Third C-k failed");
 
-    /* Should have single entry with all text */
+    // Should have single entry with all text
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT_EQ(count, 1, "Successive C-k created multiple entries");
@@ -553,28 +553,28 @@ TEST(readline_compat_yank_and_yank_pop) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Build kill ring */
+    // Build kill ring
     result = lle_kill_ring_add(ring, "oldest", false);
     result = lle_kill_ring_add(ring, "middle", false);
     result = lle_kill_ring_add(ring, "newest", false);
 
-    /* C-y (yank) */
+    // C-y (yank)
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "C-y failed");
     ASSERT_STR_EQ(text, "newest", "C-y didn't return newest");
 
-    /* M-y (yank-pop) */
+    // M-y (yank-pop)
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_SUCCESS, "First M-y failed");
     ASSERT_STR_EQ(text, "middle", "First M-y incorrect");
 
-    /* M-y again */
+    // M-y again
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Second M-y failed");
     ASSERT_STR_EQ(text, "oldest", "Second M-y incorrect");
 
-    /* M-y wraps around */
+    // M-y wraps around
     result = lle_kill_ring_yank_pop(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Third M-y (wrap) failed");
     ASSERT_STR_EQ(text, "newest", "M-y wrap incorrect");
@@ -594,7 +594,7 @@ TEST(empty_string_rejected) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Try to add empty string */
+    // Try to add empty string
     result = lle_kill_ring_add(ring, "", false);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER, "Empty string not rejected");
 
@@ -608,16 +608,16 @@ TEST(large_text_handling) {
     result = lle_kill_ring_create(&ring, 0, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Create large text (10KB) */
+    // Create large text (10KB)
     char large_text[10240];
     memset(large_text, 'A', sizeof(large_text) - 1);
     large_text[sizeof(large_text) - 1] = '\0';
 
-    /* Add large text */
+    // Add large text
     result = lle_kill_ring_add(ring, large_text, false);
     ASSERT(result == LLE_SUCCESS, "Add large text failed");
 
-    /* Retrieve and verify */
+    // Retrieve and verify
     const char *text;
     result = lle_kill_ring_get_current(ring, &text);
     ASSERT(result == LLE_SUCCESS, "Retrieve large text failed");
@@ -657,7 +657,7 @@ TEST(concurrent_adds) {
     result = lle_kill_ring_create(&ring, 128, NULL);
     ASSERT(result == LLE_SUCCESS, "Create failed");
 
-    /* Launch multiple threads adding concurrently */
+    // Launch multiple threads adding concurrently
     const int num_threads = 4;
     const int iterations = 10;
     pthread_t threads[num_threads];
@@ -670,12 +670,12 @@ TEST(concurrent_adds) {
         pthread_create(&threads[i], NULL, concurrent_add_thread, &data[i]);
     }
 
-    /* Wait for threads */
+    // Wait for threads
     for (int i = 0; i < num_threads; i++) {
         pthread_join(threads[i], NULL);
     }
 
-    /* Verify ring has entries (may be less than total due to overflow) */
+    // Verify ring has entries (may be less than total due to overflow)
     size_t count;
     result = lle_kill_ring_get_count(ring, &count);
     ASSERT(result == LLE_SUCCESS, "Get count failed");

@@ -220,7 +220,7 @@ void set_shell_vari(char *name, int val);
  * Contains all shell option flags for behavior control.
  */
 typedef struct shell_options {
-    /* Command-line invocation modes */
+    // Command-line invocation modes
     bool command_mode;    /**< -c flag: execute command string */
     char *command_string; /**< -c argument: command to execute */
     bool stdin_mode;      /**< -s flag: read from stdin */
@@ -234,7 +234,7 @@ typedef struct shell_options {
     char *analyze_file;   /**< --analyze/--lint argument: file to analyze */
     char *output_format;  /**< --format: output format (text, json, gcc) */
 
-    /* Shell behavior flags */
+    // Shell behavior flags
     bool exit_on_error;   /**< -e flag: exit on command failure */
     bool trace_execution; /**< -x flag: trace command execution */
     bool syntax_check;    /**< -n flag: syntax check only */
@@ -746,4 +746,4 @@ int execute_new_parser_while(node_t *while_node);
  */
 int execute_new_parser_for(node_t *for_node);
 
-#endif /* LUSH_H */
+#endif // LUSH_H

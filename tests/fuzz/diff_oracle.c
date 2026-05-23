@@ -63,10 +63,11 @@ static const char *MODE_NAMES[] = {
 };
 
 typedef struct {
-    const char *env_var;           /* env var override of binary path */
-    const char *binary_name;       /* basename for PATH lookup */
-    const char *const *candidates; /* NULL-terminated list of absolute paths */
-    const char *lush_mode; /* `mode X` preset to inject when running lush */
+    const char *env_var;     /**< env var override of binary path */
+    const char *binary_name; /**< basename for PATH lookup */
+    const char *const
+        *candidates;       /**< NULL-terminated list of absolute paths */
+    const char *lush_mode; /**< `mode X` preset to inject when running lush */
 } oracle_config_t;
 
 /* Candidate paths probed in order when env override is unset and PATH
@@ -75,10 +76,10 @@ typedef struct {
  * Arch /usr/bin; Fedora /usr/bin). dash is not installed by default
  * on macOS or RHEL-family so its absence is expected there. */
 static const char *const DASH_CANDIDATES[] = {
-    "/usr/bin/dash",          /* Debian/Ubuntu, Arch, Fedora */
-    "/bin/dash",              /* some Debian variants */
-    "/usr/local/bin/dash",    /* macOS Homebrew (Intel) */
-    "/opt/homebrew/bin/dash", /* macOS Homebrew (Apple Silicon) */
+    "/usr/bin/dash",          // Debian/Ubuntu, Arch, Fedora
+    "/bin/dash",              // some Debian variants
+    "/usr/local/bin/dash",    // macOS Homebrew (Intel)
+    "/opt/homebrew/bin/dash", // macOS Homebrew (Apple Silicon)
     NULL,
 };
 /* Homebrew prefixes first so macOS prefers modern bash over the
@@ -93,17 +94,17 @@ static const char *const DASH_CANDIDATES[] = {
  * picked on macOS without Homebrew, the harness will warn and skip it
  * rather than producing a flood of false-positive divergences. */
 static const char *const BASH_CANDIDATES[] = {
-    "/usr/local/bin/bash",    /* macOS Homebrew (Intel) */
-    "/opt/homebrew/bin/bash", /* macOS Homebrew (Apple Silicon) */
-    "/bin/bash",              /* most Linux distros */
-    "/usr/bin/bash",          /* Fedora/Arch */
+    "/usr/local/bin/bash",    // macOS Homebrew (Intel)
+    "/opt/homebrew/bin/bash", // macOS Homebrew (Apple Silicon)
+    "/bin/bash",              // most Linux distros
+    "/usr/bin/bash",          // Fedora/Arch
     NULL,
 };
 static const char *const ZSH_CANDIDATES[] = {
-    "/bin/zsh",              /* macOS default, some Linux */
-    "/usr/bin/zsh",          /* most Linux distros */
-    "/usr/local/bin/zsh",    /* macOS Homebrew (Intel) */
-    "/opt/homebrew/bin/zsh", /* macOS Homebrew (Apple Silicon) */
+    "/bin/zsh",              // macOS default, some Linux
+    "/usr/bin/zsh",          // most Linux distros
+    "/usr/local/bin/zsh",    // macOS Homebrew (Intel)
+    "/opt/homebrew/bin/zsh", // macOS Homebrew (Apple Silicon)
     NULL,
 };
 
@@ -125,7 +126,7 @@ typedef struct {
 
 typedef struct {
     char path[1024];
-    bool ignore_stdout; /* known-divergence allow-list entry */
+    bool ignore_stdout; /**< known-divergence allow-list entry */
 } allowlist_entry_t;
 
 static allowlist_entry_t g_allowlist[256];
@@ -137,17 +138,17 @@ static size_t g_allowlist_count = 0;
  */
 
 static mode_t_ mode_from_path(const char *path) {
-    /* Walk back to find the parent directory name. */
+    // Walk back to find the parent directory name.
     const char *last_slash = strrchr(path, '/');
     if (!last_slash) {
         return MODE_UNKNOWN;
     }
-    /* Find the second-to-last slash to extract the parent dir name. */
+    // Find the second-to-last slash to extract the parent dir name.
     const char *p = last_slash;
     while (p > path && *(p - 1) != '/') {
         p--;
     }
-    /* p..last_slash is the parent dir name */
+    // p..last_slash is the parent dir name
     size_t n = (size_t)(last_slash - p);
     for (mode_t_ m = MODE_POSIX; m <= MODE_LUSH; m++) {
         if (strlen(MODE_NAMES[m]) == n && strncmp(p, MODE_NAMES[m], n) == 0) {
@@ -219,10 +220,10 @@ static int read_major_version(const char *binary) {
     close(pipefd[1]);
     char buf[256];
     ssize_t n = read(pipefd[0], buf, sizeof(buf) - 1);
-    /* Drain anything remaining so the child does not block on pipe. */
+    // Drain anything remaining so the child does not block on pipe.
     char scratch[64];
     while (read(pipefd[0], scratch, sizeof(scratch)) > 0) {
-        /* discard */
+        // discard
     }
     close(pipefd[0]);
     int status = 0;
@@ -261,7 +262,7 @@ static bool oracle_candidate_acceptable(mode_t_ mode, const char *path) {
     }
     int major = read_major_version(path);
     if (major < 0) {
-        return true; /* version unknown -- accept */
+        return true; // version unknown -- accept
     }
     if (major < 4) {
         fprintf(stderr,
@@ -317,7 +318,7 @@ static const char *resolve_oracle(mode_t_ mode) {
     if (cfg->env_var) {
         const char *env_val = getenv(cfg->env_var);
         if (path_executable(env_val)) {
-            (void)oracle_candidate_acceptable(mode, env_val); /* warns */
+            (void)oracle_candidate_acceptable(mode, env_val); // warns
             return env_val;
         }
     }
@@ -334,7 +335,7 @@ static const char *resolve_oracle(mode_t_ mode) {
         }
     }
 
-    /* 3. Candidate list */
+    // 3. Candidate list
     if (cfg->candidates) {
         for (const char *const *c = cfg->candidates; *c; c++) {
             if (oracle_candidate_acceptable(mode, *c)) {
@@ -353,21 +354,21 @@ static const char *resolve_oracle(mode_t_ mode) {
 static void allowlist_load(const char *path) {
     FILE *fp = fopen(path, "r");
     if (!fp) {
-        /* Allow-list is optional. */
+        // Allow-list is optional.
         return;
     }
     char line[DIFF_ALLOWLIST_LINE_MAX];
     while (fgets(line, sizeof(line), fp)) {
-        /* Trim leading whitespace */
+        // Trim leading whitespace
         char *p = line;
         while (*p == ' ' || *p == '\t') {
             p++;
         }
-        /* Skip blank lines and comments */
+        // Skip blank lines and comments
         if (*p == '\0' || *p == '\n' || *p == '#') {
             continue;
         }
-        /* basename is up to first whitespace */
+        // basename is up to first whitespace
         char *end = p;
         while (*end != '\0' && *end != ' ' && *end != '\t' && *end != '\n') {
             end++;
@@ -413,10 +414,10 @@ static void drain_fd(int fd, char *buf, size_t cap) {
         n += (size_t)r;
     }
     buf[n] = '\0';
-    /* Drain anything remaining so the child's writes never block. */
+    // Drain anything remaining so the child's writes never block.
     char scratch[4096];
     while (read(fd, scratch, sizeof(scratch)) > 0) {
-        /* discard */
+        // discard
     }
 }
 
@@ -454,7 +455,7 @@ static run_result_t run_with_input(const char *binary, const char *const *argv,
         _exit(127);
     }
 
-    /* Parent: feed input to child stdin, then close to signal EOF. */
+    // Parent: feed input to child stdin, then close to signal EOF.
     close(in_pipe[0]);
     close(out_pipe[1]);
     close(err_pipe[1]);
@@ -656,22 +657,22 @@ static int process_input(const char *path, const char *lush_path) {
             run_with_input(oracle_bin, oracle_argv, input, DIFF_TIMEOUT_SEC);
     }
 
-    /* Decide outcome */
+    // Decide outcome
     bool divergent = false;
     if (mode == MODE_LUSH) {
-        /* No oracle — flag only crashes/timeouts */
+        // No oracle — flag only crashes/timeouts
         if (lush_r.timed_out || lush_r.exit_status >= 128) {
             divergent = true;
         }
     } else if (!oracle_present) {
-        /* Oracle missing — skip silently in JSONL marker */
+        // Oracle missing — skip silently in JSONL marker
     } else if (!results_agree(&lush_r, &oracle_r)) {
         divergent = true;
     }
 
     bool allowed = is_known_divergence(path);
 
-    /* Emit JSONL */
+    // Emit JSONL
     char path_e[2048], lush_out_e[DIFF_BUF_SIZE * 2];
     char oracle_out_e[DIFF_BUF_SIZE * 2];
     json_escape(path, path_e, sizeof(path_e));

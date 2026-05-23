@@ -1755,14 +1755,14 @@ build_continuation_prompts(composition_engine_t *engine,
                            const char *primary_prompt, const char *command_text,
                            const command_line_info_t *lines, size_t line_count,
                            char (*prompts)[256], size_t prompt_size) {
-    (void)command_text; /* Used by display_controller callback instead */
-    (void)lines;        /* Used by display_controller callback instead */
+    (void)command_text; // Used by display_controller callback instead
+    (void)lines;        // Used by display_controller callback instead
 
     if (!engine || !primary_prompt || !prompts || line_count == 0) {
         return COMPOSITION_ENGINE_ERROR_INVALID_PARAM;
     }
 
-    /* Line 0: Use primary prompt */
+    // Line 0: Use primary prompt
     strncpy(prompts[0], primary_prompt, prompt_size - 1);
     prompts[0][prompt_size - 1] = '\0';
 

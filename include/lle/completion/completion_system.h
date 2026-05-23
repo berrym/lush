@@ -35,17 +35,17 @@ extern "C" {
  * @brief Enhanced completion system - Spec 12 architecture
  */
 typedef struct lle_completion_system {
-    /* Core engines */
+    // Core engines
     lle_source_manager_t *source_manager; /**< Manage completion sources */
 
-    /* Current state */
+    // Current state
     lle_completion_state_t *current_state; /**< Active completion session */
     lle_completion_menu_state_t *menu;     /**< Menu state (if visible) */
 
-    /* Memory management */
+    // Memory management
     lle_memory_pool_t *pool; /**< Memory pool for allocations */
 
-    /* Configuration */
+    // Configuration
     bool enable_history_source; /**< Use history as source */
     bool enable_fuzzy_matching; /**< Future: fuzzy matching */
     size_t max_completions;     /**< Limit results */
@@ -146,4 +146,4 @@ lle_completion_system_get_menu(lle_completion_system_t *system);
 }
 #endif
 
-#endif /* LLE_COMPLETION_SYSTEM_H */
+#endif // LLE_COMPLETION_SYSTEM_H

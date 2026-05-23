@@ -39,7 +39,7 @@
 #include "../lle/notification.h"
 #include "autosuggestions_layer.h"
 
-/* Symbol compatibility mode for display rendering */
+// Symbol compatibility mode for display rendering
 typedef enum {
     SYMBOL_MODE_UNICODE = 0,   /**< Full Unicode symbols */
     SYMBOL_MODE_ASCII = 1,     /**< ASCII-only fallback */
@@ -1043,4 +1043,4 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
 }
 #endif
 
-#endif /* DISPLAY_CONTROLLER_H */
+#endif // DISPLAY_CONTROLLER_H

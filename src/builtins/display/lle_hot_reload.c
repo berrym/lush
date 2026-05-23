@@ -14,7 +14,7 @@
 #include "lle/lle_shell_integration.h"
 
 int display_lle_hot_reload(int argc, char **argv) {
-    /* Control theme hot-reload (auto-reload on file change) */
+    // Control theme hot-reload (auto-reload on file change)
     if (argc < 2) {
         printf("Theme hot-reload: %s\n",
                config.display_theme_hot_reload ? "enabled" : "disabled");

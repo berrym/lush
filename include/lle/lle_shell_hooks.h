@@ -195,4 +195,4 @@ bool lle_shell_hook_in_progress(void);
  */
 lle_hook_type_t lle_shell_hook_current(void);
 
-#endif /* LLE_SHELL_HOOKS_H */
+#endif // LLE_SHELL_HOOKS_H

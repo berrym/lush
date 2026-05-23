@@ -46,11 +46,11 @@
  */
 
 typedef struct {
-    const char *gutter;          /* per-line left marker, e.g. "│ " or "| " */
-    const char *frame_corner_tl; /* top-left, e.g. "┌─" or "+-"           */
-    const char *frame_corner_bl; /* bottom-left, e.g. "└─" or "+-"        */
-    const char *frame_horiz;     /* horizontal fill, "─" or "-"            */
-    const char *frame_open;      /* between title and trailing fill, " "   */
+    const char *gutter;          /**< per-line left marker, e.g. "│ " or "| " */
+    const char *frame_corner_tl; /**< top-left, e.g. "┌─" or "+-" */
+    const char *frame_corner_bl; /**< bottom-left, e.g. "└─" or "+-" */
+    const char *frame_horiz;     /**< horizontal fill, "─" or "-" */
+    const char *frame_open;      /**< between title and trailing fill, " " */
 } debug_view_glyphs_t;
 
 static const debug_view_glyphs_t glyphs_utf8 = {
@@ -196,11 +196,11 @@ void debug_view_begin_frame(debug_context_t *ctx, const char *title) {
     const debug_view_glyphs_t *g = view_glyphs();
     fputs(g->frame_corner_tl, ctx->debug_output);
 
-    /* When a title is supplied, frame it: "<corner>- [title] <fill>". */
+    // When a title is supplied, frame it: "<corner>- [title] <fill>".
     int fill = DEBUG_VIEW_FRAME_WIDTH;
     if (title && *title) {
-        size_t title_visible = strlen(title); /* ASCII title assumed */
-        /* "<corner>- [" + title + "] " consumes 4 + title chars of fill. */
+        size_t title_visible = strlen(title); // ASCII title assumed
+        // "<corner>- [" + title + "] " consumes 4 + title chars of fill.
         fputs(g->frame_open, ctx->debug_output);
         fputc('[', ctx->debug_output);
         fputs(title, ctx->debug_output);

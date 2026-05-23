@@ -20,18 +20,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* External memory pool from mock */
+// External memory pool from mock
 extern lush_memory_pool_t *global_memory_pool;
 
-/* Test counter */
+// Test counter
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-/* Current test name */
+// Current test name
 static const char *current_test = NULL;
 
-/* Test macros */
+// Test macros
 #define TEST(name)                                                             \
     do {                                                                       \
         current_test = name;                                                   \
@@ -103,21 +103,21 @@ static void test_insert_updates_utf8_index() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Insert ASCII text */
+    // Insert ASCII text
     const char *text1 = "Hello";
     result = lle_buffer_insert_text(buffer, 0, text1, strlen(text1));
     ASSERT_SUCCESS(result, "ASCII text insertion succeeds");
 
-    /* Verify byte count matches codepoint count for ASCII */
+    // Verify byte count matches codepoint count for ASCII
     ASSERT_EQ(buffer->length, 5, "Buffer length correct");
     ASSERT_EQ(buffer->codepoint_count, 5, "Codepoint count correct for ASCII");
 
-    /* Insert UTF-8 text with multibyte characters */
-    const char *text2 = "世界"; /* 2 Chinese characters, 6 bytes */
+    // Insert UTF-8 text with multibyte characters
+    const char *text2 = "世界"; // 2 Chinese characters, 6 bytes
     result = lle_buffer_insert_text(buffer, 5, text2, strlen(text2));
     ASSERT_SUCCESS(result, "UTF-8 text insertion succeeds");
 
-    /* Verify counts: 5 ASCII + 6 UTF-8 bytes = 11 bytes, but 7 codepoints */
+    // Verify counts: 5 ASCII + 6 UTF-8 bytes = 11 bytes, but 7 codepoints
     ASSERT_EQ(buffer->length, 11, "Buffer length includes UTF-8 bytes");
     ASSERT_EQ(buffer->codepoint_count, 7, "Codepoint count correct with UTF-8");
 
@@ -138,7 +138,7 @@ static void test_delete_updates_utf8_index() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Insert mixed ASCII and UTF-8 */
+    // Insert mixed ASCII and UTF-8
     const char *text = "Hello世界World";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
@@ -146,17 +146,17 @@ static void test_delete_updates_utf8_index() {
     size_t initial_length = buffer->length;
     size_t initial_codepoints = buffer->codepoint_count;
 
-    /* Delete the UTF-8 characters (6 bytes, 2 codepoints) */
+    // Delete the UTF-8 characters (6 bytes, 2 codepoints)
     result = lle_buffer_delete_text(buffer, 5, 6);
     ASSERT_SUCCESS(result, "UTF-8 deletion succeeds");
 
-    /* Verify counts updated */
+    // Verify counts updated
     ASSERT_EQ(buffer->length, initial_length - 6,
               "Buffer length decreased by 6 bytes");
     ASSERT_EQ(buffer->codepoint_count, initial_codepoints - 2,
               "Codepoint count decreased by 2");
 
-    /* Verify content */
+    // Verify content
     ASSERT_STR_EQ(buffer->data, "HelloWorld", "Content correct after deletion");
 
     lle_buffer_destroy(buffer);
@@ -176,31 +176,31 @@ static void test_insert_adjusts_cursor() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Initialize cursor manager */
+    // Initialize cursor manager
     lle_cursor_manager_t *cursor_mgr = NULL;
     result = lle_cursor_manager_init(&cursor_mgr, buffer);
     ASSERT_SUCCESS(result, "Cursor manager init succeeds");
 
-    /* Insert initial text */
+    // Insert initial text
     const char *text1 = "Hello";
     result = lle_buffer_insert_text(buffer, 0, text1, strlen(text1));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
 
-    /* Move cursor to end */
+    // Move cursor to end
     result = lle_cursor_manager_move_to_byte_offset(cursor_mgr, 5);
     ASSERT_SUCCESS(result, "Cursor move succeeds");
     ASSERT_EQ(buffer->cursor.byte_offset, 5, "Cursor at end");
 
-    /* Insert text before cursor */
+    // Insert text before cursor
     const char *text2 = "XXX";
     result = lle_buffer_insert_text(buffer, 2, text2, strlen(text2));
     ASSERT_SUCCESS(result, "Insertion before cursor succeeds");
 
-    /* Buffer operations update buffer->cursor directly */
-    /* Cursor should have moved forward by 3 bytes */
+    // Buffer operations update buffer->cursor directly
+    // Cursor should have moved forward by 3 bytes
     ASSERT_EQ(buffer->cursor.byte_offset, 8, "Cursor adjusted after insertion");
 
-    /* Verify content */
+    // Verify content
     ASSERT_STR_EQ(buffer->data, "HeXXXllo", "Content correct");
 
     lle_cursor_manager_destroy(cursor_mgr);
@@ -215,29 +215,29 @@ static void test_cursor_movement_with_utf8() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Insert UTF-8 text */
+    // Insert UTF-8 text
     const char *text = "a世b界c"; /* a + 世(3 bytes) + b + 界(3 bytes) + c = 9
                                      bytes, 5 codepoints */
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "UTF-8 text insertion succeeds");
 
-    /* Initialize cursor manager */
+    // Initialize cursor manager
     lle_cursor_manager_t *cursor_mgr = NULL;
     result = lle_cursor_manager_init(&cursor_mgr, buffer);
     ASSERT_SUCCESS(result, "Cursor manager init succeeds");
 
-    /* Start at beginning */
+    // Start at beginning
     result = lle_cursor_manager_move_to_byte_offset(cursor_mgr, 0);
     ASSERT_SUCCESS(result, "Move to start succeeds");
     ASSERT_EQ(buffer->cursor.codepoint_index, 0, "At codepoint 0");
 
-    /* Move forward by 1 codepoint (should skip 1 byte for 'a') */
+    // Move forward by 1 codepoint (should skip 1 byte for 'a')
     result = lle_cursor_manager_move_by_codepoints(cursor_mgr, 1);
     ASSERT_SUCCESS(result, "Move by 1 codepoint succeeds");
     ASSERT_EQ(buffer->cursor.byte_offset, 1, "At byte 1");
     ASSERT_EQ(buffer->cursor.codepoint_index, 1, "At codepoint 1");
 
-    /* Move forward by 1 more codepoint (should skip 3 bytes for '世') */
+    // Move forward by 1 more codepoint (should skip 3 bytes for '世')
     result = lle_cursor_manager_move_by_codepoints(cursor_mgr, 1);
     ASSERT_SUCCESS(result, "Move by 1 codepoint succeeds");
     ASSERT_EQ(buffer->cursor.byte_offset, 4, "At byte 4");
@@ -261,16 +261,16 @@ static void test_operations_maintain_validity() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Initialize validator */
+    // Initialize validator
     lle_buffer_validator_t *validator = NULL;
     result = lle_buffer_validator_init(&validator);
     ASSERT_SUCCESS(result, "Validator init succeeds");
 
-    /* Validate empty buffer */
+    // Validate empty buffer
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Empty buffer is valid");
 
-    /* Insert text and validate */
+    // Insert text and validate
     const char *text1 = "Hello World";
     result = lle_buffer_insert_text(buffer, 0, text1, strlen(text1));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
@@ -278,14 +278,14 @@ static void test_operations_maintain_validity() {
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after insertion");
 
-    /* Delete text and validate */
+    // Delete text and validate
     result = lle_buffer_delete_text(buffer, 5, 6);
     ASSERT_SUCCESS(result, "Text deletion succeeds");
 
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after deletion");
 
-    /* Replace text and validate */
+    // Replace text and validate
     const char *text2 = "XXX";
     result = lle_buffer_replace_text(buffer, 0, 5, text2, strlen(text2));
     ASSERT_SUCCESS(result, "Text replacement succeeds");
@@ -305,22 +305,22 @@ static void test_validator_detects_corruption() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Initialize validator */
+    // Initialize validator
     lle_buffer_validator_t *validator = NULL;
     result = lle_buffer_validator_init(&validator);
     ASSERT_SUCCESS(result, "Validator init succeeds");
 
-    /* Insert valid UTF-8 */
+    // Insert valid UTF-8
     const char *text = "Hello世界";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
 
-    /* Manually corrupt the UTF-8 by writing invalid byte sequence */
-    /* This simulates a bug or memory corruption */
-    buffer->data[5] = 0xFF; /* Invalid UTF-8 byte */
-    buffer->data[6] = 0xFF; /* Invalid UTF-8 byte */
+    // Manually corrupt the UTF-8 by writing invalid byte sequence
+    // This simulates a bug or memory corruption
+    buffer->data[5] = 0xFF; // Invalid UTF-8 byte
+    buffer->data[6] = 0xFF; // Invalid UTF-8 byte
 
-    /* Validator should detect the corruption */
+    // Validator should detect the corruption
     result = lle_buffer_validate_utf8(buffer, validator);
     ASSERT_TRUE(result != LLE_SUCCESS, "Validator detects UTF-8 corruption");
     ASSERT_TRUE(validator->corruption_detections > 0,
@@ -344,49 +344,49 @@ static void test_undo_single_insert() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Initialize change tracker */
+    // Initialize change tracker
     lle_change_tracker_t *tracker = NULL;
     result = lle_change_tracker_init(&tracker, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Change tracker init succeeds");
 
-    /* Start change tracking sequence */
+    // Start change tracking sequence
     lle_change_sequence_t *sequence = NULL;
     result =
         lle_change_tracker_begin_sequence(tracker, "insert text", &sequence);
     ASSERT_SUCCESS(result, "Begin sequence succeeds");
 
-    /* Attach sequence to buffer to enable tracking */
+    // Attach sequence to buffer to enable tracking
     buffer->current_sequence = sequence;
     buffer->change_tracking_enabled = true;
 
-    /* Insert text */
+    // Insert text
     const char *text = "Hello";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
     ASSERT_STR_EQ(buffer->data, "Hello", "Content correct");
 
-    /* Complete the sequence */
+    // Complete the sequence
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence succeeds");
 
-    /* Verify can undo */
+    // Verify can undo
     ASSERT_TRUE(lle_change_tracker_can_undo(tracker), "Undo available");
 
-    /* Undo the insertion */
+    // Undo the insertion
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo succeeds");
 
-    /* Buffer should be empty */
+    // Buffer should be empty
     ASSERT_EQ(buffer->length, 0, "Buffer empty after undo");
 
-    /* Verify can redo */
+    // Verify can redo
     ASSERT_TRUE(lle_change_tracker_can_redo(tracker), "Redo available");
 
-    /* Redo the insertion */
+    // Redo the insertion
     result = lle_change_tracker_redo(tracker, buffer);
     ASSERT_SUCCESS(result, "Redo succeeds");
 
-    /* Content should be restored */
+    // Content should be restored
     ASSERT_STR_EQ(buffer->data, "Hello", "Content restored after redo");
 
     lle_change_tracker_destroy(tracker);
@@ -401,15 +401,15 @@ static void test_undo_complex_sequence() {
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Initialize change tracker */
+    // Initialize change tracker
     lle_change_tracker_t *tracker = NULL;
     result = lle_change_tracker_init(&tracker, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Change tracker init succeeds");
 
-    /* Attach change tracker to buffer */
+    // Attach change tracker to buffer
     buffer->change_tracking_enabled = true;
 
-    /* Perform sequence of operations, each in its own sequence */
+    // Perform sequence of operations, each in its own sequence
     lle_change_sequence_t *seq1 = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "insert hello", &seq1);
     ASSERT_SUCCESS(result, "Begin sequence 1");
@@ -439,17 +439,17 @@ static void test_undo_complex_sequence() {
 
     ASSERT_STR_EQ(buffer->data, "Hello", "Content after operations");
 
-    /* Undo delete */
+    // Undo delete
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo delete succeeds");
     ASSERT_STR_EQ(buffer->data, "Hello World", "Content restored");
 
-    /* Undo second insert */
+    // Undo second insert
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo insert 2 succeeds");
     ASSERT_STR_EQ(buffer->data, "Hello", "Content after undo 2");
 
-    /* Undo first insert */
+    // Undo first insert
     result = lle_change_tracker_undo(tracker, buffer);
     ASSERT_SUCCESS(result, "Undo insert 1 succeeds");
     ASSERT_EQ(buffer->length, 0, "Buffer empty after undo all");
@@ -468,12 +468,12 @@ static void test_undo_complex_sequence() {
 static void test_e2e_text_editing_session() {
     TEST("End-to-end text editing session with all subsystems");
 
-    /* Create buffer */
+    // Create buffer
     lle_buffer_t *buffer = NULL;
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Initialize all subsystems */
+    // Initialize all subsystems
     lle_cursor_manager_t *cursor_mgr = NULL;
     result = lle_cursor_manager_init(&cursor_mgr, buffer);
     ASSERT_SUCCESS(result, "Cursor manager init succeeds");
@@ -486,10 +486,10 @@ static void test_e2e_text_editing_session() {
     result = lle_change_tracker_init(&tracker, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Change tracker init succeeds");
 
-    /* Enable change tracking */
+    // Enable change tracking
     buffer->change_tracking_enabled = true;
 
-    /* Simulate typing "Hello World" with change tracking */
+    // Simulate typing "Hello World" with change tracking
     lle_change_sequence_t *seq_h = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "type H", &seq_h);
     ASSERT_SUCCESS(result, "Begin sequence");
@@ -524,14 +524,14 @@ static void test_e2e_text_editing_session() {
     result = lle_cursor_manager_move_to_byte_offset(cursor_mgr, 11);
     ASSERT_SUCCESS(result, "Move cursor");
 
-    /* Validate after typing */
+    // Validate after typing
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after typing");
     ASSERT_STR_EQ(buffer->data, "Hello World", "Content correct");
     ASSERT_EQ(cursor_mgr->position.byte_offset, 11, "Cursor at end");
 
-    /* User realizes they want "Hello Universe" instead */
-    /* Delete "World" with change tracking */
+    // User realizes they want "Hello Universe" instead
+    // Delete "World" with change tracking
     lle_change_sequence_t *seq_del = NULL;
     result =
         lle_change_tracker_begin_sequence(tracker, "delete World", &seq_del);
@@ -542,7 +542,7 @@ static void test_e2e_text_editing_session() {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete delete sequence");
 
-    /* Insert "Universe" with change tracking */
+    // Insert "Universe" with change tracking
     lle_change_sequence_t *seq_ins = NULL;
     result =
         lle_change_tracker_begin_sequence(tracker, "insert Universe", &seq_ins);
@@ -553,24 +553,23 @@ static void test_e2e_text_editing_session() {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete insert sequence");
 
-    /* Validate */
+    // Validate
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after edit");
     ASSERT_STR_EQ(buffer->data, "Hello Universe", "Content updated");
 
-    /* User changes mind, undo to get "Hello World" back */
-    result =
-        lle_change_tracker_undo(tracker, buffer); /* Undo insert "Universe" */
+    // User changes mind, undo to get "Hello World" back
+    result = lle_change_tracker_undo(tracker, buffer); // Undo insert "Universe"
     ASSERT_SUCCESS(result, "Undo insert");
-    result = lle_change_tracker_undo(tracker, buffer); /* Undo delete "World" */
+    result = lle_change_tracker_undo(tracker, buffer); // Undo delete "World"
     ASSERT_SUCCESS(result, "Undo delete");
 
-    /* Validate after undo */
+    // Validate after undo
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after undo");
     ASSERT_STR_EQ(buffer->data, "Hello World", "Original content restored");
 
-    /* Cleanup */
+    // Cleanup
     lle_change_tracker_destroy(tracker);
     lle_buffer_validator_destroy(validator);
     lle_cursor_manager_destroy(cursor_mgr);
@@ -581,12 +580,12 @@ static void test_e2e_text_editing_session() {
 static void test_e2e_utf8_editing_with_all_subsystems() {
     TEST("End-to-end UTF-8 editing with all subsystems");
 
-    /* Create buffer */
+    // Create buffer
     lle_buffer_t *buffer = NULL;
     lle_result_t result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    /* Initialize all subsystems */
+    // Initialize all subsystems
     lle_cursor_manager_t *cursor_mgr = NULL;
     result = lle_cursor_manager_init(&cursor_mgr, buffer);
     ASSERT_SUCCESS(result, "Cursor manager init succeeds");
@@ -599,10 +598,10 @@ static void test_e2e_utf8_editing_with_all_subsystems() {
     result = lle_change_tracker_init(&tracker, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Change tracker init succeeds");
 
-    /* Enable change tracking */
+    // Enable change tracking
     buffer->change_tracking_enabled = true;
 
-    /* Insert mixed ASCII and UTF-8 content with change tracking */
+    // Insert mixed ASCII and UTF-8 content with change tracking
     lle_change_sequence_t *seq1 = NULL;
     result = lle_change_tracker_begin_sequence(tracker, "insert Hello", &seq1);
     ASSERT_SUCCESS(result, "Begin sequence 1");
@@ -617,7 +616,7 @@ static void test_e2e_utf8_editing_with_all_subsystems() {
     ASSERT_SUCCESS(result, "Begin sequence 2");
     buffer->current_sequence = seq2;
     result = lle_buffer_insert_text(buffer, 6, "世界",
-                                    6); /* 2 Chinese chars, 6 bytes */
+                                    6); // 2 Chinese chars, 6 bytes
     ASSERT_SUCCESS(result, "Insert UTF-8");
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence 2");
@@ -631,48 +630,48 @@ static void test_e2e_utf8_editing_with_all_subsystems() {
     result = lle_change_tracker_complete_sequence(tracker);
     ASSERT_SUCCESS(result, "Complete sequence 3");
 
-    /* Verify UTF-8 handling */
+    // Verify UTF-8 handling
     ASSERT_EQ(buffer->length, 18, "Total bytes correct");
     ASSERT_EQ(buffer->codepoint_count, 14, "Total codepoints correct");
-    /* UTF-8 index is lazily built and invalidated after modifications */
+    // UTF-8 index is lazily built and invalidated after modifications
     ASSERT_FALSE(buffer->utf8_index_valid,
                  "UTF-8 index invalidated after modifications");
 
-    /* Move cursor by codepoints (not bytes) */
+    // Move cursor by codepoints (not bytes)
     result = lle_cursor_manager_move_to_byte_offset(cursor_mgr, 0);
     ASSERT_SUCCESS(result, "Move to start");
 
     result = lle_cursor_manager_move_by_codepoints(cursor_mgr, 7);
     ASSERT_SUCCESS(result, "Move by 7 codepoints");
 
-    /* Should be after "Hello 世" (6 ASCII + 1 Chinese = 9 bytes) */
+    // Should be after "Hello 世" (6 ASCII + 1 Chinese = 9 bytes)
     ASSERT_EQ(buffer->cursor.byte_offset, 9, "Cursor at correct byte offset");
     ASSERT_EQ(buffer->cursor.codepoint_index, 7, "Cursor at codepoint 7");
 
-    /* Validate everything */
+    // Validate everything
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid with UTF-8");
 
-    /* Test undo with UTF-8 */
-    result = lle_change_tracker_undo(tracker, buffer); /* Undo " World" */
+    // Test undo with UTF-8
+    result = lle_change_tracker_undo(tracker, buffer); // Undo " World"
     ASSERT_SUCCESS(result, "Undo succeeds");
     ASSERT_EQ(buffer->length, 12, "Length after undo");
 
-    result = lle_change_tracker_undo(tracker, buffer); /* Undo "世界" */
+    result = lle_change_tracker_undo(tracker, buffer); // Undo "世界"
     ASSERT_SUCCESS(result, "Undo UTF-8 succeeds");
     ASSERT_EQ(buffer->length, 6, "Length after UTF-8 undo");
     ASSERT_STR_EQ(buffer->data, "Hello ", "Content after UTF-8 undo");
 
-    /* Redo */
+    // Redo
     result = lle_change_tracker_redo(tracker, buffer);
     ASSERT_SUCCESS(result, "Redo UTF-8 succeeds");
     ASSERT_EQ(buffer->codepoint_count, 8, "Codepoint count restored");
 
-    /* Validate after redo */
+    // Validate after redo
     result = lle_buffer_validate_complete(buffer, validator);
     ASSERT_SUCCESS(result, "Buffer valid after redo");
 
-    /* Cleanup */
+    // Cleanup
     lle_change_tracker_destroy(tracker);
     lle_buffer_validator_destroy(validator);
     lle_cursor_manager_destroy(cursor_mgr);
@@ -690,37 +689,37 @@ int main(void) {
     printf("LLE Subsystem Integration Tests\n");
     printf("=================================================\n\n");
 
-    /* Buffer Operations + UTF-8 Index */
+    // Buffer Operations + UTF-8 Index
     printf("--- Buffer Operations + UTF-8 Index ---\n");
     test_insert_updates_utf8_index();
     test_delete_updates_utf8_index();
     printf("\n");
 
-    /* Buffer Operations + Cursor Manager */
+    // Buffer Operations + Cursor Manager
     printf("--- Buffer Operations + Cursor Manager ---\n");
     test_insert_adjusts_cursor();
     test_cursor_movement_with_utf8();
     printf("\n");
 
-    /* Buffer Operations + Validator */
+    // Buffer Operations + Validator
     printf("--- Buffer Operations + Validator ---\n");
     test_operations_maintain_validity();
     test_validator_detects_corruption();
     printf("\n");
 
-    /* Buffer Operations + Change Tracker */
+    // Buffer Operations + Change Tracker
     printf("--- Buffer Operations + Change Tracker ---\n");
     test_undo_single_insert();
     test_undo_complex_sequence();
     printf("\n");
 
-    /* End-to-End Multi-Subsystem Tests */
+    // End-to-End Multi-Subsystem Tests
     printf("--- End-to-End Multi-Subsystem Tests ---\n");
     test_e2e_text_editing_session();
     test_e2e_utf8_editing_with_all_subsystems();
     printf("\n");
 
-    /* Summary */
+    // Summary
     printf("=================================================\n");
     printf("Test Summary:\n");
     printf("  Total:  %d\n", tests_run);

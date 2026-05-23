@@ -185,7 +185,7 @@ static screen_buffer_t desired_screen;
 static bool screen_buffer_initialized = false;
 static bool prompt_rendered = false;
 static int last_terminal_end_row =
-    0; /* Actual terminal row after ghost text/menu */
+    0; // Actual terminal row after ghost text/menu
 /* Note: Notification is now tracked in screen_buffer like menu, so no separate
  * tracking variable needed */
 
@@ -219,16 +219,16 @@ void dc_reset_prompt_display_state(void) {
  * resets display state for the next prompt.
  */
 void dc_finalize_input(void) {
-    /* Block SIGWINCH during terminal output */
+    // Block SIGWINCH during terminal output
     sigset_t block_set, old_set;
     sigemptyset(&block_set);
     sigaddset(&block_set, SIGWINCH);
     sigprocmask(SIG_BLOCK, &block_set, &old_set);
 
-    /* Write newline to move cursor to next line for command output */
+    // Write newline to move cursor to next line for command output
     dc_write_all(STDOUT_FILENO, "\n", 1);
 
-    /* Reset display state for next prompt */
+    // Reset display state for next prompt
     dc_reset_prompt_display_state();
 
     sigprocmask(SIG_SETMASK, &old_set, NULL);
@@ -275,7 +275,7 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
     char seq_buf[32];
     int seq_len;
 
-    /* Step 1: Move cursor up to the first row (where prompt started) */
+    // Step 1: Move cursor up to the first row (where prompt started)
     if (current_screen.cursor_row > 0) {
         seq_len = snprintf(seq_buf, sizeof(seq_buf), "\033[%dA",
                            current_screen.cursor_row);
@@ -284,27 +284,27 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
         }
     }
 
-    /* Step 2: Move to column 1 */
+    // Step 2: Move to column 1
     dc_write_all(STDOUT_FILENO, "\033[1G", 4);
 
-    /* Step 3: Clear from cursor to end of screen */
+    // Step 3: Clear from cursor to end of screen
     dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
-    /* Step 4: Write transient prompt */
+    // Step 4: Write transient prompt
     if (transient_prompt[0] != '\0') {
         dc_write_all(STDOUT_FILENO, transient_prompt, strlen(transient_prompt));
     }
 
-    /* Step 5: Write command text (with syntax highlighting if available) */
+    // Step 5: Write command text (with syntax highlighting if available)
     if (command_text && command_text[0] != '\0') {
         bool wrote_highlighted = false;
 
-        /* Try to get syntax-highlighted version from display controller */
+        // Try to get syntax-highlighted version from display controller
         display_controller_t *dc = display_integration_get_controller();
         if (dc && dc->compositor && dc->compositor->command_layer) {
             command_layer_t *cmd_layer = dc->compositor->command_layer;
 
-            /* Temporarily set the command text for highlighting */
+            // Temporarily set the command text for highlighting
             command_layer_error_t set_result = command_layer_set_command(
                 cmd_layer, command_text, strlen(command_text));
 
@@ -324,7 +324,7 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
             }
         }
 
-        /* Fallback to plain text if highlighting failed */
+        // Fallback to plain text if highlighting failed
         if (!wrote_highlighted) {
             dc_write_all(STDOUT_FILENO, command_text, strlen(command_text));
         }
@@ -339,7 +339,7 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
     /* Mark that we handled this - prompt_rendered stays true since we
      * wrote a prompt, but next dc_reset_prompt_display_state will clear it */
 
-    (void)total_rows; /* Used for documentation, may use later */
+    (void)total_rows; // Used for documentation, may use later
 
     sigprocmask(SIG_SETMASK, &old_set, NULL);
     return true;
@@ -387,7 +387,7 @@ void dc_get_prompt_metrics(int *prompt_lines, int *total_lines,
     }
 
     if (total_lines) {
-        /* Total lines = cursor row + 1 (cursor is on the last used row) */
+        // Total lines = cursor row + 1 (cursor is on the last used row)
         *total_lines = current_screen.cursor_row + 1;
     }
 
@@ -415,13 +415,13 @@ static const char *dc_continuation_prompt_callback(const char *line_text,
                                                    void *user_data) {
     continuation_state_t *cont_state = (continuation_state_t *)user_data;
     if (!cont_state) {
-        return "> "; /* Fallback */
+        return "> "; // Fallback
     }
 
-    /* Analyze this line to update continuation state */
+    // Analyze this line to update continuation state
     continuation_analyze_line(line_text, cont_state);
 
-    /* Get the continuation prompt based on updated state */
+    // Get the continuation prompt based on updated state
     const char *prompt = continuation_get_prompt(cont_state);
 
     DC_DEBUG("Continuation callback: line=%d, text='%.40s%s', prompt='%s'",
@@ -499,7 +499,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         controller->active_completion_menu) {
         lle_menu_render_options_t options =
             lle_menu_renderer_default_options(term_width);
-        options.max_rows = 20; /* Limit menu to 20 rows */
+        options.max_rows = 20; // Limit menu to 20 rows
 
         lle_menu_render_stats_t stats;
         lle_result_t result = lle_completion_menu_render(
@@ -528,7 +528,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     size_t cursor_byte_offset = cmd_layer->cursor_position;
 
     if (is_multiline) {
-        /* Use callback-based rendering for proper visual row tracking */
+        // Use callback-based rendering for proper visual row tracking
         continuation_state_t cont_state;
         continuation_state_init(&cont_state);
 
@@ -538,18 +538,18 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
 
         continuation_state_cleanup(&cont_state);
     } else {
-        /* No newlines - use simple render */
+        // No newlines - use simple render
         screen_buffer_render(&desired_screen, prompt_buffer, command_buffer,
                              cursor_byte_offset);
     }
 
-    /* DEBUG: Log what screen_buffer_render produced */
+    // DEBUG: Log what screen_buffer_render produced
     DC_DEBUG("After render: num_rows=%d, command_start_row=%d, cursor=(%d,%d), "
              "term_width=%d",
              desired_screen.num_rows, desired_screen.command_start_row,
              desired_screen.cursor_row, desired_screen.cursor_col, term_width);
 
-    /* DEBUG: Log prefixes set on each row */
+    // DEBUG: Log prefixes set on each row
     for (int r = 0; r < desired_screen.num_rows && r < 10; r++) {
         const char *prefix = screen_buffer_get_line_prefix(&desired_screen, r);
         if (prefix) {
@@ -603,7 +603,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             &controller->notification_copy, notification_buffer,
             sizeof(notification_buffer));
 
-        /* Add notification to screen_buffer like we do for menu */
+        // Add notification to screen_buffer like we do for menu
         if (notification_text && *notification_text) {
             int notif_start_row = desired_screen.num_rows;
             notification_rows_added = screen_buffer_add_text_rows(
@@ -628,7 +628,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
      * as this would allow \033[J to clear the prompt.
      */
 
-    /* First render only: Draw prompt once */
+    // First render only: Draw prompt once
     if (!prompt_rendered) {
         if (prompt_buffer[0]) {
             dc_write_all(STDOUT_FILENO, prompt_buffer, strlen(prompt_buffer));
@@ -673,10 +673,10 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             dc_write_all(STDOUT_FILENO, move_down, down_len);
         }
 
-        /* Clear from here to end of screen (clears ghost text) */
+        // Clear from here to end of screen (clears ghost text)
         dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
-        /* Move back up to command start row */
+        // Move back up to command start row
         int rows_up = last_terminal_end_row - command_row;
         if (rows_up > 0) {
             DC_DEBUG("Step2: Moving UP %d rows to command start", rows_up);
@@ -724,9 +724,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
         dc_write_all(STDOUT_FILENO, desired_screen.rprompt_text,
                      strlen(desired_screen.rprompt_text));
-        /* Reset attributes after RPROMPT (it may contain colors) */
+        // Reset attributes after RPROMPT (it may contain colors)
         dc_write_all(STDOUT_FILENO, "\033[0m", 4);
-        /* Move back to command start column */
+        // Move back to command start column
         char back_col_seq[16];
         int back_col_len = snprintf(back_col_seq, sizeof(back_col_seq),
                                     "\033[%dG", command_start_col + 1);
@@ -775,7 +775,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                             }
                         }
                     }
-                    /* Write the ANSI sequence */
+                    // Write the ANSI sequence
                     dc_write_all(STDOUT_FILENO, command_buffer + seq_start,
                                  i - seq_start);
                     continue;
@@ -787,7 +787,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     dc_write_all(STDOUT_FILENO, "\n", 1);
                     visual_row++;
 
-                    /* Get continuation prompt for this visual row */
+                    // Get continuation prompt for this visual row
                     const char *cont_prompt = screen_buffer_get_line_prefix(
                         &desired_screen, visual_row);
                     if (cont_prompt) {
@@ -816,13 +816,13 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                 if (char_bytes > 0) {
                     int char_width = lle_utf8_codepoint_width(codepoint);
 
-                    /* Write the character */
+                    // Write the character
                     dc_write_all(STDOUT_FILENO, command_buffer + i, char_bytes);
 
-                    /* Update visual position */
+                    // Update visual position
                     visual_col += char_width;
 
-                    /* Check for line wrap */
+                    // Check for line wrap
                     if (visual_col >= term_width) {
                         visual_row++;
                         visual_col = 0;
@@ -832,7 +832,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
 
                     i += char_bytes;
                 } else {
-                    /* Invalid UTF-8, write single byte */
+                    // Invalid UTF-8, write single byte
                     dc_write_all(STDOUT_FILENO, command_buffer + i, 1);
                     visual_col++;
                     if (visual_col >= term_width) {
@@ -843,7 +843,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                 }
             }
         } else {
-            /* Single-line input - write directly */
+            // Single-line input - write directly
             dc_write_all(STDOUT_FILENO, command_buffer, strlen(command_buffer));
         }
     }
@@ -867,16 +867,16 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             controller->autosuggestions_layer);
 
         if (suggestion && *suggestion) {
-            /* Write ghost text in BRIGHT_BLACK (dimmed gray) */
+            // Write ghost text in BRIGHT_BLACK (dimmed gray)
             dc_write_all(STDOUT_FILENO, "\033[90m",
-                         5); /* Set bright black foreground */
+                         5); // Set bright black foreground
             dc_write_all(STDOUT_FILENO, suggestion, strlen(suggestion));
             dc_write_all(STDOUT_FILENO, "\033[0m",
-                         4); /* Reset all attributes */
+                         4); // Reset all attributes
         }
     }
 
-    /* Step 4b: Write completion menu WITHOUT continuation prompts */
+    // Step 4b: Write completion menu WITHOUT continuation prompts
     if (menu_text && *menu_text) {
         dc_write_all(STDOUT_FILENO, "\n", 1);
         dc_write_all(STDOUT_FILENO, menu_text, strlen(menu_text));
@@ -1866,14 +1866,14 @@ display_controller_init(display_controller_t *controller,
     if (controller->event_system) {
         layer_events_error_t subscribe_result = layer_events_subscribe(
             controller->event_system, LAYER_EVENT_REDRAW_NEEDED,
-            LAYER_ID_DISPLAY_CONTROLLER,         /* subscriber_id */
-            dc_handle_redraw_needed, controller, /* user_data */
+            LAYER_ID_DISPLAY_CONTROLLER,         // subscriber_id
+            dc_handle_redraw_needed, controller, // user_data
             LAYER_EVENT_PRIORITY_HIGH);
 
         if (subscribe_result != LAYER_EVENTS_SUCCESS) {
             DC_ERROR("Failed to subscribe to REDRAW_NEEDED events: %s",
                      layer_events_error_string(subscribe_result));
-            /* Non-fatal - display may still work without events */
+            // Non-fatal - display may still work without events
         } else {
             DC_DEBUG("Successfully subscribed to LAYER_EVENT_REDRAW_NEEDED");
         }
@@ -2549,7 +2549,7 @@ display_controller_clear_screen(display_controller_t *controller) {
 
     DC_DEBUG("Clearing screen");
 
-    /* Clear the screen through terminal_control */
+    // Clear the screen through terminal_control
     terminal_control_error_t result =
         terminal_control_clear_screen(controller->terminal_ctrl);
 
@@ -2784,13 +2784,13 @@ void display_controller_set_autosuggestion(display_controller_t *controller,
         return;
     }
 
-    /* Don't set suggestion if completion menu is visible */
+    // Don't set suggestion if completion menu is visible
     if (controller->completion_menu_visible) {
         autosuggestions_layer_clear(controller->autosuggestions_layer);
         return;
     }
 
-    /* Set the suggestion directly (or clear if NULL/empty) */
+    // Set the suggestion directly (or clear if NULL/empty)
     autosuggestions_layer_set_suggestion(controller->autosuggestions_layer,
                                          suggestion);
 }
@@ -3304,7 +3304,7 @@ display_controller_get_version(const display_controller_t *controller,
 display_controller_error_t
 display_controller_prepare_shell_integration(display_controller_t *controller,
                                              const void *shell_config) {
-    (void)shell_config; /* Reserved for future use */
+    (void)shell_config; // Reserved for future use
 
     if (!controller) {
         return DISPLAY_CONTROLLER_ERROR_NULL_POINTER;

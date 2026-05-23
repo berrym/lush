@@ -104,30 +104,30 @@ lle_result_t lle_input_stream_init(lle_input_stream_t **stream,
     lle_result_t result = LLE_SUCCESS;
     lle_input_stream_t *new_stream = NULL;
 
-    /* Allocate stream structure */
+    // Allocate stream structure
     new_stream = lle_pool_alloc(sizeof(lle_input_stream_t));
     if (!new_stream) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
     memset(new_stream, 0, sizeof(lle_input_stream_t));
 
-    /* Allocate input buffer */
+    // Allocate input buffer
     new_stream->buffer = lle_pool_alloc(LLE_INPUT_BUFFER_SIZE);
     if (!new_stream->buffer) {
         lle_pool_free(new_stream);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize stream fields */
+    // Initialize stream fields
     new_stream->buffer_size = LLE_INPUT_BUFFER_SIZE;
     new_stream->buffer_used = 0;
     new_stream->buffer_pos = 0;
     new_stream->memory_pool = memory_pool;
 
-    /* Get terminal file descriptor - assuming STDIN for now */
+    // Get terminal file descriptor - assuming STDIN for now
     new_stream->terminal_fd = STDIN_FILENO;
 
-    /* Set non-blocking mode by default for responsive input */
+    // Set non-blocking mode by default for responsive input
     new_stream->blocking_mode = false;
     result = set_nonblocking(new_stream->terminal_fd);
     if (result != LLE_SUCCESS) {
@@ -136,12 +136,12 @@ lle_result_t lle_input_stream_init(lle_input_stream_t **stream,
         return result;
     }
 
-    /* Initialize statistics */
+    // Initialize statistics
     new_stream->bytes_read = 0;
     new_stream->read_operations = 0;
     new_stream->buffer_overflows = 0;
 
-    /* Flow control disabled by default */
+    // Flow control disabled by default
     new_stream->flow_control_enabled = false;
 
     /* Note: terminal_caps would be set from terminal system in full integration
@@ -163,17 +163,17 @@ lle_result_t lle_input_stream_destroy(lle_input_stream_t *stream) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Restore blocking mode on terminal before cleanup */
+    // Restore blocking mode on terminal before cleanup
     if (!stream->blocking_mode) {
         set_blocking(stream->terminal_fd);
     }
 
-    /* Free buffer */
+    // Free buffer
     if (stream->buffer) {
         lle_pool_free(stream->buffer);
     }
 
-    /* Free stream structure */
+    // Free stream structure
     lle_pool_free(stream);
 
     return LLE_SUCCESS;
@@ -196,41 +196,41 @@ lle_result_t lle_input_stream_read(lle_input_stream_t *stream, char *buffer,
 
     *bytes_read = 0;
 
-    /* Compact buffer if needed to make room */
+    // Compact buffer if needed to make room
     if (stream->buffer_used >= stream->buffer_size) {
         compact_buffer(stream);
 
-        /* Check if buffer is still full after compacting */
+        // Check if buffer is still full after compacting
         if (stream->buffer_used >= stream->buffer_size) {
             stream->buffer_overflows++;
             return LLE_ERROR_BUFFER_OVERFLOW;
         }
     }
 
-    /* Read from terminal */
+    // Read from terminal
     size_t space_available = stream->buffer_size - stream->buffer_used;
     ssize_t n = read(stream->terminal_fd, stream->buffer + stream->buffer_used,
                      space_available);
 
     if (n < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            /* No data available in non-blocking mode - not an error */
+            // No data available in non-blocking mode - not an error
             return LLE_SUCCESS;
         }
         return LLE_ERROR_IO_ERROR;
     }
 
     if (n == 0) {
-        /* EOF - terminal closed */
+        // EOF - terminal closed
         return LLE_ERROR_IO_ERROR;
     }
 
-    /* Update buffer state */
+    // Update buffer state
     stream->buffer_used += (size_t)n;
     stream->bytes_read += (size_t)n;
     stream->read_operations++;
 
-    /* Copy to output buffer if requested */
+    // Copy to output buffer if requested
     size_t copy_size = (size_t)n < buffer_size ? (size_t)n : buffer_size;
     memcpy(buffer, stream->buffer + stream->buffer_used - (size_t)n, copy_size);
     *bytes_read = copy_size;
@@ -256,18 +256,18 @@ lle_result_t lle_input_stream_buffer_data(lle_input_stream_t *stream,
         return LLE_SUCCESS;
     }
 
-    /* Compact buffer if needed */
+    // Compact buffer if needed
     if (stream->buffer_used + data_len > stream->buffer_size) {
         compact_buffer(stream);
 
-        /* Check if there's still not enough space */
+        // Check if there's still not enough space
         if (stream->buffer_used + data_len > stream->buffer_size) {
             stream->buffer_overflows++;
             return LLE_ERROR_BUFFER_OVERFLOW;
         }
     }
 
-    /* Copy data to buffer */
+    // Copy data to buffer
     memcpy(stream->buffer + stream->buffer_used, data, data_len);
     stream->buffer_used += data_len;
     stream->bytes_read += data_len;
@@ -325,7 +325,7 @@ lle_result_t lle_input_stream_consume(lle_input_stream_t *stream,
 
     stream->buffer_pos += bytes;
 
-    /* Compact buffer if we've consumed a significant portion */
+    // Compact buffer if we've consumed a significant portion
     if (stream->buffer_pos > stream->buffer_size / 2) {
         compact_buffer(stream);
     }
@@ -372,7 +372,7 @@ lle_result_t lle_input_stream_set_blocking(lle_input_stream_t *stream,
     }
 
     if (stream->blocking_mode == blocking) {
-        return LLE_SUCCESS; /* Already in desired mode */
+        return LLE_SUCCESS; // Already in desired mode
     }
 
     lle_result_t result;
@@ -449,11 +449,11 @@ lle_result_t lle_input_stream_reset(lle_input_stream_t *stream) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Clear buffer */
+    // Clear buffer
     stream->buffer_used = 0;
     stream->buffer_pos = 0;
 
-    /* Reset statistics */
+    // Reset statistics
     stream->bytes_read = 0;
     stream->read_operations = 0;
     stream->buffer_overflows = 0;

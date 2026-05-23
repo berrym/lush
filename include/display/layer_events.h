@@ -667,7 +667,7 @@ static inline void layer_events_get_version(int *major, int *minor,
 }
 #endif
 
-#endif /* LAYER_EVENTS_H */
+#endif // LAYER_EVENTS_H
 
 // ============================================================================
 // USAGE EXAMPLES

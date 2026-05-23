@@ -18,10 +18,10 @@
 #include <ctype.h>
 #include <string.h>
 
-/* Default configuration values */
+// Default configuration values
 #define DEFAULT_MAX_LINES 10000
 
-/* Multiline parser implementation */
+// Multiline parser implementation
 struct lle_multiline_parser {
     lle_memory_pool_t *memory_pool;
     lle_structure_analyzer_t *analyzer;
@@ -29,7 +29,7 @@ struct lle_multiline_parser {
     bool active;
 };
 
-/* Forward declarations for internal functions */
+// Forward declarations for internal functions
 static lle_parsed_line_t *create_parsed_line(lle_multiline_parser_t *parser,
                                              const char *content, size_t length,
                                              size_t line_number);
@@ -115,7 +115,7 @@ lle_result_t lle_multiline_parser_destroy(lle_multiline_parser_t *parser) {
     }
 
     parser->active = false;
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -130,7 +130,7 @@ lle_result_t lle_multiline_parser_reset(lle_multiline_parser_t *parser) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Reset analyzer if needed */
+    // Reset analyzer if needed
     return lle_structure_analyzer_reset(parser->analyzer);
 }
 
@@ -182,7 +182,7 @@ lle_result_t lle_multiline_parser_split_lines(lle_multiline_parser_t *parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Count lines first */
+    // Count lines first
     size_t count = 1;
     for (size_t i = 0; i < command_length; i++) {
         if (command_text[i] == '\n') {
@@ -194,14 +194,14 @@ lle_result_t lle_multiline_parser_split_lines(lle_multiline_parser_t *parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate line array */
+    // Allocate line array
     lle_parsed_line_t **line_array =
         lle_pool_alloc(count * sizeof(lle_parsed_line_t *));
     if (!line_array) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Split into lines */
+    // Split into lines
     size_t line_idx = 0;
     size_t line_start = 0;
 
@@ -244,7 +244,7 @@ lle_result_t lle_multiline_parser_parse(lle_multiline_parser_t *parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate parse result */
+    // Allocate parse result
     lle_multiline_parse_result_t *parse_result =
         lle_pool_alloc(sizeof(lle_multiline_parse_result_t));
     if (!parse_result) {
@@ -253,7 +253,7 @@ lle_result_t lle_multiline_parser_parse(lle_multiline_parser_t *parser,
 
     memset(parse_result, 0, sizeof(lle_multiline_parse_result_t));
 
-    /* Split into lines */
+    // Split into lines
     lle_parsed_line_t **lines = NULL;
     size_t line_count = 0;
 
@@ -264,7 +264,7 @@ lle_result_t lle_multiline_parser_parse(lle_multiline_parser_t *parser,
         return res;
     }
 
-    /* Build linked list of lines */
+    // Build linked list of lines
     if (line_count > 0) {
         parse_result->first_line = lines[0];
         parse_result->last_line = lines[line_count - 1];
@@ -277,7 +277,7 @@ lle_result_t lle_multiline_parser_parse(lle_multiline_parser_t *parser,
     parse_result->line_count = line_count;
     parse_result->total_length = command_length;
 
-    /* Analyze command structure */
+    // Analyze command structure
     lle_command_structure_t *structure = NULL;
     res = lle_structure_analyzer_analyze(parser->analyzer, command_text,
                                          command_length, &structure);
@@ -292,7 +292,7 @@ lle_result_t lle_multiline_parser_parse(lle_multiline_parser_t *parser,
         parse_result->has_syntax_error = true;
     }
 
-    /* Check for expected closing keyword if incomplete */
+    // Check for expected closing keyword if incomplete
     if (!parse_result->is_complete) {
         lle_keyword_type_t expected = LLE_KEYWORD_NONE;
         lle_structure_analyzer_check_complete(
@@ -318,17 +318,17 @@ lle_multiline_parser_free_result(lle_multiline_parser_t *parser,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Free line list */
+    // Free line list
     if (result->first_line) {
         free_parsed_line_list(result->first_line);
     }
 
-    /* Free command structure */
+    // Free command structure
     if (result->structure) {
         lle_command_structure_destroy(result->structure);
     }
 
-    /* Memory pool owns parse_result allocation */
+    // Memory pool owns parse_result allocation
 
     return LLE_SUCCESS;
 }
@@ -356,7 +356,7 @@ static lle_parsed_line_t *create_parsed_line(lle_multiline_parser_t *parser,
 
     memset(line, 0, sizeof(lle_parsed_line_t));
 
-    /* Allocate and copy content */
+    // Allocate and copy content
     line->content = lle_pool_alloc(length + 1);
     if (!line->content) {
         return NULL;
@@ -367,28 +367,28 @@ static lle_parsed_line_t *create_parsed_line(lle_multiline_parser_t *parser,
     line->length = length;
     line->line_number = line_number;
 
-    /* Calculate indentation if configured */
+    // Calculate indentation if configured
     if (parser->config.preserve_indentation) {
         line->indent_level = calculate_indent_level(content, length);
     }
 
-    /* Check for continuation */
+    // Check for continuation
     if (parser->config.detect_continuations) {
         line->has_continuation = has_backslash_continuation(content, length);
     }
 
-    /* Detect primary keyword (simple detection) */
+    // Detect primary keyword (simple detection)
     line->primary_keyword = LLE_KEYWORD_NONE;
     line->keyword_count = 0;
 
-    /* Skip leading whitespace to find first word */
+    // Skip leading whitespace to find first word
     size_t start = 0;
     while (start < length && isspace(content[start])) {
         start++;
     }
 
     if (start < length) {
-        /* Check for common keywords */
+        // Check for common keywords
         const char *keywords[] = {"for",  "while",    "until", "if",
                                   "case", "function", NULL};
         const lle_keyword_type_t types[] = {
@@ -419,8 +419,8 @@ static lle_parsed_line_t *create_parsed_line(lle_multiline_parser_t *parser,
  * API completeness and potential future enhancements.
  */
 static void free_parsed_line_list(lle_parsed_line_t *first_line) {
-    /* Memory pool owns all allocations, no explicit frees needed */
-    /* This function exists for API completeness and future enhancements */
+    // Memory pool owns all allocations, no explicit frees needed
+    // This function exists for API completeness and future enhancements
     (void)first_line;
 }
 
@@ -435,7 +435,7 @@ static bool has_backslash_continuation(const char *line, size_t length) {
         return false;
     }
 
-    /* Skip trailing whitespace */
+    // Skip trailing whitespace
     size_t end = length;
     while (end > 0 && isspace(line[end - 1])) {
         end--;
@@ -445,9 +445,9 @@ static bool has_backslash_continuation(const char *line, size_t length) {
         return false;
     }
 
-    /* Check for backslash */
+    // Check for backslash
     if (line[end - 1] == '\\') {
-        /* Count preceding backslashes to handle escapes */
+        // Count preceding backslashes to handle escapes
         size_t backslash_count = 1;
         size_t pos = end - 1;
 
@@ -456,7 +456,7 @@ static bool has_backslash_continuation(const char *line, size_t length) {
             pos--;
         }
 
-        /* Odd number of backslashes means continuation */
+        // Odd number of backslashes means continuation
         return (backslash_count % 2) == 1;
     }
 
@@ -476,9 +476,9 @@ static size_t calculate_indent_level(const char *line, size_t length) {
         if (line[i] == ' ') {
             indent++;
         } else if (line[i] == '\t') {
-            indent += 4; /* Tab = 4 spaces */
+            indent += 4; // Tab = 4 spaces
         } else {
-            break; /* Non-whitespace found */
+            break; // Non-whitespace found
         }
     }
 

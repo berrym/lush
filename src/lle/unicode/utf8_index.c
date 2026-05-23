@@ -64,17 +64,17 @@ static bool is_valid_utf8_sequence(const char *ptr, int length) {
 
     unsigned char byte1 = (unsigned char)ptr[0];
 
-    /* Validate first byte matches expected length */
+    // Validate first byte matches expected length
     if (length == 1 && (byte1 & 0x80) != 0x00)
-        return false; /* 0xxxxxxx */
+        return false; // 0xxxxxxx
     if (length == 2 && (byte1 & 0xE0) != 0xC0)
-        return false; /* 110xxxxx */
+        return false; // 110xxxxx
     if (length == 3 && (byte1 & 0xF0) != 0xE0)
-        return false; /* 1110xxxx */
+        return false; // 1110xxxx
     if (length == 4 && (byte1 & 0xF8) != 0xF0)
-        return false; /* 11110xxx */
+        return false; // 11110xxx
 
-    /* Validate continuation bytes (10xxxxxx) */
+    // Validate continuation bytes (10xxxxxx)
     for (int i = 1; i < length; i++) {
         unsigned char byte = (unsigned char)ptr[i];
         if ((byte & 0xC0) != 0x80) {
@@ -82,7 +82,7 @@ static bool is_valid_utf8_sequence(const char *ptr, int length) {
         }
     }
 
-    /* Check for overlong encodings */
+    // Check for overlong encodings
     if (length == 2 && (byte1 & 0xFE) == 0xC0)
         return false;
     if (length == 3 && byte1 == 0xE0 && ((unsigned char)ptr[1] & 0xE0) == 0x80)
@@ -90,7 +90,7 @@ static bool is_valid_utf8_sequence(const char *ptr, int length) {
     if (length == 4 && byte1 == 0xF0 && ((unsigned char)ptr[1] & 0xF0) == 0x80)
         return false;
 
-    /* Check for surrogate pairs (invalid in UTF-8) */
+    // Check for surrogate pairs (invalid in UTF-8)
     if (length == 3 && byte1 == 0xED && ((unsigned char)ptr[1] & 0xE0) == 0xA0)
         return false;
 
@@ -116,7 +116,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Start timing for performance tracking */
+    // Start timing for performance tracking
     struct timespec start_time, end_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
@@ -132,31 +132,31 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
     const char *end = text + text_length;
 
     while (ptr < end) {
-        /* Get UTF-8 sequence length */
+        // Get UTF-8 sequence length
         int sequence_length = lle_utf8_sequence_length(*ptr);
 
-        /* Validate sequence length */
+        // Validate sequence length
         if (sequence_length == 0 || ptr + sequence_length > end) {
             return LLE_ERROR_INVALID_ENCODING;
         }
 
-        /* Validate complete UTF-8 sequence */
+        // Validate complete UTF-8 sequence
         if (!is_valid_utf8_sequence(ptr, sequence_length)) {
             return LLE_ERROR_INVALID_ENCODING;
         }
 
         codepoint_count++;
 
-        /* Check if this starts a new grapheme cluster */
+        // Check if this starts a new grapheme cluster
         if (is_grapheme_boundary_at_position(ptr, text, end)) {
             grapheme_count++;
 
-            /* Decode codepoint to get its width */
+            // Decode codepoint to get its width
             uint32_t codepoint;
             lle_utf8_decode_codepoint(ptr, sequence_length, &codepoint);
             int width = lle_codepoint_width(codepoint);
             if (width < 0)
-                width = 1; /* Treat invalid as normal width */
+                width = 1; // Treat invalid as normal width
             display_width_total += width;
         }
 
@@ -172,21 +172,21 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
     size_t *new_grapheme_to_display = NULL;
     size_t *new_display_to_grapheme = NULL;
 
-    /* Allocate byte_to_codepoint (one entry per byte) */
+    // Allocate byte_to_codepoint (one entry per byte)
     new_byte_to_codepoint = calloc(text_length + 1, sizeof(size_t));
     if (!new_byte_to_codepoint) {
         result = LLE_ERROR_OUT_OF_MEMORY;
         goto cleanup;
     }
 
-    /* Allocate codepoint_to_byte (one entry per codepoint) */
+    // Allocate codepoint_to_byte (one entry per codepoint)
     new_codepoint_to_byte = calloc(codepoint_count + 1, sizeof(size_t));
     if (!new_codepoint_to_byte) {
         result = LLE_ERROR_OUT_OF_MEMORY;
         goto cleanup;
     }
 
-    /* Allocate grapheme arrays */
+    // Allocate grapheme arrays
     new_grapheme_to_codepoint = calloc(grapheme_count + 1, sizeof(size_t));
     new_codepoint_to_grapheme = calloc(codepoint_count + 1, sizeof(size_t));
     new_grapheme_to_display = calloc(grapheme_count + 1, sizeof(size_t));
@@ -216,25 +216,25 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
             new_byte_to_codepoint[byte_pos + i] = codepoint_pos;
         }
 
-        /* Update codepoint-to-byte mapping */
+        // Update codepoint-to-byte mapping
         new_codepoint_to_byte[codepoint_pos] = byte_pos;
 
-        /* Check for grapheme boundary */
+        // Check for grapheme boundary
         if (is_grapheme_boundary_at_position(ptr, text, end)) {
             if (grapheme_pos > 0) {
-                /* Complete previous grapheme cluster */
+                // Complete previous grapheme cluster
                 for (size_t i = current_grapheme_start_codepoint;
                      i < codepoint_pos; i++) {
                     new_codepoint_to_grapheme[i] = grapheme_pos - 1;
                 }
             }
 
-            /* Start new grapheme cluster */
+            // Start new grapheme cluster
             new_grapheme_to_codepoint[grapheme_pos] = codepoint_pos;
             new_grapheme_to_display[grapheme_pos] = display_col;
             current_grapheme_start_codepoint = codepoint_pos;
 
-            /* Update display column mapping */
+            // Update display column mapping
             uint32_t codepoint;
             lle_utf8_decode_codepoint(ptr, sequence_length, &codepoint);
             int width = lle_codepoint_width(codepoint);
@@ -282,7 +282,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
     index->grapheme_to_display = new_grapheme_to_display;
     index->display_to_grapheme = new_display_to_grapheme;
 
-    /* Update metadata */
+    // Update metadata
     index->byte_count = text_length;
     index->codepoint_count = codepoint_count;
     index->grapheme_count = grapheme_count;
@@ -290,7 +290,7 @@ lle_result_t lle_utf8_index_rebuild(lle_utf8_index_t *index, const char *text,
     index->index_valid = true;
     index->rebuild_count++;
 
-    /* Update timing */
+    // Update timing
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     uint64_t elapsed_ns =
         (end_time.tv_sec - start_time.tv_sec) * 1000000000ULL +

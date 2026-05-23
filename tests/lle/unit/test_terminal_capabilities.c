@@ -32,11 +32,11 @@ TEST(capability_detection_basic) {
     ASSERT(caps->terminal_type != NULL);
     ASSERT(caps->terminal_program != NULL);
 
-    /* Should detect some terminal type */
+    // Should detect some terminal type
     ASSERT(caps->terminal_type_enum >= LLE_TERMINAL_UNKNOWN);
     ASSERT(caps->terminal_type_enum <= LLE_TERMINAL_KITTY);
 
-    /* Cleanup */
+    // Cleanup
     lle_capabilities_destroy(caps);
 }
 
@@ -47,11 +47,11 @@ TEST(terminal_type_strings) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Terminal type string should not be empty */
+    // Terminal type string should not be empty
     ASSERT(strlen(caps->terminal_type) > 0);
     ASSERT(strlen(caps->terminal_program) > 0);
 
-    /* Should be valid strings */
+    // Should be valid strings
     ASSERT(strcmp(caps->terminal_type, "") != 0);
     ASSERT(strcmp(caps->terminal_program, "") != 0);
 
@@ -65,7 +65,7 @@ TEST(tty_detection) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* is_tty should match actual TTY status */
+    // is_tty should match actual TTY status
     int stdin_is_tty = isatty(STDIN_FILENO);
     int stdout_is_tty = isatty(STDOUT_FILENO);
     bool expected_tty = (stdin_is_tty && stdout_is_tty);
@@ -87,11 +87,11 @@ TEST(color_depth_valid) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Color depth should be 0, 4, 8, or 24 */
+    // Color depth should be 0, 4, 8, or 24
     ASSERT(caps->detected_color_depth == 0 || caps->detected_color_depth == 4 ||
            caps->detected_color_depth == 8 || caps->detected_color_depth == 24);
 
-    /* Color support flags should be consistent with depth */
+    // Color support flags should be consistent with depth
     if (caps->detected_color_depth >= 4) {
         ASSERT(caps->supports_ansi_colors == true);
     }
@@ -114,13 +114,13 @@ TEST(color_flags_consistency) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* If truecolor supported, 256 colors must also be supported */
+    // If truecolor supported, 256 colors must also be supported
     if (caps->supports_truecolor) {
         ASSERT(caps->supports_256_colors == true);
         ASSERT(caps->supports_ansi_colors == true);
     }
 
-    /* If 256 colors supported, ANSI colors must be supported */
+    // If 256 colors supported, ANSI colors must be supported
     if (caps->supports_256_colors) {
         ASSERT(caps->supports_ansi_colors == true);
     }
@@ -140,11 +140,11 @@ TEST(text_attributes_detected) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Modern terminals should support at least bold and underline */
-    /* Note: This might fail in very minimal environments, but that's OK */
-    /* We're just testing that detection ran, not enforcing support */
+    // Modern terminals should support at least bold and underline
+    // Note: This might fail in very minimal environments, but that's OK
+    // We're just testing that detection ran, not enforcing support
 
-    /* Text attribute flags should be boolean */
+    // Text attribute flags should be boolean
     ASSERT(caps->supports_bold == true || caps->supports_bold == false);
     ASSERT(caps->supports_italic == true || caps->supports_italic == false);
     ASSERT(caps->supports_underline == true ||
@@ -169,7 +169,7 @@ TEST(advanced_features_detected) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Feature flags should be boolean */
+    // Feature flags should be boolean
     ASSERT(caps->supports_mouse_reporting == true ||
            caps->supports_mouse_reporting == false);
     ASSERT(caps->supports_bracketed_paste == true ||
@@ -190,7 +190,7 @@ TEST(feature_correlation) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Modern terminals (Alacritty, Kitty) should support most features */
+    // Modern terminals (Alacritty, Kitty) should support most features
     if (caps->terminal_type_enum == LLE_TERMINAL_ALACRITTY ||
         caps->terminal_type_enum == LLE_TERMINAL_KITTY) {
         ASSERT(caps->supports_unicode == true);
@@ -213,11 +213,11 @@ TEST(geometry_detection) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Width and height should be reasonable */
-    ASSERT(caps->terminal_width >= 20); /* Minimum enforced */
-    ASSERT(caps->terminal_height >= 5); /* Minimum enforced */
+    // Width and height should be reasonable
+    ASSERT(caps->terminal_width >= 20); // Minimum enforced
+    ASSERT(caps->terminal_height >= 5); // Minimum enforced
 
-    /* Should not be absurdly large */
+    // Should not be absurdly large
     ASSERT(caps->terminal_width < 10000);
     ASSERT(caps->terminal_height < 10000);
 
@@ -231,23 +231,23 @@ TEST(geometry_update) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Update with specific dimensions */
+    // Update with specific dimensions
     result = lle_capabilities_update_geometry(caps, 100, 40);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps->terminal_width == 100);
     ASSERT(caps->terminal_height == 40);
 
-    /* Update with zeros (should re-detect) */
+    // Update with zeros (should re-detect)
     result = lle_capabilities_update_geometry(caps, 0, 0);
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps->terminal_width >= 20);
     ASSERT(caps->terminal_height >= 5);
 
-    /* Update with too-small values (should enforce minimums) */
+    // Update with too-small values (should enforce minimums)
     result = lle_capabilities_update_geometry(caps, 10, 2);
     ASSERT(result == LLE_SUCCESS);
-    ASSERT(caps->terminal_width == 80);  /* Enforced minimum */
-    ASSERT(caps->terminal_height == 24); /* Enforced minimum */
+    ASSERT(caps->terminal_width == 80);  // Enforced minimum
+    ASSERT(caps->terminal_height == 24); // Enforced minimum
 
     lle_capabilities_destroy(caps);
 }
@@ -264,15 +264,15 @@ TEST(performance_characteristics) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Latency should be reasonable (1-100ms) */
+    // Latency should be reasonable (1-100ms)
     ASSERT(caps->estimated_latency_ms >= 1);
     ASSERT(caps->estimated_latency_ms <= 100);
 
-    /* Fast update flag should be boolean */
+    // Fast update flag should be boolean
     ASSERT(caps->supports_fast_updates == true ||
            caps->supports_fast_updates == false);
 
-    /* Modern terminals should have lower latency */
+    // Modern terminals should have lower latency
     if (caps->terminal_type_enum == LLE_TERMINAL_ALACRITTY ||
         caps->terminal_type_enum == LLE_TERMINAL_KITTY) {
         ASSERT(caps->estimated_latency_ms <= 10);
@@ -289,13 +289,13 @@ TEST(optimization_flags) {
     ASSERT(result == LLE_SUCCESS);
     ASSERT(caps != NULL);
 
-    /* Optimization flags should be set */
-    /* At minimum, unicode awareness should be set for modern terminals */
+    // Optimization flags should be set
+    // At minimum, unicode awareness should be set for modern terminals
     if (caps->supports_unicode) {
         ASSERT((caps->optimizations & LLE_OPT_UNICODE_AWARE) != 0);
     }
 
-    /* Fast terminals should have incremental draw enabled */
+    // Fast terminals should have incremental draw enabled
     if (caps->supports_fast_updates) {
         ASSERT((caps->optimizations & LLE_OPT_INCREMENTAL_DRAW) != 0);
     }
@@ -309,20 +309,20 @@ TEST(optimization_flags) {
  */
 
 TEST(null_parameter_handling) {
-    /* NULL caps pointer should return error */
+    // NULL caps pointer should return error
     lle_result_t result = lle_capabilities_detect_environment(NULL, NULL);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 
-    /* NULL destroy should not crash */
+    // NULL destroy should not crash
     lle_capabilities_destroy(NULL);
 
-    /* NULL update should return error */
+    // NULL update should return error
     result = lle_capabilities_update_geometry(NULL, 80, 24);
     ASSERT(result == LLE_ERROR_INVALID_PARAMETER);
 }
 
 TEST(multiple_detections) {
-    /* Should be able to detect multiple times */
+    // Should be able to detect multiple times
     lle_terminal_capabilities_t *caps1 = NULL;
     lle_terminal_capabilities_t *caps2 = NULL;
 
@@ -334,7 +334,7 @@ TEST(multiple_detections) {
     ASSERT(caps1 != NULL);
     ASSERT(caps2 != NULL);
 
-    /* Results should be consistent */
+    // Results should be consistent
     ASSERT(caps1->terminal_type_enum == caps2->terminal_type_enum);
     ASSERT(caps1->terminal_width == caps2->terminal_width);
     ASSERT(caps1->terminal_height == caps2->terminal_height);
@@ -349,7 +349,7 @@ TEST(multiple_detections) {
  */
 
 TEST(memory_cleanup) {
-    /* Test that destroy properly frees memory */
+    // Test that destroy properly frees memory
     lle_terminal_capabilities_t *caps = NULL;
     lle_result_t result = lle_capabilities_detect_environment(&caps, NULL);
 
@@ -358,9 +358,9 @@ TEST(memory_cleanup) {
     ASSERT(caps->terminal_type != NULL);
     ASSERT(caps->terminal_program != NULL);
 
-    /* Should not leak memory when destroyed */
+    // Should not leak memory when destroyed
     lle_capabilities_destroy(caps);
-    /* If valgrind is run, this will be verified */
+    // If valgrind is run, this will be verified
 }
 
 /* ============================================================================

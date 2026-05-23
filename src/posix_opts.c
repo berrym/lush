@@ -59,7 +59,7 @@ bool apply_mode_preset(shell_mode_t mode) {
      * it see the right value. */
     shell_opts.posix_mode = (mode == SHELL_MODE_POSIX);
 
-    /* Persist the canonical mode label in the central registry. */
+    // Persist the canonical mode label in the central registry.
     config.shell_mode = (int)mode;
     if (config_registry_is_initialized()) {
         config_registry_set_string("shell.mode", shell_mode_name(mode));
@@ -83,14 +83,14 @@ bool apply_mode_preset(shell_mode_t mode) {
  * @param value The new boolean value
  */
 static void sync_shell_option_to_registry(const char *name, bool value) {
-    /* Build the full key: shell.<name> */
+    // Build the full key: shell.<name>
     char key[CREG_KEY_MAX];
     snprintf(key, sizeof(key), "shell.%s", name);
 
-    /* Update config system's shell option */
+    // Update config system's shell option
     config_set_shell_option(key, value);
 
-    /* Update registry if initialized */
+    // Update registry if initialized
     if (config_registry_is_initialized()) {
         config_registry_set_boolean(key, value);
     }
@@ -333,7 +333,7 @@ static void print_variable_quoted(const char *key, const char *value) {
         return;
     }
 
-    /* Check if value needs quoting (contains special chars) */
+    // Check if value needs quoting (contains special chars)
     bool needs_quote = false;
     for (const char *p = value; *p; p++) {
         if (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\'' || *p == '"' ||
@@ -347,11 +347,11 @@ static void print_variable_quoted(const char *key, const char *value) {
     }
 
     if (needs_quote) {
-        /* Use single quotes, escaping any single quotes in value */
+        // Use single quotes, escaping any single quotes in value
         printf("%s='", key);
         for (const char *p = value; *p; p++) {
             if (*p == '\'') {
-                printf("'\\''"); /* End quote, escaped quote, start quote */
+                printf("'\\''"); // End quote, escaped quote, start quote
             } else {
                 putchar(*p);
             }
@@ -380,7 +380,7 @@ static void print_variable_callback(const char *key, const char *value,
         return;
     }
 
-    /* Skip internal/special variables that start with double underscore */
+    // Skip internal/special variables that start with double underscore
     if (key[0] == '_' && key[1] == '_') {
         return;
     }

@@ -18,7 +18,7 @@
 #include <string.h>
 #include <sys/time.h>
 
-/* Test counter */
+// Test counter
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -45,13 +45,13 @@ void test_index_creation(void) {
     lle_history_core_t *core = NULL;
     lle_result_t result;
 
-    /* Create core with default config (use_indexing = true by default) */
+    // Create core with default config (use_indexing = true by default)
     result = lle_history_core_create(&core, NULL, NULL);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to create core");
     }
 
-    /* Check that index was created */
+    // Check that index was created
     if (core->entry_lookup == NULL) {
         lle_history_core_destroy(core);
         FAIL("Index not created despite use_indexing=true");
@@ -75,7 +75,7 @@ void test_fast_id_lookup(void) {
         FAIL("Failed to create core");
     }
 
-    /* Add 1000 entries */
+    // Add 1000 entries
     uint64_t ids[1000];
     for (int i = 0; i < 1000; i++) {
         char cmd[64];
@@ -87,7 +87,7 @@ void test_fast_id_lookup(void) {
         }
     }
 
-    /* Time lookups using ID (should be O(1) via hashtable) */
+    // Time lookups using ID (should be O(1) via hashtable)
     struct timeval start, end;
     gettimeofday(&start, NULL);
 
@@ -99,7 +99,7 @@ void test_fast_id_lookup(void) {
             FAIL("Failed to lookup entry by ID");
         }
 
-        /* Verify it's the correct entry */
+        // Verify it's the correct entry
         char expected_cmd[64];
         snprintf(expected_cmd, sizeof(expected_cmd), "command_%d", i);
         if (strcmp(entry->command, expected_cmd) != 0) {
@@ -141,7 +141,7 @@ void test_reverse_index_access(void) {
         FAIL("Failed to create core");
     }
 
-    /* Add entries */
+    // Add entries
     const char *commands[] = {"first", "second", "third", "fourth", "fifth"};
     for (int i = 0; i < 5; i++) {
         uint64_t id;
@@ -152,7 +152,7 @@ void test_reverse_index_access(void) {
         }
     }
 
-    /* Test reverse indexing */
+    // Test reverse indexing
     result = lle_history_get_entry_by_reverse_index(core, 0, &entry);
     if (result != LLE_SUCCESS || entry == NULL) {
         lle_history_core_destroy(core);
@@ -175,7 +175,7 @@ void test_reverse_index_access(void) {
         FAIL("Reverse index 4 should be 'first'");
     }
 
-    /* Test out of bounds */
+    // Test out of bounds
     result = lle_history_get_entry_by_reverse_index(core, 5, &entry);
     if (result != LLE_ERROR_INVALID_RANGE) {
         lle_history_core_destroy(core);
@@ -200,7 +200,7 @@ void test_get_last_n_entries(void) {
         FAIL("Failed to create core");
     }
 
-    /* Add 10 entries */
+    // Add 10 entries
     for (int i = 0; i < 10; i++) {
         char cmd[32];
         snprintf(cmd, sizeof(cmd), "cmd_%d", i);
@@ -208,7 +208,7 @@ void test_get_last_n_entries(void) {
         result = lle_history_add_entry(core, cmd, 0, &id);
     }
 
-    /* Get last 3 entries */
+    // Get last 3 entries
     lle_history_entry_t *entries[3];
     size_t count = 0;
 
@@ -223,7 +223,7 @@ void test_get_last_n_entries(void) {
         FAIL("Should return 3 entries");
     }
 
-    /* Verify they're the last 3 (cmd_7, cmd_8, cmd_9) */
+    // Verify they're the last 3 (cmd_7, cmd_8, cmd_9)
     if (strcmp(entries[0]->command, "cmd_7") != 0 ||
         strcmp(entries[1]->command, "cmd_8") != 0 ||
         strcmp(entries[2]->command, "cmd_9") != 0) {
@@ -231,7 +231,7 @@ void test_get_last_n_entries(void) {
         FAIL("Wrong entries returned");
     }
 
-    /* Test requesting more than available */
+    // Test requesting more than available
     lle_history_entry_t *big_array[20];
     result = lle_history_get_last_n_entries(core, 20, big_array, &count);
     if (result != LLE_SUCCESS) {
@@ -262,7 +262,7 @@ void test_index_rebuild(void) {
         FAIL("Failed to create core");
     }
 
-    /* Add entries */
+    // Add entries
     uint64_t ids[5];
     for (int i = 0; i < 5; i++) {
         char cmd[32];
@@ -270,14 +270,14 @@ void test_index_rebuild(void) {
         result = lle_history_add_entry(core, cmd, 0, &ids[i]);
     }
 
-    /* Rebuild index */
+    // Rebuild index
     result = lle_history_rebuild_index(core);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
         FAIL("Failed to rebuild index");
     }
 
-    /* Verify all entries still accessible */
+    // Verify all entries still accessible
     for (int i = 0; i < 5; i++) {
         lle_history_entry_t *entry = NULL;
         result = lle_history_get_entry_by_id(core, ids[i], &entry);
@@ -300,13 +300,13 @@ void test_index_operations(void) {
     lle_hashtable_t *index = NULL;
     lle_result_t result;
 
-    /* Create index */
+    // Create index
     result = lle_history_index_create(&index, 100);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to create index");
     }
 
-    /* Create a test entry */
+    // Create a test entry
     lle_history_entry_t *entry = NULL;
     result = lle_history_entry_create(&entry, "test command", NULL);
     if (result != LLE_SUCCESS) {
@@ -315,7 +315,7 @@ void test_index_operations(void) {
     }
     entry->entry_id = 42;
 
-    /* Insert into index */
+    // Insert into index
     result = lle_history_index_insert(index, 42, entry);
     if (result != LLE_SUCCESS) {
         lle_history_entry_destroy(entry, NULL);
@@ -323,7 +323,7 @@ void test_index_operations(void) {
         FAIL("Failed to insert into index");
     }
 
-    /* Lookup */
+    // Lookup
     lle_history_entry_t *found = NULL;
     result = lle_history_index_lookup(index, 42, &found);
     if (result != LLE_SUCCESS || found == NULL) {
@@ -338,7 +338,7 @@ void test_index_operations(void) {
         FAIL("Lookup returned wrong entry");
     }
 
-    /* Remove from index */
+    // Remove from index
     result = lle_history_index_remove(index, 42);
     if (result != LLE_SUCCESS) {
         lle_history_entry_destroy(entry, NULL);
@@ -346,7 +346,7 @@ void test_index_operations(void) {
         FAIL("Failed to remove from index");
     }
 
-    /* Verify removed */
+    // Verify removed
     found = NULL;
     result = lle_history_index_lookup(index, 42, &found);
     if (result != LLE_SUCCESS || found != NULL) {
@@ -355,7 +355,7 @@ void test_index_operations(void) {
         FAIL("Entry still in index after removal");
     }
 
-    /* Cleanup */
+    // Cleanup
     lle_history_entry_destroy(entry, NULL);
     lle_history_index_destroy(index);
     PASS();
@@ -370,7 +370,7 @@ int main(void) {
     printf("Indexing and Fast Lookup\n");
     printf("=================================================\n");
 
-    /* Run all tests */
+    // Run all tests
     test_index_creation();
     test_fast_id_lookup();
     test_reverse_index_access();
@@ -378,7 +378,7 @@ int main(void) {
     test_index_rebuild();
     test_index_operations();
 
-    /* Summary */
+    // Summary
     printf("\n=================================================\n");
     printf("Test Results:\n");
     printf("  Passed: %d\n", tests_passed);

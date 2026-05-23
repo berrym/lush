@@ -23,16 +23,16 @@ int display_lle_reset(int argc, char **argv) {
         return 1;
     }
 
-    /* Check for options */
+    // Check for options
     if (argc >= 2) {
         const char *opt = argv[1];
         if (strcmp(opt, "--soft") == 0) {
-            /* Soft reset: abort current line */
+            // Soft reset: abort current line
             lle_soft_reset();
             printf("LLE soft reset complete (line aborted)\n");
             return 0;
         } else if (strcmp(opt, "--terminal") == 0) {
-            /* Nuclear reset: hard reset + terminal reset */
+            // Nuclear reset: hard reset + terminal reset
             printf("Performing LLE nuclear reset...\n");
             lle_nuclear_reset();
             printf("LLE nuclear reset complete (editor recreated, "
@@ -45,7 +45,7 @@ int display_lle_reset(int argc, char **argv) {
         }
     }
 
-    /* Default: Hard reset (destroy and recreate editor) */
+    // Default: Hard reset (destroy and recreate editor)
     printf("Performing LLE hard reset...\n");
     lle_hard_reset();
     printf("LLE hard reset complete (editor recreated)\n");

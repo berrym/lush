@@ -107,17 +107,17 @@ typedef enum {
  * Contains all information needed for mode selection and initialization.
  */
 typedef struct {
-    /* Basic terminal status */
+    // Basic terminal status
     bool stdin_is_tty;
     bool stdout_is_tty;
     bool stderr_is_tty;
 
-    /* Environment analysis results */
+    // Environment analysis results
     char term_name[64];
     char term_program[64];
     char colorterm[32];
 
-    /* Detected capabilities */
+    // Detected capabilities
     bool supports_colors;
     bool supports_256_colors;
     bool supports_truecolor;
@@ -127,20 +127,20 @@ typedef struct {
     bool supports_bracketed_paste;
     bool supports_unicode;
 
-    /* Terminal dimensions */
+    // Terminal dimensions
     int terminal_cols; /**< Terminal width in columns */
     int terminal_rows; /**< Terminal height in rows */
 
-    /* Multiplexer detection */
+    // Multiplexer detection
     lle_multiplexer_type_t multiplexer_type;
 
-    /* Terminal classification */
+    // Terminal classification
     const lle_terminal_signature_t *matched_signature;
     lle_capability_level_t capability_level;
     lle_adaptive_mode_t recommended_mode;
     bool detection_confidence_high;
 
-    /* Timing and performance */
+    // Timing and performance
     uint64_t detection_time_us;
     bool probing_successful;
 } lle_terminal_detection_result_t;
@@ -162,7 +162,7 @@ typedef struct {
  * ============================================================================
  */
 
-/* Opaque types - defined in implementation files */
+// Opaque types - defined in implementation files
 typedef struct lle_native_controller_t lle_native_controller_t;
 typedef struct lle_display_client_controller_t lle_display_client_controller_t;
 typedef struct lle_multiplexer_controller_t lle_multiplexer_controller_t;
@@ -184,7 +184,7 @@ typedef struct {
     lle_adaptive_mode_t mode;
     lle_terminal_detection_result_t *detection_result;
 
-    /* Control method implementations (mode-specific) */
+    // Control method implementations (mode-specific)
     union {
         lle_native_controller_t *native;
         lle_display_client_controller_t *display_client;
@@ -192,20 +192,20 @@ typedef struct {
         lle_minimal_controller_t *minimal;
     } controller;
 
-    /* Common systems (available in all modes) */
-    void *buffer;          /* lle_buffer_t - avoid circular dependency */
-    void *history;         /* lle_history_core_t */
-    void *completion;      /* lle_completion_system_t */
-    void *input_processor; /* lle_input_processor_t */
+    // Common systems (available in all modes)
+    void *buffer;          /**< lle_buffer_t - avoid circular dependency */
+    void *history;         /**< lle_history_core_t */
+    void *completion;      /**< lle_completion_system_t */
+    void *input_processor; /**< lle_input_processor_t */
 
-    /* Integration with Lush systems */
+    // Integration with Lush systems
     lush_memory_pool_t *memory_pool;
-    void *display_context; /* lush_display_context_t */
+    void *display_context; /**< lush_display_context_t */
 
-    /* Performance monitoring */
+    // Performance monitoring
     lle_performance_monitor_t *performance_monitor;
 
-    /* Health status */
+    // Health status
     bool healthy;
     uint32_t error_count;
     uint64_t last_health_check_us;
@@ -222,7 +222,7 @@ typedef struct {
 typedef struct {
     lle_adaptive_context_t *adaptive_context;
 
-    /* Unified operation interface */
+    // Unified operation interface
     lle_result_t (*read_line)(lle_adaptive_context_t *ctx, const char *prompt,
                               char **line);
 
@@ -559,4 +559,4 @@ void lle_terminal_detection_cache_cleanup(void);
 }
 #endif
 
-#endif /* LLE_ADAPTIVE_TERMINAL_INTEGRATION_H */
+#endif // LLE_ADAPTIVE_TERMINAL_INTEGRATION_H

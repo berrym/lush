@@ -216,4 +216,4 @@ lle_menu_renderer_estimate_size(const lle_completion_menu_state_t *state,
 }
 #endif
 
-#endif /* LLE_COMPLETION_MENU_RENDERER_H */
+#endif // LLE_COMPLETION_MENU_RENDERER_H

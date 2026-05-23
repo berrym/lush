@@ -59,7 +59,7 @@ extern "C" {
 
 // Composition content limits
 #define COMPOSITION_ENGINE_MAX_OUTPUT_SIZE                                     \
-    65536 /* Increased for complex prompts */
+    65536 // Increased for complex prompts
 #define COMPOSITION_ENGINE_MAX_LINES 64
 #define COMPOSITION_ENGINE_MAX_LINE_WIDTH 1024
 

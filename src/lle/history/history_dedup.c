@@ -36,23 +36,23 @@
  * Deduplication engine state
  */
 struct lle_history_dedup_engine {
-    lle_history_dedup_strategy_t strategy; /* Active strategy */
-    lle_history_dedup_scope_t scope;       /* Dedup scope (how far to scan) */
-    lle_history_core_t *history_core;      /* Reference to history core */
+    lle_history_dedup_strategy_t strategy; /**< Active strategy */
+    lle_history_dedup_scope_t scope;       /**< Dedup scope (how far to scan) */
+    lle_history_core_t *history_core;      /**< Reference to history core */
 
-    /* Statistics */
-    uint64_t duplicates_detected; /* Total duplicates found */
-    uint64_t duplicates_merged;   /* Total duplicates merged */
-    uint64_t duplicates_ignored;  /* Total duplicates ignored */
+    // Statistics
+    uint64_t duplicates_detected; /**< Total duplicates found */
+    uint64_t duplicates_merged;   /**< Total duplicates merged */
+    uint64_t duplicates_ignored;  /**< Total duplicates ignored */
 
-    /* Performance tracking */
-    lle_performance_monitor_t *perf_monitor; /* Performance monitor */
+    // Performance tracking
+    lle_performance_monitor_t *perf_monitor; /**< Performance monitor */
 
-    /* Configuration */
-    bool case_sensitive;    /* Case-sensitive comparison */
-    bool trim_whitespace;   /* Trim whitespace before compare */
-    bool merge_forensics;   /* Merge forensic metadata */
-    bool unicode_normalize; /* Use Unicode NFC normalization */
+    // Configuration
+    bool case_sensitive;    /**< Case-sensitive comparison */
+    bool trim_whitespace;   /**< Trim whitespace before compare */
+    bool merge_forensics;   /**< Merge forensic metadata */
+    bool unicode_normalize; /**< Use Unicode NFC normalization */
 };
 
 /* ============================================================================
@@ -82,21 +82,20 @@ static lle_result_t normalize_command(const lle_history_dedup_engine_t *dedup,
 
     const char *src = command;
     char *dst = normalized;
-    size_t remaining =
-        normalized_size - 1; /* Reserve space for null terminator */
+    size_t remaining = normalized_size - 1; // Reserve space for null terminator
 
-    /* Trim leading whitespace if configured */
+    // Trim leading whitespace if configured
     if (dedup->trim_whitespace) {
         while (*src && (*src == ' ' || *src == '\t')) {
             src++;
         }
     }
 
-    /* Copy and optionally convert case */
+    // Copy and optionally convert case
     while (*src && remaining > 0) {
         char c = *src++;
 
-        /* Convert to lowercase if case-insensitive */
+        // Convert to lowercase if case-insensitive
         if (!dedup->case_sensitive && c >= 'A' && c <= 'Z') {
             c = c - 'A' + 'a';
         }
@@ -105,7 +104,7 @@ static lle_result_t normalize_command(const lle_history_dedup_engine_t *dedup,
         remaining--;
     }
 
-    /* Trim trailing whitespace if configured */
+    // Trim trailing whitespace if configured
     if (dedup->trim_whitespace) {
         while (dst > normalized && (dst[-1] == ' ' || dst[-1] == '\t')) {
             dst--;
@@ -139,12 +138,12 @@ static bool commands_equal(const lle_history_dedup_engine_t *dedup,
         return false;
     }
 
-    /* Fast path: pointer equality */
+    // Fast path: pointer equality
     if (cmd1 == cmd2) {
         return true;
     }
 
-    /* Use Unicode-aware comparison if enabled */
+    // Use Unicode-aware comparison if enabled
     if (dedup->unicode_normalize) {
         lle_unicode_compare_options_t opts = {
             .normalize = true,
@@ -197,22 +196,22 @@ merge_forensic_metadata(lle_history_entry_t *new_entry,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Merge usage counts */
+    // Merge usage counts
     new_entry->usage_count += old_entry->usage_count;
 
-    /* Keep earliest start time (when command was first used) */
+    // Keep earliest start time (when command was first used)
     if (old_entry->start_time_ns > 0 &&
         (new_entry->start_time_ns == 0 ||
          old_entry->start_time_ns < new_entry->start_time_ns)) {
         new_entry->start_time_ns = old_entry->start_time_ns;
     }
 
-    /* Keep most recent access time */
+    // Keep most recent access time
     if (old_entry->last_access_time > new_entry->last_access_time) {
         new_entry->last_access_time = old_entry->last_access_time;
     }
 
-    /* Accumulate total execution time for duration tracking */
+    // Accumulate total execution time for duration tracking
     if (old_entry->end_time_ns > 0 && old_entry->start_time_ns > 0) {
         uint64_t old_duration_ns =
             old_entry->end_time_ns - old_entry->start_time_ns;
@@ -222,7 +221,7 @@ merge_forensic_metadata(lle_history_entry_t *new_entry,
             new_duration_ns = new_entry->end_time_ns - new_entry->start_time_ns;
         }
 
-        /* Store combined duration in duration_ms field (convert to ms) */
+        // Store combined duration in duration_ms field (convert to ms)
         uint64_t total_duration_ms =
             (old_duration_ns + new_duration_ns) / 1000000;
         if (total_duration_ms > UINT32_MAX) {
@@ -267,7 +266,7 @@ lle_result_t lle_history_dedup_create(lle_history_dedup_engine_t **dedup,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize engine */
+    // Initialize engine
     engine->strategy = strategy;
     engine->scope = scope;
     engine->history_core = history_core;
@@ -276,12 +275,12 @@ lle_result_t lle_history_dedup_create(lle_history_dedup_engine_t **dedup,
     engine->duplicates_ignored = 0;
     engine->perf_monitor = NULL;
 
-    /* Default configuration */
+    // Default configuration
     engine->case_sensitive = true;
     engine->trim_whitespace = true;
     engine->merge_forensics = true;
     engine->unicode_normalize =
-        true; /* Use Unicode NFC normalization by default */
+        true; // Use Unicode NFC normalization by default
 
     *dedup = engine;
     return LLE_SUCCESS;
@@ -329,12 +328,12 @@ lle_result_t lle_history_dedup_check(lle_history_dedup_engine_t *dedup,
         *duplicate_entry = NULL;
     }
 
-    /* Check dedup scope - if NONE, skip deduplication entirely */
+    // Check dedup scope - if NONE, skip deduplication entirely
     if (dedup->scope == LLE_HISTORY_DEDUP_SCOPE_NONE) {
-        return LLE_ERROR_NOT_FOUND; /* No dedup = no duplicates found */
+        return LLE_ERROR_NOT_FOUND; // No dedup = no duplicates found
     }
 
-    /* Get history entries (we need to scan backwards from most recent) */
+    // Get history entries (we need to scan backwards from most recent)
     lle_history_core_t *core = dedup->history_core;
     if (!core) {
         return LLE_ERROR_INVALID_STATE;
@@ -363,24 +362,24 @@ lle_result_t lle_history_dedup_check(lle_history_dedup_engine_t *dedup,
         check_limit = (entry_count > 1000) ? 1000 : entry_count;
         break;
     case LLE_HISTORY_DEDUP_SCOPE_RECENT:
-        /* Recent scope: check last 100 entries (the original behavior) */
+        // Recent scope: check last 100 entries (the original behavior)
         check_limit = (entry_count > 100) ? 100 : entry_count;
         break;
     case LLE_HISTORY_DEDUP_SCOPE_GLOBAL:
-        /* Global scope: check entire history */
+        // Global scope: check entire history
         check_limit = entry_count;
         break;
     default:
-        /* Fallback to recent behavior */
+        // Fallback to recent behavior
         check_limit = (entry_count > 100) ? 100 : entry_count;
         break;
     }
 
     for (size_t i = entry_count; i > entry_count - check_limit && i > 0; i--) {
-        /* Direct array access - safe because caller holds lock */
+        // Direct array access - safe because caller holds lock
         size_t index = i - 1;
         if (index >= entry_count) {
-            continue; /* Safety check */
+            continue; // Safety check
         }
 
         lle_history_entry_t *entry = core->entries[index];
@@ -388,12 +387,12 @@ lle_result_t lle_history_dedup_check(lle_history_dedup_engine_t *dedup,
             continue;
         }
 
-        /* Skip deleted/archived entries */
+        // Skip deleted/archived entries
         if (entry->state != LLE_HISTORY_STATE_ACTIVE) {
             continue;
         }
 
-        /* Compare commands */
+        // Compare commands
         if (commands_equal(dedup, new_entry->command, entry->command)) {
             dedup->duplicates_detected++;
 
@@ -401,11 +400,11 @@ lle_result_t lle_history_dedup_check(lle_history_dedup_engine_t *dedup,
                 *duplicate_entry = entry;
             }
 
-            return LLE_SUCCESS; /* Duplicate found */
+            return LLE_SUCCESS; // Duplicate found
         }
     }
 
-    return LLE_ERROR_NOT_FOUND; /* Not a duplicate */
+    return LLE_ERROR_NOT_FOUND; // Not a duplicate
 }
 
 /**
@@ -427,12 +426,12 @@ lle_result_t lle_history_dedup_merge(lle_history_dedup_engine_t *dedup,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Verify they're actually duplicates */
+    // Verify they're actually duplicates
     if (!commands_equal(dedup, keep_entry->command, discard_entry->command)) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Merge forensic metadata if enabled */
+    // Merge forensic metadata if enabled
     if (dedup->merge_forensics) {
         lle_result_t result =
             merge_forensic_metadata(keep_entry, discard_entry);
@@ -441,7 +440,7 @@ lle_result_t lle_history_dedup_merge(lle_history_dedup_engine_t *dedup,
         }
     }
 
-    /* Mark discard entry as deleted */
+    // Mark discard entry as deleted
     discard_entry->state = LLE_HISTORY_STATE_DELETED;
 
     dedup->duplicates_merged++;
@@ -471,29 +470,29 @@ lle_result_t lle_history_dedup_apply(lle_history_dedup_engine_t *dedup,
         *entry_rejected = false;
     }
 
-    /* KEEP_ALL strategy: no deduplication */
+    // KEEP_ALL strategy: no deduplication
     if (dedup->strategy == LLE_DEDUP_KEEP_ALL) {
         return LLE_SUCCESS;
     }
 
-    /* Check for duplicates */
+    // Check for duplicates
     lle_history_entry_t *duplicate = NULL;
     lle_result_t result = lle_history_dedup_check(dedup, new_entry, &duplicate);
 
     if (result == LLE_ERROR_NOT_FOUND) {
-        /* Not a duplicate - accept entry */
+        // Not a duplicate - accept entry
         return LLE_SUCCESS;
     }
 
     if (result != LLE_SUCCESS) {
-        /* Error during check */
+        // Error during check
         return result;
     }
 
-    /* Found duplicate - apply strategy */
+    // Found duplicate - apply strategy
     switch (dedup->strategy) {
     case LLE_DEDUP_IGNORE:
-        /* Reject new entry, keep old one */
+        // Reject new entry, keep old one
         dedup->duplicates_ignored++;
         if (entry_rejected) {
             *entry_rejected = true;
@@ -501,7 +500,7 @@ lle_result_t lle_history_dedup_apply(lle_history_dedup_engine_t *dedup,
         return LLE_SUCCESS;
 
     case LLE_DEDUP_KEEP_RECENT:
-        /* Keep new entry (more recent), mark old as deleted */
+        // Keep new entry (more recent), mark old as deleted
         if (duplicate) {
             result = lle_history_dedup_merge(dedup, new_entry, duplicate);
             if (result != LLE_SUCCESS) {
@@ -511,9 +510,9 @@ lle_result_t lle_history_dedup_apply(lle_history_dedup_engine_t *dedup,
         return LLE_SUCCESS;
 
     case LLE_DEDUP_KEEP_FREQUENT:
-        /* Keep entry with higher usage count */
+        // Keep entry with higher usage count
         if (duplicate && duplicate->usage_count >= new_entry->usage_count) {
-            /* Old entry is more frequent - reject new one */
+            // Old entry is more frequent - reject new one
             if (dedup->merge_forensics) {
                 merge_forensic_metadata(duplicate, new_entry);
             }
@@ -522,7 +521,7 @@ lle_result_t lle_history_dedup_apply(lle_history_dedup_engine_t *dedup,
                 *entry_rejected = true;
             }
         } else if (duplicate) {
-            /* New entry is more frequent - keep it, discard old */
+            // New entry is more frequent - keep it, discard old
             result = lle_history_dedup_merge(dedup, new_entry, duplicate);
             if (result != LLE_SUCCESS) {
                 return result;
@@ -531,7 +530,7 @@ lle_result_t lle_history_dedup_apply(lle_history_dedup_engine_t *dedup,
         return LLE_SUCCESS;
 
     case LLE_DEDUP_MERGE_METADATA:
-        /* Merge metadata into existing entry, reject new entry */
+        // Merge metadata into existing entry, reject new entry
         if (duplicate) {
             if (dedup->merge_forensics) {
                 merge_forensic_metadata(duplicate, new_entry);
@@ -544,11 +543,11 @@ lle_result_t lle_history_dedup_apply(lle_history_dedup_engine_t *dedup,
         return LLE_SUCCESS;
 
     case LLE_DEDUP_KEEP_ALL:
-        /* Already handled above */
+        // Already handled above
         return LLE_SUCCESS;
     }
 
-    return LLE_ERROR_INVALID_PARAMETER; /* Invalid strategy */
+    return LLE_ERROR_INVALID_PARAMETER; // Invalid strategy
 }
 
 /**
@@ -577,7 +576,7 @@ lle_result_t lle_history_dedup_cleanup(lle_history_dedup_engine_t *dedup,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Get all entries and remove those marked as deleted */
+    // Get all entries and remove those marked as deleted
     size_t entry_count = 0;
     lle_result_t result = lle_history_get_entry_count(core, &entry_count);
     if (result != LLE_SUCCESS) {
@@ -627,7 +626,7 @@ lle_history_dedup_set_strategy(lle_history_dedup_engine_t *dedup,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Validate strategy */
+    // Validate strategy
     if (strategy < LLE_DEDUP_IGNORE || strategy > LLE_DEDUP_KEEP_ALL) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
@@ -737,7 +736,7 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
         *duplicates_removed = 0;
     }
 
-    /* KEEP_ALL strategy means no deduplication */
+    // KEEP_ALL strategy means no deduplication
     if (dedup->strategy == LLE_DEDUP_KEEP_ALL) {
         return LLE_SUCCESS;
     }
@@ -749,7 +748,7 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
 
     size_t entry_count = core->entry_count;
     if (entry_count < 2) {
-        return LLE_SUCCESS; /* Nothing to deduplicate */
+        return LLE_SUCCESS; // Nothing to deduplicate
     }
 
     size_t removed = 0;
@@ -764,16 +763,16 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
             continue;
         }
 
-        /* Check against all later entries for duplicates */
+        // Check against all later entries for duplicates
         for (size_t j = i + 1; j < entry_count; j++) {
             lle_history_entry_t *entry_j = core->entries[j];
             if (!entry_j || entry_j->state != LLE_HISTORY_STATE_ACTIVE) {
                 continue;
             }
 
-            /* Check if commands are equal */
+            // Check if commands are equal
             if (commands_equal(dedup, entry_i->command, entry_j->command)) {
-                /* Found a duplicate - decide which to keep based on strategy */
+                // Found a duplicate - decide which to keep based on strategy
                 lle_history_entry_t *keep = NULL;
                 lle_history_entry_t *discard = NULL;
 
@@ -788,7 +787,7 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
                     break;
 
                 case LLE_DEDUP_KEEP_FREQUENT:
-                    /* Keep entry with higher usage count */
+                    // Keep entry with higher usage count
                     if (entry_i->usage_count > entry_j->usage_count) {
                         keep = entry_i;
                         discard = entry_j;
@@ -799,16 +798,16 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
                     break;
 
                 case LLE_DEDUP_KEEP_ALL:
-                    /* Should not reach here - handled above */
+                    // Should not reach here - handled above
                     continue;
                 }
 
-                /* Merge forensic metadata if enabled */
+                // Merge forensic metadata if enabled
                 if (dedup->merge_forensics && keep && discard) {
                     merge_forensic_metadata(keep, discard);
                 }
 
-                /* Mark the discard entry as deleted */
+                // Mark the discard entry as deleted
                 if (discard) {
                     discard->state = LLE_HISTORY_STATE_DELETED;
                     removed++;

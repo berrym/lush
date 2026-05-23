@@ -17,7 +17,7 @@
 #include <string.h>
 #include <time.h>
 
-/* Include display headers */
+// Include display headers
 #include "display/command_layer.h"
 #include "display/layer_events.h"
 #include "test_framework.h"
@@ -28,14 +28,14 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * HELPER FUNCTIONS
  * ============================================================================
  */
 
-/* Create a fully initialized command layer with event system */
+// Create a fully initialized command layer with event system
 static command_layer_t *
 create_initialized_layer(layer_event_system_t **events_out) {
     layer_event_system_t *events = layer_events_create(NULL);
@@ -81,11 +81,11 @@ TEST(command_layer_create_destroy) {
     ASSERT_NOT_NULL(layer, "command_layer_create should succeed");
 
     command_layer_destroy(layer);
-    /* Should not crash */
+    // Should not crash
 }
 
 TEST(command_layer_destroy_null) {
-    /* Should not crash with NULL */
+    // Should not crash with NULL
     command_layer_destroy(NULL);
 }
 
@@ -142,13 +142,13 @@ TEST(command_layer_cursor_position) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Set command with cursor at position 5 */
+    // Set command with cursor at position 5
     command_layer_error_t err =
         command_layer_set_command(layer, "echo hello", 5);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS,
               "set_command with cursor should succeed");
 
-    /* Update cursor position */
+    // Update cursor position
     err = command_layer_set_cursor_position(layer, 8);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "set_cursor_position should succeed");
 
@@ -210,14 +210,14 @@ TEST(command_layer_syntax_command) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Commands like 'ls', 'echo' should be highlighted */
+    // Commands like 'ls', 'echo' should be highlighted
     command_layer_set_command(layer, "ls -la", 0);
     command_layer_update(layer);
 
     char buffer[1024];
     command_layer_get_highlighted_text(layer, buffer, sizeof(buffer));
 
-    /* Buffer should contain output */
+    // Buffer should contain output
     ASSERT(strlen(buffer) >= 6, "Highlighted output should not be empty");
 
     destroy_initialized_layer(layer, events);
@@ -303,7 +303,7 @@ TEST(command_layer_syntax_keyword) {
  * ============================================================================
  */
 
-/* Test callback for events */
+// Test callback for events
 static int test_event_callback_count = 0;
 static layer_events_error_t test_event_callback(const layer_event_t *event,
                                                 void *user_data) {
@@ -322,7 +322,7 @@ TEST(layer_events_create_destroy) {
 
 TEST(layer_events_destroy_null) {
     layer_events_destroy(NULL);
-    /* Should not crash */
+    // Should not crash
 }
 
 TEST(layer_events_init) {
@@ -399,7 +399,7 @@ TEST(layer_events_publish_simple) {
         LAYER_ID_COMMAND_LAYER, LAYER_EVENT_PRIORITY_NORMAL);
     ASSERT_EQ(err, LAYER_EVENTS_SUCCESS, "publish_simple should succeed");
 
-    /* Process pending events */
+    // Process pending events
     layer_events_process_pending(events, 0, 100);
 
     layer_events_destroy(events);
@@ -435,9 +435,9 @@ TEST(layer_events_has_pending) {
     ASSERT_NOT_NULL(events, "layer_events_create should succeed");
     layer_events_init(events);
 
-    /* Initially no pending events */
+    // Initially no pending events
     bool has_pending = layer_events_has_pending(events);
-    /* May or may not have pending depending on init */
+    // May or may not have pending depending on init
 
     layer_events_publish_simple(events, LAYER_EVENT_CONTENT_CHANGED,
                                 LAYER_ID_PROMPT_LAYER, 0,
@@ -455,7 +455,7 @@ TEST(layer_events_get_pending_count) {
     layer_events_init(events);
 
     uint32_t count = layer_events_get_pending_count(events);
-    /* Initial count may be 0 or more */
+    // Initial count may be 0 or more
 
     layer_events_publish_simple(events, LAYER_EVENT_CONTENT_CHANGED,
                                 LAYER_ID_PROMPT_LAYER, 0,
@@ -496,7 +496,7 @@ TEST(layer_events_process_priority) {
     ASSERT_NOT_NULL(events, "layer_events_create should succeed");
     layer_events_init(events);
 
-    /* Publish events with different priorities */
+    // Publish events with different priorities
     layer_events_publish_simple(events, LAYER_EVENT_CONTENT_CHANGED,
                                 LAYER_ID_PROMPT_LAYER, 0,
                                 LAYER_EVENT_PRIORITY_LOW);
@@ -504,7 +504,7 @@ TEST(layer_events_process_priority) {
                                 LAYER_ID_PROMPT_LAYER, 0,
                                 LAYER_EVENT_PRIORITY_HIGH);
 
-    /* Process only high priority */
+    // Process only high priority
     int processed =
         layer_events_process_priority(events, LAYER_EVENT_PRIORITY_HIGH, 10);
     ASSERT(processed >= 0, "process_priority should not return negative");
@@ -534,7 +534,7 @@ TEST(layer_events_error_string) {
 
 TEST(layer_events_default_config) {
     layer_events_config_t config = layer_events_create_default_config();
-    /* Config should have reasonable defaults */
+    // Config should have reasonable defaults
     ASSERT(config.max_queue_size > 0, "Queue size should be positive");
     ASSERT(config.max_subscribers > 0, "Max subscribers should be positive");
 }
@@ -545,8 +545,8 @@ TEST(layer_events_statistics) {
     layer_events_init(events);
 
     layer_event_stats_t stats = layer_events_get_statistics(events);
-    /* Stats should be available - verify struct is properly initialized */
-    (void)stats; /* Stats retrieved successfully */
+    // Stats should be available - verify struct is properly initialized
+    (void)stats; // Stats retrieved successfully
 
     layer_events_destroy(events);
 }
@@ -691,7 +691,7 @@ TEST(command_layer_very_long_command) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Build a moderately long command */
+    // Build a moderately long command
     char long_cmd[2048];
     strcpy(long_cmd, "echo ");
     for (int i = 0; i < 50; i++) {
@@ -699,7 +699,7 @@ TEST(command_layer_very_long_command) {
     }
 
     command_layer_error_t err = command_layer_set_command(layer, long_cmd, 0);
-    /* Should handle gracefully */
+    // Should handle gracefully
     ASSERT(err == COMMAND_LAYER_SUCCESS ||
                err == COMMAND_LAYER_ERROR_COMMAND_TOO_LARGE,
            "Long command should be handled");
@@ -712,7 +712,7 @@ TEST(command_layer_unicode) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Unicode in command */
+    // Unicode in command
     command_layer_error_t err =
         command_layer_set_command(layer, "echo 日本語", 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "Unicode should be handled");
@@ -725,7 +725,7 @@ TEST(command_layer_special_chars) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Special shell characters */
+    // Special shell characters
     command_layer_set_command(layer, "echo $HOME && ls || true", 0);
     command_layer_set_command(layer, "cat < input > output 2>&1", 0);
     command_layer_set_command(layer, "echo $(pwd) `date`", 0);
@@ -749,7 +749,7 @@ TEST(command_layer_performance_target) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Measure update time */
+    // Measure update time
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
@@ -766,7 +766,7 @@ TEST(command_layer_performance_target) {
     long avg_ns = elapsed_ns / 100;
     long avg_ms = avg_ns / 1000000;
 
-    /* Target is <5ms per update, allow some slack for test environment */
+    // Target is <5ms per update, allow some slack for test environment
     ASSERT(avg_ms < 50, "Average update time should be reasonable");
 
     destroy_initialized_layer(layer, events);
@@ -780,7 +780,7 @@ TEST(command_layer_performance_target) {
 int main(void) {
     printf("\n=== Display Subsystem Unit Tests ===\n\n");
 
-    /* Command layer lifecycle tests */
+    // Command layer lifecycle tests
     printf("Command Layer Lifecycle:\n");
     RUN_TEST(command_layer_create_destroy);
     RUN_TEST(command_layer_destroy_null);
@@ -793,7 +793,7 @@ int main(void) {
     RUN_TEST(command_layer_get_metrics);
     RUN_TEST(command_layer_clear);
 
-    /* Syntax highlighting tests */
+    // Syntax highlighting tests
     printf("\nSyntax Highlighting:\n");
     RUN_TEST(command_layer_syntax_command);
     RUN_TEST(command_layer_syntax_pipe);
@@ -802,7 +802,7 @@ int main(void) {
     RUN_TEST(command_layer_syntax_string);
     RUN_TEST(command_layer_syntax_keyword);
 
-    /* Layer events tests */
+    // Layer events tests
     printf("\nLayer Events System:\n");
     RUN_TEST(layer_events_create_destroy);
     RUN_TEST(layer_events_destroy_null);
@@ -825,26 +825,26 @@ int main(void) {
     RUN_TEST(layer_events_clear_statistics);
     RUN_TEST(layer_events_debug_enabled);
 
-    /* Completion menu tests */
+    // Completion menu tests
     printf("\nCompletion Menu:\n");
     RUN_TEST(command_layer_completion_menu_set);
     RUN_TEST(command_layer_completion_menu_clear);
     RUN_TEST(command_layer_completion_menu_selection);
     RUN_TEST(command_layer_completion_menu_content);
 
-    /* Multiline tests */
+    // Multiline tests
     printf("\nMultiline Commands:\n");
     RUN_TEST(command_layer_multiline);
     RUN_TEST(command_layer_continuation);
 
-    /* Edge case tests */
+    // Edge case tests
     printf("\nEdge Cases:\n");
     RUN_TEST(command_layer_very_long_command);
     RUN_TEST(command_layer_unicode);
     RUN_TEST(command_layer_special_chars);
     RUN_TEST(command_layer_version);
 
-    /* Performance tests */
+    // Performance tests
     printf("\nPerformance:\n");
     RUN_TEST(command_layer_performance_target);
 

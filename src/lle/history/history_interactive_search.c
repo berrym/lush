@@ -68,7 +68,7 @@ static char *pool_strdup(const char *str) {
  * ============================================================================
  */
 
-/* Note: lle_interactive_search_state_t is already defined in history.h */
+// Note: lle_interactive_search_state_t is already defined in history.h
 
 /**
  * Interactive search session
@@ -77,35 +77,35 @@ static char *pool_strdup(const char *str) {
  * Lives from search initialization until accept/cancel.
  */
 typedef struct {
-    /* Search state */
+    // Search state
     lle_interactive_search_state_t state;
     bool active;
 
-    /* Search query */
+    // Search query
     char query[SEARCH_QUERY_MAX_LEN];
     size_t query_len;
 
-    /* Search results */
+    // Search results
     lle_history_search_results_t *results;
     size_t current_result_index;
 
-    /* History context */
+    // History context
     lle_history_core_t *history_core;
 
-    /* Original state (for cancel) */
+    // Original state (for cancel)
     char *original_line;
     size_t original_cursor_pos;
 
-    /* Display strings */
+    // Display strings
     char prompt_string[SEARCH_PROMPT_MAX_LEN];
 
-    /* Statistics */
+    // Statistics
     uint64_t searches_performed;
     uint64_t total_search_time_us;
 
 } lle_interactive_search_session_t;
 
-/* Global search session (singleton) */
+// Global search session (singleton)
 static lle_interactive_search_session_t g_search_session = {
     .state = LLE_SEARCH_STATE_INACTIVE,
     .active = false,
@@ -183,13 +183,13 @@ static bool perform_search(void) {
         return false;
     }
 
-    /* Clean up previous results */
+    // Clean up previous results
     if (session->results) {
         lle_history_search_results_destroy(session->results);
         session->results = NULL;
     }
 
-    /* Empty query = no search */
+    // Empty query = no search
     if (session->query_len == 0) {
         session->state = LLE_SEARCH_STATE_NO_RESULTS;
         session->current_result_index = 0;
@@ -197,9 +197,9 @@ static bool perform_search(void) {
         return false;
     }
 
-    /* Perform substring search (most useful for interactive search) */
+    // Perform substring search (most useful for interactive search)
     session->results = lle_history_search_substring(
-        session->history_core, session->query, 100 /* max results */
+        session->history_core, session->query, 100 // max results
     );
 
     if (!session->results) {
@@ -208,12 +208,12 @@ static bool perform_search(void) {
         return false;
     }
 
-    /* Update statistics */
+    // Update statistics
     session->searches_performed++;
     session->total_search_time_us +=
         lle_history_search_results_get_time_us(session->results);
 
-    /* Check if we found any results */
+    // Check if we found any results
     size_t result_count =
         lle_history_search_results_get_count(session->results);
     if (result_count == 0) {
@@ -223,10 +223,9 @@ static bool perform_search(void) {
         return false;
     }
 
-    /* Success - we have results */
+    // Success - we have results
     session->state = LLE_SEARCH_STATE_ACTIVE;
-    session->current_result_index =
-        0; /* Start with most recent (highest score) */
+    session->current_result_index = 0; // Start with most recent (highest score)
     update_prompt_string();
 
     return true;
@@ -261,7 +260,7 @@ lle_history_interactive_search_init(lle_history_core_t *history_core,
 
     lle_interactive_search_session_t *session = &g_search_session;
 
-    /* If already active, cancel the previous search first */
+    // If already active, cancel the previous search first
     if (session->active) {
         lle_history_interactive_search_cancel();
     }
@@ -276,7 +275,7 @@ lle_history_interactive_search_init(lle_history_core_t *history_core,
         session->results = NULL;
     }
 
-    /* Initialize session */
+    // Initialize session
     session->state = LLE_SEARCH_STATE_ACTIVE;
     session->active = true;
     session->history_core = history_core;
@@ -285,14 +284,14 @@ lle_history_interactive_search_init(lle_history_core_t *history_core,
     session->results = NULL;
     session->current_result_index = 0;
 
-    /* Save original state for cancel */
+    // Save original state for cancel
     if (session->original_line) {
         lle_pool_free(session->original_line);
     }
     session->original_line = current_line ? pool_strdup(current_line) : NULL;
     session->original_cursor_pos = cursor_pos;
 
-    /* Update prompt */
+    // Update prompt
     update_prompt_string();
 
     return LLE_SUCCESS;
@@ -315,17 +314,17 @@ lle_result_t lle_history_interactive_search_update_query(char c) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* Check if we have room for another character */
+    // Check if we have room for another character
     if (session->query_len >= SEARCH_QUERY_MAX_LEN - 1) {
         return LLE_ERROR_BUFFER_OVERFLOW;
     }
 
-    /* Append character to query */
+    // Append character to query
     session->query[session->query_len] = c;
     session->query_len++;
     session->query[session->query_len] = '\0';
 
-    /* Re-run search with updated query */
+    // Re-run search with updated query
     perform_search();
 
     return LLE_SUCCESS;
@@ -343,20 +342,20 @@ lle_result_t lle_history_interactive_search_backspace(void) {
     lle_interactive_search_session_t *session = &g_search_session;
 
     if (!session->active) {
-        /* No active search session */
+        // No active search session
         return LLE_ERROR_INVALID_STATE;
     }
 
     if (session->query_len == 0) {
-        /* Nothing to delete */
+        // Nothing to delete
         return LLE_SUCCESS;
     }
 
-    /* Remove last character */
+    // Remove last character
     session->query_len--;
     session->query[session->query_len] = '\0';
 
-    /* Re-run search with updated query */
+    // Re-run search with updated query
     perform_search();
 
     return LLE_SUCCESS;
@@ -379,7 +378,7 @@ lle_result_t lle_history_interactive_search_next(void) {
     }
 
     if (!session->results || session->state != LLE_SEARCH_STATE_ACTIVE) {
-        /* No results to navigate */
+        // No results to navigate
         return LLE_SUCCESS;
     }
 
@@ -389,10 +388,10 @@ lle_result_t lle_history_interactive_search_next(void) {
         return LLE_SUCCESS;
     }
 
-    /* Move to next result (wrap around) */
+    // Move to next result (wrap around)
     session->current_result_index++;
     if (session->current_result_index >= result_count) {
-        session->current_result_index = 0; /* Wrap to first result */
+        session->current_result_index = 0; // Wrap to first result
     }
 
     return LLE_SUCCESS;
@@ -415,7 +414,7 @@ lle_result_t lle_history_interactive_search_prev(void) {
     }
 
     if (!session->results || session->state != LLE_SEARCH_STATE_ACTIVE) {
-        /* No results to navigate */
+        // No results to navigate
         return LLE_SUCCESS;
     }
 
@@ -425,10 +424,9 @@ lle_result_t lle_history_interactive_search_prev(void) {
         return LLE_SUCCESS;
     }
 
-    /* Move to previous result (wrap around) */
+    // Move to previous result (wrap around)
     if (session->current_result_index == 0) {
-        session->current_result_index =
-            result_count - 1; /* Wrap to last result */
+        session->current_result_index = result_count - 1; // Wrap to last result
     } else {
         session->current_result_index--;
     }
@@ -455,7 +453,7 @@ const char *lle_history_interactive_search_accept(void) {
 
     const char *selected_command = NULL;
 
-    /* Get the currently selected result */
+    // Get the currently selected result
     if (session->results && session->state == LLE_SEARCH_STATE_ACTIVE) {
         size_t result_count =
             lle_history_search_results_get_count(session->results);
@@ -468,14 +466,14 @@ const char *lle_history_interactive_search_accept(void) {
         }
     }
 
-    /* Clean up session but don't free the command yet (caller needs it) */
+    // Clean up session but don't free the command yet (caller needs it)
     if (session->results) {
         /* Note: We return a pointer to command in results, so we can't destroy
          * yet. Caller must copy the string before we destroy results. For now,
          * we'll keep results alive and destroy on next init. */
     }
 
-    /* Mark session as inactive */
+    // Mark session as inactive
     session->active = false;
     session->state = LLE_SEARCH_STATE_INACTIVE;
 
@@ -500,13 +498,13 @@ const char *lle_history_interactive_search_cancel(void) {
 
     const char *original = session->original_line;
 
-    /* Clean up search results */
+    // Clean up search results
     if (session->results) {
         lle_history_search_results_destroy(session->results);
         session->results = NULL;
     }
 
-    /* Mark session as inactive */
+    // Mark session as inactive
     session->active = false;
     session->state = LLE_SEARCH_STATE_INACTIVE;
 

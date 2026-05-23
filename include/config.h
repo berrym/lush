@@ -143,14 +143,14 @@ typedef struct {
  * Contains all configuration settings for the shell.
  */
 typedef struct {
-    /* History settings */
+    // History settings
     bool history_enabled;    /**< Enable command history */
     int history_size;        /**< Maximum history entries */
     bool history_no_dups;    /**< Ignore duplicate entries */
     bool history_timestamps; /**< Record timestamps */
     char *history_file;      /**< History file path */
 
-    /* LLE History Configuration */
+    // LLE History Configuration
     lle_arrow_key_mode_t lle_arrow_key_mode; /**< Arrow key behavior mode */
     bool lle_enable_multiline_navigation;    /**< Enable multiline navigation */
     bool lle_wrap_history_navigation;        /**< Wrap at history ends */
@@ -176,7 +176,7 @@ typedef struct {
     int lle_cache_size;                /**< Cache size */
     bool lle_readline_compatible_mode; /**< Readline compatibility mode */
 
-    /* Completion settings */
+    // Completion settings
     bool completion_enabled;        /**< Enable tab completion */
     bool fuzzy_completion;          /**< Enable fuzzy matching */
     int completion_threshold;       /**< Minimum match score */
@@ -184,14 +184,14 @@ typedef struct {
     bool completion_show_all;       /**< Show all completions */
     bool hints_enabled;             /**< Enable inline hints */
 
-    /* Prompt settings */
+    // Prompt settings
     bool use_theme_prompt;   /**< Use theme system for prompts */
     char *prompt_theme;      /**< Theme name */
     bool git_prompt_enabled; /**< Enable git info in prompt */
     int git_cache_timeout;   /**< Git info cache timeout (seconds) */
     char *prompt_format;     /**< Custom prompt format string */
 
-    /* Theme settings */
+    // Theme settings
     char *theme_name;                  /**< Active theme name */
     bool theme_auto_detect_colors;     /**< Auto-detect color support */
     bool theme_fallback_basic;         /**< Fall back to basic theme */
@@ -206,7 +206,7 @@ typedef struct {
     bool theme_enable_icons;           /**< Enable Unicode icons */
     int theme_color_support_override;  /**< Override detected color support */
 
-    /* Behavior settings */
+    // Behavior settings
     bool auto_cd;            /**< Auto-cd to directories */
     bool spell_correction;   /**< Enable spell correction */
     bool confirm_exit;       /**< Confirm before exit */
@@ -228,7 +228,7 @@ typedef struct {
     int loop_failure_seconds; /**< Min wall-clock seconds streak must last
                                  before tripping */
 
-    /* Auto-correction settings */
+    // Auto-correction settings
     int autocorrect_max_suggestions; /**< Maximum suggestions */
     int autocorrect_threshold;       /**< Minimum similarity threshold */
     bool autocorrect_interactive;    /**< Interactive prompts */
@@ -237,15 +237,15 @@ typedef struct {
     bool autocorrect_external;       /**< Correct external commands */
     bool autocorrect_case_sensitive; /**< Case-sensitive matching */
 
-    /* Color settings */
+    // Color settings
     char *color_scheme;  /**< Active color scheme name */
     bool colors_enabled; /**< Enable colored output */
 
-    /* Advanced settings */
+    // Advanced settings
     bool verbose_errors; /**< Verbose error messages */
     bool debug_mode;     /**< Enable debug mode */
 
-    /* Display system settings */
+    // Display system settings
     bool display_syntax_highlighting;   /**< Enable syntax highlighting */
     bool display_autosuggestions;       /**< Enable autosuggestions */
     bool display_transient_prompt;      /**< Enable transient prompts */
@@ -255,7 +255,7 @@ typedef struct {
     int display_optimization_level;      /**< Optimization level (0-4) */
     bool enhanced_display_mode; /**< Legacy display setting (deprecated) */
 
-    /* Network settings */
+    // Network settings
     bool ssh_completion_enabled;  /**< Enable SSH host completion */
     bool cloud_discovery_enabled; /**< Enable cloud host discovery */
     bool cache_ssh_hosts;         /**< Cache SSH hosts */
@@ -264,10 +264,10 @@ typedef struct {
     bool auto_detect_cloud;       /**< Auto-detect cloud environment */
     int max_completion_hosts;     /**< Maximum hosts for completion */
 
-    /* Script execution control */
+    // Script execution control
     bool script_execution; /**< Enable script execution */
 
-    /* Shell mode settings (Phase 0: Extended Language Support) */
+    // Shell mode settings (Phase 0: Extended Language Support)
     int shell_mode;         /**< Shell mode: 0=posix, 1=bash, 2=zsh, 3=lush */
     bool shell_mode_strict; /**< Disallow runtime mode changes */
 } config_values_t;
@@ -874,4 +874,4 @@ void builtin_config(int argc, char **argv);
 /** @brief Configuration file template for new installations */
 extern const char *CONFIG_FILE_TEMPLATE;
 
-#endif /* CONFIG_H */
+#endif // CONFIG_H

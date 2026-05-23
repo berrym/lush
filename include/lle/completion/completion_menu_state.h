@@ -63,28 +63,28 @@ typedef struct {
 typedef struct {
     lle_completion_result_t *result; /**< Completion result (not owned) */
 
-    /* Navigation state */
+    // Navigation state
     size_t selected_index; /**< Currently selected item (global index) */
     size_t first_visible;  /**< First visible item index (for scrolling) */
     size_t visible_count;  /**< Number of visible items */
     size_t target_column;  /**< Sticky column for UP/DOWN navigation */
 
-    /* Layout state (for multi-column navigation) */
+    // Layout state (for multi-column navigation)
     size_t terminal_width; /**< Current terminal width */
     size_t column_width;   /**< Width of each column */
     size_t num_columns;    /**< Number of columns in layout */
 
-    /* Category tracking */
+    // Category tracking
     size_t *category_positions; /**< Start position of each category */
     size_t category_count;      /**< Number of categories present */
 
-    /* State flags */
+    // State flags
     bool menu_active; /**< Whether menu is currently active */
 
-    /* Configuration */
+    // Configuration
     lle_completion_menu_config_t config; /**< Menu configuration */
 
-    /* Memory pool */
+    // Memory pool
     lle_memory_pool_t *memory_pool; /**< Memory pool for allocations */
 } lle_completion_menu_state_t;
 
@@ -230,4 +230,4 @@ lle_completion_menu_get_num_columns(const lle_completion_menu_state_t *state);
 }
 #endif
 
-#endif /* LLE_COMPLETION_MENU_STATE_H */
+#endif // LLE_COMPLETION_MENU_STATE_H

@@ -20,7 +20,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-/* Forward declarations */
+// Forward declarations
 struct executor;
 typedef struct executor executor_t;
 
@@ -113,7 +113,7 @@ typedef struct debug_context {
     bool profile_enabled;  /**< Profiling enabled */
     bool analysis_enabled; /**< Script analysis enabled */
 
-    /* Execution state */
+    // Execution state
     debug_frame_t *current_frame; /**< Current stack frame */
     int stack_depth;              /**< Current stack depth */
     int step_target_depth;        /**< Single-stepping stops only when
@@ -122,7 +122,7 @@ typedef struct debug_context {
                                        current depth for step-over, and
                                        depth-1 for step-out. */
 
-    /* Execution context preservation (for loop debugging fix) */
+    // Execution context preservation (for loop debugging fix)
     struct {
         bool in_loop;              /**< Currently inside a loop */
         char *loop_variable;       /**< Current loop variable name */
@@ -132,31 +132,31 @@ typedef struct debug_context {
         int loop_body_start_line;  /**< Line number where loop body starts */
     } execution_context;           /**< Execution context for loop debugging */
 
-    /* Breakpoints */
+    // Breakpoints
     breakpoint_t *breakpoints; /**< List of breakpoints */
     int next_breakpoint_id;    /**< Next breakpoint ID to assign */
 
-    /* Profiling */
+    // Profiling
     profile_data_t *profile_data; /**< Profiling data */
     bool timing_enabled;          /**< Timing collection enabled */
 
-    /* Analysis */
+    // Analysis
     analysis_issue_t *analysis_issues; /**< List of analysis issues */
     int issue_count;                   /**< Number of issues found */
 
-    /* Output control */
+    // Output control
     FILE *debug_output;    /**< Debug output stream */
     FILE *profile_output;  /**< Profile output stream */
     FILE *analysis_output; /**< Analysis output stream */
 
-    /* Configuration */
+    // Configuration
     bool show_variables;   /**< Show variable values */
     bool show_stack_trace; /**< Show stack traces */
     bool show_timing;      /**< Show timing information */
     bool highlight_syntax; /**< Syntax highlighting in output */
     int max_stack_depth;   /**< Maximum stack depth to display */
 
-    /* Statistics */
+    // Statistics
     long total_commands;           /**< Total commands executed */
     long total_time_ns;            /**< Total execution time */
     struct timespec session_start; /**< Session start time */
@@ -952,4 +952,4 @@ bool debug_check_breakpoint_with_context(debug_context_t *ctx, const char *file,
                                          int line, executor_t *executor,
                                          node_t *node);
 
-#endif /* DEBUG_H */
+#endif // DEBUG_H

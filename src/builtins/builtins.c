@@ -43,7 +43,7 @@
 #include <time.h>
 #include <unistd.h>
 
-/* bin_set's underlying impl lives in src/posix_opts.c. */
+// bin_set's underlying impl lives in src/posix_opts.c.
 int builtin_set(char **argv);
 
 /* Hash table for remembered command paths. Owned here; bin_hash.c
@@ -82,7 +82,7 @@ typedef struct {
 } path_neg_cache_entry_t;
 
 static path_neg_cache_entry_t path_neg_cache[PATH_NEG_CACHE_SIZE];
-static size_t path_neg_cache_next; /* FIFO insertion index */
+static size_t path_neg_cache_next; // FIFO insertion index
 
 static int64_t timespec_diff_ms(const struct timespec *later,
                                 const struct timespec *earlier) {
@@ -96,11 +96,11 @@ static int64_t timespec_diff_ms(const struct timespec *later,
 static bool path_neg_cache_check(const char *command) {
     int ttl_ms = config.path_negative_cache_ttl_ms;
     if (ttl_ms <= 0) {
-        return false; /* disabled */
+        return false; // disabled
     }
     struct timespec now;
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
-        return false; /* defensive: treat clock failure as "not cached" */
+        return false; // defensive: treat clock failure as "not cached"
     }
     for (size_t i = 0; i < PATH_NEG_CACHE_SIZE; i++) {
         if (!path_neg_cache[i].valid) {
@@ -111,7 +111,7 @@ static bool path_neg_cache_check(const char *command) {
                 ttl_ms) {
                 return true;
             }
-            path_neg_cache[i].valid = false; /* stale */
+            path_neg_cache[i].valid = false; // stale
             return false;
         }
     }
@@ -126,7 +126,7 @@ static void path_neg_cache_insert(const char *command) {
         return;
     }
     if (strlen(command) >= PATH_NEG_CACHE_NAME_MAX) {
-        return; /* too long to cache; PATH walk will retry next time */
+        return; // too long to cache; PATH walk will retry next time
     }
     size_t idx = path_neg_cache_next;
     path_neg_cache_next = (path_neg_cache_next + 1) % PATH_NEG_CACHE_SIZE;
@@ -302,12 +302,12 @@ int is_valid_identifier(const char *name) {
         return 0;
     }
 
-    /* First character must be letter or underscore. */
+    // First character must be letter or underscore.
     if (!isalpha(*name) && *name != '_') {
         return 0;
     }
 
-    /* Subsequent characters must be alphanumeric or underscore. */
+    // Subsequent characters must be alphanumeric or underscore.
     for (const char *p = name + 1; *p; p++) {
         if (!isalnum(*p) && *p != '_') {
             return 0;
@@ -351,7 +351,7 @@ char *find_command_in_path(const char *command) {
         return NULL;
     }
 
-    /* If command contains slash, check if it exists as-is. */
+    // If command contains slash, check if it exists as-is.
     if (strchr(command, '/')) {
         if (access(command, F_OK) == 0) {
             return strdup(command);
@@ -398,7 +398,7 @@ char *find_command_in_path(const char *command) {
     while (path_dir) {
         size_t dir_len = strlen(path_dir);
         size_t cmd_len = strlen(command);
-        char *full_path = malloc(dir_len + cmd_len + 2); /* +'/' + '\0' */
+        char *full_path = malloc(dir_len + cmd_len + 2); // +'/' + '\0'
 
         if (full_path) {
             snprintf(full_path, dir_len + cmd_len + 2, "%s/%s", path_dir,
@@ -427,7 +427,7 @@ char *find_command_in_path(const char *command) {
             ht_strstr_insert(command_hash, command, result);
         }
     } else {
-        /* Populate negative cache so the next call within TTL is O(1). */
+        // Populate negative cache so the next call within TTL is O(1).
         path_neg_cache_insert(command);
     }
     return result;

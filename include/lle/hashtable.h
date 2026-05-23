@@ -25,12 +25,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Include LLE dependencies */
+// Include LLE dependencies
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lle/performance.h"
 
-/* Include libhashtable */
+// Include libhashtable
 #include "ht.h"
 
 /* ============================================================================
@@ -75,28 +75,28 @@ typedef enum {
  * @brief Hashtable configuration structure
  */
 struct lle_hashtable_config {
-    /* Memory management */
+    // Memory management
     lush_memory_pool_t *memory_pool; /**< Lush memory pool */
     bool use_memory_pool;            /**< Enable memory pool integration */
 
-    /* Hash configuration */
+    // Hash configuration
     ht_hash hash_function; /**< Hash function (default: FNV1A) */
     ht_keyeq key_equality; /**< Key comparison function */
     uint64_t hash_seed;    /**< Hash seed (security) */
     bool random_seed;      /**< Use random seed */
 
-    /* Performance tuning */
+    // Performance tuning
     uint32_t initial_capacity; /**< Initial capacity hint */
     double max_load_factor;    /**< Load factor threshold (default: 0.75) */
     uint32_t growth_factor;    /**< Growth factor (default: 2) */
     uint32_t max_capacity;     /**< Maximum capacity limit */
 
-    /* Thread safety */
+    // Thread safety
     bool thread_safe;            /**< Enable thread safety */
     lle_lock_type_t lock_type;   /**< Lock type (rwlock, mutex) */
     bool allow_concurrent_reads; /**< Concurrent read optimization */
 
-    /* Monitoring and debugging */
+    // Monitoring and debugging
     bool performance_monitoring; /**< Enable performance monitoring */
     bool debug_mode;             /**< Debug output enabled */
     const char *hashtable_name;  /**< Name for monitoring/debugging */
@@ -118,29 +118,29 @@ struct lle_hashtable_memory_context {
  * @brief Performance metrics for hashtable operations
  */
 struct lle_hashtable_performance_metrics {
-    /* Operation counts */
+    // Operation counts
     uint64_t insert_operations;    /**< Insert operation count */
     uint64_t lookup_operations;    /**< Lookup operation count */
     uint64_t delete_operations;    /**< Delete operation count */
     uint64_t iteration_operations; /**< Iteration operation count */
 
-    /* Timing statistics (microseconds) */
+    // Timing statistics (microseconds)
     uint64_t total_insert_time_us; /**< Total insert time */
     uint64_t total_lookup_time_us; /**< Total lookup time */
     uint64_t total_delete_time_us; /**< Total delete time */
 
-    /* Performance characteristics */
+    // Performance characteristics
     uint64_t max_insert_time_us; /**< Max insert time */
     uint64_t max_lookup_time_us; /**< Max lookup time */
     uint64_t avg_insert_time_us; /**< Average insert time */
     uint64_t avg_lookup_time_us; /**< Average lookup time */
 
-    /* Hash quality metrics */
+    // Hash quality metrics
     uint64_t collisions;        /**< Collision count */
     uint64_t rehash_operations; /**< Rehash count */
     double load_factor;         /**< Current load factor */
 
-    /* Memory usage */
+    // Memory usage
     size_t current_capacity;   /**< Current capacity */
     size_t used_entries;       /**< Used entry count */
     size_t memory_usage_bytes; /**< Total memory usage */
@@ -393,4 +393,4 @@ lle_result_t lle_hashtable_registry_add(lle_hashtable_registry_t *registry,
 lle_result_t lle_hashtable_registry_remove(lle_hashtable_registry_t *registry,
                                            lle_strstr_hashtable_t *hashtable);
 
-#endif /* LLE_HASHTABLE_H */
+#endif // LLE_HASHTABLE_H

@@ -69,7 +69,7 @@ typedef struct source_location {
 typedef enum shell_error_code {
     SHELL_OK = 0,
 
-    /* Parse errors (1000-1099) */
+    // Parse errors (1000-1099)
     SHELL_ERR_PARSE_BASE = 1000,
     SHELL_ERR_UNEXPECTED_TOKEN,  /**< Got 'X' but expected 'Y' */
     SHELL_ERR_UNEXPECTED_EOF,    /**< Unexpected end of input */
@@ -83,7 +83,7 @@ typedef enum shell_error_code {
     SHELL_ERR_HEREDOC_DELIMITER, /**< Invalid heredoc delimiter */
     SHELL_ERR_PARSE_MAX = 1099,
 
-    /* Runtime errors (1100-1199) */
+    // Runtime errors (1100-1199)
     SHELL_ERR_RUNTIME_BASE = 1100,
     SHELL_ERR_COMMAND_NOT_FOUND,           /**< Command not in PATH */
     SHELL_ERR_PERMISSION_DENIED,           /**< Permission denied */
@@ -122,7 +122,7 @@ typedef enum shell_error_code {
                                    SEMANTICS.md section 3.9 */
     SHELL_ERR_RUNTIME_MAX = 1199,
 
-    /* Builtin errors (1200-1299) */
+    // Builtin errors (1200-1299)
     SHELL_ERR_BUILTIN_BASE = 1200,
     SHELL_ERR_INVALID_OPTION,     /**< Unknown option */
     SHELL_ERR_MISSING_ARGUMENT,   /**< Required argument missing */
@@ -135,7 +135,7 @@ typedef enum shell_error_code {
     SHELL_ERR_TRAP_ERROR,         /**< Invalid trap specification */
     SHELL_ERR_BUILTIN_MAX = 1299,
 
-    /* Expansion errors (1300-1399) */
+    // Expansion errors (1300-1399)
     SHELL_ERR_EXPANSION_BASE = 1300,
     SHELL_ERR_BAD_PATTERN,             /**< Invalid glob pattern */
     SHELL_ERR_NO_MATCH,                /**< No glob matches (with failglob) */
@@ -148,7 +148,7 @@ typedef enum shell_error_code {
                                           check) */
     SHELL_ERR_EXPANSION_MAX = 1399,
 
-    /* System errors (1400-1499) */
+    // System errors (1400-1499)
     SHELL_ERR_SYSTEM_BASE = 1400,
     SHELL_ERR_OUT_OF_MEMORY,  /**< Memory allocation failed */
     SHELL_ERR_IO_ERROR,       /**< I/O error */
@@ -156,7 +156,7 @@ typedef enum shell_error_code {
     SHELL_ERR_RESOURCE_LIMIT, /**< Resource limit exceeded */
     SHELL_ERR_SYSTEM_MAX = 1499,
 
-    /* Internal errors (1500-1599) */
+    // Internal errors (1500-1599)
     SHELL_ERR_INTERNAL_BASE = 1500,
     SHELL_ERR_ASSERTION,             /**< Internal assertion failed */
     SHELL_ERR_STATE_CORRUPTION,      /**< Internal state corruption */
@@ -199,30 +199,30 @@ typedef enum shell_error_severity {
  * - Suggestions for fixing the error
  */
 typedef struct shell_error {
-    /* Core error information */
+    // Core error information
     shell_error_code_t code;         /**< Structured error code */
     shell_error_severity_t severity; /**< Error severity */
     source_location_t location;      /**< Where error occurred */
 
-    /* Error message components */
+    // Error message components
     char *message;    /**< Primary error message */
     char *detail;     /**< Additional detail (optional) */
     char *suggestion; /**< "Did you mean?" suggestion */
 
-    /* Source context for display */
+    // Source context for display
     char *source_line;      /**< The actual source line text */
     size_t highlight_start; /**< Start of error highlight */
     size_t highlight_end;   /**< End of error highlight */
 
-    /* Error chaining */
+    // Error chaining
     struct shell_error *cause; /**< What caused this error */
     struct shell_error *next;  /**< Next error in list (multi-error) */
 
-    /* Execution context stack */
+    // Execution context stack
     char *context_stack[SHELL_ERROR_CONTEXT_MAX];
     size_t context_depth; /**< Number of context frames */
 
-    /* Recovery information */
+    // Recovery information
     bool recoverable; /**< Can execution continue? */
     int exit_status;  /**< Suggested exit status */
 
@@ -247,7 +247,7 @@ typedef struct shell_error_collector {
     size_t max_errors;    /**< Maximum errors before bailout */
     bool has_fatal;       /**< Contains at least one fatal error */
 
-    /* Source buffer for context display */
+    // Source buffer for context display
     const char *source_buffer; /**< Full source for line lookup */
     size_t source_length;      /**< Length of source buffer */
     const char *source_name;   /**< Filename for display */
@@ -480,4 +480,4 @@ void shell_error_push_context(shell_error_t *error, const char *fmt, ...);
     shell_error_create((code), SHELL_SEVERITY_FATAL, SOURCE_LOC_HERE(), (fmt), \
                        ##__VA_ARGS__)
 
-#endif /* SHELL_ERROR_H */
+#endif // SHELL_ERROR_H

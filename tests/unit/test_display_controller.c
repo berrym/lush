@@ -39,7 +39,7 @@
 #define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
 #define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================
  * CREATE/DESTROY TESTS
@@ -49,7 +49,7 @@ static int test_create_returns_non_null(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    /* Should not be initialized yet */
+    // Should not be initialized yet
     ASSERT(!display_controller_is_initialized(dc));
 
     display_controller_destroy(dc);
@@ -60,16 +60,16 @@ static int test_create_initializes_config_defaults(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    /* Check that default config values are set */
-    /* Before init, config should have default values from create */
-    /* We can check this by examining the internal state */
+    // Check that default config values are set
+    // Before init, config should have default values from create
+    // We can check this by examining the internal state
 
     display_controller_destroy(dc);
     return 1;
 }
 
 static int test_destroy_null_safe(void) {
-    /* Should not crash */
+    // Should not crash
     display_controller_destroy(NULL);
     return 1;
 }
@@ -78,7 +78,7 @@ static int test_destroy_uninitialized(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    /* Destroy without init should not crash */
+    // Destroy without init should not crash
     display_controller_destroy(dc);
     return 1;
 }
@@ -117,34 +117,34 @@ static int test_create_default_config_null_param(void) {
 
 static int test_create_default_config_sets_values(void) {
     display_controller_config_t config;
-    memset(&config, 0xff, sizeof(config)); /* Fill with non-zero values */
+    memset(&config, 0xff, sizeof(config)); // Fill with non-zero values
 
     display_controller_error_t result =
         display_controller_create_default_config(&config);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_SUCCESS);
 
-    /* Check that default values are set correctly */
+    // Check that default values are set correctly
     ASSERT_EQ(config.optimization_level, DISPLAY_OPTIMIZATION_STANDARD);
     ASSERT_EQ(config.cache_ttl_ms, DISPLAY_CONTROLLER_DEFAULT_CACHE_TTL_MS);
     ASSERT_EQ(config.performance_monitor_interval_ms,
               DISPLAY_CONTROLLER_DEFAULT_MONITORING_INTERVAL_MS);
     ASSERT_EQ(config.max_cache_entries, 256);
 
-    /* Feature toggles */
+    // Feature toggles
     ASSERT(config.enable_caching);
     ASSERT(config.enable_diff_algorithms);
     ASSERT(config.enable_performance_monitoring);
     ASSERT(config.enable_adaptive_optimization);
     ASSERT(!config.enable_integration_mode);
 
-    /* Threshold configuration */
+    // Threshold configuration
     ASSERT_EQ(config.performance_threshold_ms,
               DISPLAY_CONTROLLER_PERFORMANCE_THRESHOLD_MS);
     ASSERT(config.cache_hit_rate_threshold > 0.0);
     ASSERT_EQ(config.memory_threshold_mb,
               DISPLAY_CONTROLLER_MEMORY_THRESHOLD_MB);
 
-    /* Debug disabled by default */
+    // Debug disabled by default
     ASSERT(!config.enable_debug_logging);
     ASSERT(!config.enable_performance_profiling);
     ASSERT_NULL(config.log_file_path);
@@ -221,11 +221,11 @@ static int test_error_string_buffer_too_small(void) {
 }
 
 static int test_error_string_unknown_error(void) {
-    /* Test with an invalid error code */
+    // Test with an invalid error code
     const char *msg =
         display_controller_error_string((display_controller_error_t)9999);
     ASSERT_NOT_NULL(msg);
-    /* Should return some string even for unknown errors */
+    // Should return some string even for unknown errors
     return 1;
 }
 
@@ -237,7 +237,7 @@ static int test_error_strings_are_different(void) {
     const char *memory = display_controller_error_string(
         DISPLAY_CONTROLLER_ERROR_MEMORY_ALLOCATION);
 
-    /* Different errors should have different descriptions */
+    // Different errors should have different descriptions
     ASSERT(strcmp(success, invalid) != 0);
     ASSERT(strcmp(success, memory) != 0);
     ASSERT(strcmp(invalid, memory) != 0);
@@ -287,7 +287,7 @@ static int test_display_zero_size(void) {
     char output[1024];
     display_controller_error_t result =
         display_controller_display(dc, "prompt", "command", output, 0);
-    /* Should fail because output_size is 0 or not initialized */
+    // Should fail because output_size is 0 or not initialized
     ASSERT(result != DISPLAY_CONTROLLER_SUCCESS);
 
     display_controller_destroy(dc);
@@ -407,7 +407,7 @@ static int test_cleanup_uninitialized_controller(void) {
     display_controller_t *dc = display_controller_create();
     ASSERT_NOT_NULL(dc);
 
-    /* Cleanup uninitialized controller should succeed without crashing */
+    // Cleanup uninitialized controller should succeed without crashing
     display_controller_error_t result = display_controller_cleanup(dc);
     ASSERT_EQ(result, DISPLAY_CONTROLLER_SUCCESS);
 
@@ -525,13 +525,13 @@ static int test_check_and_clear_menu_changed_null_controller(void) {
  * ============================================================ */
 
 static int test_update_autosuggestion_null_controller(void) {
-    /* Should not crash */
+    // Should not crash
     display_controller_update_autosuggestion(NULL, "test", 4, 4);
     return 1;
 }
 
 static int test_set_autosuggestion_null_controller(void) {
-    /* Should not crash */
+    // Should not crash
     display_controller_set_autosuggestion(NULL, "suggestion");
     return 1;
 }
@@ -557,13 +557,13 @@ static int test_has_autosuggestion_null_controller(void) {
 }
 
 static int test_clear_autosuggestion_null_controller(void) {
-    /* Should not crash */
+    // Should not crash
     display_controller_clear_autosuggestion(NULL);
     return 1;
 }
 
 static int test_set_autosuggestions_enabled_null_controller(void) {
-    /* Should not crash */
+    // Should not crash
     display_controller_set_autosuggestions_enabled(NULL, true);
     return 1;
 }
@@ -832,20 +832,20 @@ static int test_generate_diagnostic_report_null_buffer(void) {
  * ============================================================ */
 
 static int test_reset_prompt_display_state_no_crash(void) {
-    /* Should not crash even without initialized controller */
+    // Should not crash even without initialized controller
     dc_reset_prompt_display_state();
     return 1;
 }
 
 static int test_finalize_input_no_crash(void) {
-    /* Should not crash even without initialized controller */
-    /* Note: This writes to stdout, so we just verify it doesn't crash */
-    /* dc_finalize_input() would write \n to stdout - skip in test */
+    // Should not crash even without initialized controller
+    // Note: This writes to stdout, so we just verify it doesn't crash
+    // dc_finalize_input() would write \n to stdout - skip in test
     return 1;
 }
 
 static int test_get_prompt_metrics_null_params(void) {
-    /* Should not crash with NULL params */
+    // Should not crash with NULL params
     dc_get_prompt_metrics(NULL, NULL, NULL);
     return 1;
 }
@@ -854,7 +854,7 @@ static int test_get_prompt_metrics_with_params(void) {
     int prompt_lines, total_lines, command_col;
     dc_get_prompt_metrics(&prompt_lines, &total_lines, &command_col);
 
-    /* Without initialization, should return defaults */
+    // Without initialization, should return defaults
     ASSERT(prompt_lines >= 1);
     ASSERT(total_lines >= 1);
 
@@ -872,7 +872,7 @@ static int test_apply_transient_prompt_null_prompt(void) {
  * ============================================================ */
 
 static int test_optimization_level_values(void) {
-    /* Verify enum values are distinct */
+    // Verify enum values are distinct
     ASSERT(DISPLAY_OPTIMIZATION_DISABLED != DISPLAY_OPTIMIZATION_BASIC);
     ASSERT(DISPLAY_OPTIMIZATION_BASIC != DISPLAY_OPTIMIZATION_STANDARD);
     ASSERT(DISPLAY_OPTIMIZATION_STANDARD != DISPLAY_OPTIMIZATION_AGGRESSIVE);
@@ -885,7 +885,7 @@ static int test_optimization_level_values(void) {
  * ============================================================ */
 
 static int test_state_change_values(void) {
-    /* Verify enum values are distinct */
+    // Verify enum values are distinct
     ASSERT(DISPLAY_STATE_UNCHANGED != DISPLAY_STATE_PROMPT_CHANGED);
     ASSERT(DISPLAY_STATE_PROMPT_CHANGED != DISPLAY_STATE_COMMAND_CHANGED);
     ASSERT(DISPLAY_STATE_COMMAND_CHANGED != DISPLAY_STATE_COMPOSITION_CHANGED);
@@ -899,10 +899,10 @@ static int test_state_change_values(void) {
  * ============================================================ */
 
 static int test_error_code_values(void) {
-    /* Verify success is 0 */
+    // Verify success is 0
     ASSERT_EQ((int)DISPLAY_CONTROLLER_SUCCESS, 0);
 
-    /* Verify error codes are distinct from success */
+    // Verify error codes are distinct from success
     ASSERT(DISPLAY_CONTROLLER_ERROR_INVALID_PARAM !=
            DISPLAY_CONTROLLER_SUCCESS);
     ASSERT(DISPLAY_CONTROLLER_ERROR_NULL_POINTER != DISPLAY_CONTROLLER_SUCCESS);
@@ -921,7 +921,7 @@ static int test_error_code_values(void) {
  * ============================================================ */
 
 static int test_symbol_mode_values(void) {
-    /* Verify enum values are distinct */
+    // Verify enum values are distinct
     ASSERT(SYMBOL_MODE_UNICODE != SYMBOL_MODE_ASCII);
     ASSERT(SYMBOL_MODE_ASCII != SYMBOL_MODE_NERD_FONT);
     ASSERT(SYMBOL_MODE_NERD_FONT != SYMBOL_MODE_AUTO);

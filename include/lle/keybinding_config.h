@@ -217,4 +217,4 @@ lle_keybinding_reload_user_config(lle_keybinding_manager_t *manager,
 }
 #endif
 
-#endif /* LLE_KEYBINDING_CONFIG_H */
+#endif // LLE_KEYBINDING_CONFIG_H

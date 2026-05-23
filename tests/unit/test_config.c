@@ -27,7 +27,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-/* Test framework macros */
+// Test framework macros
 
 /* ============================================================================
  * BOOLEAN VALIDATION TESTS
@@ -260,7 +260,7 @@ TEST(validate_shell_mode_invalid) {
  */
 
 TEST(validate_shell_option_valid) {
-    /* Shell options accept boolean values */
+    // Shell options accept boolean values
     ASSERT_TRUE(config_validate_shell_option("true"), "true should be valid");
     ASSERT_TRUE(config_validate_shell_option("false"), "false should be valid");
     ASSERT_TRUE(config_validate_shell_option("1"), "1 should be valid");
@@ -278,7 +278,7 @@ TEST(validate_shell_option_invalid) {
  */
 
 TEST(validate_color_scheme_valid) {
-    /* Color scheme accepts any non-null string */
+    // Color scheme accepts any non-null string
     ASSERT_TRUE(config_validate_color_scheme("default"),
                 "default should be valid");
     ASSERT_TRUE(config_validate_color_scheme("dark"), "dark should be valid");
@@ -303,18 +303,18 @@ TEST(validate_color_valid) {
 TEST(config_init_basic) {
     int result = config_init();
     ASSERT_EQ(result, 0, "config_init should succeed");
-    /* Verify some defaults were set */
+    // Verify some defaults were set
     ASSERT_TRUE(config.history_enabled, "history should be enabled by default");
     ASSERT_TRUE(config.completion_enabled,
                 "completion should be enabled by default");
 }
 
 TEST(config_set_defaults_basic) {
-    /* First init, then set defaults to reset */
+    // First init, then set defaults to reset
     config_init();
     config_set_defaults();
 
-    /* Check default values */
+    // Check default values
     ASSERT_TRUE(config.history_enabled,
                 "history_enabled should default to true");
     ASSERT_EQ(config.history_size, 1000, "history_size should default to 1000");
@@ -331,21 +331,21 @@ TEST(config_set_defaults_basic) {
 TEST(config_set_get_bool) {
     config_init();
 
-    /* Set and get a boolean value */
+    // Set and get a boolean value
     int result = config_set_bool("history.enabled", false);
     ASSERT_EQ(result, 0, "config_set_bool should succeed");
 
     bool value = config_get_bool("history.enabled", true);
     ASSERT_FALSE(value, "config_get_bool should return set value");
 
-    /* Restore */
+    // Restore
     config_set_bool("history.enabled", true);
 }
 
 TEST(config_set_get_int) {
     config_init();
 
-    /* Set and get an integer value */
+    // Set and get an integer value
     int result = config_set_int("history.size", 5000);
     ASSERT_EQ(result, 0, "config_set_int should succeed");
 
@@ -356,7 +356,7 @@ TEST(config_set_get_int) {
 TEST(config_set_get_string) {
     config_init();
 
-    /* Set and get a string value */
+    // Set and get a string value
     int result = config_set_string("prompt.theme", "test_theme");
     ASSERT_EQ(result, 0, "config_set_string should succeed");
 
@@ -368,7 +368,7 @@ TEST(config_set_get_string) {
 TEST(config_get_bool_default) {
     config_init();
 
-    /* Get a non-existent key should return default */
+    // Get a non-existent key should return default
     bool value = config_get_bool("nonexistent.key", true);
     ASSERT_TRUE(value, "should return default for non-existent key");
 
@@ -379,7 +379,7 @@ TEST(config_get_bool_default) {
 TEST(config_get_int_default) {
     config_init();
 
-    /* Get a non-existent key should return default */
+    // Get a non-existent key should return default
     int value = config_get_int("nonexistent.key", 42);
     ASSERT_EQ(value, 42, "should return default for non-existent key");
 }
@@ -387,7 +387,7 @@ TEST(config_get_int_default) {
 TEST(config_get_string_default) {
     config_init();
 
-    /* Get a non-existent key should return default */
+    // Get a non-existent key should return default
     const char *value = config_get_string("nonexistent.key", "default_value");
     ASSERT_STR_EQ(value, "default_value",
                   "should return default for non-existent key");
@@ -401,7 +401,7 @@ TEST(config_get_string_default) {
 TEST(config_set_get_shell_option) {
     config_init();
 
-    /* Set errexit option - API expects "shell." prefix */
+    // Set errexit option - API expects "shell." prefix
     config_set_shell_option("shell.errexit", true);
     bool value = config_get_shell_option("shell.errexit");
     ASSERT_TRUE(value, "errexit should be set");
@@ -443,7 +443,7 @@ TEST(config_get_xdg_dir) {
     int result = config_get_xdg_dir(buffer, sizeof(buffer));
     ASSERT_EQ(result, 0, "config_get_xdg_dir should succeed");
     ASSERT_NOT_NULL(buffer, "buffer should be populated");
-    /* Should contain "lush" */
+    // Should contain "lush"
     ASSERT(strstr(buffer, "lush") != NULL, "XDG dir should contain 'lush'");
 }
 
@@ -451,7 +451,7 @@ TEST(config_get_xdg_config_path) {
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_xdg_config_path(buffer, sizeof(buffer));
     ASSERT_EQ(result, 0, "config_get_xdg_config_path should succeed");
-    /* Should end with lushrc.toml */
+    // Should end with lushrc.toml
     ASSERT(strstr(buffer, "lushrc.toml") != NULL,
            "XDG config path should contain 'lushrc.toml'");
 }
@@ -460,7 +460,7 @@ TEST(config_get_legacy_config_path) {
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_legacy_config_path(buffer, sizeof(buffer));
     ASSERT_EQ(result, 0, "config_get_legacy_config_path should succeed");
-    /* Should end with .lushrc */
+    // Should end with .lushrc
     ASSERT(strstr(buffer, ".lushrc") != NULL,
            "Legacy config path should contain '.lushrc'");
 }
@@ -469,7 +469,7 @@ TEST(config_get_script_config_path) {
     char buffer[CONFIG_PATH_MAX];
     int result = config_get_script_config_path(buffer, sizeof(buffer));
     ASSERT_EQ(result, 0, "config_get_script_config_path should succeed");
-    /* Should contain lushrc (but not .toml) */
+    // Should contain lushrc (but not .toml)
     ASSERT(strstr(buffer, "lush") != NULL,
            "Script config path should contain 'lush'");
 }
@@ -529,7 +529,7 @@ TEST(config_parse_section_keys) {
 
 TEST(config_parse_section_invalid) {
     int result = config_parse_section("invalid_section");
-    /* Should return non-zero for invalid section */
+    // Should return non-zero for invalid section
     ASSERT(result != 0, "parsing invalid section should fail");
 }
 
@@ -540,21 +540,21 @@ TEST(config_parse_section_invalid) {
 
 TEST(config_parse_line_comment) {
     config_init();
-    /* Comment lines should be skipped */
+    // Comment lines should be skipped
     int result = config_parse_line("# This is a comment", 1, "test");
     ASSERT_EQ(result, 0, "comment line should be parsed successfully");
 }
 
 TEST(config_parse_line_empty) {
     config_init();
-    /* Empty lines should be skipped */
+    // Empty lines should be skipped
     int result = config_parse_line("", 1, "test");
     ASSERT_EQ(result, 0, "empty line should be parsed successfully");
 }
 
 TEST(config_parse_line_whitespace) {
     config_init();
-    /* Whitespace-only lines should be skipped */
+    // Whitespace-only lines should be skipped
     int result = config_parse_line("   \t  ", 1, "test");
     ASSERT_EQ(result, 0, "whitespace line should be parsed successfully");
 }
@@ -573,17 +573,17 @@ TEST(config_parse_line_section_header) {
 TEST(config_script_execution_control) {
     config_init();
 
-    /* Enable script execution */
+    // Enable script execution
     config_set_script_execution(true);
     ASSERT_TRUE(config_should_execute_scripts(),
                 "scripts should be executable when enabled");
 
-    /* Disable script execution */
+    // Disable script execution
     config_set_script_execution(false);
     ASSERT_FALSE(config_should_execute_scripts(),
                  "scripts should not be executable when disabled");
 
-    /* Re-enable */
+    // Re-enable
     config_set_script_execution(true);
 }
 
@@ -610,7 +610,7 @@ TEST(config_script_exists_nonexistent) {
 }
 
 TEST(config_script_exists_etc_passwd) {
-    /* /etc/passwd should exist on any Unix system */
+    // /etc/passwd should exist on any Unix system
     bool exists = config_script_exists("/etc/passwd");
     ASSERT_TRUE(exists, "/etc/passwd should exist");
 }
@@ -622,9 +622,9 @@ TEST(config_script_exists_etc_passwd) {
 
 TEST(config_cleanup_basic) {
     config_init();
-    /* Should not crash */
+    // Should not crash
     config_cleanup();
-    /* Re-init for subsequent tests */
+    // Re-init for subsequent tests
     config_init();
 }
 
@@ -636,79 +636,79 @@ TEST(config_cleanup_basic) {
 int main(void) {
     printf("Running Configuration System tests...\n");
 
-    /* Boolean validation */
+    // Boolean validation
     printf("\n=== Boolean Validation Tests ===\n");
     RUN_TEST(validate_bool_true_values);
     RUN_TEST(validate_bool_false_values);
     RUN_TEST(validate_bool_invalid);
 
-    /* Integer validation */
+    // Integer validation
     printf("\n=== Integer Validation Tests ===\n");
     RUN_TEST(validate_int_valid);
     RUN_TEST(validate_int_invalid);
 
-    /* String validation */
+    // String validation
     printf("\n=== String Validation Tests ===\n");
     RUN_TEST(validate_string_valid);
 
-    /* Float validation */
+    // Float validation
     printf("\n=== Float Validation Tests ===\n");
     RUN_TEST(validate_float_valid);
     RUN_TEST(validate_float_invalid);
 
-    /* Path validation */
+    // Path validation
     printf("\n=== Path Validation Tests ===\n");
     RUN_TEST(validate_path_valid);
 
-    /* Optimization level validation */
+    // Optimization level validation
     printf("\n=== Optimization Level Validation Tests ===\n");
     RUN_TEST(validate_optimization_level_valid);
     RUN_TEST(validate_optimization_level_invalid);
 
-    /* LLE arrow mode validation */
+    // LLE arrow mode validation
     printf("\n=== LLE Arrow Mode Validation Tests ===\n");
     RUN_TEST(validate_lle_arrow_mode_valid);
     RUN_TEST(validate_lle_arrow_mode_invalid);
 
-    /* LLE storage mode validation */
+    // LLE storage mode validation
     printf("\n=== LLE Storage Mode Validation Tests ===\n");
     RUN_TEST(validate_lle_storage_mode_valid);
     RUN_TEST(validate_lle_storage_mode_invalid);
 
-    /* LLE dedup scope validation */
+    // LLE dedup scope validation
     printf("\n=== LLE Dedup Scope Validation Tests ===\n");
     RUN_TEST(validate_lle_dedup_scope_valid);
     RUN_TEST(validate_lle_dedup_scope_invalid);
 
-    /* LLE dedup strategy validation */
+    // LLE dedup strategy validation
     printf("\n=== LLE Dedup Strategy Validation Tests ===\n");
     RUN_TEST(validate_lle_dedup_strategy_valid);
     RUN_TEST(validate_lle_dedup_strategy_invalid);
 
-    /* Shell mode validation */
+    // Shell mode validation
     printf("\n=== Shell Mode Validation Tests ===\n");
     RUN_TEST(validate_shell_mode_valid);
     RUN_TEST(validate_shell_mode_invalid);
 
-    /* Shell option validation */
+    // Shell option validation
     printf("\n=== Shell Option Validation Tests ===\n");
     RUN_TEST(validate_shell_option_valid);
     RUN_TEST(validate_shell_option_invalid);
 
-    /* Color scheme validation */
+    // Color scheme validation
     printf("\n=== Color Scheme Validation Tests ===\n");
     RUN_TEST(validate_color_scheme_valid);
 
-    /* Color validation */
+    // Color validation
     printf("\n=== Color Validation Tests ===\n");
     RUN_TEST(validate_color_valid);
 
-    /* Configuration initialization */
+    // Configuration initialization
     printf("\n=== Configuration Initialization Tests ===\n");
     RUN_TEST(config_init_basic);
     RUN_TEST(config_set_defaults_basic);
 
-    /* Configuration getters/setters */
+    // Configuration getters/setters
     printf("\n=== Configuration Getter/Setter Tests ===\n");
     RUN_TEST(config_set_get_bool);
     RUN_TEST(config_set_get_int);
@@ -717,13 +717,13 @@ int main(void) {
     RUN_TEST(config_get_int_default);
     RUN_TEST(config_get_string_default);
 
-    /* Shell option getters/setters */
+    // Shell option getters/setters
     printf("\n=== Shell Option Getter/Setter Tests ===\n");
     RUN_TEST(config_set_get_shell_option);
     RUN_TEST(config_shell_option_nounset);
     RUN_TEST(config_shell_option_xtrace);
 
-    /* Path resolution */
+    // Path resolution
     printf("\n=== Path Resolution Tests ===\n");
     RUN_TEST(config_get_xdg_dir);
     RUN_TEST(config_get_xdg_config_path);
@@ -731,7 +731,7 @@ int main(void) {
     RUN_TEST(config_get_script_config_path);
     RUN_TEST(config_get_system_config_path);
 
-    /* Section parsing */
+    // Section parsing
     printf("\n=== Section Parsing Tests ===\n");
     RUN_TEST(config_parse_section_history);
     RUN_TEST(config_parse_section_completion);
@@ -743,27 +743,27 @@ int main(void) {
     RUN_TEST(config_parse_section_keys);
     RUN_TEST(config_parse_section_invalid);
 
-    /* Line parsing */
+    // Line parsing
     printf("\n=== Line Parsing Tests ===\n");
     RUN_TEST(config_parse_line_comment);
     RUN_TEST(config_parse_line_empty);
     RUN_TEST(config_parse_line_whitespace);
     RUN_TEST(config_parse_line_section_header);
 
-    /* Script execution control */
+    // Script execution control
     printf("\n=== Script Execution Control Tests ===\n");
     RUN_TEST(config_script_execution_control);
 
-    /* Error handling */
+    // Error handling
     printf("\n=== Error Handling Tests ===\n");
-    /* RUN_TEST(config_error_message) removed -- see #71 migration */
+    // RUN_TEST(config_error_message) removed -- see #71 migration
 
-    /* Script path detection */
+    // Script path detection
     printf("\n=== Script Path Detection Tests ===\n");
     RUN_TEST(config_script_exists_nonexistent);
     RUN_TEST(config_script_exists_etc_passwd);
 
-    /* Cleanup */
+    // Cleanup
     printf("\n=== Cleanup Tests ===\n");
     RUN_TEST(config_cleanup_basic);
 

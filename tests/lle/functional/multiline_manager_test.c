@@ -14,10 +14,10 @@
 #include <stdio.h>
 #include <string.h>
 
-/* External global from test_memory_mock.c */
+// External global from test_memory_mock.c
 extern lush_memory_pool_t *global_memory_pool;
 
-/* Test macros */
+// Test macros
 #define TEST(name)                                                             \
     static void name(void);                                                    \
     static void name##_wrapper(void) {                                         \
@@ -84,18 +84,18 @@ TEST(test_multiline_context_lifecycle) {
     lle_multiline_context_t *ctx = NULL;
     lle_result_t result;
 
-    /* Test init */
+    // Test init
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
     ASSERT_NOT_NULL(ctx, "Context created");
     ASSERT_NOT_NULL(ctx->core_state, "Core state allocated");
 
-    /* Verify initial state */
+    // Verify initial state
     ASSERT_TRUE(lle_multiline_is_complete(ctx), "Initially complete");
     ASSERT_FALSE(lle_multiline_needs_continuation(ctx), "No continuation");
     ASSERT_NULL(lle_multiline_get_construct(ctx), "No construct");
 
-    /* Test destroy */
+    // Test destroy
     result = lle_multiline_context_destroy(ctx);
     ASSERT_SUCCESS(result, "Destroy context");
 }
@@ -108,12 +108,12 @@ TEST(test_multiline_context_reset) {
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
 
-    /* Analyze a line that starts a quote */
+    // Analyze a line that starts a quote
     result = lle_multiline_analyze_line(ctx, "echo '", 6);
     ASSERT_SUCCESS(result, "Analyze line");
     ASSERT_FALSE(lle_multiline_is_complete(ctx), "Incomplete after quote");
 
-    /* Reset should clear state */
+    // Reset should clear state
     result = lle_multiline_context_reset(ctx);
     ASSERT_SUCCESS(result, "Reset context");
     ASSERT_TRUE(lle_multiline_is_complete(ctx), "Complete after reset");
@@ -129,7 +129,7 @@ TEST(test_multiline_single_quote) {
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
 
-    /* Start single quote */
+    // Start single quote
     result = lle_multiline_analyze_line(ctx, "echo 'hello", 11);
     ASSERT_SUCCESS(result, "Analyze line");
     ASSERT_FALSE(lle_multiline_is_complete(ctx), "Incomplete");
@@ -137,7 +137,7 @@ TEST(test_multiline_single_quote) {
     ASSERT_STR_EQ(lle_multiline_get_construct(ctx), "single quote",
                   "Construct name");
 
-    /* Complete quote */
+    // Complete quote
     lle_multiline_context_reset(ctx);
     result = lle_multiline_analyze_line(ctx, "echo 'hello'", 12);
     ASSERT_SUCCESS(result, "Analyze complete line");
@@ -155,7 +155,7 @@ TEST(test_multiline_double_quote) {
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
 
-    /* Start double quote */
+    // Start double quote
     result = lle_multiline_analyze_line(ctx, "echo \"hello", 11);
     ASSERT_SUCCESS(result, "Analyze line");
     ASSERT_FALSE(lle_multiline_is_complete(ctx), "Incomplete");
@@ -173,19 +173,19 @@ TEST(test_multiline_if_statement) {
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
 
-    /* Start if statement */
+    // Start if statement
     result = lle_multiline_analyze_line(ctx, "if true; then", 13);
     ASSERT_SUCCESS(result, "Analyze if line");
     ASSERT_FALSE(lle_multiline_is_complete(ctx), "Incomplete");
     ASSERT_STR_EQ(lle_multiline_get_construct(ctx), "if statement",
                   "Construct name");
 
-    /* Add body */
+    // Add body
     result = lle_multiline_analyze_line(ctx, "    echo hello", 14);
     ASSERT_SUCCESS(result, "Analyze body");
     ASSERT_FALSE(lle_multiline_is_complete(ctx), "Still incomplete");
 
-    /* Complete with fi */
+    // Complete with fi
     result = lle_multiline_analyze_line(ctx, "fi", 2);
     ASSERT_SUCCESS(result, "Analyze fi");
     ASSERT_TRUE(lle_multiline_is_complete(ctx), "Complete after fi");
@@ -201,7 +201,7 @@ TEST(test_multiline_backslash_continuation) {
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
 
-    /* Line with backslash continuation */
+    // Line with backslash continuation
     result = lle_multiline_analyze_line(ctx, "echo hello \\", 12);
     ASSERT_SUCCESS(result, "Analyze line with backslash");
     ASSERT_FALSE(lle_multiline_is_complete(ctx), "Incomplete");
@@ -219,11 +219,11 @@ TEST(test_multiline_prompt) {
     result = lle_multiline_context_init(&ctx, global_memory_pool);
     ASSERT_SUCCESS(result, "Init context");
 
-    /* Complete line should have default prompt */
+    // Complete line should have default prompt
     prompt = lle_multiline_get_prompt(ctx);
     ASSERT_NOT_NULL(prompt, "Has prompt");
 
-    /* Quote should have quote prompt */
+    // Quote should have quote prompt
     result = lle_multiline_analyze_line(ctx, "echo '", 6);
     ASSERT_SUCCESS(result, "Analyze quote");
     prompt = lle_multiline_get_prompt(ctx);
@@ -242,16 +242,16 @@ TEST(test_multiline_manager_lifecycle) {
     lle_multiline_manager_t *manager = NULL;
     lle_result_t result;
 
-    /* Test init */
+    // Test init
     result = lle_multiline_manager_init(&manager, global_memory_pool);
     ASSERT_SUCCESS(result, "Init manager");
     ASSERT_NOT_NULL(manager, "Manager created");
 
-    /* Verify initial stats */
+    // Verify initial stats
     ASSERT_TRUE(manager->analysis_count == 0, "Zero analyses");
     ASSERT_TRUE(manager->line_updates == 0, "Zero line updates");
 
-    /* Test destroy */
+    // Test destroy
     result = lle_multiline_manager_destroy(manager);
     ASSERT_SUCCESS(result, "Destroy manager");
 }
@@ -268,15 +268,15 @@ TEST(test_multiline_buffer_analysis_simple) {
     result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Create buffer");
 
-    /* Insert a complete line */
+    // Insert a complete line
     result = lle_buffer_insert_text(buffer, 0, "echo hello", 10);
     ASSERT_SUCCESS(result, "Insert text");
 
-    /* Analyze buffer */
+    // Analyze buffer
     result = lle_multiline_manager_analyze_buffer(manager, buffer);
     ASSERT_SUCCESS(result, "Analyze buffer");
 
-    /* Should be complete */
+    // Should be complete
     ASSERT_FALSE(buffer->multiline_active, "Not multiline active");
     ASSERT_TRUE(manager->analysis_count == 1, "One analysis");
 
@@ -296,15 +296,15 @@ TEST(test_multiline_buffer_analysis_incomplete_quote) {
     result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Create buffer");
 
-    /* Insert incomplete quote */
+    // Insert incomplete quote
     result = lle_buffer_insert_text(buffer, 0, "echo '", 6);
     ASSERT_SUCCESS(result, "Insert text");
 
-    /* Analyze buffer */
+    // Analyze buffer
     result = lle_multiline_manager_analyze_buffer(manager, buffer);
     ASSERT_SUCCESS(result, "Analyze buffer");
 
-    /* Should be incomplete */
+    // Should be incomplete
     ASSERT_TRUE(buffer->multiline_active, "Multiline active");
 
     lle_buffer_destroy(buffer);
@@ -323,16 +323,16 @@ TEST(test_multiline_buffer_analysis_multiline_if) {
     result = lle_buffer_create(&buffer, global_memory_pool, 0);
     ASSERT_SUCCESS(result, "Create buffer");
 
-    /* Insert incomplete if statement (without fi) */
+    // Insert incomplete if statement (without fi)
     result =
         lle_buffer_insert_text(buffer, 0, "if true; then\necho hello\n", 25);
     ASSERT_SUCCESS(result, "Insert multiline if");
 
-    /* Analyze buffer */
+    // Analyze buffer
     result = lle_multiline_manager_analyze_buffer(manager, buffer);
     ASSERT_SUCCESS(result, "Analyze buffer");
 
-    /* Should be incomplete */
+    // Should be incomplete
     ASSERT_TRUE(buffer->multiline_active, "Multiline active for incomplete if");
 
     lle_buffer_destroy(buffer);

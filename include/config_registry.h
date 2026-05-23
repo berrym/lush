@@ -126,7 +126,7 @@ typedef struct creg_section {
     const creg_option_t *options; /**< Array of options in this section */
     size_t option_count;          /**< Number of options */
 
-    /* Lifecycle hooks (all optional) */
+    // Lifecycle hooks (all optional)
     void (*on_load)(void);       /**< Called after section is loaded */
     void (*on_save)(FILE *file); /**< Called during save (for custom output) */
     void (*sync_to_runtime)(void); /**< Apply config values to runtime state */
@@ -525,4 +525,4 @@ bool creg_value_equal(const creg_value_t *a, const creg_value_t *b);
 }
 #endif
 
-#endif /* CONFIG_REGISTRY_H */
+#endif // CONFIG_REGISTRY_H

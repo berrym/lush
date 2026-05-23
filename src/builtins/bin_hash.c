@@ -9,7 +9,7 @@
 #include "builtins.h"
 #include "ht.h"
 
-/* command_hash is owned by src/builtins/builtins.c (registry-side). */
+// command_hash is owned by src/builtins/builtins.c (registry-side).
 extern ht_strstr_t *command_hash;
 
 /**

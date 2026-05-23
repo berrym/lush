@@ -56,4 +56,4 @@ lle_result_t lle_powerline_render(const lle_theme_t *theme,
 }
 #endif
 
-#endif /* LLE_PROMPT_POWERLINE_H */
+#endif // LLE_PROMPT_POWERLINE_H

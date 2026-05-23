@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_edit_cache lle_edit_cache_t;
 typedef struct lle_edit_cache_entry lle_edit_cache_entry_t;
 
@@ -160,4 +160,4 @@ lle_result_t lle_edit_cache_get_default_config(lle_edit_cache_config_t *config);
 }
 #endif
 
-#endif /* LLE_EDIT_CACHE_H */
+#endif // LLE_EDIT_CACHE_H

@@ -18,11 +18,11 @@
 #include <ctype.h>
 #include <string.h>
 
-/* Default configuration values */
+// Default configuration values
 #define DEFAULT_SPACES_PER_LEVEL 2
 #define DEFAULT_MAX_LINE_LENGTH 80
 
-/* Formatting engine implementation */
+// Formatting engine implementation
 struct lle_formatting_engine {
     lle_memory_pool_t *memory_pool;
     lle_structure_analyzer_t *analyzer;
@@ -30,7 +30,7 @@ struct lle_formatting_engine {
     bool active;
 };
 
-/* Forward declarations for internal functions */
+// Forward declarations for internal functions
 static lle_result_t format_compact(lle_formatting_engine_t *engine,
                                    const char *text, size_t length,
                                    char **output, size_t *output_len);
@@ -104,7 +104,7 @@ lle_formatting_engine_get_preset_options(lle_formatting_style_t style,
         break;
 
     case LLE_FORMAT_READABLE:
-        /* Use defaults */
+        // Use defaults
         break;
 
     case LLE_FORMAT_EXPANDED:
@@ -116,7 +116,7 @@ lle_formatting_engine_get_preset_options(lle_formatting_style_t style,
         break;
 
     case LLE_FORMAT_CUSTOM:
-        /* Keep current options */
+        // Keep current options
         break;
     }
 
@@ -177,7 +177,7 @@ lle_result_t lle_formatting_engine_destroy(lle_formatting_engine_t *engine) {
     }
 
     engine->active = false;
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -224,7 +224,7 @@ lle_result_t lle_formatting_engine_normalize(lle_formatting_engine_t *engine,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate output buffer */
+    // Allocate output buffer
     char *output = lle_pool_alloc(command_length + 1);
     if (!output) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -238,7 +238,7 @@ lle_result_t lle_formatting_engine_normalize(lle_formatting_engine_t *engine,
     for (size_t i = 0; i < command_length; i++) {
         char c = command_text[i];
 
-        /* Handle quotes */
+        // Handle quotes
         if (!in_quote && (c == '"' || c == '\'')) {
             in_quote = true;
             quote_char = c;
@@ -253,23 +253,23 @@ lle_result_t lle_formatting_engine_normalize(lle_formatting_engine_t *engine,
             continue;
         }
 
-        /* Don't normalize inside quotes */
+        // Don't normalize inside quotes
         if (in_quote) {
             output[out_pos++] = c;
             last_was_space = false;
             continue;
         }
 
-        /* Normalize whitespace */
+        // Normalize whitespace
         if (engine->options.normalize_spaces && isspace(c)) {
             if (!last_was_space && c != '\n') {
                 output[out_pos++] = ' ';
                 last_was_space = true;
             } else if (c == '\n') {
-                /* Handle trailing whitespace */
+                // Handle trailing whitespace
                 if (engine->options.trim_trailing && out_pos > 0 &&
                     output[out_pos - 1] == ' ') {
-                    out_pos--; /* Remove trailing space */
+                    out_pos--; // Remove trailing space
                 }
                 output[out_pos++] = '\n';
                 last_was_space = false;
@@ -280,7 +280,7 @@ lle_result_t lle_formatting_engine_normalize(lle_formatting_engine_t *engine,
         }
     }
 
-    /* Trim final trailing whitespace */
+    // Trim final trailing whitespace
     if (engine->options.trim_trailing && out_pos > 0) {
         while (out_pos > 0 && isspace(output[out_pos - 1])) {
             out_pos--;
@@ -335,7 +335,7 @@ lle_result_t lle_formatting_engine_apply_style(lle_formatting_engine_t *engine,
         break;
 
     case LLE_FORMAT_CUSTOM:
-        /* Use current options for formatting */
+        // Use current options for formatting
         result = format_readable(engine, command_text, command_length,
                                  formatted_text, formatted_length);
         break;
@@ -363,7 +363,7 @@ lle_result_t lle_formatting_engine_format(lle_formatting_engine_t *engine,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate result structure */
+    // Allocate result structure
     lle_formatted_command_t *formatted =
         lle_pool_alloc(sizeof(lle_formatted_command_t));
     if (!formatted) {
@@ -372,7 +372,7 @@ lle_result_t lle_formatting_engine_format(lle_formatting_engine_t *engine,
 
     memset(formatted, 0, sizeof(lle_formatted_command_t));
 
-    /* Apply formatting according to configured style */
+    // Apply formatting according to configured style
     char *formatted_text = NULL;
     size_t formatted_length = 0;
 
@@ -408,7 +408,7 @@ lle_formatting_engine_free_result(lle_formatting_engine_t *engine,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Memory pool owns all allocations, no explicit frees needed */
+    // Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -430,8 +430,8 @@ lle_formatting_engine_free_result(lle_formatting_engine_t *engine,
 static lle_result_t format_compact(lle_formatting_engine_t *engine,
                                    const char *text, size_t length,
                                    char **output, size_t *output_len) {
-    (void)engine; /* Reserved for engine-specific formatting options */
-    /* Compact format: minimize whitespace */
+    (void)engine; // Reserved for engine-specific formatting options
+    // Compact format: minimize whitespace
     char *result = lle_pool_alloc(length + 1);
     if (!result) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -445,7 +445,7 @@ static lle_result_t format_compact(lle_formatting_engine_t *engine,
     for (size_t i = 0; i < length; i++) {
         char c = text[i];
 
-        /* Handle quotes */
+        // Handle quotes
         if (!in_quote && (c == '"' || c == '\'')) {
             in_quote = true;
             quote_char = c;
@@ -458,14 +458,14 @@ static lle_result_t format_compact(lle_formatting_engine_t *engine,
             result[out_pos++] = c;
             last_was_space = false;
         } else if (c == '\n') {
-            /* Keep newlines but remove preceding spaces */
+            // Keep newlines but remove preceding spaces
             if (out_pos > 0 && result[out_pos - 1] == ' ') {
                 out_pos--;
             }
             result[out_pos++] = '\n';
             last_was_space = false;
         } else if (isspace(c)) {
-            /* Replace multiple spaces with single space */
+            // Replace multiple spaces with single space
             if (!last_was_space && out_pos > 0) {
                 result[out_pos++] = ' ';
                 last_was_space = true;
@@ -495,8 +495,8 @@ static lle_result_t format_compact(lle_formatting_engine_t *engine,
 static lle_result_t format_readable(lle_formatting_engine_t *engine,
                                     const char *text, size_t length,
                                     char **output, size_t *output_len) {
-    /* Readable format: balanced whitespace and indentation */
-    size_t estimated_size = length + (length / 10); /* 10% overhead estimate */
+    // Readable format: balanced whitespace and indentation
+    size_t estimated_size = length + (length / 10); // 10% overhead estimate
     char *result = lle_pool_alloc(estimated_size);
     if (!result) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -510,7 +510,7 @@ static lle_result_t format_readable(lle_formatting_engine_t *engine,
     for (size_t i = 0; i < length; i++) {
         char c = text[i];
 
-        /* Handle quotes */
+        // Handle quotes
         if (!in_quote && (c == '"' || c == '\'')) {
             in_quote = true;
             quote_char = c;
@@ -528,7 +528,7 @@ static lle_result_t format_readable(lle_formatting_engine_t *engine,
                 last_was_space = (c != '\n');
             }
         } else {
-            /* Add space around operators if configured */
+            // Add space around operators if configured
             if (engine->options.space_around_operators) {
                 if (should_add_space_before(c) && out_pos > 0 &&
                     !isspace(result[out_pos - 1])) {
@@ -566,9 +566,8 @@ static lle_result_t format_readable(lle_formatting_engine_t *engine,
 static lle_result_t format_expanded(lle_formatting_engine_t *engine,
                                     const char *text, size_t length,
                                     char **output, size_t *output_len) {
-    /* Expanded format: maximum readability with line breaks */
-    size_t estimated_size =
-        length * 2; /* 100% overhead estimate for expansion */
+    // Expanded format: maximum readability with line breaks
+    size_t estimated_size = length * 2; // 100% overhead estimate for expansion
     char *result = lle_pool_alloc(estimated_size);
     if (!result) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -581,7 +580,7 @@ static lle_result_t format_expanded(lle_formatting_engine_t *engine,
     for (size_t i = 0; i < length; i++) {
         char c = text[i];
 
-        /* Handle quotes */
+        // Handle quotes
         if (!in_quote && (c == '"' || c == '\'')) {
             in_quote = true;
             quote_char = c;
@@ -593,12 +592,12 @@ static lle_result_t format_expanded(lle_formatting_engine_t *engine,
         if (in_quote) {
             result[out_pos++] = c;
         } else if (c == '|' && engine->options.break_pipes) {
-            /* Break pipelines into separate lines */
+            // Break pipelines into separate lines
             result[out_pos++] = ' ';
             result[out_pos++] = '|';
             result[out_pos++] = '\n';
 
-            /* Add indentation for next line */
+            // Add indentation for next line
             for (uint8_t j = 0; j < engine->options.spaces_per_level; j++) {
                 result[out_pos++] = engine->options.indent_char;
             }

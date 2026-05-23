@@ -32,23 +32,23 @@
 #include <stdint.h>
 #include <time.h>
 
-/* LLE Core Dependencies */
+// LLE Core Dependencies
 #include "lle/arena.h"
 #include "lle/buffer_management.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lle/performance.h"
 
-/* Lush Display System Dependencies */
+// Lush Display System Dependencies
 #include "display/display_controller.h"
 
-/* libhashtable Integration (Spec 05) - Use LLE wrapper */
+// libhashtable Integration (Spec 05) - Use LLE wrapper
 #include "lle/hashtable.h"
 
-/* LLE Event System - Use existing event types */
+// LLE Event System - Use existing event types
 #include "lle/event_system.h"
 
-/* LLE Terminal Abstraction - Use existing terminal types */
+// LLE Terminal Abstraction - Use existing terminal types
 #include "lle/terminal_abstraction.h"
 
 #ifdef __cplusplus
@@ -56,50 +56,50 @@ extern "C" {
 #endif
 
 /* ========================================================================== */
-/*                         FORWARD DECLARATIONS                               */
+// FORWARD DECLARATIONS
 /* ========================================================================== */
 
-/* Core integration structures */
+// Core integration structures
 typedef struct lle_display_integration_t lle_display_integration_t;
 typedef struct lle_display_bridge_t lle_display_bridge_t;
 typedef struct lle_render_controller_t lle_render_controller_t;
 typedef struct lle_event_coordinator_t lle_event_coordinator_t;
 
-/* Rendering structures */
+// Rendering structures
 typedef struct lle_render_pipeline_t lle_render_pipeline_t;
 typedef struct lle_buffer_renderer_t lle_buffer_renderer_t;
 typedef struct lle_cursor_renderer_t lle_cursor_renderer_t;
 typedef struct lle_render_output_t lle_render_output_t;
 typedef struct lle_render_context_t lle_render_context_t;
 
-/* Cache structures */
+// Cache structures
 typedef struct lle_display_cache_t lle_display_cache_t;
 typedef struct lle_render_cache_t lle_render_cache_t;
 typedef struct lle_cached_entry_t lle_cached_entry_t;
 typedef struct lle_cache_policy_t lle_display_cache_policy_t;
 
-/* Event structures */
+// Event structures
 typedef struct lle_event_translator_t lle_event_translator_t;
 typedef struct lle_event_router_t lle_event_router_t;
-/* NOTE: lle_event_filter_t is defined in event_system.h */
+// NOTE: lle_event_filter_t is defined in event_system.h
 typedef struct lle_coord_queue_t
-    lle_coord_queue_t; /* Coordinator queue (not core event system) */
+    lle_coord_queue_t; // Coordinator queue (not core event system)
 
-/* Memory structures */
+// Memory structures
 typedef struct lle_display_memory_manager_t lle_display_memory_manager_t;
 typedef struct lle_memory_usage_tracker_t lle_memory_usage_tracker_t;
 
-/* Theme structures */
+// Theme structures
 typedef struct lle_syntax_color_table_t lle_syntax_color_table_t;
 typedef struct lle_cursor_colors_t lle_cursor_colors_t;
 
-/* Terminal structures */
+// Terminal structures
 typedef struct lle_terminal_adapter_t lle_terminal_adapter_t;
-/* NOTE: lle_terminal_capabilities_t is defined in terminal_abstraction.h */
+// NOTE: lle_terminal_capabilities_t is defined in terminal_abstraction.h
 typedef struct lle_compatibility_matrix_t lle_compatibility_matrix_t;
 
 /* ========================================================================== */
-/*                              ENUMERATIONS                                  */
+// ENUMERATIONS
 /* ========================================================================== */
 
 /**
@@ -147,7 +147,7 @@ typedef enum {
  * definition */
 
 /* ========================================================================== */
-/*                      DISPLAY BRIDGE STRUCTURES                             */
+// DISPLAY BRIDGE STRUCTURES
 /* ========================================================================== */
 
 /**
@@ -197,35 +197,35 @@ typedef struct {
  * Coordinates event flow and state synchronization.
  */
 struct lle_display_bridge_t {
-    /* LLE system connections */
+    // LLE system connections
     lle_buffer_t *active_buffer;       /**< Currently active editing buffer */
     lle_cursor_position_t *cursor_pos; /**< Current cursor position */
     void *lle_event_manager;           /**< LLE event system (opaque) */
 
-    /* Lush display connections */
+    // Lush display connections
     void *command_layer; /**< Lush command display layer (opaque) */
     composition_engine_t *composition_engine; /**< Lush composition engine */
     layer_event_system_t *layer_events;       /**< Lush layer event system */
     display_controller_t
         *display_controller; /**< Display controller for terminal info */
 
-    /* Bridge state management */
+    // Bridge state management
     lle_display_sync_state_t sync_state; /**< Synchronization state tracking */
     lle_coord_queue_t *render_queue;     /**< Pending render requests */
     lle_display_diff_t *diff_tracker;    /**< Display change tracking */
 
-    /* Performance optimization */
+    // Performance optimization
     struct timespec last_render_time; /**< Last successful render timestamp */
     uint32_t render_skip_count;       /**< Consecutive skipped renders */
     bool force_full_render;           /**< Force complete redraw flag */
 
-    /* Error handling */
+    // Error handling
     lle_error_context_t *error_context; /**< Bridge error context */
     uint32_t consecutive_errors;        /**< Error tracking for fallback */
 };
 
 /* ========================================================================== */
-/*                      RENDERING SYSTEM STRUCTURES                           */
+// RENDERING SYSTEM STRUCTURES
 /* ========================================================================== */
 
 /**
@@ -261,7 +261,7 @@ struct lle_render_output_t {
     uint64_t render_hash;                /**< Hash of this render output */
     uint64_t timestamp;                  /**< Render timestamp (microseconds) */
 
-    /* Cursor screen position (calculated during rendering) */
+    // Cursor screen position (calculated during rendering)
     size_t cursor_screen_row;    /**< Cursor row (0-based) on screen */
     size_t cursor_screen_column; /**< Cursor column (0-based) on screen */
     bool cursor_position_valid;  /**< True if cursor position was calculated */
@@ -405,7 +405,7 @@ struct lle_render_controller_t {
 };
 
 /* ========================================================================== */
-/*                        CACHE SYSTEM STRUCTURES                             */
+// CACHE SYSTEM STRUCTURES
 /* ========================================================================== */
 
 /**
@@ -477,10 +477,10 @@ struct lle_render_cache_t {
 };
 
 /* ========================================================================== */
-/*                      EVENT COORDINATION STRUCTURES                         */
+// EVENT COORDINATION STRUCTURES
 /* ========================================================================== */
 
-/* NOTE: lle_event_t is defined in event_system.h - using that definition */
+// NOTE: lle_event_t is defined in event_system.h - using that definition
 
 /**
  * @brief Buffer change event
@@ -582,7 +582,7 @@ struct lle_event_coordinator_t {
 };
 
 /* ========================================================================== */
-/*                     MEMORY MANAGEMENT STRUCTURES                           */
+// MEMORY MANAGEMENT STRUCTURES
 /* ========================================================================== */
 
 /**
@@ -661,7 +661,7 @@ struct lle_display_memory_manager_t {
 };
 
 /* ========================================================================== */
-/*                       THEME INTEGRATION STRUCTURES                         */
+// THEME INTEGRATION STRUCTURES
 /* ========================================================================== */
 
 /**
@@ -694,7 +694,7 @@ struct lle_cursor_colors_t {
 };
 
 /* ========================================================================== */
-/*                    TERMINAL COMPATIBILITY STRUCTURES                       */
+// TERMINAL COMPATIBILITY STRUCTURES
 /* ========================================================================== */
 
 /**
@@ -738,7 +738,7 @@ struct lle_terminal_adapter_t {
 };
 
 /* ========================================================================== */
-/*                      MAIN INTEGRATION STRUCTURE                            */
+// MAIN INTEGRATION STRUCTURE
 /* ========================================================================== */
 
 /**
@@ -796,29 +796,29 @@ typedef struct {
  * components and coordinates between LLE and Lush display systems.
  */
 struct lle_display_integration_t {
-    /* Core integration components */
+    // Core integration components
     lle_display_bridge_t *display_bridge; /**< Bridge between LLE and display */
     lle_render_controller_t *render_controller; /**< Rendering coordinator */
     lle_display_cache_t *display_cache;         /**< Display caching system */
     lle_composition_manager_t *comp_manager;    /**< Composition manager */
 
-    /* Lush system integration */
+    // Lush system integration
     display_controller_t *lush_display; /**< Existing Lush display controller */
     void *theme_system;                 /**< Existing theme system (opaque) */
     lle_memory_pool_t *memory_pool;     /**< Lush memory pool */
 
-    /* Performance and coordination */
+    // Performance and coordination
     lle_display_metrics_t *perf_metrics; /**< Display performance monitoring */
     lle_event_coordinator_t
         *event_coordinator;                   /**< Event system coordination */
     lle_terminal_adapter_t *terminal_adapter; /**< Terminal compatibility */
 
-    /* Configuration and state */
+    // Configuration and state
     lle_display_config_t *config; /**< Display integration configuration */
     lle_display_state_t *current_state; /**< Current display state */
     void *render_cache_hashtable; /**< Render result caching (hash table) */
 
-    /* Synchronization and safety */
+    // Synchronization and safety
     pthread_rwlock_t integration_lock; /**< Thread-safe access control */
     bool integration_active;           /**< Integration system status */
     uint64_t frame_counter;            /**< Display frame tracking */
@@ -826,7 +826,7 @@ struct lle_display_integration_t {
 };
 
 /* ========================================================================== */
-/*                       FUNCTION DECLARATIONS                                */
+// FUNCTION DECLARATIONS
 /* ========================================================================== */
 
 /* NOTE: Function implementations will be in Layer 1
@@ -834,7 +834,7 @@ struct lle_display_integration_t {
  * signatures per Layer 0 requirements.
  */
 
-/* Core Integration Functions */
+// Core Integration Functions
 lle_display_integration_t *lle_display_integration_get_global(void);
 lle_result_t
 lle_display_integration_init(lle_display_integration_t **integration,
@@ -843,7 +843,7 @@ lle_display_integration_init(lle_display_integration_t **integration,
 lle_result_t
 lle_display_integration_cleanup(lle_display_integration_t *integration);
 
-/* Display Bridge Functions */
+// Display Bridge Functions
 lle_result_t lle_display_bridge_init(lle_display_bridge_t **bridge,
                                      void *editor,
                                      display_controller_t *display,
@@ -857,7 +857,7 @@ lle_result_t lle_display_create_bridge(lle_display_bridge_t **bridge,
                                        display_controller_t *display,
                                        lle_memory_pool_t *pool);
 
-/* Event Coordinator Functions */
+// Event Coordinator Functions
 lle_result_t lle_event_coordinator_init(lle_event_coordinator_t **coordinator,
                                         void *editor,
                                         display_controller_t *display,
@@ -868,13 +868,13 @@ lle_result_t
 lle_event_coordinator_process_event(lle_event_coordinator_t *coordinator,
                                     lle_event_t *event);
 
-/* Render Controller Functions */
+// Render Controller Functions
 lle_result_t lle_render_controller_init(lle_render_controller_t **controller,
                                         lle_display_bridge_t *bridge,
                                         lle_memory_pool_t *memory_pool);
 lle_result_t lle_render_controller_cleanup(lle_render_controller_t *controller);
 
-/* Rendering Functions */
+// Rendering Functions
 lle_result_t lle_render_buffer_content(lle_render_controller_t *controller,
                                        lle_buffer_t *buffer,
                                        lle_cursor_position_t *cursor,
@@ -885,7 +885,7 @@ lle_result_t lle_render_cursor_position(lle_render_controller_t *controller,
                                         size_t *bytes_written);
 lle_result_t lle_render_output_free(lle_render_output_t *output);
 
-/* Pipeline Functions */
+// Pipeline Functions
 lle_result_t lle_render_pipeline_init(lle_render_pipeline_t **pipeline,
                                       lle_memory_pool_t *memory_pool);
 lle_result_t lle_render_pipeline_cleanup(lle_render_pipeline_t *pipeline);
@@ -893,7 +893,7 @@ lle_result_t lle_render_pipeline_execute(lle_render_pipeline_t *pipeline,
                                          lle_render_context_t *context,
                                          lle_render_output_t **output);
 
-/* Event Sub-Component Functions */
+// Event Sub-Component Functions
 lle_result_t lle_event_translator_init(lle_event_translator_t **translator,
                                        lle_memory_pool_t *memory_pool);
 lle_result_t lle_event_router_init(lle_event_router_t **router,
@@ -905,21 +905,21 @@ lle_result_t lle_coord_queue_init(lle_coord_queue_t **queue,
 lle_result_t lle_event_metrics_init(lle_event_metrics_t **metrics,
                                     lle_memory_pool_t *memory_pool);
 
-/* Event Routing Functions */
+// Event Routing Functions
 lle_result_t lle_event_router_add_route(lle_event_router_t *router,
                                         lle_display_event_type_t event_type,
                                         lle_event_handler_fn handler);
 bool lle_event_filter_should_process(lle_event_filter_t *filter,
                                      lle_event_t *event);
 
-/* Event Handlers */
+// Event Handlers
 lle_result_t
 lle_display_on_buffer_change(lle_display_integration_t *integration,
                              lle_buffer_change_event_t *event);
 lle_result_t lle_display_on_cursor_move(lle_display_integration_t *integration,
                                         lle_cursor_move_event_t *event);
 
-/* Cache Functions (libhashtable integration per Spec 05) */
+// Cache Functions (libhashtable integration per Spec 05)
 lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
                                     lle_memory_pool_t *memory_pool);
 lle_result_t lle_display_cache_cleanup(lle_display_cache_t *cache);
@@ -936,7 +936,7 @@ lle_result_t lle_render_cache_cleanup(lle_render_cache_t *cache);
 uint64_t lle_compute_cache_key(lle_buffer_t *buffer,
                                lle_cursor_position_t *cursor);
 
-/* Terminal Adapter Functions */
+// Terminal Adapter Functions
 lle_result_t lle_terminal_adapter_init(lle_terminal_adapter_t **adapter,
                                        display_controller_t *display_controller,
                                        lle_memory_pool_t *memory_pool);
@@ -953,4 +953,4 @@ bool lle_terminal_adapter_supports_feature(
 }
 #endif
 
-#endif /* LLE_DISPLAY_INTEGRATION_H */
+#endif // LLE_DISPLAY_INTEGRATION_H

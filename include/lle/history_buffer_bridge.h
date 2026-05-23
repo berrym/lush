@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_history_buffer_bridge lle_history_buffer_bridge_t;
 typedef struct lle_history_core lle_history_core_t;
 typedef struct lle_multiline_parser lle_multiline_parser_t;
@@ -161,4 +161,4 @@ lle_history_buffer_bridge_get_default_options(lle_transfer_options_t *options);
 }
 #endif
 
-#endif /* LLE_HISTORY_BUFFER_BRIDGE_H */
+#endif // LLE_HISTORY_BUFFER_BRIDGE_H

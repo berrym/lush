@@ -243,7 +243,7 @@ TEST(display_cache_overwrite_same_key_returns_new_value) {
 }
 
 TEST(display_cache_independent_keys_round_trip_independently) {
-    /* Storing under several distinct keys must not cross-contaminate. */
+    // Storing under several distinct keys must not cross-contaminate.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
 
@@ -356,7 +356,7 @@ TEST(display_cache_invalidate_all_then_restore_works) {
 }
 
 TEST(display_cache_invalidate_all_on_empty_is_safe) {
-    /* No assertions on state — just that the call does not crash. */
+    // No assertions on state — just that the call does not crash.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
     ASSERT_EQ(lle_display_cache_invalidate_all(cache), LLE_SUCCESS,

@@ -42,7 +42,7 @@ lle_result_t lle_widget_hooks_manager_init(lle_widget_hooks_manager_t **manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate manager structure */
+    // Allocate manager structure
     lle_widget_hooks_manager_t *mgr =
         lle_pool_alloc(sizeof(lle_widget_hooks_manager_t));
     if (!mgr) {
@@ -51,13 +51,13 @@ lle_result_t lle_widget_hooks_manager_init(lle_widget_hooks_manager_t **manager,
 
     memset(mgr, 0, sizeof(lle_widget_hooks_manager_t));
 
-    /* Initialize fields */
+    // Initialize fields
     mgr->registry = registry;
     mgr->memory_pool = memory_pool;
     mgr->total_hooks_triggered = 0;
     mgr->hooks_enabled = true;
 
-    /* Initialize hook arrays to NULL */
+    // Initialize hook arrays to NULL
     for (size_t i = 0; i < LLE_HOOK_COUNT; i++) {
         mgr->hooks[i] = NULL;
         mgr->hook_trigger_counts[i] = 0;
@@ -73,7 +73,7 @@ lle_widget_hooks_manager_destroy(lle_widget_hooks_manager_t *manager) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Free all hook registrations */
+    // Free all hook registrations
     for (size_t i = 0; i < LLE_HOOK_COUNT; i++) {
         lle_hook_registration_t *reg = manager->hooks[i];
         while (reg) {
@@ -83,7 +83,7 @@ lle_widget_hooks_manager_destroy(lle_widget_hooks_manager_t *manager) {
         }
     }
 
-    /* Free manager structure */
+    // Free manager structure
     lle_pool_free(manager);
 
     return LLE_SUCCESS;
@@ -105,13 +105,13 @@ lle_result_t lle_widget_hook_register(lle_widget_hooks_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Lookup widget in registry */
+    // Lookup widget in registry
     lle_widget_t *widget = lle_widget_lookup(manager->registry, widget_name);
     if (!widget) {
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Check if widget already registered for this hook */
+    // Check if widget already registered for this hook
     lle_hook_registration_t *existing = manager->hooks[hook_type];
     while (existing) {
         if (existing->widget == widget) {
@@ -120,26 +120,26 @@ lle_result_t lle_widget_hook_register(lle_widget_hooks_manager_t *manager,
         existing = existing->next;
     }
 
-    /* Allocate registration structure */
+    // Allocate registration structure
     lle_hook_registration_t *reg =
         lle_pool_alloc(sizeof(lle_hook_registration_t));
     if (!reg) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Initialize registration */
+    // Initialize registration
     reg->widget = widget;
     reg->hook_type = hook_type;
     reg->trigger_count = 0;
     reg->enabled = true;
     reg->next = NULL;
 
-    /* Add to end of list (maintains registration order) */
+    // Add to end of list (maintains registration order)
     if (!manager->hooks[hook_type]) {
-        /* First registration for this hook */
+        // First registration for this hook
         manager->hooks[hook_type] = reg;
     } else {
-        /* Find end of list */
+        // Find end of list
         lle_hook_registration_t *last = manager->hooks[hook_type];
         while (last->next) {
             last = last->next;
@@ -161,19 +161,19 @@ lle_result_t lle_widget_hook_unregister(lle_widget_hooks_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Lookup widget in registry */
+    // Lookup widget in registry
     lle_widget_t *widget = lle_widget_lookup(manager->registry, widget_name);
     if (!widget) {
         return LLE_ERROR_NOT_FOUND;
     }
 
-    /* Find and remove registration */
+    // Find and remove registration
     lle_hook_registration_t *reg = manager->hooks[hook_type];
     lle_hook_registration_t *prev = NULL;
 
     while (reg) {
         if (reg->widget == widget) {
-            /* Found the registration - remove it */
+            // Found the registration - remove it
             if (prev) {
                 prev->next = reg->next;
             } else {
@@ -202,26 +202,26 @@ lle_result_t lle_widget_hook_trigger(lle_widget_hooks_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Check if hooks are globally enabled */
+    // Check if hooks are globally enabled
     if (!manager->hooks_enabled) {
         return LLE_SUCCESS;
     }
 
-    /* Update statistics */
+    // Update statistics
     manager->total_hooks_triggered++;
     manager->hook_trigger_counts[hook_type]++;
 
-    /* Execute all widgets registered for this hook */
+    // Execute all widgets registered for this hook
     lle_hook_registration_t *reg = manager->hooks[hook_type];
 
     while (reg) {
-        /* Check if registration is enabled */
+        // Check if registration is enabled
         if (!reg->enabled) {
             reg = reg->next;
             continue;
         }
 
-        /* Execute widget (error-resilient: continue even if widget fails) */
+        // Execute widget (error-resilient: continue even if widget fails)
         lle_widget_execute_direct(reg->widget, editor);
 
         /* Note: Widget errors are logged but do not stop hook execution.
@@ -229,13 +229,13 @@ lle_result_t lle_widget_hook_trigger(lle_widget_hooks_manager_t *manager,
          * hook chain. Individual widget failures can be diagnosed via widget
          * execution statistics and logs. */
 
-        /* Update registration statistics */
+        // Update registration statistics
         reg->trigger_count++;
 
         reg = reg->next;
     }
 
-    /* Hook triggering always succeeds (error-resilient design) */
+    // Hook triggering always succeeds (error-resilient design)
     return LLE_SUCCESS;
 }
 

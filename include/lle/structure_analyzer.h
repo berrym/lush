@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-/* Forward declarations */
+// Forward declarations
 typedef struct lle_structure_analyzer lle_structure_analyzer_t;
 
 /**
@@ -173,4 +173,4 @@ lle_result_t lle_structure_analyzer_reset(lle_structure_analyzer_t *analyzer);
 }
 #endif
 
-#endif /* LLE_STRUCTURE_ANALYZER_H */
+#endif // LLE_STRUCTURE_ANALYZER_H

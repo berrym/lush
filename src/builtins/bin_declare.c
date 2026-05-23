@@ -18,10 +18,10 @@ static void declare_print_var_callback(const char *key, const char *value,
     (void)userdata;
     if (!key)
         return;
-    /* Skip internal variables starting with __ */
+    // Skip internal variables starting with __
     if (key[0] == '_' && key[1] == '_')
         return;
-    /* Skip if this is actually an array (handled separately) */
+    // Skip if this is actually an array (handled separately)
     if (symtable_is_array(key))
         return;
     printf("declare -- %s=\"%s\"\n", key, value ? value : "");
@@ -71,7 +71,7 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
         printf(")\n");
     } else {
         printf("declare -a %s=(", name);
-        /* Print indexed array elements */
+        // Print indexed array elements
         bool first = true;
         for (size_t i = 0; i < array->count; i++) {
             if (array->elements[i]) {

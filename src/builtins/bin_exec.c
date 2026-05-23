@@ -138,7 +138,7 @@ int bin_exec(int argc, char **argv) {
     char *command = NULL;
     char **exec_argv = NULL;
     int exec_argc = 0;
-    (void)exec_argc; /* Reserved for argument count validation */
+    (void)exec_argc; // Reserved for argument count validation
 
     // Find the first non-redirection argument as the command
     int cmd_start = 1;

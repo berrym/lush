@@ -30,10 +30,10 @@
 #include <time.h>
 #include <unistd.h>
 
-/* macOS compatibility */
+// macOS compatibility
 #ifdef __APPLE__
 #include <pthread.h>
-/* macOS doesn't have CLOCK_MONOTONIC_COARSE, use CLOCK_MONOTONIC instead */
+// macOS doesn't have CLOCK_MONOTONIC_COARSE, use CLOCK_MONOTONIC instead
 #ifndef CLOCK_MONOTONIC_COARSE
 #define CLOCK_MONOTONIC_COARSE CLOCK_MONOTONIC
 #endif
@@ -44,7 +44,7 @@
  * ============================================================================
  */
 
-/* Pre-allocated error contexts for zero-allocation critical paths */
+// Pre-allocated error contexts for zero-allocation critical paths
 #define LLE_PREALLOCATED_ERROR_CONTEXTS 100
 #define LLE_ERROR_STRING_POOL_SIZE 256
 #define LLE_ERROR_POOL_BLOCKS 1000
@@ -57,16 +57,16 @@ static struct {
 } g_preallocated_errors = {.allocation_mutex = PTHREAD_MUTEX_INITIALIZER,
                            .allocation_hint = 0};
 
-/* Static fallback error context for emergency situations */
+// Static fallback error context for emergency situations
 static lle_error_context_t g_static_error_context = {0};
 
-/* Global error reporting system */
+// Global error reporting system
 static lle_error_reporting_system_t *g_error_reporting_system = NULL;
 
-/* Global atomic error counters */
+// Global atomic error counters
 static lle_error_atomic_counters_t g_error_atomic_counters = {0};
 
-/* Global error injection configuration for testing */
+// Global error injection configuration for testing
 static lle_error_injection_config_t g_error_injection_config = {
     .injection_enabled = false,
     .injection_probability = 0.0f,
@@ -80,13 +80,13 @@ static lle_error_injection_config_t g_error_injection_config = {
     .successful_recoveries = 0,
     .failed_recoveries = 0};
 
-/* Thread-local storage for current operation context */
+// Thread-local storage for current operation context
 static __thread uint64_t tls_current_operation_id = 0;
 static __thread const char *tls_current_operation_name = NULL;
 static __thread uint64_t tls_cached_thread_id = 0;
 static __thread bool tls_thread_id_cached = false;
 
-/* Simple memory pool for error contexts */
+// Simple memory pool for error contexts
 static struct {
     void *error_context_pool;
     void *error_string_pool;
@@ -162,20 +162,20 @@ const char *lle_get_current_operation_name(void) {
  * @brief Get bitmask of currently active components
  */
 uint32_t lle_get_active_components_mask(void) {
-    /* This would integrate with actual component tracking system */
-    /* For now, return a placeholder indicating basic components active */
-    return 0x0001; /* Bit 0: Core system active */
+    // This would integrate with actual component tracking system
+    // For now, return a placeholder indicating basic components active
+    return 0x0001; // Bit 0: Core system active
 }
 
 /**
  * @brief Calculate current system load factor (0-100)
  */
 uint32_t lle_calculate_system_load(void) {
-    /* System load calculation based on concurrent error activity */
+    // System load calculation based on concurrent error activity
     uint32_t concurrent = atomic_load_explicit(
         &g_error_atomic_counters.concurrent_errors, memory_order_relaxed);
 
-    /* Simple heuristic: 10% per concurrent error, capped at 100% */
+    // Simple heuristic: 10% per concurrent error, capped at 100%
     uint32_t load = concurrent * 10;
     return (load > 100) ? 100 : load;
 }
@@ -184,11 +184,11 @@ uint32_t lle_calculate_system_load(void) {
  * @brief Measure current performance impact in nanoseconds
  */
 uint64_t lle_measure_current_performance_impact(void) {
-    /* Returns estimated performance impact based on error handling activity */
+    // Returns estimated performance impact based on error handling activity
     uint32_t concurrent = atomic_load_explicit(
         &g_error_atomic_counters.concurrent_errors, memory_order_relaxed);
 
-    /* Each concurrent error adds ~10μs estimated impact */
+    // Each concurrent error adds ~10μs estimated impact
     return concurrent * 10000ULL;
 }
 
@@ -196,8 +196,8 @@ uint64_t lle_measure_current_performance_impact(void) {
  * @brief Check if critical path is currently active
  */
 bool lle_is_critical_path_active(void) {
-    /* This would integrate with actual performance monitoring */
-    /* For now, assume critical path during user input processing */
+    // This would integrate with actual performance monitoring
+    // For now, assume critical path during user input processing
     return tls_current_operation_name != NULL &&
            strstr(tls_current_operation_name, "input") != NULL;
 }
@@ -218,8 +218,8 @@ lle_result_t lle_init_error_memory_pools(void) {
         return LLE_SUCCESS;
     }
 
-    /* For Phase 1, use simple malloc-based allocation */
-    /* Phase 2 will integrate with Document 15 memory pools */
+    // For Phase 1, use simple malloc-based allocation
+    // Phase 2 will integrate with Document 15 memory pools
     g_error_memory_pools.error_context_pool =
         malloc(sizeof(lle_error_context_t) * LLE_ERROR_POOL_BLOCKS);
 
@@ -248,8 +248,8 @@ lle_result_t lle_init_error_memory_pools(void) {
  * @brief Allocate memory from error pool
  */
 void *lle_error_pool_alloc(size_t size) {
-    /* Simple allocation for Phase 1 */
-    /* Phase 2 will use proper pool allocation */
+    // Simple allocation for Phase 1
+    // Phase 2 will use proper pool allocation
     return malloc(size);
 }
 
@@ -278,7 +278,7 @@ char *lle_error_string_pool_strdup(const char *str) {
  * @brief Generate technical details string for error code
  */
 const char *lle_generate_technical_details(lle_result_t error_code) {
-    /* Error code category and range information */
+    // Error code category and range information
     if (error_code == LLE_SUCCESS) {
         return "Operation completed successfully";
     }
@@ -335,7 +335,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     case LLE_SUCCESS_WITH_WARNINGS:
         return "LLE_SUCCESS_WITH_WARNINGS";
 
-    /* Input validation errors */
+    // Input validation errors
     case LLE_ERROR_INVALID_PARAMETER:
         return "LLE_ERROR_INVALID_PARAMETER";
     case LLE_ERROR_NULL_POINTER:
@@ -353,7 +353,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     case LLE_ERROR_INVALID_ENCODING:
         return "LLE_ERROR_INVALID_ENCODING";
 
-    /* Memory errors */
+    // Memory errors
     case LLE_ERROR_OUT_OF_MEMORY:
         return "LLE_ERROR_OUT_OF_MEMORY";
     case LLE_ERROR_MEMORY_CORRUPTION:
@@ -371,7 +371,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     case LLE_ERROR_MEMORY_PROTECTION:
         return "LLE_ERROR_MEMORY_PROTECTION";
 
-    /* System errors */
+    // System errors
     case LLE_ERROR_SYSTEM_CALL:
         return "LLE_ERROR_SYSTEM_CALL";
     case LLE_ERROR_IO_ERROR:
@@ -389,7 +389,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     case LLE_ERROR_NETWORK_ERROR:
         return "LLE_ERROR_NETWORK_ERROR";
 
-    /* Component errors */
+    // Component errors
     case LLE_ERROR_BUFFER_COMPONENT:
         return "LLE_ERROR_BUFFER_COMPONENT";
     case LLE_ERROR_EVENT_SYSTEM:
@@ -411,7 +411,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     case LLE_ERROR_PERFORMANCE_MONITORING:
         return "LLE_ERROR_PERFORMANCE_MONITORING";
 
-    /* Feature errors */
+    // Feature errors
     case LLE_ERROR_FEATURE_DISABLED:
         return "LLE_ERROR_FEATURE_DISABLED";
     case LLE_ERROR_FEATURE_NOT_AVAILABLE:
@@ -433,7 +433,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     case LLE_ERROR_CONFIGURATION_MISSING:
         return "LLE_ERROR_CONFIGURATION_MISSING";
 
-    /* Performance errors */
+    // Performance errors
     case LLE_ERROR_PERFORMANCE_DEGRADED:
         return "LLE_ERROR_PERFORMANCE_DEGRADED";
     case LLE_ERROR_RESOURCE_EXHAUSTED:
@@ -451,7 +451,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     case LLE_ERROR_OPTIMIZATION_FAILED:
         return "LLE_ERROR_OPTIMIZATION_FAILED";
 
-    /* Critical errors */
+    // Critical errors
     case LLE_ERROR_INITIALIZATION_FAILED:
         return "LLE_ERROR_INITIALIZATION_FAILED";
     case LLE_ERROR_SHUTDOWN_FAILED:
@@ -507,7 +507,7 @@ static const char *lle_severity_to_string(lle_error_severity_t severity) {
 lle_error_severity_t
 lle_determine_error_severity(lle_result_t error_code,
                              const lle_error_context_t *context) {
-    /* Memory errors are generally critical */
+    // Memory errors are generally critical
     if (error_code >= LLE_ERROR_OUT_OF_MEMORY &&
         error_code < LLE_ERROR_SYSTEM_CALL) {
         if (error_code == LLE_ERROR_MEMORY_CORRUPTION ||
@@ -517,7 +517,7 @@ lle_determine_error_severity(lle_result_t error_code,
         return LLE_SEVERITY_CRITICAL;
     }
 
-    /* System call errors depend on context */
+    // System call errors depend on context
     if (error_code >= LLE_ERROR_SYSTEM_CALL &&
         error_code < LLE_ERROR_BUFFER_COMPONENT) {
         if (context && context->critical_path_affected) {
@@ -526,29 +526,29 @@ lle_determine_error_severity(lle_result_t error_code,
         return LLE_SEVERITY_MAJOR;
     }
 
-    /* Component errors are generally recoverable */
+    // Component errors are generally recoverable
     if (error_code >= LLE_ERROR_BUFFER_COMPONENT &&
         error_code < LLE_ERROR_FEATURE_DISABLED) {
         return LLE_SEVERITY_MAJOR;
     }
 
-    /* Feature errors are usually minor */
+    // Feature errors are usually minor
     if (error_code >= LLE_ERROR_FEATURE_DISABLED &&
         error_code < LLE_ERROR_PERFORMANCE_DEGRADED) {
         return LLE_SEVERITY_MINOR;
     }
 
-    /* Performance errors are warnings unless severe */
+    // Performance errors are warnings unless severe
     if (error_code >= LLE_ERROR_PERFORMANCE_DEGRADED &&
         error_code < LLE_ERROR_INITIALIZATION_FAILED) {
         if (context &&
-            context->performance_impact_ns > 1000000) { /* > 1ms impact */
+            context->performance_impact_ns > 1000000) { // > 1ms impact
             return LLE_SEVERITY_MAJOR;
         }
         return LLE_SEVERITY_WARNING;
     }
 
-    /* Critical system errors */
+    // Critical system errors
     if (error_code >= LLE_ERROR_INITIALIZATION_FAILED) {
         return LLE_SEVERITY_CRITICAL;
     }
@@ -575,18 +575,17 @@ static void lle_capture_system_state(lle_error_context_t *ctx) {
     if (!ctx)
         return;
 
-    /* Memory usage tracking */
-    ctx->memory_usage_bytes =
-        0; /* Integrates with memory system when available */
+    // Memory usage tracking
+    ctx->memory_usage_bytes = 0; // Integrates with memory system when available
     ctx->memory_pool_utilization = 0;
 
-    /* Active components bitmask */
+    // Active components bitmask
     ctx->active_components = lle_get_active_components_mask();
 
-    /* System load factor */
+    // System load factor
     ctx->system_load_factor = lle_calculate_system_load();
 
-    /* Performance impact measurement */
+    // Performance impact measurement
     ctx->performance_impact_ns = lle_measure_current_performance_impact();
     ctx->critical_path_affected = lle_is_critical_path_active();
 }
@@ -604,49 +603,49 @@ lle_error_context_t *lle_create_error_context(lle_result_t error_code,
                                               const char *function,
                                               const char *file, int line,
                                               const char *component) {
-    /* Allocate from error pool */
+    // Allocate from error pool
     lle_error_context_t *ctx =
         lle_error_pool_alloc(sizeof(lle_error_context_t));
     if (!ctx) {
-        /* Fallback to static error context for critical memory situations */
+        // Fallback to static error context for critical memory situations
         return &g_static_error_context;
     }
 
-    /* Zero-initialize structure */
+    // Zero-initialize structure
     memset(ctx, 0, sizeof(lle_error_context_t));
 
-    /* Populate basic error information */
+    // Populate basic error information
     ctx->error_code = error_code;
     ctx->error_message = lle_error_string_pool_strdup(message);
     ctx->technical_details = lle_generate_technical_details(error_code);
 
-    /* Source location information */
+    // Source location information
     ctx->function_name = function;
     ctx->file_name = file;
     ctx->line_number = line;
     ctx->component_name = component;
 
-    /* Execution context */
+    // Execution context
     ctx->thread_id = lle_get_thread_id();
     ctx->timestamp_ns = lle_get_timestamp_ns();
     ctx->operation_id = lle_get_current_operation_id();
     ctx->operation_name = lle_get_current_operation_name();
 
-    /* System state capture */
+    // System state capture
     lle_capture_system_state(ctx);
 
-    /* Error chain - initially NULL */
+    // Error chain - initially NULL
     ctx->root_cause = NULL;
     ctx->immediate_cause = NULL;
     ctx->error_chain_depth = 0;
 
-    /* Recovery information - initially unset */
+    // Recovery information - initially unset
     ctx->recovery_attempts = 0;
     ctx->degradation_level = 0;
-    ctx->auto_recovery_possible = true; /* Optimistic default */
+    ctx->auto_recovery_possible = true; // Optimistic default
     ctx->user_intervention_required = false;
 
-    /* Custom context data - initially NULL */
+    // Custom context data - initially NULL
     ctx->context_data = NULL;
     ctx->context_data_size = 0;
     ctx->context_data_cleanup = NULL;
@@ -667,17 +666,17 @@ void lle_error_context_destroy(lle_error_context_t *ctx) {
         return;
     }
 
-    /* Don't free the static fallback context */
+    // Don't free the static fallback context
     if (ctx == &g_static_error_context) {
         return;
     }
 
-    /* Free dynamically allocated error message */
+    // Free dynamically allocated error message
     if (ctx->error_message) {
         free((void *)ctx->error_message);
     }
 
-    /* Free the context structure itself */
+    // Free the context structure itself
     free(ctx);
 }
 
@@ -687,7 +686,7 @@ void lle_error_context_destroy(lle_error_context_t *ctx) {
 lle_error_context_t *lle_allocate_fast_error_context(void) {
     pthread_mutex_lock(&g_preallocated_errors.allocation_mutex);
 
-    /* Start from hint position for better cache locality */
+    // Start from hint position for better cache locality
     for (uint32_t i = 0; i < LLE_PREALLOCATED_ERROR_CONTEXTS; i++) {
         uint32_t index = (g_preallocated_errors.allocation_hint + i) %
                          LLE_PREALLOCATED_ERROR_CONTEXTS;
@@ -702,7 +701,7 @@ lle_error_context_t *lle_allocate_fast_error_context(void) {
 
             pthread_mutex_unlock(&g_preallocated_errors.allocation_mutex);
 
-            /* Update atomic counter */
+            // Update atomic counter
             atomic_fetch_add_explicit(
                 &g_error_atomic_counters.preallocated_contexts_used, 1,
                 memory_order_relaxed);
@@ -712,7 +711,7 @@ lle_error_context_t *lle_allocate_fast_error_context(void) {
     }
 
     pthread_mutex_unlock(&g_preallocated_errors.allocation_mutex);
-    return NULL; /* All preallocated contexts in use */
+    return NULL; // All preallocated contexts in use
 }
 
 /**
@@ -722,14 +721,14 @@ void lle_release_fast_error_context(lle_error_context_t *ctx) {
     if (!ctx)
         return;
 
-    /* Check if this is from preallocated pool */
+    // Check if this is from preallocated pool
     ptrdiff_t offset = ctx - g_preallocated_errors.contexts;
     if (offset >= 0 && offset < LLE_PREALLOCATED_ERROR_CONTEXTS) {
         pthread_mutex_lock(&g_preallocated_errors.allocation_mutex);
         g_preallocated_errors.in_use[offset] = false;
         pthread_mutex_unlock(&g_preallocated_errors.allocation_mutex);
 
-        /* Update atomic counter */
+        // Update atomic counter
         atomic_fetch_sub_explicit(
             &g_error_atomic_counters.preallocated_contexts_used, 1,
             memory_order_relaxed);
@@ -745,11 +744,11 @@ void lle_init_memory_safe_error_context(lle_memory_safe_error_context_t *ctx) {
 
     memset(ctx, 0, sizeof(lle_memory_safe_error_context_t));
 
-    /* Set magic values for corruption detection */
+    // Set magic values for corruption detection
     ctx->magic_header = 0xDEADBEEF;
     ctx->magic_footer = 0xCAFEBABE;
 
-    /* Initialize resource tracking */
+    // Initialize resource tracking
     ctx->allocated_resources = NULL;
     ctx->allocated_count = 0;
     ctx->allocated_capacity = 0;
@@ -765,30 +764,30 @@ void lle_cleanup_memory_safe_error_context(
     if (!ctx)
         return;
 
-    /* Verify magic values */
+    // Verify magic values
     if (ctx->magic_header != 0xDEADBEEF || ctx->magic_footer != 0xCAFEBABE) {
-        /* Memory corruption detected */
+        // Memory corruption detected
         return;
     }
 
-    /* Execute cleanup functions */
+    // Execute cleanup functions
     for (size_t i = 0; i < ctx->cleanup_count; i++) {
         if (ctx->cleanup_functions[i] && i < ctx->allocated_count) {
             ctx->cleanup_functions[i](ctx->allocated_resources[i]);
         }
     }
 
-    /* Free tracking arrays */
+    // Free tracking arrays
     free(ctx->allocated_resources);
     free(ctx->cleanup_functions);
 
-    /* Cleanup base context custom data */
+    // Cleanup base context custom data
     if (ctx->base_context.context_data &&
         ctx->base_context.context_data_cleanup) {
         ctx->base_context.context_data_cleanup(ctx->base_context.context_data);
     }
 
-    /* Clear magic values */
+    // Clear magic values
     ctx->magic_header = 0;
     ctx->magic_footer = 0;
 }
@@ -808,26 +807,26 @@ void lle_report_error_to_console(const lle_error_context_t *context) {
     lle_error_severity_t severity =
         lle_determine_error_severity(context->error_code, context);
 
-    /* Color codes for different severity levels */
+    // Color codes for different severity levels
     const char *color_reset = "\033[0m";
     const char *color;
 
     switch (severity) {
     case LLE_SEVERITY_FATAL:
     case LLE_SEVERITY_CRITICAL:
-        color = "\033[1;31m"; /* Bold Red */
+        color = "\033[1;31m"; // Bold Red
         break;
     case LLE_SEVERITY_MAJOR:
-        color = "\033[0;31m"; /* Red */
+        color = "\033[0;31m"; // Red
         break;
     case LLE_SEVERITY_WARNING:
-        color = "\033[0;33m"; /* Yellow */
+        color = "\033[0;33m"; // Yellow
         break;
     case LLE_SEVERITY_MINOR:
-        color = "\033[0;36m"; /* Cyan */
+        color = "\033[0;36m"; // Cyan
         break;
     default:
-        color = "\033[0;37m"; /* White */
+        color = "\033[0;37m"; // White
         break;
     }
 
@@ -870,7 +869,7 @@ void lle_report_error_to_log_file(lle_error_reporting_system_t *system,
     lle_error_severity_t severity =
         lle_determine_error_severity(context->error_code, context);
 
-    /* Format: [timestamp] [severity] [component] message */
+    // Format: [timestamp] [severity] [component] message
     fprintf(system->log_file, "[%lu] [%s] [%s] %s (%s)\n",
             (unsigned long)context->timestamp_ns,
             lle_severity_to_string(severity),
@@ -900,7 +899,7 @@ void lle_report_error_to_system_log(const lle_error_context_t *context) {
     lle_error_severity_t severity =
         lle_determine_error_severity(context->error_code, context);
 
-    /* Map LLE severity to syslog priority */
+    // Map LLE severity to syslog priority
     int priority;
     switch (severity) {
     case LLE_SEVERITY_FATAL:
@@ -936,8 +935,8 @@ bool lle_should_suppress_error(lle_error_reporting_system_t *system,
                                const lle_error_context_t *context) {
     (void)system;
 
-    /* Flood control logic */
-    /* Never suppress critical or fatal errors */
+    // Flood control logic
+    // Never suppress critical or fatal errors
     lle_error_severity_t severity =
         lle_determine_error_severity(context->error_code, context);
 
@@ -945,7 +944,7 @@ bool lle_should_suppress_error(lle_error_reporting_system_t *system,
         return false;
     }
 
-    /* Phase 2 will implement full suppression table */
+    // Phase 2 will implement full suppression table
     return false;
 }
 
@@ -957,7 +956,7 @@ lle_result_t lle_report_error(const lle_error_context_t *context) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Update atomic statistics */
+    // Update atomic statistics
     lle_error_severity_t severity =
         lle_determine_error_severity(context->error_code, context);
 
@@ -975,10 +974,10 @@ lle_result_t lle_report_error(const lle_error_context_t *context) {
 
     uint64_t reporting_start = lle_get_timestamp_ns();
 
-    /* Console reporting - always enabled for Phase 1 */
+    // Console reporting - always enabled for Phase 1
     lle_report_error_to_console(context);
 
-    /* Log file reporting if system is configured */
+    // Log file reporting if system is configured
     if (g_error_reporting_system) {
         if (g_error_reporting_system->config.log_file_reporting_enabled &&
             severity >=
@@ -986,14 +985,14 @@ lle_result_t lle_report_error(const lle_error_context_t *context) {
             lle_report_error_to_log_file(g_error_reporting_system, context);
         }
 
-        /* System log reporting */
+        // System log reporting
         if (g_error_reporting_system->config.system_log_reporting_enabled &&
             severity >=
                 g_error_reporting_system->config.min_system_log_severity) {
             lle_report_error_to_system_log(context);
         }
 
-        /* Callback reporting */
+        // Callback reporting
         if (g_error_reporting_system->config.callback_reporting_enabled &&
             g_error_reporting_system->config.error_callback &&
             severity >=
@@ -1002,7 +1001,7 @@ lle_result_t lle_report_error(const lle_error_context_t *context) {
                 context, g_error_reporting_system->config.callback_user_data);
         }
 
-        /* Update reporting statistics */
+        // Update reporting statistics
         uint64_t reporting_end = lle_get_timestamp_ns();
         uint64_t latency = reporting_end - reporting_start;
 
@@ -1027,7 +1026,7 @@ void lle_fast_report_critical_error(const lle_error_context_t *ctx) {
     if (!ctx)
         return;
 
-    /* Minimal console output for critical paths */
+    // Minimal console output for critical paths
     fprintf(stderr, "[LLE CRITICAL] %s (%d) in %s\n",
             ctx->error_message ? ctx->error_message : "Critical error",
             ctx->error_code,
@@ -1044,38 +1043,38 @@ void lle_fast_report_critical_error(const lle_error_context_t *ctx) {
  */
 lle_result_t lle_handle_critical_path_error(lle_result_t error_code,
                                             const char *component) {
-    /* Use pre-allocated context to avoid memory allocation */
+    // Use pre-allocated context to avoid memory allocation
     lle_error_context_t *ctx = lle_allocate_fast_error_context();
     if (!ctx) {
-        /* Fallback to static context if no pre-allocated available */
+        // Fallback to static context if no pre-allocated available
         ctx = &g_static_error_context;
     }
 
-    /* Minimal context population for performance */
+    // Minimal context population for performance
     ctx->error_code = error_code;
     ctx->timestamp_ns = lle_get_fast_timestamp_ns();
     ctx->component_name = component;
     ctx->thread_id = lle_get_thread_id_cached();
     ctx->critical_path_affected = true;
 
-    /* Fast severity determination */
+    // Fast severity determination
     lle_error_severity_t severity = lle_fast_determine_severity(error_code);
 
-    /* Fast reporting (minimal) for critical errors */
+    // Fast reporting (minimal) for critical errors
     if (severity >= LLE_SEVERITY_CRITICAL) {
         lle_fast_report_critical_error(ctx);
     }
 
-    /* Update statistics */
+    // Update statistics
     atomic_fetch_add_explicit(&g_error_atomic_counters.total_errors_handled, 1,
                               memory_order_relaxed);
 
-    /* Release context if it was pre-allocated */
+    // Release context if it was pre-allocated
     if (ctx != &g_static_error_context) {
         lle_release_fast_error_context(ctx);
     }
 
-    return error_code; /* Return original error for propagation */
+    return error_code; // Return original error for propagation
 }
 
 /* ============================================================================
@@ -1143,12 +1142,12 @@ lle_result_t lle_error_update_statistics_lockfree(lle_result_t error_code,
                                                   lle_error_severity_t severity,
                                                   uint64_t recovery_time_ns,
                                                   bool recovery_successful) {
-    (void)error_code; /* Error code is encoded in severity for Phase 1 */
+    (void)error_code; // Error code is encoded in severity for Phase 1
 
-    /* Update total errors counter */
+    // Update total errors counter
     lle_error_increment_counter(&g_error_atomic_counters.total_errors_handled);
 
-    /* Update severity-specific counters */
+    // Update severity-specific counters
     switch (severity) {
     case LLE_SEVERITY_CRITICAL:
     case LLE_SEVERITY_MAJOR:
@@ -1163,7 +1162,7 @@ lle_result_t lle_error_update_statistics_lockfree(lle_result_t error_code,
         break;
     }
 
-    /* Update recovery statistics */
+    // Update recovery statistics
     if (recovery_time_ns > 0) {
         if (recovery_successful) {
             lle_error_increment_counter(
@@ -1173,7 +1172,7 @@ lle_result_t lle_error_update_statistics_lockfree(lle_result_t error_code,
                 &g_error_atomic_counters.recoveries_failed);
         }
 
-        /* Update recovery time statistics */
+        // Update recovery time statistics
         atomic_fetch_add_explicit(
             &g_error_atomic_counters.total_recovery_time_ns, recovery_time_ns,
             memory_order_relaxed);
@@ -1198,14 +1197,14 @@ lle_result_t lle_maybe_inject_error(const char *component,
         return LLE_SUCCESS;
     }
 
-    /* Check timing constraints */
+    // Check timing constraints
     uint64_t current_time = lle_get_timestamp_ns();
     if (current_time - g_error_injection_config.last_injection_time_ns <
         g_error_injection_config.injection_interval_ns) {
         return LLE_SUCCESS;
     }
 
-    /* Check if this component is targeted */
+    // Check if this component is targeted
     bool component_targeted = false;
     for (size_t i = 0; i < g_error_injection_config.target_component_count;
          i++) {
@@ -1220,13 +1219,13 @@ lle_result_t lle_maybe_inject_error(const char *component,
         return LLE_SUCCESS;
     }
 
-    /* Probability check */
+    // Probability check
     float random_value = (float)rand() / (float)RAND_MAX;
     if (random_value > g_error_injection_config.injection_probability) {
         return LLE_SUCCESS;
     }
 
-    /* Select error to inject */
+    // Select error to inject
     if (g_error_injection_config.target_error_count == 0) {
         return LLE_SUCCESS;
     }
@@ -1235,11 +1234,11 @@ lle_result_t lle_maybe_inject_error(const char *component,
     lle_result_t injected_error =
         g_error_injection_config.target_error_codes[error_index];
 
-    /* Update injection statistics */
+    // Update injection statistics
     g_error_injection_config.total_injections++;
     g_error_injection_config.last_injection_time_ns = current_time;
 
-    /* Log injection */
+    // Log injection
     lle_log_error_injection(component, operation, injected_error);
 
     return injected_error;
@@ -1285,7 +1284,7 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate forensic log entry */
+    // Allocate forensic log entry
     *log_entry = malloc(sizeof(lle_forensic_log_entry_t));
     if (!*log_entry) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -1294,10 +1293,10 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
     lle_forensic_log_entry_t *entry = *log_entry;
     memset(entry, 0, sizeof(lle_forensic_log_entry_t));
 
-    /* Copy error context */
+    // Copy error context
     memcpy(&entry->error_context, error_context, sizeof(lle_error_context_t));
 
-    /* Capture system snapshot */
+    // Capture system snapshot
     entry->system_snapshot.total_memory_usage = 0;
     entry->system_snapshot.peak_memory_usage = 0;
     entry->system_snapshot.active_components_mask =
@@ -1309,19 +1308,19 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
     entry->system_snapshot.operations_per_second = 0;
     entry->system_snapshot.cache_hit_rate_percent = 0;
 
-    /* Stack trace - Phase 2 will implement full backtrace */
+    // Stack trace - Phase 2 will implement full backtrace
     entry->stack_trace.frame_count = 0;
     entry->stack_trace.symbol_names = NULL;
     entry->stack_trace.stack_trace_complete = false;
 
-    /* Component state dumps - Phase 2 will implement */
+    // Component state dumps - Phase 2 will implement
     entry->component_state.buffer_state_dump = NULL;
     entry->component_state.event_system_state_dump = NULL;
     entry->component_state.terminal_state_dump = NULL;
     entry->component_state.memory_pool_state_dump = NULL;
     entry->component_state.total_state_dump_size = 0;
 
-    /* Recovery log - initially empty */
+    // Recovery log - initially empty
     entry->recovery_log.strategy_count = 0;
     entry->recovery_log.recovery_successful = false;
     entry->recovery_log.total_recovery_time_ns = 0;
@@ -1346,7 +1345,7 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
  * ============================================================================
  */
 
-/* Buffer component recovery strategies */
+// Buffer component recovery strategies
 static lle_recovery_strategy_t g_buffer_recovery_strategies[] = {
     {               .type = RECOVERY_STRATEGY_RETRY,
      .strategy_name = "Buffer Retry",
@@ -1395,7 +1394,7 @@ static lle_recovery_strategy_t g_buffer_recovery_strategies[] = {
      .strategy_data_size = 0}
 };
 
-/* Event system recovery strategies */
+// Event system recovery strategies
 static lle_recovery_strategy_t g_event_recovery_strategies[] = {
     {.type = RECOVERY_STRATEGY_RESET_COMPONENT,
      .strategy_name = "Event Queue Flush",
@@ -1429,7 +1428,7 @@ static lle_recovery_strategy_t g_event_recovery_strategies[] = {
      .strategy_data_size = 0}
 };
 
-/* Memory error recovery strategies */
+// Memory error recovery strategies
 static lle_recovery_strategy_t g_memory_recovery_strategies[] = {
     {.type = RECOVERY_STRATEGY_GRACEFUL_DEGRADATION,
      .strategy_name = "Memory Pool Compaction",
@@ -1463,7 +1462,7 @@ static lle_recovery_strategy_t g_memory_recovery_strategies[] = {
      .strategy_data_size = 0}
 };
 
-/* Generic/fallback recovery strategies */
+// Generic/fallback recovery strategies
 static lle_recovery_strategy_t g_generic_recovery_strategies[] = {
     {.type = RECOVERY_STRATEGY_RETRY,
      .strategy_name = "Generic Retry",
@@ -1506,33 +1505,33 @@ lle_score_recovery_strategy(const lle_recovery_strategy_t *strategy,
 
     float score = 0.0f;
 
-    /* Base score from success probability (0-40 points) */
+    // Base score from success probability (0-40 points)
     score += strategy->success_probability * 40.0f;
 
-    /* Penalty for high cost (0-10 points penalty) */
-    if (strategy->estimated_cost_ns > 100000) { /* > 100μs */
+    // Penalty for high cost (0-10 points penalty)
+    if (strategy->estimated_cost_ns > 100000) { // > 100μs
         score -= 10.0f;
     }
 
-    /* Penalty for high degradation (0-20 points penalty) */
+    // Penalty for high degradation (0-20 points penalty)
     score -= (strategy->degradation_level / 100.0f) * 20.0f;
 
-    /* Bonus for low resource requirements (5 points) */
+    // Bonus for low resource requirements (5 points)
     if (strategy->required_resources == 0) {
         score += 5.0f;
     }
 
-    /* Critical path considerations (15 points penalty) */
+    // Critical path considerations (15 points penalty)
     if (context->critical_path_affected && strategy->affects_critical_path) {
         score -= 15.0f;
     }
 
-    /* User intervention penalty (25 points penalty) */
+    // User intervention penalty (25 points penalty)
     if (strategy->requires_user_confirmation) {
         score -= 25.0f;
     }
 
-    /* Clamp score to valid range [0-100] */
+    // Clamp score to valid range [0-100]
     if (score < 0.0f)
         score = 0.0f;
     if (score > 100.0f)
@@ -1558,10 +1557,10 @@ lle_get_recovery_strategies_for_error(lle_result_t error_code,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Determine error category and return appropriate strategies */
+    // Determine error category and return appropriate strategies
     if (error_code >= LLE_ERROR_BUFFER_COMPONENT &&
         error_code < LLE_ERROR_EVENT_SYSTEM) {
-        /* Buffer component errors */
+        // Buffer component errors
         *strategies = g_buffer_recovery_strategies;
         *strategy_count = sizeof(g_buffer_recovery_strategies) /
                           sizeof(g_buffer_recovery_strategies[0]);
@@ -1570,7 +1569,7 @@ lle_get_recovery_strategies_for_error(lle_result_t error_code,
 
     if (error_code >= LLE_ERROR_EVENT_SYSTEM &&
         error_code < LLE_ERROR_TERMINAL_ABSTRACTION) {
-        /* Event system errors */
+        // Event system errors
         *strategies = g_event_recovery_strategies;
         *strategy_count = sizeof(g_event_recovery_strategies) /
                           sizeof(g_event_recovery_strategies[0]);
@@ -1579,14 +1578,14 @@ lle_get_recovery_strategies_for_error(lle_result_t error_code,
 
     if (error_code >= LLE_ERROR_OUT_OF_MEMORY &&
         error_code < LLE_ERROR_SYSTEM_CALL) {
-        /* Memory errors */
+        // Memory errors
         *strategies = g_memory_recovery_strategies;
         *strategy_count = sizeof(g_memory_recovery_strategies) /
                           sizeof(g_memory_recovery_strategies[0]);
         return LLE_SUCCESS;
     }
 
-    /* Generic/fallback strategies for all other errors */
+    // Generic/fallback strategies for all other errors
     *strategies = g_generic_recovery_strategies;
     *strategy_count = sizeof(g_generic_recovery_strategies) /
                       sizeof(g_generic_recovery_strategies[0]);
@@ -1608,7 +1607,7 @@ lle_select_recovery_strategy(const lle_error_context_t *error_context) {
     if (!error_context)
         return NULL;
 
-    /* Get available strategies for error type */
+    // Get available strategies for error type
     lle_recovery_strategy_t *strategies = NULL;
     size_t strategy_count = 0;
 
@@ -1622,7 +1621,7 @@ lle_select_recovery_strategy(const lle_error_context_t *error_context) {
         return NULL;
     }
 
-    /* Score strategies based on context */
+    // Score strategies based on context
     lle_recovery_strategy_t *best_strategy = NULL;
     float best_score = 0.0f;
 
@@ -1662,28 +1661,28 @@ lle_result_t lle_apply_degradation(lle_degradation_controller_t *controller,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Don't degrade if already at higher level */
+    // Don't degrade if already at higher level
     if (target_level <= controller->current_level) {
         return LLE_SUCCESS;
     }
 
-    /* Update controller state */
+    // Update controller state
     controller->previous_level = controller->current_level;
     controller->current_level = target_level;
     controller->degradation_start_time_ns = lle_get_timestamp_ns();
     controller->degradation_events++;
 
-    /* Apply degradation to each feature based on its threshold */
+    // Apply degradation to each feature based on its threshold
     for (size_t i = 0; i < controller->feature_map_count; i++) {
         lle_feature_degradation_map_t *feature = &controller->feature_map[i];
 
-        /* Check if this feature should be degraded at this level */
+        // Check if this feature should be degraded at this level
         if (target_level >= feature->disable_at_level) {
             if (feature->apply_degradation) {
                 lle_result_t result =
                     feature->apply_degradation(target_level, NULL);
 
-                /* Log if degradation failed, but continue with others */
+                // Log if degradation failed, but continue with others
                 if (result != LLE_SUCCESS) {
                     fprintf(stderr,
                             "[DEGRADATION] Failed to degrade feature: %s\n",
@@ -1694,7 +1693,7 @@ lle_result_t lle_apply_degradation(lle_degradation_controller_t *controller,
         }
     }
 
-    /* Log degradation event */
+    // Log degradation event
     lle_log_degradation_event(target_level, reason);
 
     return LLE_SUCCESS;
@@ -1719,9 +1718,9 @@ lle_result_t lle_apply_degradation(lle_degradation_controller_t *controller,
  */
 lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
                                      const void *error_context) {
-    (void)error_context; /* Reserved for future use */
+    (void)error_context; // Reserved for future use
 
-    /* Create error context for this buffer error */
+    // Create error context for this buffer error
     lle_error_context_t *ctx = LLE_CREATE_ERROR_CONTEXT(
         LLE_ERROR_BUFFER_COMPONENT + (error - LLE_BUFFER_ERROR_BASE),
         "Buffer management error occurred", "BufferManager");
@@ -1730,15 +1729,15 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Report the error */
+    // Report the error
     lle_report_error(ctx);
 
-    /* Handle specific buffer errors with recovery */
+    // Handle specific buffer errors with recovery
     lle_result_t recovery_result = LLE_ERROR_RECOVERY_FAILED;
 
     switch (error) {
     case LLE_BUFFER_ERROR_INVALID_CURSOR_POSITION:
-        /* Reset cursor to safe position (start of buffer) */
+        // Reset cursor to safe position (start of buffer)
         if (buffer) {
             /* Would call: lle_buffer_reset_cursor_to_safe_position(buffer, ctx)
              */
@@ -1749,15 +1748,15 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
         break;
 
     case LLE_BUFFER_ERROR_TEXT_ENCODING_INVALID:
-        /* Sanitize text encoding to valid UTF-8 */
+        // Sanitize text encoding to valid UTF-8
         if (buffer) {
-            /* Would call: lle_buffer_sanitize_encoding(buffer, ctx) */
+            // Would call: lle_buffer_sanitize_encoding(buffer, ctx)
             recovery_result = LLE_SUCCESS;
         }
         break;
 
     case LLE_BUFFER_ERROR_MULTILINE_CORRUPTION:
-        /* Rebuild multiline structure from scratch */
+        // Rebuild multiline structure from scratch
         if (buffer) {
             /* Would call: lle_buffer_rebuild_multiline_structure(buffer, ctx)
              */
@@ -1766,20 +1765,20 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
         break;
 
     case LLE_BUFFER_ERROR_UNDO_STACK_OVERFLOW:
-        /* Compress or truncate undo stack */
+        // Compress or truncate undo stack
         if (buffer) {
-            /* Would call: lle_buffer_compress_undo_stack(buffer, ctx) */
+            // Would call: lle_buffer_compress_undo_stack(buffer, ctx)
             recovery_result = LLE_SUCCESS;
         }
         break;
 
     case LLE_BUFFER_ERROR_REDO_UNAVAILABLE:
-        /* This is not a critical error, just report it */
+        // This is not a critical error, just report it
         recovery_result = LLE_SUCCESS;
         break;
 
     default: {
-        /* Generic buffer recovery - select best strategy */
+        // Generic buffer recovery - select best strategy
         lle_recovery_strategy_t *strategy = lle_select_recovery_strategy(ctx);
         if (strategy && strategy->execute_strategy) {
             recovery_result =
@@ -1793,7 +1792,7 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
     }
     }
 
-    /* Update recovery statistics */
+    // Update recovery statistics
     lle_error_severity_t severity =
         lle_determine_error_severity(ctx->error_code, ctx);
     uint64_t recovery_time = lle_get_timestamp_ns() - ctx->timestamp_ns;
@@ -1801,7 +1800,7 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
                                          recovery_time,
                                          recovery_result == LLE_SUCCESS);
 
-    /* Free error context if dynamically allocated */
+    // Free error context if dynamically allocated
     if (ctx != &g_static_error_context) {
         if (ctx->error_message) {
             free((void *)ctx->error_message);
@@ -1829,7 +1828,7 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
 lle_result_t
 lle_handle_event_system_error(void *event_system, lle_event_error_t error,
                               lle_event_circuit_breaker_t *breaker) {
-    /* Create error context for this event system error */
+    // Create error context for this event system error
     lle_error_context_t *ctx = LLE_CREATE_ERROR_CONTEXT(
         LLE_ERROR_EVENT_SYSTEM + (error - LLE_EVENT_ERROR_BASE),
         "Event system error occurred", "EventSystem");
@@ -1838,25 +1837,25 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Report the error */
+    // Report the error
     lle_report_error(ctx);
 
-    /* Update circuit breaker state */
+    // Update circuit breaker state
     if (breaker) {
         breaker->failure_count++;
         breaker->last_failure_time_ns = lle_get_timestamp_ns();
 
-        /* Check if we should open the circuit breaker */
+        // Check if we should open the circuit breaker
         if (breaker->failure_count >= breaker->failure_threshold) {
             breaker->is_open = true;
 
-            /* Temporarily bypass event system */
+            // Temporarily bypass event system
             if (event_system) {
                 /* Would call: lle_event_system_enter_bypass_mode(event_system,
                  * ctx) */
             }
 
-            /* Free error context */
+            // Free error context
             if (ctx != &g_static_error_context) {
                 if (ctx->error_message) {
                     free((void *)ctx->error_message);
@@ -1864,16 +1863,16 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
                 free(ctx);
             }
 
-            return LLE_SUCCESS; /* Bypass mode enabled */
+            return LLE_SUCCESS; // Bypass mode enabled
         }
     }
 
-    /* Handle specific event system errors */
+    // Handle specific event system errors
     lle_result_t recovery_result = LLE_ERROR_RECOVERY_FAILED;
 
     switch (error) {
     case LLE_EVENT_ERROR_QUEUE_OVERFLOW:
-        /* Emergency queue flush - drop non-critical events */
+        // Emergency queue flush - drop non-critical events
         if (event_system) {
             /* Would call: lle_event_system_emergency_flush(event_system, ctx)
              */
@@ -1882,7 +1881,7 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
         break;
 
     case LLE_EVENT_ERROR_PROCESSING_TIMEOUT:
-        /* Kill hanging event handlers */
+        // Kill hanging event handlers
         if (event_system) {
             /* Would call: lle_event_system_kill_hanging_handlers(event_system,
              * ctx) */
@@ -1891,33 +1890,33 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
         break;
 
     case LLE_EVENT_ERROR_DEADLOCK_DETECTED:
-        /* Break deadlock by resetting affected components */
+        // Break deadlock by resetting affected components
         if (event_system) {
-            /* Would call: lle_event_system_break_deadlock(event_system, ctx) */
+            // Would call: lle_event_system_break_deadlock(event_system, ctx)
             recovery_result = LLE_SUCCESS;
         }
         break;
 
     case LLE_EVENT_ERROR_HANDLER_REGISTRATION_FAILED:
-        /* Cleanup and retry handler registration */
+        // Cleanup and retry handler registration
         recovery_result = LLE_SUCCESS;
         break;
 
     default: {
-        /* Generic event system recovery */
+        // Generic event system recovery
         lle_recovery_strategy_t *strategy = lle_select_recovery_strategy(ctx);
         if (strategy && strategy->execute_strategy) {
             recovery_result =
                 strategy->execute_strategy(ctx, strategy->strategy_data);
         } else if (strategy) {
-            /* Strategy exists but no execution function */
+            // Strategy exists but no execution function
             recovery_result = LLE_SUCCESS;
         }
         break;
     }
     }
 
-    /* Update recovery statistics */
+    // Update recovery statistics
     lle_error_severity_t severity =
         lle_determine_error_severity(ctx->error_code, ctx);
     uint64_t recovery_time = lle_get_timestamp_ns() - ctx->timestamp_ns;
@@ -1925,7 +1924,7 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
                                          recovery_time,
                                          recovery_result == LLE_SUCCESS);
 
-    /* Free error context if dynamically allocated */
+    // Free error context if dynamically allocated
     if (ctx != &g_static_error_context) {
         if (ctx->error_message) {
             free((void *)ctx->error_message);
@@ -1961,7 +1960,7 @@ lle_run_individual_validation_test(const lle_error_validation_test_t *test) {
     void *test_context = NULL;
     lle_result_t result = LLE_SUCCESS;
 
-    /* Setup phase */
+    // Setup phase
     if (test->setup_test) {
         result = test->setup_test(test_context);
         if (result != LLE_SUCCESS) {
@@ -1970,7 +1969,7 @@ lle_run_individual_validation_test(const lle_error_validation_test_t *test) {
         }
     }
 
-    /* Execution phase */
+    // Execution phase
     uint64_t start_time = lle_get_timestamp_ns();
 
     if (test->execute_test) {
@@ -1980,7 +1979,7 @@ lle_run_individual_validation_test(const lle_error_validation_test_t *test) {
     uint64_t end_time = lle_get_timestamp_ns();
     uint64_t execution_time = end_time - start_time;
 
-    /* Validation phase */
+    // Validation phase
     if (test->validate_result) {
         lle_result_t validation_result =
             test->validate_result(test_context, result);
@@ -1990,7 +1989,7 @@ lle_run_individual_validation_test(const lle_error_validation_test_t *test) {
         }
     }
 
-    /* Check timing constraints */
+    // Check timing constraints
     if (test->max_recovery_time_ns > 0 &&
         execution_time > test->max_recovery_time_ns) {
         fprintf(stderr,
@@ -2000,7 +1999,7 @@ lle_run_individual_validation_test(const lle_error_validation_test_t *test) {
         result = LLE_ERROR_TIMEOUT;
     }
 
-    /* Cleanup phase */
+    // Cleanup phase
     if (test->cleanup_test) {
         lle_result_t cleanup_result = test->cleanup_test(test_context);
         if (cleanup_result != LLE_SUCCESS && result == LLE_SUCCESS) {
@@ -2022,14 +2021,14 @@ lle_run_individual_validation_test(const lle_error_validation_test_t *test) {
  * Prints detailed results and returns success only if all tests pass.
  */
 lle_result_t lle_run_error_handling_validation_suite(void) {
-    /* Define validation test cases */
+    // Define validation test cases
     static const lle_error_validation_test_t validation_tests[] = {
         {      .test_name = "Buffer Error Recovery Test",
          .target_error = LLE_ERROR_BUFFER_COMPONENT,
          .target_component = "BufferManager",
          .should_recover_automatically = true,
          .expected_degradation = DEGRADATION_LEVEL_LOW,
-         .max_recovery_time_ns = 1000000, /* 1ms */
+         .max_recovery_time_ns = 1000000, // 1ms
  .setup_test = NULL,
          .execute_test = NULL,
          .validate_result = NULL,
@@ -2039,7 +2038,7 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
          .target_component = "EventSystem",
          .should_recover_automatically = true,
          .expected_degradation = DEGRADATION_LEVEL_MINIMAL,
-         .max_recovery_time_ns = 500000, /* 500μs */
+         .max_recovery_time_ns = 500000, // 500μs
  .setup_test = NULL,
          .execute_test = NULL,
          .validate_result = NULL,
@@ -2049,7 +2048,7 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
          .target_component = "MemoryManager",
          .should_recover_automatically = true,
          .expected_degradation = DEGRADATION_LEVEL_MODERATE,
-         .max_recovery_time_ns = 2000000, /* 2ms */
+         .max_recovery_time_ns = 2000000, // 2ms
  .setup_test = NULL,
          .execute_test = NULL,
          .validate_result = NULL,
@@ -2062,7 +2061,7 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
 
     printf("\n=== Error Handling Validation Suite ===\n\n");
 
-    /* Run each validation test */
+    // Run each validation test
     for (size_t i = 0; i < test_count; i++) {
         const lle_error_validation_test_t *test = &validation_tests[i];
 
@@ -2080,7 +2079,7 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
         }
     }
 
-    /* Print summary */
+    // Print summary
     printf("\n=== Validation Results ===\n");
     printf("Passed: %u/%zu tests (%.1f%%)\n", passed_tests, test_count,
            (passed_tests * 100.0f) / test_count);

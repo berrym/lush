@@ -643,4 +643,4 @@ extern posix_history_manager_t *global_posix_history;
 }
 #endif
 
-#endif /* POSIX_HISTORY_H */
+#endif // POSIX_HISTORY_H
