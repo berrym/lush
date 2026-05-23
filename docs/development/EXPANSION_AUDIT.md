@@ -1,5 +1,12 @@
 # Expansion Engine Audit: list-to-string conversion
 
+**Status (2026-05-23):** **AUDIT COMPLETE; WORK LIST CLOSED.** The
+single identified §3.4 gap (`${arr[@]}` joining like `${arr[*]}` in
+the general parameter-expansion fallthrough) was fixed in
+`1c5e587f`; bare `${arr}` §3.9 conformance landed in `78a7db6c`.
+The full list→string surface in SEMANTICS §7 is now closed. This
+document is preserved as the audit record that justified the fixes.
+
 **Purpose**: ground SEMANTICS.md §3.4 ("no implicit list→string
 coercion") against the actual expansion engine. This document maps
 every site where a list (indexed array) or map (associative array)

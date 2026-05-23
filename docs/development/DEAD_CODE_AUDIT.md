@@ -1,8 +1,16 @@
 # Dead Code Audit - MAYBE_UNUSED Functions and Variables
 
-**Date**: 2025-12-24  
-**Session**: 58  
+**Date**: 2025-12-24
+**Session**: 58
 **Auditor**: AI Assistant
+
+**Reading note (2026-05-23):** point-in-time snapshot. The file:line
+references and per-symbol classifications were accurate as of the
+audit date but have not been re-verified against current code. Use
+this document as a *historical* record of the categorization
+methodology and the major action calls; re-grep for `MAYBE_UNUSED`
+and `LLE_MAYBE_UNUSED` to get an accurate current inventory before
+acting on individual entries.
 
 ## Overview
 

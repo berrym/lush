@@ -1,6 +1,7 @@
 # Completion Rewrite Plan
 
-**Status:** Design ready for implementation. Drafted from Q&A session 2026-05-02.
+**Status (2026-05-23):** **IMPLEMENTED** — see [`COMPLETION_ARCHITECTURE.md`](COMPLETION_ARCHITECTURE.md) for the authoritative as-built reference. This document is preserved as the design record that fed that implementation.
+**Original status:** Design ready for implementation. Drafted from Q&A session 2026-05-02.
 **Provenance:** Replaces the scratched `completion-rewrite` branch (nuked 2026-05-01); supersedes the deleted `COMPLETION_ARCHITECTURE.md` v1/v2 from that branch. The previous attempt's failure modes are captured in the project memory `project-completion-rewrite-failure-postmortem.md` and informed this design — but the design's correctness rests on lush's own architectural standards, not on the postmortem's prescriptions.
 
 ## 1. The Bugs This Closes

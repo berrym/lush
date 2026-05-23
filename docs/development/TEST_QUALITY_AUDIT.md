@@ -5,7 +5,16 @@ four new test files that already use the shared framework introduced this
 branch: `test_char_width.c`, `test_grapheme_detector.c`, `test_utf8_index.c`,
 `test_theme_parser.c`).
 
-**Status:** findings only. No migrations yet. Migrating tests is its own
+**Status (2026-05-23):** findings still valid; migration in
+progress. `tests/test_framework.h` (the shared framework with
+setjmp/longjmp isolation + canonical signatures) is now the
+authoritative test framework. Phase A migration is underway --
+re-grep `tests/` for `define TEST` and `exit(1)` before relying on
+the counts below; they are point-in-time. Each migration is also a
+test-strengthening pass -- tests must verify real behavior, no
+filler.
+
+**Original status:** findings only. No migrations yet. Migrating tests is its own
 work and is best done file-by-file with each migration also strengthening
 the tests.
 

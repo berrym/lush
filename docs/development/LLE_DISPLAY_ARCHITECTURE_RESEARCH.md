@@ -1,7 +1,19 @@
 # LLE-Display Architecture Research
-**Date**: 2025-11-17  
-**Purpose**: Comprehensive understanding before Phase 5 implementation  
+**Date**: 2025-11-17
+**Purpose**: Comprehensive understanding before Phase 5 implementation
 **Context**: Must understand existing architecture before adding completion menu rendering
+
+**Reading note (2026-05-23):** the differential-update / diff-based
+render path described below was **replaced**. The current
+implementation is prompt-once + clear-and-redraw; `screen_buffer`
+remains the cursor-math source of truth but `display_controller` is
+the sole stdout writer for the REPL and does not call any
+`screen_buffer_diff` / `screen_buffer_apply_diff` path. See
+[`../../CLAUDE.md`](../../CLAUDE.md) "Display System" and the
+authoritative spec at [`SCREEN_BUFFER_SPECIFICATION.md`](SCREEN_BUFFER_SPECIFICATION.md).
+This research note is preserved as historical context for why the
+data-flow shape ended up where it did; treat any "diff" references
+as anachronisms.
 
 ---
 
