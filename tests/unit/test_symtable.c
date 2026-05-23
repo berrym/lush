@@ -405,6 +405,101 @@ TEST(array_associative) {
 }
 
 /* ============================================================================
+ * UNIFIED VALUE VIEW TESTS (SEMANTICS section 3 first-class values)
+ * ============================================================================
+ */
+
+TEST(value_view_scalar_lookup) {
+    /* symtable_lookup queries the global manager. Ensure it is up;
+     * init_symtable() is a no-op if already initialized. */
+    init_symtable();
+    symtable_manager_t *mgr = symtable_get_global_manager();
+    if (!mgr) {
+        printf(
+            "    (Skipped - global manager not initialized in test context)\n");
+        return;
+    }
+    symtable_set_var(mgr, "lush_view_scalar", "hello", 0);
+
+    lush_value_view_t view = {0};
+    bool found = symtable_lookup("lush_view_scalar", &view);
+
+    ASSERT(found, "scalar binding should be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_SCALAR, "kind should be SCALAR");
+    ASSERT_NOT_NULL(view.scalar_value, "scalar_value populated");
+    ASSERT_STR_EQ(view.scalar_value, "hello", "value matches");
+    ASSERT_NULL(view.array, "array NULL for scalar");
+
+    lush_value_view_clear(&view);
+    ASSERT_NULL(view.scalar_value, "clear zeroed scalar_value");
+    ASSERT_EQ(view.kind, LUSH_VALUE_NONE, "clear zeroed kind");
+
+    symtable_unset_var(mgr, "lush_view_scalar");
+}
+
+TEST(value_view_list_lookup) {
+    array_value_t *arr = symtable_array_create(false);
+    ASSERT_NOT_NULL(arr, "array_create");
+    symtable_array_append(arr, "a");
+    symtable_array_append(arr, "b");
+    symtable_set_array("lush_view_list", arr);
+
+    lush_value_view_t view = {0};
+    bool found = symtable_lookup("lush_view_list", &view);
+
+    ASSERT(found, "list binding should be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_LIST, "kind should be LIST");
+    ASSERT_NULL(view.scalar_value, "scalar_value NULL for list");
+    ASSERT_NOT_NULL(view.array, "array populated");
+    ASSERT_EQ(symtable_array_length(view.array), 2, "length matches");
+
+    lush_value_view_clear(&view);
+    /* The borrowed array is untouched by clear: still live in the
+     * symtable until we explicitly unset. */
+    symtable_unset_var(symtable_manager(), "lush_view_list");
+}
+
+TEST(value_view_map_lookup) {
+    array_value_t *arr = symtable_array_create(true);
+    ASSERT_NOT_NULL(arr, "array_create assoc");
+    symtable_array_set_assoc(arr, "k1", "v1");
+    symtable_set_array("lush_view_map", arr);
+
+    lush_value_view_t view = {0};
+    bool found = symtable_lookup("lush_view_map", &view);
+
+    ASSERT(found, "map binding should be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_MAP, "kind should be MAP");
+    ASSERT_NOT_NULL(view.array, "array populated for map");
+    ASSERT(view.array->is_associative, "is_associative on the borrowed array");
+
+    lush_value_view_clear(&view);
+    symtable_unset_var(symtable_manager(), "lush_view_map");
+}
+
+TEST(value_view_none_on_miss) {
+    lush_value_view_t view = {
+        .kind = LUSH_VALUE_SCALAR, .scalar_value = NULL, .array = NULL};
+    bool found = symtable_lookup("lush_view_no_such_var", &view);
+
+    ASSERT(!found, "unbound name should not be found");
+    ASSERT_EQ(view.kind, LUSH_VALUE_NONE, "kind reset to NONE on miss");
+    ASSERT_NULL(view.scalar_value, "scalar_value NULL on miss");
+    ASSERT_NULL(view.array, "array NULL on miss");
+    lush_value_view_clear(&view);
+}
+
+TEST(value_view_clear_idempotent) {
+    lush_value_view_t view = {0};
+    /* Repeated clears on a zero view are no-ops; safe to call after
+     * lookup whether or not a binding was found. */
+    lush_value_view_clear(&view);
+    lush_value_view_clear(&view);
+    lush_value_view_clear(NULL); // NULL-safe
+    ASSERT_EQ(view.kind, LUSH_VALUE_NONE, "remains NONE");
+}
+
+/* ============================================================================
  * GLOBAL CONVENIENCE API TESTS
  * ============================================================================
  */
@@ -474,6 +569,11 @@ int main(void) {
 
     printf("\nArray tests:\n");
     RUN_TEST(array_create);
+    RUN_TEST(value_view_scalar_lookup);
+    RUN_TEST(value_view_list_lookup);
+    RUN_TEST(value_view_map_lookup);
+    RUN_TEST(value_view_none_on_miss);
+    RUN_TEST(value_view_clear_idempotent);
     RUN_TEST(array_indexed_operations);
     RUN_TEST(array_append);
     RUN_TEST(array_associative);

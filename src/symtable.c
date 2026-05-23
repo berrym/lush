@@ -2802,6 +2802,53 @@ bool symtable_is_array(const char *name) {
     return symtable_get_array(name) != NULL;
 }
 
+/*
+ * Implementation of symtable_lookup. Contract documented in symtable.h.
+ * Walks the array side-table first (catches both indexed lists and
+ * associative maps, distinguished by the is_associative flag inside
+ * array_value_t); on miss falls through to the scalar scope chain.
+ * NULL on both paths returns LUSH_VALUE_NONE.
+ */
+bool symtable_lookup(const char *name, lush_value_view_t *out) {
+    if (!name || !out) {
+        return false;
+    }
+    out->kind = LUSH_VALUE_NONE;
+    out->scalar_value = NULL;
+    out->array = NULL;
+
+    array_value_t *arr = symtable_get_array(name);
+    if (arr) {
+        out->kind = arr->is_associative ? LUSH_VALUE_MAP : LUSH_VALUE_LIST;
+        out->array = arr;
+        return true;
+    }
+
+    char *scalar = symtable_get_var(symtable_manager(), name);
+    if (scalar) {
+        out->kind = LUSH_VALUE_SCALAR;
+        out->scalar_value = scalar;
+        return true;
+    }
+
+    return false;
+}
+
+/*
+ * Implementation of lush_value_view_clear. Contract documented in
+ * symtable.h. Idempotent: zeroes the struct after freeing so a
+ * follow-up call is safe.
+ */
+void lush_value_view_clear(lush_value_view_t *view) {
+    if (!view) {
+        return;
+    }
+    free(view->scalar_value);
+    view->scalar_value = NULL;
+    view->array = NULL;
+    view->kind = LUSH_VALUE_NONE;
+}
+
 /**
  * @brief Set an array element using shell syntax
  *

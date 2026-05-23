@@ -71,6 +71,44 @@ typedef struct array_value {
     size_t assoc_insertion_capacity; /**< Allocated capacity */
 } array_value_t;
 
+/* ============================================================================
+ * UNIFIED VALUE VIEW (SEMANTICS.md section 3 first-class values)
+ * ============================================================================
+ *
+ * Single lookup primitive returning a kind-tagged view of whatever the
+ * symtable holds for a name. Bridges the historical split between
+ * symtable_get_var (returns owned char*) and symtable_get_array
+ * (returns borrowed array_value_t*), so call sites that need to
+ * branch on the kind of a value can do so through one query rather
+ * than the two-step "try array, fall back to scalar" dance that
+ * proliferates through the expansion engine.
+ *
+ * Ownership:
+ *   - scalar_value is OWNED by the view (caller frees, or calls
+ *     lush_value_view_clear); strdup'd from the symtable's storage
+ *     so symtable mutations between lookup and use are safe.
+ *   - array is BORROWED from the symtable's array side-table;
+ *     valid until the next unset / mutation of that array.
+ *
+ * Call sites migrate at their own pace; symtable_get_var /
+ * symtable_get_array continue to work and serve sites where the
+ * unified view would not be a net simplification (single-kind
+ * lookups, hot paths that pre-classified the kind elsewhere).
+ */
+
+typedef enum {
+    LUSH_VALUE_NONE = 0, /**< No binding under this name */
+    LUSH_VALUE_SCALAR,   /**< Scalar string value */
+    LUSH_VALUE_LIST,     /**< Indexed array (list per SEMANTICS section 3.1) */
+    LUSH_VALUE_MAP /**< Associative array (map per SEMANTICS section 3.1) */
+} lush_value_kind_t;
+
+typedef struct lush_value_view {
+    lush_value_kind_t kind;
+    char *scalar_value;   /**< Owned strdup; non-NULL iff kind==SCALAR */
+    array_value_t *array; /**< Borrowed; non-NULL iff kind==LIST or MAP */
+} lush_value_view_t;
+
 // Variable flags
 typedef enum {
     SYMVAR_NONE = 0,
@@ -1184,6 +1222,41 @@ int symtable_set_array(const char *name, array_value_t *array);
  * @return Array value or NULL if not an array or not found
  */
 array_value_t *symtable_get_array(const char *name);
+
+/**
+ * @brief Unified value lookup (SEMANTICS section 3 first-class values)
+ *
+ * Populates @c out with whatever the symtable holds for @c name --
+ * scalar, list, or map -- with one call. Implementation walks the
+ * array side-table first (lists/maps), then the scalar scope chain
+ * (symtable_get_var) for a fallback to a scalar binding.
+ *
+ * On a hit, returns true and out->kind is one of LUSH_VALUE_SCALAR /
+ * LUSH_VALUE_LIST / LUSH_VALUE_MAP; out->scalar_value (owned) or
+ * out->array (borrowed) is populated accordingly. The caller MUST
+ * call lush_value_view_clear(&out) when done, even on a hit -- it is
+ * the only safe way to release a scalar strdup.
+ *
+ * On a miss, returns false; out->kind is LUSH_VALUE_NONE and the
+ * other fields are zeroed. lush_value_view_clear is a no-op on a
+ * cleared view, so the same call site can clear unconditionally.
+ *
+ * @param name Variable name (must not be NULL)
+ * @param out  Output view (must not be NULL; zeroed on entry)
+ * @return true if @c name is bound, false otherwise.
+ */
+bool symtable_lookup(const char *name, lush_value_view_t *out);
+
+/**
+ * @brief Free any owned storage in a value view
+ *
+ * Frees out->scalar_value if non-NULL and zeroes the struct. The
+ * array field is borrowed from the symtable and is not freed. Safe
+ * to call multiple times or on a never-populated view.
+ *
+ * @param view View to clear (NULL-safe; out fields zeroed on return)
+ */
+void lush_value_view_clear(lush_value_view_t *view);
 
 /**
  * @brief Check if a variable is an array
