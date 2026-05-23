@@ -2845,35 +2845,25 @@ array_value_t *symtable_get_array(const char *name) {
         return NULL;
     }
 
-    // Walk the scope chain first -- arrays land in the same per-scope
-    // vars_ht as scalars (storage unification phase A) so they get
-    // proper scope-aware lookup including SYMVAR_UNSET shadowing.
-    // Fall back to the global side-table during the transition for
-    // call sites (mostly the LLE shell hooks) that haven't migrated.
-    if (global_manager && global_manager->current_scope) {
-        symvar_t *var = find_var(global_manager->current_scope, name);
-        if (var) {
-            array_value_t *result =
-                (var->type == SYMVAR_ARRAY) ? var->array : NULL;
-            free_symvar(var);
-            if (result) {
-                return result;
-            }
-        }
-    }
-
-    if (!array_storage) {
+    // Single source of truth: the scope chain. Arrays live in
+    // per-scope vars_ht the same way scalars do (storage
+    // unification phase B), so a local array defined in a function
+    // dies when the function scope is popped -- matching bash. The
+    // global array_storage side-table is still allocated (set_array
+    // also writes there for the lle_shell_hooks PROMPT_COMMAND walk
+    // and the shutdown cleanup that frees array_value_t backing
+    // memory) but is no longer consulted as a get fallback: that
+    // fallback was leaking local arrays out of their function scope.
+    if (!global_manager || !global_manager->current_scope) {
         return NULL;
     }
-    const char *ptr_str = ht_strstr_get(array_storage, name);
-    if (!ptr_str) {
+    symvar_t *var = find_var(global_manager->current_scope, name);
+    if (!var) {
         return NULL;
     }
-    void *ptr;
-    if (sscanf(ptr_str, "%p", &ptr) != 1) {
-        return NULL;
-    }
-    return (array_value_t *)ptr;
+    array_value_t *result = (var->type == SYMVAR_ARRAY) ? var->array : NULL;
+    free_symvar(var);
+    return result;
 }
 
 /**
