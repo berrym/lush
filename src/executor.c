@@ -1219,6 +1219,10 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return 0; // Syntax check mode - don't execute
         }
 
+        /* Bash-style DEBUG pseudo-signal: fires BEFORE every command.
+         * fire_debug_trap itself gates on functrace + function scope. */
+        fire_debug_trap();
+
         last_result = execute_node(executor, current);
 
         // Check for loop control (break/continue) - stop executing list
@@ -5701,6 +5705,10 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             continue;
         }
 
+        /* Bash-style DEBUG pseudo-signal: fires BEFORE each command in a
+         * brace group. fire_debug_trap gates on functrace + scope. */
+        fire_debug_trap();
+
         last_result = execute_node(executor, command);
 
         if (executor->debug) {
@@ -9105,6 +9113,12 @@ static int execute_function_call(executor_t *executor,
             continue;
         }
 
+        /* Bash-style DEBUG pseudo-signal: fires BEFORE each command in
+         * the function body. fire_debug_trap gates on functrace +
+         * function scope, so by default it stays silent inside
+         * functions and surfaces only when the user opts in. */
+        fire_debug_trap();
+
         result = execute_node(executor, command);
 
         /* Bash-style ERR pseudo-signal: fires on a non-zero exit
@@ -9120,6 +9134,12 @@ static int execute_function_call(executor_t *executor,
         if (result >= 200 && result <= 255) {
             // Extract the actual return value from the special code
             int actual_return = result - 200;
+
+            /* Bash-style RETURN pseudo-signal: fires when a function
+             * returns via the `return` builtin. fire_return_trap gates
+             * on functrace; fires BEFORE we pop the scope so the trap
+             * runs in the function's frame. */
+            fire_return_trap();
 
             if (has_redirections) {
                 restore_file_descriptors(&redir_state);
@@ -9139,6 +9159,12 @@ static int execute_function_call(executor_t *executor,
         }
         command = command->next_sibling;
     }
+
+    /* Bash-style RETURN pseudo-signal: fires when a function returns
+     * by falling off the end of its body (no explicit `return`).
+     * Fires BEFORE we pop the scope so the trap runs in the
+     * function's frame. */
+    fire_return_trap();
 
     if (has_redirections) {
         restore_file_descriptors(&redir_state);

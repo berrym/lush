@@ -54,6 +54,26 @@ extern trap_entry_t *trap_list;
 void fire_err_trap(void);
 
 /**
+ * @brief Execute the registered DEBUG trap, if any
+ *
+ * Fires before every simple command. Gated by `set -o functrace` (-T):
+ * when functrace is OFF and execution is inside a function scope, the
+ * DEBUG trap is suppressed (matches bash's default of not inheriting
+ * DEBUG into function bodies). Safe to call when no DEBUG trap is set.
+ */
+void fire_debug_trap(void);
+
+/**
+ * @brief Execute the registered RETURN trap, if any
+ *
+ * Fires when a function returns (or a sourced file finishes). Gated
+ * by `set -o functrace` (-T): when functrace is OFF, the RETURN trap
+ * is suppressed for non-top-level returns. Safe to call when no
+ * RETURN trap is set.
+ */
+void fire_return_trap(void);
+
+/**
  * @brief Set a signal handler function
  *
  * @param signum Signal number to handle

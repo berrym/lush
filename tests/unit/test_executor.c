@@ -377,6 +377,85 @@ TEST(trap_err_inherited_in_function_with_errtrace) {
     executor_free(exec);
 }
 
+/* Issue #109: the functrace option (`set -o functrace` / `-T`)
+ * controls whether the DEBUG and RETURN traps are inherited into
+ * function bodies. Without functrace, both traps are suppressed for
+ * commands executed inside a function scope (bash's default).
+ * With functrace, they fire normally inside the body. */
+TEST(trap_debug_not_inherited_in_function_by_default) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec,
+                                             "trap 'echo D' DEBUG\n"
+                                             "f() { echo a; echo b; }\n"
+                                             "f\n"
+                                             "trap - DEBUG\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /* Between `a` and `b` (both inside f's body), no DEBUG line
+     * should appear. If DEBUG were inherited, we'd see "a\nD\nb";
+     * with the default-off behavior we should see "a\nb" with no
+     * interruption. */
+    ASSERT_NULL(strstr(r.out, "a\nD\nb"),
+                "DEBUG must not fire between commands inside f");
+
+    executor_free(exec);
+}
+
+TEST(trap_debug_inherited_in_function_with_functrace) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec,
+                                             "trap 'echo D' DEBUG\n"
+                                             "set -o functrace\n"
+                                             "f() { echo a; echo b; }\n"
+                                             "f\n"
+                                             "set +o functrace\n"
+                                             "trap - DEBUG\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /* With functrace, between a and b a DEBUG line should appear
+     * (`a\nD\nb`), proving the trap fired inside the body. */
+    ASSERT_NOT_NULL(strstr(r.out, "a\nD\nb"),
+                    "DEBUG must fire between commands inside f with functrace");
+
+    executor_free(exec);
+}
+
+TEST(trap_return_not_inherited_in_function_by_default) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec,
+                                             "trap 'echo RET' RETURN\n"
+                                             "f() { echo inside; }\n"
+                                             "f\n"
+                                             "trap - RETURN\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_NULL(strstr(r.out, "RET"),
+                "RETURN trap must NOT fire without functrace");
+
+    executor_free(exec);
+}
+
+TEST(trap_return_inherited_in_function_with_functrace) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(exec,
+                                             "trap 'echo RET' RETURN\n"
+                                             "set -o functrace\n"
+                                             "f() { echo inside; }\n"
+                                             "f\n"
+                                             "set +o functrace\n"
+                                             "trap - RETURN\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_NOT_NULL(strstr(r.out, "RET"),
+                    "RETURN trap must fire when functrace is set");
+
+    executor_free(exec);
+}
+
 TEST(trap_err_silent_on_zero_exit) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -2162,6 +2241,10 @@ int main(void) {
     RUN_TEST(trap_err_silent_on_zero_exit);
     RUN_TEST(trap_err_not_inherited_in_function_by_default);
     RUN_TEST(trap_err_inherited_in_function_with_errtrace);
+    RUN_TEST(trap_debug_not_inherited_in_function_by_default);
+    RUN_TEST(trap_debug_inherited_in_function_with_functrace);
+    RUN_TEST(trap_return_not_inherited_in_function_by_default);
+    RUN_TEST(trap_return_inherited_in_function_with_functrace);
 
     printf("\nSEMANTICS 3.4/3.9 conformance tests:\n");
     RUN_TEST(arr_at_in_scalar_assignment_raises_type_mismatch);

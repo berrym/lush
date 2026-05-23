@@ -502,6 +502,47 @@ void fire_err_trap(void) {
     }
 }
 
+/**
+ * @brief Execute the registered DEBUG trap, if any
+ *
+ * Bash's `set -o functrace` (`-T`) gates DEBUG and RETURN trap
+ * inheritance into function bodies. Without functrace, DEBUG fires
+ * only at the top-level shell (not inside functions); with it, DEBUG
+ * follows execution into nested contexts. Mirrors fire_err_trap's
+ * gating shape exactly.
+ */
+void fire_debug_trap(void) {
+    if (!shell_opts.functrace &&
+        symtable_in_function_scope(symtable_manager())) {
+        return;
+    }
+
+    trap_entry_t *trap = find_trap(TRAP_PSEUDO_DEBUG);
+    if (trap && trap->command && trap->command[0] != '\0') {
+        run_trap_command(trap->command);
+    }
+}
+
+/**
+ * @brief Execute the registered RETURN trap, if any
+ *
+ * Fires when a function returns. Gated by functrace the same way
+ * DEBUG is: without `set -o functrace`, RETURN is suppressed for
+ * function-scope returns. Top-level returns (from sourced files at
+ * the top-level shell) fire normally.
+ */
+void fire_return_trap(void) {
+    if (!shell_opts.functrace &&
+        symtable_in_function_scope(symtable_manager())) {
+        return;
+    }
+
+    trap_entry_t *trap = find_trap(TRAP_PSEUDO_RETURN);
+    if (trap && trap->command && trap->command[0] != '\0') {
+        run_trap_command(trap->command);
+    }
+}
+
 void execute_pending_traps(void) {
     sig_atomic_t pending = pending_trap_signals;
     if (pending == 0) {

@@ -278,6 +278,7 @@ static option_mapping_t option_map[] = {
     {"ignoreeof", &shell_opts.ignoreeof, 0},
     {"nolog", &shell_opts.nolog, 0},
     {"errtrace", &shell_opts.errtrace, 'E'},
+    {"functrace", &shell_opts.functrace, 'T'},
     {"emacs", &shell_opts.emacs_mode, 0},
     {"vi", &shell_opts.vi_mode, 0},
     {"posix", &shell_opts.posix_mode, 0},
