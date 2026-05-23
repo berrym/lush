@@ -44,6 +44,11 @@
 // Global manager
 static symtable_manager_t *global_manager = NULL;
 
+// Forward declaration: defined at line ~2754. Needed by
+// symtable_unset_var (which must free arrays from the side-table on
+// `unset arr`) before the file-static definition appears.
+static ht_strstr_t *array_storage;
+
 // Legacy compatibility structures
 static symtable_t dummy_symtable = {0, NULL, NULL};
 
@@ -750,6 +755,23 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
 int symtable_unset_var(symtable_manager_t *manager, const char *name) {
     if (!manager || !name) {
         return -1;
+    }
+
+    // For array bindings: free the underlying array_value_t and drop
+    // it from the global side-table. Without this, `unset arr` would
+    // mark the scope-entry UNSET but leave the array alive in the
+    // side-table, so a follow-up ${#arr[@]} or symtable_get_array
+    // would resurrect it. Read straight from the side-table here so
+    // we don't recurse through the scope-walk + UNSET filter.
+    if (array_storage) {
+        const char *ptr_str = ht_strstr_get(array_storage, name);
+        if (ptr_str) {
+            void *ptr = NULL;
+            if (sscanf(ptr_str, "%p", &ptr) == 1 && ptr) {
+                symtable_array_free((array_value_t *)ptr);
+            }
+            ht_strstr_remove(array_storage, name);
+        }
     }
 
     // Mark as unset rather than removing
