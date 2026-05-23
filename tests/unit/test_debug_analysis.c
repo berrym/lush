@@ -355,6 +355,57 @@ TEST(analyze_script_portability_echo_e) {
     cleanup_test_dir();
 }
 
+/* The predictive type-mismatch warning (SEMANTICS section 3.9):
+ * `${arr[@]}` in a scalar-assignment RHS becomes a runtime type error
+ * at execution; the analyzer flags it statically so the script author
+ * sees the issue without running. */
+TEST(analyze_script_type_at_subscript_in_scalar_assignment) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/bin/sh\n"
+                         "arr=(a b c)\n"
+                         "x=${arr[@]}\n"
+                         "y=\"${arr[@]}\"\n"
+                         "for i in ${arr[@]}; do echo $i; done\n";
+    char *path = create_test_script("type_at_scalar.sh", script);
+
+    debug_analyze_script(ctx, path);
+
+    /* Count "type" category issues -- expect exactly two: lines 3 and
+     * 4. The for-in usage on line 5 is vector-accepting and must NOT
+     * be flagged. */
+    int type_issue_count = 0;
+    bool flagged_line_3 = false;
+    bool flagged_line_4 = false;
+    bool flagged_line_5_for_loop = false;
+    analysis_issue_t *issue = ctx->analysis_issues;
+    while (issue) {
+        if (strcmp(issue->category, "type") == 0) {
+            type_issue_count++;
+            if (issue->line_number == 3) {
+                flagged_line_3 = true;
+            } else if (issue->line_number == 4) {
+                flagged_line_4 = true;
+            } else if (issue->line_number == 5) {
+                flagged_line_5_for_loop = true;
+            }
+        }
+        issue = issue->next;
+    }
+    ASSERT_TRUE(flagged_line_3,
+                "x=\\${arr[@]} flagged as scalar-slot type mismatch");
+    ASSERT_TRUE(flagged_line_4,
+                "y=\"\\${arr[@]}\" flagged as scalar-slot type mismatch");
+    ASSERT_FALSE(flagged_line_5_for_loop,
+                 "for-in is vector-accepting; must not flag");
+    ASSERT_EQ(type_issue_count, 2, "exactly two type-mismatch warnings");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
 TEST(analyze_script_style_long_lines) {
     setup_test_dir();
     debug_context_t *ctx = debug_init();
@@ -676,6 +727,7 @@ int main(void) {
     printf("\nPortability Analysis:\n");
     RUN_TEST(analyze_script_portability_source);
     RUN_TEST(analyze_script_portability_echo_e);
+    RUN_TEST(analyze_script_type_at_subscript_in_scalar_assignment);
 
     printf("\nStyle Analysis:\n");
     RUN_TEST(analyze_script_style_long_lines);

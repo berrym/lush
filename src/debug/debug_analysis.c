@@ -37,6 +37,8 @@ static void debug_analyze_security(debug_context_t *ctx, const char *file,
                                    const char *content);
 static void debug_analyze_portability(debug_context_t *ctx, const char *file,
                                       const char *content, node_t *ast);
+static void debug_analyze_types(debug_context_t *ctx, const char *file,
+                                const char *content);
 
 /**
  * @brief Analyze a script file for various issues
@@ -97,6 +99,7 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
     debug_analyze_performance(ctx, script_path, script_content);
     debug_analyze_security(ctx, script_path, script_content);
     debug_analyze_portability(ctx, script_path, script_content, ast);
+    debug_analyze_types(ctx, script_path, script_content);
 
     // Generate analysis report
     debug_show_analysis_report(ctx);
@@ -504,6 +507,150 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
     }
 }
 
+/* ============================================================================
+ * Type-mismatch analysis (predictive, per SEMANTICS.md section 3.9)
+ * ============================================================================
+ *
+ * SEMANTICS section 3.9 makes a list value in a scalar-requiring slot a
+ * runtime type error -- enforced at runtime by executor.c (commit
+ * 1c5e587f). This pass catches the same condition statically, so the
+ * user can see the issue without running the script.
+ *
+ * Pattern-based, not full type inference. It detects ${...[@]...}
+ * (and the parameter-flag (k)/(v)/(kv) vector operators) appearing
+ * immediately after an "=" assignment marker, with or without an
+ * intervening double quote. This covers the most common bug shape:
+ *
+ *     x=${arr[@]}              -- assignment RHS
+ *     x="${arr[@]}"            -- quoted assignment RHS (quotes are a
+ *                                 whitespace anchor, not a type op)
+ *
+ * Bare ${arr} references (where the type depends on runtime value)
+ * and cases inside command substitution or arithmetic are out of
+ * scope for the pattern pass -- they need real type inference.
+ *
+ * False positives are possible (e.g. a literal "=" inside a comment
+ * followed by "${...[@]}" syntax illustrated in documentation). The
+ * pass skips lines whose first non-whitespace character is "#".
+ */
+
+/* Find the first occurrence of a vector-yielding subscript inside the
+ * ${...} expansion that begins at `start` (which must point at the
+ * "${"). Returns true if found; *end is set to the position just
+ * after the closing "}". */
+static bool scan_vector_expansion(const char *start, size_t avail,
+                                  bool *out_has_vector, size_t *out_end) {
+    if (avail < 3 || start[0] != '$' || start[1] != '{') {
+        return false;
+    }
+    size_t i = 2;
+    int depth = 1;
+    bool has_vector = false;
+    while (i < avail && depth > 0) {
+        char c = start[i];
+        if (c == '{') {
+            depth++;
+        } else if (c == '}') {
+            depth--;
+            if (depth == 0) {
+                i++;
+                break;
+            }
+        } else if (c == '[' && i + 2 < avail && start[i + 1] == '@' &&
+                   start[i + 2] == ']') {
+            /* The [@] subscript is the canonical vector trigger. */
+            has_vector = true;
+        } else if (c == '(' && i + 2 < avail && depth == 1) {
+            /* Parameter-flag operators (k) / (v) / (kv) yield vectors
+             * from a map. (i)/(I) yield indices (scalars) and are not
+             * vector-yielding -- exclude them. */
+            char f1 = start[i + 1];
+            char f2 = start[i + 2];
+            if ((f1 == 'k' || f1 == 'v') && (f2 == ')' || f2 == 'k' ||
+                                              f2 == 'v')) {
+                has_vector = true;
+            }
+        }
+        i++;
+    }
+    if (depth != 0) {
+        return false; /* no closing brace -- bail */
+    }
+    *out_has_vector = has_vector;
+    *out_end = i;
+    return true;
+}
+
+static void debug_analyze_types(debug_context_t *ctx, const char *file,
+                                const char *content) {
+    if (!ctx || !file || !content) {
+        return;
+    }
+
+    int line_num = 1;
+    const char *line_start = content;
+    size_t content_len = strlen(content);
+
+    for (size_t i = 0; i <= content_len; i++) {
+        if (i == content_len || content[i] == '\n') {
+            size_t line_len = (size_t)(content + i - line_start);
+
+            /* Skip blank lines and shell comments outright. */
+            const char *trim = line_start;
+            const char *end = line_start + line_len;
+            while (trim < end && (*trim == ' ' || *trim == '\t')) {
+                trim++;
+            }
+            if (trim >= end || *trim == '#') {
+                goto next_line;
+            }
+
+            /* Walk the line scanning for "=" followed (with optional
+             * double quote) by a ${...} expansion that contains [@]. */
+            for (size_t k = 0; k + 2 < line_len; k++) {
+                if (line_start[k] != '=') {
+                    continue;
+                }
+                /* Skip "==" (string equality), not assignment. */
+                if (k + 1 < line_len && line_start[k + 1] == '=') {
+                    continue;
+                }
+                size_t e = k + 1;
+                if (e < line_len && line_start[e] == '"') {
+                    e++;
+                }
+                if (e + 1 >= line_len) {
+                    continue;
+                }
+                if (line_start[e] != '$' || line_start[e + 1] != '{') {
+                    continue;
+                }
+                bool has_vector = false;
+                size_t end_pos = 0;
+                if (!scan_vector_expansion(line_start + e, line_len - e,
+                                           &has_vector, &end_pos)) {
+                    continue;
+                }
+                if (has_vector) {
+                    debug_add_analysis_issue(
+                        ctx, file, line_num, "warning", "type",
+                        "list value (`${...[@]}`) reaches a scalar "
+                        "assignment RHS -- runtime type error per "
+                        "SEMANTICS section 3.9",
+                        "use ${name[*]} for a space-joined scalar, "
+                        "or use the array directly in a vector-"
+                        "accepting position (argv, for-in list)");
+                    k = e + end_pos; /* don't double-flag */
+                }
+            }
+
+        next_line:
+            line_start = content + i + 1;
+            line_num++;
+        }
+    }
+}
+
 /**
  * @brief Display the analysis report
  * @param ctx Debug context containing analysis results
@@ -539,12 +686,12 @@ void debug_show_analysis_report(debug_context_t *ctx) {
                  ctx->issue_count, error_count, warning_count, info_count);
 
     // Show issues by category
-    const char *categories[] = {"syntax", "security", "performance", "style",
-                                "portability"};
-    const char *category_names[] = {"Syntax", "Security", "Performance",
-                                    "Style", "Portability"};
+    const char *categories[] = {"syntax", "security",    "performance",
+                                "style",  "portability", "type"};
+    const char *category_names[] = {"Syntax",      "Security",    "Performance",
+                                    "Style",       "Portability", "Type"};
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         bool has_issues = false;
         issue = ctx->analysis_issues;
 
@@ -661,12 +808,12 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
     }
 
     // Show issues by category
-    const char *categories[] = {"syntax", "security", "performance", "style",
-                                "portability"};
-    const char *category_names[] = {"Syntax", "Security", "Performance",
-                                    "Style", "Portability"};
+    const char *categories[] = {"syntax", "security",    "performance",
+                                "style",  "portability", "type"};
+    const char *category_names[] = {"Syntax",      "Security",    "Performance",
+                                    "Style",       "Portability", "Type"};
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         bool has_issues = false;
         issue = ctx->analysis_issues;
 
