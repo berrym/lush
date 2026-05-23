@@ -1561,6 +1561,32 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         return 1;
     }
 
+    // Parser-internal array-literal sentinel (\x1F) housekeeping:
+    // the parser prefixes any unquoted `name=(...)` argv element with
+    // \x1F so assignment-aware builtins (local, declare, typeset,
+    // readonly, export) can distinguish it from a quoted scalar.
+    // External commands and non-assignment builtins must not see
+    // that internal byte. Strip it from EVERY argv element when the
+    // command is NOT one of the assignment-aware set; the targeted
+    // builtins handle the sentinel themselves.
+    if (argc > 0 && argv[0]) {
+        const char *cmd = argv[0];
+        bool sentinel_aware =
+            (strcmp(cmd, "local") == 0 || strcmp(cmd, "declare") == 0 ||
+             strcmp(cmd, "typeset") == 0 || strcmp(cmd, "readonly") == 0 ||
+             strcmp(cmd, "export") == 0);
+        if (!sentinel_aware) {
+            for (int i = 0; i < argc; i++) {
+                if (argv[i] && argv[i][0] == '\x1F') {
+                    // Shift the string left by one to drop the prefix
+                    // byte; the allocation came from build_argv_from_ast
+                    // and is owned by us, so an in-place shift is safe.
+                    memmove(argv[i], argv[i] + 1, strlen(argv[i]));
+                }
+            }
+        }
+    }
+
     // Privileged mode security check
     if (argc > 0 && !is_privileged_command_allowed(argv[0])) {
         executor_error_report(
