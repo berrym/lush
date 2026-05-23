@@ -40,8 +40,8 @@ extern trap_entry_t *trap_list;
  * unchanged. ERR fires after a command returns non-zero; DEBUG fires
  * before each command; RETURN fires when a function returns.
  */
-#define TRAP_PSEUDO_ERR    -100
-#define TRAP_PSEUDO_DEBUG  -101
+#define TRAP_PSEUDO_ERR -100
+#define TRAP_PSEUDO_DEBUG -101
 #define TRAP_PSEUDO_RETURN -102
 
 /**

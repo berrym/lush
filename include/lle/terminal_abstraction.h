@@ -81,19 +81,19 @@ typedef struct lle_key_detector lle_key_detector_t;
  * Spec Reference: Section 4 - Terminal Capability Detection
  */
 typedef enum {
-    LLE_TERMINAL_UNKNOWN = 0,    ///< Terminal type not yet identified
-    LLE_TERMINAL_GENERIC,        ///< Generic/unrecognized terminal
-    LLE_TERMINAL_XTERM,          ///< xterm and xterm-compatible
-    LLE_TERMINAL_RXVT,           ///< rxvt / urxvt
-    LLE_TERMINAL_KONSOLE,        ///< KDE Konsole
-    LLE_TERMINAL_GNOME_TERMINAL, ///< GNOME Terminal (VTE)
-    LLE_TERMINAL_SCREEN,         ///< GNU screen
-    LLE_TERMINAL_TMUX,           ///< tmux multiplexer
-    LLE_TERMINAL_LINUX_CONSOLE,  ///< Linux text console
-    LLE_TERMINAL_DARWIN_TERMINAL,///< Apple Terminal.app
-    LLE_TERMINAL_ITERM2,         ///< iTerm2 (macOS)
-    LLE_TERMINAL_ALACRITTY,      ///< Alacritty
-    LLE_TERMINAL_KITTY           ///< Kitty terminal
+    LLE_TERMINAL_UNKNOWN = 0,     ///< Terminal type not yet identified
+    LLE_TERMINAL_GENERIC,         ///< Generic/unrecognized terminal
+    LLE_TERMINAL_XTERM,           ///< xterm and xterm-compatible
+    LLE_TERMINAL_RXVT,            ///< rxvt / urxvt
+    LLE_TERMINAL_KONSOLE,         ///< KDE Konsole
+    LLE_TERMINAL_GNOME_TERMINAL,  ///< GNOME Terminal (VTE)
+    LLE_TERMINAL_SCREEN,          ///< GNU screen
+    LLE_TERMINAL_TMUX,            ///< tmux multiplexer
+    LLE_TERMINAL_LINUX_CONSOLE,   ///< Linux text console
+    LLE_TERMINAL_DARWIN_TERMINAL, ///< Apple Terminal.app
+    LLE_TERMINAL_ITERM2,          ///< iTerm2 (macOS)
+    LLE_TERMINAL_ALACRITTY,       ///< Alacritty
+    LLE_TERMINAL_KITTY            ///< Kitty terminal
 } lle_terminal_type_t;
 
 /**
@@ -102,46 +102,46 @@ typedef enum {
  * Spec Reference: Section 7 - Input Event Processing
  */
 typedef enum {
-    LLE_INPUT_TYPE_CHARACTER = 0,  ///< Printable character (UTF-8 codepoint)
-    LLE_INPUT_TYPE_SPECIAL_KEY,    ///< Special key (arrow, function, etc.)
-    LLE_INPUT_TYPE_WINDOW_RESIZE,  ///< Terminal window resize event
-    LLE_INPUT_TYPE_SIGNAL,         ///< Signal-delivered event
-    LLE_INPUT_TYPE_TIMEOUT,        ///< Input read timeout elapsed
-    LLE_INPUT_TYPE_ERROR,          ///< Error encountered during input
-    LLE_INPUT_TYPE_EOF             ///< End-of-file on terminal input
+    LLE_INPUT_TYPE_CHARACTER = 0, ///< Printable character (UTF-8 codepoint)
+    LLE_INPUT_TYPE_SPECIAL_KEY,   ///< Special key (arrow, function, etc.)
+    LLE_INPUT_TYPE_WINDOW_RESIZE, ///< Terminal window resize event
+    LLE_INPUT_TYPE_SIGNAL,        ///< Signal-delivered event
+    LLE_INPUT_TYPE_TIMEOUT,       ///< Input read timeout elapsed
+    LLE_INPUT_TYPE_ERROR,         ///< Error encountered during input
+    LLE_INPUT_TYPE_EOF            ///< End-of-file on terminal input
 } lle_input_type_t;
 
 /**
  * @brief Special key codes
  */
 typedef enum {
-    LLE_KEY_UNKNOWN = 0,  ///< Unrecognized key
-    LLE_KEY_UP,           ///< Up arrow
-    LLE_KEY_DOWN,         ///< Down arrow
-    LLE_KEY_LEFT,         ///< Left arrow
-    LLE_KEY_RIGHT,        ///< Right arrow
-    LLE_KEY_HOME,         ///< Home key
-    LLE_KEY_END,          ///< End key
-    LLE_KEY_PAGE_UP,      ///< Page Up
-    LLE_KEY_PAGE_DOWN,    ///< Page Down
-    LLE_KEY_INSERT,       ///< Insert key
-    LLE_KEY_DELETE,       ///< Forward delete
-    LLE_KEY_BACKSPACE,    ///< Backspace key
-    LLE_KEY_TAB,          ///< Tab key
-    LLE_KEY_ENTER,        ///< Enter / Return
-    LLE_KEY_ESCAPE,       ///< Escape key
-    LLE_KEY_F1,           ///< Function key F1
-    LLE_KEY_F2,           ///< Function key F2
-    LLE_KEY_F3,           ///< Function key F3
-    LLE_KEY_F4,           ///< Function key F4
-    LLE_KEY_F5,           ///< Function key F5
-    LLE_KEY_F6,           ///< Function key F6
-    LLE_KEY_F7,           ///< Function key F7
-    LLE_KEY_F8,           ///< Function key F8
-    LLE_KEY_F9,           ///< Function key F9
-    LLE_KEY_F10,          ///< Function key F10
-    LLE_KEY_F11,          ///< Function key F11
-    LLE_KEY_F12           ///< Function key F12
+    LLE_KEY_UNKNOWN = 0, ///< Unrecognized key
+    LLE_KEY_UP,          ///< Up arrow
+    LLE_KEY_DOWN,        ///< Down arrow
+    LLE_KEY_LEFT,        ///< Left arrow
+    LLE_KEY_RIGHT,       ///< Right arrow
+    LLE_KEY_HOME,        ///< Home key
+    LLE_KEY_END,         ///< End key
+    LLE_KEY_PAGE_UP,     ///< Page Up
+    LLE_KEY_PAGE_DOWN,   ///< Page Down
+    LLE_KEY_INSERT,      ///< Insert key
+    LLE_KEY_DELETE,      ///< Forward delete
+    LLE_KEY_BACKSPACE,   ///< Backspace key
+    LLE_KEY_TAB,         ///< Tab key
+    LLE_KEY_ENTER,       ///< Enter / Return
+    LLE_KEY_ESCAPE,      ///< Escape key
+    LLE_KEY_F1,          ///< Function key F1
+    LLE_KEY_F2,          ///< Function key F2
+    LLE_KEY_F3,          ///< Function key F3
+    LLE_KEY_F4,          ///< Function key F4
+    LLE_KEY_F5,          ///< Function key F5
+    LLE_KEY_F6,          ///< Function key F6
+    LLE_KEY_F7,          ///< Function key F7
+    LLE_KEY_F8,          ///< Function key F8
+    LLE_KEY_F9,          ///< Function key F9
+    LLE_KEY_F10,         ///< Function key F10
+    LLE_KEY_F11,         ///< Function key F11
+    LLE_KEY_F12          ///< Function key F12
 } lle_special_key_t;
 
 /**
@@ -159,11 +159,12 @@ typedef enum {
  * @brief Terminal optimization flags
  */
 typedef enum {
-    LLE_OPT_NONE = 0,                  ///< No optimization flags enabled
-    LLE_OPT_FAST_CURSOR = (1 << 0),    ///< Fast cursor positioning available
-    LLE_OPT_BATCH_UPDATES = (1 << 1),  ///< Batch multiple updates per flush
-    LLE_OPT_INCREMENTAL_DRAW = (1 << 2),///< Incremental draw supported
-    LLE_OPT_UNICODE_AWARE = (1 << 3)   ///< Terminal handles Unicode width correctly
+    LLE_OPT_NONE = 0,                    ///< No optimization flags enabled
+    LLE_OPT_FAST_CURSOR = (1 << 0),      ///< Fast cursor positioning available
+    LLE_OPT_BATCH_UPDATES = (1 << 1),    ///< Batch multiple updates per flush
+    LLE_OPT_INCREMENTAL_DRAW = (1 << 2), ///< Incremental draw supported
+    LLE_OPT_UNICODE_AWARE =
+        (1 << 3) ///< Terminal handles Unicode width correctly
 } lle_optimization_flags_t;
 
 /* ============================================================================
@@ -309,7 +310,7 @@ typedef struct lle_display_content {
     /* Complete display lines */
     lle_display_line_t *lines; ///< Array of generated display lines
     size_t line_count;         ///< Number of populated lines
-    size_t line_capacity; /* Total allocated lines for proper cleanup */
+    size_t line_capacity;      /* Total allocated lines for proper cleanup */
 
     /* Cursor position information */
     size_t cursor_line;   ///< Cursor row within content (0-based)
@@ -317,9 +318,9 @@ typedef struct lle_display_content {
     bool cursor_visible;  ///< Cursor visibility flag
 
     /* Content metadata */
-    uint64_t generation_time;  ///< Microsecond timestamp when generated
-    bool is_complete_refresh;  ///< True when full refresh is required
-    uint32_t content_version;  ///< Monotonic content version counter
+    uint64_t generation_time; ///< Microsecond timestamp when generated
+    bool is_complete_refresh; ///< True when full refresh is required
+    uint32_t content_version; ///< Monotonic content version counter
 } lle_display_content_t;
 
 /**
@@ -337,8 +338,9 @@ typedef struct lle_generation_params {
  * Spec Reference: Section 5 - Display Content Generation
  */
 typedef struct lle_display_generator {
-    lle_terminal_capabilities_t *capabilities; ///< Detected terminal capabilities
-    lle_internal_state_t *internal_state;      ///< Authoritative editing state
+    lle_terminal_capabilities_t
+        *capabilities;                    ///< Detected terminal capabilities
+    lle_internal_state_t *internal_state; ///< Authoritative editing state
 
     /* Content generation state */
     lle_display_content_t *current_content;  ///< Latest generated content
@@ -375,7 +377,8 @@ typedef struct lle_lush_display_client {
     lle_layer_config_t layer_config; ///< Layer configuration values
 
     /* Terminal capabilities for display optimization */
-    lle_terminal_capabilities_t *capabilities; ///< Detected terminal capabilities
+    lle_terminal_capabilities_t
+        *capabilities; ///< Detected terminal capabilities
 
     /* Display submission tracking */
     uint64_t last_submission_time; ///< Microsecond timestamp of last submission
@@ -424,8 +427,8 @@ typedef struct lle_input_event_t {
 
         /* Error event */
         struct {
-            lle_result_t error_code;   ///< LLE error code for this event
-            char error_message[256];   ///< Human-readable error message
+            lle_result_t error_code; ///< LLE error code for this event
+            char error_message[256]; ///< Human-readable error message
         } error;
     } data; ///< Event payload, selected by `type`
 } lle_input_event_t;
@@ -436,8 +439,10 @@ typedef struct lle_input_event_t {
  * Spec Reference: Section 7 - Input Event Processing
  */
 typedef struct lle_input_processor {
-    lle_terminal_capabilities_t *capabilities; ///< Detected terminal capabilities
-    struct lle_unix_interface *unix_interface; ///< Backing Unix terminal interface
+    lle_terminal_capabilities_t
+        *capabilities; ///< Detected terminal capabilities
+    struct lle_unix_interface
+        *unix_interface; ///< Backing Unix terminal interface
 
     /* Input processing state */
     uint64_t events_processed;     ///< Total events processed

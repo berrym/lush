@@ -140,8 +140,8 @@ typedef enum {
 typedef enum {
     LLE_POOL_SELECTION_ROUND_ROBIN, ///< Rotate through pools in order
     LLE_POOL_SELECTION_LEAST_USED,  ///< Pick the pool with the most free space
-    LLE_POOL_SELECTION_BEST_FIT,    ///< Pick the pool whose block size best fits
-    LLE_POOL_SELECTION_FIRST_FIT    ///< Pick the first pool that can satisfy
+    LLE_POOL_SELECTION_BEST_FIT, ///< Pick the pool whose block size best fits
+    LLE_POOL_SELECTION_FIRST_FIT ///< Pick the first pool that can satisfy
 } lle_pool_selection_algorithm_t;
 
 typedef enum {
@@ -152,9 +152,9 @@ typedef enum {
 } lle_allocation_strategy_t;
 
 typedef enum {
-    LLE_RESIZE_ACTION_NONE,   ///< No resize action required
-    LLE_RESIZE_ACTION_GROW,   ///< Grow the pool
-    LLE_RESIZE_ACTION_SHRINK  ///< Shrink the pool
+    LLE_RESIZE_ACTION_NONE,  ///< No resize action required
+    LLE_RESIZE_ACTION_GROW,  ///< Grow the pool
+    LLE_RESIZE_ACTION_SHRINK ///< Shrink the pool
 } lle_resize_action_t;
 
 typedef enum {
@@ -165,9 +165,9 @@ typedef enum {
 } lle_resize_reason_t;
 
 typedef enum {
-    LLE_ACCESS_TYPE_READ,       ///< Read-only access
-    LLE_ACCESS_TYPE_WRITE,      ///< Write-only access
-    LLE_ACCESS_TYPE_READ_WRITE  ///< Combined read and write access
+    LLE_ACCESS_TYPE_READ,      ///< Read-only access
+    LLE_ACCESS_TYPE_WRITE,     ///< Write-only access
+    LLE_ACCESS_TYPE_READ_WRITE ///< Combined read and write access
 } lle_access_type_t;
 
 typedef enum {
@@ -200,17 +200,17 @@ typedef enum {
 } lle_memory_recovery_strategy_t;
 
 typedef enum {
-    LLE_ENCRYPTION_NONE,     ///< No encryption
-    LLE_ENCRYPTION_AES_128,  ///< AES-128 encryption
-    LLE_ENCRYPTION_AES_256,  ///< AES-256 encryption
-    LLE_ENCRYPTION_CHACHA20  ///< ChaCha20 stream cipher
+    LLE_ENCRYPTION_NONE,    ///< No encryption
+    LLE_ENCRYPTION_AES_128, ///< AES-128 encryption
+    LLE_ENCRYPTION_AES_256, ///< AES-256 encryption
+    LLE_ENCRYPTION_CHACHA20 ///< ChaCha20 stream cipher
 } lle_encryption_algorithm_t;
 
 typedef enum {
-    LLE_DATA_SENSITIVITY_LOW,      ///< Non-sensitive data
-    LLE_DATA_SENSITIVITY_MEDIUM,   ///< Moderately sensitive data
-    LLE_DATA_SENSITIVITY_HIGH,     ///< Highly sensitive data
-    LLE_DATA_SENSITIVITY_CRITICAL  ///< Critical / secret data
+    LLE_DATA_SENSITIVITY_LOW,     ///< Non-sensitive data
+    LLE_DATA_SENSITIVITY_MEDIUM,  ///< Moderately sensitive data
+    LLE_DATA_SENSITIVITY_HIGH,    ///< Highly sensitive data
+    LLE_DATA_SENSITIVITY_CRITICAL ///< Critical / secret data
 } lle_data_sensitivity_t;
 
 typedef enum {
@@ -254,10 +254,10 @@ typedef enum {
 } lle_buffer_type_t;
 
 typedef enum {
-    LLE_COMPRESSION_NONE,   ///< No compression
-    LLE_COMPRESSION_LZ4,    ///< LZ4 compression
-    LLE_COMPRESSION_ZSTD,   ///< Zstandard compression
-    LLE_COMPRESSION_SNAPPY  ///< Snappy compression
+    LLE_COMPRESSION_NONE,  ///< No compression
+    LLE_COMPRESSION_LZ4,   ///< LZ4 compression
+    LLE_COMPRESSION_ZSTD,  ///< Zstandard compression
+    LLE_COMPRESSION_SNAPPY ///< Snappy compression
 } lle_compression_algorithm_t;
 
 /* ============================================================================
@@ -295,8 +295,8 @@ typedef struct lle_memory_test_framework_t lle_memory_test_framework_t;
 
 /* Types needed for complete structure definitions */
 typedef struct {
-    int error_code;            ///< Numeric error code
-    char error_message[256];   ///< Human-readable error message
+    int error_code;          ///< Numeric error code
+    char error_message[256]; ///< Human-readable error message
 } lle_integration_error_t;
 
 /* ============================================================================
@@ -329,12 +329,12 @@ typedef struct {
 } lle_memory_config_t;
 
 typedef struct {
-    uint64_t total_allocated;    ///< Cumulative bytes allocated
-    uint64_t total_freed;        ///< Cumulative bytes freed
-    uint64_t current_usage;      ///< Current bytes in use
-    uint64_t peak_usage;         ///< Peak bytes ever in use
-    double allocation_rate;      ///< Recent allocation rate (bytes/sec)
-    double deallocation_rate;    ///< Recent deallocation rate (bytes/sec)
+    uint64_t total_allocated; ///< Cumulative bytes allocated
+    uint64_t total_freed;     ///< Cumulative bytes freed
+    uint64_t current_usage;   ///< Current bytes in use
+    uint64_t peak_usage;      ///< Peak bytes ever in use
+    double allocation_rate;   ///< Recent allocation rate (bytes/sec)
+    double deallocation_rate; ///< Recent deallocation rate (bytes/sec)
 } lle_memory_stats_t;
 
 typedef struct {
@@ -343,9 +343,9 @@ typedef struct {
 } lle_resize_decision_t;
 
 typedef struct {
-    double locality_score;     ///< Locality score in [0.0, 1.0]
-    double sequential_ratio;   ///< Fraction of sequential accesses
-    size_t hot_region_count;   ///< Number of hot memory regions detected
+    double locality_score;   ///< Locality score in [0.0, 1.0]
+    double sequential_ratio; ///< Fraction of sequential accesses
+    size_t hot_region_count; ///< Number of hot memory regions detected
 } lle_access_pattern_analysis_t;
 
 typedef struct {
@@ -366,7 +366,7 @@ typedef struct {
 
 typedef struct {
     lle_tuning_action_item_t actions[16]; ///< Planned tuning actions
-    size_t action_count;                  ///< Number of valid entries in actions
+    size_t action_count; ///< Number of valid entries in actions
 } lle_tuning_action_plan_t;
 
 typedef struct {
@@ -374,8 +374,8 @@ typedef struct {
     double deallocation_rate;                ///< Deallocations per second
     struct timespec average_allocation_time; ///< Average allocation latency
     struct timespec peak_allocation_time;    ///< Worst-case allocation latency
-    double fragmentation_ratio;              ///< Fragmentation ratio in [0.0, 1.0]
-    double utilization_efficiency;           ///< Utilization efficiency in [0.0, 1.0]
+    double fragmentation_ratio;    ///< Fragmentation ratio in [0.0, 1.0]
+    double utilization_efficiency; ///< Utilization efficiency in [0.0, 1.0]
 } lle_memory_pool_performance_t;
 
 typedef struct {

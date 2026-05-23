@@ -169,11 +169,12 @@ typedef struct {
  * Used for introspection and debugging
  */
 typedef struct {
-    char key_sequence[LLE_MAX_KEY_SEQUENCE_LENGTH]; ///< Key sequence string in GNU Readline notation
+    char key_sequence[LLE_MAX_KEY_SEQUENCE_LENGTH]; ///< Key sequence string in
+                                                    ///< GNU Readline notation
     lle_keybinding_action_t
         action;                /* Full action structure (type + func + name) */
     const char *function_name; /* Legacy field (use action.name instead) */
-    lle_keymap_mode_t mode; ///< Keymap mode this binding belongs to
+    lle_keymap_mode_t mode;    ///< Keymap mode this binding belongs to
 } lle_keybinding_info_t;
 
 /* ============================================================================

@@ -26,7 +26,11 @@ typedef struct {
 
 /* Mock builtins array */
 static builtin_t mock_builtins[] = {
-    {"cd", NULL}, {"echo", NULL}, {"exit", NULL}, {NULL, NULL}};
+    {  "cd", NULL},
+    {"echo", NULL},
+    {"exit", NULL},
+    {  NULL, NULL}
+};
 
 builtin_t *builtins = mock_builtins;
 int builtins_count = 3;

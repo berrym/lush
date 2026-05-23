@@ -23,16 +23,25 @@ static const struct {
     const char *text;
     token_type_t type;
 } keywords[] = {
-    {"if", TOK_IF},         {"then", TOK_THEN},
-    {"else", TOK_ELSE},     {"elif", TOK_ELIF},
-    {"fi", TOK_FI},         {"while", TOK_WHILE},
-    {"do", TOK_DO},         {"done", TOK_DONE},
-    {"for", TOK_FOR},       {"in", TOK_IN},
-    {"case", TOK_CASE},     {"esac", TOK_ESAC},
-    {"until", TOK_UNTIL},   {"function", TOK_FUNCTION},
-    {"select", TOK_SELECT}, {"time", TOK_TIME},
-    {"coproc", TOK_COPROC}, {"repeat", TOK_REPEAT},
-    {NULL, TOK_WORD} // Sentinel
+    {      "if",       TOK_IF},
+    {    "then",     TOK_THEN},
+    {    "else",     TOK_ELSE},
+    {    "elif",     TOK_ELIF},
+    {      "fi",       TOK_FI},
+    {   "while",    TOK_WHILE},
+    {      "do",       TOK_DO},
+    {    "done",     TOK_DONE},
+    {     "for",      TOK_FOR},
+    {      "in",       TOK_IN},
+    {    "case",     TOK_CASE},
+    {    "esac",     TOK_ESAC},
+    {   "until",    TOK_UNTIL},
+    {"function", TOK_FUNCTION},
+    {  "select",   TOK_SELECT},
+    {    "time",     TOK_TIME},
+    {  "coproc",   TOK_COPROC},
+    {  "repeat",   TOK_REPEAT},
+    {      NULL,     TOK_WORD}  // Sentinel
 };
 
 // Helper functions

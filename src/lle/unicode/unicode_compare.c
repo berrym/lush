@@ -284,11 +284,11 @@ static const combining_class_entry_t combining_class_table[] = {
     {0x0331, 220}, /* Combining macron below */
     {0x0332, 220}, /* Combining low line */
     {0x0333, 220}, /* Combining double low line */
-    {0x0334, 1},   /* Combining tilde overlay */
-    {0x0335, 1},   /* Combining short stroke overlay */
-    {0x0336, 1},   /* Combining long stroke overlay */
-    {0x0337, 1},   /* Combining short solidus overlay */
-    {0x0338, 1},   /* Combining long solidus overlay */
+    {0x0334,   1}, /* Combining tilde overlay */
+    {0x0335,   1}, /* Combining short stroke overlay */
+    {0x0336,   1}, /* Combining long stroke overlay */
+    {0x0337,   1}, /* Combining short solidus overlay */
+    {0x0338,   1}, /* Combining long solidus overlay */
     {0x0339, 220}, /* Combining right half ring below */
     {0x033A, 220}, /* Combining inverted bridge below */
     {0x033B, 220}, /* Combining square below */

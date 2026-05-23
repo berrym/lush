@@ -218,8 +218,15 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
         const char *name;
         int code;
     } named[] = {
-        {"black", 0},   {"red", 1},  {"green", 2}, {"yellow", 3},  {"blue", 4},
-        {"magenta", 5}, {"cyan", 6}, {"white", 7}, {"default", 9},
+        {  "black", 0},
+        {    "red", 1},
+        {  "green", 2},
+        { "yellow", 3},
+        {   "blue", 4},
+        {"magenta", 5},
+        {   "cyan", 6},
+        {  "white", 7},
+        {"default", 9},
     };
     for (size_t i = 0; i < sizeof(named) / sizeof(named[0]); i++) {
         if (strcmp(spec, named[i].name) == 0) {

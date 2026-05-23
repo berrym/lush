@@ -21,13 +21,13 @@
 
 typedef enum {
     NODE_COMMAND, ///< Simple command (argv-style)
-    NODE_ASSIGN, // cmd_prefix assignment: val.str = "var=value" / "var+=value"
-    NODE_VAR,    ///< Variable reference
-    NODE_STRING_LITERAL,    // Single-quoted string - no expansion
-    NODE_STRING_EXPANDABLE, // Double-quoted string - variable expansion
-    NODE_ARITH_EXP,         // Arithmetic expansion $((expr))
-    NODE_COMMAND_SUB,       // Command substitution $(cmd)
-    NODE_PIPE,              ///< Pipe operator '|'
+    NODE_ASSIGN,  // cmd_prefix assignment: val.str = "var=value" / "var+=value"
+    NODE_VAR,     ///< Variable reference
+    NODE_STRING_LITERAL,      // Single-quoted string - no expansion
+    NODE_STRING_EXPANDABLE,   // Double-quoted string - variable expansion
+    NODE_ARITH_EXP,           // Arithmetic expansion $((expr))
+    NODE_COMMAND_SUB,         // Command substitution $(cmd)
+    NODE_PIPE,                ///< Pipe operator '|'
     NODE_REDIR_IN,            // '<'
     NODE_REDIR_OUT,           // '>'
     NODE_REDIR_APPEND,        // '>>'
@@ -96,14 +96,14 @@ typedef enum {
 } case_terminator_t;
 
 typedef enum {
-    VAL_SINT = 1,  ///< Signed integer (ssize_t)
-    VAL_UINT,      ///< Unsigned integer (size_t)
-    VAL_SLLONG,    ///< Signed 64-bit integer (int64_t)
-    VAL_ULLONG,    ///< Unsigned 64-bit integer (uint64_t)
-    VAL_FLOAT,     ///< Double-precision floating point
-    VAL_LDOUBLE,   ///< Long double floating point
-    VAL_CHR,       ///< Single character
-    VAL_STR,       ///< Heap-allocated C string
+    VAL_SINT = 1, ///< Signed integer (ssize_t)
+    VAL_UINT,     ///< Unsigned integer (size_t)
+    VAL_SLLONG,   ///< Signed 64-bit integer (int64_t)
+    VAL_ULLONG,   ///< Unsigned 64-bit integer (uint64_t)
+    VAL_FLOAT,    ///< Double-precision floating point
+    VAL_LDOUBLE,  ///< Long double floating point
+    VAL_CHR,      ///< Single character
+    VAL_STR,      ///< Heap-allocated C string
 } val_type_t;
 
 typedef union {
@@ -118,12 +118,12 @@ typedef union {
 } symval_t;
 
 typedef struct node {
-    node_type_t type;                          ///< AST node kind
-    val_type_t val_type;                       ///< Active union member of `val`
-    symval_t val;                              ///< Node payload (type-tagged)
-    size_t children;                           ///< Count of direct children
-    struct node *first_child;                  ///< First child in linked list
-    struct node *next_sibling, *prev_sibling;  ///< Sibling linked-list pointers
+    node_type_t type;                         ///< AST node kind
+    val_type_t val_type;                      ///< Active union member of `val`
+    symval_t val;                             ///< Node payload (type-tagged)
+    size_t children;                          ///< Count of direct children
+    struct node *first_child;                 ///< First child in linked list
+    struct node *next_sibling, *prev_sibling; ///< Sibling linked-list pointers
 
     /* Source location tracking for error reporting */
     source_location_t loc;

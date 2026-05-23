@@ -726,8 +726,7 @@ int init(int argc, char **argv, FILE **in) {
         if (lle_result != LLE_SUCCESS) {
             shell_error_t *err = shell_error_create(
                 SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
-                SOURCE_LOC_UNKNOWN,
-                "failed to initialise the LLE (code %d)",
+                SOURCE_LOC_UNKNOWN, "failed to initialise the LLE (code %d)",
                 (int)lle_result);
             if (err) {
                 shell_error_set_suggestion(
@@ -955,8 +954,7 @@ static int parse_opts(int argc, char **argv) {
                 } else {
                     shell_error_t *err = shell_error_create(
                         SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
-                        SOURCE_LOC_UNKNOWN,
-                        "--target requires an argument");
+                        SOURCE_LOC_UNKNOWN, "--target requires an argument");
                     if (err) {
                         shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);
@@ -997,8 +995,7 @@ static int parse_opts(int argc, char **argv) {
                 } else {
                     shell_error_t *err = shell_error_create(
                         SHELL_ERR_MISSING_ARGUMENT, SHELL_SEVERITY_ERROR,
-                        SOURCE_LOC_UNKNOWN,
-                        "--format requires an argument");
+                        SOURCE_LOC_UNKNOWN, "--format requires an argument");
                     if (err) {
                         shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);

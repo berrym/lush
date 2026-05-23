@@ -731,8 +731,8 @@ TEST(path_implicit_tilde_plus) {
         TEST_PASS();
     } else {
         char msg[128];
-        snprintf(msg, sizeof(msg),
-                 "expected PATH_DIR_HOME for `~+`, got %d", (int)type);
+        snprintf(msg, sizeof(msg), "expected PATH_DIR_HOME for `~+`, got %d",
+                 (int)type);
         TEST_FAIL(msg);
     }
     rmdir(dir);
@@ -772,8 +772,8 @@ TEST(path_implicit_tilde_minus) {
         TEST_PASS();
     } else {
         char msg[128];
-        snprintf(msg, sizeof(msg),
-                 "expected PATH_DIR_HOME for `~-`, got %d", (int)type);
+        snprintf(msg, sizeof(msg), "expected PATH_DIR_HOME for `~-`, got %d",
+                 (int)type);
         TEST_FAIL(msg);
     }
     rmdir(dir);
@@ -813,8 +813,7 @@ TEST(path_implicit_tilde_user) {
         TEST_PASS();
     } else {
         char msg[256];
-        snprintf(msg, sizeof(msg),
-                 "expected PATH_DIR_HOME for `~%s`, got %d",
+        snprintf(msg, sizeof(msg), "expected PATH_DIR_HOME for `~%s`, got %d",
                  pw->pw_name, (int)type);
         TEST_FAIL(msg);
     }
@@ -838,7 +837,8 @@ TEST(path_implicit_tilde_unknown_user) {
     } else {
         char msg[128];
         snprintf(msg, sizeof(msg),
-                 "expected PATH_INVALID for unknown `~user`, got %d", (int)type);
+                 "expected PATH_INVALID for unknown `~user`, got %d",
+                 (int)type);
         TEST_FAIL(msg);
     }
     lle_syntax_highlighter_destroy(h);

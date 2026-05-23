@@ -656,8 +656,7 @@ TEST(enumerate_current_scope_vars_in_function_scope) {
     init_symtable();
     ASSERT_NOT_NULL(symtable_manager(), "symtable manager must exist");
 
-    int rc = symtable_push_scope(symtable_manager(), SCOPE_FUNCTION,
-                                 "test_fn");
+    int rc = symtable_push_scope(symtable_manager(), SCOPE_FUNCTION, "test_fn");
     ASSERT_EQ(rc, 0, "push function scope");
 
     rc = symtable_set_local_var(symtable_manager(), "fn_local", "hello");
@@ -689,8 +688,7 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
     debug_context_t *ctx = new_captured_ctx();
     ASSERT_NOT_NULL(ctx, "captured ctx");
 
-    int rc = symtable_push_scope(symtable_manager(), SCOPE_FUNCTION,
-                                 "speak");
+    int rc = symtable_push_scope(symtable_manager(), SCOPE_FUNCTION, "speak");
     ASSERT_EQ(rc, 0, "push function scope");
     symtable_set_local_var(symtable_manager(), "greeting", "hi");
 
@@ -713,10 +711,8 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
      * UTF-8 and ASCII glyph sets. */
     ASSERT_TRUE(strstr(log, "[Local Variables]") != NULL,
                 "Local Variables section present");
-    ASSERT_TRUE(strstr(log, "greeting") != NULL,
-                "local variable name appears");
-    ASSERT_TRUE(strstr(log, "Scalar") != NULL,
-                "Scalar type label appears");
+    ASSERT_TRUE(strstr(log, "greeting") != NULL, "local variable name appears");
+    ASSERT_TRUE(strstr(log, "Scalar") != NULL, "Scalar type label appears");
 
     symtable_pop_scope(symtable_manager());
     debug_cleanup(ctx);
@@ -913,12 +909,10 @@ TEST(view_frame_brackets_render_around_title) {
     /* Top border with bracketed title, plus a row, plus the bottom
      * border. The exact horizontal fill length is fixed by the
      * module; assert presence of the load-bearing pieces. */
-    ASSERT_TRUE(strstr(log, "+- [Sample] ") != NULL,
-                "frame top with title");
+    ASSERT_TRUE(strstr(log, "+- [Sample] ") != NULL, "frame top with title");
     ASSERT_TRUE(strstr(log, "| row one\n") != NULL,
                 "interior row carries the gutter");
-    ASSERT_TRUE(strstr(log, "+--") != NULL,
-                "frame bottom border");
+    ASSERT_TRUE(strstr(log, "+--") != NULL, "frame bottom border");
 
     debug_view_reset_glyph_cache();
     debug_cleanup(ctx);

@@ -1348,7 +1348,7 @@ lle_create_forensic_log_entry(const lle_error_context_t *error_context,
 
 /* Buffer component recovery strategies */
 static lle_recovery_strategy_t g_buffer_recovery_strategies[] = {
-    {.type = RECOVERY_STRATEGY_RETRY,
+    {               .type = RECOVERY_STRATEGY_RETRY,
      .strategy_name = "Buffer Retry",
      .description = "Retry buffer operation with validation",
      .max_attempts = 3,
@@ -1363,7 +1363,7 @@ static lle_recovery_strategy_t g_buffer_recovery_strategies[] = {
      .execute_strategy = NULL,
      .strategy_data = NULL,
      .strategy_data_size = 0},
-    {.type = RECOVERY_STRATEGY_RESET_COMPONENT,
+    {     .type = RECOVERY_STRATEGY_RESET_COMPONENT,
      .strategy_name = "Buffer Reset",
      .description = "Reset buffer to safe state",
      .max_attempts = 1,
@@ -1392,7 +1392,8 @@ static lle_recovery_strategy_t g_buffer_recovery_strategies[] = {
      .affects_critical_path = false,
      .execute_strategy = NULL,
      .strategy_data = NULL,
-     .strategy_data_size = 0}};
+     .strategy_data_size = 0}
+};
 
 /* Event system recovery strategies */
 static lle_recovery_strategy_t g_event_recovery_strategies[] = {
@@ -1411,7 +1412,7 @@ static lle_recovery_strategy_t g_event_recovery_strategies[] = {
      .execute_strategy = NULL,
      .strategy_data = NULL,
      .strategy_data_size = 0},
-    {.type = RECOVERY_STRATEGY_FALLBACK_MODE,
+    {  .type = RECOVERY_STRATEGY_FALLBACK_MODE,
      .strategy_name = "Event Bypass Mode",
      .description = "Temporarily bypass event system",
      .max_attempts = 1,
@@ -1425,7 +1426,8 @@ static lle_recovery_strategy_t g_event_recovery_strategies[] = {
      .affects_critical_path = false,
      .execute_strategy = NULL,
      .strategy_data = NULL,
-     .strategy_data_size = 0}};
+     .strategy_data_size = 0}
+};
 
 /* Memory error recovery strategies */
 static lle_recovery_strategy_t g_memory_recovery_strategies[] = {
@@ -1458,7 +1460,8 @@ static lle_recovery_strategy_t g_memory_recovery_strategies[] = {
      .affects_critical_path = false,
      .execute_strategy = NULL,
      .strategy_data = NULL,
-     .strategy_data_size = 0}};
+     .strategy_data_size = 0}
+};
 
 /* Generic/fallback recovery strategies */
 static lle_recovery_strategy_t g_generic_recovery_strategies[] = {
@@ -1476,7 +1479,8 @@ static lle_recovery_strategy_t g_generic_recovery_strategies[] = {
      .affects_critical_path = false,
      .execute_strategy = NULL,
      .strategy_data = NULL,
-     .strategy_data_size = 0}};
+     .strategy_data_size = 0}
+};
 
 /* ============================================================================
  * RECOVERY STRATEGY SCORING AND SELECTION
@@ -2020,13 +2024,13 @@ lle_run_individual_validation_test(const lle_error_validation_test_t *test) {
 lle_result_t lle_run_error_handling_validation_suite(void) {
     /* Define validation test cases */
     static const lle_error_validation_test_t validation_tests[] = {
-        {.test_name = "Buffer Error Recovery Test",
+        {      .test_name = "Buffer Error Recovery Test",
          .target_error = LLE_ERROR_BUFFER_COMPONENT,
          .target_component = "BufferManager",
          .should_recover_automatically = true,
          .expected_degradation = DEGRADATION_LEVEL_LOW,
          .max_recovery_time_ns = 1000000, /* 1ms */
-         .setup_test = NULL,
+ .setup_test = NULL,
          .execute_test = NULL,
          .validate_result = NULL,
          .cleanup_test = NULL},
@@ -2036,20 +2040,21 @@ lle_result_t lle_run_error_handling_validation_suite(void) {
          .should_recover_automatically = true,
          .expected_degradation = DEGRADATION_LEVEL_MINIMAL,
          .max_recovery_time_ns = 500000, /* 500μs */
-         .setup_test = NULL,
+ .setup_test = NULL,
          .execute_test = NULL,
          .validate_result = NULL,
          .cleanup_test = NULL},
-        {.test_name = "Memory Exhaustion Recovery Test",
+        { .test_name = "Memory Exhaustion Recovery Test",
          .target_error = LLE_ERROR_OUT_OF_MEMORY,
          .target_component = "MemoryManager",
          .should_recover_automatically = true,
          .expected_degradation = DEGRADATION_LEVEL_MODERATE,
          .max_recovery_time_ns = 2000000, /* 2ms */
-         .setup_test = NULL,
+ .setup_test = NULL,
          .execute_test = NULL,
          .validate_result = NULL,
-         .cleanup_test = NULL}};
+         .cleanup_test = NULL}
+    };
 
     size_t test_count = sizeof(validation_tests) / sizeof(validation_tests[0]);
     uint32_t passed_tests = 0;

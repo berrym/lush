@@ -144,7 +144,8 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
         if (bp->enabled && bp->line == line && strcmp(bp->file, file) == 0) {
             bp->hit_count++;
 
-            debug_trace_printf(ctx, "BREAKPOINT MATCHED - entering debug mode\n");
+            debug_trace_printf(ctx,
+                               "BREAKPOINT MATCHED - entering debug mode\n");
             debug_view_begin_frame(ctx, "BREAKPOINT HIT");
             debug_view_emit_line(ctx, "Breakpoint %d at %s:%d (hit count: %d)",
                                  bp->id, file, line, bp->hit_count);
@@ -736,9 +737,10 @@ void debug_print_help(debug_context_t *ctx) {
 void debug_save_execution_context(debug_context_t *ctx, executor_t *executor,
                                   node_t *node) {
     if (!ctx || !executor || !node) {
-        debug_trace_printf(ctx, "debug_save_execution_context: NULL parameter - "
-                     "ctx=%p executor=%p node=%p\n",
-                     (void *)ctx, (void *)executor, (void *)node);
+        debug_trace_printf(ctx,
+                           "debug_save_execution_context: NULL parameter - "
+                           "ctx=%p executor=%p node=%p\n",
+                           (void *)ctx, (void *)executor, (void *)node);
         return;
     }
 
@@ -752,8 +754,8 @@ void debug_save_execution_context(debug_context_t *ctx, executor_t *executor,
          node->type == NODE_UNTIL);
 
     if (ctx->execution_context.in_loop) {
-        debug_trace_printf(ctx, "Saving loop execution context - node type: %d\n",
-                     node->type);
+        debug_trace_printf(
+            ctx, "Saving loop execution context - node type: %d\n", node->type);
 
         // Save loop-specific context
         if (node->type == NODE_FOR) {
@@ -833,8 +835,9 @@ void debug_enter_loop(debug_context_t *ctx, const char *loop_type,
     }
 
     debug_trace_printf(ctx, "Entering %s loop with variable '%s' = '%s'\n",
-                 loop_type ? loop_type : "unknown",
-                 variable ? variable : "unknown", value ? value : "unknown");
+                       loop_type ? loop_type : "unknown",
+                       variable ? variable : "unknown",
+                       value ? value : "unknown");
 
     ctx->execution_context.in_loop = true;
     // Save the current line as the loop body start line (will be set to body
@@ -864,7 +867,8 @@ void debug_update_loop_variable(debug_context_t *ctx, const char *variable,
     }
 
     debug_trace_printf(ctx, "Loop variable update: '%s' = '%s'\n",
-                 variable ? variable : "unknown", value ? value : "unknown");
+                       variable ? variable : "unknown",
+                       value ? value : "unknown");
 
     // Update the stored loop variable value
     free(ctx->execution_context.loop_variable_value);
@@ -882,7 +886,7 @@ void debug_exit_loop(debug_context_t *ctx) {
     }
 
     debug_trace_printf(ctx, "Exiting loop after %d iterations\n",
-                 ctx->execution_context.loop_iteration);
+                       ctx->execution_context.loop_iteration);
 
     // Clean up loop context
     ctx->execution_context.in_loop = false;

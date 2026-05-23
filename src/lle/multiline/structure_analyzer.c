@@ -31,21 +31,22 @@ typedef struct keyword_definition {
 } keyword_definition_t;
 
 static const keyword_definition_t SHELL_KEYWORDS[] = {
-    {"for", 3, LLE_KEYWORD_FOR, true},
-    {"select", 6, LLE_KEYWORD_SELECT, true},
-    {"case", 4, LLE_KEYWORD_CASE, true},
-    {"if", 2, LLE_KEYWORD_IF, true},
-    {"while", 5, LLE_KEYWORD_WHILE, true},
-    {"until", 5, LLE_KEYWORD_UNTIL, true},
-    {"function", 8, LLE_KEYWORD_FUNCTION, true},
-    {"do", 2, LLE_KEYWORD_DO, false},
-    {"done", 4, LLE_KEYWORD_DONE, false},
-    {"then", 4, LLE_KEYWORD_THEN, false},
-    {"fi", 2, LLE_KEYWORD_FI, false},
-    {"esac", 4, LLE_KEYWORD_ESAC, false},
-    {"elif", 4, LLE_KEYWORD_ELIF, false},
-    {"else", 4, LLE_KEYWORD_ELSE, false},
-    {NULL, 0, LLE_KEYWORD_NONE, false}};
+    {     "for", 3,      LLE_KEYWORD_FOR,  true},
+    {  "select", 6,   LLE_KEYWORD_SELECT,  true},
+    {    "case", 4,     LLE_KEYWORD_CASE,  true},
+    {      "if", 2,       LLE_KEYWORD_IF,  true},
+    {   "while", 5,    LLE_KEYWORD_WHILE,  true},
+    {   "until", 5,    LLE_KEYWORD_UNTIL,  true},
+    {"function", 8, LLE_KEYWORD_FUNCTION,  true},
+    {      "do", 2,       LLE_KEYWORD_DO, false},
+    {    "done", 4,     LLE_KEYWORD_DONE, false},
+    {    "then", 4,     LLE_KEYWORD_THEN, false},
+    {      "fi", 2,       LLE_KEYWORD_FI, false},
+    {    "esac", 4,     LLE_KEYWORD_ESAC, false},
+    {    "elif", 4,     LLE_KEYWORD_ELIF, false},
+    {    "else", 4,     LLE_KEYWORD_ELSE, false},
+    {      NULL, 0,     LLE_KEYWORD_NONE, false}
+};
 
 /* Structure analyzer implementation */
 struct lle_structure_analyzer {
@@ -367,13 +368,14 @@ lle_structure_analyzer_check_complete(lle_structure_analyzer_t *analyzer,
     } keyword_pair_t;
 
     static const keyword_pair_t pairs[] = {
-        {LLE_KEYWORD_FOR, LLE_KEYWORD_DONE},
-        {LLE_KEYWORD_WHILE, LLE_KEYWORD_DONE},
-        {LLE_KEYWORD_UNTIL, LLE_KEYWORD_DONE},
+        {   LLE_KEYWORD_FOR, LLE_KEYWORD_DONE},
+        { LLE_KEYWORD_WHILE, LLE_KEYWORD_DONE},
+        { LLE_KEYWORD_UNTIL, LLE_KEYWORD_DONE},
         {LLE_KEYWORD_SELECT, LLE_KEYWORD_DONE},
-        {LLE_KEYWORD_IF, LLE_KEYWORD_FI},
-        {LLE_KEYWORD_CASE, LLE_KEYWORD_ESAC},
-        {LLE_KEYWORD_NONE, LLE_KEYWORD_NONE}};
+        {    LLE_KEYWORD_IF,   LLE_KEYWORD_FI},
+        {  LLE_KEYWORD_CASE, LLE_KEYWORD_ESAC},
+        {  LLE_KEYWORD_NONE, LLE_KEYWORD_NONE}
+    };
 
     /* Simple stack to track unclosed keywords */
     lle_keyword_type_t stack[DEFAULT_MAX_NESTING_DEPTH];

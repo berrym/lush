@@ -112,8 +112,7 @@ typedef struct {
  * @param with_script_context Set script-execution mode for the call.
  * @return Exit status plus captured stdout.
  */
-static gate_result_t run_under_debugger(executor_t *exec,
-                                        debug_context_t *ctx,
+static gate_result_t run_under_debugger(executor_t *exec, debug_context_t *ctx,
                                         const char *script,
                                         bool with_script_context) {
     gate_result_t r = {0};
@@ -254,8 +253,7 @@ TEST(breakpoint_requires_script_context) {
 
     breakpoint_t *bp = find_breakpoint(ctx, id);
     ASSERT_NOT_NULL(bp, "breakpoint still present");
-    ASSERT_EQ(bp->hit_count, 0,
-              "no breakpoint fires outside script execution");
+    ASSERT_EQ(bp->hit_count, 0, "no breakpoint fires outside script execution");
 
     debug_cleanup(ctx);
     executor_free(exec);
@@ -380,8 +378,7 @@ TEST(step_mode_breaks_at_next_node) {
      * across the UTF-8 and ASCII glyph sets. */
     ASSERT_TRUE(strstr(log, "[STEP]") != NULL,
                 "step branch reached during execution");
-    ASSERT_FALSE(ctx->step_mode,
-                 "EOF at the debug prompt cleared step mode");
+    ASSERT_FALSE(ctx->step_mode, "EOF at the debug prompt cleared step mode");
 
     debug_cleanup(ctx);
     executor_free(exec);

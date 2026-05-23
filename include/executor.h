@@ -494,8 +494,7 @@ void free_function_params(function_param_t *params);
  * @param executor Executor context
  * @param script_file Script file path (NULL to clear)
  */
-void executor_set_script_context(executor_t *executor,
-                                 const char *script_file);
+void executor_set_script_context(executor_t *executor, const char *script_file);
 
 /**
  * @brief Clear script execution context

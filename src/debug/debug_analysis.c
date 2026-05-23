@@ -81,8 +81,7 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
     size_t bytes_read = fread(script_content, 1, (size_t)file_size, file);
     fclose(file);
     if (bytes_read != (size_t)file_size) {
-        debug_printf(ctx,
-                     "ERROR: Short read on %s (expected %ld, got %zu)\n",
+        debug_printf(ctx, "ERROR: Short read on %s (expected %ld, got %zu)\n",
                      script_path, file_size, bytes_read);
         free(script_content);
         return;
@@ -576,8 +575,8 @@ static bool scan_vector_expansion(const char *start, size_t avail,
              * vector-yielding -- exclude them. */
             char f1 = start[i + 1];
             char f2 = start[i + 2];
-            if ((f1 == 'k' || f1 == 'v') && (f2 == ')' || f2 == 'k' ||
-                                              f2 == 'v')) {
+            if ((f1 == 'k' || f1 == 'v') &&
+                (f2 == ')' || f2 == 'k' || f2 == 'v')) {
                 has_vector = true;
             }
         }
@@ -712,8 +711,8 @@ void debug_show_analysis_report(debug_context_t *ctx) {
     // Show issues by category
     const char *categories[] = {"syntax", "security",    "performance",
                                 "style",  "portability", "type"};
-    const char *category_names[] = {"Syntax",      "Security",    "Performance",
-                                    "Style",       "Portability", "Type"};
+    const char *category_names[] = {"Syntax", "Security",    "Performance",
+                                    "Style",  "Portability", "Type"};
 
     for (int i = 0; i < 6; i++) {
         bool has_issues = false;
@@ -834,8 +833,8 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
     // Show issues by category
     const char *categories[] = {"syntax", "security",    "performance",
                                 "style",  "portability", "type"};
-    const char *category_names[] = {"Syntax",      "Security",    "Performance",
-                                    "Style",       "Portability", "Type"};
+    const char *category_names[] = {"Syntax", "Security",    "Performance",
+                                    "Style",  "Portability", "Type"};
 
     for (int i = 0; i < 6; i++) {
         bool has_issues = false;
@@ -978,8 +977,7 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
     size_t bytes_read = fread(script_content, 1, (size_t)file_size, file);
     fclose(file);
     if (bytes_read != (size_t)file_size) {
-        debug_printf(ctx,
-                     "ERROR: Short read on %s (expected %ld, got %zu)\n",
+        debug_printf(ctx, "ERROR: Short read on %s (expected %ld, got %zu)\n",
                      script_path, file_size, bytes_read);
         free(script_content);
         return -1;

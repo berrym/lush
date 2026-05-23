@@ -32,55 +32,55 @@ const char **lle_builtin_get_signal_names(void) { return signal_names; }
 
 /* echo options */
 static const lle_builtin_option_t echo_options[] = {
-    {"-n", "Do not output trailing newline"},
-    {"-e", "Enable interpretation of backslash escapes"},
+    {"-n",              "Do not output trailing newline"},
+    {"-e",  "Enable interpretation of backslash escapes"},
     {"-E", "Disable interpretation of backslash escapes"},
 };
 
 /* read options */
 static const lle_builtin_option_t read_options[] = {
-    {"-p", "Prompt string"},
+    {"-p",                              "Prompt string"},
     {"-r", "Do not treat backslash as escape character"},
-    {"-t", "Timeout in seconds"},
-    {"-n", "Read specified number of characters"},
-    {"-s", "Silent mode (do not echo input)"},
+    {"-t",                         "Timeout in seconds"},
+    {"-n",        "Read specified number of characters"},
+    {"-s",            "Silent mode (do not echo input)"},
 };
 
 /* type options */
 static const lle_builtin_option_t type_options[] = {
-    {"-t", "Print only type name"},
+    {"-t",             "Print only type name"},
     {"-p", "Print path for external commands"},
-    {"-a", "Print all matches"},
+    {"-a",                "Print all matches"},
 };
 
 /* ulimit options */
 static const lle_builtin_option_t ulimit_options[] = {
-    {"-a", "Show all current limits"},
-    {"-H", "Set hard limit"},
-    {"-S", "Set soft limit"},
-    {"-f", "Maximum file size"},
+    {"-a",                 "Show all current limits"},
+    {"-H",                          "Set hard limit"},
+    {"-S",                          "Set soft limit"},
+    {"-f",                       "Maximum file size"},
     {"-n", "Maximum number of open file descriptors"},
-    {"-t", "Maximum CPU time"},
-    {"-s", "Maximum stack size"},
-    {"-u", "Maximum number of user processes"},
-    {"-v", "Maximum virtual memory size"},
-    {"-h", "Show help"},
+    {"-t",                        "Maximum CPU time"},
+    {"-s",                      "Maximum stack size"},
+    {"-u",        "Maximum number of user processes"},
+    {"-v",             "Maximum virtual memory size"},
+    {"-h",                               "Show help"},
 };
 
 /* fc options */
 static const lle_builtin_option_t fc_options[] = {
-    {"-e", "Editor to use"},
-    {"-l", "List commands"},
-    {"-n", "Suppress command numbers"},
-    {"-r", "Reverse order"},
+    {"-e",              "Editor to use"},
+    {"-l",              "List commands"},
+    {"-n",   "Suppress command numbers"},
+    {"-r",              "Reverse order"},
     {"-s", "Re-execute without editing"},
 };
 
 /* command options */
 static const lle_builtin_option_t command_options[] = {
-    {"-v", "Print command description"},
+    {"-v",         "Print command description"},
     {"-V", "Print verbose command description"},
-    {"-p", "Use default PATH"},
+    {"-p",                  "Use default PATH"},
 };
 
 /* trap options */
@@ -100,16 +100,16 @@ static const lle_builtin_option_t hash_options[] = {
 
 /* set options */
 static const lle_builtin_option_t set_options[] = {
-    {"-a", "Export all variables"},
+    {"-a",                              "Export all variables"},
     {"-C", "Prevent output redirection from overwriting files"},
-    {"-e", "Exit on error"},
-    {"-f", "Disable filename expansion"},
-    {"-n", "Read commands but do not execute"},
-    {"-u", "Treat unset variables as error"},
-    {"-v", "Print shell input lines"},
-    {"-x", "Print commands and arguments"},
-    {"-o", "Set option by name"},
-    {"+o", "Unset option by name"},
+    {"-e",                                     "Exit on error"},
+    {"-f",                        "Disable filename expansion"},
+    {"-n",                  "Read commands but do not execute"},
+    {"-u",                    "Treat unset variables as error"},
+    {"-v",                           "Print shell input lines"},
+    {"-x",                      "Print commands and arguments"},
+    {"-o",                                "Set option by name"},
+    {"+o",                              "Unset option by name"},
 };
 
 /* export options */
@@ -124,75 +124,75 @@ static const lle_builtin_option_t readonly_options[] = {
 
 /* history options */
 static const lle_builtin_option_t history_options[] = {
-    {"-c", "Clear history"},
+    {"-c",          "Clear history"},
     {"-d", "Delete entry at offset"},
-    {"-r", "Read history file"},
-    {"-w", "Write history file"},
+    {"-r",      "Read history file"},
+    {"-w",     "Write history file"},
 };
 
 /* jobs options */
 static const lle_builtin_option_t jobs_options[] = {
     {"-l", "Long format with process IDs"},
-    {"-p", "Show only process IDs"},
+    {"-p",        "Show only process IDs"},
 };
 
 /* setopt options */
 static const lle_builtin_option_t setopt_options[] = {
-    {"-p", "Print in re-usable format"},
+    {"-p",         "Print in re-usable format"},
     {"-q", "Query silently (exit status only)"},
 };
 
 /* disown options */
 static const lle_builtin_option_t disown_options[] = {
     {"-h", "Mark jobs to not receive SIGHUP instead of removing"},
-    {"-a", "Apply to all jobs"},
-    {"-r", "Apply to running jobs only"},
+    {"-a",                                   "Apply to all jobs"},
+    {"-r",                          "Apply to running jobs only"},
 };
 
 /* mapfile/readarray options */
 static const lle_builtin_option_t mapfile_options[] = {
     {"-d", "Use specified delimiter instead of newline"},
-    {"-n", "Read at most count lines"},
-    {"-O", "Start assigning at index origin"},
-    {"-s", "Skip first count lines"},
-    {"-t", "Remove trailing delimiter from each line"},
+    {"-n",                   "Read at most count lines"},
+    {"-O",            "Start assigning at index origin"},
+    {"-s",                     "Skip first count lines"},
+    {"-t",   "Remove trailing delimiter from each line"},
     {"-u", "Read from file descriptor instead of stdin"},
-    {"-C", "Execute callback every quantum lines"},
-    {"-c", "Quantum for callback (default 5000)"},
+    {"-C",       "Execute callback every quantum lines"},
+    {"-c",        "Quantum for callback (default 5000)"},
 };
 
 /* env options */
 static const lle_builtin_option_t env_options[] = {
-    {"-i", "Start with empty environment"},
-    {"-u", "Remove variable from environment"},
-    {"-0", "Use NUL instead of newline for output"},
-    {"--help", "Display help message"},
+    {    "-i",          "Start with empty environment"},
+    {    "-u",      "Remove variable from environment"},
+    {    "-0", "Use NUL instead of newline for output"},
+    {"--help",                  "Display help message"},
 };
 
 /* analyze options */
 static const lle_builtin_option_t analyze_options[] = {
-    {"-t", "Target shell (posix, bash, zsh)"},
+    {      "-t", "Target shell (posix, bash, zsh)"},
     {"--target", "Target shell (posix, bash, zsh)"},
-    {"-s", "Treat warnings as errors"},
-    {"--strict", "Treat warnings as errors"},
-    {"-h", "Show help message"},
-    {"--help", "Show help message"},
+    {      "-s",        "Treat warnings as errors"},
+    {"--strict",        "Treat warnings as errors"},
+    {      "-h",               "Show help message"},
+    {  "--help",               "Show help message"},
 };
 
 /* lint options */
 static const lle_builtin_option_t lint_options[] = {
-    {"-t", "Target shell (posix, bash, zsh)"},
-    {"--target", "Target shell (posix, bash, zsh)"},
-    {"-s", "Treat warnings as errors"},
-    {"--strict", "Treat warnings as errors"},
-    {"--fix", "Apply safe automatic fixes"},
-    {"--fix-interactive", "Interactively approve each fix"},
-    {"--unsafe-fixes", "Also apply unsafe fixes"},
-    {"--dry-run", "Preview fixes without applying"},
-    {"--diff", "Show unified diff of changes"},
-    {"--no-backup", "Don't create backup when fixing"},
-    {"-h", "Show help message"},
-    {"--help", "Show help message"},
+    {               "-t", "Target shell (posix, bash, zsh)"},
+    {         "--target", "Target shell (posix, bash, zsh)"},
+    {               "-s",        "Treat warnings as errors"},
+    {         "--strict",        "Treat warnings as errors"},
+    {            "--fix",      "Apply safe automatic fixes"},
+    {"--fix-interactive",  "Interactively approve each fix"},
+    {   "--unsafe-fixes",         "Also apply unsafe fixes"},
+    {        "--dry-run",  "Preview fixes without applying"},
+    {           "--diff",    "Show unified diff of changes"},
+    {      "--no-backup", "Don't create backup when fixing"},
+    {               "-h",               "Show help message"},
+    {           "--help",               "Show help message"},
 };
 
 /* getopts - no options, just takes optstring and varname */
@@ -203,137 +203,137 @@ static const lle_builtin_option_t lint_options[] = {
 
 /* display lle theme subcommands */
 static const lle_builtin_subcommand_t display_lle_theme_subcmds[] = {
-    {"list", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"set", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_THEME},
-    {"export", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"reload", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "list", NULL, 0, NULL, 0,  LLE_BUILTIN_ARG_NONE},
+    {   "set", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_THEME},
+    {"export", NULL, 0, NULL, 0,  LLE_BUILTIN_ARG_NONE},
+    {"reload", NULL, 0, NULL, 0,  LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle history dedup scope values */
 static const lle_builtin_subcommand_t display_lle_history_dedup_scope_vals[] = {
-    {"none", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "none", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"session", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"recent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"global", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    { "recent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    { "global", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle history dedup strategy values */
 static const lle_builtin_subcommand_t
     display_lle_history_dedup_strategy_vals[] = {
-        {"ignore", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-        {"keep-recent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {       "ignore", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {  "keep-recent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
         {"keep-frequent", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-        {"merge", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-        {"keep-all", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {        "merge", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {     "keep-all", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle history dedup subcommands */
 static const lle_builtin_subcommand_t display_lle_history_dedup_subcmds[] = {
-    {"on", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"off", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"scope", display_lle_history_dedup_scope_vals,
+    {      "on",                                    NULL,0,NULL, 0, LLE_BUILTIN_ARG_NONE                                                            },
+    {     "off",                                    NULL, 0,  NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "scope",    display_lle_history_dedup_scope_vals,
      sizeof(display_lle_history_dedup_scope_vals) /
-         sizeof(display_lle_history_dedup_scope_vals[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
+     sizeof(display_lle_history_dedup_scope_vals[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE                                                         },
     {"strategy", display_lle_history_dedup_strategy_vals,
      sizeof(display_lle_history_dedup_strategy_vals) /
-         sizeof(display_lle_history_dedup_strategy_vals[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"clean", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+     sizeof(display_lle_history_dedup_strategy_vals[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE                                                         },
+    {   "clean",                                    NULL, 0,  NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* Generic on/off value pair for boolean LLE knobs (history nav-dedup,
  * nav-unique, completion chain_directories, ...). */
 static const lle_builtin_subcommand_t lle_onoff_vals[] = {
-    {"on", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    { "on", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"off", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle history subcommands */
 static const lle_builtin_subcommand_t display_lle_history_subcmds[] = {
-    {"status", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"dedup", display_lle_history_dedup_subcmds,
+    {    "status",                              NULL,0,NULL, 0,LLE_BUILTIN_ARG_NONE             },
+    {     "dedup", display_lle_history_dedup_subcmds,
      sizeof(display_lle_history_dedup_subcmds) /
-         sizeof(display_lle_history_dedup_subcmds[0]),
+     sizeof(display_lle_history_dedup_subcmds[0]),
      NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"nav-dedup", lle_onoff_vals,
-     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"nav-unique", lle_onoff_vals,
-     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
+    { "nav-dedup",                    lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]),  NULL, 0,
+     LLE_BUILTIN_ARG_NONE         },
+    {"nav-unique",                    lle_onoff_vals,
+     sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]),  NULL, 0,
+     LLE_BUILTIN_ARG_NONE         },
 };
 
 /* display lle completion sources subcommands */
 static const lle_builtin_subcommand_t display_lle_completion_sources_subcmds[] =
     {
-        {"list", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {  "list", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
         {"reload", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-        {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+        {  "help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle completion subcommands */
 static const lle_builtin_subcommand_t display_lle_completion_subcmds[] = {
-    {"sources", display_lle_completion_sources_subcmds,
+    {          "sources", display_lle_completion_sources_subcmds,
      sizeof(display_lle_completion_sources_subcmds) /
-         sizeof(display_lle_completion_sources_subcmds[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"chain_directories", lle_onoff_vals,
+     sizeof(display_lle_completion_sources_subcmds[0]),
+     NULL, 0,LLE_BUILTIN_ARG_NONE                                                                             },
+    {"chain_directories",                         lle_onoff_vals,
      sizeof(lle_onoff_vals) / sizeof(lle_onoff_vals[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+     LLE_BUILTIN_ARG_NONE                                                                         },
+    {             "help",                                   NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display lle subcommands */
 static const lle_builtin_subcommand_t display_lle_subcmds[] = {
-    {"status", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"diagnostics", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"autosuggestions", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"syntax", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"transient", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"theme", display_lle_theme_subcmds,
+    {         "status",                           NULL,0,NULL, 0, LLE_BUILTIN_ARG_NONE                                                                              },
+    {    "diagnostics",                           NULL,                     0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"autosuggestions",                           NULL,                     0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {         "syntax",                           NULL,                     0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {      "transient",                           NULL,                     0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {          "theme",      display_lle_theme_subcmds,
      sizeof(display_lle_theme_subcmds) / sizeof(display_lle_theme_subcmds[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"history", display_lle_history_subcmds,
+     NULL, 0, LLE_BUILTIN_ARG_NONE                                                                          },
+    {        "history",    display_lle_history_subcmds,
      sizeof(display_lle_history_subcmds) /
-         sizeof(display_lle_history_subcmds[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"reset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"keybindings", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"completion", display_lle_completion_subcmds,
+     sizeof(display_lle_history_subcmds[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE                                                                          },
+    {          "reset",                           NULL,                     0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "keybindings",                           NULL,                     0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {     "completion", display_lle_completion_subcmds,
      sizeof(display_lle_completion_subcmds) /
-         sizeof(display_lle_completion_subcmds[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
+     sizeof(display_lle_completion_subcmds[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE                                                                          },
 };
 
 /* display performance subcommands */
 static const lle_builtin_subcommand_t display_performance_subcmds[] = {
-    {"init", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"report", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"layers", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"memory", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"baseline", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"reset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"targets", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {      "init", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "report", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "layers", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "memory", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "baseline", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {     "reset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "targets", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"monitoring", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"debug", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {     "debug", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* display top-level subcommands */
 static const lle_builtin_subcommand_t display_subcmds[] = {
-    {"status", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"config", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"stats", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"diagnostics", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"test", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {     "status",                        NULL,0,NULL, 0,LLE_BUILTIN_ARG_NONE                                                                           },
+    {     "config",                        NULL,                0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {      "stats",                        NULL,                0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"diagnostics",                        NULL,                0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {       "test",                        NULL,                0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"performance", display_performance_subcmds,
      sizeof(display_performance_subcmds) /
-         sizeof(display_performance_subcmds[0]),
-     NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"lle", display_lle_subcmds,
+     sizeof(display_performance_subcmds[0]),
+     NULL, 0, LLE_BUILTIN_ARG_NONE                                                              },
+    {        "lle",         display_lle_subcmds,
      sizeof(display_lle_subcmds) / sizeof(display_lle_subcmds[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+     LLE_BUILTIN_ARG_NONE                                                                       },
+    {       "help",                        NULL,                0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 // ============================================================================
@@ -342,33 +342,33 @@ static const lle_builtin_subcommand_t display_subcmds[] = {
 
 /* debug break subcommands */
 static const lle_builtin_subcommand_t debug_break_subcmds[] = {
-    {"add", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "add", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"remove", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"delete", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"list", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"clear", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "list", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    { "clear", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 /* debug top-level subcommands */
 static const lle_builtin_subcommand_t debug_subcmds[] = {
-    {"on", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"off", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"level", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"trace", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"break", debug_break_subcmds,
+    {       "on",                NULL,0, NULL, 0,LLE_BUILTIN_ARG_NONE                                                                           },
+    {      "off",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "level",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "trace",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "break", debug_break_subcmds,
      sizeof(debug_break_subcmds) / sizeof(debug_break_subcmds[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"step", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"next", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"continue", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"stack", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"vars", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"print", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"profile", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"analyze", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"functions", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"function", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+     LLE_BUILTIN_ARG_NONE                                                                       },
+    {     "step",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {     "next",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    { "continue",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "stack",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {     "vars",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "print",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "profile",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "analyze",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {"functions",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    { "function",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {     "help",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 // ============================================================================
@@ -376,11 +376,11 @@ static const lle_builtin_subcommand_t debug_subcmds[] = {
 // ============================================================================
 
 static const lle_builtin_subcommand_t config_subcmds[] = {
-    {"show", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"get", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"set", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "show", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "get", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "set", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"reload", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"save", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "save", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 // ============================================================================
@@ -388,12 +388,12 @@ static const lle_builtin_subcommand_t config_subcmds[] = {
 // ============================================================================
 
 static const lle_builtin_subcommand_t mode_subcmds[] = {
-    {"lush", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"posix", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"bash", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"zsh", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "lush", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "posix", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "bash", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {    "zsh", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"--reset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"--show", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    { "--show", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 // ============================================================================
@@ -401,9 +401,9 @@ static const lle_builtin_subcommand_t mode_subcmds[] = {
 // ============================================================================
 
 static const lle_builtin_subcommand_t network_subcmds[] = {
-    {"hosts", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {  "hosts", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"refresh", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {   "help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
 // ============================================================================
@@ -412,123 +412,123 @@ static const lle_builtin_subcommand_t network_subcmds[] = {
 
 static const lle_builtin_completion_spec_t builtin_specs[] = {
     /* Builtins with options */
-    {"echo", echo_options, sizeof(echo_options) / sizeof(echo_options[0]), NULL,
-     0, LLE_BUILTIN_ARG_NONE},
-    {"read", read_options, sizeof(read_options) / sizeof(read_options[0]), NULL,
-     0, LLE_BUILTIN_ARG_VARIABLE},
-    {"type", type_options, sizeof(type_options) / sizeof(type_options[0]), NULL,
-     0, LLE_BUILTIN_ARG_COMMAND},
-    {"ulimit", ulimit_options,
-     sizeof(ulimit_options) / sizeof(ulimit_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"fc", fc_options, sizeof(fc_options) / sizeof(fc_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"command", command_options,
-     sizeof(command_options) / sizeof(command_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_COMMAND},
-    {"trap", trap_options, sizeof(trap_options) / sizeof(trap_options[0]), NULL,
-     0, LLE_BUILTIN_ARG_SIGNAL},
-    {"unalias", unalias_options,
-     sizeof(unalias_options) / sizeof(unalias_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_ALIAS},
-    {"hash", hash_options, sizeof(hash_options) / sizeof(hash_options[0]), NULL,
-     0, LLE_BUILTIN_ARG_COMMAND},
-    {"set", set_options, sizeof(set_options) / sizeof(set_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"export", export_options,
-     sizeof(export_options) / sizeof(export_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_VARIABLE},
-    {"readonly", readonly_options,
-     sizeof(readonly_options) / sizeof(readonly_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_VARIABLE},
-    {"history", history_options,
-     sizeof(history_options) / sizeof(history_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"jobs", jobs_options, sizeof(jobs_options) / sizeof(jobs_options[0]), NULL,
-     0, LLE_BUILTIN_ARG_NONE},
-    {"setopt", setopt_options,
-     sizeof(setopt_options) / sizeof(setopt_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_FEATURE},
-    {"unsetopt", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_FEATURE},
+    {        "echo",     echo_options,sizeof(echo_options) / sizeof(echo_options[0]),NULL,
+     0,LLE_BUILTIN_ARG_NONE                                                                                                                                                },
+    {        "read",     read_options, sizeof(read_options) / sizeof(read_options[0]),            NULL,
+     0,  LLE_BUILTIN_ARG_VARIABLE                                                                                                                                         },
+    {        "type",     type_options, sizeof(type_options) / sizeof(type_options[0]),            NULL,
+     0,   LLE_BUILTIN_ARG_COMMAND                                                                                                                                         },
+    {      "ulimit",   ulimit_options,
+     sizeof(ulimit_options) / sizeof(ulimit_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
+    {          "fc",       fc_options,     sizeof(fc_options) / sizeof(fc_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
+    {     "command",  command_options,
+     sizeof(command_options) / sizeof(command_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_COMMAND                                                                                                                                              },
+    {        "trap",     trap_options, sizeof(trap_options) / sizeof(trap_options[0]),            NULL,
+     0,    LLE_BUILTIN_ARG_SIGNAL                                                                                                                                         },
+    {     "unalias",  unalias_options,
+     sizeof(unalias_options) / sizeof(unalias_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_ALIAS                                                                                                                                                },
+    {        "hash",     hash_options, sizeof(hash_options) / sizeof(hash_options[0]),            NULL,
+     0,   LLE_BUILTIN_ARG_COMMAND                                                                                                                                         },
+    {         "set",      set_options,   sizeof(set_options) / sizeof(set_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
+    {      "export",   export_options,
+     sizeof(export_options) / sizeof(export_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_VARIABLE                                                                                                                                             },
+    {    "readonly", readonly_options,
+     sizeof(readonly_options) / sizeof(readonly_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_VARIABLE                                                                                                                                             },
+    {     "history",  history_options,
+     sizeof(history_options) / sizeof(history_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
+    {        "jobs",     jobs_options, sizeof(jobs_options) / sizeof(jobs_options[0]),            NULL,
+     0,      LLE_BUILTIN_ARG_NONE                                                                                                                                         },
+    {      "setopt",   setopt_options,
+     sizeof(setopt_options) / sizeof(setopt_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_FEATURE                                                                                                                                              },
+    {    "unsetopt",             NULL,                                              0,            NULL,                                       0,   LLE_BUILTIN_ARG_FEATURE},
 
     /* Builtins with subcommands */
-    {"display", NULL, 0, display_subcmds,
+    {     "display",             NULL,                                              0, display_subcmds,
      sizeof(display_subcmds) / sizeof(display_subcmds[0]),
-     LLE_BUILTIN_ARG_NONE},
-    {"debug", NULL, 0, debug_subcmds,
-     sizeof(debug_subcmds) / sizeof(debug_subcmds[0]), LLE_BUILTIN_ARG_NONE},
-    {"config", NULL, 0, config_subcmds,
-     sizeof(config_subcmds) / sizeof(config_subcmds[0]), LLE_BUILTIN_ARG_NONE},
-    {"network", NULL, 0, network_subcmds,
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
+    {       "debug",             NULL,                                              0,   debug_subcmds,
+     sizeof(debug_subcmds) / sizeof(debug_subcmds[0]),      LLE_BUILTIN_ARG_NONE                                                                                          },
+    {      "config",             NULL,                                              0,  config_subcmds,
+     sizeof(config_subcmds) / sizeof(config_subcmds[0]),      LLE_BUILTIN_ARG_NONE                                                                                        },
+    {     "network",             NULL,                                              0, network_subcmds,
      sizeof(network_subcmds) / sizeof(network_subcmds[0]),
-     LLE_BUILTIN_ARG_NONE},
-    {"mode", NULL, 0, mode_subcmds,
-     sizeof(mode_subcmds) / sizeof(mode_subcmds[0]), LLE_BUILTIN_ARG_NONE},
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
+    {        "mode",             NULL,                                              0,    mode_subcmds,
+     sizeof(mode_subcmds) / sizeof(mode_subcmds[0]),      LLE_BUILTIN_ARG_NONE                                                                                            },
 
     /* Builtins with only dynamic arguments */
-    {"cd", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_DIRECTORY},
-    {"source", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_FILE},
-    {".", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_FILE},
-    {"unset", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_VARIABLE},
-    {"local", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_VARIABLE},
-    {"fg", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_JOB},
-    {"bg", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_JOB},
-    {"wait", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_JOB},
+    {          "cd",             NULL,                                              0,            NULL,                                       0, LLE_BUILTIN_ARG_DIRECTORY},
+    {      "source",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
+    {           ".",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
+    {       "unset",             NULL,                                              0,            NULL,                                       0,  LLE_BUILTIN_ARG_VARIABLE},
+    {       "local",             NULL,                                              0,            NULL,                                       0,  LLE_BUILTIN_ARG_VARIABLE},
+    {          "fg",             NULL,                                              0,            NULL,                                       0,       LLE_BUILTIN_ARG_JOB},
+    {          "bg",             NULL,                                              0,            NULL,                                       0,       LLE_BUILTIN_ARG_JOB},
+    {        "wait",             NULL,                                              0,            NULL,                                       0,       LLE_BUILTIN_ARG_JOB},
 
     /* Directory stack builtins */
-    {"pushd", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_DIRECTORY},
-    {"popd", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"dirs", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {       "pushd",             NULL,                                              0,            NULL,                                       0, LLE_BUILTIN_ARG_DIRECTORY},
+    {        "popd",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {        "dirs",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
 
     /* Simple builtins (no special completions, but registered for lookup) */
-    {"exit", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"pwd", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"true", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"false", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"clear", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"terminal", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"break", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"continue", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"return", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"return_value", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"exec", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_COMMAND},
-    {"shift", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"umask", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"times", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"getopts", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"alias", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {":", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
-    {"printf", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_FILE},
-    {"test", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_FILE},
-    {"[", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_FILE},
-    {"eval", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
+    {        "exit",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {         "pwd",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {        "true",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {       "false",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {       "clear",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {    "terminal",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {       "break",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {    "continue",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {      "return",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {"return_value",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {        "exec",             NULL,                                              0,            NULL,                                       0,   LLE_BUILTIN_ARG_COMMAND},
+    {       "shift",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {       "umask",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {       "times",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {     "getopts",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {       "alias",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {           ":",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {        "help",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
+    {      "printf",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
+    {        "test",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
+    {           "[",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
+    {        "eval",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
 
     /* Job control builtins */
-    {"disown", disown_options,
-     sizeof(disown_options) / sizeof(disown_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_JOB},
+    {      "disown",   disown_options,
+     sizeof(disown_options) / sizeof(disown_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_JOB                                                                                                                                                  },
 
     /* Array builtins */
-    {"mapfile", mapfile_options,
-     sizeof(mapfile_options) / sizeof(mapfile_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
-    {"readarray", mapfile_options,
-     sizeof(mapfile_options) / sizeof(mapfile_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_NONE},
+    {     "mapfile",  mapfile_options,
+     sizeof(mapfile_options) / sizeof(mapfile_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
+    {   "readarray",  mapfile_options,
+     sizeof(mapfile_options) / sizeof(mapfile_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_NONE                                                                                                                                                 },
 
     /* Environment builtins */
-    {"env", env_options, sizeof(env_options) / sizeof(env_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_COMMAND},
-    {"printenv", env_options, sizeof(env_options) / sizeof(env_options[0]),
-     NULL, 0, LLE_BUILTIN_ARG_VARIABLE},
+    {         "env",      env_options,   sizeof(env_options) / sizeof(env_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_COMMAND                                                                                                                                              },
+    {    "printenv",      env_options,   sizeof(env_options) / sizeof(env_options[0]),
+     NULL,                                       0,  LLE_BUILTIN_ARG_VARIABLE                                                                                             },
 
     /* Script analysis builtins */
-    {"analyze", analyze_options,
-     sizeof(analyze_options) / sizeof(analyze_options[0]), NULL, 0,
-     LLE_BUILTIN_ARG_FILE},
-    {"lint", lint_options, sizeof(lint_options) / sizeof(lint_options[0]), NULL,
-     0, LLE_BUILTIN_ARG_FILE},
+    {     "analyze",  analyze_options,
+     sizeof(analyze_options) / sizeof(analyze_options[0]),            NULL,                                       0,
+     LLE_BUILTIN_ARG_FILE                                                                                                                                                 },
+    {        "lint",     lint_options, sizeof(lint_options) / sizeof(lint_options[0]),            NULL,
+     0,      LLE_BUILTIN_ARG_FILE                                                                                                                                         },
 };
 
 static const size_t builtin_specs_count =

@@ -543,15 +543,17 @@ lle_result_t lle_theme_value_table_get_boolean(const lle_theme_value_t *value,
 static const struct {
     const char *name;
     lle_basic_color_t color;
-} color_names[] = {{"black", LLE_COLOR_BLACK},
-                   {"red", LLE_COLOR_RED},
-                   {"green", LLE_COLOR_GREEN},
-                   {"yellow", LLE_COLOR_YELLOW},
-                   {"blue", LLE_COLOR_BLUE},
-                   {"magenta", LLE_COLOR_MAGENTA},
-                   {"cyan", LLE_COLOR_CYAN},
-                   {"white", LLE_COLOR_WHITE},
-                   {NULL, 0}};
+} color_names[] = {
+    {  "black",   LLE_COLOR_BLACK},
+    {    "red",     LLE_COLOR_RED},
+    {  "green",   LLE_COLOR_GREEN},
+    { "yellow",  LLE_COLOR_YELLOW},
+    {   "blue",    LLE_COLOR_BLUE},
+    {"magenta", LLE_COLOR_MAGENTA},
+    {   "cyan",    LLE_COLOR_CYAN},
+    {  "white",   LLE_COLOR_WHITE},
+    {     NULL,                 0}
+};
 
 /**
  * @brief Parse hex digit to integer

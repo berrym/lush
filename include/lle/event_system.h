@@ -1339,7 +1339,8 @@ lle_result_t lle_event_timer_disable(lle_event_system_t *system,
  * @brief Get timer information
  * @param system Event system
  * @param timer_id Timer ID to query
- * @param next_fire_time_us Output: when timer will next fire (absolute timestamp)
+ * @param next_fire_time_us Output: when timer will next fire (absolute
+ * timestamp)
  * @param fire_count Output: how many times timer has fired
  * @param is_repeating Output: is this a repeating timer?
  * @return LLE_SUCCESS or an error code on failure

@@ -125,26 +125,26 @@ typedef enum {
 } symbol_type_t;
 
 typedef struct symtable_entry {
-    char *name;                    ///< Symbol name
-    symbol_type_t val_type;        ///< Type of stored value
-    char *val;                     ///< String value (for SYM_STR)
-    unsigned int flags;            ///< Legacy flag bits (FLAG_*)
-    struct symtable_entry *next;   ///< Next entry in the chain
-    struct node *func_body;        ///< Function body AST (for SYM_FUNC)
+    char *name;                  ///< Symbol name
+    symbol_type_t val_type;      ///< Type of stored value
+    char *val;                   ///< String value (for SYM_STR)
+    unsigned int flags;          ///< Legacy flag bits (FLAG_*)
+    struct symtable_entry *next; ///< Next entry in the chain
+    struct node *func_body;      ///< Function body AST (for SYM_FUNC)
 } symtable_entry_t;
 
 typedef struct {
-    size_t level;              ///< Scope nesting level
-    symtable_entry_t *head,    ///< First entry in the chain
-        *tail;                 ///< Last entry in the chain
+    size_t level;           ///< Scope nesting level
+    symtable_entry_t *head, ///< First entry in the chain
+        *tail;              ///< Last entry in the chain
 } symtable_t;
 
 #define MAX_SYMTAB 256
 typedef struct {
-    size_t symtable_count;                       ///< Number of active symbol tables
-    symtable_t *symtable_list[MAX_SYMTAB];       ///< Stack of symbol tables
-    symtable_t *global_symtable,                 ///< Global (outermost) symbol table
-        *local_symtable;                         ///< Current (innermost) symbol table
+    size_t symtable_count;                 ///< Number of active symbol tables
+    symtable_t *symtable_list[MAX_SYMTAB]; ///< Stack of symbol tables
+    symtable_t *global_symtable,           ///< Global (outermost) symbol table
+        *local_symtable;                   ///< Current (innermost) symbol table
 } symtable_stack_t;
 
 /* ============================================================================
@@ -627,11 +627,12 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
  *                 type so the consumer can label Scalar / Nameref / etc.
  * @param userdata Opaque pointer passed through to the callback
  */
-void symtable_enumerate_current_scope_vars(
-    symtable_manager_t *manager,
-    void (*callback)(const char *name, const char *value, symvar_type_t type,
-                     void *userdata),
-    void *userdata);
+void symtable_enumerate_current_scope_vars(symtable_manager_t *manager,
+                                           void (*callback)(const char *name,
+                                                            const char *value,
+                                                            symvar_type_t type,
+                                                            void *userdata),
+                                           void *userdata);
 
 /**
  * @brief Count global variables

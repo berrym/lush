@@ -150,7 +150,7 @@ int bin_printf(int argc, char **argv) {
         for (int i = 0; format[i] != '\0'; i++) {
             if (format[i] == '%' && format[i + 1] != '\0') {
                 int spec_start = i; /* points at '%' for forwarding to libc */
-                i++; // Skip the %
+                i++;                // Skip the %
 
                 // Handle literal %
                 if (format[i] == '%') {

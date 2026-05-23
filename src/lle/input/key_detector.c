@@ -45,121 +45,113 @@ typedef struct {
  */
 static const key_mapping_entry_t key_mappings[] = {
     /* Function keys (xterm) */
-    {"\x1BOP", 3, LLE_KEY_TYPE_FUNCTION, 1, LLE_KEY_MOD_NONE, "F1"},
-    {"\x1BOQ", 3, LLE_KEY_TYPE_FUNCTION, 2, LLE_KEY_MOD_NONE, "F2"},
-    {"\x1BOR", 3, LLE_KEY_TYPE_FUNCTION, 3, LLE_KEY_MOD_NONE, "F3"},
-    {"\x1BOS", 3, LLE_KEY_TYPE_FUNCTION, 4, LLE_KEY_MOD_NONE, "F4"},
-    {"\x1B[15~", 5, LLE_KEY_TYPE_FUNCTION, 5, LLE_KEY_MOD_NONE, "F5"},
-    {"\x1B[17~", 5, LLE_KEY_TYPE_FUNCTION, 6, LLE_KEY_MOD_NONE, "F6"},
-    {"\x1B[18~", 5, LLE_KEY_TYPE_FUNCTION, 7, LLE_KEY_MOD_NONE, "F7"},
-    {"\x1B[19~", 5, LLE_KEY_TYPE_FUNCTION, 8, LLE_KEY_MOD_NONE, "F8"},
-    {"\x1B[20~", 5, LLE_KEY_TYPE_FUNCTION, 9, LLE_KEY_MOD_NONE, "F9"},
-    {"\x1B[21~", 5, LLE_KEY_TYPE_FUNCTION, 10, LLE_KEY_MOD_NONE, "F10"},
-    {"\x1B[23~", 5, LLE_KEY_TYPE_FUNCTION, 11, LLE_KEY_MOD_NONE, "F11"},
-    {"\x1B[24~", 5, LLE_KEY_TYPE_FUNCTION, 12, LLE_KEY_MOD_NONE, "F12"},
+    {   "\x1BOP", 3, LLE_KEY_TYPE_FUNCTION,    1,  LLE_KEY_MOD_NONE,"F1"                                                                    },
+    {   "\x1BOQ", 3, LLE_KEY_TYPE_FUNCTION,    2,  LLE_KEY_MOD_NONE,         "F2"},
+    {   "\x1BOR", 3, LLE_KEY_TYPE_FUNCTION,    3,  LLE_KEY_MOD_NONE,         "F3"},
+    {   "\x1BOS", 3, LLE_KEY_TYPE_FUNCTION,    4,  LLE_KEY_MOD_NONE,         "F4"},
+    { "\x1B[15~", 5, LLE_KEY_TYPE_FUNCTION,    5,  LLE_KEY_MOD_NONE,         "F5"},
+    { "\x1B[17~", 5, LLE_KEY_TYPE_FUNCTION,    6,  LLE_KEY_MOD_NONE,         "F6"},
+    { "\x1B[18~", 5, LLE_KEY_TYPE_FUNCTION,    7,  LLE_KEY_MOD_NONE,         "F7"},
+    { "\x1B[19~", 5, LLE_KEY_TYPE_FUNCTION,    8,  LLE_KEY_MOD_NONE,         "F8"},
+    { "\x1B[20~", 5, LLE_KEY_TYPE_FUNCTION,    9,  LLE_KEY_MOD_NONE,         "F9"},
+    { "\x1B[21~", 5, LLE_KEY_TYPE_FUNCTION,   10,  LLE_KEY_MOD_NONE,        "F10"},
+    { "\x1B[23~", 5, LLE_KEY_TYPE_FUNCTION,   11,  LLE_KEY_MOD_NONE,        "F11"},
+    { "\x1B[24~", 5, LLE_KEY_TYPE_FUNCTION,   12,  LLE_KEY_MOD_NONE,        "F12"},
 
     /* Cursor keys (normal mode) */
-    {"\x1B[A", 3, LLE_KEY_TYPE_CURSOR, 'A', LLE_KEY_MOD_NONE, "Up"},
-    {"\x1B[B", 3, LLE_KEY_TYPE_CURSOR, 'B', LLE_KEY_MOD_NONE, "Down"},
-    {"\x1B[C", 3, LLE_KEY_TYPE_CURSOR, 'C', LLE_KEY_MOD_NONE, "Right"},
-    {"\x1B[D", 3, LLE_KEY_TYPE_CURSOR, 'D', LLE_KEY_MOD_NONE, "Left"},
+    {   "\x1B[A", 3,   LLE_KEY_TYPE_CURSOR,  'A',  LLE_KEY_MOD_NONE,         "Up"},
+    {   "\x1B[B", 3,   LLE_KEY_TYPE_CURSOR,  'B',  LLE_KEY_MOD_NONE,       "Down"},
+    {   "\x1B[C", 3,   LLE_KEY_TYPE_CURSOR,  'C',  LLE_KEY_MOD_NONE,      "Right"},
+    {   "\x1B[D", 3,   LLE_KEY_TYPE_CURSOR,  'D',  LLE_KEY_MOD_NONE,       "Left"},
 
     /* Cursor keys (application mode) */
-    {"\x1BOA", 3, LLE_KEY_TYPE_CURSOR, 'A', LLE_KEY_MOD_NONE, "Up"},
-    {"\x1BOB", 3, LLE_KEY_TYPE_CURSOR, 'B', LLE_KEY_MOD_NONE, "Down"},
-    {"\x1BOC", 3, LLE_KEY_TYPE_CURSOR, 'C', LLE_KEY_MOD_NONE, "Right"},
-    {"\x1BOD", 3, LLE_KEY_TYPE_CURSOR, 'D', LLE_KEY_MOD_NONE, "Left"},
+    {   "\x1BOA", 3,   LLE_KEY_TYPE_CURSOR,  'A',  LLE_KEY_MOD_NONE,         "Up"},
+    {   "\x1BOB", 3,   LLE_KEY_TYPE_CURSOR,  'B',  LLE_KEY_MOD_NONE,       "Down"},
+    {   "\x1BOC", 3,   LLE_KEY_TYPE_CURSOR,  'C',  LLE_KEY_MOD_NONE,      "Right"},
+    {   "\x1BOD", 3,   LLE_KEY_TYPE_CURSOR,  'D',  LLE_KEY_MOD_NONE,       "Left"},
 
     /* Navigation keys */
-    {"\x1B[H", 3, LLE_KEY_TYPE_CURSOR, 'H', LLE_KEY_MOD_NONE, "Home"},
-    {"\x1B[F", 3, LLE_KEY_TYPE_CURSOR, 'F', LLE_KEY_MOD_NONE, "End"},
-    {"\x1B[1~", 4, LLE_KEY_TYPE_CURSOR, '1', LLE_KEY_MOD_NONE, "Home"},
-    {"\x1B[4~", 4, LLE_KEY_TYPE_CURSOR, '4', LLE_KEY_MOD_NONE, "End"},
-    {"\x1B[5~", 4, LLE_KEY_TYPE_CURSOR, '5', LLE_KEY_MOD_NONE, "PageUp"},
-    {"\x1B[6~", 4, LLE_KEY_TYPE_CURSOR, '6', LLE_KEY_MOD_NONE, "PageDown"},
+    {   "\x1B[H", 3,   LLE_KEY_TYPE_CURSOR,  'H',  LLE_KEY_MOD_NONE,       "Home"},
+    {   "\x1B[F", 3,   LLE_KEY_TYPE_CURSOR,  'F',  LLE_KEY_MOD_NONE,        "End"},
+    {  "\x1B[1~", 4,   LLE_KEY_TYPE_CURSOR,  '1',  LLE_KEY_MOD_NONE,       "Home"},
+    {  "\x1B[4~", 4,   LLE_KEY_TYPE_CURSOR,  '4',  LLE_KEY_MOD_NONE,        "End"},
+    {  "\x1B[5~", 4,   LLE_KEY_TYPE_CURSOR,  '5',  LLE_KEY_MOD_NONE,     "PageUp"},
+    {  "\x1B[6~", 4,   LLE_KEY_TYPE_CURSOR,  '6',  LLE_KEY_MOD_NONE,   "PageDown"},
 
     /* Editing keys */
-    {"\x1B[2~", 4, LLE_KEY_TYPE_EDITING, '2', LLE_KEY_MOD_NONE, "Insert"},
-    {"\x1B[3~", 4, LLE_KEY_TYPE_EDITING, '3', LLE_KEY_MOD_NONE, "Delete"},
-    {"\x7F", 1, LLE_KEY_TYPE_EDITING, 0x7F, LLE_KEY_MOD_NONE, "Backspace"},
-    {"\x08", 1, LLE_KEY_TYPE_EDITING, 0x08, LLE_KEY_MOD_NONE, "Backspace"},
+    {  "\x1B[2~", 4,  LLE_KEY_TYPE_EDITING,  '2',  LLE_KEY_MOD_NONE,     "Insert"},
+    {  "\x1B[3~", 4,  LLE_KEY_TYPE_EDITING,  '3',  LLE_KEY_MOD_NONE,     "Delete"},
+    {     "\x7F", 1,  LLE_KEY_TYPE_EDITING, 0x7F,  LLE_KEY_MOD_NONE,  "Backspace"},
+    {     "\x08", 1,  LLE_KEY_TYPE_EDITING, 0x08,  LLE_KEY_MOD_NONE,  "Backspace"},
 
     /* Special keys */
-    {"\x09", 1, LLE_KEY_TYPE_SPECIAL, 0x09, LLE_KEY_MOD_NONE, "Tab"},
-    {"\x0D", 1, LLE_KEY_TYPE_SPECIAL, 0x0D, LLE_KEY_MOD_NONE, "Enter"},
-    {"\x1B\x0D", 2, LLE_KEY_TYPE_SPECIAL, 0x0D, LLE_KEY_MOD_ALT, "Alt+Enter"},
-    {"\x1B", 1, LLE_KEY_TYPE_SPECIAL, 0x1B, LLE_KEY_MOD_NONE, "Escape"},
+    {     "\x09", 1,  LLE_KEY_TYPE_SPECIAL, 0x09,  LLE_KEY_MOD_NONE,        "Tab"},
+    {     "\x0D", 1,  LLE_KEY_TYPE_SPECIAL, 0x0D,  LLE_KEY_MOD_NONE,      "Enter"},
+    { "\x1B\x0D", 2,  LLE_KEY_TYPE_SPECIAL, 0x0D,   LLE_KEY_MOD_ALT,  "Alt+Enter"},
+    {     "\x1B", 1,  LLE_KEY_TYPE_SPECIAL, 0x1B,  LLE_KEY_MOD_NONE,     "Escape"},
 
     /* Modified cursor keys (Shift) */
-    {"\x1B[1;2A", 6, LLE_KEY_TYPE_CURSOR, 'A', LLE_KEY_MOD_SHIFT, "Shift+Up"},
-    {"\x1B[1;2B", 6, LLE_KEY_TYPE_CURSOR, 'B', LLE_KEY_MOD_SHIFT, "Shift+Down"},
-    {"\x1B[1;2C", 6, LLE_KEY_TYPE_CURSOR, 'C', LLE_KEY_MOD_SHIFT,
-     "Shift+Right"},
-    {"\x1B[1;2D", 6, LLE_KEY_TYPE_CURSOR, 'D', LLE_KEY_MOD_SHIFT, "Shift+Left"},
+    {"\x1B[1;2A", 6,   LLE_KEY_TYPE_CURSOR,  'A', LLE_KEY_MOD_SHIFT,   "Shift+Up"},
+    {"\x1B[1;2B", 6,   LLE_KEY_TYPE_CURSOR,  'B', LLE_KEY_MOD_SHIFT, "Shift+Down"},
+    {"\x1B[1;2C", 6,   LLE_KEY_TYPE_CURSOR,  'C', LLE_KEY_MOD_SHIFT,
+     "Shift+Right"                                                               },
+    {"\x1B[1;2D", 6,   LLE_KEY_TYPE_CURSOR,  'D', LLE_KEY_MOD_SHIFT, "Shift+Left"},
 
     /* Modified cursor keys (Alt) */
-    {"\x1B[1;3A", 6, LLE_KEY_TYPE_CURSOR, 'A', LLE_KEY_MOD_ALT, "Alt+Up"},
-    {"\x1B[1;3B", 6, LLE_KEY_TYPE_CURSOR, 'B', LLE_KEY_MOD_ALT, "Alt+Down"},
-    {"\x1B[1;3C", 6, LLE_KEY_TYPE_CURSOR, 'C', LLE_KEY_MOD_ALT, "Alt+Right"},
-    {"\x1B[1;3D", 6, LLE_KEY_TYPE_CURSOR, 'D', LLE_KEY_MOD_ALT, "Alt+Left"},
+    {"\x1B[1;3A", 6,   LLE_KEY_TYPE_CURSOR,  'A',   LLE_KEY_MOD_ALT,     "Alt+Up"},
+    {"\x1B[1;3B", 6,   LLE_KEY_TYPE_CURSOR,  'B',   LLE_KEY_MOD_ALT,   "Alt+Down"},
+    {"\x1B[1;3C", 6,   LLE_KEY_TYPE_CURSOR,  'C',   LLE_KEY_MOD_ALT,  "Alt+Right"},
+    {"\x1B[1;3D", 6,   LLE_KEY_TYPE_CURSOR,  'D',   LLE_KEY_MOD_ALT,   "Alt+Left"},
 
     /* Modified cursor keys (Ctrl) */
-    {"\x1B[1;5A", 6, LLE_KEY_TYPE_CURSOR, 'A', LLE_KEY_MOD_CTRL, "Ctrl+Up"},
-    {"\x1B[1;5B", 6, LLE_KEY_TYPE_CURSOR, 'B', LLE_KEY_MOD_CTRL, "Ctrl+Down"},
-    {"\x1B[1;5C", 6, LLE_KEY_TYPE_CURSOR, 'C', LLE_KEY_MOD_CTRL, "Ctrl+Right"},
-    {"\x1B[1;5D", 6, LLE_KEY_TYPE_CURSOR, 'D', LLE_KEY_MOD_CTRL, "Ctrl+Left"},
+    {"\x1B[1;5A", 6,   LLE_KEY_TYPE_CURSOR,  'A',  LLE_KEY_MOD_CTRL,    "Ctrl+Up"},
+    {"\x1B[1;5B", 6,   LLE_KEY_TYPE_CURSOR,  'B',  LLE_KEY_MOD_CTRL,  "Ctrl+Down"},
+    {"\x1B[1;5C", 6,   LLE_KEY_TYPE_CURSOR,  'C',  LLE_KEY_MOD_CTRL, "Ctrl+Right"},
+    {"\x1B[1;5D", 6,   LLE_KEY_TYPE_CURSOR,  'D',  LLE_KEY_MOD_CTRL,  "Ctrl+Left"},
 
     /* Control characters */
-    {"\x01", 1, LLE_KEY_TYPE_CONTROL, 'A', LLE_KEY_MOD_CTRL, "Ctrl+A"},
-    {"\x02", 1, LLE_KEY_TYPE_CONTROL, 'B', LLE_KEY_MOD_CTRL, "Ctrl+B"},
-    {"\x03", 1, LLE_KEY_TYPE_CONTROL, 'C', LLE_KEY_MOD_CTRL, "Ctrl+C"},
-    {"\x04", 1, LLE_KEY_TYPE_CONTROL, 'D', LLE_KEY_MOD_CTRL, "Ctrl+D"},
-    {"\x05", 1, LLE_KEY_TYPE_CONTROL, 'E', LLE_KEY_MOD_CTRL, "Ctrl+E"},
-    {"\x06", 1, LLE_KEY_TYPE_CONTROL, 'F', LLE_KEY_MOD_CTRL, "Ctrl+F"},
-    {"\x07", 1, LLE_KEY_TYPE_CONTROL, 'G', LLE_KEY_MOD_CTRL, "Ctrl+G"},
-    {"\x0B", 1, LLE_KEY_TYPE_CONTROL, 'K', LLE_KEY_MOD_CTRL, "Ctrl+K"},
-    {"\x0C", 1, LLE_KEY_TYPE_CONTROL, 'L', LLE_KEY_MOD_CTRL, "Ctrl+L"},
-    {"\x0E", 1, LLE_KEY_TYPE_CONTROL, 'N', LLE_KEY_MOD_CTRL, "Ctrl+N"},
-    {"\x0F", 1, LLE_KEY_TYPE_CONTROL, 'O', LLE_KEY_MOD_CTRL, "Ctrl+O"},
-    {"\x10", 1, LLE_KEY_TYPE_CONTROL, 'P', LLE_KEY_MOD_CTRL, "Ctrl+P"},
-    {"\x11", 1, LLE_KEY_TYPE_CONTROL, 'Q', LLE_KEY_MOD_CTRL, "Ctrl+Q"},
-    {"\x12", 1, LLE_KEY_TYPE_CONTROL, 'R', LLE_KEY_MOD_CTRL, "Ctrl+R"},
-    {"\x13", 1, LLE_KEY_TYPE_CONTROL, 'S', LLE_KEY_MOD_CTRL, "Ctrl+S"},
-    {"\x14", 1, LLE_KEY_TYPE_CONTROL, 'T', LLE_KEY_MOD_CTRL, "Ctrl+T"},
-    {"\x15", 1, LLE_KEY_TYPE_CONTROL, 'U', LLE_KEY_MOD_CTRL, "Ctrl+U"},
-    {"\x16", 1, LLE_KEY_TYPE_CONTROL, 'V', LLE_KEY_MOD_CTRL, "Ctrl+V"},
-    {"\x17", 1, LLE_KEY_TYPE_CONTROL, 'W', LLE_KEY_MOD_CTRL, "Ctrl+W"},
-    {"\x18", 1, LLE_KEY_TYPE_CONTROL, 'X', LLE_KEY_MOD_CTRL, "Ctrl+X"},
-    {"\x19", 1, LLE_KEY_TYPE_CONTROL, 'Y', LLE_KEY_MOD_CTRL, "Ctrl+Y"},
-    {"\x1A", 1, LLE_KEY_TYPE_CONTROL, 'Z', LLE_KEY_MOD_CTRL, "Ctrl+Z"},
+    {     "\x01", 1,  LLE_KEY_TYPE_CONTROL,  'A',  LLE_KEY_MOD_CTRL,     "Ctrl+A"},
+    {     "\x02", 1,  LLE_KEY_TYPE_CONTROL,  'B',  LLE_KEY_MOD_CTRL,     "Ctrl+B"},
+    {     "\x03", 1,  LLE_KEY_TYPE_CONTROL,  'C',  LLE_KEY_MOD_CTRL,     "Ctrl+C"},
+    {     "\x04", 1,  LLE_KEY_TYPE_CONTROL,  'D',  LLE_KEY_MOD_CTRL,     "Ctrl+D"},
+    {     "\x05", 1,  LLE_KEY_TYPE_CONTROL,  'E',  LLE_KEY_MOD_CTRL,     "Ctrl+E"},
+    {     "\x06", 1,  LLE_KEY_TYPE_CONTROL,  'F',  LLE_KEY_MOD_CTRL,     "Ctrl+F"},
+    {     "\x07", 1,  LLE_KEY_TYPE_CONTROL,  'G',  LLE_KEY_MOD_CTRL,     "Ctrl+G"},
+    {     "\x0B", 1,  LLE_KEY_TYPE_CONTROL,  'K',  LLE_KEY_MOD_CTRL,     "Ctrl+K"},
+    {     "\x0C", 1,  LLE_KEY_TYPE_CONTROL,  'L',  LLE_KEY_MOD_CTRL,     "Ctrl+L"},
+    {     "\x0E", 1,  LLE_KEY_TYPE_CONTROL,  'N',  LLE_KEY_MOD_CTRL,     "Ctrl+N"},
+    {     "\x0F", 1,  LLE_KEY_TYPE_CONTROL,  'O',  LLE_KEY_MOD_CTRL,     "Ctrl+O"},
+    {     "\x10", 1,  LLE_KEY_TYPE_CONTROL,  'P',  LLE_KEY_MOD_CTRL,     "Ctrl+P"},
+    {     "\x11", 1,  LLE_KEY_TYPE_CONTROL,  'Q',  LLE_KEY_MOD_CTRL,     "Ctrl+Q"},
+    {     "\x12", 1,  LLE_KEY_TYPE_CONTROL,  'R',  LLE_KEY_MOD_CTRL,     "Ctrl+R"},
+    {     "\x13", 1,  LLE_KEY_TYPE_CONTROL,  'S',  LLE_KEY_MOD_CTRL,     "Ctrl+S"},
+    {     "\x14", 1,  LLE_KEY_TYPE_CONTROL,  'T',  LLE_KEY_MOD_CTRL,     "Ctrl+T"},
+    {     "\x15", 1,  LLE_KEY_TYPE_CONTROL,  'U',  LLE_KEY_MOD_CTRL,     "Ctrl+U"},
+    {     "\x16", 1,  LLE_KEY_TYPE_CONTROL,  'V',  LLE_KEY_MOD_CTRL,     "Ctrl+V"},
+    {     "\x17", 1,  LLE_KEY_TYPE_CONTROL,  'W',  LLE_KEY_MOD_CTRL,     "Ctrl+W"},
+    {     "\x18", 1,  LLE_KEY_TYPE_CONTROL,  'X',  LLE_KEY_MOD_CTRL,     "Ctrl+X"},
+    {     "\x19", 1,  LLE_KEY_TYPE_CONTROL,  'Y',  LLE_KEY_MOD_CTRL,     "Ctrl+Y"},
+    {     "\x1A", 1,  LLE_KEY_TYPE_CONTROL,  'Z',  LLE_KEY_MOD_CTRL,     "Ctrl+Z"},
 
     /* Meta/Alt + letter keys (lowercase) */
-    {"\x1B"
-     "f",
-     2, LLE_KEY_TYPE_REGULAR, 'f', LLE_KEY_MOD_ALT, "Alt+F"},
-    {"\x1B"
-     "b",
-     2, LLE_KEY_TYPE_REGULAR, 'b', LLE_KEY_MOD_ALT, "Alt+B"},
-    {"\x1B"
-     "c",
-     2, LLE_KEY_TYPE_REGULAR, 'c', LLE_KEY_MOD_ALT, "Alt+C"},
-    {"\x1B"
-     "d",
-     2, LLE_KEY_TYPE_REGULAR, 'd', LLE_KEY_MOD_ALT, "Alt+D"},
-    {"\x1B"
-     "l",
-     2, LLE_KEY_TYPE_REGULAR, 'l', LLE_KEY_MOD_ALT, "Alt+L"},
-    {"\x1B"
-     "u",
-     2, LLE_KEY_TYPE_REGULAR, 'u', LLE_KEY_MOD_ALT, "Alt+U"},
+    {   "\x1B"
+   "f", 2,  LLE_KEY_TYPE_REGULAR,  'f',   LLE_KEY_MOD_ALT,      "Alt+F"     },
+    {   "\x1B"
+   "b", 2,  LLE_KEY_TYPE_REGULAR,  'b',   LLE_KEY_MOD_ALT,      "Alt+B"     },
+    {   "\x1B"
+   "c", 2,  LLE_KEY_TYPE_REGULAR,  'c',   LLE_KEY_MOD_ALT,      "Alt+C"     },
+    {   "\x1B"
+   "d", 2,  LLE_KEY_TYPE_REGULAR,  'd',   LLE_KEY_MOD_ALT,      "Alt+D"     },
+    {   "\x1B"
+   "l", 2,  LLE_KEY_TYPE_REGULAR,  'l',   LLE_KEY_MOD_ALT,      "Alt+L"     },
+    {   "\x1B"
+   "u", 2,  LLE_KEY_TYPE_REGULAR,  'u',   LLE_KEY_MOD_ALT,      "Alt+U"     },
 
     /* Meta/Alt + special characters */
-    {"\x1B"
-     "<",
-     2, LLE_KEY_TYPE_REGULAR, '<', LLE_KEY_MOD_ALT, "Alt+<"},
-    {"\x1B"
-     ">",
-     2, LLE_KEY_TYPE_REGULAR, '>', LLE_KEY_MOD_ALT, "Alt+>"},
+    {   "\x1B"
+   "<", 2,  LLE_KEY_TYPE_REGULAR,  '<',   LLE_KEY_MOD_ALT,      "Alt+<"     },
+    {   "\x1B"
+   ">", 2,  LLE_KEY_TYPE_REGULAR,  '>',   LLE_KEY_MOD_ALT,      "Alt+>"     },
 };
 
 #define KEY_MAPPING_COUNT (sizeof(key_mappings) / sizeof(key_mappings[0]))

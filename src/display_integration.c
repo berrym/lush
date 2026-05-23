@@ -33,7 +33,6 @@
 
 #include "display_integration.h"
 #include "config.h"
-#include "shell_error.h"
 #include "display/autosuggestions_layer.h"
 #include "display/command_layer.h"
 #include "display/composition_engine.h"
@@ -47,6 +46,7 @@
 #include "lle/prompt/theme.h"
 #include "lush.h"
 #include "lush_memory_pool.h"
+#include "shell_error.h"
 #include "symtable.h"
 
 #include <inttypes.h>
@@ -496,12 +496,10 @@ bool display_integration_set_config(
                         event_init_error);
                     if (err) {
                         shell_error_set_suggestion(
-                            err,
-                            "event-system reinit failed during a runtime "
-                            "config change; rolling back to the previous "
-                            "configuration");
-                        shell_error_display(err, stderr,
-                                            isatty(STDERR_FILENO));
+                            err, "event-system reinit failed during a runtime "
+                                 "config change; rolling back to the previous "
+                                 "configuration");
+                        shell_error_display(err, stderr, isatty(STDERR_FILENO));
                         shell_error_free(err);
                     }
                     layer_events_destroy(event_system);

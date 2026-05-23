@@ -19,8 +19,8 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 
 // Forward declarations
 static node_t *parse_command_list(parser_t *parser);
@@ -1099,9 +1099,8 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
          token_is_word_like(arg_token->type) ||
          token_is_keyword(arg_token->type) || arg_token->type == TOK_VARIABLE ||
          arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
-         arg_token->type == TOK_COMMA ||
-         arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
-         arg_token->type == TOK_NOT_EQUAL);
+         arg_token->type == TOK_COMMA || arg_token->type == TOK_GLOB ||
+         arg_token->type == TOK_QUESTION || arg_token->type == TOK_NOT_EQUAL);
     if (!accepted) {
         return false;
     }
@@ -1122,19 +1121,18 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
      * word concatenation depends on this being correct. */
     size_t last_end_pos = arg_token->end_position;
 
-    while (arg_token &&
-           (arg_token->type == TOK_STRING ||
-            arg_token->type == TOK_EXPANDABLE_STRING ||
-            arg_token->type == TOK_ARITH_EXP ||
-            arg_token->type == TOK_COMMAND_SUB ||
-            arg_token->type == TOK_BACKQUOTE ||
-            token_is_word_like(arg_token->type) ||
-            token_is_keyword(arg_token->type) ||
-            arg_token->type == TOK_VARIABLE ||
-            arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
-            arg_token->type == TOK_COMMA ||
-            arg_token->type == TOK_GLOB || arg_token->type == TOK_QUESTION ||
-            arg_token->type == TOK_NOT_EQUAL)) {
+    while (
+        arg_token &&
+        (arg_token->type == TOK_STRING ||
+         arg_token->type == TOK_EXPANDABLE_STRING ||
+         arg_token->type == TOK_ARITH_EXP ||
+         arg_token->type == TOK_COMMAND_SUB ||
+         arg_token->type == TOK_BACKQUOTE ||
+         token_is_word_like(arg_token->type) ||
+         token_is_keyword(arg_token->type) || arg_token->type == TOK_VARIABLE ||
+         arg_token->type == TOK_RBRACKET || arg_token->type == TOK_ASSIGN ||
+         arg_token->type == TOK_COMMA || arg_token->type == TOK_GLOB ||
+         arg_token->type == TOK_QUESTION || arg_token->type == TOK_NOT_EQUAL)) {
 
         token_info_t *new_tokens =
             realloc(collected_tokens, (token_count + 1) * sizeof(token_info_t));
@@ -1879,8 +1877,7 @@ static char *parse_scalar_assignment_string(parser_t *parser,
                 value->type == TOK_VARIABLE || value->type == TOK_ARITH_EXP ||
                 value->type == TOK_COMMAND_SUB ||
                 value->type == TOK_BACKQUOTE || value->type == TOK_ASSIGN ||
-                value->type == TOK_PLUS_ASSIGN ||
-                value->type == TOK_COMMA)) {
+                value->type == TOK_PLUS_ASSIGN || value->type == TOK_COMMA)) {
 
             size_t token_len = strlen(value->text);
             /* Quote re-wrapping policy for assignment-value
@@ -2795,8 +2792,8 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
              * keyword-aware tokenization for whatever follows. */
             found_delimiter_line = true;
             free(line);
-            *body_end = (line_end < tokenizer->input_length) ? line_end + 1
-                                                             : line_end;
+            *body_end =
+                (line_end < tokenizer->input_length) ? line_end + 1 : line_end;
             break;
         }
 
@@ -2918,9 +2915,8 @@ static bool collect_pending_heredocs(parser_t *parser) {
     for (size_t i = 0; i < parser->pending_heredoc_count; i++) {
         pending_heredoc_t *ph = &parser->pending_heredocs[i];
         size_t body_end = scan;
-        char *content =
-            collect_one_heredoc_body(parser, ph->delimiter, ph->strip_tabs,
-                                     scan, ph->op_loc, &body_end);
+        char *content = collect_one_heredoc_body(
+            parser, ph->delimiter, ph->strip_tabs, scan, ph->op_loc, &body_end);
         scan = body_end;
         if (!content) {
             ok = false;
@@ -2944,8 +2940,7 @@ static bool collect_pending_heredocs(parser_t *parser) {
             ok = false;
             break;
         }
-        expand_flag_node->val.str =
-            strdup(ph->expand_variables ? "1" : "0");
+        expand_flag_node->val.str = strdup(ph->expand_variables ? "1" : "0");
         expand_flag_node->val_type = VAL_STR;
         add_child_node(ph->redir_node, expand_flag_node);
     }
@@ -3864,16 +3859,15 @@ static node_t *parse_for_statement(parser_t *parser) {
                 if (!next_tok || next_tok->position != current_end_pos) {
                     break;
                 }
-                bool is_continuation =
-                    token_is_word_like(next_tok->type) ||
-                    next_tok->type == TOK_VARIABLE ||
-                    next_tok->type == TOK_NUMBER ||
-                    next_tok->type == TOK_COMMAND_SUB ||
-                    next_tok->type == TOK_ARITH_EXP ||
-                    next_tok->type == TOK_BACKQUOTE ||
-                    next_tok->type == TOK_ASSIGN ||
-                    next_tok->type == TOK_PLUS_ASSIGN ||
-                    next_tok->type == TOK_COMMA;
+                bool is_continuation = token_is_word_like(next_tok->type) ||
+                                       next_tok->type == TOK_VARIABLE ||
+                                       next_tok->type == TOK_NUMBER ||
+                                       next_tok->type == TOK_COMMAND_SUB ||
+                                       next_tok->type == TOK_ARITH_EXP ||
+                                       next_tok->type == TOK_BACKQUOTE ||
+                                       next_tok->type == TOK_ASSIGN ||
+                                       next_tok->type == TOK_PLUS_ASSIGN ||
+                                       next_tok->type == TOK_COMMA;
                 if (!is_continuation) {
                     break;
                 }

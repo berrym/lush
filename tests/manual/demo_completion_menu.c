@@ -33,11 +33,11 @@ typedef struct builtin_s {
 
 // Mock builtin list
 builtin builtins[] = {
-    {"cd", "Change directory", NULL},
-    {"echo", "Echo arguments", NULL},
-    {"pwd", "Print working directory", NULL},
-    {"exit", "Exit shell", NULL},
-    {"help", "Show help", NULL},
+    {  "cd",        "Change directory", NULL},
+    {"echo",          "Echo arguments", NULL},
+    { "pwd", "Print working directory", NULL},
+    {"exit",              "Exit shell", NULL},
+    {"help",               "Show help", NULL},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);

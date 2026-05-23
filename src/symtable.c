@@ -1552,11 +1552,12 @@ void symtable_enumerate_global_vars(void (*callback)(const char *key,
     ht_strstr_enum_destroy(enum_iter);
 }
 
-void symtable_enumerate_current_scope_vars(
-    symtable_manager_t *manager,
-    void (*callback)(const char *name, const char *value, symvar_type_t type,
-                     void *userdata),
-    void *userdata) {
+void symtable_enumerate_current_scope_vars(symtable_manager_t *manager,
+                                           void (*callback)(const char *name,
+                                                            const char *value,
+                                                            symvar_type_t type,
+                                                            void *userdata),
+                                           void *userdata) {
     if (!manager || !manager->current_scope ||
         !manager->current_scope->vars_ht || !callback) {
         return;

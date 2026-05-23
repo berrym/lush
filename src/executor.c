@@ -5893,15 +5893,15 @@ typedef enum {
     GLOB_QUAL_READABLE = 16, // (r) - readable files
     GLOB_QUAL_WRITABLE = 32, // (w) - writable files
     /* Behavior modifiers (not type/permission filters): */
-    GLOB_QUAL_NULLGLOB = 64,  // (N) - no match -> empty, never literal
-    GLOB_QUAL_DOTGLOB = 128,  // (D) - include dot (hidden) files
+    GLOB_QUAL_NULLGLOB = 64, // (N) - no match -> empty, never literal
+    GLOB_QUAL_DOTGLOB = 128, // (D) - include dot (hidden) files
 } glob_qualifier_t;
 
 /* Bits that filter by file type or permission (vs. behavior modifiers
  * like N/D). matches_glob_qualifier only needs to act when one of
  * these is set. */
 #define GLOB_QUAL_FILTER_MASK                                                  \
-    (GLOB_QUAL_FILE | GLOB_QUAL_DIR | GLOB_QUAL_LINK | GLOB_QUAL_EXEC |         \
+    (GLOB_QUAL_FILE | GLOB_QUAL_DIR | GLOB_QUAL_LINK | GLOB_QUAL_EXEC |        \
      GLOB_QUAL_READABLE | GLOB_QUAL_WRITABLE)
 
 /**
@@ -13822,10 +13822,10 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                          name[0] != '0' && name[0] != '@' && name[0] != '*' &&
                          name[0] != '-' && name[0] != '!')) {
                         // Report structured error for unbound variable
-                        executor_error_report(
-                            executor, SHELL_ERR_UNBOUND_VARIABLE,
-                            executor_current_loc(executor),
-                            "%s: unbound variable", name);
+                        executor_error_report(executor,
+                                              SHELL_ERR_UNBOUND_VARIABLE,
+                                              executor_current_loc(executor),
+                                              "%s: unbound variable", name);
                         free(name);
                         // Set expansion error instead of exiting to allow ||
                         // constructs
@@ -14217,10 +14217,10 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
         const char *msg = arithm_error_message();
         const char *while_ctx = arithm_error_while();
         const char *help = arithm_error_help();
-        shell_error_t *err = shell_error_create(
-            arithm_error_code(), SHELL_SEVERITY_ERROR,
-            executor_current_loc(executor), "arithmetic: %s",
-            msg ? msg : "evaluation error");
+        shell_error_t *err =
+            shell_error_create(arithm_error_code(), SHELL_SEVERITY_ERROR,
+                               executor_current_loc(executor), "arithmetic: %s",
+                               msg ? msg : "evaluation error");
         if (err) {
             if (while_ctx) {
                 shell_error_push_context(err, "%s", while_ctx);
@@ -14242,10 +14242,9 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
             executor->error_message = NULL;
         } else {
             /* Fallback if shell_error_create failed (e.g. OOM) */
-            executor_error_report(executor, arithm_error_code(),
-                                  executor_current_loc(executor),
-                                  "arithmetic: %s",
-                                  msg ? msg : "evaluation error");
+            executor_error_report(
+                executor, arithm_error_code(), executor_current_loc(executor),
+                "arithmetic: %s", msg ? msg : "evaluation error");
         }
     } else {
         executor_error_report(executor, SHELL_ERR_ARITHMETIC_SYNTAX,
@@ -16752,11 +16751,10 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                          * array element regardless of internal spaces
                          * (the brace expander has already partitioned
                          * the source into discrete words). */
-                        if (!is_quoted &&
-                            needs_brace_expansion(final_value)) {
+                        if (!is_quoted && needs_brace_expansion(final_value)) {
                             int brace_count = 0;
-                            char **brace_results = expand_brace_pattern(
-                                final_value, &brace_count);
+                            char **brace_results =
+                                expand_brace_pattern(final_value, &brace_count);
                             if (brace_results) {
                                 for (int bi = 0; bi < brace_count; bi++) {
                                     symtable_array_set_index(array, index,

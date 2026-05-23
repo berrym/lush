@@ -349,8 +349,7 @@ TEST(etc_hosts_dedupes_against_higher_priority_source) {
 
     if (n != 0) {
         char msg[64];
-        snprintf(msg, sizeof(msg),
-                 "expected 0 new hosts (dedupe), got %d", n);
+        snprintf(msg, sizeof(msg), "expected 0 new hosts (dedupe), got %d", n);
         TEST_FAIL_MSG(msg);
         return;
     }

@@ -46,7 +46,7 @@
  */
 
 typedef struct {
-    const char *gutter;       /* per-line left marker, e.g. "│ " or "| " */
+    const char *gutter;          /* per-line left marker, e.g. "│ " or "| " */
     const char *frame_corner_tl; /* top-left, e.g. "┌─" or "+-"           */
     const char *frame_corner_bl; /* bottom-left, e.g. "└─" or "+-"        */
     const char *frame_horiz;     /* horizontal fill, "─" or "-"            */

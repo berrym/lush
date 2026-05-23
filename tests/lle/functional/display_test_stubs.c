@@ -139,7 +139,7 @@ const char *lookup_alias(const char *name) {
 
 /* Empty builtins array for tests */
 builtin builtins[] = {
-    {NULL, NULL, NULL} /* Terminator */
+    {NULL, NULL, NULL}  /* Terminator */
 };
 const size_t builtins_count = 0;
 
@@ -266,4 +266,3 @@ creg_result_t config_registry_get_boolean(const char *key, bool *out) {
     }
     return CREG_ERROR_NOT_FOUND;
 }
-

@@ -109,10 +109,10 @@ static const char *const ZSH_CANDIDATES[] = {
 
 static const oracle_config_t ORACLES[] = {
     [MODE_POSIX] = {"LUSH_ORACLE_POSIX", "dash", DASH_CANDIDATES, "posix"},
-    [MODE_BASH] = {"LUSH_ORACLE_BASH", "bash", BASH_CANDIDATES, "bash"},
-    [MODE_ZSH] = {"LUSH_ORACLE_ZSH", "zsh", ZSH_CANDIDATES, "zsh"},
-    [MODE_LUSH] = {NULL, NULL, NULL, "lush"},
-    [MODE_UNKNOWN] = {NULL, NULL, NULL, NULL},
+    [MODE_BASH] = { "LUSH_ORACLE_BASH", "bash", BASH_CANDIDATES,  "bash"},
+    [MODE_ZSH] = {  "LUSH_ORACLE_ZSH",  "zsh",  ZSH_CANDIDATES,   "zsh"},
+    [MODE_LUSH] = {               NULL,   NULL,            NULL,  "lush"},
+    [MODE_UNKNOWN] = {               NULL,   NULL,            NULL,    NULL},
 };
 
 typedef struct {

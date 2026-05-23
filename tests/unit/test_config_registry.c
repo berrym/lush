@@ -63,26 +63,18 @@
  */
 
 static const creg_option_t shell_options[] = {
-    {"mode",
-     CREG_VALUE_STRING,
-     {.type = CREG_VALUE_STRING, .data.string = "lush"},
-     "Shell mode",
-     true},
+    {   "mode",
+     CREG_VALUE_STRING,  {.type = CREG_VALUE_STRING, .data.string = "lush"},
+     "Shell mode", true     },
     {"errexit",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Exit on error",
-     true},
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Exit on error", true  },
     {"nounset",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Error on unset",
-     true},
-    {"xtrace",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-     "Trace execution",
-     true},
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Error on unset", true },
+    { "xtrace",
+     CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+     "Trace execution", true},
 };
 
 static const creg_section_t shell_section = {
@@ -97,20 +89,14 @@ static const creg_section_t shell_section = {
 
 static const creg_option_t history_options[] = {
     {"enabled",
-     CREG_VALUE_BOOLEAN,
-     {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
-     "Enable history",
-     true},
-    {"size",
-     CREG_VALUE_INTEGER,
-     {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
-     "History size",
-     true},
-    {"file",
-     CREG_VALUE_STRING,
-     {.type = CREG_VALUE_STRING, .data.string = "~/.lush_history"},
-     "History file",
-     true},
+     CREG_VALUE_BOOLEAN,            {.type = CREG_VALUE_BOOLEAN, .data.boolean = true},
+     "Enable history", true},
+    {   "size",
+     CREG_VALUE_INTEGER,           {.type = CREG_VALUE_INTEGER, .data.integer = 10000},
+     "History size", true  },
+    {   "file",
+     CREG_VALUE_STRING, {.type = CREG_VALUE_STRING, .data.string = "~/.lush_history"},
+     "History file", true  },
 };
 
 static const creg_section_t history_section = {
@@ -614,10 +600,9 @@ static void test_sync_from_runtime(void) { sync_from_runtime_called++; }
 TEST(on_load_hook) {
     creg_option_t opts[] = {
         {"test",
-         CREG_VALUE_BOOLEAN,
-         {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-         NULL,
-         true}};
+         CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+         NULL, true}
+    };
     creg_section_t sec = {
         .name = "test",
         .options = opts,
@@ -644,10 +629,9 @@ TEST(on_load_hook) {
 TEST(sync_hooks) {
     creg_option_t opts[] = {
         {"test",
-         CREG_VALUE_BOOLEAN,
-         {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
-         NULL,
-         true}};
+         CREG_VALUE_BOOLEAN, {.type = CREG_VALUE_BOOLEAN, .data.boolean = false},
+         NULL, true}
+    };
     creg_section_t sec = {
         .name = "test",
         .options = opts,

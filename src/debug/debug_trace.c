@@ -87,8 +87,8 @@ static void debug_array_print_cb(const char *name, array_value_t *array,
     }
     debug_view_emit_line(
         ctx, "%-12s %-7s (%zu element%s)", name,
-        debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
-        array->count, array->count == 1 ? "" : "s");
+        debug_var_type_label(SYMVAR_ARRAY, array->is_associative), array->count,
+        array->count == 1 ? "" : "s");
 }
 
 /**
@@ -407,11 +407,11 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
             debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
         debug_view_emit_line(ctx, "Count: %zu element%s", array->count,
                              array->count == 1 ? "" : "s");
-        debug_view_emit_line(
-            ctx, "Scope: %s",
-            symtable_current_scope_type(symtable_manager()) == SCOPE_GLOBAL
-                ? "global"
-                : "function");
+        debug_view_emit_line(ctx, "Scope: %s",
+                             symtable_current_scope_type(symtable_manager()) ==
+                                     SCOPE_GLOBAL
+                                 ? "global"
+                                 : "function");
         debug_view_end_frame(ctx);
         return;
     }
@@ -622,8 +622,8 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
     if (environ && *environ) {
         debug_view_emit_line(
             ctx, "Use 'debug print <varname>' to inspect specific variables");
-        debug_view_emit_line(
-            ctx, "Use 'debug stack' to see call stack and context");
+        debug_view_emit_line(ctx,
+                             "Use 'debug stack' to see call stack and context");
     }
 }
 
@@ -647,9 +647,8 @@ void debug_watch_variable(debug_context_t *ctx, const char *name) {
     // the value, or report that the name is unbound.
     array_value_t *array = symtable_get_array(clean_name);
     if (array) {
-        debug_printf(
-            ctx, "  Type:  %s\n",
-            debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
+        debug_printf(ctx, "  Type:  %s\n",
+                     debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
         debug_printf(ctx, "  Count: %zu element%s\n", array->count,
                      array->count == 1 ? "" : "s");
         debug_printf(ctx, "  Variable is now being watched for changes\n");
@@ -680,10 +679,9 @@ void debug_show_variable_type(debug_context_t *ctx, const char *name) {
 
     array_value_t *array = symtable_get_array(clean_name);
     if (array) {
-        debug_printf(
-            ctx, "%s: %s (%zu element%s)\n", clean_name,
-            debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
-            array->count, array->count == 1 ? "" : "s");
+        debug_printf(ctx, "%s: %s (%zu element%s)\n", clean_name,
+                     debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
+                     array->count, array->count == 1 ? "" : "s");
         return;
     }
 

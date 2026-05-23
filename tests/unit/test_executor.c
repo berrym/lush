@@ -311,8 +311,7 @@ TEST(trap_err_fires_on_nonzero_exit) {
      * at the end of the test so subsequent tests don't observe a
      * stale ERR handler firing on their own non-zero exits. */
     run_result_t r = run_shell_with_executor(
-        exec,
-        "trap 'echo ERR_HIT' ERR\nfalse\necho continuing\ntrap - ERR\n");
+        exec, "trap 'echo ERR_HIT' ERR\nfalse\necho continuing\ntrap - ERR\n");
     ASSERT_EXIT_STATUS(r, 0);
     /* The trap action runs after `false` returns 1, then execution
      * continues with the next command. */
@@ -331,12 +330,10 @@ TEST(trap_err_not_inherited_in_function_by_default) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    run_result_t r = run_shell_with_executor(
-        exec,
-        "trap 'echo HIT' ERR\n"
-        "f() { false; }\n"
-        "f\n"
-        "trap - ERR\n");
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo HIT' ERR\n"
+                                                   "f() { false; }\n"
+                                                   "f\n"
+                                                   "trap - ERR\n");
     ASSERT_EXIT_STATUS(r, 0);
     /* Exactly one HIT -- the top-level fire on f's non-zero return.
      * The inside-f false was suppressed by the default-off errtrace. */
@@ -355,14 +352,12 @@ TEST(trap_err_inherited_in_function_with_errtrace) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    run_result_t r = run_shell_with_executor(
-        exec,
-        "trap 'echo HIT' ERR\n"
-        "set -o errtrace\n"
-        "f() { false; }\n"
-        "f\n"
-        "set +o errtrace\n"
-        "trap - ERR\n");
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo HIT' ERR\n"
+                                                   "set -o errtrace\n"
+                                                   "f() { false; }\n"
+                                                   "f\n"
+                                                   "set +o errtrace\n"
+                                                   "trap - ERR\n");
     ASSERT_EXIT_STATUS(r, 0);
     /* Two HITs -- inside f at false, and at the top-level on f's
      * non-zero return. */
@@ -386,11 +381,10 @@ TEST(trap_debug_not_inherited_in_function_by_default) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    run_result_t r = run_shell_with_executor(exec,
-                                             "trap 'echo D' DEBUG\n"
-                                             "f() { echo a; echo b; }\n"
-                                             "f\n"
-                                             "trap - DEBUG\n");
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo D' DEBUG\n"
+                                                   "f() { echo a; echo b; }\n"
+                                                   "f\n"
+                                                   "trap - DEBUG\n");
     ASSERT_EXIT_STATUS(r, 0);
     /* Between `a` and `b` (both inside f's body), no DEBUG line
      * should appear. If DEBUG were inherited, we'd see "a\nD\nb";
@@ -406,13 +400,12 @@ TEST(trap_debug_inherited_in_function_with_functrace) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    run_result_t r = run_shell_with_executor(exec,
-                                             "trap 'echo D' DEBUG\n"
-                                             "set -o functrace\n"
-                                             "f() { echo a; echo b; }\n"
-                                             "f\n"
-                                             "set +o functrace\n"
-                                             "trap - DEBUG\n");
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo D' DEBUG\n"
+                                                   "set -o functrace\n"
+                                                   "f() { echo a; echo b; }\n"
+                                                   "f\n"
+                                                   "set +o functrace\n"
+                                                   "trap - DEBUG\n");
     ASSERT_EXIT_STATUS(r, 0);
     /* With functrace, between a and b a DEBUG line should appear
      * (`a\nD\nb`), proving the trap fired inside the body. */
@@ -426,11 +419,10 @@ TEST(trap_return_not_inherited_in_function_by_default) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    run_result_t r = run_shell_with_executor(exec,
-                                             "trap 'echo RET' RETURN\n"
-                                             "f() { echo inside; }\n"
-                                             "f\n"
-                                             "trap - RETURN\n");
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo RET' RETURN\n"
+                                                   "f() { echo inside; }\n"
+                                                   "f\n"
+                                                   "trap - RETURN\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_NULL(strstr(r.out, "RET"),
                 "RETURN trap must NOT fire without functrace");
@@ -442,13 +434,12 @@ TEST(trap_return_inherited_in_function_with_functrace) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    run_result_t r = run_shell_with_executor(exec,
-                                             "trap 'echo RET' RETURN\n"
-                                             "set -o functrace\n"
-                                             "f() { echo inside; }\n"
-                                             "f\n"
-                                             "set +o functrace\n"
-                                             "trap - RETURN\n");
+    run_result_t r = run_shell_with_executor(exec, "trap 'echo RET' RETURN\n"
+                                                   "set -o functrace\n"
+                                                   "f() { echo inside; }\n"
+                                                   "f\n"
+                                                   "set +o functrace\n"
+                                                   "trap - RETURN\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_NOT_NULL(strstr(r.out, "RET"),
                     "RETURN trap must fire when functrace is set");
@@ -461,8 +452,7 @@ TEST(trap_err_silent_on_zero_exit) {
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
     run_result_t r = run_shell_with_executor(
-        exec,
-        "trap 'echo ERR_HIT' ERR\ntrue\necho continuing\ntrap - ERR\n");
+        exec, "trap 'echo ERR_HIT' ERR\ntrue\necho continuing\ntrap - ERR\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_TRUE(strstr(r.out, "ERR_HIT") == NULL,
                 "no ERR trap on a zero-exit command");
@@ -528,8 +518,7 @@ TEST(arr_at_in_scalar_assignment_raises_type_mismatch) {
     /* The diagnostic must reach stderr with the canonical phrasing. */
     ASSERT_STDERR_CONTAINS(r, "type mismatch");
     ASSERT_STDERR_CONTAINS(r, "${arr[@]}");
-    ASSERT_TRUE(r.exit_status != 0,
-                "non-zero exit on type-mismatch abort");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on type-mismatch abort");
 
     executor_free(exec);
 }
@@ -1992,8 +1981,8 @@ TEST(rt_heredoc_in_if_body) {
 }
 
 TEST(rt_heredoc_loop_redirection) {
-    run_result_t r = run_shell(
-        "while read l; do echo \"got $l\"; done <<EOF\nx\ny\nEOF\n");
+    run_result_t r =
+        run_shell("while read l; do echo \"got $l\"; done <<EOF\nx\ny\nEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "got x\ngot y\n");
 }
@@ -2043,8 +2032,7 @@ TEST(rt_glob_for_array_qualifiers) {
     rt_touch(".hidden");
 
     /* for-loop word list globs (previously iterated the literal "*"). */
-    run_result_t r =
-        run_shell("n=0; for f in *; do n=$((n+1)); done; echo $n");
+    run_result_t r = run_shell("n=0; for f in *; do n=$((n+1)); done; echo $n");
     ASSERT_STDOUT_EQ(r, "4\n");
 
     /* indexed-array initializer globs. */
@@ -2105,9 +2093,9 @@ TEST(rt_case_arm_runs_all) {
 TEST(rt_case_arm_return_status) {
     /* posix/101 init-script shape: a function returning non-zero in a
      * case arm, its status captured by a following command. */
-    run_result_t r = run_shell(
-        "do_status() { return 3; }\n"
-        "case status in status) do_status; rc=$?; esac\necho $rc\n");
+    run_result_t r =
+        run_shell("do_status() { return 3; }\n"
+                  "case status in status) do_status; rc=$?; esac\necho $rc\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "3\n");
 }

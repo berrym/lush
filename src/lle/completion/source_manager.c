@@ -240,8 +240,7 @@ static lle_result_t history_source_generate(lle_memory_pool_t *pool,
  * ============================================================================
  */
 
-static bool
-debug_command_source_applicable(const lle_word_context_t *context) {
+static bool debug_command_source_applicable(const lle_word_context_t *context) {
     return lle_in_debug_prompt() &&
            context->context_type == LLE_CONTEXT_COMMAND_POSITION;
 }
@@ -257,13 +256,11 @@ debug_command_source_generate(lle_memory_pool_t *pool,
      * / h / q / t) are listed as their own entries so prefix matching
      * surfaces both forms naturally. */
     static const char *const debug_commands[] = {
-        "backtrace", "bt",       "c",       "continue", "down",
-        "eval",      "f",        "feature", "features", "finish",
-        "h",         "help",     "l",       "list",     "mode",
-        "n",         "next",     "p",       "print",    "q",
-        "quit",      "s",        "set",     "step",     "t",
-        "type",      "up",       "vars",    "watch",    "where",
-        NULL,
+        "backtrace", "bt",       "c",      "continue", "down",  "eval", "f",
+        "feature",   "features", "finish", "h",        "help",  "l",    "list",
+        "mode",      "n",        "next",   "p",        "print", "q",    "quit",
+        "s",         "set",      "step",   "t",        "type",  "up",   "vars",
+        "watch",     "where",    NULL,
     };
 
     for (size_t i = 0; debug_commands[i] != NULL; i++) {

@@ -34,6 +34,4 @@ bool lle_in_debug_prompt(void) { return g_in_debug_prompt; }
  *
  * See declaration in include/lle/lle_readline.h.
  */
-void lle_set_debug_prompt_active(bool active) {
-    g_in_debug_prompt = active;
-}
+void lle_set_debug_prompt_active(bool active) { g_in_debug_prompt = active; }

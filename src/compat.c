@@ -167,20 +167,34 @@ static void free_internal_entry(internal_entry_t *entry) {
  */
 static void internal_to_public(const internal_entry_t *internal,
                                compat_entry_t *public) {
-    public->id = internal->id;
-    public->category = internal->category;
-    public->feature = internal->feature;
-    public->description = internal->description;
-    public->behavior.posix = internal->behavior_posix;
-    public->behavior.bash = internal->behavior_bash;
-    public->behavior.zsh = internal->behavior_zsh;
-    public->behavior.lush = internal->behavior_lush;
-    public->lint.severity = internal->severity;
-    public->lint.message = internal->lint_message;
-    public->lint.suggestion = internal->lint_suggestion;
-    public->lint.pattern = internal->lint_pattern;
-    public->lint.fix = internal->fix_class;
-    public->lint.replacement = internal->fix_replacement;
+  public
+    ->id = internal->id;
+  public
+    ->category = internal->category;
+  public
+    ->feature = internal->feature;
+  public
+    ->description = internal->description;
+  public
+    ->behavior.posix = internal->behavior_posix;
+  public
+    ->behavior.bash = internal->behavior_bash;
+  public
+    ->behavior.zsh = internal->behavior_zsh;
+  public
+    ->behavior.lush = internal->behavior_lush;
+  public
+    ->lint.severity = internal->severity;
+  public
+    ->lint.message = internal->lint_message;
+  public
+    ->lint.suggestion = internal->lint_suggestion;
+  public
+    ->lint.pattern = internal->lint_pattern;
+  public
+    ->lint.fix = internal->fix_class;
+  public
+    ->lint.replacement = internal->fix_replacement;
 }
 
 /**
@@ -983,33 +997,33 @@ static const struct {
     const char *description;
 } ast_feature_map[] = {
     /* Extended test and arithmetic */
-    {NODE_EXTENDED_TEST, "extended_test", "[[ ]] extended test"},
-    {NODE_ARITH_CMD, "arithmetic_command", "(( )) arithmetic command"},
-    {NODE_FOR_ARITH, "arithmetic_for", "C-style for loop"},
+    {    NODE_EXTENDED_TEST,        "extended_test",      "[[ ]] extended test"},
+    {        NODE_ARITH_CMD,   "arithmetic_command", "(( )) arithmetic command"},
+    {        NODE_FOR_ARITH,       "arithmetic_for",         "C-style for loop"},
 
     /* Process substitution */
-    {NODE_PROC_SUB_IN, "process_substitution", "<() process substitution"},
-    {NODE_PROC_SUB_OUT, "process_substitution", ">() process substitution"},
+    {      NODE_PROC_SUB_IN, "process_substitution", "<() process substitution"},
+    {     NODE_PROC_SUB_OUT, "process_substitution", ">() process substitution"},
 
     /* Arrays */
-    {NODE_ARRAY_LITERAL, "arrays", "array literal"},
-    {NODE_ARRAY_ACCESS, "arrays", "array access"},
-    {NODE_ARRAY_ASSIGN, "arrays", "array assignment"},
-    {NODE_ARRAY_APPEND, "arrays", "array append"},
+    {    NODE_ARRAY_LITERAL,               "arrays",            "array literal"},
+    {     NODE_ARRAY_ACCESS,               "arrays",             "array access"},
+    {     NODE_ARRAY_ASSIGN,               "arrays",         "array assignment"},
+    {     NODE_ARRAY_APPEND,               "arrays",             "array append"},
 
     /* Redirections (non-POSIX) */
-    {NODE_REDIR_HERESTRING, "here_string", "<<< here-string"},
-    {NODE_REDIR_BOTH, "redirect_both", "&> redirect both streams"},
-    {NODE_REDIR_BOTH_APPEND, "redirect_append_both", "&>> append both streams"},
-    {NODE_REDIR_FD_ALLOC, "redirect_fd", "{var}> fd allocation"},
+    { NODE_REDIR_HERESTRING,          "here_string",          "<<< here-string"},
+    {       NODE_REDIR_BOTH,        "redirect_both", "&> redirect both streams"},
+    {NODE_REDIR_BOTH_APPEND, "redirect_append_both",  "&>> append both streams"},
+    {   NODE_REDIR_FD_ALLOC,          "redirect_fd",     "{var}> fd allocation"},
 
     /* Control flow extensions */
-    {NODE_COPROC, "coproc", "coproc coprocess"},
-    {NODE_SELECT, "select_loop", "select loop"},
-    {NODE_TIME, "time_keyword", "time keyword"},
+    {           NODE_COPROC,               "coproc",         "coproc coprocess"},
+    {           NODE_SELECT,          "select_loop",              "select loop"},
+    {             NODE_TIME,         "time_keyword",             "time keyword"},
 
     /* Functions */
-    {NODE_ANON_FUNCTION, "anonymous_function", "anonymous function"},
+    {    NODE_ANON_FUNCTION,   "anonymous_function",       "anonymous function"},
 };
 
 #define AST_FEATURE_MAP_SIZE                                                   \

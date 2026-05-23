@@ -27,8 +27,8 @@ int main(void) {
         size_t expected_graphemes;
     } tests[] = {
         {"Family emoji", "👨‍👩‍👧‍👦", 1},
-        {"Flag emoji", "🇺🇸", 1},
-        {"Skin tone", "👋🏽", 1},
+        {  "Flag emoji",                        "🇺🇸", 1},
+        {   "Skin tone",                      "👋🏽", 1},
     };
 
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

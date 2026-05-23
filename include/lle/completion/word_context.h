@@ -189,22 +189,22 @@ typedef struct lle_word_context {
 
     /* Surrounding-command context --------------------------------------- */
     lle_word_context_type_t context_type; ///< Where the word sits structurally
-    char *command_name;    /**< Owner command for builtin-arg
-                                dispatch (e.g., "cd", "set"). NULL
-                                in command-position contexts.       */
-    int arg_index;         /**< Zero-based index of this argument
-                                within its command. -1 if not
-                                applicable.                         */
-    char **arguments;      /**< Pool-allocated array of completed
-                                argument strings before the
-                                cursor's current word, dequoted
-                                and NFC-normalized. Used by
-                                builtin-arg sources to walk
-                                subcommand hierarchies (e.g.,
-                                recognizing the chain in
-                                `display lle theme set <here>`).
-                                NULL when no completed arguments
-                                exist.                              */
+    char *command_name;                   /**< Owner command for builtin-arg
+                                               dispatch (e.g., "cd", "set"). NULL
+                                               in command-position contexts.       */
+    int arg_index;                        /**< Zero-based index of this argument
+                                               within its command. -1 if not
+                                               applicable.                         */
+    char **arguments;                     /**< Pool-allocated array of completed
+                                               argument strings before the
+                                               cursor's current word, dequoted
+                                               and NFC-normalized. Used by
+                                               builtin-arg sources to walk
+                                               subcommand hierarchies (e.g.,
+                                               recognizing the chain in
+                                               `display lle theme set <here>`).
+                                               NULL when no completed arguments
+                                               exist.                              */
     size_t argument_count; /**< Number of entries in arguments[]. */
 
     /* Resolved data for sources ------------------------------------------ */

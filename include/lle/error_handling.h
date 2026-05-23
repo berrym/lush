@@ -188,7 +188,8 @@ typedef enum {
  * @brief Buffer Management specific errors
  */
 typedef enum {
-    LLE_BUFFER_ERROR_BASE = LLE_ERROR_BUFFER_COMPONENT, ///< Base code for buffer errors
+    LLE_BUFFER_ERROR_BASE =
+        LLE_ERROR_BUFFER_COMPONENT,           ///< Base code for buffer errors
     LLE_BUFFER_ERROR_INVALID_CURSOR_POSITION, /**< Cursor position invalid */
     LLE_BUFFER_ERROR_TEXT_ENCODING_INVALID,   /**< Text encoding error */
     LLE_BUFFER_ERROR_MULTILINE_CORRUPTION, /**< Multiline structure corrupted */
@@ -204,9 +205,10 @@ typedef enum {
  * @brief Event System specific errors
  */
 typedef enum {
-    LLE_EVENT_ERROR_BASE = LLE_ERROR_EVENT_SYSTEM, ///< Base code for event system errors
-    LLE_EVENT_ERROR_QUEUE_OVERFLOW,              /**< Event queue overflow */
-    LLE_EVENT_ERROR_INVALID_PRIORITY,            /**< Invalid event priority */
+    LLE_EVENT_ERROR_BASE =
+        LLE_ERROR_EVENT_SYSTEM,       ///< Base code for event system errors
+    LLE_EVENT_ERROR_QUEUE_OVERFLOW,   /**< Event queue overflow */
+    LLE_EVENT_ERROR_INVALID_PRIORITY, /**< Invalid event priority */
     LLE_EVENT_ERROR_HANDLER_REGISTRATION_FAILED, /**< Handler registration
                                                     failed */
     LLE_EVENT_ERROR_CIRCULAR_DEPENDENCY,   /**< Circular event dependency */
@@ -220,7 +222,8 @@ typedef enum {
  * @brief Terminal Abstraction specific errors
  */
 typedef enum {
-    LLE_TERMINAL_ERROR_BASE = LLE_ERROR_TERMINAL_ABSTRACTION, ///< Base code for terminal errors
+    LLE_TERMINAL_ERROR_BASE =
+        LLE_ERROR_TERMINAL_ABSTRACTION, ///< Base code for terminal errors
     LLE_TERMINAL_ERROR_CAPABILITY_DETECTION_FAILED, /**< Capability detection
                                                        failed */
     LLE_TERMINAL_ERROR_UNSUPPORTED_TERMINAL, /**< Terminal type unsupported */
