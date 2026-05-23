@@ -136,13 +136,30 @@ typedef enum {
     SCOPE_CONDITIONAL /**< Conditional execution scope (if/case) */
 } scope_type_t;
 
-// Variable entry structure
+/**
+ * @brief Variable entry structure
+ *
+ * Deserialized form of one scope-table entry. Storage is kind-tagged
+ * via the type field:
+ *
+ *   - SYMVAR_STRING / SYMVAR_INTEGER / SYMVAR_NAMEREF / SYMVAR_FUNCTION:
+ *       value holds the scalar string; array is NULL.
+ *   - SYMVAR_ARRAY:
+ *       value holds the array_value_t pointer encoded as a hex string
+ *       (so the existing ht_strstr storage can carry it verbatim);
+ *       array is the parsed pointer for fast direct access.
+ *
+ * Callers read array directly when type==SYMVAR_ARRAY rather than
+ * re-parsing value, but the two fields are always consistent --
+ * serialize_variable encodes both from a single source.
+ */
 struct symvar {
     char *name;           /**< Variable name */
-    char *value;          /**< Variable value (string representation) */
-    symvar_type_t type;   /**< Variable type */
+    char *value;          /**< Scalar string (or hex pointer for arrays) */
+    symvar_type_t type;   /**< Variable type (selects which storage is live) */
     symvar_flags_t flags; /**< Variable flags */
     size_t scope_level;   /**< Scope level where defined */
+    array_value_t *array; /**< List/Map storage; non-NULL iff type==ARRAY */
     symvar_t *next;       /**< Next variable in hash chain */
 };
 

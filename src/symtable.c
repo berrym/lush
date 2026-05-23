@@ -138,6 +138,7 @@ static symvar_t *deserialize_variable(const char *name,
     var->type = SYMVAR_STRING;
     var->flags = SYMVAR_NONE;
     var->scope_level = 0;
+    var->array = NULL;
     var->next = NULL;
 
     if (!var->name) {
@@ -183,6 +184,17 @@ static symvar_t *deserialize_variable(const char *name,
     // Ensure we have a value
     if (!var->value) {
         var->value = strdup("");
+    }
+
+    // For SYMVAR_ARRAY entries, value is the array_value_t pointer as
+    // a hex string; parse it back into the typed array field so
+    // callers reading symvar.array directly see the live pointer
+    // without re-scanning value on every access.
+    if (var->type == SYMVAR_ARRAY && var->value && var->value[0]) {
+        void *ptr = NULL;
+        if (sscanf(var->value, "%p", &ptr) == 1) {
+            var->array = (array_value_t *)ptr;
+        }
     }
 
     return var;
@@ -704,6 +716,18 @@ char *symtable_get_var(symtable_manager_t *manager, const char *name) {
 
     symvar_t *var = find_var(manager->current_scope, resolved_name);
     if (!var) {
+        return NULL;
+    }
+
+    // Array bindings are not scalars; symtable_get_var returns NULL
+    // so the array path (symtable_get_array / symtable_lookup) is the
+    // only way to read them. Without this filter, get_var would
+    // return the hex pointer string stored in var->value -- harmless
+    // for the common bare-${arr} call sites already migrated to
+    // symtable_lookup, but a leak for paths like ${!ref} indirection
+    // that resolve the name and then call get_var.
+    if (var->type == SYMVAR_ARRAY) {
+        free_symvar(var);
         return NULL;
     }
 
@@ -2771,6 +2795,23 @@ int symtable_set_array(const char *name, array_value_t *array) {
     snprintf(ptr_str, sizeof(ptr_str), "%p", (void *)array);
 
     ht_strstr_insert(array_storage, name, ptr_str);
+
+    // Also write a kind-tagged symvar into the current scope's vars_ht
+    // so the scope chain carries the array binding -- this is the
+    // storage unification path that makes scalar/list/map share one
+    // scope-aware location. The side-table write above stays during
+    // the transition so callers that iterate it (e.g. lle_shell_hooks)
+    // continue to work; once those migrate the side-table can go.
+    if (global_manager && global_manager->current_scope) {
+        char *serialized =
+            serialize_variable(ptr_str, SYMVAR_ARRAY, SYMVAR_NONE,
+                               global_manager->current_scope->level);
+        if (serialized) {
+            ht_strstr_insert(global_manager->current_scope->vars_ht, name,
+                             serialized);
+            free(serialized);
+        }
+    }
     return 0;
 }
 
