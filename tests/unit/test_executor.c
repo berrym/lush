@@ -523,6 +523,83 @@ TEST(arr_at_in_scalar_assignment_raises_type_mismatch) {
     executor_free(exec);
 }
 
+/* SEMANTICS section 3.9: bare unsubscripted ${arr} on a list value.
+ * - In a vector-accepting slot (argv, for-loop word list, array
+ *   init), contributes elements one-to-one with [@].
+ * - In a scalar-requiring slot (assignment RHS, case word, here-
+ *   string, arithmetic operand, conditional-expression operand,
+ *   or a within-word glued position), the engine raises a runtime
+ *   type-mismatch error and the script aborts before the bad value
+ *   reaches a downstream command. */
+TEST(bare_arr_in_scalar_assignment_raises_type_mismatch) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\ny=${arr}\necho saw_post_assign\n");
+
+    ASSERT_TRUE(strstr(r.out, "saw_post_assign") == NULL,
+                "execution aborted after type mismatch");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_STDERR_CONTAINS(r, "${arr}");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on type-mismatch abort");
+
+    executor_free(exec);
+}
+
+TEST(bare_arr_in_for_loop_iterates) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nfor i in ${arr}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "iter=a");
+    ASSERT_STDOUT_CONTAINS(r, "iter=b");
+    ASSERT_STDOUT_CONTAINS(r, "iter=c");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no error in vector position");
+
+    executor_free(exec);
+}
+
+TEST(bare_arr_glued_to_text_raises_type_mismatch) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /* Whole-word constraint per section 3.9: a list value glued to
+     * other text within a single word has no coherent meaning and is
+     * a runtime type error. */
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\necho \"x${arr}y\"\necho after\n");
+
+    ASSERT_TRUE(strstr(r.out, "after") == NULL,
+                "execution aborted on glued list");
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_TRUE(r.exit_status != 0, "non-zero exit on glued list");
+
+    executor_free(exec);
+}
+
+TEST(bare_arr_argv_yields_elements_one_to_one) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /* argv slot is vector-accepting. printf '<%s>\n' ${arr} must
+     * produce one <element> line per element, preserving the
+     * original boundaries even for elements containing spaces. */
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a 'x y' c)\nprintf '<%s>\\n' ${arr}\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "<a>");
+    ASSERT_STDOUT_CONTAINS(r, "<x y>");
+    ASSERT_STDOUT_CONTAINS(r, "<c>");
+
+    executor_free(exec);
+}
+
 TEST(arr_at_in_for_loop_iterates) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -2238,6 +2315,10 @@ int main(void) {
     RUN_TEST(arr_at_in_scalar_assignment_raises_type_mismatch);
     RUN_TEST(arr_at_in_for_loop_iterates);
     RUN_TEST(arr_star_in_scalar_assignment_joins);
+    RUN_TEST(bare_arr_in_scalar_assignment_raises_type_mismatch);
+    RUN_TEST(bare_arr_in_for_loop_iterates);
+    RUN_TEST(bare_arr_glued_to_text_raises_type_mismatch);
+    RUN_TEST(bare_arr_argv_yields_elements_one_to_one);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);

@@ -193,7 +193,9 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                                   bool in_double_quotes);
 static char *expand_arg_node(executor_t *executor, node_t *node);
 static char *expand_array_unsubscripted(executor_t *executor,
-                                        array_value_t *array);
+                                        array_value_t *array,
+                                        const char *arr_name);
+static void executor_request_posix_exit(executor_t *executor, int status);
 static char *slice_string_graphemes(const char *str, size_t str_len,
                                     int start_grapheme, int count);
 static char *expand_ansi_c_string(const char *str, size_t len);
@@ -4469,6 +4471,34 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
             if (name_len == 0) {
                 return false;
             }
+            /* Braced bare `${NAME}` (no subscript). Per SEMANTICS.md
+             * section 3.9, a bare reference to a list/map value is a
+             * vector-yielding expansion -- it contributes its elements
+             * to the surrounding argv/word-list slot, exactly as
+             * `${NAME[@]}` does. Curated zsh/lush behavior; bash and
+             * posix mode keep the legacy "first-element" form via
+             * expand_array_unsubscripted. The unbraced `$NAME` case
+             * is already handled above; this is the braced peer.
+             * Issue: SEMANTICS section 3.9 conformance. */
+            if (!keys_form && p == end) {
+                char nb[256];
+                if (name_len >= sizeof(nb)) {
+                    return false;
+                }
+                memcpy(nb, name_start, name_len);
+                nb[name_len] = '\0';
+                array_value_t *probe = symtable_get_array(nb);
+                if (!probe) {
+                    return false;
+                }
+                shell_mode_t mode = shell_mode_get();
+                if (mode != SHELL_MODE_ZSH && mode != SHELL_MODE_LUSH) {
+                    return false;
+                }
+                subscript = '@';
+                // Fall through to the per-array assembly path below.
+                goto braced_bare_array_ready;
+            }
             if (p >= end || *p != '[') {
                 return false;
             }
@@ -4515,6 +4545,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         }
     }
 
+braced_bare_array_ready:;
     // Now produce the element vector.
     char **vec = NULL;
     int vcount = 0;
@@ -4768,8 +4799,8 @@ static char *expand_arg_node(executor_t *executor, node_t *node) {
  * @return Newly malloc'd string (caller frees), empty on NULL/error
  */
 static char *expand_array_unsubscripted(executor_t *executor,
-                                        array_value_t *array) {
-    (void)executor;
+                                        array_value_t *array,
+                                        const char *arr_name) {
     if (!array) {
         return strdup("");
     }
@@ -4778,9 +4809,40 @@ static char *expand_array_unsubscripted(executor_t *executor,
         const char *first = symtable_array_get_index(array, 0);
         return strdup(first ? first : "");
     }
-    // zsh and lush: joined-by-space
-    char *result = symtable_array_expand(array, " ");
-    return result ? result : strdup("");
+    /* zsh/lush mode: per SEMANTICS.md section 3.9, a list/map value
+     * reaching a scalar slot (or glued to text within a word) is a
+     * runtime type error. We get here only AFTER try_expand_vector_arg
+     * declined to handle the reference as vector-yielding -- which
+     * means the surrounding context is scalar (variable assignment
+     * RHS, case word, here-string, arithmetic operand, conditional-
+     * expression operand, or a within-word "glued" position). Emit
+     * the type-mismatch diagnostic via the structured-error system
+     * and request a POSIX shell abort so a script halts before the
+     * bad value reaches a downstream command. */
+    shell_error_t *err = shell_error_create(
+        SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+        executor_current_loc(executor),
+        "type mismatch: %s value ${%s} in a scalar position",
+        array->is_associative ? "map" : "list", arr_name ? arr_name : "?");
+    if (err) {
+        shell_error_set_suggestion(
+            err, "join the list explicitly to place it in a string position -- "
+                 "${name[*]} for space-joining, or an explicit join.");
+        shell_error_display(err, stderr, isatty(STDERR_FILENO));
+        shell_error_free(err);
+        if (executor) {
+            executor->has_error = true;
+        }
+    } else if (executor) {
+        executor_error_report(
+            executor, SHELL_ERR_TYPE_MISMATCH, executor_current_loc(executor),
+            "type mismatch: %s value ${%s} in a scalar position",
+            array->is_associative ? "map" : "list", arr_name ? arr_name : "?");
+    }
+    if (executor) {
+        executor_request_posix_exit(executor, 1);
+    }
+    return strdup("");
 }
 
 static char **build_argv_from_ast(executor_t *executor, node_t *command,
@@ -13631,7 +13693,7 @@ static char *parse_parameter_expansion(executor_t *executor,
     // joined. Matches the bare-$arr form behavior in expand_variable.
     array_value_t *array = symtable_get_array(expansion);
     if (array) {
-        return expand_array_unsubscripted(executor, array);
+        return expand_array_unsubscripted(executor, array, expansion);
     }
 
     char *value = symtable_get_var(executor->symtable, expansion);
@@ -13792,7 +13854,8 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                 // zsh and lush give all elements joined. (Issue #65.)
                 array_value_t *array = symtable_get_array(resolved_name);
                 if (array) {
-                    char *result = expand_array_unsubscripted(executor, array);
+                    char *result = expand_array_unsubscripted(executor, array,
+                                                              resolved_name);
                     if (resolved_to_free) {
                         free(resolved_to_free);
                     }
