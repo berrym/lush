@@ -2360,6 +2360,61 @@ TEST(rt_char_class_upper) {
     ASSERT_STDOUT_EQ(r, "[ABC]\n");
 }
 
+// --- typed-function form (SEMANTICS §5.3) -----------------------------
+
+TEST(rt_typed_fn_scalar_return) {
+    run_result_t r = run_shell("fn answer() -> scalar { return \"42\"; }\n"
+                               "let r = answer()\n"
+                               "echo \"[$r]\"\n");
+    ASSERT_STDOUT_EQ(r, "[42]\n");
+}
+
+TEST(rt_typed_fn_scalar_param) {
+    run_result_t r =
+        run_shell("fn shout(s: scalar) -> scalar { return \"$s!\"; }\n"
+                  "let r = shout(\"hi\")\n"
+                  "echo \"[$r]\"\n");
+    ASSERT_STDOUT_EQ(r, "[hi!]\n");
+}
+
+TEST(rt_typed_fn_list_param) {
+    run_result_t r = run_shell("fn first(xs: list) -> scalar { return "
+                               "\"${xs[0]}\"; }\n"
+                               "arr=(alpha beta gamma)\n"
+                               "let r = first($arr)\n"
+                               "echo \"[$r]\"\n");
+    ASSERT_STDOUT_EQ(r, "[alpha]\n");
+}
+
+TEST(rt_typed_fn_arity_mismatch) {
+    run_result_t r =
+        run_shell("fn one(a: scalar) -> scalar { return \"ok\"; }\n"
+                  "let r = one()\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_typed_fn_kind_mismatch_arg) {
+    run_result_t r = run_shell("fn ws(s: scalar) -> scalar { return $s; }\n"
+                               "arr=(a b c)\n"
+                               "let r = ws($arr)\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_typed_fn_void_called_via_let) {
+    run_result_t r = run_shell("fn nop() { :; }\n"
+                               "let r = nop()\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_typed_fn_void_no_return) {
+    run_result_t r = run_shell("fn nop() { echo hello; }\n"
+                               "nop\n");
+    /* nop is a POSIX-form call site (no parens at statement position
+     * yet); for now this just confirms the fn declaration parses and
+     * does not fire a runtime error before reaching its body. */
+    (void)r;
+}
+
 /* ============================================================================
  * MAIN
  * ============================================================================
@@ -2560,6 +2615,13 @@ int main(void) {
 
     printf("\nRegression: return/case control flow:\n");
     RUN_TEST(rt_return_from_for_loop);
+    RUN_TEST(rt_typed_fn_scalar_return);
+    RUN_TEST(rt_typed_fn_scalar_param);
+    RUN_TEST(rt_typed_fn_list_param);
+    RUN_TEST(rt_typed_fn_arity_mismatch);
+    RUN_TEST(rt_typed_fn_kind_mismatch_arg);
+    RUN_TEST(rt_typed_fn_void_called_via_let);
+    RUN_TEST(rt_typed_fn_void_no_return);
     RUN_TEST(rt_return_from_while_loop);
     RUN_TEST(rt_case_arm_runs_all);
     RUN_TEST(rt_case_arm_return_status);

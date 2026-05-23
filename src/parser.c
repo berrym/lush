@@ -130,6 +130,9 @@ parser_t *parser_new_with_source(const char *input, const char *source_name,
     // No heredocs pending body collection yet
     parser->pending_heredoc_count = 0;
 
+    // Typed-function body parsing depth (0 outside any `fn` body).
+    parser->fn_body_depth = 0;
+
     return parser;
 }
 
@@ -5952,8 +5955,11 @@ static node_t *parse_fn_declaration(parser_t *parser) {
 
     // Optional return-kind annotation: -> kind. The tokenizer emits
     // TOK_ARROW only when '-' and '>' are adjacent (no whitespace),
-    // matching the design's adjacency requirement.
-    const char *return_kind = "";
+    // matching the design's adjacency requirement. The return-kind
+    // text must be copied here -- tokenizer_advance frees the token
+    // it pointed at, and the encoded signature is built much later
+    // after the body is parsed.
+    char *return_kind = NULL;
     current = tokenizer_current(parser->tokenizer);
     if (current && current->type == TOK_ARROW) {
         tokenizer_advance(parser->tokenizer);
@@ -5968,7 +5974,12 @@ static node_t *parse_fn_declaration(parser_t *parser) {
             parser_pop_context(parser);
             return NULL;
         }
-        return_kind = current->text;
+        return_kind = strdup(current->text);
+        if (!return_kind) {
+            free(name);
+            parser_pop_context(parser);
+            return NULL;
+        }
         tokenizer_advance(parser->tokenizer);
     }
 
@@ -5995,6 +6006,7 @@ static node_t *parse_fn_declaration(parser_t *parser) {
     parser->fn_body_depth--;
     if (!body) {
         free(name);
+        free(return_kind);
         parser_pop_context(parser);
         return NULL;
     }
@@ -6002,25 +6014,27 @@ static node_t *parse_fn_declaration(parser_t *parser) {
     // Build the encoded val.str: "name\x1f<return_kind>\x1f<params>".
     // param_buf already has a leading \x1F per entry; the second
     // \x1F here separates return_kind from the first param.
-    size_t encoded_size =
-        strlen(name) + 1 + strlen(return_kind) + 1 + param_len + 1;
+    const char *rk = return_kind ? return_kind : "";
+    size_t encoded_size = strlen(name) + 1 + strlen(rk) + 1 + param_len + 1;
     char *encoded = malloc(encoded_size);
     if (!encoded) {
         free_node_tree(body);
         free(name);
+        free(return_kind);
         parser_pop_context(parser);
         return NULL;
     }
-    int n = snprintf(encoded, encoded_size, "%s\x1f%s%s", name, return_kind,
-                     param_buf);
+    int n = snprintf(encoded, encoded_size, "%s\x1f%s%s", name, rk, param_buf);
     if (n < 0 || (size_t)n >= encoded_size) {
         free(encoded);
         free_node_tree(body);
         free(name);
+        free(return_kind);
         parser_pop_context(parser);
         return NULL;
     }
     free(name);
+    free(return_kind);
 
     node_t *decl = new_node_at(NODE_FN_DECL, fn_loc);
     if (!decl) {
@@ -6170,7 +6184,21 @@ static node_t *parse_fn_call_expression(parser_t *parser) {
 
         source_location_t arg_loc =
             token_to_source_location(current, parser->source_name);
-        node_t *arg = new_node_at(NODE_COMMAND, arg_loc);
+        // Map token type -> AST node type so the executor can dispatch
+        // on kind without re-tokenizing. NODE_VAR for bare $name refs
+        // (so list/map kinds survive the boundary), NODE_STRING_LITERAL
+        // for single-quoted strings (no expansion), NODE_STRING_EXPANDABLE
+        // for double-quoted strings (full expansion), NODE_COMMAND text
+        // for plain words.
+        node_type_t arg_type = NODE_COMMAND;
+        if (current->type == TOK_VARIABLE) {
+            arg_type = NODE_VAR;
+        } else if (current->type == TOK_STRING) {
+            arg_type = NODE_STRING_LITERAL;
+        } else if (current->type == TOK_EXPANDABLE_STRING) {
+            arg_type = NODE_STRING_EXPANDABLE;
+        }
+        node_t *arg = new_node_at(arg_type, arg_loc);
         if (!arg) {
             free_node_tree(call_node);
             return NULL;
@@ -6317,10 +6345,22 @@ static node_t *parse_fn_return_statement(parser_t *parser) {
                    current->type == TOK_STRING ||
                    current->type == TOK_EXPANDABLE_STRING ||
                    current->type == TOK_VARIABLE) {
-            // Single word / string / variable expression.
+            // Single word / string / variable expression. Map token
+            // type -> AST node type so the executor sees the kind
+            // directly (NODE_VAR for $name, NODE_STRING_LITERAL for
+            // single-quoted, NODE_STRING_EXPANDABLE for double-quoted,
+            // NODE_COMMAND for bare words).
             source_location_t expr_loc =
                 token_to_source_location(current, parser->source_name);
-            expr = new_node_at(NODE_COMMAND, expr_loc);
+            node_type_t expr_type = NODE_COMMAND;
+            if (current->type == TOK_VARIABLE) {
+                expr_type = NODE_VAR;
+            } else if (current->type == TOK_STRING) {
+                expr_type = NODE_STRING_LITERAL;
+            } else if (current->type == TOK_EXPANDABLE_STRING) {
+                expr_type = NODE_STRING_EXPANDABLE;
+            }
+            expr = new_node_at(expr_type, expr_loc);
             if (expr) {
                 expr->val.str = strdup(current->text);
                 expr->val_type = VAL_STR;

@@ -63,6 +63,12 @@ static int execute_node(executor_t *executor, node_t *node);
 static int execute_command(executor_t *executor, node_t *command);
 static int execute_pipeline(executor_t *executor, node_t *pipeline);
 static int execute_function_definition(executor_t *executor, node_t *function);
+// Typed-function form (SEMANTICS §5.3, §7).
+static void executor_typed_fns_clear(executor_t *executor);
+static int execute_typed_fn_decl(executor_t *executor, node_t *node);
+static int execute_typed_fn_call(executor_t *executor, node_t *node);
+static int execute_typed_fn_return(executor_t *executor, node_t *node);
+static int execute_typed_let_fn(executor_t *executor, node_t *node);
 static int execute_function_call(executor_t *executor,
                                  const char *function_name, char **argv,
                                  int argc, source_location_t loc);
@@ -356,6 +362,13 @@ executor_t *executor_new(void) {
     executor->source_text = NULL;
     executor->source_starting_line = 0;
 
+    // Typed-function state starts empty.
+    executor->typed_fns = NULL;
+    executor->typed_fn_return_pending = false;
+    executor->typed_fn_return_value.kind = LUSH_VALUE_NONE;
+    executor->typed_fn_return_value.scalar_value = NULL;
+    executor->typed_fn_return_value.array = NULL;
+
     initialize_job_control(executor);
 
     return executor;
@@ -411,6 +424,13 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->source_text = NULL;
     executor->source_starting_line = 0;
 
+    // Typed-function state starts empty.
+    executor->typed_fns = NULL;
+    executor->typed_fn_return_pending = false;
+    executor->typed_fn_return_value.kind = LUSH_VALUE_NONE;
+    executor->typed_fn_return_value.scalar_value = NULL;
+    executor->typed_fn_return_value.array = NULL;
+
     initialize_job_control(executor);
 
     return executor;
@@ -439,10 +459,17 @@ void executor_free(executor_t *executor) {
             func = next;
         }
 
+        // Free typed-function registry.
+        executor_typed_fns_clear(executor);
+
+        // Free any pending typed-return value (defensive; cleared on
+        // unwind under normal flow).
+        lush_value_view_clear(&executor->typed_fn_return_value);
+
         // Free script context
         free(executor->current_script_file);
 
-        // Free error context stack (Phase 3)
+        // Free error context stack
         executor_clear_context(executor);
 
         free(executor);
@@ -1180,17 +1207,13 @@ static int execute_node(executor_t *executor, node_t *node) {
     case NODE_ANON_FUNCTION:
         return execute_anonymous_function(executor, node);
     case NODE_FN_DECL:
+        return execute_typed_fn_decl(executor, node);
     case NODE_FN_CALL:
+        return execute_typed_fn_call(executor, node);
     case NODE_FN_RETURN:
+        return execute_typed_fn_return(executor, node);
     case NODE_LET_FN:
-        // Typed-function AST nodes parse but the executor does not yet
-        // run them. Surface a clear structured error so a declaration
-        // in a script halts loudly rather than silently no-op'ing.
-        executor_error_report(
-            executor, SHELL_ERR_FUNCTION_ERROR, node->loc,
-            "typed-function form ('fn' / let-fn-call / typed return) is "
-            "recognized by the parser but is not yet executable");
-        return 1;
+        return execute_typed_let_fn(executor, node);
     default:
         if (executor->debug) {
             printf("DEBUG: Unknown node type %d, skipping\n", node->type);
@@ -17445,3 +17468,704 @@ int executor_call_chpwd(executor_t *executor) {
  * @return true if in hook execution
  */
 bool executor_in_hook(void) { return g_in_hook_execution; }
+
+/* ============================================================================
+ * Typed-function form (SEMANTICS §5.3, §7)
+ *
+ * Surface grammar lives in parser.c (parse_fn_declaration,
+ * parse_fn_call_expression, parse_let_fn_call, parse_fn_return_statement).
+ * The executor owns the registry, the call mechanism, and the typed return
+ * unwind. Lexical scope resolution is not yet implemented in this pass --
+ * fn bodies use the existing dynamic scope chain; the lexical pass that
+ * SEMANTICS §5.3 names is a follow-on. PHILOSOPHY §7's gate currently
+ * passes because the surface obligation (parse + execute + render in
+ * `debug vars`) is met under dynamic scope; the lexical-vs-dynamic
+ * distinction in the gate test will arrive with the resolver pass.
+ * ============================================================================
+ */
+
+#define SHELL_FN_RETURN_STATUS 500
+
+typedef struct typed_fn_param {
+    char *name;
+    lush_value_kind_t kind;
+    struct typed_fn_param *next;
+} typed_fn_param_t;
+
+typedef struct typed_fn {
+    char *name;
+    typed_fn_param_t *params;
+    int param_count;
+    lush_value_kind_t return_kind;
+    bool has_return_kind;
+    node_t *body;
+    struct typed_fn *next;
+} typed_fn_t;
+
+static lush_value_kind_t parse_fn_kind_name(const char *text) {
+    if (!text) {
+        return LUSH_VALUE_NONE;
+    }
+    if (strcmp(text, "scalar") == 0) {
+        return LUSH_VALUE_SCALAR;
+    }
+    if (strcmp(text, "list") == 0) {
+        return LUSH_VALUE_LIST;
+    }
+    if (strcmp(text, "map") == 0) {
+        return LUSH_VALUE_MAP;
+    }
+    return LUSH_VALUE_NONE;
+}
+
+static const char *fn_kind_name(lush_value_kind_t k) {
+    switch (k) {
+    case LUSH_VALUE_SCALAR:
+        return "scalar";
+    case LUSH_VALUE_LIST:
+        return "list";
+    case LUSH_VALUE_MAP:
+        return "map";
+    default:
+        return "void";
+    }
+}
+
+// Deep-copy an array_value_t. The source remains owned by its
+// originator (typically the caller's scope binding); the returned
+// copy is independent and owned by the caller of this helper. Returns
+// NULL on allocation failure.
+static array_value_t *typed_fn_dup_array(const array_value_t *src) {
+    if (!src) {
+        return NULL;
+    }
+    bool is_assoc = src->is_associative;
+    array_value_t *dup = symtable_array_create(is_assoc);
+    if (!dup) {
+        return NULL;
+    }
+    if (is_assoc) {
+        // Walk insertion order to preserve §4.2.
+        for (size_t i = 0; i < src->assoc_insertion_count; i++) {
+            const char *key = src->assoc_insertion_order[i];
+            const char *value =
+                symtable_array_get_assoc((array_value_t *)src, key);
+            if (symtable_array_set_assoc(dup, key, value ? value : "") != 0) {
+                symtable_array_free(dup);
+                return NULL;
+            }
+        }
+    } else {
+        size_t n = symtable_array_length((array_value_t *)src);
+        for (size_t i = 0; i < n; i++) {
+            const char *value =
+                symtable_array_get_index((array_value_t *)src, (int)i);
+            if (symtable_array_append(dup, value ? value : "") < 0) {
+                symtable_array_free(dup);
+                return NULL;
+            }
+        }
+    }
+    return dup;
+}
+
+static void typed_fn_param_free(typed_fn_param_t *p) {
+    while (p) {
+        typed_fn_param_t *next = p->next;
+        free(p->name);
+        free(p);
+        p = next;
+    }
+}
+
+static void typed_fn_free(typed_fn_t *f) {
+    if (!f) {
+        return;
+    }
+    free(f->name);
+    typed_fn_param_free(f->params);
+    // body was deep-copied via copy_ast_chain at registration time
+    // (see execute_typed_fn_decl); the registry owns the copy.
+    if (f->body) {
+        free_node_tree(f->body);
+    }
+    free(f);
+}
+
+static void executor_typed_fns_clear(executor_t *executor) {
+    if (!executor) {
+        return;
+    }
+    typed_fn_t *f = executor->typed_fns;
+    while (f) {
+        typed_fn_t *next = f->next;
+        typed_fn_free(f);
+        f = next;
+    }
+    executor->typed_fns = NULL;
+}
+
+static typed_fn_t *executor_typed_fn_find(executor_t *executor,
+                                          const char *name) {
+    if (!executor || !name) {
+        return NULL;
+    }
+    for (typed_fn_t *f = executor->typed_fns; f; f = f->next) {
+        if (f->name && strcmp(f->name, name) == 0) {
+            return f;
+        }
+    }
+    return NULL;
+}
+
+// Decode the NODE_FN_DECL encoded val.str of the form
+//   "name\x1F<return_kind>\x1F<p1>:<k1>\x1F<p2>:<k2>..."
+// into a typed_fn_t record. Returns NULL on malformed encoding.
+static typed_fn_t *decode_fn_signature(const char *encoded) {
+    if (!encoded) {
+        return NULL;
+    }
+    const char *sep1 = strchr(encoded, '\x1f');
+    if (!sep1) {
+        return NULL;
+    }
+    size_t name_len = (size_t)(sep1 - encoded);
+
+    typed_fn_t *fn = calloc(1, sizeof(typed_fn_t));
+    if (!fn) {
+        return NULL;
+    }
+    fn->name = malloc(name_len + 1);
+    if (!fn->name) {
+        free(fn);
+        return NULL;
+    }
+    memcpy(fn->name, encoded, name_len);
+    fn->name[name_len] = '\0';
+
+    const char *cursor = sep1 + 1;
+    const char *sep2 = strchr(cursor, '\x1f');
+    size_t rk_len = sep2 ? (size_t)(sep2 - cursor) : strlen(cursor);
+
+    if (rk_len > 0) {
+        char rk_buf[32];
+        if (rk_len >= sizeof(rk_buf)) {
+            typed_fn_free(fn);
+            return NULL;
+        }
+        memcpy(rk_buf, cursor, rk_len);
+        rk_buf[rk_len] = '\0';
+        fn->return_kind = parse_fn_kind_name(rk_buf);
+        fn->has_return_kind = fn->return_kind != LUSH_VALUE_NONE;
+        if (!fn->has_return_kind) {
+            typed_fn_free(fn);
+            return NULL;
+        }
+    } else {
+        fn->return_kind = LUSH_VALUE_NONE;
+        fn->has_return_kind = false;
+    }
+
+    if (!sep2) {
+        // No parameters.
+        return fn;
+    }
+    cursor = sep2 + 1;
+
+    typed_fn_param_t *tail = NULL;
+    while (cursor && *cursor) {
+        const char *next_sep = strchr(cursor, '\x1f');
+        size_t entry_len =
+            next_sep ? (size_t)(next_sep - cursor) : strlen(cursor);
+        if (entry_len == 0) {
+            cursor = next_sep ? next_sep + 1 : NULL;
+            continue;
+        }
+        char entry[256];
+        if (entry_len >= sizeof(entry)) {
+            typed_fn_free(fn);
+            return NULL;
+        }
+        memcpy(entry, cursor, entry_len);
+        entry[entry_len] = '\0';
+
+        char *colon = strchr(entry, ':');
+        if (!colon || colon == entry || colon[1] == '\0') {
+            typed_fn_free(fn);
+            return NULL;
+        }
+        *colon = '\0';
+        const char *pname = entry;
+        const char *pkind = colon + 1;
+
+        typed_fn_param_t *p = calloc(1, sizeof(typed_fn_param_t));
+        if (!p) {
+            typed_fn_free(fn);
+            return NULL;
+        }
+        p->name = strdup(pname);
+        p->kind = parse_fn_kind_name(pkind);
+        if (!p->name || p->kind == LUSH_VALUE_NONE) {
+            free(p->name);
+            free(p);
+            typed_fn_free(fn);
+            return NULL;
+        }
+
+        if (tail) {
+            tail->next = p;
+        } else {
+            fn->params = p;
+        }
+        tail = p;
+        fn->param_count++;
+
+        cursor = next_sep ? next_sep + 1 : NULL;
+    }
+
+    return fn;
+}
+
+// Register (or replace) a typed function declaration. Mirrors the
+// POSIX function-table semantics: redeclaring the same name replaces
+// the prior record.
+static int execute_typed_fn_decl(executor_t *executor, node_t *node) {
+    if (!executor || !node || !node->val.str) {
+        return 1;
+    }
+    typed_fn_t *fn = decode_fn_signature(node->val.str);
+    if (!fn) {
+        executor_error_report(executor, SHELL_ERR_FUNCTION_ERROR, node->loc,
+                              "malformed typed-function signature");
+        return 1;
+    }
+    // Deep-copy the body so the registry survives the source AST
+    // being freed at the end of this batch (executor_execute_command_line
+    // frees `ast` after dispatch). copy_ast_chain produces a tree
+    // independent of the parser's allocations.
+    if (node->first_child) {
+        fn->body = copy_ast_chain(node->first_child);
+        if (!fn->body) {
+            typed_fn_free(fn);
+            executor_error_report(executor, SHELL_ERR_FUNCTION_ERROR, node->loc,
+                                  "failed to copy typed-function body");
+            return 1;
+        }
+    }
+
+    // Replace existing record under the same name, if any.
+    typed_fn_t **slot = &executor->typed_fns;
+    while (*slot) {
+        if ((*slot)->name && strcmp((*slot)->name, fn->name) == 0) {
+            typed_fn_t *old = *slot;
+            *slot = old->next;
+            typed_fn_free(old);
+            break;
+        }
+        slot = &(*slot)->next;
+    }
+    fn->next = executor->typed_fns;
+    executor->typed_fns = fn;
+    return 0;
+}
+
+// Evaluate one NODE_FN_CALL argument expression to a kind-tagged
+// value. Argument forms accepted today: scalar literals (the parser
+// stored the arg text in val.str of a NODE_COMMAND); `$var` references
+// resolved to the var's current value+kind; nested NODE_FN_CALL
+// returning a typed value.
+//
+// The caller owns the returned view (scalar_value is strdup'd; array
+// is borrowed from the symtable's current store and remains valid
+// until the call site's scope walk concludes).
+static int eval_fn_call_argument(executor_t *executor, node_t *arg,
+                                 lush_value_view_t *out) {
+    if (!out) {
+        return 1;
+    }
+    out->kind = LUSH_VALUE_NONE;
+    out->scalar_value = NULL;
+    out->array = NULL;
+
+    if (!arg) {
+        return 1;
+    }
+
+    if (arg->type == NODE_FN_CALL) {
+        // Nested typed-fn call as an argument expression.
+        executor->typed_fn_return_pending = false;
+        lush_value_view_clear(&executor->typed_fn_return_value);
+        int rc = execute_node(executor, arg);
+        if (rc != 0 && rc != SHELL_FN_RETURN_STATUS) {
+            return rc;
+        }
+        if (!executor->typed_fn_return_pending) {
+            executor_error_report(
+                executor, SHELL_ERR_TYPE_MISMATCH, arg->loc,
+                "typed-function call returned no value (void) but a "
+                "value is required as an argument");
+            return 1;
+        }
+        *out = executor->typed_fn_return_value;
+        executor->typed_fn_return_value.kind = LUSH_VALUE_NONE;
+        executor->typed_fn_return_value.scalar_value = NULL;
+        executor->typed_fn_return_value.array = NULL;
+        executor->typed_fn_return_pending = false;
+        return 0;
+    }
+
+    const char *text = arg->val.str;
+    if (!text) {
+        out->kind = LUSH_VALUE_SCALAR;
+        out->scalar_value = strdup("");
+        return out->scalar_value ? 0 : 1;
+    }
+
+    // NODE_VAR carries a bare $name (or ${name}) reference. Strip the
+    // leading '$' / '${...}' to get the variable name and look it up
+    // kind-aware via symtable_lookup; a list / map binding crosses the
+    // call boundary with its kind preserved (SEMANTICS section 7).
+    if (arg->type == NODE_VAR) {
+        const char *var_name = text;
+        char name_buf[256];
+        if (var_name[0] == '$') {
+            var_name++;
+        }
+        if (var_name[0] == '{') {
+            const char *close = strchr(var_name, '}');
+            if (close) {
+                size_t len = (size_t)(close - var_name - 1);
+                if (len < sizeof(name_buf)) {
+                    memcpy(name_buf, var_name + 1, len);
+                    name_buf[len] = '\0';
+                    var_name = name_buf;
+                }
+            }
+        }
+        lush_value_view_t v = {LUSH_VALUE_NONE, NULL, NULL};
+        if (symtable_lookup(var_name, &v) && v.kind != LUSH_VALUE_NONE) {
+            *out = v;
+            return 0;
+        }
+        // Unset variable -- treat as empty scalar, matching POSIX.
+        out->kind = LUSH_VALUE_SCALAR;
+        out->scalar_value = strdup("");
+        return out->scalar_value ? 0 : 1;
+    }
+
+    // Single-quoted strings carry their text literally; no expansion.
+    if (arg->type == NODE_STRING_LITERAL) {
+        out->kind = LUSH_VALUE_SCALAR;
+        out->scalar_value = strdup(text);
+        return out->scalar_value ? 0 : 1;
+    }
+
+    // Bare words, double-quoted strings (NODE_STRING_EXPANDABLE), and
+    // arithmetic numerals all pass through the standard word-expansion
+    // path. This is where `"hello $name!"` style interpolation gets
+    // resolved correctly.
+    char *expanded = expand_if_needed(executor, text);
+    out->kind = LUSH_VALUE_SCALAR;
+    out->scalar_value = expanded ? expanded : strdup("");
+    return out->scalar_value ? 0 : 1;
+}
+
+// Bind one parameter (name + declared kind) to an argument value in
+// the current (just-pushed) function scope. Raises a type-mismatch
+// error if the kinds disagree.
+static int bind_typed_fn_param(executor_t *executor, source_location_t loc,
+                               const typed_fn_param_t *param,
+                               lush_value_view_t *value, const char *callee) {
+    if (param->kind != value->kind) {
+        executor_error_report(
+            executor, SHELL_ERR_TYPE_MISMATCH, loc,
+            "argument '%s' to '%s' is %s; declared kind is %s", param->name,
+            callee, fn_kind_name(value->kind), fn_kind_name(param->kind));
+        lush_value_view_clear(value);
+        return 1;
+    }
+    switch (param->kind) {
+    case LUSH_VALUE_SCALAR:
+        if (symtable_set_local_var(executor->symtable, param->name,
+                                   value->scalar_value ? value->scalar_value
+                                                       : "") != 0) {
+            lush_value_view_clear(value);
+            return 1;
+        }
+        break;
+    case LUSH_VALUE_LIST:
+    case LUSH_VALUE_MAP: {
+        if (!value->array) {
+            executor_error_report(executor, SHELL_ERR_TYPE_MISMATCH, loc,
+                                  "argument '%s' to '%s' is %s but the "
+                                  "underlying value is missing",
+                                  param->name, callee,
+                                  fn_kind_name(param->kind));
+            return 1;
+        }
+        // Deep-copy: the function scope owns its parameter binding.
+        // The caller's array remains intact when this scope pops.
+        array_value_t *bound = typed_fn_dup_array(value->array);
+        if (!bound) {
+            lush_value_view_clear(value);
+            return 1;
+        }
+        if (symtable_set_array(param->name, bound) != 0) {
+            symtable_array_free(bound);
+            lush_value_view_clear(value);
+            return 1;
+        }
+        break;
+    }
+    default:
+        lush_value_view_clear(value);
+        return 1;
+    }
+    lush_value_view_clear(value);
+    return 0;
+}
+
+// Execute a NODE_FN_CALL. On a non-void return, sets
+// executor->typed_fn_return_pending = true and stashes the value in
+// executor->typed_fn_return_value for the caller (either NODE_LET_FN
+// or a nested call) to consume. Returns 0 on success / non-void
+// return, non-zero on error.
+static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
+    if (!executor || !node || node->type != NODE_FN_CALL || !node->val.str) {
+        return 1;
+    }
+    const char *callee = node->val.str;
+    typed_fn_t *fn = executor_typed_fn_find(executor, callee);
+    if (!fn) {
+        executor_error_report(executor, SHELL_ERR_INVALID_FUNCTION, node->loc,
+                              "no typed function named '%s' is in scope",
+                              callee);
+        return 1;
+    }
+
+    // Count arguments and verify arity before pushing scope.
+    int argc = 0;
+    for (node_t *a = node->first_child; a; a = a->next_sibling) {
+        argc++;
+    }
+    if (argc != fn->param_count) {
+        executor_error_report(executor, SHELL_ERR_INVALID_ARGUMENT, node->loc,
+                              "typed call '%s': expected %d argument%s, got %d",
+                              callee, fn->param_count,
+                              fn->param_count == 1 ? "" : "s", argc);
+        return 1;
+    }
+
+    // Evaluate arguments BEFORE pushing scope so $var references
+    // resolve in the caller's scope (the typed-fn body should not see
+    // them as locals; they are values passed in).
+    lush_value_view_t *arg_values =
+        argc > 0 ? calloc((size_t)argc, sizeof(lush_value_view_t)) : NULL;
+    if (argc > 0 && !arg_values) {
+        return 1;
+    }
+    int idx = 0;
+    int rc = 0;
+    for (node_t *a = node->first_child; a; a = a->next_sibling) {
+        rc = eval_fn_call_argument(executor, a, &arg_values[idx]);
+        if (rc != 0) {
+            for (int i = 0; i < idx; i++) {
+                lush_value_view_clear(&arg_values[i]);
+            }
+            free(arg_values);
+            return rc;
+        }
+        idx++;
+    }
+
+    if (symtable_push_scope(executor->symtable, SCOPE_FUNCTION, callee) != 0) {
+        for (int i = 0; i < argc; i++) {
+            lush_value_view_clear(&arg_values[i]);
+        }
+        free(arg_values);
+        executor_error_report(executor, SHELL_ERR_FUNCTION_ERROR, node->loc,
+                              "failed to push scope for typed call '%s'",
+                              callee);
+        return 1;
+    }
+
+    typed_fn_param_t *p = fn->params;
+    for (int i = 0; i < argc; i++) {
+        rc =
+            bind_typed_fn_param(executor, node->loc, p, &arg_values[i], callee);
+        if (rc != 0) {
+            for (int j = i + 1; j < argc; j++) {
+                lush_value_view_clear(&arg_values[j]);
+            }
+            free(arg_values);
+            symtable_pop_scope(executor->symtable);
+            return rc;
+        }
+        p = p->next;
+    }
+    free(arg_values);
+
+    executor_push_context(executor, node->loc, "in typed call '%s'", callee);
+
+    // Execute body. Any NODE_FN_RETURN inside surfaces as
+    // SHELL_FN_RETURN_STATUS, which we consume here.
+    int result = 0;
+    executor->typed_fn_return_pending = false;
+    lush_value_view_clear(&executor->typed_fn_return_value);
+
+    for (node_t *cmd = fn->body ? fn->body->first_child : NULL; cmd;
+         cmd = cmd->next_sibling) {
+        result = execute_node(executor, cmd);
+        if (result == SHELL_FN_RETURN_STATUS) {
+            result = 0;
+            break;
+        }
+        if (executor->shell_exit_requested) {
+            break;
+        }
+        if (result != 0 && result < 200) {
+            break;
+        }
+    }
+
+    executor_pop_context(executor);
+    symtable_pop_scope(executor->symtable);
+
+    if (result != 0) {
+        lush_value_view_clear(&executor->typed_fn_return_value);
+        executor->typed_fn_return_pending = false;
+        return result;
+    }
+
+    // Validate the captured return against the declared return kind.
+    if (fn->has_return_kind && !executor->typed_fn_return_pending) {
+        executor_error_report(
+            executor, SHELL_ERR_TYPE_MISMATCH, node->loc,
+            "typed call '%s' declared '-> %s' but the body returned "
+            "no value",
+            callee, fn_kind_name(fn->return_kind));
+        return 1;
+    }
+    if (!fn->has_return_kind && executor->typed_fn_return_pending) {
+        executor_error_report(
+            executor, SHELL_ERR_TYPE_MISMATCH, node->loc,
+            "typed call '%s' has no declared return kind but the "
+            "body returned a value",
+            callee);
+        lush_value_view_clear(&executor->typed_fn_return_value);
+        executor->typed_fn_return_pending = false;
+        return 1;
+    }
+    if (fn->has_return_kind &&
+        executor->typed_fn_return_value.kind != fn->return_kind) {
+        executor_error_report(
+            executor, SHELL_ERR_TYPE_MISMATCH, node->loc,
+            "typed call '%s' declared '-> %s' but the return value "
+            "is %s",
+            callee, fn_kind_name(fn->return_kind),
+            fn_kind_name(executor->typed_fn_return_value.kind));
+        lush_value_view_clear(&executor->typed_fn_return_value);
+        executor->typed_fn_return_pending = false;
+        return 1;
+    }
+    return 0;
+}
+
+// Top-level dispatch for a NODE_FN_CALL appearing as a statement (its
+// return value is discarded). Used when the user writes `name(args)`
+// or `name args` at command position.
+static int execute_typed_fn_call(executor_t *executor, node_t *node) {
+    int rc = execute_typed_fn_call_node(executor, node);
+    // Discard any return value the call produced.
+    lush_value_view_clear(&executor->typed_fn_return_value);
+    executor->typed_fn_return_pending = false;
+    return rc;
+}
+
+// `let name = call(args)` capture form. Invokes the call, then binds
+// the LHS in the current scope (kind-aware).
+static int execute_typed_let_fn(executor_t *executor, node_t *node) {
+    if (!executor || !node || !node->val.str || !node->first_child) {
+        return 1;
+    }
+    const char *lhs = node->val.str;
+    node_t *call = node->first_child;
+    if (call->type != NODE_FN_CALL) {
+        return 1;
+    }
+
+    int rc = execute_typed_fn_call_node(executor, call);
+    if (rc != 0) {
+        return rc;
+    }
+
+    if (!executor->typed_fn_return_pending) {
+        executor_error_report(
+            executor, SHELL_ERR_TYPE_MISMATCH, node->loc,
+            "'let %s = %s(...)' but the call has no declared return "
+            "kind (void function)",
+            lhs, call->val.str);
+        return 1;
+    }
+
+    lush_value_view_t v = executor->typed_fn_return_value;
+    executor->typed_fn_return_value.kind = LUSH_VALUE_NONE;
+    executor->typed_fn_return_value.scalar_value = NULL;
+    executor->typed_fn_return_value.array = NULL;
+    executor->typed_fn_return_pending = false;
+
+    switch (v.kind) {
+    case LUSH_VALUE_SCALAR:
+        rc =
+            symtable_set_var(executor->symtable, lhs,
+                             v.scalar_value ? v.scalar_value : "", SYMVAR_NONE);
+        break;
+    case LUSH_VALUE_LIST:
+    case LUSH_VALUE_MAP: {
+        // The captured return view borrows from the callee's scope.
+        // That scope has already popped by the time we get here, but
+        // executor->typed_fn_return_value held the borrow; the
+        // underlying array is still valid because the unwind moved
+        // ownership semantics through the view. Take a deep copy so
+        // the caller's binding is independent.
+        array_value_t *bound = typed_fn_dup_array(v.array);
+        if (!bound) {
+            rc = 1;
+            break;
+        }
+        if (symtable_set_array(lhs, bound) != 0) {
+            symtable_array_free(bound);
+            rc = 1;
+        }
+        break;
+    }
+    default:
+        rc = 1;
+        break;
+    }
+    lush_value_view_clear(&v);
+    return rc;
+}
+
+// NODE_FN_RETURN handler. Evaluates the optional return expression to
+// a kind-tagged value, stashes it in executor->typed_fn_return_value,
+// and unwinds via SHELL_FN_RETURN_STATUS.
+static int execute_typed_fn_return(executor_t *executor, node_t *node) {
+    if (!executor) {
+        return 1;
+    }
+    lush_value_view_clear(&executor->typed_fn_return_value);
+    executor->typed_fn_return_pending = false;
+
+    node_t *expr = node->first_child;
+    if (expr) {
+        lush_value_view_t v = {LUSH_VALUE_NONE, NULL, NULL};
+        int rc = eval_fn_call_argument(executor, expr, &v);
+        if (rc != 0) {
+            return rc;
+        }
+        executor->typed_fn_return_value = v;
+        executor->typed_fn_return_pending = true;
+    }
+    return SHELL_FN_RETURN_STATUS;
+}

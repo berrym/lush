@@ -141,6 +141,24 @@ typedef struct executor {
     const char *source_text;
     size_t source_starting_line;
 
+    /**
+     * Typed-function (`fn`) registry. Stored separately from
+     * `functions` (POSIX form) because the surface forms, scoping
+     * disciplines, and value semantics differ -- see SEMANTICS §5.3.
+     * Owned by the executor; freed by executor_free.
+     */
+    struct typed_fn *typed_fns;
+
+    /**
+     * In-flight typed return state. NODE_FN_RETURN populates these
+     * and yields a SHELL_FN_RETURN_STATUS unwind code; execute_typed_fn_call
+     * consumes them at the call site, kind-checks against the declared
+     * return kind, and clears the state. NODE_LET_FN binds the value
+     * into the caller's scope. Treat this slot as live only during
+     * the call-to-return unwind window.
+     */
+    bool typed_fn_return_pending;
+    lush_value_view_t typed_fn_return_value;
 } executor_t;
 
 /** Global executor instance */
