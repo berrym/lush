@@ -68,7 +68,11 @@ static node_t *parse_anonymous_function(parser_t *parser);
 
 // Typed-function form (SEMANTICS §5.3, §7).
 static node_t *parse_fn_declaration(parser_t *parser);
+static node_t *parse_fn_call_expression(parser_t *parser);
+static node_t *parse_let_fn_call(parser_t *parser);
+static node_t *parse_fn_return_statement(parser_t *parser);
 static bool is_valid_fn_kind_name(const char *text);
+static bool is_let_fn_call_form(parser_t *parser);
 
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
@@ -1396,6 +1400,31 @@ static node_t *parse_simple_command(parser_t *parser) {
     // Check for function definition (word followed by ())
     if (token_is_word_like(current->type) && is_function_definition(parser)) {
         return parse_function_definition(parser);
+    }
+
+    // Typed `return EXPR` inside a typed-function body. Outside such a
+    // body, `return` remains a POSIX command and falls through to the
+    // builtin path below.
+    if (parser->fn_body_depth > 0 && token_is_word_like(current->type) &&
+        current->text && strcmp(current->text, "return") == 0) {
+        return parse_fn_return_statement(parser);
+    }
+
+    // Typed `let name = call(args)` capture. Recognised only when the
+    // `let` is followed by IDENT '=' IDENT '(' with the IDENT and '('
+    // adjacent (no whitespace between them). Anything else with `let`
+    // falls through to the existing arithmetic-let builtin path below.
+    // is_let_fn_call_form advances and restores the tokenizer; the
+    // outer `current` pointer is invalidated by the restore (refresh
+    // frees the prior tokens), so re-fetch it whether the recognizer
+    // matched or not.
+    if (token_is_word_like(current->type) && current->text &&
+        strcmp(current->text, "let") == 0) {
+        bool is_call = is_let_fn_call_form(parser);
+        current = tokenizer_current(parser->tokenizer);
+        if (is_call) {
+            return parse_let_fn_call(parser);
+        }
     }
 
     // Check for assignment (word followed by =) or array assignment
@@ -5959,7 +5988,11 @@ static node_t *parse_fn_declaration(parser_t *parser) {
         return NULL;
     }
 
+    // Track fn-body depth so `return expression` inside the body is
+    // recognised as the typed return statement.
+    parser->fn_body_depth++;
     node_t *body = parse_brace_group(parser);
+    parser->fn_body_depth--;
     if (!body) {
         free(name);
         parser_pop_context(parser);
@@ -6003,4 +6036,321 @@ static node_t *parse_fn_declaration(parser_t *parser) {
     (void)param_count; // reserved for static-check coupling
     parser_pop_context(parser);
     return decl;
+}
+
+/**
+ * @brief Recognise the let-fn-call form by peek-ahead.
+ *
+ * Returns true iff the token stream beginning at the current `let`
+ * matches `let IDENT = IDENT (` with the IDENT and the `(` adjacent
+ * in the input (no whitespace between them).
+ *
+ * Does not consume tokens: the recognizer saves the tokenizer state,
+ * walks five tokens forward, and restores. The parser handler then
+ * re-walks the same tokens to build the AST.
+ *
+ * Anything that does not match falls through to the existing
+ * arithmetic-let builtin path.
+ */
+static bool is_let_fn_call_form(parser_t *parser) {
+    token_t *current = tokenizer_current(parser->tokenizer);
+    if (!current || !current->text || strcmp(current->text, "let") != 0) {
+        return false;
+    }
+
+    size_t saved_pos = current->position;
+    size_t saved_line = parser->tokenizer->line;
+    size_t saved_col = parser->tokenizer->column;
+
+    bool matched = false;
+
+    // Consume `let`.
+    tokenizer_advance(parser->tokenizer);
+    token_t *lhs = tokenizer_current(parser->tokenizer);
+    if (!lhs || !token_is_word_like(lhs->type)) {
+        goto restore;
+    }
+
+    // Consume LHS identifier; expect '='.
+    tokenizer_advance(parser->tokenizer);
+    token_t *eq = tokenizer_current(parser->tokenizer);
+    if (!eq || eq->type != TOK_ASSIGN) {
+        goto restore;
+    }
+
+    // Consume '='; expect a call-target identifier adjacent to '('.
+    tokenizer_advance(parser->tokenizer);
+    token_t *callee = tokenizer_current(parser->tokenizer);
+    if (!callee || !token_is_word_like(callee->type)) {
+        goto restore;
+    }
+    size_t callee_end = callee->end_position;
+
+    tokenizer_advance(parser->tokenizer);
+    token_t *lparen = tokenizer_current(parser->tokenizer);
+    if (!lparen || lparen->type != TOK_LPAREN) {
+        goto restore;
+    }
+    if (lparen->position != callee_end) {
+        // `let x = foo (...)` with whitespace before '(' falls through
+        // to the arithmetic-let path. The space-before-paren failure
+        // mode is intentional per the design.
+        goto restore;
+    }
+
+    matched = true;
+
+restore:
+    parser->tokenizer->position = saved_pos;
+    parser->tokenizer->line = saved_line;
+    parser->tokenizer->column = saved_col;
+    tokenizer_refresh_from_position(parser->tokenizer);
+    return matched;
+}
+
+/**
+ * @brief Parse a typed-function call expression `callee(args)`.
+ *
+ * The parser is positioned at the callee identifier. Each argument is
+ * collected as a single word token (a full expression-argument grammar
+ * arrives with the executor pass; arguments here are parsed as words /
+ * strings / variable references, which is what the typed-call site
+ * binds to parameters). Arguments are separated by ',' tokens; trailing
+ * commas are tolerated.
+ *
+ * @return NODE_FN_CALL with the callee name in val.str and arguments
+ *         as children, or NULL on error.
+ */
+static node_t *parse_fn_call_expression(parser_t *parser) {
+    token_t *current = tokenizer_current(parser->tokenizer);
+    if (!current || !token_is_word_like(current->type)) {
+        parser_error_add(parser, SHELL_ERR_INVALID_FUNCTION,
+                         "expected function name in call expression");
+        return NULL;
+    }
+
+    source_location_t call_loc =
+        token_to_source_location(current, parser->source_name);
+    char *callee = strdup(current->text);
+    if (!callee) {
+        return NULL;
+    }
+    tokenizer_advance(parser->tokenizer);
+
+    if (!expect_token_with_help(
+            parser, TOK_LPAREN,
+            "typed-function call requires '(' immediately after the "
+            "function name")) {
+        free(callee);
+        return NULL;
+    }
+
+    node_t *call_node = new_node_at(NODE_FN_CALL, call_loc);
+    if (!call_node) {
+        free(callee);
+        return NULL;
+    }
+    call_node->val.str = callee;
+    call_node->val_type = VAL_STR;
+
+    // Collect arguments until ')'.
+    current = tokenizer_current(parser->tokenizer);
+    while (current && current->type != TOK_RPAREN && current->type != TOK_EOF) {
+        if (!token_is_word_like(current->type) && current->type != TOK_STRING &&
+            current->type != TOK_EXPANDABLE_STRING &&
+            current->type != TOK_VARIABLE) {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_INVALID_FUNCTION,
+                "arguments to a typed-function call must be words, "
+                "strings, or variable references",
+                "unexpected token in argument list");
+            free_node_tree(call_node);
+            return NULL;
+        }
+
+        source_location_t arg_loc =
+            token_to_source_location(current, parser->source_name);
+        node_t *arg = new_node_at(NODE_COMMAND, arg_loc);
+        if (!arg) {
+            free_node_tree(call_node);
+            return NULL;
+        }
+        arg->val.str = strdup(current->text);
+        arg->val_type = VAL_STR;
+        if (!arg->val.str) {
+            free_node_tree(arg);
+            free_node_tree(call_node);
+            return NULL;
+        }
+        add_child_node(call_node, arg);
+        tokenizer_advance(parser->tokenizer);
+
+        // Optional comma between arguments.
+        current = tokenizer_current(parser->tokenizer);
+        if (current && current->type == TOK_COMMA) {
+            tokenizer_advance(parser->tokenizer);
+            current = tokenizer_current(parser->tokenizer);
+        }
+    }
+
+    if (!expect_token_with_help(
+            parser, TOK_RPAREN,
+            "typed-function call requires ')' to close the argument "
+            "list")) {
+        free_node_tree(call_node);
+        return NULL;
+    }
+
+    return call_node;
+}
+
+/**
+ * @brief Parse `let NAME = callee(args)` capture form.
+ *
+ * Recognised only when `is_let_fn_call_form` returned true. Builds a
+ * NODE_LET_FN whose val.str is the LHS variable name, with a single
+ * child NODE_FN_CALL carrying the call expression. Existing
+ * arithmetic-let forms (`let x=5+3`, `let "x += 1"`) take a different
+ * dispatch path and continue to reach the bin_let builtin unchanged.
+ */
+static node_t *parse_let_fn_call(parser_t *parser) {
+    token_t *current = tokenizer_current(parser->tokenizer);
+    source_location_t let_loc =
+        token_to_source_location(current, parser->source_name);
+
+    parser_push_context(parser, "parsing 'let' typed-function call");
+
+    // Consume `let`.
+    tokenizer_advance(parser->tokenizer);
+
+    // LHS identifier.
+    current = tokenizer_current(parser->tokenizer);
+    if (!current || !token_is_word_like(current->type)) {
+        parser_error_add_with_help(parser, SHELL_ERR_INVALID_FUNCTION,
+                                   "form: let NAME = callee(args)",
+                                   "expected variable name after 'let'");
+        parser_pop_context(parser);
+        return NULL;
+    }
+    char *lhs = strdup(current->text);
+    if (!lhs) {
+        parser_pop_context(parser);
+        return NULL;
+    }
+    tokenizer_advance(parser->tokenizer);
+
+    // '='.
+    if (!expect_token_with_help(parser, TOK_ASSIGN,
+                                "let-fn-call requires '=' between the "
+                                "name and the call expression")) {
+        free(lhs);
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    // Call expression.
+    node_t *call = parse_fn_call_expression(parser);
+    if (!call) {
+        free(lhs);
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    node_t *let_node = new_node_at(NODE_LET_FN, let_loc);
+    if (!let_node) {
+        free_node_tree(call);
+        free(lhs);
+        parser_pop_context(parser);
+        return NULL;
+    }
+    let_node->val.str = lhs;
+    let_node->val_type = VAL_STR;
+    add_child_node(let_node, call);
+
+    parser_pop_context(parser);
+    return let_node;
+}
+
+/**
+ * @brief Parse `return [expression]` inside a typed-function body.
+ *
+ * The dispatch path only reaches this handler when
+ * `parser->fn_body_depth > 0`. Builds a NODE_FN_RETURN whose
+ * first_child is the optional return-value expression (NULL for a
+ * void return), captured as a single word / string / variable / call
+ * expression. A full expression grammar arrives with the executor
+ * pass; this surface accepts what the typed-return runtime will
+ * consume.
+ */
+static node_t *parse_fn_return_statement(parser_t *parser) {
+    token_t *current = tokenizer_current(parser->tokenizer);
+    source_location_t loc =
+        token_to_source_location(current, parser->source_name);
+
+    parser_push_context(parser, "parsing typed-function return");
+
+    // Consume `return`.
+    tokenizer_advance(parser->tokenizer);
+
+    node_t *ret_node = new_node_at(NODE_FN_RETURN, loc);
+    if (!ret_node) {
+        parser_pop_context(parser);
+        return NULL;
+    }
+
+    // Optional expression. A bare `return` followed by a statement
+    // terminator is a void return.
+    current = tokenizer_current(parser->tokenizer);
+    if (current && current->type != TOK_NEWLINE &&
+        current->type != TOK_SEMICOLON && current->type != TOK_EOF &&
+        current->type != TOK_RBRACE && current->type != TOK_AND) {
+
+        node_t *expr = NULL;
+        token_t *next = tokenizer_peek(parser->tokenizer);
+        // A typed-function call as the return expression -- IDENT
+        // immediately followed by '(' (adjacent, no whitespace).
+        if (token_is_word_like(current->type) && next &&
+            next->type == TOK_LPAREN &&
+            next->position == current->end_position) {
+            expr = parse_fn_call_expression(parser);
+        } else if (token_is_word_like(current->type) ||
+                   current->type == TOK_STRING ||
+                   current->type == TOK_EXPANDABLE_STRING ||
+                   current->type == TOK_VARIABLE) {
+            // Single word / string / variable expression.
+            source_location_t expr_loc =
+                token_to_source_location(current, parser->source_name);
+            expr = new_node_at(NODE_COMMAND, expr_loc);
+            if (expr) {
+                expr->val.str = strdup(current->text);
+                expr->val_type = VAL_STR;
+                if (!expr->val.str) {
+                    free_node_tree(expr);
+                    expr = NULL;
+                }
+            }
+            if (expr) {
+                tokenizer_advance(parser->tokenizer);
+            }
+        } else {
+            parser_error_add_with_help(
+                parser, SHELL_ERR_INVALID_FUNCTION,
+                "supported forms: return; return WORD; return STRING; "
+                "return $VAR; return callee(args)",
+                "unexpected token in typed return expression");
+            free_node_tree(ret_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+
+        if (!expr) {
+            free_node_tree(ret_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        add_child_node(ret_node, expr);
+    }
+
+    parser_pop_context(parser);
+    return ret_node;
 }

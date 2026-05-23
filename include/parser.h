@@ -80,6 +80,15 @@ typedef struct parser {
     // Heredocs awaiting deferred body collection (see pending_heredoc_t)
     pending_heredoc_t pending_heredocs[PARSER_MAX_PENDING_HEREDOCS];
     size_t pending_heredoc_count;
+
+    /**
+     * Depth counter for typed-function (`fn`) body parsing. Incremented
+     * on entry to a NODE_FN_DECL body, decremented on exit. While > 0,
+     * `return expression` is recognised as the typed-function return
+     * statement (NODE_FN_RETURN). Outside fn bodies it remains a POSIX
+     * `return` command setting the exit status.
+     */
+    size_t fn_body_depth;
 } parser_t;
 
 /* ============================================================================
