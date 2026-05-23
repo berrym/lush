@@ -31,15 +31,52 @@ int bin_export(int argc, char **argv) {
     }
 
     for (int i = 1; i < argc; i++) {
-        // Strip the parser-internal array-literal sentinel (\x1F) if
-        // present. export does not propagate arrays into the
-        // environment (matches bash), but the sentinel-stripping
-        // keeps `export arr=(a b c)` from rejecting the name as
-        // invalid -- it falls through to scalar handling on the
-        // serialized "(a b c)" form, same as bash's behavior here.
         char *arg = argv[i];
+        // Parser-internal array-literal sentinel (\x1F): an argv
+        // element with this prefix came from the unquoted `name=(...)`
+        // form. The process environment is a key=string map -- list
+        // values cannot be exported. Per SEMANTICS section 3.4 (no
+        // implicit list-to-string coercion) and section 3.9 (list in
+        // a scalar-requiring slot is a runtime type error), reject
+        // with the structured-error type-mismatch rather than
+        // silently joining the elements into a string. bash silently
+        // flattens; lush does not.
         if (arg[0] == '\x1F') {
-            arg++;
+            // Recover the name for the diagnostic.
+            const char *name_start = arg + 1;
+            const char *name_end = strchr(name_start, '=');
+            size_t nlen =
+                name_end ? (size_t)(name_end - name_start) : strlen(name_start);
+            char namebuf[256];
+            if (nlen >= sizeof(namebuf)) {
+                nlen = sizeof(namebuf) - 1;
+            }
+            memcpy(namebuf, name_start, nlen);
+            namebuf[nlen] = '\0';
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+                builtin_get_source_location(),
+                "type mismatch: cannot export list value '%s' as an "
+                "environment variable",
+                namebuf);
+            if (err) {
+                shell_error_set_suggestion(
+                    err,
+                    "the process environment is a key=string map; "
+                    "export individual elements (export FOO=\"${arr[0]}\") "
+                    "or an explicit join (export FOO=\"${arr[*]}\"), or "
+                    "use `declare -a -x` for an exported indexed array.");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                executor_error_report(
+                    current_executor, SHELL_ERR_TYPE_MISMATCH,
+                    builtin_get_source_location(),
+                    "type mismatch: cannot export list value '%s' as an "
+                    "environment variable",
+                    namebuf);
+            }
+            return 1;
         }
         char *eq = strchr(arg, '=');
         if (eq) {

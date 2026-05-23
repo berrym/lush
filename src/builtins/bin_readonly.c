@@ -39,14 +39,48 @@ int bin_readonly(int argc, char **argv) {
     // Process each argument
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
-        // Strip the parser-internal array-literal sentinel (\x1F)
-        // if present. readonly's array support today is minimal
-        // (matches bash: readonly arrays are a separate `-a` flag);
-        // for the unflagged form we accept the unquoted (...) but
-        // treat the value as scalar, mirroring bash's actual
-        // behavior on `readonly arr=(a b c)`.
+        // Parser-internal array-literal sentinel (\x1F): an argv
+        // element with this prefix came from the unquoted `name=(...)`
+        // form. Per SEMANTICS section 3.4 (no implicit list-to-string
+        // coercion) and section 3.9 (list in a scalar-requiring slot
+        // is a runtime type error), reject rather than silently
+        // join the elements into a string. bash supports readonly
+        // arrays via the `-a` flag; lush will add that surface
+        // alongside; for now the unflagged `readonly arr=(...)` is
+        // a type error rather than a silent scalar coercion.
         if (arg[0] == '\x1F') {
-            arg++;
+            const char *name_start = arg + 1;
+            const char *name_end = strchr(name_start, '=');
+            size_t nlen =
+                name_end ? (size_t)(name_end - name_start) : strlen(name_start);
+            char namebuf[256];
+            if (nlen >= sizeof(namebuf)) {
+                nlen = sizeof(namebuf) - 1;
+            }
+            memcpy(namebuf, name_start, nlen);
+            namebuf[nlen] = '\0';
+            shell_error_t *err = shell_error_create(
+                SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+                builtin_get_source_location(),
+                "type mismatch: cannot bind list value '%s' to a "
+                "scalar readonly",
+                namebuf);
+            if (err) {
+                shell_error_set_suggestion(
+                    err, "use `declare -a -r` for a readonly indexed "
+                         "array, or pass an explicit-join expression "
+                         "(readonly NAME=\"${arr[*]}\").");
+                shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                shell_error_free(err);
+            } else {
+                executor_error_report(
+                    current_executor, SHELL_ERR_TYPE_MISMATCH,
+                    builtin_get_source_location(),
+                    "type mismatch: cannot bind list value '%s' to a "
+                    "scalar readonly",
+                    namebuf);
+            }
+            return 1;
         }
         char *equals = strchr(arg, '=');
 
