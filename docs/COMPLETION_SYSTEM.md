@@ -24,7 +24,8 @@ LLE's completion system is built into the line editor, not bolted on. It underst
 ### Key Features
 
 - **Context awareness**: Knows whether you're completing a command, argument, option, or variable
-- **45 builtin completions**: Every completable builtin has specific completion logic
+- **Builtin completions**: Every completable shell builtin has specific completion logic
+- **Debug-prompt completion**: At the `(lush-debug)` break prompt, first-word completion switches to the debugger command vocabulary; shell-side first-word sources sit out via a `lle_in_debug_prompt()` gate, while variable and file completion remain available for argument positions
 - **Real-time**: Completions update as you type
 - **Menu interface**: Navigate multiple options with keyboard
 - **Integration**: Works with history, multi-line editing, and syntax highlighting
@@ -120,7 +121,10 @@ $ ssh user@<Tab>     # Hosts from ~/.ssh/known_hosts, /etc/hosts
 
 ## Context-Aware Builtin Completions
 
-All 45 completable shell builtins have context-specific completion logic. The completion system knows what arguments each builtin accepts.
+Every completable shell builtin has context-specific completion
+logic. The completion system knows what arguments each builtin
+accepts. See [BUILTIN_COMMANDS.md](BUILTIN_COMMANDS.md) for the
+authoritative builtin inventory.
 
 ### Shell Options (set, shopt)
 
@@ -152,13 +156,20 @@ $ config get <Tab>
 
 ```bash
 $ debug <Tab>
-on  off  vars  print  trace  profile  functions  help
+on  off  vars  print  trace  profile  functions  help  break  step  next  continue  stack  analyze
 
 $ debug on <Tab>     # 1 2 3 (debug levels)
 $ debug print <Tab>  # Variable names
 $ debug profile <Tab>
-on  off  report
+on  off  report  reset
+$ debug break <Tab>
+add  remove  list  clear
 ```
+
+At the `(lush-debug)` break prompt the first-word vocabulary
+switches to short-form prompt commands (`step`, `next`, `out`,
+`continue`, `print`, `vars`, `stack`, `type`, `t`, `watch`,
+`break`, `quit`, ...).
 
 ### Display System (display)
 
@@ -167,7 +178,16 @@ $ display <Tab>
 lle  features  themes  status  stats  config  diagnostics  help
 
 $ display lle <Tab>
-diagnostics  status  info
+diagnostics  status  info  widget  hook  segment
+
+$ display lle widget <Tab>
+list  add  remove  bind  show  help
+
+$ display lle hook <Tab>
+list  add  remove  help
+
+$ display lle segment <Tab>
+list  add  remove  show  enable  disable  help
 ```
 
 ### Theme Commands (theme)

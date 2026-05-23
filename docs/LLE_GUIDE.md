@@ -26,7 +26,7 @@ Every major shell wraps GNU Readline or implements something similar. Bash uses 
 
 Lush took a different approach. LLE (Lush Line Editor) is a line editor designed from the ground up for interactive shell use. This isn't academic distinction - it enables capabilities that bolted-on solutions can't provide:
 
-- **Deep completion integration**: LLE's completion system understands shell syntax at a fundamental level. It doesn't just complete filenames - it knows what arguments each of the 45 shell builtins accepts and presents context-appropriate options.
+- **Deep completion integration**: LLE's completion system understands shell syntax at a fundamental level. It doesn't just complete filenames — it knows what arguments each shell builtin accepts and presents context-appropriate options. It also switches its first-word vocabulary to the debugger command set at the `(lush-debug)` break prompt.
 
 - **Real-time syntax highlighting**: Every character you type is tokenized and colored. Commands are validated as you type. You see errors before pressing Enter.
 
@@ -44,11 +44,11 @@ LLE supports two editing paradigms:
 
 ### Emacs Mode (Default, Complete)
 
-Emacs-style editing is the default and provides complete functionality. All 44 keybinding actions are implemented and production-ready.
+Emacs-style editing is the default and provides complete functionality. The full keybinding-action set is implemented and production-ready.
 
 ### Vi Mode (In Development)
 
-Vi mode has the framework in place - mode switching, state machine, command parsing - but is not yet wired to editing operations. This is targeted for completion in the v1.4.0 release cycle.
+Vi mode has the framework in place — mode switching, state machine, command parsing — but is not yet wired to editing operations. Track progress in [lle_specification/](lle_specification/) and the issue tracker. Use Emacs mode in the meantime.
 
 To check the current mode:
 
@@ -60,7 +60,7 @@ display lle diagnostics
 
 ## Emacs Mode Reference
 
-LLE implements 44 GNU Readline-compatible keybinding actions.
+LLE implements the full set of GNU Readline-compatible keybinding actions.
 
 ### Cursor Movement
 
@@ -200,23 +200,32 @@ LLE's completion system is context-aware. It understands what you're typing and 
 
 ### Context-Aware Builtin Completions
 
-All 45 completable shell builtins have specific completion logic:
+Every completable shell builtin has specific completion logic:
 
 ```bash
 # set builtin knows its options
 set -o <Tab>        # Shows: errexit nounset xtrace ...
 
-# config builtin knows its structure  
+# config builtin knows its structure
 config set <Tab>    # Shows: shell completion display ...
 config set shell.<Tab>  # Shows: errexit nounset pipefail ...
 
 # debug builtin knows its subcommands
-debug <Tab>         # Shows: on off vars print trace profile
+debug <Tab>         # Shows: on off vars print trace profile analyze ...
 
-# display builtin knows its arguments
-display <Tab>       # Shows: lle features themes status stats
-display lle <Tab>   # Shows: diagnostics status info
+# display builtin knows its arguments (including LLE Phase 3 trio)
+display <Tab>       # Shows: lle features themes status stats widget hook segment
+display lle <Tab>   # Shows: diagnostics status info widget hook segment
 ```
+
+### Debug-Prompt Completion
+
+At the `(lush-debug)` break prompt, LLE's first-word completion
+switches to the debugger command vocabulary (`step`, `next`, `out`,
+`continue`, `print`, `vars`, `stack`, `type`, `t`, `watch`,
+`break`, `quit`, ...). The shell-side first-word sources sit out
+via a `lle_in_debug_prompt()` gate; variable completion (`$x`) and
+file completion remain available for argument positions.
 
 ### Menu Navigation
 
@@ -244,7 +253,8 @@ LLE tokenizes your input in real-time and applies colors based on token types.
 
 ### Token Types
 
-LLE recognizes 45 distinct token types:
+LLE recognizes a broad token vocabulary covering every construct
+the shell can parse:
 
 **Commands**
 - Valid external command (green)
@@ -444,6 +454,78 @@ These operations add to the kill ring:
 ---
 
 ## Customization
+
+LLE exposes three first-class customization surfaces — widgets,
+hooks, and segments — all routed through the central configuration
+registry. They are the LLE Phase 3 customization trio.
+
+### Widgets: User-Defined Editing Actions
+
+A widget is a named shell function bound to a key sequence so it
+behaves as a one-shot editing operation. Equivalent to `zle -N` in
+zsh, but available in every mode.
+
+```bash
+# Define a widget body
+my-uppercase-word() {
+    # Widget callbacks operate on the active LLE buffer
+    lle buffer transform "${WIDGET_WORD}" upper
+}
+
+# Register and bind
+display lle widget add  my-uppercase-word my-uppercase-word
+display lle widget bind '\eU' my-uppercase-word
+
+# Inspect
+display lle widget list
+display lle widget show my-uppercase-word
+display lle widget remove my-uppercase-word
+```
+
+User widgets sit alongside builtin widgets in the same dispatcher;
+they can be bound from `~/.config/lush/lushrc` or a `keybindings.toml`
+exactly like built-ins.
+
+### Hooks: Lifecycle Callbacks
+
+`precmd`, `preexec`, `chpwd`, and `periodic` shell functions are the
+canonical hook surface (see [HOOKS_AND_PLUGINS.md](HOOKS_AND_PLUGINS.md)).
+For symmetric configuration alongside widgets and segments, the same
+hooks can be registered with `display lle hook`:
+
+```bash
+display lle hook add  precmd  my_precmd_widget
+display lle hook list
+display lle hook remove precmd my_precmd_widget
+```
+
+The full hook-type catalogue covers ten LLE-internal events; the
+shell-event hub bridges to PRE_COMMAND / POST_COMMAND at editor
+init.
+
+### Segments: Custom Prompt Pieces
+
+A segment is a prompt fragment whose visibility and contents are
+driven by a shell variable. Useful for context indicators (active
+kubernetes context, current AWS profile, virtualenv name) that
+update on every prompt redraw without re-parsing PS1.
+
+```bash
+# A precmd hook keeps the variable current
+precmd() {
+    KUBE_CTX="${KUBECONFIG:+k8s:$(basename "$KUBECONFIG")}"
+}
+
+# Register a segment backed by that variable
+display lle segment add kube_ctx KUBE_CTX
+display lle segment list
+display lle segment show kube_ctx
+display lle segment remove kube_ctx
+```
+
+The segment renders whenever `$KUBE_CTX` is non-empty; visibility
+flips automatically without conditional logic in the prompt
+template.
 
 ### Keybinding Configuration
 
