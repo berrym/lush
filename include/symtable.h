@@ -129,11 +129,14 @@ typedef enum {
 
 // Scope types for different contexts
 typedef enum {
-    SCOPE_GLOBAL,     /**< Global shell scope */
-    SCOPE_FUNCTION,   /**< Function local scope */
-    SCOPE_LOOP,       /**< Loop iteration scope (for/while) */
-    SCOPE_SUBSHELL,   /**< Subshell scope */
-    SCOPE_CONDITIONAL /**< Conditional execution scope (if/case) */
+    SCOPE_GLOBAL,      /**< Global shell scope */
+    SCOPE_FUNCTION,    /**< POSIX-form function scope (dynamic-scoped) */
+    SCOPE_LOOP,        /**< Loop iteration scope (for/while) */
+    SCOPE_SUBSHELL,    /**< Subshell scope */
+    SCOPE_CONDITIONAL, /**< Conditional execution scope (if/case) */
+    SCOPE_LEXICAL      /**< Typed-function (`fn`) frame; parent is the
+                          captured declaration-time scope, not the
+                          dynamic caller. See SEMANTICS §5.3. */
 } scope_type_t;
 
 /**
@@ -168,8 +171,18 @@ struct symtable_scope_enhanced {
     scope_type_t scope_type;  /**< Type of scope */
     size_t level;             /**< Scope nesting level */
     ht_strstr_t *vars_ht;     /**< libhashtable ht_strstr_t for variables */
-    symtable_scope_t *parent; /**< Parent scope */
-    char *scope_name;         /**< Name of scope (for debugging) */
+    symtable_scope_t *parent; /**< Parent scope (for variable lookup walk);
+                                   for SCOPE_LEXICAL this is the captured
+                                   declaration-site parent, not the
+                                   dynamic caller. */
+    /**
+     * SCOPE_LEXICAL only: the scope that was current at push time
+     * (i.e. the dynamic caller). The scope stack is LIFO regardless
+     * of scoping discipline, so pop must return here, not to `parent`.
+     * NULL for non-lexical frames.
+     */
+    symtable_scope_t *dynamic_caller;
+    char *scope_name; /**< Name of scope (for debugging) */
 };
 
 // Symbol table manager (forward declaration for implementation)
@@ -245,6 +258,47 @@ void symtable_manager_set_debug(symtable_manager_t *manager, bool debug);
  */
 int symtable_push_scope(symtable_manager_t *manager, scope_type_t type,
                         const char *name);
+
+/**
+ * @brief Capture the current scope as an opaque parent for a future
+ *        SCOPE_LEXICAL push.
+ *
+ * Used at typed-function (`fn`) declaration time to record the lexical
+ * environment the function should resolve free names against. The
+ * returned pointer is borrowed and remains valid until the captured
+ * scope is popped by the same manager; the caller must not free it.
+ * In the common case of top-level `fn` declarations, the captured
+ * scope is the global scope, which lives for the manager's entire
+ * lifetime.
+ *
+ * @param manager Manager instance
+ * @return Opaque pointer to the current scope, or NULL on error
+ */
+void *symtable_capture_scope_for_lexical(symtable_manager_t *manager);
+
+/**
+ * @brief Push a SCOPE_LEXICAL frame whose parent is the supplied
+ *        captured scope rather than the dynamic caller.
+ *
+ * The new frame inherits all lookup semantics of a normal scope
+ * frame -- variable resolution walks the parent chain -- but the
+ * parent is the capture site, not the live `current_scope` at push
+ * time. That is exactly the lexical-scoping discipline SEMANTICS §5.3
+ * names. Used by execute_typed_fn_call_node to give a `fn` body its
+ * closure environment.
+ *
+ * On pop, the frame restores the previous `current_scope` (the dynamic
+ * caller) -- the captured-parent linkage exists only for the duration
+ * of the lexical frame.
+ *
+ * @param manager Manager instance
+ * @param name Scope name for diagnostics (typically the fn name)
+ * @param captured_parent Opaque pointer returned by
+ *                        symtable_capture_scope_for_lexical
+ * @return 0 on success, -1 on error
+ */
+int symtable_push_lexical_scope(symtable_manager_t *manager, const char *name,
+                                void *captured_parent);
 
 /**
  * @brief Pop the current scope from the stack

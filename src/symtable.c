@@ -417,6 +417,102 @@ int symtable_push_scope(symtable_manager_t *manager, scope_type_t type,
 }
 
 /**
+ * @brief Capture the current scope for a future lexical-scope push.
+ *
+ * Returns an opaque borrowed pointer to the scope that was current at
+ * call time. Caller stores it in a `typed_fn` record (or equivalent)
+ * and feeds it to symtable_push_lexical_scope when invoking the
+ * closure. The pointer must NOT be freed by the caller; it is owned
+ * by the symtable's scope stack.
+ *
+ * @param manager Symbol table manager
+ * @return Opaque pointer to the current scope, or NULL on error
+ */
+void *symtable_capture_scope_for_lexical(symtable_manager_t *manager) {
+    if (!manager) {
+        return NULL;
+    }
+    return manager->current_scope;
+}
+
+/**
+ * @brief Push a SCOPE_LEXICAL frame with a captured parent.
+ *
+ * Identical to symtable_push_scope(SCOPE_LEXICAL, name) except that
+ * the new frame's `parent` is the supplied captured pointer, not the
+ * dynamic current_scope. This is what gives typed-function (`fn`)
+ * bodies lexical (closure) semantics per SEMANTICS §5.3: free names
+ * inside the body resolve through the declaration-site scope chain,
+ * not the call-site chain.
+ *
+ * `level` is one more than the captured parent's level (preserving
+ * the depth-limit check), and the scope's lifecycle on pop is the
+ * same as for any other scope -- only the parent linkage differs.
+ *
+ * @param manager Symbol table manager
+ * @param name Scope name for diagnostics (typically the fn name)
+ * @param captured_parent Opaque pointer from
+ *                        symtable_capture_scope_for_lexical
+ * @return 0 on success, -1 on error
+ */
+int symtable_push_lexical_scope(symtable_manager_t *manager, const char *name,
+                                void *captured_parent) {
+    if (!manager || !name || !captured_parent) {
+        return -1;
+    }
+    symtable_scope_t *parent = (symtable_scope_t *)captured_parent;
+
+    if (manager->current_scope->level >= MAX_SCOPE_DEPTH) {
+        if (manager->debug_mode) {
+            fprintf(stderr, "ERROR: Maximum scope depth exceeded\n");
+        }
+        return -1;
+    }
+
+    symtable_scope_t *new_scope = calloc(1, sizeof(symtable_scope_t));
+    if (!new_scope) {
+        return -1;
+    }
+
+    new_scope->scope_type = SCOPE_LEXICAL;
+    new_scope->level = manager->current_scope->level + 1;
+    new_scope->vars_ht = ht_strstr_create(DEFAULT_HT_FLAGS);
+    new_scope->parent = parent;
+    new_scope->scope_name = strdup(name);
+
+    if (!new_scope->vars_ht || !new_scope->scope_name) {
+        if (new_scope->vars_ht) {
+            ht_strstr_destroy(new_scope->vars_ht);
+        }
+        free(new_scope->scope_name);
+        free(new_scope);
+        return -1;
+    }
+
+    /* Stash the dynamic caller so pop can restore it. The lexical
+     * frame's `parent` field points at the captured scope (lookup
+     * direction), but the SCOPE STACK is still LIFO -- pop must
+     * return to whoever pushed us, not to the captured site. We
+     * piggyback the link through a side field on the manager so
+     * existing pop machinery can find it without growing the public
+     * struct shape. */
+    new_scope->dynamic_caller = manager->current_scope;
+
+    manager->current_scope = new_scope;
+    if (new_scope->level > manager->max_scope_level) {
+        manager->max_scope_level = new_scope->level;
+    }
+
+    if (manager->debug_mode) {
+        printf("DEBUG: Pushed lexical scope '%s' (level %zu, captured "
+               "parent level %zu)\n",
+               name, new_scope->level, parent->level);
+    }
+
+    return 0;
+}
+
+/**
  * @brief Pop the current scope from the scope stack
  *
  * Removes the current scope, freeing its hash table and memory,
@@ -456,7 +552,14 @@ int symtable_pop_scope(symtable_manager_t *manager) {
     }
 
     symtable_scope_t *old_scope = manager->current_scope;
-    manager->current_scope = old_scope->parent;
+    // Lexical (typed-fn) frames keep their `parent` pointing at the
+    // captured declaration site for lookup; the LIFO restore goes to
+    // the dynamic_caller stashed at push time.
+    if (old_scope->scope_type == SCOPE_LEXICAL && old_scope->dynamic_caller) {
+        manager->current_scope = old_scope->dynamic_caller;
+    } else {
+        manager->current_scope = old_scope->parent;
+    }
 
     if (manager->debug_mode) {
         printf("DEBUG: Popped scope '%s' (level %zu)\n", old_scope->scope_name,
@@ -1186,6 +1289,9 @@ void symtable_dump_scope(symtable_manager_t *manager, scope_type_t scope) {
     case SCOPE_CONDITIONAL:
         scope_name = "conditional";
         break;
+    case SCOPE_LEXICAL:
+        scope_name = "lexical (fn)";
+        break;
     }
 
     printf("=== %s scope (level %zu) ===\n", scope_name, target_scope->level);
@@ -1262,6 +1368,9 @@ void symtable_dump_all_scopes(symtable_manager_t *manager) {
             break;
         case SCOPE_CONDITIONAL:
             type_name = "conditional";
+            break;
+        case SCOPE_LEXICAL:
+            type_name = "lexical";
             break;
         }
 

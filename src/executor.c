@@ -17499,6 +17499,14 @@ typedef struct typed_fn {
     lush_value_kind_t return_kind;
     bool has_return_kind;
     node_t *body;
+    /**
+     * Captured declaration-site scope. The closure environment for
+     * free names in the body. Captured at execute_typed_fn_decl time
+     * via symtable_capture_scope_for_lexical; fed back to
+     * symtable_push_lexical_scope at each call. Opaque on this side --
+     * the symtable layer owns the underlying scope.
+     */
+    void *captured_scope;
     struct typed_fn *next;
 } typed_fn_t;
 
@@ -17753,6 +17761,16 @@ static int execute_typed_fn_decl(executor_t *executor, node_t *node) {
         }
     }
 
+    // Capture the declaration-site scope as the lexical-closure parent.
+    // For a top-level `fn`, this is the global scope, which the symtable
+    // never pops -- the borrowed pointer is valid for the manager's
+    // lifetime. For an `fn` declared inside another scope, the captured
+    // pointer is only valid until that enclosing scope pops; once
+    // re-decl of an inner fn from an already-popped enclosing scope
+    // becomes a real pattern, the registry will need a stronger
+    // lifetime guarantee. Today's typical case (top-level fn) is safe.
+    fn->captured_scope = symtable_capture_scope_for_lexical(executor->symtable);
+
     // Replace existing record under the same name, if any.
     typed_fn_t **slot = &executor->typed_fns;
     while (*slot) {
@@ -17978,7 +17996,22 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
         idx++;
     }
 
-    if (symtable_push_scope(executor->symtable, SCOPE_FUNCTION, callee) != 0) {
+    // Push a SCOPE_LEXICAL frame parented at the captured declaration
+    // site rather than the dynamic caller, so the body resolves free
+    // names through its closure environment per SEMANTICS §5.3. If
+    // the fn was declared at top level the captured scope is the
+    // global scope, which behaves identically to dynamic scoping for
+    // global variables -- the distinction surfaces when a POSIX-form
+    // caller has its own locals; those are now invisible to the fn.
+    int push_rc;
+    if (fn->captured_scope) {
+        push_rc = symtable_push_lexical_scope(executor->symtable, callee,
+                                              fn->captured_scope);
+    } else {
+        push_rc =
+            symtable_push_scope(executor->symtable, SCOPE_FUNCTION, callee);
+    }
+    if (push_rc != 0) {
         for (int i = 0; i < argc; i++) {
             lush_value_view_clear(&arg_values[i]);
         }

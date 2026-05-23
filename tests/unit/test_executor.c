@@ -2415,6 +2415,22 @@ TEST(rt_typed_fn_void_no_return) {
     (void)r;
 }
 
+TEST(rt_typed_fn_lexical_scope) {
+    // SEMANTICS section 5.3: a `fn` body resolves free names through
+    // its captured declaration-site scope, not through the dynamic
+    // caller's locals. The same caller invokes a POSIX function and
+    // a typed function -- the POSIX one sees the caller's `local v`,
+    // the typed one sees the global `v`.
+    run_result_t r = run_shell(
+        "v=GLOBAL\n"
+        "posix_callee() { echo \"[$v]\"; }\n"
+        "fn typed_callee() -> scalar { return \"$v\"; }\n"
+        "outer() { local v=LOCAL; posix_callee; let r = typed_callee(); "
+        "echo \"[$r]\"; }\n"
+        "outer\n");
+    ASSERT_STDOUT_EQ(r, "[LOCAL]\n[GLOBAL]\n");
+}
+
 /* ============================================================================
  * MAIN
  * ============================================================================
@@ -2622,6 +2638,7 @@ int main(void) {
     RUN_TEST(rt_typed_fn_kind_mismatch_arg);
     RUN_TEST(rt_typed_fn_void_called_via_let);
     RUN_TEST(rt_typed_fn_void_no_return);
+    RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
     RUN_TEST(rt_case_arm_runs_all);
     RUN_TEST(rt_case_arm_return_status);
