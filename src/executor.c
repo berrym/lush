@@ -7189,8 +7189,14 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    // If no glob qualifier was parsed yet, set up base_pattern now
-    if (qualifier == GLOB_QUAL_NONE) {
+    /* Ensure base_pattern is set to a strdup of the original pattern
+     * when no qualifier was parsed. parse_glob_qualifier already does
+     * this on its GLOB_QUAL_NONE return paths (lines 5887, 5959), so
+     * we only need to strdup here when the qualifier feature is
+     * disabled and parse_glob_qualifier was therefore never called --
+     * doing it unconditionally would leak the parse_glob_qualifier
+     * allocation (issue #112). */
+    if (qualifier == GLOB_QUAL_NONE && !base_pattern) {
         base_pattern = strdup(pattern);
     }
 
