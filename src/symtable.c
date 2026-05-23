@@ -2819,20 +2819,38 @@ int symtable_set_array(const char *name, array_value_t *array) {
  * @brief Get an array variable
  */
 array_value_t *symtable_get_array(const char *name) {
-    if (!name || !array_storage) {
+    if (!name) {
         return NULL;
     }
 
+    // Walk the scope chain first -- arrays land in the same per-scope
+    // vars_ht as scalars (storage unification phase A) so they get
+    // proper scope-aware lookup including SYMVAR_UNSET shadowing.
+    // Fall back to the global side-table during the transition for
+    // call sites (mostly the LLE shell hooks) that haven't migrated.
+    if (global_manager && global_manager->current_scope) {
+        symvar_t *var = find_var(global_manager->current_scope, name);
+        if (var) {
+            array_value_t *result =
+                (var->type == SYMVAR_ARRAY) ? var->array : NULL;
+            free_symvar(var);
+            if (result) {
+                return result;
+            }
+        }
+    }
+
+    if (!array_storage) {
+        return NULL;
+    }
     const char *ptr_str = ht_strstr_get(array_storage, name);
     if (!ptr_str) {
         return NULL;
     }
-
     void *ptr;
     if (sscanf(ptr_str, "%p", &ptr) != 1) {
         return NULL;
     }
-
     return (array_value_t *)ptr;
 }
 
