@@ -13693,17 +13693,26 @@ static char *parse_parameter_expansion(executor_t *executor,
     }
 
     // Fall back to symbol table lookup for regular variables
-    // Note: symtable_get_var returns a strdup'd value, caller must free
-
-    // ${arr} without subscript: mode-aware expansion via the shared
-    // helper. bash gives first element; zsh and lush give all elements
-    // joined. Matches the bare-$arr form behavior in expand_variable.
-    array_value_t *array = symtable_get_array(expansion);
-    if (array) {
-        return expand_array_unsubscripted(executor, array, expansion);
+    // Bare ${var} / ${arr} via the unified value view. The view
+    // condenses the historical "try array, fall back to scalar" dance
+    // into one call. For lists/maps, hand to expand_array_unsubscripted
+    // (which enforces SEMANTICS section 3.9 in zsh/lush mode); for
+    // scalars, take ownership of the strdup and continue to the
+    // set -u check.
+    lush_value_view_t view = {0};
+    symtable_lookup(expansion, &view);
+    if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
+        char *result =
+            expand_array_unsubscripted(executor, view.array, expansion);
+        lush_value_view_clear(&view);
+        return result;
     }
-
-    char *value = symtable_get_var(executor->symtable, expansion);
+    /* Transfer ownership of the scalar strdup out of the view so the
+     * subsequent free path stays the same as the legacy code. clear()
+     * is now a no-op on the (zeroed) scalar field. */
+    char *value = view.scalar_value;
+    view.scalar_value = NULL;
+    lush_value_view_clear(&view);
 
     // Check for unset variable error (set -u) for ${var} syntax
     if (!value && shell_opts.unset_error) {
@@ -13855,14 +13864,18 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                     }
                 }
 
-                // Bare $arr on an array: mode-aware expansion via the
-                // shared helper. Matches the brace-form ${arr} behavior
-                // in parse_parameter_expansion. bash gives first element;
-                // zsh and lush give all elements joined. (Issue #65.)
-                array_value_t *array = symtable_get_array(resolved_name);
-                if (array) {
-                    char *result = expand_array_unsubscripted(executor, array,
-                                                              resolved_name);
+                // Bare $arr / $var via the unified value view (mirrors
+                // the parse_parameter_expansion braced ${arr} site).
+                // bash mode gives first element, zsh/lush mode raises a
+                // type error in scalar slots; both come out of
+                // expand_array_unsubscripted. (Issue #65.)
+                lush_value_view_t view = {0};
+                symtable_lookup(resolved_name, &view);
+                if (view.kind == LUSH_VALUE_LIST ||
+                    view.kind == LUSH_VALUE_MAP) {
+                    char *result = expand_array_unsubscripted(
+                        executor, view.array, resolved_name);
+                    lush_value_view_clear(&view);
                     if (resolved_to_free) {
                         free(resolved_to_free);
                     }
@@ -13871,10 +13884,11 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                      * trailing literal text after the variable name. */
                     return result ? result : strdup("");
                 }
-
-                // Look up in modern symbol table using resolved name
-                char *value =
-                    symtable_get_var(executor->symtable, resolved_name);
+                /* Transfer ownership of the scalar out of the view so
+                 * the legacy unset / set -u path below stays identical. */
+                char *value = view.scalar_value;
+                view.scalar_value = NULL;
+                lush_value_view_clear(&view);
 
                 // Free resolved nameref if it was allocated
                 if (resolved_to_free) {
