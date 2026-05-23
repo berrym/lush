@@ -55,11 +55,11 @@ extern "C" {
 #define DISPLAY_INTEGRATION_VERSION_MINOR 0
 #define DISPLAY_INTEGRATION_VERSION_PATCH 0
 
-// Buffer and limit constants
+/* Buffer and limit constants */
 #define DISPLAY_INTEGRATION_MAX_OUTPUT_SIZE 16384
 #define DISPLAY_INTEGRATION_MAX_CONFIG_STRING 256
 
-// Default configuration values
+/* Default configuration values */
 #define DISPLAY_INTEGRATION_DEFAULT_PERFORMANCE_THRESHOLD_MS 20
 #define DISPLAY_INTEGRATION_DEFAULT_CACHE_HIT_RATE_THRESHOLD 0.8
 #define DISPLAY_INTEGRATION_DEFAULT_OPTIMIZATION_LEVEL                         \
@@ -75,11 +75,13 @@ extern "C" {
  * Tracks why layered display operations fall back to standard functions.
  */
 typedef enum {
-    INTEGRATION_FALLBACK_NONE = 0, /**< No fallback - layered display succeeded */
+    INTEGRATION_FALLBACK_NONE =
+        0, /**< No fallback - layered display succeeded */
     INTEGRATION_FALLBACK_CONTROLLER_NULL,  /**< Display controller is null */
-    INTEGRATION_FALLBACK_CONTROLLER_ERROR, /**< Display controller returned error */
-    INTEGRATION_FALLBACK_BUFFER_ERROR,     /**< Buffer allocation or size error */
-    INTEGRATION_FALLBACK_TIMEOUT,      /**< Operation exceeded timeout threshold */
+    INTEGRATION_FALLBACK_CONTROLLER_ERROR, /**< Display controller returned
+                                              error */
+    INTEGRATION_FALLBACK_BUFFER_ERROR, /**< Buffer allocation or size error */
+    INTEGRATION_FALLBACK_TIMEOUT, /**< Operation exceeded timeout threshold */
     /**
      * User explicitly disabled layered display
      */
@@ -90,7 +92,8 @@ typedef enum {
      * System not properly initialized
      */
     INTEGRATION_FALLBACK_INITIALIZATION_ERROR,
-    INTEGRATION_FALLBACK_RECURSION_PROTECTION  /**< Recursion protection triggered */
+    INTEGRATION_FALLBACK_RECURSION_PROTECTION /**< Recursion protection
+                                                 triggered */
 } integration_fallback_reason_t;
 
 /**
@@ -101,12 +104,14 @@ typedef enum {
      * Operating perfectly with layered display
      */
     DISPLAY_INTEGRATION_HEALTH_EXCELLENT = 0,
-    DISPLAY_INTEGRATION_HEALTH_GOOD = 1, /**< Operating well with minor issues */
+    DISPLAY_INTEGRATION_HEALTH_GOOD =
+        1, /**< Operating well with minor issues */
     /**
      * Performance issues or high fallback rate
      */
     DISPLAY_INTEGRATION_HEALTH_DEGRADED = 2,
-    DISPLAY_INTEGRATION_HEALTH_ERROR = 3, /**< Error in layered display system */
+    DISPLAY_INTEGRATION_HEALTH_ERROR =
+        3, /**< Error in layered display system */
     /**
      * Layered display intentionally disabled
      */
@@ -122,30 +127,32 @@ typedef enum {
  * Controls all aspects of layered display integration behavior.
  */
 typedef struct {
-    // Core feature enables - v1.3.0: Layered display is now exclusive system
-    bool enable_caching; // Enable display caching for performance
-    bool enable_performance_monitoring; // Enable performance tracking and
-                                        // metrics
+    /* Core feature enables - v1.3.0: Layered display is now exclusive system */
+    bool enable_caching; /**< Enable display caching for performance */
+    bool enable_performance_monitoring; /**< Enable performance tracking and
+                                           metrics */
 
-    // Optimization settings
+    /* Optimization settings */
     display_optimization_level_t
-        optimization_level; // Performance optimization level
-    uint32_t
-        performance_threshold_ms;    // Performance threshold for health checks
-    double cache_hit_rate_threshold; // Cache hit rate threshold for health
+        optimization_level;            /**< Performance optimization level */
+    uint32_t performance_threshold_ms; /**< Performance threshold for health
+                                          checks */
+    double cache_hit_rate_threshold; /**< Cache hit rate threshold for health */
 
-    // Behavior settings
-    bool fallback_on_error; // Fallback to original functions on error
-    bool debug_mode;        // Enable debug output and logging
-    size_t max_output_size; // Maximum size for display output buffers
+    /* Behavior settings */
+    bool fallback_on_error; /**< Fallback to original functions on error */
+    bool debug_mode;        /**< Enable debug output and logging */
+    size_t max_output_size; /**< Maximum size for display output buffers */
 
-    // Enterprise deployment settings
-    char deployment_mode
-        [DISPLAY_INTEGRATION_MAX_CONFIG_STRING]; // Deployment mode identifier
-    char environment_name[DISPLAY_INTEGRATION_MAX_CONFIG_STRING]; // Environment
-                                                                  // name
-    bool enable_enterprise_logging; // Enable enterprise-grade logging
-    bool strict_compatibility_mode; // Strict backward compatibility mode
+    /* Enterprise deployment settings */
+    char
+        deployment_mode[DISPLAY_INTEGRATION_MAX_CONFIG_STRING]; /**< Deployment
+                                                                   mode
+                                                                   identifier */
+    char environment_name
+        [DISPLAY_INTEGRATION_MAX_CONFIG_STRING]; /**< Environment name */
+    bool enable_enterprise_logging; /**< Enable enterprise-grade logging */
+    bool strict_compatibility_mode; /**< Strict backward compatibility mode */
 } display_integration_config_t;
 
 /**
@@ -154,35 +161,36 @@ typedef struct {
  * optimization.
  */
 typedef struct {
-    // Usage statistics
-    time_t init_time;               // Time when integration was initialized
-    uint64_t total_display_calls;   // Total number of display function calls
-    uint64_t layered_display_calls; // Calls handled by layered display
-    uint64_t fallback_calls; // Calls that fell back to original functions
+    /* Usage statistics */
+    time_t init_time;             /**< Time when integration was initialized */
+    uint64_t total_display_calls; /**< Total number of display function calls */
+    uint64_t layered_display_calls; /**< Calls handled by layered display */
+    uint64_t fallback_calls; /**< Calls that fell back to original functions */
 
-    // Performance metrics
-    uint64_t avg_layered_display_time_ns; // Average time for layered display
-                                          // operations
-    double cache_hit_rate;                // Current cache hit rate (0.0-1.0)
-    size_t memory_usage_bytes; // Current memory usage of integration system
+    /* Performance metrics */
+    uint64_t avg_layered_display_time_ns; /**< Average time for layered display
+                                             operations */
+    double cache_hit_rate; /**< Current cache hit rate (0.0-1.0) */
+    size_t
+        memory_usage_bytes; /**< Current memory usage of integration system */
 
-    // Error tracking
-    uint64_t layered_display_errors; // Number of errors in layered display
-    uint64_t fallback_triggers;      // Number of times fallback was triggered
-    time_t last_error_time;          // Time of last error
+    /* Error tracking */
+    uint64_t layered_display_errors; /**< Number of errors in layered display */
+    uint64_t fallback_triggers; /**< Number of times fallback was triggered */
+    time_t last_error_time;     /**< Time of last error */
 
-    // Health indicators
-    bool performance_within_threshold; // Performance meeting threshold
-                                       // requirements
-    bool cache_efficiency_good;        // Cache performing efficiently
-    bool memory_usage_acceptable;      // Memory usage within acceptable limits
+    /* Health indicators */
+    bool performance_within_threshold; /**< Performance meeting threshold
+                                          requirements */
+    bool cache_efficiency_good;        /**< Cache performing efficiently */
+    bool memory_usage_acceptable; /**< Memory usage within acceptable limits */
 
-    // v1.3.0 Safety Infrastructure Statistics
-    uint64_t safety_checks_performed; // Number of safety checks performed
-    uint64_t fallback_events[10];     // Count of each fallback reason type
-    time_t last_fallback_time;        // Time of last fallback event
+    /* v1.3.0 Safety Infrastructure Statistics */
+    uint64_t safety_checks_performed; /**< Number of safety checks performed */
+    uint64_t fallback_events[10];     /**< Count of each fallback reason type */
+    time_t last_fallback_time;        /**< Time of last fallback event */
     integration_fallback_reason_t
-        last_fallback_reason; // Reason for last fallback
+        last_fallback_reason; /**< Reason for last fallback */
 } display_integration_stats_t;
 
 /**
@@ -190,46 +198,49 @@ typedef struct {
  * Provides detailed metrics for cache efficiency and display timing validation.
  */
 typedef struct {
-    // Cache Performance Targets
-    uint64_t cache_operations_total; // Total cache operations performed
-    uint64_t cache_hits_global;      // Global cache hits across all systems
-    uint64_t cache_misses_global;    // Global cache misses across all systems
-    double cache_hit_rate_current;   // Current cache hit rate percentage
-    double
-        cache_hit_rate_target; // Target cache hit rate (>75% dev, >90% release)
-    bool cache_target_achieved; // Whether cache target is being met
+    /* Cache Performance Targets */
+    uint64_t cache_operations_total; /**< Total cache operations performed */
+    uint64_t cache_hits_global;   /**< Global cache hits across all systems */
+    uint64_t cache_misses_global; /**< Global cache misses across all systems */
+    double cache_hit_rate_current; /**< Current cache hit rate percentage */
+    double cache_hit_rate_target;  /**< Target cache hit rate (>75% dev, >90%
+                                      release) */
+    bool cache_target_achieved;    /**< Whether cache target is being met */
 
-    // Display Timing Targets
-    uint64_t
-        display_operations_measured; // Number of display operations measured
-    uint64_t display_time_total_ns;  // Total display time in nanoseconds
-    uint64_t display_time_min_ns;    // Minimum display time recorded
-    uint64_t display_time_max_ns;    // Maximum display time recorded
-    double display_time_avg_ms;      // Average display time in milliseconds
-    double display_time_target_ms;   // Target display time (<50ms release)
-    bool display_timing_target_achieved; // Whether timing target is being met
+    /* Display Timing Targets */
+    uint64_t display_operations_measured; /**< Number of display operations
+                                             measured */
+    uint64_t display_time_total_ns; /**< Total display time in nanoseconds */
+    uint64_t display_time_min_ns;   /**< Minimum display time recorded */
+    uint64_t display_time_max_ns;   /**< Maximum display time recorded */
+    double display_time_avg_ms;     /**< Average display time in milliseconds */
+    double display_time_target_ms;  /**< Target display time (<50ms release) */
+    bool display_timing_target_achieved; /**< Whether timing target is being met
+                                          */
 
-    // Performance Trend Analysis
-    uint64_t
-        measurements_window[60]; // Rolling window of last 60 measurements (ns)
-    uint32_t measurements_index; // Current index in measurements window
-    double performance_trend;    // Performance trend indicator
+    /* Performance Trend Analysis */
+    uint64_t measurements_window[60]; /**< Rolling window of last 60
+                                         measurements (ns) */
+    uint32_t measurements_index; /**< Current index in measurements window */
+    double performance_trend;    /**< Performance trend indicator */
 
-    // Real-time Monitoring
-    time_t last_measurement_time;      // Time of last performance measurement
-    bool monitoring_active;            // Whether real-time monitoring is active
-    uint32_t measurement_frequency_hz; // Measurement frequency for monitoring
+    /* Real-time Monitoring */
+    time_t last_measurement_time; /**< Time of last performance measurement */
+    bool monitoring_active;       /**< Whether real-time monitoring is active */
+    uint32_t
+        measurement_frequency_hz; /**< Measurement frequency for monitoring */
 
-    // Baseline Establishment
-    bool baseline_established;          // Whether performance baseline is set
-    double baseline_cache_hit_rate;     // Baseline cache hit rate
-    double baseline_display_time_ms;    // Baseline display time
-    time_t baseline_establishment_time; // When baseline was established
+    /* Baseline Establishment */
+    bool baseline_established;       /**< Whether performance baseline is set */
+    double baseline_cache_hit_rate;  /**< Baseline cache hit rate */
+    double baseline_display_time_ms; /**< Baseline display time */
+    time_t baseline_establishment_time; /**< When baseline was established */
 } display_perf_metrics_t;
 
-// ============================================================================
-// INITIALIZATION AND CLEANUP
-// ============================================================================
+/* ============================================================================
+ * INITIALIZATION AND CLEANUP
+ * ============================================================================
+ */
 
 /**
  * Initialize the display integration system.
@@ -253,9 +264,10 @@ bool display_integration_init(const display_integration_config_t *init_config);
  */
 void display_integration_cleanup(void);
 
-// ============================================================================
-// CONFIGURATION MANAGEMENT
-// ============================================================================
+/* ============================================================================
+ * CONFIGURATION MANAGEMENT
+ * ============================================================================
+ */
 
 /**
  * Create default configuration for display integration.
@@ -288,9 +300,10 @@ bool display_integration_set_config(const display_integration_config_t *config);
  */
 bool display_integration_get_config(display_integration_config_t *config);
 
-// ============================================================================
-// MAIN INTEGRATION FUNCTIONS (Shell Function Replacements)
-// ============================================================================
+/* ============================================================================
+ * MAIN INTEGRATION FUNCTIONS (Shell Function Replacements)
+ * ============================================================================
+ */
 
 /**
  * Integrated display function - replacement for lush_safe_redisplay().
@@ -365,9 +378,10 @@ char *lush_generate_prompt(void);
  */
 void display_integration_post_command_update(const char *executed_command);
 
-// ============================================================================
-// PERFORMANCE MONITORING AND DIAGNOSTICS
-// ============================================================================
+/* ============================================================================
+ * PERFORMANCE MONITORING AND DIAGNOSTICS
+ * ============================================================================
+ */
 
 /**
  * Get display integration performance statistics.
@@ -421,9 +435,10 @@ display_integration_health_t display_integration_get_health(void);
 const char *
 display_integration_health_string(display_integration_health_t health);
 
-// ============================================================================
-// v1.3.0 SAFETY INFRASTRUCTURE
-// ============================================================================
+/* ============================================================================
+ * v1.3.0 SAFETY INFRASTRUCTURE
+ * ============================================================================
+ */
 
 /**
  * Perform comprehensive safety check for layered display operation.
@@ -483,9 +498,10 @@ integration_fallback_reason_string(integration_fallback_reason_t reason);
  */
 void display_integration_print_diagnostics(void);
 
-// ============================================================================
-// ENTERPRISE FEATURES AND DEPLOYMENT
-// ============================================================================
+/* ============================================================================
+ * ENTERPRISE FEATURES AND DEPLOYMENT
+ * ============================================================================
+ */
 
 /**
  * Enable enterprise deployment mode with specific configuration.
@@ -550,9 +566,10 @@ bool display_integration_init_autosuggestions(void);
  */
 void display_integration_cleanup_autosuggestions(void);
 
-// ============================================================================
-// PERFORMANCE MONITORING
-// ============================================================================
+/* ============================================================================
+ * PERFORMANCE MONITORING
+ * ============================================================================
+ */
 
 /**
  * Initialize performance monitoring system.
@@ -649,9 +666,10 @@ bool display_integration_perf_monitor_reset(void);
 bool display_integration_perf_monitor_set_active(bool enable,
                                                  uint32_t frequency_hz);
 
-// ============================================================================
-// DISPLAY INTEGRATION MACROS
-// ============================================================================
+/* ============================================================================
+ * DISPLAY INTEGRATION MACROS
+ * ============================================================================
+ */
 
 /**
  * Convenience macro for safe function replacement.
