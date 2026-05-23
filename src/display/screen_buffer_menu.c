@@ -16,6 +16,7 @@
  */
 
 #include "display/screen_buffer.h"
+#include "lle/utf8_support.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -251,24 +252,30 @@ int screen_buffer_add_text_rows(screen_buffer_t *buffer, int start_row,
             continue;
         }
 
-        // Handle regular characters - calculate visual width
+        // Handle regular characters - decode the codepoint and consult
+        // the Unicode East Asian Width property via the shared LLE
+        // primitive. The previous byte-count heuristic (3 bytes => 2
+        // columns) wrongly inflated narrow 3-byte glyphs like the box
+        // drawings U+2500..U+257F, causing frame borders to wrap.
         int char_bytes = 1;
         int visual_width = 1;
-
-        if ((ch & 0x80) == 0) {
-            // ASCII - 1 byte, 1 column
+        uint32_t codepoint = 0;
+        int decoded =
+            lle_utf8_decode_codepoint(text + i, text_len - i, &codepoint);
+        if (decoded > 0 && codepoint >= 32) {
+            char_bytes = decoded;
+            int w = lle_utf8_codepoint_width(codepoint);
+            visual_width = w > 0 ? w : 1;
+        } else if ((ch & 0x80) == 0) {
             char_bytes = 1;
             visual_width = 1;
         } else if ((ch & 0xE0) == 0xC0) {
-            // 2-byte UTF-8
             char_bytes = 2;
             visual_width = 1;
         } else if ((ch & 0xF0) == 0xE0) {
-            // 3-byte UTF-8 (often CJK - 2 columns)
             char_bytes = 3;
-            visual_width = 2;
+            visual_width = 1;
         } else if ((ch & 0xF8) == 0xF0) {
-            // 4-byte UTF-8 (emoji - usually 2 columns)
             char_bytes = 4;
             visual_width = 2;
         }
