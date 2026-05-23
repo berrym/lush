@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.0-prerelease]
 
+### Removed
+- `return_value` builtin and the associated `__LUSH_RETURN__` stdout-marker
+  scanner inside command substitution. The builtin was an early sketch
+  of returning a typed value from a shell function; the typed-function
+  form (`fn name(...) -> kind { ... }` with `let result = name(args)`
+  capture) supersedes it. Retired before the call/return surface of the
+  typed form lands so there is only one path to a structured return value.
+
 ### Added
 
 #### Session 125: Hook System and Syntax Highlighting (2026-01-23)

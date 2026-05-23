@@ -1,6 +1,6 @@
 # Builtin Commands Reference
 
-**All 66 registered builtin entries (61 distinct commands) in Lush v1.5.0**
+**All 65 registered builtin entries (60 distinct commands) in Lush v1.5.0**
 
 Five entries are aliases that share an implementation: `.` ↔ `source`,
 `[` ↔ `test`, `typeset` ↔ `declare`, `readarray` ↔ `mapfile`,
@@ -21,7 +21,7 @@ Five entries are aliases that share an implementation: `.` ↔ `source`,
 
 ## Overview
 
-Lush provides 61 distinct builtin commands (66 registry entries including
+Lush provides 60 distinct builtin commands (65 registry entries including
 five aliases). These execute within the shell process without spawning
 external programs, making them faster and giving them access to shell
 internals.
@@ -32,7 +32,7 @@ internals.
 |----------|----------|
 | POSIX Standard | `:`, `.`, `break`, `continue`, `eval`, `exec`, `exit`, `export`, `readonly`, `return`, `set`, `shift`, `trap`, `unset` |
 | POSIX Utilities | `alias`, `bg`, `cd`, `command`, `disown`, `env`, `fc`, `fg`, `getopts`, `hash`, `jobs`, `printenv`, `pwd`, `read`, `test`, `times`, `type`, `ulimit`, `umask`, `unalias`, `wait` |
-| Extended | `declare`, `dirs`, `echo`, `false`, `help`, `history`, `let`, `local`, `mapfile`, `popd`, `print`, `printf`, `pushd`, `readarray`, `return_value`, `shopt`, `source`, `true`, `typeset`, `[` |
+| Extended | `declare`, `dirs`, `echo`, `false`, `help`, `history`, `let`, `local`, `mapfile`, `popd`, `print`, `printf`, `pushd`, `readarray`, `shopt`, `source`, `true`, `typeset`, `[` |
 | Lush-Specific | `analyze`, `clear`, `config`, `debug`, `display`, `lint`, `mode`, `network`, `setopt`, `terminal`, `unsetopt` |
 
 ---
@@ -659,19 +659,6 @@ pushd +1              # Rotate stack
 pushd -n /opt         # Push without changing directory
 ```
 
-### `return_value`
-
-Set the function return value (replaces the marker-hack
-`__LUSH_RETURN__` form). Designed for the typed-function form
-(§5.3) that's currently in development; today usable as a marker
-inside POSIX-form functions.
-
-```bash
-my_func() {
-    return_value "computed result"
-}
-```
-
 ### `shopt`
 
 Bash-style shell options. Operates on the same feature matrix as
@@ -983,26 +970,25 @@ fg          getopts     hash        help        history
 jobs        let         lint        local       mapfile
 mode        network     popd        print       printenv
 printf      pushd       pwd         read        readarray
-readonly    return      return_value  set       setopt
-shift       shopt       source      terminal    test
-times       trap        true        type        typeset
-ulimit      umask       unalias     unset       unsetopt
-wait
+readonly    return      set         setopt      shift
+shopt       source      terminal    test        times
+trap        true        type        typeset     ulimit
+umask       unalias     unset       unsetopt    wait
 ```
 
 Five entries are aliases (same underlying impl): `.` ↔ `source`,
 `[` ↔ `test`, `typeset` ↔ `declare`, `readarray` ↔ `mapfile`,
-`printenv` ↔ `env`. Distinct command count is 61.
+`printenv` ↔ `env`. Distinct command count is 60.
 
 ### By Purpose
 
 | Purpose | Builtins |
 |---------|----------|
-| Flow control | `break`, `continue`, `return`, `return_value`, `exit` |
+| Flow control | `break`, `continue`, `return`, `exit` |
 | Loops | `for`, `while`, `until` (keywords, not builtins) |
 | Conditionals | `test`, `[`, `if` (keyword) |
 | Variables | `declare`, `export`, `local`, `readonly`, `unset`, `typeset`, `let` |
-| Functions | `return`, `return_value`, `local`, `declare -f` |
+| Functions | `return`, `local`, `declare -f` |
 | Jobs | `bg`, `disown`, `fg`, `jobs`, `wait` |
 | Signals | `trap` |
 | I/O | `echo`, `print`, `printf`, `read`, `mapfile`, `readarray` |

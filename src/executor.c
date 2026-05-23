@@ -14551,31 +14551,6 @@ static char *expand_command_substitution(executor_t *executor,
         }
         output[output_len] = '\0';
 
-        // Check for return value marker in output
-        const char *return_marker = "__LUSH_RETURN__:";
-        const char *end_marker = ":__END__";
-        char *marker_pos = strstr(output, return_marker);
-
-        if (marker_pos) {
-            // Found return value marker, extract the return value
-            char *value_start = marker_pos + strlen(return_marker);
-            char *value_end = strstr(value_start, end_marker);
-
-            if (value_end) {
-                // Extract the return value
-                size_t value_len = value_end - value_start;
-                char *return_value = malloc(value_len + 1);
-                if (return_value) {
-                    strncpy(return_value, value_start, value_len);
-                    return_value[value_len] = '\0';
-
-                    // Clean up the original output
-                    free(output);
-                    return return_value;
-                }
-            }
-        }
-
         // Null terminate and remove trailing newlines
         output[output_len] = '\0';
         while (output_len > 0 && (output[output_len - 1] == '\n' ||

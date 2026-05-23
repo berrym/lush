@@ -474,7 +474,7 @@ sizes are rough engineering estimates.)
 | `(@)` flag | accepted as a no-op spelling alias for `[@]` presentation in `try_expand_vector_arg` (`${(@)arr}` yields the same as `${arr[@]}`) | redundant; at most a spelling alias (§3.7) | **match** |
 | Array-literal discrimination | parser-internal `\x1F` sentinel prefix on unquoted `name=(...)` argv elements lets `local`/`declare`/`typeset` route to array-literal handling while `local data="(scoped)"` (which strips quotes to the same shape) correctly stays a scalar | a parsed `local arr=(a b c)` must build a real array, distinct from `local data="(...)"` | **match** |
 | Word splitting | `FEATURE_WORD_SPLIT_DEFAULT`, per-mode | retained as a preset (§3.8) | **match** |
-| Typed-function form | not implemented -- no `fn` keyword, no typed parameters; `return_value` is a builtin emitting a `__LUSH_RETURN__` marker, not a language construct | a typed form carrying lexical scope (§5.3) | large -- form not yet designed |
+| Typed-function form | declaration grammar implemented -- `fn name(p: kind, ...) [-> kind] { body }` parses to NODE_FN_DECL; call expression, typed `return`, and `let name = call(args)` capture in flight. The legacy `return_value` builtin and its `__LUSH_RETURN__` marker scanner were removed; the typed form is the only path to a structured return value | a typed form carrying lexical scope (§5.3) | parser surface landed; runtime + lexical resolution + debugger surface remain |
 | Scoping | dynamic scope-chain for all functions (`symtable` walks `scope->parent`; issue #47 assignment semantics) | dynamic for POSIX form, lexical for the typed form (§5) | large -- lexical resolution and the typed form both unbuilt |
 
 The two "large" gaps -- the typed-function form and lexical scoping --
@@ -493,9 +493,12 @@ on arrays; `${!ref}` no longer leaks pointer bytes).
 Recorded here so they are not lost. These are *not* decided by this
 document; they are to be decided against it, as their own work.
 
-- **The typed-function form.** Its syntax, typed parameters, a proper
-  `return_value` construct (replacing the marker-hack builtin), and
-  the lexical-scope resolution pass. A full design of its own.
+- **The typed-function form.** Its syntax and parameter declaration
+  landed; the call expression, the typed `return EXPR` statement, the
+  `let name = call(args)` capture form, and the lexical-scope
+  resolution pass remain to land. The legacy `return_value` builtin
+  was retired at the start of this work; the typed form is the only
+  path to a structured return value.
 - **Pipeline status reporting** -- a modern alternative to `pipefail`
   feeding clean per-stage exit states into the structured-error
   system.

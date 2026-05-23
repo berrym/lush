@@ -296,14 +296,6 @@ int bin_continue(int argc, char **argv);
 int bin_return(int argc, char **argv);
 
 /**
- * @brief Return from a function with a specific value
- * @param argc Argument count
- * @param argv Argument vector
- * @return Specified return value
- */
-int bin_return_value(int argc, char **argv);
-
-/**
  * @brief Set signal traps
  * @param argc Argument count
  * @param argv Argument vector

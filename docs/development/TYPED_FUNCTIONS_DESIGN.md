@@ -160,11 +160,12 @@ Outside a `fn` body (in POSIX functions, in `for` loops, etc.),
 parser tracks whether the current command is inside a `fn` body via
 a context flag; `return expression` is only parsed there.
 
-This **replaces the `__LUSH_RETURN__` marker hack** for typed
-functions. The marker mechanism stays in place for the existing
-`return_value` builtin used by POSIX-form functions (which has no
-typed return concept and emits the marker to communicate non-zero
-values back through stdout).
+This **replaces** the older `return_value` builtin (and its
+`__LUSH_RETURN__` stdout-marker scanner inside every command
+substitution). Both are retired in the same landing as `fn`: there
+is no longer a "non-typed alternative" for returning a structured
+value from a function, because the typed form is now the answer
+the marker hack was approximating.
 
 ### 2.5 Kind taxonomy
 
