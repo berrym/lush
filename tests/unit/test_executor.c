@@ -294,6 +294,73 @@ TEST(case_wildcard) {
 }
 
 /* ============================================================================
+ * SEMANTICS section 3.4/3.9 conformance: ${arr[@]} in scalar context
+ *
+ * Per SEMANTICS.md section 3.9, a list value (${arr[@]}, etc.) reaching
+ * a scalar-requiring position is a runtime type error. Vector-accepting
+ * positions (argv, for-loop word list) continue to receive the array's
+ * elements; the explicit-join subscript ${arr[*]} stays a scalar.
+ * ============================================================================
+ */
+
+TEST(arr_at_in_scalar_assignment_raises_type_mismatch) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nx=${arr[@]}\necho saw_post_assign\n");
+
+    /* The offending command aborts execution -- "saw_post_assign"
+     * must not reach stdout. */
+    ASSERT_TRUE(strstr(r.out, "saw_post_assign") == NULL,
+                "execution aborted after type mismatch");
+    /* The diagnostic must reach stderr with the canonical phrasing. */
+    ASSERT_STDERR_CONTAINS(r, "type mismatch");
+    ASSERT_STDERR_CONTAINS(r, "${arr[@]}");
+    ASSERT_TRUE(r.exit_status != 0,
+                "non-zero exit on type-mismatch abort");
+
+    executor_free(exec);
+}
+
+TEST(arr_at_in_for_loop_iterates) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /* The for-loop word list is vector-accepting -- ${arr[@]} feeds it
+     * elements, no error. */
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nfor i in ${arr[@]}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "iter=a");
+    ASSERT_STDOUT_CONTAINS(r, "iter=b");
+    ASSERT_STDOUT_CONTAINS(r, "iter=c");
+    /* No spurious type-mismatch diagnostic. */
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "no error in vector position");
+
+    executor_free(exec);
+}
+
+TEST(arr_star_in_scalar_assignment_joins) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /* ${arr[*]} is the explicit scalar-join operator -- legal in a
+     * scalar-requiring position; per SEMANTICS section 3.5. */
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a b c)\nx=${arr[*]}\necho \"x=$x\"\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "x=a b c");
+    ASSERT_TRUE(strstr(r.err, "type mismatch") == NULL,
+                "[*] join is conformant in scalar context");
+
+    executor_free(exec);
+}
+
+/* ============================================================================
  * LOGICAL OPERATOR TESTS
  * ============================================================================
  */
@@ -1958,6 +2025,11 @@ int main(void) {
     RUN_TEST(until_loop);
     RUN_TEST(case_statement);
     RUN_TEST(case_wildcard);
+
+    printf("\nSEMANTICS 3.4/3.9 conformance tests:\n");
+    RUN_TEST(arr_at_in_scalar_assignment_raises_type_mismatch);
+    RUN_TEST(arr_at_in_for_loop_iterates);
+    RUN_TEST(arr_star_in_scalar_assignment_joins);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);

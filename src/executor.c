@@ -12397,10 +12397,50 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 }
                             }
                         }
-                    } else if (strcmp(subscript, "@") == 0 ||
-                               strcmp(subscript, "*") == 0) {
-                        // ${arr[@]} or ${arr[*]} - all elements
+                    } else if (strcmp(subscript, "*") == 0) {
+                        // ${arr[*]} - explicit scalar join (SEMANTICS.md
+                        // section 3.5). All elements joined with the
+                        // first character of IFS (" " here as a fixed
+                        // default, matching prior behavior).
                         result = symtable_array_expand(array, " ");
+                    } else if (strcmp(subscript, "@") == 0) {
+                        // ${arr[@]} reaching this general parameter-
+                        // expansion fallthrough means the expansion sits
+                        // in a SCALAR-REQUIRING context (vector-accepting
+                        // positions are handled earlier by
+                        // try_expand_vector_arg). Per SEMANTICS.md section
+                        // 3.9, this is a runtime type mismatch -- a list
+                        // value cannot flow into a scalar slot.
+                        shell_error_t *err = shell_error_create(
+                            SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+                            executor_current_loc(executor),
+                            "type mismatch: list value ${%s[@]} in a "
+                            "scalar position",
+                            arr_name ? arr_name : "?");
+                        if (err) {
+                            shell_error_set_suggestion(
+                                err,
+                                "join the list explicitly -- use ${name[*]} "
+                                "for space-joining, or build a scalar from "
+                                "the elements with an explicit join.");
+                            shell_error_display(err, stderr,
+                                                isatty(STDERR_FILENO));
+                            shell_error_free(err);
+                            executor->has_error = true;
+                        } else {
+                            executor_error_report(
+                                executor, SHELL_ERR_TYPE_MISMATCH,
+                                executor_current_loc(executor),
+                                "type mismatch: list value ${%s[@]} in a "
+                                "scalar position",
+                                arr_name ? arr_name : "?");
+                        }
+                        /* SEMANTICS.md section 3.9 enforcement: in a
+                         * script, a type mismatch aborts before the bad
+                         * value can reach a downstream command;
+                         * interactively, the prompt continues. */
+                        executor_request_posix_exit(executor, 1);
+                        result = strdup("");
                     } else if ((strncmp(subscript, "(r)", 3) == 0 ||
                                 strncmp(subscript, "(R)", 3) == 0) &&
                                !array->is_associative) {
