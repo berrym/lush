@@ -39,7 +39,18 @@ extern "C" {
  * ============================================================================
  */
 
+/**
+ * @brief Check whether a name resolves to a shell builtin
+ * @param text Candidate command name (NUL-terminated)
+ * @return true if text names a registered builtin, false otherwise
+ */
 bool lle_shell_is_builtin(const char *text);
+
+/**
+ * @brief Check whether a name resolves to a shell alias
+ * @param text Candidate command name (NUL-terminated)
+ * @return true if text names a registered alias, false otherwise
+ */
 bool lle_shell_is_alias(const char *text);
 
 /* ============================================================================
@@ -53,35 +64,91 @@ bool lle_shell_is_alias(const char *text);
  * working directory.
  */
 
+/**
+ * @brief Emit builtin-command completion candidates
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context produced by the analyzer
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t lle_completion_source_builtins(lle_memory_pool_t *pool,
                                             const lle_word_context_t *context,
                                             lle_completion_result_t *result);
 
+/**
+ * @brief Emit alias-name completion candidates
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context produced by the analyzer
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t lle_completion_source_aliases(lle_memory_pool_t *pool,
                                            const lle_word_context_t *context,
                                            lle_completion_result_t *result);
 
+/**
+ * @brief Emit PATH-executable command completion candidates
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context produced by the analyzer
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t lle_completion_source_commands(lle_memory_pool_t *pool,
                                             const lle_word_context_t *context,
                                             lle_completion_result_t *result);
 
+/**
+ * @brief Emit file-path completion candidates from the resolved directory
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context (expanded_directory selects the scan path)
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t lle_completion_source_files(lle_memory_pool_t *pool,
                                          const lle_word_context_t *context,
                                          lle_completion_result_t *result);
 
+/**
+ * @brief Emit directory-only completion candidates from the resolved directory
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context (expanded_directory selects the scan path)
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t
 lle_completion_source_directories(lle_memory_pool_t *pool,
                                   const lle_word_context_t *context,
                                   lle_completion_result_t *result);
 
+/**
+ * @brief Emit environment and shell variable completion candidates
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context produced by the analyzer
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t lle_completion_source_variables(lle_memory_pool_t *pool,
                                              const lle_word_context_t *context,
                                              lle_completion_result_t *result);
 
+/**
+ * @brief Emit command-history completion candidates
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context produced by the analyzer
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t lle_completion_source_history(lle_memory_pool_t *pool,
                                            const lle_word_context_t *context,
                                            lle_completion_result_t *result);
 
+/**
+ * @brief Emit SSH host completion candidates from known_hosts/config
+ * @param pool Memory pool for candidate allocations
+ * @param context Word context produced by the analyzer
+ * @param result Result set to append matching candidates to
+ * @return LLE_SUCCESS or an error code
+ */
 lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
                                              const lle_word_context_t *context,
                                              lle_completion_result_t *result);
