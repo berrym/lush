@@ -747,39 +747,117 @@ lle_result_t lle_input_parser_system_reset(lle_input_parser_system_t *system);
  * ============================================================================
  */
 
+/**
+ * @brief Initialize an input stream attached to a terminal.
+ * @param stream Output pointer for created stream
+ * @param terminal Terminal system providing the file descriptor
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_init(lle_input_stream_t **stream,
                                    lle_terminal_system_t *terminal,
                                    lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy an input stream and release its resources.
+ * @param stream Input stream to destroy
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_destroy(lle_input_stream_t *stream);
 
+/**
+ * @brief Read raw bytes from the input stream into a caller buffer.
+ * @param stream Input stream
+ * @param buffer Destination buffer
+ * @param buffer_size Buffer capacity in bytes
+ * @param bytes_read Output: number of bytes actually read
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_read(lle_input_stream_t *stream, char *buffer,
                                    size_t buffer_size, size_t *bytes_read);
 
+/**
+ * @brief Append data into the stream's internal buffer.
+ * @param stream Input stream
+ * @param data Data to buffer
+ * @param data_len Length of data in bytes
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_buffer_data(lle_input_stream_t *stream,
                                           const char *data, size_t data_len);
 
+/**
+ * @brief Get a pointer to the stream's currently buffered data.
+ * @param stream Input stream
+ * @param data Output: pointer to buffered bytes (read-only)
+ * @param data_len Output: number of buffered bytes available
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_get_buffered(lle_input_stream_t *stream,
                                            const char **data, size_t *data_len);
 
+/**
+ * @brief Consume (advance past) bytes from the stream's buffer.
+ * @param stream Input stream
+ * @param bytes Number of bytes to consume
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_consume(lle_input_stream_t *stream, size_t bytes);
 
+/**
+ * @brief Peek at a buffered byte at the given offset without consuming.
+ * @param stream Input stream
+ * @param offset Offset from current read position
+ * @param byte Output: byte at that offset
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_peek(lle_input_stream_t *stream, size_t offset,
                                    char *byte);
 
+/**
+ * @brief Set whether stream reads should block.
+ * @param stream Input stream
+ * @param blocking true for blocking reads, false for non-blocking
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_set_blocking(lle_input_stream_t *stream,
                                            bool blocking);
 
+/**
+ * @brief Enable or disable flow control on the stream.
+ * @param stream Input stream
+ * @param enabled true to enable flow control
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_set_flow_control(lle_input_stream_t *stream,
                                                bool enabled);
 
+/**
+ * @brief Retrieve cumulative I/O statistics for the stream.
+ * @param stream Input stream
+ * @param bytes_read Output: total bytes read
+ * @param read_operations Output: number of read operations performed
+ * @param buffer_overflows Output: number of buffer overflow events
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_get_statistics(lle_input_stream_t *stream,
                                              uint64_t *bytes_read,
                                              uint64_t *read_operations,
                                              uint64_t *buffer_overflows);
 
+/**
+ * @brief Reset the stream's buffer and counters to initial state.
+ * @param stream Input stream
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_reset(lle_input_stream_t *stream);
 
+/**
+ * @brief Get the number of bytes currently available in the stream buffer.
+ * @param stream Input stream
+ * @param available Output: number of buffered bytes
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_stream_get_available(lle_input_stream_t *stream,
                                             size_t *available);
 
@@ -788,17 +866,49 @@ lle_result_t lle_input_stream_get_available(lle_input_stream_t *stream,
  * ============================================================================
  */
 
+/**
+ * @brief Initialize an input buffer with the given capacity.
+ * @param buffer Output pointer for created buffer
+ * @param capacity Desired buffer capacity in bytes
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_buffer_init(lle_input_buffer_t **buffer, size_t capacity,
                                    lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy an input buffer and free associated memory.
+ * @param buffer Input buffer to destroy
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_buffer_destroy(lle_input_buffer_t *buffer);
 
+/**
+ * @brief Write data into the input buffer.
+ * @param buffer Input buffer
+ * @param data Bytes to write
+ * @param data_len Length of data in bytes
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_buffer_write(lle_input_buffer_t *buffer,
                                     const char *data, size_t data_len);
 
+/**
+ * @brief Read data out of the input buffer.
+ * @param buffer Input buffer
+ * @param data Destination for read bytes
+ * @param data_len Maximum bytes to read
+ * @param bytes_read Output: number of bytes actually read
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_buffer_read(lle_input_buffer_t *buffer, char *data,
                                    size_t data_len, size_t *bytes_read);
 
+/**
+ * @brief Clear all data from the input buffer.
+ * @param buffer Input buffer
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_buffer_clear(lle_input_buffer_t *buffer);
 
 /* ============================================================================
@@ -806,35 +916,92 @@ lle_result_t lle_input_buffer_clear(lle_input_buffer_t *buffer);
  * ============================================================================
  */
 
+/**
+ * @brief Initialize an escape sequence parser.
+ * @param parser Output pointer for created parser
+ * @param terminal_caps Terminal capabilities used to interpret sequences
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_sequence_parser_init(lle_sequence_parser_t **parser,
                          lle_terminal_capabilities_t *terminal_caps,
                          lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy a sequence parser and free its resources.
+ * @param parser Sequence parser
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_sequence_parser_destroy(lle_sequence_parser_t *parser);
 
+/**
+ * @brief Feed raw bytes into the sequence parser and emit a parsed input
+ *        when a complete sequence is recognized.
+ * @param parser Sequence parser
+ * @param data Raw bytes to process
+ * @param data_len Length of data in bytes
+ * @param parsed_input Output: produced parsed-input structure (if any)
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_sequence_parser_process_data(lle_sequence_parser_t *parser,
                                  const char *data, size_t data_len,
                                  lle_parsed_input_t **parsed_input);
 
+/**
+ * @brief Reset the sequence parser's state machine and buffers.
+ * @param parser Sequence parser
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_sequence_parser_reset_state(lle_sequence_parser_t *parser);
 
+/**
+ * @brief Get the current parser state.
+ * @param parser Sequence parser
+ * @return Current parser state
+ */
 lle_parser_state_t
 lle_sequence_parser_get_state(const lle_sequence_parser_t *parser);
 
+/**
+ * @brief Get the current sequence type being parsed.
+ * @param parser Sequence parser
+ * @return Current sequence type
+ */
 lle_sequence_type_t
 lle_sequence_parser_get_type(const lle_sequence_parser_t *parser);
 
+/**
+ * @brief Get a pointer to the parser's internal sequence buffer.
+ * @param parser Sequence parser
+ * @param buffer Output: pointer to internal buffer (read-only)
+ * @param buffer_len Output: number of buffered bytes
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_sequence_parser_get_buffer(const lle_sequence_parser_t *parser,
                                             const char **buffer,
                                             size_t *buffer_len);
 
+/**
+ * @brief Get the CSI parameter values collected by the parser.
+ * @param parser Sequence parser
+ * @param params Output: pointer to parameter array (read-only)
+ * @param param_count Output: number of parameters
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_sequence_parser_get_csi_params(const lle_sequence_parser_t *parser,
                                    const uint32_t **params,
                                    uint8_t *param_count);
 
+/**
+ * @brief Get sequence parser error counters.
+ * @param parser Sequence parser
+ * @param malformed Output: count of malformed sequences seen
+ * @param timeout Output: count of timed-out sequences
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_sequence_parser_get_stats(const lle_sequence_parser_t *parser,
                                            uint32_t *malformed,
                                            uint32_t *timeout);
@@ -858,39 +1025,116 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
  * ============================================================================
  */
 
+/**
+ * @brief Initialize a UTF-8 processor for decoding input.
+ * @param processor Output pointer for created processor
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_utf8_processor_init(lle_utf8_processor_t **processor,
                                            lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy a UTF-8 processor and free its resources.
+ * @param processor UTF-8 processor
+ */
 void lle_input_utf8_processor_destroy(lle_utf8_processor_t *processor);
 
+/**
+ * @brief Reset the UTF-8 processor's partial-sequence state.
+ * @param processor UTF-8 processor
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_utf8_processor_reset(lle_utf8_processor_t *processor);
 
+/**
+ * @brief Check whether the processor holds a partial multibyte sequence.
+ * @param processor UTF-8 processor
+ * @return true if a partial UTF-8 sequence is buffered
+ */
 bool lle_input_utf8_processor_has_partial(
     const lle_utf8_processor_t *processor);
 
+/**
+ * @brief Get the number of additional bytes needed to complete a partial
+ *        UTF-8 sequence.
+ * @param processor UTF-8 processor
+ * @return Number of bytes still expected (zero if not in partial state)
+ */
 size_t
 lle_input_utf8_processor_bytes_needed(const lle_utf8_processor_t *processor);
 
+/**
+ * @brief Feed a single byte to the UTF-8 processor.
+ * @param processor UTF-8 processor
+ * @param byte Input byte
+ * @param codepoint_out Output: decoded codepoint when a full sequence completes
+ * @param is_grapheme_boundary Output: true if this codepoint starts a new
+ *        grapheme cluster
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_utf8_processor_process_byte(
     lle_utf8_processor_t *processor, unsigned char byte,
     uint32_t *codepoint_out, bool *is_grapheme_boundary);
 
+/**
+ * @brief Decode a buffer of UTF-8 bytes into a codepoint info array.
+ * @param processor UTF-8 processor
+ * @param buffer Source bytes
+ * @param buffer_len Length of source bytes
+ * @param codepoints Output: array receiving codepoint information
+ * @param max_codepoints Capacity of codepoints array
+ * @param codepoints_decoded Output: number of codepoints written
+ * @param bytes_consumed Output: number of source bytes consumed
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_utf8_processor_process_buffer(
     lle_utf8_processor_t *processor, const char *buffer, size_t buffer_len,
     lle_codepoint_info_t *codepoints, size_t max_codepoints,
     size_t *codepoints_decoded, size_t *bytes_consumed);
 
+/**
+ * @brief Retrieve UTF-8 processor statistics.
+ * @param processor UTF-8 processor
+ * @param stats Output: statistics structure to fill
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_utf8_processor_get_stats(const lle_utf8_processor_t *processor,
                                    lle_utf8_processor_stats_t *stats);
 
 /* Convenience wrappers for complete string processing */
+
+/**
+ * @brief Validate that a byte sequence is well-formed UTF-8.
+ * @param text Source bytes
+ * @param length Length of source bytes
+ * @return true if the entire range is valid UTF-8
+ */
 bool lle_input_utf8_validate_string(const char *text, size_t length);
 
+/**
+ * @brief Count the number of Unicode codepoints in a UTF-8 string.
+ * @param text Source bytes
+ * @param length Length of source bytes
+ * @return Codepoint count
+ */
 size_t lle_input_utf8_count_codepoints(const char *text, size_t length);
 
+/**
+ * @brief Count the number of grapheme clusters in a UTF-8 string.
+ * @param text Source bytes
+ * @param length Length of source bytes
+ * @return Grapheme cluster count
+ */
 size_t lle_input_utf8_count_graphemes(const char *text, size_t length);
 
+/**
+ * @brief Compute the terminal display width of a UTF-8 string in columns.
+ * @param text Source bytes
+ * @param length Length of source bytes
+ * @return Display width in columns
+ */
 size_t lle_input_utf8_get_display_width(const char *text, size_t length);
 
 /* ============================================================================
@@ -898,38 +1142,109 @@ size_t lle_input_utf8_get_display_width(const char *text, size_t length);
  * ============================================================================
  */
 
+/**
+ * @brief Initialize a key sequence detector.
+ * @param detector Output pointer for created detector
+ * @param terminal_caps Terminal capabilities used to interpret sequences
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_detector_init(lle_key_detector_t **detector,
                                    lle_terminal_capabilities_t *terminal_caps,
                                    lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy a key detector and free its resources.
+ * @param detector Key detector
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_detector_destroy(lle_key_detector_t *detector);
 
+/**
+ * @brief Feed a candidate key sequence to the detector for identification.
+ * @param detector Key detector
+ * @param sequence Candidate key sequence bytes
+ * @param sequence_len Sequence length
+ * @param key_info Output: identified key info on match
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_detector_process_sequence(lle_key_detector_t *detector,
                                                const char *sequence,
                                                size_t sequence_len,
                                                lle_key_info_t **key_info);
 
+/**
+ * @brief Resolve an ambiguous in-flight key sequence using current state.
+ * @param detector Key detector
+ * @param key_info Output: best-guess key info
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_key_detector_handle_ambiguous_sequence(lle_key_detector_t *detector,
                                            lle_key_info_t **key_info);
 
+/**
+ * @brief Force the detector to commit to a resolution for any pending
+ *        ambiguous sequence (e.g., on timeout).
+ * @param detector Key detector
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_detector_force_resolution(lle_key_detector_t *detector);
 
+/**
+ * @brief Get key detector statistics.
+ * @param detector Key detector
+ * @param sequences_detected Output: total sequences detected
+ * @param sequences_resolved Output: total sequences resolved
+ * @param ambiguous_timeouts Output: ambiguous sequences resolved by timeout
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_detector_get_stats(const lle_key_detector_t *detector,
                                         uint64_t *sequences_detected,
                                         uint64_t *sequences_resolved,
                                         uint64_t *ambiguous_timeouts);
 
+/**
+ * @brief Reset the key detector's pending sequence state.
+ * @param detector Key detector
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_detector_reset(lle_key_detector_t *detector);
 
+/**
+ * @brief Check whether the detector is waiting for more bytes to disambiguate
+ *        a sequence.
+ * @param detector Key detector
+ * @return true if the detector is currently waiting
+ */
 bool lle_key_detector_is_waiting(const lle_key_detector_t *detector);
 
 /* Key sequence mapping */
+
+/**
+ * @brief Initialize an empty key sequence map.
+ * @param map Output pointer for created map
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_sequence_map_init(lle_key_sequence_map_t **map,
                                        lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy a key sequence map and free its resources.
+ * @param map Key sequence map
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_key_sequence_map_destroy(lle_key_sequence_map_t *map);
 
+/**
+ * @brief Match a byte sequence against the key sequence map.
+ * @param map Key sequence map
+ * @param sequence Candidate sequence bytes
+ * @param sequence_len Sequence length
+ * @param result Output: match result (none, exact, prefix, ambiguous)
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_key_sequence_map_match(lle_key_sequence_map_t *map, const char *sequence,
                            size_t sequence_len,
@@ -940,36 +1255,99 @@ lle_key_sequence_map_match(lle_key_sequence_map_t *map, const char *sequence,
  * ============================================================================
  */
 
+/**
+ * @brief Initialize a mouse event parser.
+ * @param parser Output pointer for created parser
+ * @param terminal_caps Terminal capabilities (mouse modes supported)
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_mouse_parser_init(lle_mouse_parser_t **parser,
                                    lle_terminal_capabilities_t *terminal_caps,
                                    lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy a mouse parser and free its resources.
+ * @param parser Mouse parser
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_mouse_parser_destroy(lle_mouse_parser_t *parser);
 
+/**
+ * @brief Parse a mouse sequence, auto-detecting the encoding (X10/SGR/etc).
+ * @param parser Mouse parser
+ * @param sequence Mouse sequence bytes
+ * @param sequence_len Sequence length
+ * @param mouse_info Output: parsed mouse event info
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_mouse_parser_parse_sequence(lle_mouse_parser_t *parser,
                                 const char *sequence, size_t sequence_len,
                                 lle_mouse_event_info_t **mouse_info);
 
+/**
+ * @brief Parse a standard X10/VT200-style mouse sequence.
+ * @param parser Mouse parser
+ * @param sequence Mouse sequence bytes
+ * @param sequence_len Sequence length
+ * @param mouse_info Output: parsed mouse event info
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_mouse_parser_parse_standard_sequence(
     lle_mouse_parser_t *parser, const char *sequence, size_t sequence_len,
     lle_mouse_event_info_t **mouse_info);
 
+/**
+ * @brief Parse an SGR-encoded (1006) mouse sequence.
+ * @param parser Mouse parser
+ * @param sequence Mouse sequence bytes
+ * @param sequence_len Sequence length
+ * @param mouse_info Output: parsed mouse event info
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_mouse_parser_parse_sgr_sequence(lle_mouse_parser_t *parser,
                                     const char *sequence, size_t sequence_len,
                                     lle_mouse_event_info_t **mouse_info);
 
+/**
+ * @brief Enable or disable mouse tracking and select a tracking mode.
+ * @param parser Mouse parser
+ * @param enabled true to enable tracking
+ * @param mode Mouse tracking mode to use
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_mouse_parser_set_tracking(lle_mouse_parser_t *parser,
                                            bool enabled,
                                            lle_mouse_tracking_mode_t mode);
 
+/**
+ * @brief Get mouse parser statistics.
+ * @param parser Mouse parser
+ * @param events_parsed Output: total mouse events parsed
+ * @param invalid_sequences Output: count of invalid sequences encountered
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_mouse_parser_get_stats(const lle_mouse_parser_t *parser,
                                         uint64_t *events_parsed,
                                         uint64_t *invalid_sequences);
 
+/**
+ * @brief Reset the mouse parser's tracking state and counters.
+ * @param parser Mouse parser
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_mouse_parser_reset(lle_mouse_parser_t *parser);
 
+/**
+ * @brief Get the current cached mouse position and button state.
+ * @param parser Mouse parser
+ * @param x Output: last cursor column
+ * @param y Output: last cursor row
+ * @param pressed_buttons Output: currently pressed buttons
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_mouse_parser_get_state(const lle_mouse_parser_t *parser,
                                         uint16_t *x, uint16_t *y,
                                         lle_mouse_button_t *pressed_buttons);
@@ -979,41 +1357,102 @@ lle_result_t lle_mouse_parser_get_state(const lle_mouse_parser_t *parser,
  * ============================================================================
  */
 
+/**
+ * @brief Initialize the parser state machine.
+ * @param state_machine Output pointer for created state machine
+ * @param error_ctx Error context for recovery
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_parser_state_machine_init(lle_parser_state_machine_t **state_machine,
                               lle_error_context_t *error_ctx,
                               lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy the parser state machine and free its resources.
+ * @param state_machine Parser state machine
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_parser_state_machine_destroy(lle_parser_state_machine_t *state_machine);
 
+/**
+ * @brief Drive the state machine with a chunk of input data.
+ * @param state_machine Parser state machine
+ * @param parser_sys Parent parser system (for callbacks into subsystems)
+ * @param data Input bytes
+ * @param data_len Length of input
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_parser_state_machine_process(lle_parser_state_machine_t *state_machine,
                                  lle_input_parser_system_t *parser_sys,
                                  const char *data, size_t data_len);
 
+/**
+ * @brief Get the current state.
+ * @param state_machine Parser state machine
+ * @return Current parser state
+ */
 lle_parser_state_t lle_parser_state_machine_get_state(
     const lle_parser_state_machine_t *state_machine);
 
+/**
+ * @brief Get the total number of state transitions performed.
+ * @param state_machine Parser state machine
+ * @return Transition count
+ */
 uint64_t lle_parser_state_machine_get_transitions(
     const lle_parser_state_machine_t *state_machine);
 
+/**
+ * @brief Get the number of error recoveries performed by the state machine.
+ * @param state_machine Parser state machine
+ * @return Error recovery count
+ */
 uint32_t lle_parser_state_machine_get_error_recoveries(
     const lle_parser_state_machine_t *state_machine);
 
+/**
+ * @brief Reset the state machine to its initial NORMAL state.
+ * @param state_machine Parser state machine
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_parser_state_machine_reset(lle_parser_state_machine_t *state_machine);
 
+/**
+ * @brief Transition the state machine to a new state, recording the change.
+ * @param state_machine Parser state machine
+ * @param new_state Target state
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_parser_state_machine_transition(lle_parser_state_machine_t *state_machine,
                                     lle_parser_state_t new_state);
 
+/**
+ * @brief Get the previous state (the one entered before the current state).
+ * @param state_machine Parser state machine
+ * @return Previous parser state
+ */
 lle_parser_state_t lle_parser_state_machine_get_previous_state(
     const lle_parser_state_machine_t *state_machine);
 
+/**
+ * @brief Get the elapsed time spent in the current state, in microseconds.
+ * @param state_machine Parser state machine
+ * @return Microseconds spent in current state
+ */
 uint64_t lle_parser_state_machine_time_in_state(
     const lle_parser_state_machine_t *state_machine);
 
+/**
+ * @brief Check whether the state machine is currently in an error state.
+ * @param state_machine Parser state machine
+ * @return true if in ERROR_RECOVERY (or similar) state
+ */
 bool lle_parser_state_machine_is_error_state(
     const lle_parser_state_machine_t *state_machine);
 
@@ -1022,18 +1461,42 @@ bool lle_parser_state_machine_is_error_state(
  * ============================================================================
  */
 
+/**
+ * @brief Generate event-system events for a parsed input (dispatches by type).
+ * @param parser_sys Parser system
+ * @param parsed_input Parsed input to translate into events
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_parser_generate_events(lle_input_parser_system_t *parser_sys,
                                  lle_parsed_input_t *parsed_input);
 
+/**
+ * @brief Generate text-input events for parsed text input.
+ * @param parser_sys Parser system
+ * @param parsed_input Parsed text input
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_parser_generate_text_events(lle_input_parser_system_t *parser_sys,
                                       lle_parsed_input_t *parsed_input);
 
+/**
+ * @brief Generate key events for parsed key input.
+ * @param parser_sys Parser system
+ * @param parsed_input Parsed key input
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_parser_generate_key_events(lle_input_parser_system_t *parser_sys,
                                      lle_parsed_input_t *parsed_input);
 
+/**
+ * @brief Generate mouse events for parsed mouse input.
+ * @param parser_sys Parser system
+ * @param parsed_input Parsed mouse input
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_parser_generate_mouse_events(lle_input_parser_system_t *parser_sys,
                                        lle_parsed_input_t *parsed_input);
@@ -1043,14 +1506,33 @@ lle_input_parser_generate_mouse_events(lle_input_parser_system_t *parser_sys,
  * ============================================================================
  */
 
+/**
+ * @brief Initialize the keybinding integration layer.
+ * @param integration Output pointer for created integration
+ * @param keybinding_engine Keybinding engine to bind against
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_keybinding_integration_init(lle_keybinding_integration_t **integration,
                                 lle_keybinding_engine_t *keybinding_engine,
                                 lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy the keybinding integration and free its resources.
+ * @param integration Keybinding integration
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_keybinding_integration_destroy(lle_keybinding_integration_t *integration);
 
+/**
+ * @brief Process a parsed input by looking it up against the keybinding engine
+ *        and marking it handled if a binding fires.
+ * @param parser Parser system (contains the keybinding integration)
+ * @param input Parsed input to dispatch
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
                                          lle_parsed_input_t *input);
@@ -1060,14 +1542,32 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
  * ============================================================================
  */
 
+/**
+ * @brief Initialize the widget hook trigger subsystem.
+ * @param triggers Output pointer for created triggers
+ * @param hooks_manager Widget hooks manager reference
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_widget_hook_triggers_init(lle_widget_hook_triggers_t **triggers,
                               lle_widget_hooks_manager_t *hooks_manager,
                               lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy the widget hook trigger subsystem.
+ * @param triggers Widget hook triggers
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_widget_hook_triggers_destroy(lle_widget_hook_triggers_t *triggers);
 
+/**
+ * @brief Trigger any widget hooks registered for a parsed input.
+ * @param parser Parser system
+ * @param input Parsed input
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_trigger_widget_hooks(lle_input_parser_system_t *parser,
                                             lle_parsed_input_t *input);
 
@@ -1076,11 +1576,23 @@ lle_result_t lle_input_trigger_widget_hooks(lle_input_parser_system_t *parser,
  * ============================================================================
  */
 
+/**
+ * @brief Initialize the adaptive terminal parser.
+ * @param parser Output pointer for created adaptive parser
+ * @param adaptive_terminal Adaptive terminal integration reference
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_adaptive_terminal_parser_init(
     lle_adaptive_terminal_parser_t **parser,
     lle_adaptive_terminal_integration_t *adaptive_terminal,
     lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy the adaptive terminal parser.
+ * @param parser Adaptive terminal parser
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_adaptive_terminal_parser_destroy(lle_adaptive_terminal_parser_t *parser);
 
@@ -1089,9 +1601,20 @@ lle_adaptive_terminal_parser_destroy(lle_adaptive_terminal_parser_t *parser);
  * ============================================================================
  */
 
+/**
+ * @brief Initialize the cross-subsystem input coordinator.
+ * @param coordinator Output pointer for created coordinator
+ * @param memory_pool Memory pool for allocations
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_coordinator_init(lle_input_coordinator_t **coordinator,
                                         lle_memory_pool_t *memory_pool);
 
+/**
+ * @brief Destroy the input coordinator.
+ * @param coordinator Input coordinator
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_coordinator_destroy(lle_input_coordinator_t *coordinator);
 
@@ -1100,26 +1623,73 @@ lle_input_coordinator_destroy(lle_input_coordinator_t *coordinator);
  * ============================================================================
  */
 
+/**
+ * @brief Recover from a parsing error and resume processing.
+ * @param parser_sys Parser system
+ * @param error_code Original error code
+ * @param problematic_data Bytes that triggered the error (for logging)
+ * @param data_len Length of problematic data
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_parser_recover_from_error(
     lle_input_parser_system_t *parser_sys, lle_result_t error_code,
     const char *problematic_data, size_t data_len);
 
+/**
+ * @brief Insert the Unicode replacement character (U+FFFD) into the stream
+ *        after an invalid input sequence.
+ * @param parser_sys Parser system
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_parser_insert_replacement_character(
     lle_input_parser_system_t *parser_sys);
 
+/**
+ * @brief Process raw bytes as plain text input (fallback path).
+ * @param parser_sys Parser system
+ * @param data Input bytes
+ * @param data_len Length of input
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_parser_process_as_text(lle_input_parser_system_t *parser_sys,
                                  const char *data, size_t data_len);
 
+/**
+ * @brief Validate a UTF-8 byte range and report the longest valid prefix.
+ * @param data Source bytes
+ * @param len Length of source bytes
+ * @param valid_len Output: number of leading bytes that are valid UTF-8
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_parser_validate_utf8(const char *data, size_t len,
                                             size_t *valid_len);
 
+/**
+ * @brief Check whether an in-flight sequence has exceeded its timeout.
+ * @param parser_sys Parser system
+ * @param current_time_us Current timestamp in microseconds
+ * @return true if a sequence has timed out
+ */
 bool lle_input_parser_check_sequence_timeout(
     lle_input_parser_system_t *parser_sys, uint64_t current_time_us);
 
+/**
+ * @brief Handle a sequence timeout by emitting/resolving the pending input.
+ * @param parser_sys Parser system
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_parser_handle_timeout(lle_input_parser_system_t *parser_sys);
 
+/**
+ * @brief Get aggregated error statistics across parser subsystems.
+ * @param parser_sys Parser system
+ * @param utf8_errors Output: UTF-8 error count
+ * @param mouse_errors Output: mouse parsing error count
+ * @param sequence_errors Output: escape sequence error count
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_input_parser_get_error_stats(lle_input_parser_system_t *parser_sys,
                                  uint64_t *utf8_errors, uint64_t *mouse_errors,
@@ -1130,10 +1700,21 @@ lle_input_parser_get_error_stats(lle_input_parser_system_t *parser_sys,
  * ============================================================================
  */
 
+/**
+ * @brief Retrieve current performance metrics from the parser system.
+ * @param parser_sys Parser system
+ * @param metrics Output: metrics structure to fill
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_input_parser_get_performance_metrics(
     lle_input_parser_system_t *parser_sys,
     lle_input_parser_performance_t *metrics);
 
+/**
+ * @brief Run the parser system's comprehensive self-test suite.
+ * @param parser_sys Parser system
+ * @return LLE_SUCCESS on success, error code on failure
+ */
 lle_result_t
 lle_input_parser_test_comprehensive(lle_input_parser_system_t *parser_sys);
 
