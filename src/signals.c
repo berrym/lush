@@ -19,6 +19,7 @@
 #include "executor.h"
 #include "lle/adaptive_terminal_integration.h"
 #include "lush.h"
+#include "symtable.h"
 
 #include <signal.h>
 #include <stdio.h>
@@ -483,6 +484,18 @@ static void run_trap_command(const char *command) {
  * with no ERR trap registered -- a quick lookup and return.
  */
 void fire_err_trap(void) {
+    /* Bash's `set -o errtrace` (`-E`) gates trap inheritance into
+     * function bodies: when errtrace is OFF and execution is inside a
+     * function scope, the parent shell's ERR trap is suppressed.
+     * Without errtrace the trap is reset to default within function
+     * bodies; with it, the trap follows execution into nested
+     * contexts. The check is one-sided here -- if errtrace is on, or
+     * we're at top-level scope, the trap fires normally. */
+    if (!shell_opts.errtrace &&
+        symtable_in_function_scope(symtable_manager())) {
+        return;
+    }
+
     trap_entry_t *trap = find_trap(TRAP_PSEUDO_ERR);
     if (trap && trap->command && trap->command[0] != '\0') {
         run_trap_command(trap->command);

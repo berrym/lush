@@ -5707,6 +5707,15 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             printf("DEBUG: Brace group command result: %d\n", last_result);
         }
 
+        /* Bash-style ERR pseudo-signal: fires on a non-zero exit
+         * inside a brace group. fire_err_trap itself gates on
+         * errtrace + function scope so the trap is suppressed inside
+         * functions by default and surfaces only when the user opts
+         * in. */
+        if (last_result != 0 && last_result < 200) {
+            fire_err_trap();
+        }
+
         // Check for function return (special code 200-455) - propagate it
         if (last_result >= 200 && last_result <= 455) {
             if (has_redirections) {
@@ -9097,6 +9106,15 @@ static int execute_function_call(executor_t *executor,
         }
 
         result = execute_node(executor, command);
+
+        /* Bash-style ERR pseudo-signal: fires on a non-zero exit
+         * inside the function body. fire_err_trap itself gates on
+         * errtrace + function scope so the trap is suppressed inside
+         * functions by default and surfaces only when the user has
+         * `set -o errtrace`. */
+        if (result != 0 && result < 200) {
+            fire_err_trap();
+        }
 
         // Check if this is a function return (special code 200-255)
         if (result >= 200 && result <= 255) {

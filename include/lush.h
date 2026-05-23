@@ -249,6 +249,7 @@ typedef struct shell_options {
     bool notify;          /**< -b flag: asynchronous job notification */
     bool ignoreeof;       /**< ignoreeof: prevent exit on EOF (Ctrl+D) */
     bool nolog;           /**< nolog: prevent function defs in history */
+    bool errtrace;        /**< -E flag: ERR trap inherits into functions */
     bool emacs_mode;      /**< emacs: emacs-style line editing (default) */
     bool vi_mode;         /**< vi: vi-style line editing */
     bool posix_mode;      /**< posix: strict POSIX compliance mode */

@@ -277,6 +277,7 @@ static option_mapping_t option_map[] = {
     {"notify", &shell_opts.notify, 'b'},
     {"ignoreeof", &shell_opts.ignoreeof, 0},
     {"nolog", &shell_opts.nolog, 0},
+    {"errtrace", &shell_opts.errtrace, 'E'},
     {"emacs", &shell_opts.emacs_mode, 0},
     {"vi", &shell_opts.vi_mode, 0},
     {"posix", &shell_opts.posix_mode, 0},

@@ -322,6 +322,61 @@ TEST(trap_err_fires_on_nonzero_exit) {
     executor_free(exec);
 }
 
+/* Phase 2 of issue #108: the errtrace option controls whether the ERR
+ * trap is inherited into function bodies. Without errtrace, lush
+ * matches bash's default: the trap fires only at the function's call
+ * site (where the function returns non-zero), not inside the body.
+ * With `set -o errtrace`, the trap also fires inside the body. */
+TEST(trap_err_not_inherited_in_function_by_default) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "trap 'echo HIT' ERR\n"
+        "f() { false; }\n"
+        "f\n"
+        "trap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /* Exactly one HIT -- the top-level fire on f's non-zero return.
+     * The inside-f false was suppressed by the default-off errtrace. */
+    const char *p = r.out;
+    int hits = 0;
+    while ((p = strstr(p, "HIT")) != NULL) {
+        hits++;
+        p++;
+    }
+    ASSERT_EQ(hits, 1, "exactly one ERR fire without errtrace");
+
+    executor_free(exec);
+}
+
+TEST(trap_err_inherited_in_function_with_errtrace) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "trap 'echo HIT' ERR\n"
+        "set -o errtrace\n"
+        "f() { false; }\n"
+        "f\n"
+        "set +o errtrace\n"
+        "trap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /* Two HITs -- inside f at false, and at the top-level on f's
+     * non-zero return. */
+    const char *p = r.out;
+    int hits = 0;
+    while ((p = strstr(p, "HIT")) != NULL) {
+        hits++;
+        p++;
+    }
+    ASSERT_EQ(hits, 2, "two ERR fires with errtrace -- inside f + top");
+
+    executor_free(exec);
+}
+
 TEST(trap_err_silent_on_zero_exit) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -2105,6 +2160,8 @@ int main(void) {
     RUN_TEST(case_posix_character_class);
     RUN_TEST(trap_err_fires_on_nonzero_exit);
     RUN_TEST(trap_err_silent_on_zero_exit);
+    RUN_TEST(trap_err_not_inherited_in_function_by_default);
+    RUN_TEST(trap_err_inherited_in_function_with_errtrace);
 
     printf("\nSEMANTICS 3.4/3.9 conformance tests:\n");
     RUN_TEST(arr_at_in_scalar_assignment_raises_type_mismatch);
