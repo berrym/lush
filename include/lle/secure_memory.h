@@ -59,7 +59,7 @@ extern void explicit_bzero(void *, size_t);
  */
 
 /**
- * Securely wipe memory contents
+ * @brief Securely wipe memory contents
  *
  * Guarantees that the memory wipe will not be optimized away by the compiler.
  * Uses explicit_bzero() if available, falls back to volatile pointer trick.
@@ -90,7 +90,7 @@ static inline void lle_secure_wipe(void *ptr, size_t len) {
  */
 
 /**
- * Lock memory to prevent swapping to disk
+ * @brief Lock memory to prevent swapping to disk
  *
  * Uses mlock() on POSIX systems. On systems without mlock or when
  * mlock fails (insufficient privileges), returns false but this is
@@ -122,7 +122,7 @@ static inline bool lle_memory_lock(void *addr, size_t len) {
 }
 
 /**
- * Unlock previously locked memory
+ * @brief Unlock previously locked memory
  *
  * Uses munlock() on POSIX systems. Should be called when memory
  * no longer needs to be protected from swapping.
