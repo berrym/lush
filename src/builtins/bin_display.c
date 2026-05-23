@@ -467,6 +467,12 @@ int bin_display(int argc, char **argv) {
                 "  completions [cmd] - Custom completion source management\n");
             printf("                      list    - Show all sources\n");
             printf("                      reload  - Reload from config file\n");
+            printf("\nWidgets:\n");
+            printf("  widget [cmd]     - User widget registration\n");
+            printf("                     list    - Show all widgets\n");
+            printf("                     add NAME 'CMD'\n");
+            printf("                     remove NAME\n");
+            printf("                     show NAME\n");
             printf("\nHistory:\n");
             printf("  history [cmd]    - History behavior configuration\n");
             printf("                     status  - Show current settings\n");
@@ -509,6 +515,8 @@ int bin_display(int argc, char **argv) {
             return display_lle_theme(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "completion") == 0) {
             return display_lle_completion(argc - 2, argv + 2);
+        } else if (strcmp(lle_cmd, "widget") == 0) {
+            return display_lle_widget(argc - 2, argv + 2);
         } else {
             source_location_t loc = builtin_get_source_location();
             shell_error_t *err = shell_error_create(
