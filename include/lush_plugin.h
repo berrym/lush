@@ -89,7 +89,7 @@ struct symtable;
  * permissions, and users can grant or deny them.
  */
 typedef enum {
-    LUSH_PLUGIN_PERM_NONE = 0,
+    LUSH_PLUGIN_PERM_NONE = 0, ///< No permissions granted
 
     /* Builtin registration */
     LUSH_PLUGIN_PERM_REGISTER_BUILTIN = 1 << 0,
