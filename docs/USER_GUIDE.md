@@ -209,7 +209,9 @@ LLE provides complete Emacs-style editing:
 
 ### Vi Mode
 
-Vi mode is in development. Framework exists, targeting v1.4.0 release.
+A vi-mode framework is in place but not yet feature-complete. Track
+progress in [docs/lle_specification/](lle_specification/) and the
+GitHub issue tracker. For now, emacs mode is the supported flow.
 
 ### Syntax Highlighting
 
@@ -240,6 +242,48 @@ $ for i in 1 2 3; do
 > done
 ```
 
+### Customization: Widgets, Hooks, Segments
+
+LLE exposes three first-class customization surfaces, each driven by
+its own builtin. They route through the same central configuration
+registry as every other setting (see [CONFIGURATION.md](CONFIGURATION.md)).
+
+**`display lle widget` -- user-defined editing actions**
+
+Bind a shell function to a key sequence so it acts as a one-shot
+editing operation. Equivalent to `zle -N` in zsh, but works in every
+mode.
+
+```bash
+my-uppercase-word() {
+    # widget body operates on the active LLE buffer
+    lle buffer transform "${WIDGET_WORD}" upper
+}
+display lle widget add my-uppercase-word
+display lle widget bind '\eU' my-uppercase-word
+```
+
+**`display lle hook` -- lifecycle hooks**
+
+`precmd`, `preexec`, `chpwd`, and `periodic` hook functions can also
+be registered with `display lle hook` for symmetric configuration
+alongside widgets and segments.
+
+**`display lle segment` -- custom prompt segments**
+
+Define a prompt segment that renders inline in the powerline-style
+themes. Segments are pure functions of shell state and re-render on
+prompt redraw.
+
+```bash
+display lle segment add kube_ctx '
+    [[ -n "${KUBECONFIG:-}" ]] && echo "k8s:$(basename "$KUBECONFIG")"
+'
+display lle segment enable kube_ctx
+```
+
+See [LLE_GUIDE.md](LLE_GUIDE.md) for the full reference.
+
 ---
 
 ## Extended Syntax
@@ -248,20 +292,30 @@ Lush mode (and Bash/Zsh modes) support extended shell syntax beyond POSIX.
 
 ### Arrays
 
-**Indexed Arrays**
+Lush stores indexed and associative arrays as first-class **List**
+and **Map** value kinds (SEMANTICS section 7). They share the
+per-scope symbol table with scalars, so `[[ -v name ]]`, `unset
+name`, and function-local declarations work identically for all
+three kinds.
+
+**Indexed Arrays (Lists)**
 
 ```bash
 # Declaration
 fruits=(apple banana cherry)
 declare -a numbers
 
-# Assignment
+# Function-local list literal
+f() { local arr=(a b c); echo "${arr[1]}"; }
+
+# Indexed assignment
 fruits[0]="apple"
 fruits[3]="date"
 
-# Access
+# Access -- always use a presentation operator
 echo "${fruits[0]}"        # First element
-echo "${fruits[@]}"        # All elements
+echo "${fruits[@]}"        # All elements as separate words
+echo "${fruits[*]}"        # All elements joined by IFS
 echo "${#fruits[@]}"       # Count
 echo "${!fruits[@]}"       # Indices
 
@@ -269,21 +323,40 @@ echo "${!fruits[@]}"       # Indices
 echo "${fruits[@]:1:2}"    # Elements 1-2
 ```
 
-**Associative Arrays**
+**Bare `${fruits}` is a type error.** SEMANTICS section 3.9
+forbids using a List as a Scalar without a presentation operator
+(`[@]`, `[*]`, `[N]`). The shell raises `SHELL_ERR_TYPE_MISMATCH`
+with a structured-error citation. There is no implicit "first
+element" fallback. Static analysis (`debug analyze` / `lint`) flags
+this before runtime.
+
+**Associative Arrays (Maps)**
 
 ```bash
-# Declaration (required)
-declare -A colors
-
-# Assignment
+declare -A colors           # Declaration required
 colors[apple]="red"
 colors[banana]="yellow"
 colors[cherry]="red"
 
-# Access
-echo "${colors[apple]}"    # red
-echo "${colors[@]}"        # All values
-echo "${!colors[@]}"       # All keys
+echo "${colors[apple]}"     # red
+echo "${colors[@]}"         # All values
+echo "${!colors[@]}"        # All keys (bash spelling)
+echo "${(k)colors}"         # All keys (zsh spelling, same engine)
+```
+
+**Scope and Lifetime**
+
+```bash
+arr=(global)
+f() {
+    local arr=(local)       # shadows global for this frame
+    echo "${arr[0]}"        # local
+}
+f
+echo "${arr[0]}"            # global
+
+unset arr                   # removes binding from scope
+[[ -v arr ]] && echo set || echo unset   # unset
 ```
 
 ### Arithmetic
@@ -427,6 +500,28 @@ echo "${str@A}"         # Assignment form: str='hello'
 echo "${str@a}"         # Attributes (for declared vars)
 ```
 
+**Zsh Parameter Flags**
+
+Bash-style transformations have zsh-flag spellings that route to the
+same engine. The flags are accepted in all modes -- lush does not
+gate them behind `mode zsh`.
+
+```bash
+var=hello
+echo "${(U)var}"        # HELLO  (same as ${var^^})
+echo "${(L)var}"        # hello  (same as ${var,,})
+echo "${(C)var}"        # Hello  (title-case first char)
+
+arr=(c a b)
+echo "${(o)arr}"        # a b c  (sorted)
+
+declare -A m=([a]=1 [b]=2)
+echo "${(k)m}"          # keys   (same as ${!m[@]})
+```
+
+See [EXTENDED_SYNTAX.md](EXTENDED_SYNTAX.md) for the full flag
+catalogue.
+
 ### Extended Globbing
 
 Enable with `shopt -s extglob`:
@@ -515,20 +610,24 @@ LLE provides context-aware completions.
 ### Completion Types
 
 - **Command completion**: Executables in `$PATH`
-- **Builtin completion**: All 50 shell builtins
+- **Builtin completion**: Every shell builtin (~60 distinct
+  commands; see BUILTIN_COMMANDS.md)
 - **File completion**: Paths and filenames
 - **Variable completion**: `$VAR` names
 - **Option completion**: Command-specific options
+- **Debug-prompt completion**: At `(lush-debug)`, completes the
+  break-prompt command vocabulary instead of normal first-word
+  candidates
 
 ### Context-Aware Builtin Completions
 
-All 45 completable builtins understand their arguments:
+Every completable builtin understands its arguments:
 
 ```bash
 set -o <Tab>        # Shows all shell options
 config set <Tab>    # Shows config sections
-debug <Tab>         # Shows: on off vars print trace profile ...
-display <Tab>       # Shows: lle features themes status
+debug <Tab>         # Shows: on off vars print trace profile analyze ...
+display <Tab>       # Shows: lle features themes status widget hook segment
 theme <Tab>         # Shows: list set show info
 ```
 
@@ -622,7 +721,11 @@ precmd_functions=(my_precmd_handler another_precmd_handler)
 
 ## Debugging
 
-Lush is the only shell with integrated interactive debugging.
+Lush is the only shell with integrated interactive debugging --
+breakpoints, depth-aware stepping, kind-aware variable inspection,
+and predictive static analysis built into the binary. The contract
+is held by PHILOSOPHY section 7: no language change is "done" until
+the debugger can still see it.
 
 ### Enabling Debug Mode
 
@@ -633,21 +736,49 @@ debug on 3      # Maximum verbosity
 debug off       # Disable
 ```
 
-### Inspecting State
+### Inspecting State (kind-aware)
 
 ```bash
-debug vars              # Show all variables
-debug print VAR         # Show specific variable
+debug vars              # All variables with kind labels (Scalar/List/Map)
+debug print VAR         # Render contents formatted by kind
 debug functions         # List defined functions
 ```
+
+At the `(lush-debug)` break prompt, `type <name>` / `t <name>`
+print just the kind label without rendering contents.
+
+### Breakpoints and Stepping
+
+```bash
+debug break add script.sh 12   # halt at line 12
+debug break list
+source script.sh               # breakpoint fires
+# (lush-debug) prompt -- LLE-driven, with history+Ctrl-R+completion
+#   next      depth-aware step over
+#   out       step out of current function frame
+#   continue  resume
+```
+
+### Predictive Static Analysis
+
+```bash
+debug analyze ./script.sh      # flags type/error/warning/style/portability
+analyze ./script.sh            # same engine, standalone builtin
+lint    ./script.sh
+```
+
+The **type** category catches SEMANTICS section 3.9 type-mismatch
+sites (e.g. bare `${arr}` where `arr` is a List) at edit time.
 
 ### Execution Tracing
 
 ```bash
 debug trace on          # Enable tracing
-# Commands show execution details
 debug trace off         # Disable tracing
 ```
+
+ERR / DEBUG / RETURN trap inheritance into function bodies is
+available via `set -o errtrace` and `set -o functrace`.
 
 ### Performance Profiling
 
@@ -658,24 +789,7 @@ debug profile report    # Show timing information
 debug profile off
 ```
 
-### In Scripts
-
-```bash
-#!/usr/bin/env lush
-
-# Debug specific section
-debug on 2
-complex_function
-debug off
-
-# Profile critical path
-debug profile on
-expensive_operation
-debug profile report
-debug profile off
-```
-
-For complete debugging documentation, see [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md).
+For the complete reference, see [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md).
 
 ---
 

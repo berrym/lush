@@ -26,7 +26,7 @@ Lush is an advanced interactive shell that combines the familiarity of Bash and 
 
 **1. LLE - The Lush Line Editor**
 
-Every other shell wraps GNU Readline or implements something similar. Lush built its own line editor from scratch. LLE provides Emacs-style editing, context-aware completions for all 45 builtins, real-time syntax highlighting, and the foundation for features that aren't possible with traditional line editing libraries.
+Every other shell wraps GNU Readline or implements something similar. Lush built its own line editor from scratch. LLE provides Emacs-style editing, context-aware completions for every builtin, real-time syntax highlighting, and the foundation for features that aren't possible with traditional line editing libraries -- including the framed `(lush-debug)` break prompt and the user-customization trio (`display lle widget`/`hook`/`segment`).
 
 **2. Multi-Mode Shell Architecture**
 
@@ -80,7 +80,7 @@ ninja -C build
 
 # Verify the build
 ./build/lush --version
-# Output: lush 1.4.0
+# Output: lush 1.5.0
 ```
 
 ### Optional: Install System-Wide
@@ -293,7 +293,7 @@ Use **Lush mode** for interactive work and scripts that will only run in Lush. U
 #!/usr/bin/env lush
 
 # hello.sh - First lush script
-echo "Hello from Lush v1.4.0"
+echo "Hello from Lush v1.5.0"
 
 # Variables work as expected
 name="World"
@@ -379,7 +379,8 @@ Run the script and watch the debugger trace execution, show variable values, and
 
 ## The Integrated Debugger
 
-No other shell has this. The debugger is built into Lush, not bolted on.
+No other shell has this. The debugger is built into Lush, not bolted
+on, and PHILOSOPHY section 7 binds it to keep pace with the language.
 
 ### Quick Start
 
@@ -391,9 +392,17 @@ debug on
 ls -la
 echo "test"
 
-# Inspect state
+# Inspect state -- output is kind-aware (Scalar / List / Map)
 debug vars           # Show all variables
 debug print PATH     # Show specific variable
+
+# Set a breakpoint and step
+debug break add script.sh 12
+source script.sh         # halts at line 12, enters (lush-debug) prompt
+# at the prompt: t name | print name | next | out | continue
+
+# Predict type errors before running
+debug analyze script.sh
 
 # Disable
 debug off
@@ -486,21 +495,36 @@ set -x                           # Same as shell.xtrace
 
 ### Startup Configuration
 
-Create `~/.lushrc` for persistent configuration:
+Lush uses the XDG-compliant configuration layout. Two files are read
+on startup:
+
+```
+~/.config/lush/lushrc.toml   # primary configuration (TOML)
+~/.config/lush/lushrc         # optional shell script sourced after the TOML
+```
+
+The TOML file is the **central configuration registry** -- it is
+how the four configuration surfaces (`mode`, `set`, `setopt`,
+`config`) reach persistent storage. See [CONFIGURATION.md](CONFIGURATION.md)
+for the full reference.
+
+Example `~/.config/lush/lushrc.toml`:
+
+```toml
+[shell]
+mode = "lush"        # default identity preset
+
+[completion]
+enabled = true
+
+[display]
+syntax_highlighting = true
+theme = "default"
+```
+
+Example `~/.config/lush/lushrc` (shell script, sourced after the TOML):
 
 ```bash
-# ~/.lushrc - Lush startup configuration
-
-# Shell behavior
-config set shell.errexit false
-config set shell.emacs true
-
-# Completion
-config set completion.enabled true
-
-# Display
-config set display.syntax_highlighting true
-
 # Aliases
 alias ll='ls -la'
 alias gs='git status'
@@ -511,17 +535,15 @@ mkcd() {
     mkdir -p "$1" && cd "$1"
 }
 
-# Hook functions (Lush-specific)
-precmd() {
-    # Runs before each prompt
-    :
-}
-
-preexec() {
-    # Runs before each command
-    :
-}
+# Hook functions
+precmd() { :; }
+preexec() { :; }
+chpwd()   { :; }
 ```
+
+The legacy `~/.lushrc` path is no longer read. Migrate any existing
+configuration into `~/.config/lush/lushrc` (shell script) or
+`~/.config/lush/lushrc.toml` (declarative options).
 
 ---
 
@@ -543,7 +565,7 @@ You now have a working Lush installation with:
 | [EXTENDED_SYNTAX.md](EXTENDED_SYNTAX.md) | Arrays, `[[]]`, process substitution |
 | [CONFIGURATION.md](CONFIGURATION.md) | Detailed mode documentation |
 | [DEBUGGER_GUIDE.md](DEBUGGER_GUIDE.md) | Complete debugging reference |
-| [BUILTIN_COMMANDS.md](BUILTIN_COMMANDS.md) | All 48 builtin commands |
+| [BUILTIN_COMMANDS.md](BUILTIN_COMMANDS.md) | Complete builtin reference |
 | [HOOKS_AND_PLUGINS.md](HOOKS_AND_PLUGINS.md) | Hook system and plugins |
 
 ### Try These
@@ -551,7 +573,7 @@ You now have a working Lush installation with:
 1. **Explore completions**: Type partial commands and press Tab
 2. **Try the debugger**: `debug on`, run commands, `debug vars`
 3. **Test extended syntax**: Arrays, `[[]]`, `${var^^}`
-4. **Set up your profile**: Create `~/.lushrc` with your preferences
+4. **Set up your profile**: Create `~/.config/lush/lushrc` (script) or `~/.config/lush/lushrc.toml` (declarative) with your preferences
 5. **Read the LLE guide**: Master the keybindings
 
 ### Get Help
