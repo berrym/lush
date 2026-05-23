@@ -266,6 +266,18 @@ int bin_declare(int argc, char **argv) {
     // Process each variable argument
     for (int i = opt_idx; i < argc; i++) {
         char *arg = argv[i];
+        // Parser-internal sentinel: an arg whose first byte is \x1F
+        // came from the unquoted `name=(...)` array-literal form
+        // (see src/parser.c). Strip it; this is implicitly the -a
+        // (indexed array) case unless -A is set. The same value
+        // shape from a quoted scalar `declare data="(...)"` does
+        // NOT carry the sentinel and stays a scalar.
+        if (arg[0] == '\x1F') {
+            arg++;
+            if (!opt_indexed_array && !opt_assoc_array) {
+                opt_indexed_array = true;
+            }
+        }
         char *eq = strchr(arg, '=');
         char *name = NULL;
         char *value = NULL;

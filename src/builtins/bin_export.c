@@ -31,10 +31,20 @@ int bin_export(int argc, char **argv) {
     }
 
     for (int i = 1; i < argc; i++) {
-        char *eq = strchr(argv[i], '=');
+        // Strip the parser-internal array-literal sentinel (\x1F) if
+        // present. export does not propagate arrays into the
+        // environment (matches bash), but the sentinel-stripping
+        // keeps `export arr=(a b c)` from rejecting the name as
+        // invalid -- it falls through to scalar handling on the
+        // serialized "(a b c)" form, same as bash's behavior here.
+        char *arg = argv[i];
+        if (arg[0] == '\x1F') {
+            arg++;
+        }
+        char *eq = strchr(arg, '=');
         if (eq) {
             // Variable assignment: VAR=value
-            size_t name_len = eq - argv[i];
+            size_t name_len = eq - arg;
             char *name = malloc(name_len + 1);
             if (!name) {
                 executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
@@ -42,7 +52,7 @@ int bin_export(int argc, char **argv) {
                                       "memory allocation failed");
                 return 1;
             }
-            strncpy(name, argv[i], name_len);
+            strncpy(name, arg, name_len);
             name[name_len] = '\0';
 
             const char *value = eq + 1;

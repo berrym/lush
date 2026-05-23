@@ -834,6 +834,64 @@ TEST(function_return) {
  * ============================================================================
  */
 
+/* Parser-internal sentinel discrimination: `local arr=(a b c)` is an
+ * array literal (parser emits the bundled form prefixed with \x1F),
+ * while `local data="(scoped)"` is a scalar (regular argument path,
+ * no sentinel). These tests pin the discrimination so a future
+ * refactor of the parser path or the builtin-side sentinel-stripping
+ * shows up as a regression. Each test uses unique function and
+ * variable names because the global manager persists across
+ * executor_free calls in this test binary, so reusing names risks
+ * cross-test interference. */
+TEST(local_array_literal_builds_indexed_array) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "lalf() { local larr=(a b c); echo len=${#larr[@]} "
+              "first=${larr[0]}; }\nlalf\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "len=3");
+    ASSERT_STDOUT_CONTAINS(r, "first=a");
+
+    executor_free(exec);
+}
+
+TEST(local_quoted_paren_value_stays_scalar) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "lqpv() { local sdata=\"(scoped)\"; echo \"sdata=$sdata\"; }\nlqpv\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    // Sentinel correctly absent on quoted scalar; the (...) is just a
+    // literal substring of a scalar value, NOT an array literal.
+    ASSERT_STDOUT_CONTAINS(r, "sdata=(scoped)");
+
+    executor_free(exec);
+}
+
+TEST(local_array_dies_with_function_scope) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    // bash conformance: a local array declared inside a function
+    // does not outlive that function. Pre-storage-unification, lush
+    // leaked such arrays out via the global array side-table; the
+    // symtable refactor fixed that, but the test pins the contract.
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "ladwfs() { local farr=(a b c); }\nladwfs\necho len=${#farr[@]}\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "len=0");
+
+    executor_free(exec);
+}
+
 TEST(local_plain_string_reassignment) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -2387,6 +2445,9 @@ int main(void) {
     RUN_TEST(local_for_loop_variable);
     RUN_TEST(local_plus_equals_append);
     RUN_TEST(local_while_loop_counter);
+    RUN_TEST(local_array_literal_builds_indexed_array);
+    RUN_TEST(local_quoted_paren_value_stays_scalar);
+    RUN_TEST(local_array_dies_with_function_scope);
 
     printf("\nRegression tests — Issue #48 (function trailing redirections at "
            "call):\n");

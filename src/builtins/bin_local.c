@@ -107,6 +107,17 @@ int bin_local(int argc, char **argv) {
     // Process each argument
     for (int i = opt_idx; i < argc; i++) {
         char *arg = argv[i];
+        // Parser-internal sentinel: an arg whose first byte is \x1F
+        // came from the unquoted `name=(...)` array-literal form
+        // (see src/parser.c). Strip the sentinel and remember we are
+        // looking at an array-literal assignment; without the
+        // sentinel, the same value shape (after quote-stripping)
+        // could equally be a scalar `local data="(...)"`.
+        bool is_array_literal = false;
+        if (arg[0] == '\x1F') {
+            arg++;
+            is_array_literal = true;
+        }
         char *eq = strchr(arg, '=');
 
         if (eq) {
@@ -152,6 +163,69 @@ int bin_local(int argc, char **argv) {
                                           SHELL_ERR_SCOPE_ERROR,
                                           builtin_get_source_location(),
                                           "failed to create nameref");
+                    free(name);
+                    return 1;
+                }
+            } else if (is_array_literal && value && value[0] == '(') {
+                // Array literal: local arr=(a b c). The parser
+                // recognized the unquoted (...) form and prefixed the
+                // argv with the sentinel above. Build the array
+                // element-by-element, matching bin_declare's existing
+                // -a parser.
+                array_value_t *arr = symtable_array_create(false);
+                if (!arr) {
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_SCOPE_ERROR,
+                                          builtin_get_source_location(),
+                                          "failed to create array");
+                    free(name);
+                    return 1;
+                }
+                const char *p = value + 1;
+                int idx = 0;
+                while (*p && *p != ')') {
+                    while (*p && isspace(*p)) {
+                        p++;
+                    }
+                    if (*p == ')' || !*p) {
+                        break;
+                    }
+                    const char *elem_start = p;
+                    bool in_quote = false;
+                    char quote_char = 0;
+                    while (*p && (in_quote || (!isspace(*p) && *p != ')'))) {
+                        if (!in_quote && (*p == '"' || *p == '\'')) {
+                            in_quote = true;
+                            quote_char = *p;
+                        } else if (in_quote && *p == quote_char) {
+                            in_quote = false;
+                        }
+                        p++;
+                    }
+                    size_t elem_len = (size_t)(p - elem_start);
+                    if (elem_len > 0) {
+                        char *elem = malloc(elem_len + 1);
+                        if (elem) {
+                            const char *src = elem_start;
+                            size_t copy_len = elem_len;
+                            if (copy_len >= 2 &&
+                                (src[0] == '"' || src[0] == '\'') &&
+                                src[copy_len - 1] == src[0]) {
+                                src++;
+                                copy_len -= 2;
+                            }
+                            memcpy(elem, src, copy_len);
+                            elem[copy_len] = '\0';
+                            symtable_array_set_index(arr, idx++, elem);
+                            free(elem);
+                        }
+                    }
+                }
+                if (symtable_set_array(name, arr) != 0) {
+                    executor_error_report(
+                        current_executor, SHELL_ERR_SCOPE_ERROR,
+                        builtin_get_source_location(), "failed to store array");
+                    symtable_array_free(arr);
                     free(name);
                     return 1;
                 }

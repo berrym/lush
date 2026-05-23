@@ -39,6 +39,15 @@ int bin_readonly(int argc, char **argv) {
     // Process each argument
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
+        // Strip the parser-internal array-literal sentinel (\x1F)
+        // if present. readonly's array support today is minimal
+        // (matches bash: readonly arrays are a separate `-a` flag);
+        // for the unflagged form we accept the unquoted (...) but
+        // treat the value as scalar, mirroring bash's actual
+        // behavior on `readonly arr=(a b c)`.
+        if (arg[0] == '\x1F') {
+            arg++;
+        }
         char *equals = strchr(arg, '=');
 
         if (equals) {

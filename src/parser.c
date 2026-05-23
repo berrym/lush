@@ -1700,9 +1700,20 @@ static bool parse_command_suffix(parser_t *parser, node_t *command) {
                             return false;
                         }
 
-                        // Build a string representation for the argument:
-                        // name=(...) The builtin will parse this
-                        size_t total_len = strlen(var_name) +
+                        // Build the argv element with a parser-internal
+                        // sentinel prefix: \x1F (ASCII Unit Separator)
+                        // followed by "name=(...)". The sentinel marks
+                        // this element as the unquoted array-literal
+                        // form so assignment-aware builtins (local,
+                        // declare, typeset, readonly, export) can tell
+                        // it apart from a quoted scalar `name="(...)"`
+                        // which, after quote-stripping in the regular
+                        // argument path, produces the same shape.
+                        // Consumer builtins strip the sentinel before
+                        // touching the name. Regular argv strings
+                        // never contain \x1F.
+                        size_t total_len = 1 + // sentinel
+                                           strlen(var_name) +
                                            (is_append ? 2 : 1) +
                                            2; // name + = or += + ()
 
@@ -1718,14 +1729,17 @@ static bool parse_command_suffix(parser_t *parser, node_t *command) {
 
                         char *arg_str = malloc(total_len + 1);
                         if (arg_str) {
-                            strcpy(arg_str, var_name);
+                            arg_str[0] = '\x1F';
+                            arg_str[1] = '\0';
+                            strcat(arg_str, var_name);
                             strcat(arg_str, is_append ? "+=(" : "=(");
                             elem = array_node->first_child;
                             bool first = true;
                             while (elem) {
                                 if (elem->val.str) {
-                                    if (!first)
+                                    if (!first) {
                                         strcat(arg_str, " ");
+                                    }
                                     strcat(arg_str, elem->val.str);
                                     first = false;
                                 }
