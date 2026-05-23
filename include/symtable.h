@@ -120,29 +120,31 @@ typedef struct symtable_manager symtable_manager_t;
 
 // Legacy compatibility structures (for string management system)
 typedef enum {
-    SYM_STR,
-    SYM_FUNC,
+    SYM_STR,  ///< String symbol
+    SYM_FUNC, ///< Function symbol
 } symbol_type_t;
 
 typedef struct symtable_entry {
-    char *name;
-    symbol_type_t val_type;
-    char *val;
-    unsigned int flags;
-    struct symtable_entry *next;
-    struct node *func_body;
+    char *name;                    ///< Symbol name
+    symbol_type_t val_type;        ///< Type of stored value
+    char *val;                     ///< String value (for SYM_STR)
+    unsigned int flags;            ///< Legacy flag bits (FLAG_*)
+    struct symtable_entry *next;   ///< Next entry in the chain
+    struct node *func_body;        ///< Function body AST (for SYM_FUNC)
 } symtable_entry_t;
 
 typedef struct {
-    size_t level;
-    symtable_entry_t *head, *tail;
+    size_t level;              ///< Scope nesting level
+    symtable_entry_t *head,    ///< First entry in the chain
+        *tail;                 ///< Last entry in the chain
 } symtable_t;
 
 #define MAX_SYMTAB 256
 typedef struct {
-    size_t symtable_count;
-    symtable_t *symtable_list[MAX_SYMTAB];
-    symtable_t *global_symtable, *local_symtable;
+    size_t symtable_count;                       ///< Number of active symbol tables
+    symtable_t *symtable_list[MAX_SYMTAB];       ///< Stack of symbol tables
+    symtable_t *global_symtable,                 ///< Global (outermost) symbol table
+        *local_symtable;                         ///< Current (innermost) symbol table
 } symtable_stack_t;
 
 /* ============================================================================
@@ -730,17 +732,97 @@ void free_environ_array(char **env);
 #define FLAG_TEMP_VAR (1 << 9)
 
 /* Legacy functions (for string management system) */
+
+/**
+ * @brief Allocate a new legacy symbol table at the given scope level
+ *
+ * @param level Scope nesting level for the new table
+ * @return New symbol table on success, NULL on failure
+ */
 symtable_t *new_symtable(size_t level);
+
+/**
+ * @brief Push a fresh symbol table onto the legacy scope stack
+ *
+ * @return New top-of-stack symbol table on success, NULL on failure
+ */
 symtable_t *symtable_stack_push(void);
+
+/**
+ * @brief Pop the top symbol table off the legacy scope stack
+ *
+ * @return Popped symbol table on success, NULL on failure
+ */
 symtable_t *symtable_stack_pop(void);
+
+/**
+ * @brief Remove an entry from a legacy symbol table
+ *
+ * @param symtable Symbol table holding the entry
+ * @param entry Entry to remove
+ * @return 0 on success, -1 on error
+ */
 int remove_from_symtable(symtable_t *symtable, symtable_entry_t *entry);
+
+/**
+ * @brief Create and insert a new entry into the current legacy symbol table
+ *
+ * @param name Symbol name (copied/owned per legacy semantics)
+ * @return New symbol entry on success, NULL on failure
+ */
 symtable_entry_t *add_to_symtable(char *name);
+
+/**
+ * @brief Look up a symbol by name in a specific legacy symbol table
+ *
+ * @param symtable Symbol table to search
+ * @param name Symbol name to find
+ * @return Matching entry on success, NULL if not found
+ */
 symtable_entry_t *lookup_symbol(symtable_t *symtable, const char *name);
+
+/**
+ * @brief Look up a symbol by name across the legacy scope stack
+ *
+ * @param name Symbol name to find
+ * @return Matching entry on success, NULL if not found
+ */
 symtable_entry_t *get_symtable_entry(const char *name);
+
+/**
+ * @brief Get the innermost (current) legacy symbol table
+ *
+ * @return Current local symbol table on success, NULL if uninitialized
+ */
 symtable_t *get_local_symtable(void);
+
+/**
+ * @brief Get the outermost (global) legacy symbol table
+ *
+ * @return Global symbol table on success, NULL if uninitialized
+ */
 symtable_t *get_global_symtable(void);
+
+/**
+ * @brief Get the legacy symbol table stack
+ *
+ * @return Pointer to the symbol table stack on success, NULL if uninitialized
+ */
 symtable_stack_t *get_symtable_stack(void);
+
+/**
+ * @brief Free a legacy symbol table and all its entries
+ *
+ * @param symtable Symbol table to free
+ */
 void free_symtable(symtable_t *symtable);
+
+/**
+ * @brief Set the string value of a legacy symbol table entry
+ *
+ * @param entry Entry to update
+ * @param val New value (copied/owned per legacy semantics)
+ */
 void symtable_entry_setval(symtable_entry_t *entry, char *val);
 
 /* ============================================================================
@@ -749,25 +831,89 @@ void symtable_entry_setval(symtable_entry_t *entry, char *val);
  */
 
 /* Feature detection */
+
+/**
+ * @brief Report whether the libhashtable-backed symbol table is available
+ *
+ * @return true if the enhanced (libhashtable) backend can be used
+ */
 bool symtable_libht_available(void);
+
+/**
+ * @brief Get a description of the active symbol table implementation
+ *
+ * @return Static string describing the selected backend
+ */
 const char *symtable_implementation_info(void);
 
 /* Enhanced API (feature flag controlled) */
+
+/** @brief Initialize the libhashtable-backed symbol table */
 void init_symtable_libht(void);
+
+/** @brief Tear down the libhashtable-backed symbol table */
 void free_symtable_libht(void);
+
+/**
+ * @brief Get the underlying libhashtable manager handle
+ *
+ * @return Opaque pointer to the libhashtable manager, or NULL if uninitialized
+ */
 void *get_libht_manager(void);
 
 /* Enhanced variable operations */
+
+/**
+ * @brief Set a variable using the enhanced (libhashtable) backend
+ *
+ * @param name Variable name
+ * @param value Variable value
+ * @param flags Variable flags
+ * @return 0 on success, -1 on error
+ */
 int symtable_set_var_enhanced(const char *name, const char *value,
                               symvar_flags_t flags);
+
+/**
+ * @brief Get a variable value using the enhanced (libhashtable) backend
+ *
+ * @param name Variable name
+ * @return Variable value or NULL if not found
+ */
 char *symtable_get_var_enhanced(const char *name);
 
 /* Enhanced scope operations */
+
+/**
+ * @brief Push a scope using the enhanced (libhashtable) backend
+ *
+ * @param type Scope type to push
+ * @param name Scope name (for debugging)
+ * @return 0 on success, -1 on error
+ */
 int symtable_push_scope_enhanced(scope_type_t type, const char *name);
+
+/**
+ * @brief Pop the current scope using the enhanced (libhashtable) backend
+ *
+ * @return 0 on success, -1 on error
+ */
 int symtable_pop_scope_enhanced(void);
 
 /* Performance and testing */
+
+/**
+ * @brief Run a benchmark comparison between symbol table backends
+ *
+ * @param iterations Number of iterations to execute per backend
+ */
 void symtable_benchmark_comparison(int iterations);
+
+/**
+ * @brief Run the libhashtable symbol table self-test
+ *
+ * @return 0 on success, non-zero on failure
+ */
 int symtable_libht_test(void);
 
 /* ============================================================================
@@ -776,25 +922,89 @@ int symtable_libht_test(void);
  */
 
 /* Feature detection */
+
+/**
+ * @brief Report whether the optimized (libhashtable v2) backend is available
+ *
+ * @return true if the optimized backend can be used
+ */
 bool symtable_opt_available(void);
+
+/**
+ * @brief Get a description of the optimized symbol table implementation
+ *
+ * @return Static string describing the optimized backend
+ */
 const char *symtable_opt_implementation_info(void);
 
 /* Optimized API (feature flag controlled) */
+
+/** @brief Initialize the optimized (libhashtable v2) symbol table */
 void init_symtable_opt(void);
+
+/** @brief Tear down the optimized (libhashtable v2) symbol table */
 void free_symtable_opt(void);
+
+/**
+ * @brief Get the underlying optimized manager handle
+ *
+ * @return Opaque pointer to the optimized manager, or NULL if uninitialized
+ */
 void *get_opt_manager(void);
 
 /* Optimized variable operations */
+
+/**
+ * @brief Set a variable using the optimized (libhashtable v2) backend
+ *
+ * @param name Variable name
+ * @param value Variable value
+ * @param flags Variable flags
+ * @return 0 on success, -1 on error
+ */
 int symtable_set_var_opt_api(const char *name, const char *value,
                              symvar_flags_t flags);
+
+/**
+ * @brief Get a variable value using the optimized (libhashtable v2) backend
+ *
+ * @param name Variable name
+ * @return Variable value or NULL if not found
+ */
 char *symtable_get_var_opt_api(const char *name);
 
 /* Optimized scope operations */
+
+/**
+ * @brief Push a scope using the optimized (libhashtable v2) backend
+ *
+ * @param type Scope type to push
+ * @param name Scope name (for debugging)
+ * @return 0 on success, -1 on error
+ */
 int symtable_push_scope_opt_api(scope_type_t type, const char *name);
+
+/**
+ * @brief Pop the current scope using the optimized (libhashtable v2) backend
+ *
+ * @return 0 on success, -1 on error
+ */
 int symtable_pop_scope_opt_api(void);
 
 /* Performance and testing */
+
+/**
+ * @brief Run a benchmark comparison for the optimized backend
+ *
+ * @param iterations Number of iterations to execute
+ */
 void symtable_benchmark_opt_comparison(int iterations);
+
+/**
+ * @brief Run the optimized symbol table self-test
+ *
+ * @return 0 on success, non-zero on failure
+ */
 int symtable_opt_test(void);
 
 /* ============================================================================
