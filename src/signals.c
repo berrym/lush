@@ -354,10 +354,37 @@ int remove_trap(int signal) {
  * Prints all currently set traps in a format suitable for
  * re-input to the shell.
  */
+/**
+ * @brief Render a (pseudo-)signal number to its trap name
+ *
+ * For real kernel signals returns the numeric value as a string in a
+ * static buffer; for pseudo-signals returns the bash-style name
+ * ("ERR", "DEBUG", "RETURN", "EXIT"). The returned pointer is valid
+ * until the next call.
+ */
+static const char *trap_signal_name(int signum) {
+    if (signum == 0) {
+        return "EXIT";
+    }
+    if (signum == TRAP_PSEUDO_ERR) {
+        return "ERR";
+    }
+    if (signum == TRAP_PSEUDO_DEBUG) {
+        return "DEBUG";
+    }
+    if (signum == TRAP_PSEUDO_RETURN) {
+        return "RETURN";
+    }
+    static char buf[16];
+    snprintf(buf, sizeof(buf), "%d", signum);
+    return buf;
+}
+
 void list_traps(void) {
     trap_entry_t *current = trap_list;
     while (current) {
-        printf("trap -- '%s' %d\n", current->command, current->signal);
+        printf("trap -- '%s' %s\n", current->command,
+               trap_signal_name(current->signal));
         current = current->next;
     }
 }
@@ -404,6 +431,19 @@ int get_signal_number(const char *signame) {
         return 0; // Special case for EXIT trap
     }
 
+    /* Bash-style pseudo-signals: not real kernel signals, dispatched
+     * by the executor at well-known points (after a command for ERR,
+     * before a command for DEBUG, on function return for RETURN). */
+    if (strcmp(signame, "ERR") == 0) {
+        return TRAP_PSEUDO_ERR;
+    }
+    if (strcmp(signame, "DEBUG") == 0) {
+        return TRAP_PSEUDO_DEBUG;
+    }
+    if (strcmp(signame, "RETURN") == 0) {
+        return TRAP_PSEUDO_RETURN;
+    }
+
     return -1; // Unknown signal
 }
 
@@ -432,6 +472,20 @@ static void run_trap_command(const char *command) {
         (void)executor_execute_command_line(exec, command, 1);
     } else {
         (void)!system(command);
+    }
+}
+
+/**
+ * @brief Execute the registered ERR trap, if any
+ *
+ * Looks up the TRAP_PSEUDO_ERR entry in trap_list. Empty command
+ * strings (the "trap '' ERR" no-op form) are skipped. Safe to call
+ * with no ERR trap registered -- a quick lookup and return.
+ */
+void fire_err_trap(void) {
+    trap_entry_t *trap = find_trap(TRAP_PSEUDO_ERR);
+    if (trap && trap->command && trap->command[0] != '\0') {
+        run_trap_command(trap->command);
     }
 }
 

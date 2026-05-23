@@ -298,6 +298,45 @@ TEST(case_wildcard) {
  * TOK_DOUBLE_LBRACKET (the extended-test opener); the case-pattern
  * collector now accepts that token as literal "[[" text so the resulting
  * pattern string "[[:class:]]" reaches match_pattern intact. */
+/* The bash-style ERR pseudo-signal trap fires after a command's
+ * non-zero exit, before set -e would otherwise abort. Phase 1 of
+ * issue #108 -- the errtrace option (inheritance into functions and
+ * subshells) is not yet implemented; this asserts only that the
+ * trap registers and fires for a top-level non-zero exit. */
+TEST(trap_err_fires_on_nonzero_exit) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /* trap_list is global state shared across executors. Clear it
+     * at the end of the test so subsequent tests don't observe a
+     * stale ERR handler firing on their own non-zero exits. */
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "trap 'echo ERR_HIT' ERR\nfalse\necho continuing\ntrap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    /* The trap action runs after `false` returns 1, then execution
+     * continues with the next command. */
+    ASSERT_STDOUT_CONTAINS(r, "ERR_HIT");
+    ASSERT_STDOUT_CONTAINS(r, "continuing");
+
+    executor_free(exec);
+}
+
+TEST(trap_err_silent_on_zero_exit) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec,
+        "trap 'echo ERR_HIT' ERR\ntrue\necho continuing\ntrap - ERR\n");
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_TRUE(strstr(r.out, "ERR_HIT") == NULL,
+                "no ERR trap on a zero-exit command");
+    ASSERT_STDOUT_CONTAINS(r, "continuing");
+
+    executor_free(exec);
+}
+
 TEST(case_posix_character_class) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -2064,6 +2103,8 @@ int main(void) {
     RUN_TEST(case_statement);
     RUN_TEST(case_wildcard);
     RUN_TEST(case_posix_character_class);
+    RUN_TEST(trap_err_fires_on_nonzero_exit);
+    RUN_TEST(trap_err_silent_on_zero_exit);
 
     printf("\nSEMANTICS 3.4/3.9 conformance tests:\n");
     RUN_TEST(arr_at_in_scalar_assignment_raises_type_mismatch);

@@ -1258,6 +1258,12 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             printf("DEBUG: Command result: %d\n", last_result);
         }
 
+        /* Bash-style ERR pseudo-signal: fires after a non-zero command
+         * exit, before set -e gets a chance to abort. */
+        if (last_result != 0) {
+            fire_err_trap();
+        }
+
         // Handle set -e (exit_on_error): exit if command failed
         if (shell_opts.exit_on_error && last_result != 0) {
             executor->exit_status = last_result;
@@ -2133,6 +2139,13 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
          * abort propagates up to execute_command_list and the REPL. */
         if (executor->shell_exit_requested) {
             return executor->shell_exit_status;
+        }
+
+        /* Bash-style ERR pseudo-signal: fires after a non-zero command
+         * exit, before set -e gets a chance to abort. Matches bash's
+         * "ERR trap before errexit" ordering. */
+        if (last_result != 0) {
+            fire_err_trap();
         }
 
         // Handle set -e (exit_on_error): exit if command failed and not part of

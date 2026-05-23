@@ -33,6 +33,27 @@ typedef struct trap_entry {
 extern trap_entry_t *trap_list;
 
 /**
+ * @brief Pseudo-signal sentinels for bash-style non-kernel traps
+ *
+ * Picked below any real kernel signal AND below get_signal_number()'s
+ * -1 "unknown" return so the existing trap_entry_t can carry them
+ * unchanged. ERR fires after a command returns non-zero; DEBUG fires
+ * before each command; RETURN fires when a function returns.
+ */
+#define TRAP_PSEUDO_ERR    -100
+#define TRAP_PSEUDO_DEBUG  -101
+#define TRAP_PSEUDO_RETURN -102
+
+/**
+ * @brief Execute the registered ERR trap, if any
+ *
+ * Looks up trap_list for the TRAP_PSEUDO_ERR entry. If found and the
+ * command string is non-empty, executes it through the current
+ * executor. Safe to call when no ERR trap is set.
+ */
+void fire_err_trap(void);
+
+/**
  * @brief Set a signal handler function
  *
  * @param signum Signal number to handle
