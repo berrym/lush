@@ -103,13 +103,13 @@ lle_result_t lle_history_next(lle_editor_t *editor);
 /* Global LLE editor instance (proper architecture) */
 static lle_editor_t *global_lle_editor = NULL;
 
-/* When true, the in-progress lle_readline() call records nothing to
- * history -- no in-memory entry, no history-file write. Set only by
- * lle_readline_no_history() around its lle_readline() call. Safe as a
- * file-static because lle_readline() is non-reentrant by contract
- * (see lle_readline.h). The debugger's (lush-debug) break-prompt is
- * the first consumer: its commands must not pollute shell history. */
-static bool g_lle_readline_suppress_history = false;
+/* In-process debug-prompt history (lazy-created on first
+ * lle_readline_no_history call). The debug prompt swaps the editor's
+ * history_system pointer to this one for the duration of the call so
+ * arrow-key recall and ctrl-r reverse search operate on past debug
+ * commands instead of shell history. It is never persisted; it lives
+ * for the process lifetime. */
+static lle_history_core_t *g_debug_history = NULL;
 
 /* The debug-prompt-active flag lives in lle_debug_prompt_state.c so
  * that consumers (the completion sources) can read it without their
@@ -1163,20 +1163,27 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
         ctx->current_suggestion[0] = '\0';
     }
 
-    /* Add to LLE history before completing */
-    if (!g_lle_readline_suppress_history && ctx->editor &&
-        ctx->editor->history_system && ctx->buffer->data &&
+    /* Add to LLE history before completing. The editor's
+     * history_system may be the shell history or, during the
+     * debugger's break-prompt, the in-process debug history (swapped
+     * by lle_readline_no_history); the add path is identical for both.
+     * Persistence to ~/.lush_history is gated on NOT being at the
+     * debug prompt -- debug commands never reach the shell history
+     * file. */
+    if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
                               NULL);
 
-        /* Save to history file (auto-save enabled in config) */
-        const char *home = getenv("HOME");
-        if (home) {
-            char history_path[1024];
-            snprintf(history_path, sizeof(history_path), "%s/.lush_history",
-                     home);
-            lle_history_save_to_file(ctx->editor->history_system, history_path);
+        if (!lle_in_debug_prompt()) {
+            const char *home = getenv("HOME");
+            if (home) {
+                char history_path[1024];
+                snprintf(history_path, sizeof(history_path),
+                         "%s/.lush_history", home);
+                lle_history_save_to_file(ctx->editor->history_system,
+                                         history_path);
+            }
         }
     }
 
@@ -1347,20 +1354,27 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         refresh_display(ctx);
     }
 
-    /* Add to LLE history before completing */
-    if (!g_lle_readline_suppress_history && ctx->editor &&
-        ctx->editor->history_system && ctx->buffer->data &&
+    /* Add to LLE history before completing. The editor's
+     * history_system may be the shell history or, during the
+     * debugger's break-prompt, the in-process debug history (swapped
+     * by lle_readline_no_history); the add path is identical for both.
+     * Persistence to ~/.lush_history is gated on NOT being at the
+     * debug prompt -- debug commands never reach the shell history
+     * file. */
+    if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
                               NULL);
 
-        /* Save to history file (auto-save enabled in config) */
-        const char *home = getenv("HOME");
-        if (home) {
-            char history_path[1024];
-            snprintf(history_path, sizeof(history_path), "%s/.lush_history",
-                     home);
-            lle_history_save_to_file(ctx->editor->history_system, history_path);
+        if (!lle_in_debug_prompt()) {
+            const char *home = getenv("HOME");
+            if (home) {
+                char history_path[1024];
+                snprintf(history_path, sizeof(history_path),
+                         "%s/.lush_history", home);
+                lle_history_save_to_file(ctx->editor->history_system,
+                                         history_path);
+            }
         }
     }
 
@@ -3779,10 +3793,37 @@ char *lle_readline(const char *prompt) {
  * the file-static suppression flag across the call is safe.
  */
 char *lle_readline_no_history(const char *prompt) {
-    g_lle_readline_suppress_history = true;
+    /* Swap the editor's history to a separate in-process debug
+     * history for the duration of this call. Arrow-key recall and
+     * ctrl-r reverse search both read editor->history_system, so the
+     * swap covers both transparently: at the (lush-debug) prompt
+     * they walk past debug commands instead of shell history, and
+     * shell history is untouched. */
+    lle_editor_t *editor = lle_get_global_editor();
+    lle_history_core_t *saved_history = NULL;
+
+    if (editor && editor->lle_pool) {
+        if (!g_debug_history) {
+            lle_history_config_t *cfg = NULL;
+            if (lle_history_config_create_default(&cfg, editor->lle_pool) ==
+                    LLE_SUCCESS &&
+                cfg) {
+                (void)lle_history_core_create(&g_debug_history,
+                                              editor->lle_pool, cfg);
+            }
+        }
+        if (g_debug_history) {
+            saved_history = editor->history_system;
+            editor->history_system = g_debug_history;
+        }
+    }
+
     lle_set_debug_prompt_active(true);
     char *line = lle_readline(prompt);
-    g_lle_readline_suppress_history = false;
     lle_set_debug_prompt_active(false);
+
+    if (editor && saved_history) {
+        editor->history_system = saved_history;
+    }
     return line;
 }
