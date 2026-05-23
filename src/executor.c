@@ -4351,6 +4351,13 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     case 'u':
                         flag_u = true;
                         break;
+                    case '@':
+                        // Per SEMANTICS.md section 3.7, (@) is a
+                        // spelling alias for vector presentation --
+                        // redundant with the [@] subscript. Accept
+                        // it as a no-op flag so ${(@)arr} yields
+                        // exactly what ${arr[@]} would.
+                        break;
                     default:
                         ok_flags = false;
                         break;

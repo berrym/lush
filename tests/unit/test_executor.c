@@ -582,6 +582,46 @@ TEST(bare_arr_glued_to_text_raises_type_mismatch) {
     executor_free(exec);
 }
 
+/* SEMANTICS section 3.7: the (@) parameter flag is a spelling alias
+ * for vector presentation. It is redundant with the [@] subscript --
+ * ${(@)arr} must yield exactly what ${arr[@]} yields. */
+TEST(at_paren_flag_alias_yields_vector) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(a 'x y' c)\nfor i in ${(@)arr}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    ASSERT_STDOUT_CONTAINS(r, "iter=a");
+    ASSERT_STDOUT_CONTAINS(r, "iter=x y");
+    ASSERT_STDOUT_CONTAINS(r, "iter=c");
+
+    executor_free(exec);
+}
+
+TEST(at_paren_flag_composes_with_sort) {
+    executor_t *exec = executor_new();
+    ASSERT_NOT_NULL(exec, "executor_new failed");
+
+    /* (o@) -- sort ascending and yield vector. (@) is the no-op
+     * presentation alias; (o) carries the transformation per
+     * SEMANTICS section 3.5 (transformation and presentation
+     * orthogonal). */
+    run_result_t r = run_shell_with_executor(
+        exec, "arr=(c a b)\nfor i in ${(o@)arr}; do echo iter=$i; done\n");
+
+    ASSERT_EXIT_STATUS(r, 0);
+    const char *p_a = strstr(r.out, "iter=a");
+    const char *p_b = strstr(r.out, "iter=b");
+    const char *p_c = strstr(r.out, "iter=c");
+    ASSERT_TRUE(p_a != NULL && p_b != NULL && p_c != NULL,
+                "all three elements emitted");
+    ASSERT_TRUE(p_a < p_b && p_b < p_c, "sort applied via (o)");
+
+    executor_free(exec);
+}
+
 TEST(bare_arr_argv_yields_elements_one_to_one) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -2319,6 +2359,8 @@ int main(void) {
     RUN_TEST(bare_arr_in_for_loop_iterates);
     RUN_TEST(bare_arr_glued_to_text_raises_type_mismatch);
     RUN_TEST(bare_arr_argv_yields_elements_one_to_one);
+    RUN_TEST(at_paren_flag_alias_yields_vector);
+    RUN_TEST(at_paren_flag_composes_with_sort);
 
     printf("\nLogical operator tests:\n");
     RUN_TEST(and_operator_success);
