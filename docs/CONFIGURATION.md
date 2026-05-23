@@ -173,13 +173,22 @@ set -o               # list all options with current state
 ### Recognized bash extensions
 
 `set` accepts bash extensions when they have a clear semantic meaning and a
-canonical lush knob. Currently:
+canonical lush knob:
 
 - `set -o pipefail` -- canonical (already a lush option; bash spelling
   matches).
+- `set -o errtrace` / `set -E` -- ERR trap inherits into function bodies
+  (and, in the longer plan, into subshells and command substitutions).
+  Without it, the ERR trap fires only at the call site on the function's
+  non-zero return, matching bash's default. (Issue #108.)
+- `set -o functrace` / `set -T` -- DEBUG and RETURN traps inherit into
+  function bodies. The DEBUG trap fires before each command in scope;
+  the RETURN trap fires when a function returns. (Issue #109.)
 
-Other bash extensions (`errtrace`, `functrace`, ...) require additional
-implementation work; see the project issue tracker.
+These are wired via the same `option_map` in `src/posix_opts.c`. The
+trap-inheritance gating itself lives in `src/signals.c` (`fire_err_trap`,
+`fire_debug_trap`, `fire_return_trap`) and is consulted from the
+executor walkers.
 
 ### What `set` does not do
 
@@ -293,6 +302,40 @@ history ...                       # sugar over history.* keys
 The dedicated builtins exist for discoverability (`display lle <TAB>`
 guides users) and grouping. The registry is the single source of truth;
 the builtins always sync.
+
+### Extension surfaces: `display lle widget` / `hook` / `segment`
+
+Three further `display lle` subcommands let scripts and configs
+register first-class extension entities. These are not sugar over a
+single config key -- they manage their own per-process registries --
+but they share the registry's persistence convention (`config save`
+serializes them where applicable):
+
+```sh
+display lle widget add upd-stat 'export LUSH_STAT=$(git rev-parse --short HEAD)'
+display lle hook add post-command upd-stat
+display lle segment add gitsha LUSH_STAT
+# reference {gitsha} in your theme template to surface the value
+```
+
+- `display lle widget add NAME 'CMD'` registers a named LLE widget
+  whose body is a shell command. Bindable from
+  `~/.config/lush/keybindings.toml` exactly like a builtin widget.
+- `display lle hook add HOOK WIDGET` attaches a widget to one of the
+  ten LLE lifecycle hooks (`line-init`, `line-accepted`, `line-finish`,
+  `buffer-modified`, `pre-command`, `post-command`, `completion-start`,
+  `completion-end`, `history-search`, `terminal-resize`). The shell-
+  side `lle_fire_pre_command` / `lle_fire_post_command` calls in the
+  REPL are bridged to the widget-hooks-manager so the LLE hooks fire
+  in lockstep with shell lifecycle events.
+- `display lle segment add NAME VAR` registers a prompt segment whose
+  visible content tracks `$VAR`. Reading `$VAR` on each render is
+  O(1); a `display lle widget` + `display lle hook` pair updates the
+  variable on a lifecycle event, the segment reflects the change at
+  the next prompt redraw.
+
+The trio composes by design: widget defines the work, hook decides
+when, segment shows the result.
 
 ---
 

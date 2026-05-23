@@ -464,21 +464,27 @@ sizes are rough engineering estimates.)
 
 | Area | Current state | Target | Gap |
 |------|---------------|--------|-----|
-| Value kinds | `symvar.value` is `char *`; arrays in a side-table `array_value_t`; a `symvar_type_t` tag exists | scalar/list/map are first-class throughout the expansion engine | medium |
+| Value kinds | scalar/list/map all live in per-scope `vars_ht` as kind-tagged `symvar` entries; the previous global `array_storage` side-table is removed; `symtable_lookup` returns a kind-tagged view (`lush_value_view_t`) | scalar/list/map are first-class throughout the expansion engine | **match** |
 | Flatness / nesting | none (a list element is always `char *`) | none (bounded, §3.2) | **match** |
 | Map insertion order | implemented -- `array_value_t.assoc_insertion_order` (Issue #69) | insertion order (§4.2) | **match** |
 | Transformation always fires | yes (`known_divergences.txt` 301/314) | yes (§3.5) | **match** |
 | Presentation by subscript | yes -- `${arr[@]}` vector, `${(flags)arr}` scalar (`known_divergences.txt` 307) | yes (§3.5) | **match** |
 | Quoting irrelevant to presentation | `parse_parameter_expansion` does not receive quote context; `expand_quoted_string` tracks `in_double_quotes` but does not thread it down | presentation must NOT consult quote context (§3.6) -- so the un-threaded state is *correct*, not a gap | **match** |
-| Implicit list-to-string | audited (`docs/development/EXPANSION_AUDIT.md`): reduces to one site -- `${arr[@]}` joins at `executor.c:12437` where §3.5 requires a vector; bare `${arr}` now specified by §3.9 | no implicit coercion (§3.4, §3.9) | one targeted fix -- split the `[@]`/`[*]` branch |
-| `(@)` flag | recognized among parameter flags | redundant; at most a spelling alias (§3.7) | small |
+| Implicit list-to-string | `${arr[@]}` in a scalar slot raises `SHELL_ERR_TYPE_MISMATCH` and aborts the script (`executor.c` general parameter-expansion fallthrough). Bare `${arr}` enforced the same way: vector slot yields N elements, scalar slot raises type mismatch, glued-to-text raises type mismatch. `export` and `readonly` raise on list values rather than silently joining. | no implicit coercion (§3.4, §3.9) | **match** |
+| `(@)` flag | accepted as a no-op spelling alias for `[@]` presentation in `try_expand_vector_arg` (`${(@)arr}` yields the same as `${arr[@]}`) | redundant; at most a spelling alias (§3.7) | **match** |
+| Array-literal discrimination | parser-internal `\x1F` sentinel prefix on unquoted `name=(...)` argv elements lets `local`/`declare`/`typeset` route to array-literal handling while `local data="(scoped)"` (which strips quotes to the same shape) correctly stays a scalar | a parsed `local arr=(a b c)` must build a real array, distinct from `local data="(...)"` | **match** |
 | Word splitting | `FEATURE_WORD_SPLIT_DEFAULT`, per-mode | retained as a preset (§3.8) | **match** |
 | Typed-function form | not implemented -- no `fn` keyword, no typed parameters; `return_value` is a builtin emitting a `__LUSH_RETURN__` marker, not a language construct | a typed form carrying lexical scope (§5.3) | large -- form not yet designed |
 | Scoping | dynamic scope-chain for all functions (`symtable` walks `scope->parent`; issue #47 assignment semantics) | dynamic for POSIX form, lexical for the typed form (§5) | large -- lexical resolution and the typed form both unbuilt |
 
 The two "large" gaps -- the typed-function form and lexical scoping --
-are coupled and are deliberately out of scope for this document; see
-§8.
+are coupled and are recorded in §8 as the next pieces of work. The
+six value-model rows that previously sat at medium / small / "one
+targeted fix" have all landed: `tests/real_world/` runs at 100% (20
+passes + 2 principled `known_divergences.txt` entries), and the
+storage layer is unified (the array side-table is gone; local
+arrays die with their function scope; `[[ -v arr ]]` returns true
+on arrays; `${!ref}` no longer leaks pointer bytes).
 
 ---
 

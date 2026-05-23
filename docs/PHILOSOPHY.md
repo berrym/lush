@@ -228,6 +228,24 @@ The gate also scopes the rule honestly. A change the gate still passes
 needs no debugger work. A change that reddens it is not done until the
 debugger -- and the gate -- are green again.
 
+The current gate is `tests/unit/test_debug_integration.c` (driven by
+`meson test -C build`), with companion locks at `test_debug.c`,
+`test_debug_trace.c`, `test_debug_breakpoints.c`, and
+`test_debug_analysis.c`. As of this writing the debugger keeps pace
+through Tier 2: line tracking on `node->loc.line` (no
+command-ordinal counter); the break prompt is LLE-driven
+(`lle_readline_no_history`) with history recall, ctrl-r search,
+completion of the `(lush-debug)` command vocabulary, and a framed
+left-gutter UI rendered through the screen buffer; variable
+inspection queries the symtable directly via
+`symtable_enumerate_current_scope_vars` and renders the actual
+Scalar/List/Map kind; `type` / `t` exposes the kind explicitly;
+`debug analyze` statically warns on the §3.9 list-in-scalar
+pattern before the script runs. The two open obligations this rule
+will impose work for next: a typed-function form (§8) and
+lexical-scope resolution (§5.3); when those land they each carry a
+debugger obligation by this rule.
+
 ---
 
 ## See also
