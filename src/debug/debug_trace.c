@@ -260,6 +260,10 @@ debug_frame_t *debug_push_frame(debug_context_t *ctx, const char *function,
     frame->line_number = line;
     frame->current_node = NULL;
     frame->parent = ctx->current_frame;
+    // Default discipline is dynamic. The typed-fn executor opts in to
+    // lexical via debug_mark_current_frame_lexical immediately after
+    // this push completes.
+    frame->is_lexical = false;
 
     // Set timing
     clock_gettime(CLOCK_MONOTONIC, &frame->start_time);
@@ -276,6 +280,22 @@ debug_frame_t *debug_push_frame(debug_context_t *ctx, const char *function,
     }
 
     return frame;
+}
+
+/**
+ * @brief Mark the current frame as lexically scoped.
+ *
+ * The typed-function executor calls this immediately after
+ * debug_push_frame for a `fn` call, so the resulting `debug stack`
+ * output annotates that frame with `[lexical]` instead of the
+ * default `[dynamic]`. No-op if there is no current frame or no
+ * debug context.
+ */
+void debug_mark_current_frame_lexical(debug_context_t *ctx) {
+    if (!ctx || !ctx->current_frame) {
+        return;
+    }
+    ctx->current_frame->is_lexical = true;
 }
 
 /**
@@ -350,7 +370,8 @@ void debug_show_stack(debug_context_t *ctx) {
     int depth = ctx->stack_depth;
 
     while (frame) {
-        debug_printf(ctx, "  #%d: %s", depth, frame->function_name);
+        debug_printf(ctx, "  #%d: %s %s", depth, frame->function_name,
+                     frame->is_lexical ? "[lexical]" : "[dynamic]");
 
         if (frame->file_path) {
             fprintf(ctx->debug_output, " at %s:%d", frame->file_path,

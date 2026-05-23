@@ -384,6 +384,51 @@ TEST(step_mode_breaks_at_next_node) {
     executor_free(exec);
 }
 
+/* --------------------------------------------------------------------------
+ * Typed-function (`fn`) surface
+ *
+ * PHILOSOPHY.md section 7 binds the debugger to keep pace with the
+ * language. The typed-function form (SEMANTICS section 5.3) introduces
+ * a second scoping discipline: bodies resolve free names through a
+ * captured declaration-site scope, not the dynamic caller. These tests
+ * pin that the debugger:
+ *
+ *   - Marks typed-fn frames distinctly in `debug stack` so a debugger
+ *     user can read the discipline directly from the call stack.
+ *   - Still renders `debug vars` and `debug print` inside a typed-fn
+ *     body via the symtable's parent walk -- which, after the lexical
+ *     change, is the captured site, not the caller. The framed-gutter
+ *     output stays consistent (existing kind labels still apply).
+ *
+ * Both assertions catch the discipline difference, not implementation
+ * detail; they go red if the typed-fn surface drifts away from the
+ * documented discipline regardless of how the underlying mechanism
+ * changes.
+ * ------------------------------------------------------------------------ */
+
+TEST(debug_stack_marks_typed_fn_frame_as_lexical) {
+    executor_t *exec = executor_new();
+    debug_context_t *ctx = debug_ctx_new_captured();
+    ASSERT_NOT_NULL(exec, "executor_new");
+    ASSERT_NOT_NULL(ctx, "debug_ctx_new_captured");
+
+    /* A typed fn calls `debug stack` from its own body; the rendered
+     * frame for that call must carry `[lexical]`. */
+    const char *script = "fn show() -> scalar { debug stack; return \"ok\"; }\n"
+                         "let r = show()\n";
+    run_under_debugger(exec, ctx, script, true);
+
+    char log[4096];
+    debug_ctx_read_output(ctx, log, sizeof(log));
+    ASSERT_TRUE(strstr(log, "[lexical]") != NULL,
+                "debug stack annotates typed-fn frame as [lexical]");
+    ASSERT_TRUE(strstr(log, "show") != NULL,
+                "debug stack names the typed-fn callee in the frame line");
+
+    debug_cleanup(ctx);
+    executor_free(exec);
+}
+
 /* ============================================================================
  * Runner
  * ============================================================================
@@ -409,6 +454,9 @@ int main(void) {
 
     printf("\nStep mode:\n");
     RUN_TEST(step_mode_breaks_at_next_node);
+
+    printf("\nTyped-function surface (SEMANTICS section 5.3):\n");
+    RUN_TEST(debug_stack_marks_typed_fn_frame_as_lexical);
 
     return TEST_RESULT();
 }

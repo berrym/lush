@@ -71,6 +71,15 @@ typedef struct debug_frame {
     struct debug_frame *parent; /**< Parent frame */
     struct timespec start_time; /**< Frame start time */
     struct timespec end_time;   /**< Frame end time */
+    /**
+     * Scoping discipline of this frame. True for typed-function (`fn`)
+     * frames whose body resolves free names through a captured
+     * declaration-site scope; false for POSIX-form functions and
+     * top-level frames whose lookup walks the dynamic call chain.
+     * Rendered as `[lexical]` / `[dynamic]` in `debug stack` per
+     * PHILOSOPHY section 7. Set at debug_push_frame time.
+     */
+    bool is_lexical;
 } debug_frame_t;
 
 /**
@@ -277,6 +286,19 @@ void debug_trace_function_call(debug_context_t *ctx, const char *function,
  */
 debug_frame_t *debug_push_frame(debug_context_t *ctx, const char *function,
                                 const char *file, int line);
+
+/**
+ * @brief Mark the current frame as lexically scoped.
+ *
+ * Called by the typed-function executor right after pushing the
+ * frame for a `fn` call. The `debug stack` renderer reads this flag
+ * to annotate the frame with `[lexical]` instead of the default
+ * `[dynamic]`, so a debugger user can see at a glance which scoping
+ * discipline each frame is using (PHILOSOPHY section 7).
+ *
+ * @param ctx Debug context (no-op if NULL or no current frame)
+ */
+void debug_mark_current_frame_lexical(debug_context_t *ctx);
 
 /**
  * @brief Pop the current stack frame

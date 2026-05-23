@@ -18040,6 +18040,16 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
 
     executor_push_context(executor, node->loc, "in typed call '%s'", callee);
 
+    // Push a debug frame and mark it lexical so `debug stack` renders
+    // the discipline. The push only happens when the debug subsystem
+    // is enabled -- mirrors how execute_command guards its push.
+    bool debug_frame_pushed = false;
+    if (g_debug_context && g_debug_context->enabled) {
+        debug_push_frame(g_debug_context, callee, NULL, (int)node->loc.line);
+        debug_mark_current_frame_lexical(g_debug_context);
+        debug_frame_pushed = true;
+    }
+
     // Execute body. Any NODE_FN_RETURN inside surfaces as
     // SHELL_FN_RETURN_STATUS, which we consume here.
     int result = 0;
@@ -18061,6 +18071,9 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
         }
     }
 
+    if (debug_frame_pushed) {
+        debug_pop_frame(g_debug_context);
+    }
     executor_pop_context(executor);
     symtable_pop_scope(executor->symtable);
 
