@@ -286,6 +286,21 @@ lle_result_t lle_segment_registry_register(lle_segment_registry_t *registry,
                                            lle_prompt_segment_t *segment);
 
 /**
+ * @brief Unregister and free a segment by name
+ *
+ * Removes the segment with the given name from the registry, frees
+ * it via lle_segment_free (running its cleanup callback), and shifts
+ * remaining entries down to keep the array compact.
+ *
+ * @param registry  Registry to modify (must be initialized)
+ * @param name      Segment name
+ * @return LLE_SUCCESS on remove, LLE_ERROR_NOT_FOUND if no such
+ *         segment, LLE_ERROR_INVALID_PARAMETER on NULL inputs.
+ */
+lle_result_t lle_segment_registry_unregister(lle_segment_registry_t *registry,
+                                             const char *name);
+
+/**
  * @brief Find a segment by name
  *
  * @param registry  Registry to search

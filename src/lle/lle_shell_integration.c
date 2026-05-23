@@ -91,6 +91,10 @@ bool lle_shell_function_exists(const char *name) {
 /** Global shell integration instance */
 lle_shell_integration_t *g_lle_integration = NULL;
 
+// Forward declarations (definitions live further down; see step 5.5 etc.)
+struct lle_segment_registry;
+struct lle_segment_registry *lle_get_global_segment_registry(void);
+
 /** Flag to prevent double atexit registration */
 static bool atexit_registered = false;
 
@@ -502,6 +506,21 @@ static void destroy_editor(lle_shell_integration_t *integ) {
 static lle_segment_registry_t g_segment_registry;
 static lle_theme_registry_t g_theme_registry;
 static bool g_registries_initialized = false;
+
+/**
+ * @brief Public accessor for the global segment registry
+ *
+ * Returns the static g_segment_registry once it has been initialized.
+ * The pointer is stable for the life of the process. Used by
+ * `display lle segment` to register user-defined segments against the
+ * same registry the prompt composer reads from.
+ */
+struct lle_segment_registry *lle_get_global_segment_registry(void) {
+    if (!g_registries_initialized) {
+        return NULL;
+    }
+    return &g_segment_registry;
+}
 
 /**
  * @brief Create and configure the prompt composer

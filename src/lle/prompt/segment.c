@@ -117,6 +117,34 @@ lle_result_t lle_segment_registry_register(lle_segment_registry_t *registry,
 }
 
 /**
+ * @brief Unregister and free a segment by name
+ *
+ * Walks the registry; if NAME matches a slot, free that slot's segment
+ * and shift subsequent entries down by one. NULL inputs and an
+ * uninitialized registry return INVALID_PARAMETER; absence returns
+ * NOT_FOUND.
+ */
+lle_result_t lle_segment_registry_unregister(lle_segment_registry_t *registry,
+                                             const char *name) {
+    if (!registry || !name || !registry->initialized) {
+        return LLE_ERROR_INVALID_PARAMETER;
+    }
+    for (size_t i = 0; i < registry->count; i++) {
+        if (registry->segments[i] &&
+            strcmp(registry->segments[i]->name, name) == 0) {
+            lle_segment_free(registry->segments[i]);
+            for (size_t j = i; j + 1 < registry->count; j++) {
+                registry->segments[j] = registry->segments[j + 1];
+            }
+            registry->segments[registry->count - 1] = NULL;
+            registry->count--;
+            return LLE_SUCCESS;
+        }
+    }
+    return LLE_ERROR_NOT_FOUND;
+}
+
+/**
  * @brief Find a segment by name
  *
  * Searches the registry for a segment with the given name.

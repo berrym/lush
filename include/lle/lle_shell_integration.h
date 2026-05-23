@@ -187,6 +187,18 @@ bool lle_is_active(void);
 lle_editor_t *lle_get_global_editor(void);
 
 /**
+ * @brief Get the global LLE segment registry
+ *
+ * Returns the static segment registry used by the prompt composer.
+ * Created during shell initialization and shared across the session.
+ * The pointer is stable for the life of the process; it must not be
+ * freed by the caller.
+ *
+ * @return Segment registry pointer, or NULL if LLE is not initialized.
+ */
+struct lle_segment_registry *lle_get_global_segment_registry(void);
+
+/**
  * @brief Update the shell prompt
  *
  * Renders the prompt using the LLE prompt composer and updates PS1/PS2

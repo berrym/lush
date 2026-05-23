@@ -477,6 +477,11 @@ int bin_display(int argc, char **argv) {
             printf("                     list    - Show all attachments\n");
             printf("                     add HOOK WIDGET\n");
             printf("                     remove HOOK WIDGET\n");
+            printf("  segment [cmd]    - User-defined prompt segments\n");
+            printf("                     list    - Show all segments\n");
+            printf("                     add NAME VARIABLE\n");
+            printf("                     remove NAME\n");
+            printf("                     show NAME\n");
             printf("\nHistory:\n");
             printf("  history [cmd]    - History behavior configuration\n");
             printf("                     status  - Show current settings\n");
@@ -523,6 +528,8 @@ int bin_display(int argc, char **argv) {
             return display_lle_widget(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "hook") == 0) {
             return display_lle_hook(argc - 2, argv + 2);
+        } else if (strcmp(lle_cmd, "segment") == 0) {
+            return display_lle_segment(argc - 2, argv + 2);
         } else {
             source_location_t loc = builtin_get_source_location();
             shell_error_t *err = shell_error_create(
