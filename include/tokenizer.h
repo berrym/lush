@@ -18,15 +18,15 @@
 // Simple, clean token classification for parser
 typedef enum {
     /* Basic token types */
-    TOK_EOF,               /**< End of input */
-    TOK_WORD,              /**< Regular word (command, argument, variable name) */
-    TOK_STRING,            /**< Quoted string ('...' - literal) */
+    TOK_EOF,    /**< End of input */
+    TOK_WORD,   /**< Regular word (command, argument, variable name) */
+    TOK_STRING, /**< Quoted string ('...' - literal) */
     /**
      * Double-quoted string ("...") - needs variable expansion
      */
     TOK_EXPANDABLE_STRING,
-    TOK_NUMBER,            /**< Numeric literal */
-    TOK_VARIABLE,          /**< Variable reference ($var, ${var}, etc.) */
+    TOK_NUMBER,   /**< Numeric literal */
+    TOK_VARIABLE, /**< Variable reference ($var, ${var}, etc.) */
 
     /* Operators and separators */
     TOK_SEMICOLON,         /**< ; */
@@ -55,17 +55,17 @@ typedef enum {
      * still concatenates into a single shell word)
      */
     TOK_COMMA,
-    TOK_NOT_EQUAL,         /**< != */
-    TOK_PLUS,              /**< + */
-    TOK_MINUS,             /**< - */
-    TOK_MULTIPLY,          /**< * */
-    TOK_DIVIDE,            /**< / */
-    TOK_MODULO,            /**< % */
-    TOK_GLOB,              /**< * (when used for globbing) */
-    TOK_QUESTION,          /**< ? */
-    TOK_COMMAND_SUB,       /**< $(...) */
-    TOK_ARITH_EXP,         /**< $((...)) */
-    TOK_BACKQUOTE,         /**< ` */
+    TOK_NOT_EQUAL,   /**< != */
+    TOK_PLUS,        /**< + */
+    TOK_MINUS,       /**< - */
+    TOK_MULTIPLY,    /**< * */
+    TOK_DIVIDE,      /**< / */
+    TOK_MODULO,      /**< % */
+    TOK_GLOB,        /**< * (when used for globbing) */
+    TOK_QUESTION,    /**< ? */
+    TOK_COMMAND_SUB, /**< $(...) */
+    TOK_ARITH_EXP,   /**< $((...)) */
+    TOK_BACKQUOTE,   /**< ` */
 
     /* Delimiters */
     TOK_LPAREN,          /**< ( */
@@ -90,7 +90,8 @@ typedef enum {
     TOK_APPEND_BOTH,  /**< &>> - append both stdout and stderr */
 
     /* Control flow extensions (Phase 5) */
-    TOK_CASE_FALLTHROUGH, /**< ;& - case fall-through (execute next without test) */
+    TOK_CASE_FALLTHROUGH, /**< ;& - case fall-through (execute next without
+                             test) */
     TOK_CASE_CONTINUE,    /**< ;;& - case continue (test next pattern) */
 
     /* Keywords (recognized contextually) */
@@ -134,9 +135,9 @@ typedef struct token {
      * the consumed input span; use end_position for that).
      */
     size_t length;
-    size_t line;         /**< Line number (1-based) */
-    size_t column;       /**< Column number (1-based) */
-    size_t position;     /**< Byte offset where this token starts in input. */
+    size_t line;     /**< Line number (1-based) */
+    size_t column;   /**< Column number (1-based) */
+    size_t position; /**< Byte offset where this token starts in input. */
     /**
      * Byte offset immediately AFTER the token's consumed input span.
      * For unquoted tokens this equals position + length; for quoted
@@ -147,7 +148,7 @@ typedef struct token {
      * token2.position == token1.end_position.
      */
     size_t end_position;
-    struct token *next;  /**< For token stream */
+    struct token *next; /**< For token stream */
 } token_t;
 
 // Tokenizer state for parser
@@ -159,7 +160,8 @@ typedef struct tokenizer {
     size_t column;        /**< Current column (1-based) */
     token_t *current;     /**< Current token */
     token_t *lookahead;   /**< Next token (for lookahead) */
-    bool enable_keywords; /**< Whether to recognize keywords (context-sensitive) */
+    bool enable_keywords; /**< Whether to recognize keywords (context-sensitive)
+                           */
     int arith_cmd_depth;  /**< Nesting depth of (( )) arithmetic commands */
 } tokenizer_t;
 

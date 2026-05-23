@@ -20,40 +20,41 @@
 #include <sys/types.h>
 
 typedef enum {
-    NODE_COMMAND, ///< Simple command (argv-style)
-    NODE_ASSIGN,  /**< cmd_prefix assignment: val.str = "var=value" / "var+=value" */
-    NODE_VAR,     ///< Variable reference
-    NODE_STRING_LITERAL,      /**< Single-quoted string - no expansion */
-    NODE_STRING_EXPANDABLE,   /**< Double-quoted string - variable expansion */
-    NODE_ARITH_EXP,           /**< Arithmetic expansion $((expr)) */
-    NODE_COMMAND_SUB,         /**< Command substitution $(cmd) */
-    NODE_PIPE,                ///< Pipe operator '|'
-    NODE_REDIR_IN,            /**< '<' */
-    NODE_REDIR_OUT,           /**< '>' */
-    NODE_REDIR_APPEND,        /**< '>>' */
-    NODE_REDIR_ERR,           /**< 'N>' (any fd output, e.g., 2>, 3>) */
-    NODE_REDIR_IN_FD,         /**< 'N<' (any fd input, e.g., 3<, 4<) */
-    NODE_REDIR_ERR_APPEND,    /**< 'N>>' (any fd append, e.g., 2>>, 3>>) */
-    NODE_REDIR_HEREDOC,       /**< '<<' */
+    NODE_COMMAND,           ///< Simple command (argv-style)
+    NODE_ASSIGN,            /**< cmd_prefix assignment: val.str = "var=value" /
+                               "var+=value" */
+    NODE_VAR,               ///< Variable reference
+    NODE_STRING_LITERAL,    /**< Single-quoted string - no expansion */
+    NODE_STRING_EXPANDABLE, /**< Double-quoted string - variable expansion */
+    NODE_ARITH_EXP,         /**< Arithmetic expansion $((expr)) */
+    NODE_COMMAND_SUB,       /**< Command substitution $(cmd) */
+    NODE_PIPE,              ///< Pipe operator '|'
+    NODE_REDIR_IN,          /**< '<' */
+    NODE_REDIR_OUT,         /**< '>' */
+    NODE_REDIR_APPEND,      /**< '>>' */
+    NODE_REDIR_ERR,         /**< 'N>' (any fd output, e.g., 2>, 3>) */
+    NODE_REDIR_IN_FD,       /**< 'N<' (any fd input, e.g., 3<, 4<) */
+    NODE_REDIR_ERR_APPEND,  /**< 'N>>' (any fd append, e.g., 2>>, 3>>) */
+    NODE_REDIR_HEREDOC,     /**< '<<' */
     NODE_REDIR_HEREDOC_STRIP, /**< '<<-' */
     NODE_REDIR_HERESTRING,    /**< '<<<' */
     NODE_REDIR_BOTH,          /**< '&>' */
     NODE_REDIR_BOTH_APPEND,   /**< '&>>' - append both stdout and stderr */
     NODE_REDIR_FD,            /**< '&1', '&2', etc. */
-    NODE_REDIR_FD_ALLOC,      /**< '{varname}>' - fd allocation (bash 4.1+/zsh) */
-    NODE_REDIR_CLOBBER,       /**< '>|' */
+    NODE_REDIR_FD_ALLOC, /**< '{varname}>' - fd allocation (bash 4.1+/zsh) */
+    NODE_REDIR_CLOBBER,  /**< '>|' */
     /* List types for semantic clarity */
     NODE_COMMAND_LIST, /**< Sequence of commands separated by semicolons */
     NODE_PIPELINE,     /**< Sequence of commands connected by pipes */
     /* Control structures */
-    NODE_IF,          /**< if statement */
-    NODE_FOR,         /**< for loop (POSIX: for var in words) */
-    NODE_FOR_ARITH,   /**< C-style for loop: for ((init; test; update)) */
-    NODE_WHILE,       /**< while loop */
-    NODE_UNTIL,       /**< until loop */
-    NODE_REPEAT,      /**< zsh repeat N loop: repeat N do/done OR repeat N {...} */
-    NODE_CASE,        /**< case statement */
-    NODE_FUNCTION,    /**< function definition */
+    NODE_IF,        /**< if statement */
+    NODE_FOR,       /**< for loop (POSIX: for var in words) */
+    NODE_FOR_ARITH, /**< C-style for loop: for ((init; test; update)) */
+    NODE_WHILE,     /**< while loop */
+    NODE_UNTIL,     /**< until loop */
+    NODE_REPEAT,   /**< zsh repeat N loop: repeat N do/done OR repeat N {...} */
+    NODE_CASE,     /**< case statement */
+    NODE_FUNCTION, /**< function definition */
     NODE_BRACE_GROUP, /**< brace group { commands; } */
     NODE_SUBSHELL,    /**< subshell ( commands ) */
     /* Logical operators */
@@ -84,7 +85,8 @@ typedef enum {
     NODE_NEGATE,    /**< ! pipeline - negate exit status */
 
     /* Extended language features (Phase 7: Zsh-Specific) */
-    NODE_ANON_FUNCTION, /**< () { body } - anonymous function (immediately executed) */
+    NODE_ANON_FUNCTION, /**< () { body } - anonymous function (immediately
+                           executed) */
 } node_type_t;
 
 // Case item terminator types for fall-through behavior
