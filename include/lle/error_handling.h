@@ -188,7 +188,7 @@ typedef enum {
  * @brief Buffer Management specific errors
  */
 typedef enum {
-    LLE_BUFFER_ERROR_BASE = LLE_ERROR_BUFFER_COMPONENT,
+    LLE_BUFFER_ERROR_BASE = LLE_ERROR_BUFFER_COMPONENT, ///< Base code for buffer errors
     LLE_BUFFER_ERROR_INVALID_CURSOR_POSITION, /**< Cursor position invalid */
     LLE_BUFFER_ERROR_TEXT_ENCODING_INVALID,   /**< Text encoding error */
     LLE_BUFFER_ERROR_MULTILINE_CORRUPTION, /**< Multiline structure corrupted */
@@ -204,7 +204,7 @@ typedef enum {
  * @brief Event System specific errors
  */
 typedef enum {
-    LLE_EVENT_ERROR_BASE = LLE_ERROR_EVENT_SYSTEM,
+    LLE_EVENT_ERROR_BASE = LLE_ERROR_EVENT_SYSTEM, ///< Base code for event system errors
     LLE_EVENT_ERROR_QUEUE_OVERFLOW,              /**< Event queue overflow */
     LLE_EVENT_ERROR_INVALID_PRIORITY,            /**< Invalid event priority */
     LLE_EVENT_ERROR_HANDLER_REGISTRATION_FAILED, /**< Handler registration
@@ -220,7 +220,7 @@ typedef enum {
  * @brief Terminal Abstraction specific errors
  */
 typedef enum {
-    LLE_TERMINAL_ERROR_BASE = LLE_ERROR_TERMINAL_ABSTRACTION,
+    LLE_TERMINAL_ERROR_BASE = LLE_ERROR_TERMINAL_ABSTRACTION, ///< Base code for terminal errors
     LLE_TERMINAL_ERROR_CAPABILITY_DETECTION_FAILED, /**< Capability detection
                                                        failed */
     LLE_TERMINAL_ERROR_UNSUPPORTED_TERMINAL, /**< Terminal type unsupported */
@@ -499,8 +499,10 @@ typedef struct lle_feature_degradation_map {
     const char *fallback_description; /**< Fallback description */
 
     /* Degradation functions */
+    /** Apply degradation to the feature at the given level */
     lle_result_t (*apply_degradation)(uint32_t degradation_level,
                                       void *feature_data);
+    /** Restore the feature from a degraded state */
     lle_result_t (*restore_feature)(void *feature_data);
 } lle_feature_degradation_map_t;
 
@@ -697,9 +699,13 @@ typedef struct lle_error_validation_test {
     uint64_t max_recovery_time_ns; /**< Maximum recovery time */
 
     /* Test functions */
+    /** Prepare test fixtures and state before execution */
     lle_result_t (*setup_test)(void *test_context);
+    /** Execute the validation test body */
     lle_result_t (*execute_test)(void *test_context);
+    /** Validate the result returned by the test */
     lle_result_t (*validate_result)(void *test_context, lle_result_t result);
+    /** Tear down test fixtures and release resources */
     lle_result_t (*cleanup_test)(void *test_context);
 } lle_error_validation_test_t;
 
@@ -710,6 +716,16 @@ typedef struct lle_error_validation_test {
  */
 
 /* Error Context Management */
+/**
+ * @brief Create a new error context populated with the supplied fields
+ * @param error_code Primary error code
+ * @param message Human-readable error message
+ * @param function Function name where the error occurred
+ * @param file Source file name
+ * @param line Line number in source
+ * @param component LLE component name
+ * @return New error context on success, NULL on failure
+ */
 lle_error_context_t *lle_create_error_context(lle_result_t error_code,
                                               const char *message,
                                               const char *function,
@@ -720,99 +736,324 @@ lle_error_context_t *lle_create_error_context(lle_result_t error_code,
     lle_create_error_context(code, message, __func__, __FILE__, __LINE__,      \
                              component)
 
+/**
+ * @brief Destroy an error context and release its resources
+ * @param ctx Error context to destroy
+ */
 void lle_error_context_destroy(lle_error_context_t *ctx);
 
+/**
+ * @brief Allocate an error context from the fast pre-allocated pool
+ * @return New error context on success, NULL on failure
+ */
 lle_error_context_t *lle_allocate_fast_error_context(void);
+
+/**
+ * @brief Release a fast-pool error context back to the pool
+ * @param ctx Error context to release
+ */
 void lle_release_fast_error_context(lle_error_context_t *ctx);
+
+/**
+ * @brief Initialize a memory-safe error context
+ * @param ctx Memory-safe error context to initialize
+ */
 void lle_init_memory_safe_error_context(lle_memory_safe_error_context_t *ctx);
+
+/**
+ * @brief Cleanup a memory-safe error context and release tracked resources
+ * @param ctx Memory-safe error context to clean up
+ */
 void lle_cleanup_memory_safe_error_context(
     lle_memory_safe_error_context_t *ctx);
 
 /* Error Severity */
+/**
+ * @brief Determine the severity of an error using its code and context
+ * @param error_code Error code to classify
+ * @param context Optional error context for refinement
+ * @return Severity level
+ */
 lle_error_severity_t
 lle_determine_error_severity(lle_result_t error_code,
                              const lle_error_context_t *context);
 
+/**
+ * @brief Fast severity classification from error code alone
+ * @param error_code Error code to classify
+ * @return Severity level
+ */
 lle_error_severity_t lle_fast_determine_severity(lle_result_t error_code);
 
 /* Error Reporting */
+/**
+ * @brief Report an error through all configured reporting channels
+ * @param context Error context to report
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_report_error(const lle_error_context_t *context);
+
+/**
+ * @brief Report an error to the console
+ * @param context Error context to report
+ */
 void lle_report_error_to_console(const lle_error_context_t *context);
+
+/**
+ * @brief Report an error to the configured log file
+ * @param system Reporting system holding the log file handle
+ * @param context Error context to report
+ */
 void lle_report_error_to_log_file(lle_error_reporting_system_t *system,
                                   const lle_error_context_t *context);
+
+/**
+ * @brief Report an error to the system log
+ * @param context Error context to report
+ */
 void lle_report_error_to_system_log(const lle_error_context_t *context);
+
+/**
+ * @brief Fast path for reporting critical errors
+ * @param ctx Error context to report
+ */
 void lle_fast_report_critical_error(const lle_error_context_t *ctx);
+
+/**
+ * @brief Check if an error should be suppressed by the suppression table
+ * @param system Reporting system holding the suppression table
+ * @param context Error context to check
+ * @return true if the error should be suppressed, false otherwise
+ */
 bool lle_should_suppress_error(lle_error_reporting_system_t *system,
                                const lle_error_context_t *context);
 
 /* Recovery Strategy */
+/**
+ * @brief Select the best recovery strategy for an error context
+ * @param error_context Error context to recover from
+ * @return Selected recovery strategy on success, NULL on failure
+ */
 lle_recovery_strategy_t *
 lle_select_recovery_strategy(const lle_error_context_t *error_context);
 
+/**
+ * @brief Retrieve all candidate recovery strategies for a given error code
+ * @param error_code Error code to look up
+ * @param strategies Output pointer receiving the strategies array
+ * @param strategy_count Output pointer receiving the number of strategies
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_get_recovery_strategies_for_error(lle_result_t error_code,
                                       lle_recovery_strategy_t **strategies,
                                       size_t *strategy_count);
 
 /* Degradation Control */
+/**
+ * @brief Apply a system degradation level via the degradation controller
+ * @param controller Degradation controller
+ * @param target_level Degradation level to apply
+ * @param reason Human-readable reason for the degradation
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_apply_degradation(lle_degradation_controller_t *controller,
                                    lle_degradation_level_t target_level,
                                    const char *reason);
 
+/**
+ * @brief Log a degradation event for diagnostics
+ * @param level Degradation level applied
+ * @param reason Human-readable reason for the degradation
+ */
 void lle_log_degradation_event(lle_degradation_level_t level,
                                const char *reason);
 
 /* Component-Specific Error Handlers */
+/**
+ * @brief Handle a buffer subsystem error
+ * @param buffer Buffer instance the error occurred in
+ * @param error Buffer-specific error code
+ * @param error_context Associated error context
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
                                      const void *error_context);
 
+/**
+ * @brief Handle an event system error, updating the circuit breaker
+ * @param event_system Event system instance the error occurred in
+ * @param error Event-specific error code
+ * @param breaker Circuit breaker tracking failure thresholds
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_handle_event_system_error(void *event_system, lle_event_error_t error,
                               lle_event_circuit_breaker_t *breaker);
 
 /* Memory Integration */
+/**
+ * @brief Initialize the dedicated memory pools used by the error subsystem
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_init_error_memory_pools(void);
+
+/**
+ * @brief Allocate memory from the error subsystem's memory pool
+ * @param size Number of bytes to allocate
+ * @return Pointer to allocated memory on success, NULL on failure
+ */
 void *lle_error_pool_alloc(size_t size);
+
+/**
+ * @brief Duplicate a string into the error subsystem's string pool
+ * @param str Null-terminated source string
+ * @return Pointer to the duplicated string on success, NULL on failure
+ */
 char *lle_error_string_pool_strdup(const char *str);
 
 /* Forensic Logging */
+/**
+ * @brief Create a forensic log entry capturing system state for an error
+ * @param error_context Error context to capture
+ * @param log_entry Output pointer receiving the new forensic log entry
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_create_forensic_log_entry(const lle_error_context_t *error_context,
                               lle_forensic_log_entry_t **log_entry);
 
+/**
+ * @brief Generate a technical details string for an error code
+ * @param error_code Error code to describe
+ * @return Pointer to a technical details string (static or pool-owned)
+ */
 const char *lle_generate_technical_details(lle_result_t error_code);
 
 /* Performance-Critical Path */
+/**
+ * @brief Handle an error on the performance-critical execution path
+ * @param error_code Error code that occurred
+ * @param component Component name where the error occurred
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_handle_critical_path_error(lle_result_t error_code,
                                             const char *component);
 
 /* Timing Functions */
+/**
+ * @brief Get a fast monotonic timestamp in nanoseconds
+ * @return Timestamp in nanoseconds
+ */
 uint64_t lle_get_fast_timestamp_ns(void);
+
+/**
+ * @brief Get the current thread identifier from a thread-local cache
+ * @return Thread identifier
+ */
 uint64_t lle_get_thread_id_cached(void);
+
+/**
+ * @brief Get the current thread identifier
+ * @return Thread identifier
+ */
 uint64_t lle_get_thread_id(void);
+
+/**
+ * @brief Get a monotonic timestamp in nanoseconds
+ * @return Timestamp in nanoseconds
+ */
 uint64_t lle_get_timestamp_ns(void);
 
 /* Atomic Operations */
+/**
+ * @brief Atomically increment an error statistics counter
+ * @param counter Pointer to the atomic counter
+ */
 void lle_error_increment_counter(_Atomic uint64_t *counter);
+
+/**
+ * @brief Atomically read an error statistics counter
+ * @param counter Pointer to the atomic counter
+ * @return Current counter value
+ */
 uint64_t lle_error_read_counter(_Atomic uint64_t *counter);
+
+/**
+ * @brief Atomically update a maximum-time counter if new_time is greater
+ * @param max_time Pointer to the atomic maximum-time counter
+ * @param new_time Candidate new maximum time
+ */
 void lle_error_update_max_time(_Atomic uint64_t *max_time, uint64_t new_time);
+
+/**
+ * @brief Try to atomically acquire a pre-allocated error context slot
+ * @return true if a slot was acquired, false otherwise
+ */
 bool lle_error_try_acquire_context_atomic(void);
+
+/**
+ * @brief Atomically release a pre-allocated error context slot
+ */
 void lle_error_release_context_atomic(void);
 
+/**
+ * @brief Update error statistics using lock-free atomic operations
+ * @param error_code Error code that occurred
+ * @param severity Severity classification
+ * @param recovery_time_ns Time taken for recovery in nanoseconds
+ * @param recovery_successful Whether recovery succeeded
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_error_update_statistics_lockfree(lle_result_t error_code,
                                                   lle_error_severity_t severity,
                                                   uint64_t recovery_time_ns,
                                                   bool recovery_successful);
 
 /* System State */
+/**
+ * @brief Get the identifier of the current in-flight operation
+ * @return Current operation identifier
+ */
 uint64_t lle_get_current_operation_id(void);
+
+/**
+ * @brief Get the name of the current in-flight operation
+ * @return Pointer to the current operation name
+ */
 const char *lle_get_current_operation_name(void);
+
+/**
+ * @brief Get the bitmask of currently active LLE components
+ * @return Bitmask of active components
+ */
 uint32_t lle_get_active_components_mask(void);
+
+/**
+ * @brief Calculate the current system load factor
+ * @return System load factor (0-100)
+ */
 uint32_t lle_calculate_system_load(void);
+
+/**
+ * @brief Measure the current error-handling performance impact
+ * @return Performance impact measurement in nanoseconds
+ */
 uint64_t lle_measure_current_performance_impact(void);
+
+/**
+ * @brief Check whether the critical execution path is currently active
+ * @return true if the critical path is active, false otherwise
+ */
 bool lle_is_critical_path_active(void);
 
 /* Testing and Validation */
+/**
+ * @brief Possibly inject a test error based on injection configuration
+ * @param component Component name being tested
+ * @param operation Operation name being tested
+ * @return Injected error code, or LLE_SUCCESS when no injection occurs
+ */
 lle_result_t lle_maybe_inject_error(const char *component,
                                     const char *operation);
 
@@ -823,10 +1064,26 @@ lle_result_t lle_maybe_inject_error(const char *component,
             return injected;                                                   \
     } while (0)
 
+/**
+ * @brief Log an error injection event for diagnostics
+ * @param component Component name where injection occurred
+ * @param operation Operation name where injection occurred
+ * @param error_code Injected error code
+ */
 void lle_log_error_injection(const char *component, const char *operation,
                              lle_result_t error_code);
 
+/**
+ * @brief Run the full error-handling validation test suite
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t lle_run_error_handling_validation_suite(void);
+
+/**
+ * @brief Run a single error-handling validation test
+ * @param test Validation test definition to execute
+ * @return LLE_SUCCESS or an error code on failure
+ */
 lle_result_t
 lle_run_individual_validation_test(const lle_error_validation_test_t *test);
 
