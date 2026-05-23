@@ -49,8 +49,8 @@ static const char *debug_var_type_label(symvar_type_t type,
 static void debug_local_var_print_cb(const char *name, const char *value,
                                      symvar_type_t type, void *userdata) {
     debug_context_t *ctx = (debug_context_t *)userdata;
-    debug_printf(ctx, "  %-12s %-7s \"%s\"\n", name,
-                 debug_var_type_label(type, false), value);
+    debug_view_emit_line(ctx, "%-12s %-7s \"%s\"", name,
+                         debug_var_type_label(type, false), value);
 }
 
 /* Callback printing one array entry from symtable_enumerate_arrays. */
@@ -60,9 +60,10 @@ static void debug_array_print_cb(const char *name, array_value_t *array,
     if (!array) {
         return;
     }
-    debug_printf(ctx, "  %-12s %-7s (%zu element%s)\n", name,
-                 debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
-                 array->count, array->count == 1 ? "" : "s");
+    debug_view_emit_line(
+        ctx, "%-12s %-7s (%zu element%s)", name,
+        debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
+        array->count, array->count == 1 ? "" : "s");
 }
 
 /**
@@ -360,34 +361,38 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    debug_printf(ctx, "VARIABLE: %s\n", name);
-
-    // Clean variable name (remove $ prefix if present)
+    /* Clean variable name (remove $ prefix if present) */
     const char *clean_name = (name[0] == '$') ? name + 1 : name;
 
+    char frame_title[128];
+    snprintf(frame_title, sizeof(frame_title), "Variable: %s", clean_name);
+    debug_view_begin_frame(ctx, frame_title);
+
     if (!current_executor) {
-        debug_printf(ctx, "  Error: No executor context available\n");
+        debug_view_emit_line(ctx, "Error: No executor context available");
+        debug_view_end_frame(ctx);
         return;
     }
 
-    // Arrays first -- they carry the richest type info (List vs Map).
+    /* Arrays first -- they carry the richest type info (List vs Map). */
     array_value_t *array = symtable_get_array(clean_name);
     if (array) {
-        debug_printf(
-            ctx, "  Type:  %s\n",
+        debug_view_emit_line(
+            ctx, "Type:  %s",
             debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
-        debug_printf(ctx, "  Count: %zu element%s\n", array->count,
-                     array->count == 1 ? "" : "s");
-        debug_printf(ctx, "  Scope: %s\n",
-                     symtable_current_scope_type(symtable_manager()) ==
-                             SCOPE_GLOBAL
-                         ? "global"
-                         : "function");
+        debug_view_emit_line(ctx, "Count: %zu element%s", array->count,
+                             array->count == 1 ? "" : "s");
+        debug_view_emit_line(
+            ctx, "Scope: %s",
+            symtable_current_scope_type(symtable_manager()) == SCOPE_GLOBAL
+                ? "global"
+                : "function");
+        debug_view_end_frame(ctx);
         return;
     }
 
-    // Scalar via the scope chain: symtable_get_var walks current scope
-    // up to global. The return is heap-allocated and must be freed.
+    /* Scalar via the scope chain: symtable_get_var walks current scope
+     * up to global. The return is heap-allocated and must be freed. */
     char *owned_value = symtable_get_var(symtable_manager(), clean_name);
     const char *value = owned_value;
     const char *scope = NULL;
@@ -397,8 +402,8 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
                 ? "shell (in or above current scope)"
                 : "global";
     } else {
-        // Environment fallback for unexported shell vars that landed
-        // in the process environment.
+        /* Environment fallback for unexported shell vars that landed
+         * in the process environment. */
         value = getenv(clean_name);
         if (value) {
             scope = "environment";
@@ -406,68 +411,63 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
     }
 
     if (value) {
-        debug_printf(ctx, "  Type:  Scalar\n");
-        debug_printf(ctx, "  Value: \"%s\"\n", value);
-        debug_printf(ctx, "  Length: %zu characters\n", strlen(value));
-        debug_printf(ctx, "  Scope: %s\n", scope);
+        debug_view_emit_line(ctx, "Type:  Scalar");
+        debug_view_emit_line(ctx, "Value: \"%s\"", value);
+        debug_view_emit_line(ctx, "Length: %zu characters", strlen(value));
+        debug_view_emit_line(ctx, "Scope: %s", scope);
 
-        // Show first few characters if value is very long.
         if (strlen(value) > 100) {
             char preview[104];
             strncpy(preview, value, 100);
             preview[100] = '\0';
-            debug_printf(ctx, "  Preview: \"%.100s...\"\n", preview);
+            debug_view_emit_line(ctx, "Preview: \"%.100s...\"", preview);
         }
         free(owned_value);
+        debug_view_end_frame(ctx);
         return;
     }
     free(owned_value);
 
-    {
-        // Check for special variables
-        if (strcmp(clean_name, "?") == 0) {
-            const char *exit_status = symtable_get_global("?") ?: "0";
-            debug_printf(ctx, "  Value: '%s' (last exit status)\n",
-                         exit_status);
-            debug_printf(ctx, "  Type: numeric\n");
-            debug_printf(ctx, "  Scope: special\n");
-        } else if (strcmp(clean_name, "$") == 0) {
-            const char *shell_pid = symtable_get_global("$");
-            if (!shell_pid) {
-                shell_pid = "unknown";
-            }
-            debug_printf(ctx, "  Value: '%s' (shell PID)\n", shell_pid);
-            debug_printf(ctx, "  Type: numeric\n");
-            debug_printf(ctx, "  Scope: special\n");
-        } else if (strcmp(clean_name, "PWD") == 0) {
-            debug_printf(ctx, "  Value: '%s' (current directory)\n",
-                         symtable_get_global("PWD") ?: "unknown");
-        } else if (strcmp(clean_name, "HOME") == 0) {
-            debug_printf(ctx, "  Value: '%s' (home directory)\n",
-                         symtable_get_global("HOME") ?: "unknown");
-        } else if (strcmp(clean_name, "PATH") == 0) {
-            const char *path = symtable_get_global("PATH");
-            if (path) {
-                debug_printf(ctx, "  Value: '%s'\n", path);
-                debug_printf(ctx, "  Type: PATH variable\n");
-                // Count PATH entries
-                int count = 1;
-                for (const char *p = path; *p; p++) {
-                    if (*p == ':') {
-                        count++;
-                    }
-                }
-                debug_printf(ctx, "  Entries: %d\n", count);
-            } else {
-                debug_printf(ctx, "  Value: (unset)\n");
-            }
-        } else {
-            debug_printf(ctx, "  Value: (unset or not found)\n");
+    /* Special-variable fallback. */
+    if (strcmp(clean_name, "?") == 0) {
+        const char *exit_status = symtable_get_global("?") ?: "0";
+        debug_view_emit_line(ctx, "Value: \"%s\" (last exit status)",
+                             exit_status);
+        debug_view_emit_line(ctx, "Type:  numeric");
+        debug_view_emit_line(ctx, "Scope: special");
+    } else if (strcmp(clean_name, "$") == 0) {
+        const char *shell_pid = symtable_get_global("$");
+        if (!shell_pid) {
+            shell_pid = "unknown";
         }
-        debug_printf(ctx, "  Scope: %s\n",
-                     ctx->current_frame ? ctx->current_frame->function_name
-                                        : "global");
+        debug_view_emit_line(ctx, "Value: \"%s\" (shell PID)", shell_pid);
+        debug_view_emit_line(ctx, "Type:  numeric");
+        debug_view_emit_line(ctx, "Scope: special");
+    } else if (strcmp(clean_name, "PWD") == 0) {
+        debug_view_emit_line(ctx, "Value: \"%s\" (current directory)",
+                             symtable_get_global("PWD") ?: "unknown");
+    } else if (strcmp(clean_name, "HOME") == 0) {
+        debug_view_emit_line(ctx, "Value: \"%s\" (home directory)",
+                             symtable_get_global("HOME") ?: "unknown");
+    } else if (strcmp(clean_name, "PATH") == 0) {
+        const char *path = symtable_get_global("PATH");
+        if (path) {
+            debug_view_emit_line(ctx, "Value: \"%s\"", path);
+            debug_view_emit_line(ctx, "Type:  PATH variable");
+            int count = 1;
+            for (const char *p = path; *p; p++) {
+                if (*p == ':') {
+                    count++;
+                }
+            }
+            debug_view_emit_line(ctx, "Entries: %d", count);
+        } else {
+            debug_view_emit_line(ctx, "Value: (unset)");
+        }
+    } else {
+        debug_view_emit_line(ctx, "Value: (unset or not found)");
     }
+    debug_view_end_frame(ctx);
 }
 
 /**
@@ -504,10 +504,10 @@ static void debug_var_enum_callback(const char *key, const char *value,
                 '\0'; // Terminate at first separator to get clean value
         }
 
-        debug_printf(data->ctx, "  %-12s = '%s'\n", key, clean_value);
+        debug_view_emit_line(data->ctx, "%-12s = \"%s\"", key, clean_value);
         free(clean_value);
     } else {
-        debug_printf(data->ctx, "  %-12s = '%s'\n", key, value);
+        debug_view_emit_line(data->ctx, "%-12s = \"%s\"", key, value);
     }
 }
 
@@ -532,78 +532,73 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
      * not the scope, so it would mislabel inside builtins, loops, etc. */
     const char *current_scope_name =
         symtable_current_scope_name(symtable_manager());
-    debug_printf(ctx, "Current scope: %s\n",
-                 current_scope_name ? current_scope_name : "global");
-    debug_printf(ctx, "\n");
+    debug_view_begin_frame(ctx, "Variable State");
+    debug_view_emit_line(ctx, "Current scope: %s",
+                         current_scope_name ? current_scope_name : "global");
+    debug_view_end_frame(ctx);
 
     // Show local variables when inside any non-global scope (function
     // body, loop body, etc.). Iterates the current scope's vars_ht
     // directly so values shadowed from outer scopes are not included.
     if (symtable_current_scope_type(symtable_manager()) != SCOPE_GLOBAL) {
-        debug_printf(ctx, "Local Variables:\n");
+        debug_view_begin_frame(ctx, "Local Variables");
         symtable_enumerate_current_scope_vars(symtable_manager(),
                                               debug_local_var_print_cb, ctx);
-        debug_printf(ctx, "\n");
+        debug_view_end_frame(ctx);
     }
 
-    // Enumerate shell variables using callback-based approach
-    debug_printf(ctx, "Shell Variables (from symbol table):\n");
-
+    // Globals: shell variables from the symtable.
+    debug_view_begin_frame(ctx, "Shell Variables");
     debug_var_callback_data_t callback_data = {ctx, false};
-
-    // Enumerate global variables
     symtable_debug_enumerate_global_vars(debug_var_enum_callback,
                                          &callback_data);
-
     if (!callback_data.found_any) {
-        debug_printf(ctx, "  (no user-defined shell variables found)\n");
+        debug_view_emit_line(ctx, "(no user-defined shell variables found)");
     }
-    debug_printf(ctx, "\n");
+    debug_view_end_frame(ctx);
 
     // Arrays (Lists and Maps) -- not in any scope's vars_ht; lush stores
     // them in separate global array storage. Render with the
     // is_associative-derived type label and element count.
-    debug_printf(ctx, "Arrays:\n");
+    debug_view_begin_frame(ctx, "Arrays");
     symtable_enumerate_arrays(debug_array_print_cb, ctx);
-    debug_printf(ctx, "\n");
+    debug_view_end_frame(ctx);
 
-    // Also show commonly accessed system variables for completeness
-    debug_printf(ctx, "System Variables:\n");
+    // Commonly accessed system variables for context.
+    debug_view_begin_frame(ctx, "System Variables");
     const char *common_vars[] = {"PWD", "HOME",   "PATH", "USER", "SHELL", "?",
                                  "$",   "OLDPWD", "PS1",  "PS2",  NULL};
     bool found_any = false;
-
     for (int i = 0; common_vars[i]; i++) {
         const char *value = symtable_get_global(common_vars[i]);
         if (value) {
-            debug_printf(ctx, "  %-12s = '%s'\n", common_vars[i], value);
+            debug_view_emit_line(ctx, "%-12s = \"%s\"", common_vars[i], value);
             found_any = true;
         }
     }
-
     if (!found_any) {
-        debug_printf(ctx, "  (no system variables found)\n");
+        debug_view_emit_line(ctx, "(no system variables found)");
     }
-    debug_printf(ctx, "\n");
+    debug_view_end_frame(ctx);
 
-    debug_printf(ctx, "Environment Variables (first 10):\n");
-    // Show a few key environment variables
+    debug_view_begin_frame(ctx, "Environment Variables (first 10)");
     extern char **environ;
     int count = 0;
     for (char **env = environ; *env && count < 10; env++, count++) {
         char *eq = strchr(*env, '=');
         if (eq) {
             *eq = '\0';
-            debug_printf(ctx, "  %-12s = '%s'\n", *env, eq + 1);
+            debug_view_emit_line(ctx, "%-12s = \"%s\"", *env, eq + 1);
             *eq = '='; // Restore
         }
     }
+    debug_view_end_frame(ctx);
 
     if (environ && *environ) {
-        debug_printf(
-            ctx,
-            "\nUse 'debug print <varname>' to inspect specific variables\n");
-        debug_printf(ctx, "Use 'debug stack' to see call stack and context\n");
+        debug_view_emit_line(
+            ctx, "Use 'debug print <varname>' to inspect specific variables");
+        debug_view_emit_line(
+            ctx, "Use 'debug stack' to see call stack and context");
     }
 }
 

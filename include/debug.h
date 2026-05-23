@@ -673,6 +673,40 @@ void debug_printf(debug_context_t *ctx, const char *format, ...);
 void debug_trace_printf(debug_context_t *ctx, const char *format, ...);
 
 /**
+ * @brief Emit one user-facing debugger line with a left gutter
+ *
+ * Prepends the gutter glyph (UTF-8 "|" or ASCII "|") to make debugger
+ * output visually distinct from intermingled script output. Used for
+ * breakpoint banners, step indicators, and the interior lines of
+ * framed blocks (those are bracketed by debug_view_begin_frame /
+ * debug_view_end_frame).
+ *
+ * @param ctx Debug context
+ * @param format printf-style format string (no trailing newline needed)
+ * @param ... Format arguments
+ */
+void debug_view_emit_line(debug_context_t *ctx, const char *format, ...);
+
+/**
+ * @brief Open a framed block with an optional title
+ *
+ * Writes the top border: `+- [title] ---...` (ASCII) or `┌─ [title] ─...`
+ * (UTF-8). Pair with debug_view_end_frame.
+ *
+ * @param ctx Debug context
+ * @param title Title to embed in the border, or NULL/"" for an
+ *              unlabeled frame.
+ */
+void debug_view_begin_frame(debug_context_t *ctx, const char *title);
+
+/**
+ * @brief Close a framed block opened with debug_view_begin_frame
+ *
+ * @param ctx Debug context
+ */
+void debug_view_end_frame(debug_context_t *ctx);
+
+/**
  * @brief Print a separator line
  *
  * @param ctx Debug context

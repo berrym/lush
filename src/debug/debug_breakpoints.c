@@ -145,21 +145,23 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
             bp->hit_count++;
 
             debug_trace_printf(ctx, "BREAKPOINT MATCHED - entering debug mode\n");
-            debug_printf(ctx, "\n>>> BREAKPOINT HIT <<<\n");
-            debug_printf(ctx, "Breakpoint %d at %s:%d (hit count: %d)\n",
-                         bp->id, file, line, bp->hit_count);
+            debug_view_begin_frame(ctx, "BREAKPOINT HIT");
+            debug_view_emit_line(ctx, "Breakpoint %d at %s:%d (hit count: %d)",
+                                 bp->id, file, line, bp->hit_count);
 
             // Evaluate condition if present
             if (bp->condition) {
                 bool condition_met =
                     debug_evaluate_condition(ctx, bp->condition);
-                debug_printf(ctx, "  Condition: %s -> %s\n", bp->condition,
-                             condition_met ? "true" : "false");
+                debug_view_emit_line(ctx, "Condition: %s -> %s", bp->condition,
+                                     condition_met ? "true" : "false");
                 if (!condition_met) {
+                    debug_view_end_frame(ctx);
                     debug_trace_printf(ctx, "Condition not met, continuing\n");
                     return false; // Continue execution if condition not met
                 }
             }
+            debug_view_end_frame(ctx);
 
             // Show current context
             debug_show_context(ctx, file, line);
@@ -182,8 +184,9 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
     // the step target -- that is what makes step-over skip nested
     // function bodies and step-out run on to the caller.
     if (ctx->step_mode && ctx->stack_depth <= ctx->step_target_depth) {
-        debug_printf(ctx, "\n>>> STEP <<<\n");
-        debug_printf(ctx, "At %s:%d\n", file, line);
+        debug_view_begin_frame(ctx, "STEP");
+        debug_view_emit_line(ctx, "At %s:%d", file, line);
+        debug_view_end_frame(ctx);
         debug_show_context(ctx, file, line);
         debug_enter_interactive_mode(ctx);
         return true;

@@ -690,7 +690,10 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
 
     char log[8192];
     read_debug_output(ctx, log, sizeof(log));
-    ASSERT_TRUE(strstr(log, "Local Variables:") != NULL,
+    /* The Local Variables section is now a framed block titled
+     * "[Local Variables]" -- match the bracketed title across both
+     * UTF-8 and ASCII glyph sets. */
+    ASSERT_TRUE(strstr(log, "[Local Variables]") != NULL,
                 "Local Variables section present");
     ASSERT_TRUE(strstr(log, "greeting") != NULL,
                 "local variable name appears");
@@ -831,6 +834,72 @@ TEST(show_variable_type_unset) {
     debug_cleanup(ctx);
 }
 
+/* Test seams declared in src/debug/debug_view.c -- not public API. */
+void debug_view_force_ascii_for_tests(void);
+void debug_view_force_utf8_for_tests(void);
+void debug_view_reset_glyph_cache(void);
+
+TEST(view_emit_line_ascii_uses_pipe_gutter) {
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured ctx");
+    debug_view_force_ascii_for_tests();
+
+    debug_view_emit_line(ctx, "hello %d", 42);
+
+    char log[256];
+    read_debug_output(ctx, log, sizeof(log));
+    /* The captured output also carries debug_enable's preamble; check
+     * that the gutter-prefixed line is present rather than requiring
+     * exact equality. */
+    ASSERT_TRUE(strstr(log, "| hello 42\n") != NULL,
+                "ASCII gutter prefixes emitted line");
+
+    debug_view_reset_glyph_cache();
+    debug_cleanup(ctx);
+}
+
+TEST(view_emit_line_utf8_uses_box_drawing_gutter) {
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured ctx");
+    debug_view_force_utf8_for_tests();
+
+    debug_view_emit_line(ctx, "hi");
+
+    char log[256];
+    read_debug_output(ctx, log, sizeof(log));
+    /* U+2502 (BOX DRAWINGS LIGHT VERTICAL) is 0xE2 0x94 0x82 in UTF-8. */
+    ASSERT_TRUE(strstr(log, "\xE2\x94\x82 hi\n") != NULL,
+                "UTF-8 vertical-bar gutter present");
+
+    debug_view_reset_glyph_cache();
+    debug_cleanup(ctx);
+}
+
+TEST(view_frame_brackets_render_around_title) {
+    debug_context_t *ctx = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx, "captured ctx");
+    debug_view_force_ascii_for_tests();
+
+    debug_view_begin_frame(ctx, "Sample");
+    debug_view_emit_line(ctx, "row one");
+    debug_view_end_frame(ctx);
+
+    char log[1024];
+    read_debug_output(ctx, log, sizeof(log));
+    /* Top border with bracketed title, plus a row, plus the bottom
+     * border. The exact horizontal fill length is fixed by the
+     * module; assert presence of the load-bearing pieces. */
+    ASSERT_TRUE(strstr(log, "+- [Sample] ") != NULL,
+                "frame top with title");
+    ASSERT_TRUE(strstr(log, "| row one\n") != NULL,
+                "interior row carries the gutter");
+    ASSERT_TRUE(strstr(log, "+--") != NULL,
+                "frame bottom border");
+
+    debug_view_reset_glyph_cache();
+    debug_cleanup(ctx);
+}
+
 TEST(watch_variable_null_params) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
@@ -934,6 +1003,9 @@ int main(void) {
     RUN_TEST(show_variable_type_assoc_array_is_map);
     RUN_TEST(show_variable_type_scalar);
     RUN_TEST(show_variable_type_unset);
+    RUN_TEST(view_emit_line_ascii_uses_pipe_gutter);
+    RUN_TEST(view_emit_line_utf8_uses_box_drawing_gutter);
+    RUN_TEST(view_frame_brackets_render_around_title);
     RUN_TEST(watch_variable_null_params);
     RUN_TEST(watch_variable_basic);
     RUN_TEST(show_variable_changes);

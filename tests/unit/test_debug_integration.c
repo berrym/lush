@@ -348,7 +348,9 @@ TEST(step_mode_breaks_at_next_node) {
 
     char log[4096];
     debug_ctx_read_output(ctx, log, sizeof(log));
-    ASSERT_TRUE(strstr(log, ">>> STEP <<<") != NULL,
+    /* The framed step banner -- "[STEP]" is the title token, reliable
+     * across the UTF-8 and ASCII glyph sets. */
+    ASSERT_TRUE(strstr(log, "[STEP]") != NULL,
                 "step branch reached during execution");
     ASSERT_FALSE(ctx->step_mode,
                  "EOF at the debug prompt cleared step mode");
