@@ -10,6 +10,7 @@
 #include "lle/completion/builtin_completions.h"
 #include "lle/completion/completion_sources.h"
 #include "lle/completion/completion_types.h"
+#include "lle/lle_readline.h"
 
 #include <string.h>
 
@@ -835,6 +836,12 @@ static lle_result_t generate_dynamic_completions(
 
 bool lle_builtin_completions_applicable(const lle_word_context_t *context) {
     if (!context) {
+        return false;
+    }
+
+    /* Sit out the debugger's break-prompt: its `print x` / `type x`
+     * are debug-command arguments, not shell-builtin arguments. */
+    if (lle_in_debug_prompt()) {
         return false;
     }
 

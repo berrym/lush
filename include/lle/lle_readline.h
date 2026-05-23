@@ -19,6 +19,8 @@
 #ifndef LLE_READLINE_H
 #define LLE_READLINE_H
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -73,6 +75,33 @@ char *lle_readline(const char *prompt);
  *       contract.
  */
 char *lle_readline_no_history(const char *prompt);
+
+/**
+ * @brief Is the currently-active prompt the debugger's break-prompt?
+ *
+ * Returns true between the call to lle_readline_no_history() and its
+ * return. Completion sources consult this to switch from shell
+ * completions to debug-command completions at the (lush-debug) prompt
+ * -- see src/lle/completion/source_manager.c.
+ *
+ * Defined in lle_debug_prompt_state.c (separated from lle_readline.c
+ * so that completion-source .o files do not chain lle_readline.c.o's
+ * shell-symbol dependencies into LLE-isolated test binaries).
+ *
+ * @return true if a debug-prompt read is in progress, false otherwise.
+ */
+bool lle_in_debug_prompt(void);
+
+/**
+ * @brief Set the debug-prompt-active flag
+ *
+ * Called by lle_readline_no_history() to bracket the in-flight read.
+ * Internal to the LLE subsystem; external callers should use
+ * lle_readline_no_history() rather than touching the flag directly.
+ *
+ * @param active true on entry, false on return.
+ */
+void lle_set_debug_prompt_active(bool active);
 
 #ifdef __cplusplus
 }

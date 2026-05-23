@@ -66,6 +66,7 @@
 #include "lle/buffer_management.h"
 #include "lle/completion/completion_system.h" /* Completion system for menu visibility */
 #include "lle/completion/splicer.h"
+#include "lle/lle_readline.h" /* Public readline API + debug-prompt setter */
 #include "lle/completion/word_context.h"
 #include "lle/display_integration.h" /* Spec 08: Complete display integration */
 #include "lle/error_handling.h"
@@ -109,6 +110,10 @@ static lle_editor_t *global_lle_editor = NULL;
  * (see lle_readline.h). The debugger's (lush-debug) break-prompt is
  * the first consumer: its commands must not pollute shell history. */
 static bool g_lle_readline_suppress_history = false;
+
+/* The debug-prompt-active flag lives in lle_debug_prompt_state.c so
+ * that consumers (the completion sources) can read it without their
+ * .o files chaining lle_readline.c.o into the link surface. */
 
 /**
  * @brief Get the global LLE editor instance
@@ -3775,7 +3780,9 @@ char *lle_readline(const char *prompt) {
  */
 char *lle_readline_no_history(const char *prompt) {
     g_lle_readline_suppress_history = true;
+    lle_set_debug_prompt_active(true);
     char *line = lle_readline(prompt);
     g_lle_readline_suppress_history = false;
+    lle_set_debug_prompt_active(false);
     return line;
 }
