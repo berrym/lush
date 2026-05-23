@@ -84,7 +84,7 @@ typedef enum {
  * filename completion in that case.
  */
 typedef enum {
-    LLE_EXPANSION_NONE,
+    LLE_EXPANSION_NONE,          /**< Cursor is not inside an expansion  */
     LLE_EXPANSION_VARIABLE_NAME, /**< $HO|     — bare $name being typed  */
     LLE_EXPANSION_BRACED_VARIABLE_NAME, /**< ${HO|}   — braced ${name} being
                                            typed */
@@ -116,7 +116,7 @@ typedef enum {
     LLE_CONTEXT_CASE_PATTERN,     /**< case x in <here>)                 */
     LLE_CONTEXT_HEREDOC_BODY,     /**< Inside a heredoc body (refuse to
                                        complete; literal text)           */
-    LLE_CONTEXT_UNKNOWN,
+    LLE_CONTEXT_UNKNOWN,          /**< Context could not be determined   */
 } lle_word_context_type_t;
 
 /* Note: a "function body" is not a distinct context_type. Inside a
@@ -184,11 +184,11 @@ typedef struct lle_word_context {
                                         leading bytes).                     */
 
     /* Lexical state at cursor -------------------------------------------- */
-    lle_quote_state_t quote_state;
-    lle_expansion_kind_t expansion_kind;
+    lle_quote_state_t quote_state;       ///< Quote/escape state at the cursor
+    lle_expansion_kind_t expansion_kind; ///< In-progress expansion kind, if any
 
     /* Surrounding-command context --------------------------------------- */
-    lle_word_context_type_t context_type;
+    lle_word_context_type_t context_type; ///< Where the word sits structurally
     char *command_name;    /**< Owner command for builtin-arg
                                 dispatch (e.g., "cd", "set"). NULL
                                 in command-position contexts.       */
@@ -222,7 +222,7 @@ typedef struct lle_word_context {
     lle_word_context_branch_t *branches; /**< Array of per-branch resolved
                                               directory + prefix pairs.
                                               NULL when single-value.       */
-    size_t branch_count;
+    size_t branch_count;                 ///< Number of entries in branches[]
 
     /* Bookkeeping -------------------------------------------------------- */
     lle_memory_pool_t *pool; /**< Pool used for all allocations.      */
