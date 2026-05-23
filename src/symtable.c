@@ -44,10 +44,9 @@
 // Global manager
 static symtable_manager_t *global_manager = NULL;
 
-// Forward declaration: defined at line ~2754. Needed by
-// symtable_unset_var (which must free arrays from the side-table on
-// `unset arr`) before the file-static definition appears.
-static ht_strstr_t *array_storage;
+// Forward declaration so scope-pop / manager-free paths can reach
+// the helper before its definition further down.
+static void free_arrays_in_scope(symtable_scope_t *scope);
 
 // Legacy compatibility structures
 static symtable_t dummy_symtable = {0, NULL, NULL};
@@ -64,7 +63,6 @@ static int current_lineno = 0;       // For $LINENO
 #define METADATA_BUFFER_SIZE 64
 
 // Forward declarations
-static void cleanup_array_storage(void);
 
 // ============================================================================
 // STRUCTURES
@@ -284,12 +282,17 @@ void symtable_manager_free(symtable_manager_t *manager) {
         return;
     }
 
-    // Pop all scopes to free memory
+    // Pop all scopes to free memory. Each scope first surrenders
+    // any array_value_t backing memory bound at that level
+    // (free_arrays_in_scope) before its vars_ht is destroyed --
+    // otherwise the serialized hex pointers vanish and we leak the
+    // arrays.
     while (manager->current_scope &&
            manager->current_scope != manager->global_scope) {
         symtable_scope_t *old_scope = manager->current_scope;
         manager->current_scope = old_scope->parent;
 
+        free_arrays_in_scope(old_scope);
         if (old_scope->vars_ht) {
             ht_strstr_destroy(old_scope->vars_ht);
         }
@@ -297,8 +300,9 @@ void symtable_manager_free(symtable_manager_t *manager) {
         free(old_scope);
     }
 
-    // Free global scope
+    // Free global scope (same array-cleanup-then-destroy sequence).
     if (manager->global_scope) {
+        free_arrays_in_scope(manager->global_scope);
         if (manager->global_scope->vars_ht) {
             ht_strstr_destroy(manager->global_scope->vars_ht);
         }
@@ -421,6 +425,30 @@ int symtable_push_scope(symtable_manager_t *manager, scope_type_t type,
  * @param manager Symbol table manager
  * @return 0 on success, -1 if at global scope or invalid manager
  */
+// Walk a scope's vars_ht and free the array_value_t backing every
+// SYMVAR_ARRAY entry. Must run before ht_strstr_destroy on the scope,
+// otherwise the serialized hex pointers go away and we leak the
+// arrays. The scope's vars_ht itself is freed by the caller.
+static void free_arrays_in_scope(symtable_scope_t *scope) {
+    if (!scope || !scope->vars_ht) {
+        return;
+    }
+    ht_enum_t *e = ht_strstr_enum_create(scope->vars_ht);
+    if (!e) {
+        return;
+    }
+    const char *key;
+    const char *serialized;
+    while (ht_strstr_enum_next(e, &key, &serialized)) {
+        symvar_t *var = deserialize_variable(key, serialized);
+        if (var && var->type == SYMVAR_ARRAY && var->array) {
+            symtable_array_free(var->array);
+        }
+        free_symvar(var);
+    }
+    ht_strstr_enum_destroy(e);
+}
+
 int symtable_pop_scope(symtable_manager_t *manager) {
     if (!manager || !manager->current_scope ||
         manager->current_scope == manager->global_scope) {
@@ -435,6 +463,9 @@ int symtable_pop_scope(symtable_manager_t *manager) {
                old_scope->level);
     }
 
+    // Free any array_value_t backing memory bound at this scope
+    // before destroying the hashtable.
+    free_arrays_in_scope(old_scope);
     ht_strstr_destroy(old_scope->vars_ht);
     free(old_scope->scope_name);
     free(old_scope);
@@ -757,21 +788,16 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
         return -1;
     }
 
-    // For array bindings: free the underlying array_value_t and drop
-    // it from the global side-table. Without this, `unset arr` would
-    // mark the scope-entry UNSET but leave the array alive in the
-    // side-table, so a follow-up ${#arr[@]} or symtable_get_array
-    // would resurrect it. Read straight from the side-table here so
-    // we don't recurse through the scope-walk + UNSET filter.
-    if (array_storage) {
-        const char *ptr_str = ht_strstr_get(array_storage, name);
-        if (ptr_str) {
-            void *ptr = NULL;
-            if (sscanf(ptr_str, "%p", &ptr) == 1 && ptr) {
-                symtable_array_free((array_value_t *)ptr);
-            }
-            ht_strstr_remove(array_storage, name);
+    // For array bindings: free the underlying array_value_t. Read
+    // the binding via find_var so we honor the scope chain (locals
+    // shadow globals) and so we can drop the array's backing memory
+    // before the scope entry gets overwritten with the UNSET marker.
+    if (manager->current_scope) {
+        symvar_t *var = find_var(manager->current_scope, name);
+        if (var && var->type == SYMVAR_ARRAY && var->array) {
+            symtable_array_free(var->array);
         }
+        free_symvar(var);
     }
 
     // Mark as unset rather than removing
@@ -1688,9 +1714,10 @@ void init_symtable(void) {
  * Should be called during shell shutdown.
  */
 void free_global_symtable(void) {
-    // Free array storage first (arrays are separate from regular variables)
-    cleanup_array_storage();
-
+    // Storage unification: arrays live in scope hashtables (their
+    // backing memory is reclaimed via free_arrays_in_scope as each
+    // scope is destroyed in symtable_manager_free), so there is no
+    // longer a separate side-table to clean up.
     if (global_manager) {
         symtable_manager_free(global_manager);
         global_manager = NULL;
@@ -2755,85 +2782,47 @@ char *symtable_array_expand(array_value_t *array, const char *sep) {
 // ARRAY VARIABLE MANAGEMENT (Global storage integration)
 // ============================================================================
 
-/** Hash table for array storage (separate from regular variables) */
-static ht_strstr_t *array_storage = NULL;
-
-/** Initialize array storage if needed */
-static void ensure_array_storage(void) {
-    if (!array_storage) {
-        array_storage = ht_strstr_create(DEFAULT_HT_FLAGS);
-    }
-}
-
-/**
- * @brief Free all arrays and the array storage hash table
- *
- * Called during shell shutdown to release all array memory.
- */
-static void cleanup_array_storage(void) {
-    if (!array_storage) {
-        return;
-    }
-
-    // Iterate through all arrays and free them
-    ht_enum_t *e = ht_strstr_enum_create(array_storage);
-    if (e) {
-        const char *key;
-        const char *ptr_str;
-        while (ht_strstr_enum_next(e, &key, &ptr_str)) {
-            void *ptr;
-            if (sscanf(ptr_str, "%p", &ptr) == 1 && ptr) {
-                symtable_array_free((array_value_t *)ptr);
-            }
-        }
-        ht_strstr_enum_destroy(e);
-    }
-
-    ht_strstr_destroy(array_storage);
-    array_storage = NULL;
-}
+// Storage unification: the global array_storage side-table has been
+// removed. Arrays live in per-scope vars_ht as SYMVAR_ARRAY-tagged
+// entries; the backing memory is freed by free_arrays_in_scope when
+// each scope is destroyed (see symtable_pop_scope and
+// symtable_manager_free).
 
 /**
  * @brief Set a variable as an array
+ *
+ * Single storage path: write a SYMVAR_ARRAY-tagged entry into the
+ * current scope's vars_ht. The pointer is encoded as a hex string
+ * in the serialized value field so the existing ht_strstr storage
+ * can carry it verbatim; deserialize parses it back into
+ * symvar.array on read.
  */
 int symtable_set_array(const char *name, array_value_t *array) {
-    if (!name || !array) {
+    if (!name || !array || !global_manager || !global_manager->current_scope) {
         return -1;
     }
 
-    ensure_array_storage();
-    if (!array_storage) {
-        return -1;
-    }
-
-    // Free existing array if present
+    // Free any existing array bound to this name -- assignment to an
+    // already-array variable replaces the underlying array_value_t.
+    // symtable_get_array walks the scope chain; if it finds an old
+    // array, free its backing memory before we overwrite.
     array_value_t *existing = symtable_get_array(name);
-    if (existing) {
+    if (existing && existing != array) {
         symtable_array_free(existing);
     }
 
-    // Store pointer as string (hacky but works with existing ht_strstr)
+    // Encode the pointer as a hex string in the serialized value;
+    // deserialize will parse it back into symvar.array.
     char ptr_str[32];
     snprintf(ptr_str, sizeof(ptr_str), "%p", (void *)array);
 
-    ht_strstr_insert(array_storage, name, ptr_str);
-
-    // Also write a kind-tagged symvar into the current scope's vars_ht
-    // so the scope chain carries the array binding -- this is the
-    // storage unification path that makes scalar/list/map share one
-    // scope-aware location. The side-table write above stays during
-    // the transition so callers that iterate it (e.g. lle_shell_hooks)
-    // continue to work; once those migrate the side-table can go.
-    if (global_manager && global_manager->current_scope) {
-        char *serialized =
-            serialize_variable(ptr_str, SYMVAR_ARRAY, SYMVAR_NONE,
-                               global_manager->current_scope->level);
-        if (serialized) {
-            ht_strstr_insert(global_manager->current_scope->vars_ht, name,
-                             serialized);
-            free(serialized);
-        }
+    char *serialized = serialize_variable(ptr_str, SYMVAR_ARRAY, SYMVAR_NONE,
+                                          global_manager->current_scope->level);
+    if (!serialized) {
+        return -1;
     }
+    ht_strstr_insert(global_manager->current_scope->vars_ht, name, serialized);
+    free(serialized);
     return 0;
 }
 
@@ -3019,29 +3008,35 @@ char *symtable_get_array_element(const char *name, const char *subscript) {
     return result ? strdup(result) : NULL;
 }
 
-/**
- * @brief Enumerate all arrays with callback
+/*
+ * Implementation of symtable_enumerate_arrays. Contract documented in
+ * symtable.h. With the storage unification, arrays live in the global
+ * scope's vars_ht (or in active local scopes); this iteration walks
+ * the global scope's hashtable and invokes the callback for every
+ * SYMVAR_ARRAY entry that's not currently UNSET. Local-scope arrays
+ * are intentionally not surfaced -- they're transient to function
+ * invocations and out of scope for shell-level enumeration.
  */
 void symtable_enumerate_arrays(void (*callback)(const char *name,
                                                 array_value_t *array,
                                                 void *userdata),
                                void *userdata) {
-    if (!callback || !array_storage) {
+    if (!callback || !global_manager || !global_manager->global_scope ||
+        !global_manager->global_scope->vars_ht) {
         return;
     }
-
-    ht_enum_t *e = ht_strstr_enum_create(array_storage);
+    ht_enum_t *e = ht_strstr_enum_create(global_manager->global_scope->vars_ht);
     if (!e) {
         return;
     }
-
-    const char *name, *ptr_str;
-    while (ht_strstr_enum_next(e, &name, &ptr_str)) {
-        void *ptr;
-        if (sscanf(ptr_str, "%p", &ptr) == 1 && ptr) {
-            callback(name, (array_value_t *)ptr, userdata);
+    const char *key, *serialized;
+    while (ht_strstr_enum_next(e, &key, &serialized)) {
+        symvar_t *var = deserialize_variable(key, serialized);
+        if (var && var->type == SYMVAR_ARRAY && var->array &&
+            !(var->flags & SYMVAR_UNSET)) {
+            callback(key, var->array, userdata);
         }
+        free_symvar(var);
     }
-
     ht_strstr_enum_destroy(e);
 }
