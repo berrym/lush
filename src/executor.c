@@ -8702,15 +8702,22 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     int result;
 
     if (is_append) {
-        // Check if target is an array - append as new element
-        array_value_t *array = symtable_get_array(target_name);
-        if (array) {
-            // Append value as new array element
-            symtable_array_append(array, value ? value : "");
+        // += dispatches on the target's kind: list/map appends element,
+        // scalar concatenates string. One symtable_lookup tags the kind
+        // explicitly instead of the legacy "try array, fall back to
+        // scalar" dance.
+        lush_value_view_t view = {0};
+        symtable_lookup(target_name, &view);
+        if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
+            symtable_array_append(view.array, value ? value : "");
+            lush_value_view_clear(&view);
             result = 0;
         } else {
-            // String append - concatenate to existing value
-            char *existing = symtable_get_var(executor->symtable, target_name);
+            // String append: take ownership of the scalar out of the view
+            // and proceed with the existing concatenate-and-reassign path.
+            char *existing = view.scalar_value;
+            view.scalar_value = NULL;
+            lush_value_view_clear(&view);
             if (existing && existing[0]) {
                 size_t existing_len = strlen(existing);
                 size_t value_len = value ? strlen(value) : 0;
@@ -8731,6 +8738,9 @@ static int execute_assignment(executor_t *executor, const char *assignment,
                 result = symtable_assign_var(executor->symtable, target_name,
                                              value ? value : "");
             }
+            // symtable_get_var returns a strdup; free it. Pre-existing
+            // leak fixed as part of the symtable_lookup migration.
+            free(existing);
         }
     } else {
         result = symtable_assign_var(executor->symtable, target_name,
@@ -16449,9 +16459,15 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                         }
                     }
                 } else {
-                    char *val = symtable_get_var(executor->symtable, arg);
-                    result = (val != NULL);
-                    free(val);
+                    /* -v NAME without subscript: true for any kind of
+                     * binding (scalar OR array). Pre-migration this
+                     * only checked symtable_get_var, missing arrays --
+                     * `arr=(a); [[ -v arr ]]` was false in lush but
+                     * true in bash. The unified view fixes that by
+                     * returning true on any LUSH_VALUE_* hit. */
+                    lush_value_view_t view = {0};
+                    result = symtable_lookup(arg, &view);
+                    lush_value_view_clear(&view);
                 }
                 free(arg);
             }

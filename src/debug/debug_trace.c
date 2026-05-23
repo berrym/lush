@@ -399,9 +399,14 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    // Arrays first -- they carry the richest type info (List vs Map).
-    array_value_t *array = symtable_get_array(clean_name);
-    if (array) {
+    // Unified value-view lookup -- single kind-tagged query covers
+    // both array and scalar paths. Arrays carry the richest type info
+    // (List vs Map) so they're handled first; scalars fall through to
+    // the scope-chain + environment lookup below.
+    lush_value_view_t view = {0};
+    symtable_lookup(clean_name, &view);
+    if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
+        array_value_t *array = view.array;
         debug_view_emit_line(
             ctx, "Type:  %s",
             debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
@@ -412,13 +417,16 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
                                      SCOPE_GLOBAL
                                  ? "global"
                                  : "function");
+        lush_value_view_clear(&view);
         debug_view_end_frame(ctx);
         return;
     }
 
-    /* Scalar via the scope chain: symtable_get_var walks current scope
-     * up to global. The return is heap-allocated and must be freed. */
-    char *owned_value = symtable_get_var(symtable_manager(), clean_name);
+    /* Scalar via the view: ownership-transfer the strdup'd value out
+     * for the surrounding length / preview / free path below. */
+    char *owned_value = view.scalar_value;
+    view.scalar_value = NULL;
+    lush_value_view_clear(&view);
     const char *value = owned_value;
     const char *scope = NULL;
     if (value) {
@@ -642,29 +650,28 @@ void debug_watch_variable(debug_context_t *ctx, const char *name) {
 
     debug_printf(ctx, "WATCH: %s\n", clean_name);
 
-    // Resolve the current binding -- arrays carry a richer label than
-    // the scope-chain scalar lookup. Either render the type alongside
-    // the value, or report that the name is unbound.
-    array_value_t *array = symtable_get_array(clean_name);
-    if (array) {
+    // Resolve the current binding via the unified value view -- arrays
+    // carry a richer label than the scope-chain scalar lookup. Either
+    // render the type alongside the value, or report that the name is
+    // unbound.
+    lush_value_view_t view = {0};
+    symtable_lookup(clean_name, &view);
+    if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
+        array_value_t *array = view.array;
         debug_printf(ctx, "  Type:  %s\n",
                      debug_var_type_label(SYMVAR_ARRAY, array->is_associative));
         debug_printf(ctx, "  Count: %zu element%s\n", array->count,
                      array->count == 1 ? "" : "s");
         debug_printf(ctx, "  Variable is now being watched for changes\n");
+    } else if (view.kind == LUSH_VALUE_SCALAR) {
+        debug_printf(ctx, "  Type:  Scalar\n");
+        debug_printf(ctx, "  Value: \"%s\"\n", view.scalar_value);
+        debug_printf(ctx, "  Variable is now being watched for changes\n");
     } else {
-        char *value = symtable_get_var(symtable_manager(), clean_name);
-        if (value) {
-            debug_printf(ctx, "  Type:  Scalar\n");
-            debug_printf(ctx, "  Value: \"%s\"\n", value);
-            debug_printf(ctx, "  Variable is now being watched for changes\n");
-            free(value);
-        } else {
-            debug_printf(ctx, "  Variable '%s' is not currently set\n",
-                         clean_name);
-            debug_printf(ctx, "  Will watch for when it gets assigned\n");
-        }
+        debug_printf(ctx, "  Variable '%s' is not currently set\n", clean_name);
+        debug_printf(ctx, "  Will watch for when it gets assigned\n");
     }
+    lush_value_view_clear(&view);
 
     // TODO: Implement proper watch list management
     // For now, just acknowledge the watch request
@@ -677,15 +684,20 @@ void debug_show_variable_type(debug_context_t *ctx, const char *name) {
 
     const char *clean_name = (name[0] == '$') ? name + 1 : name;
 
-    array_value_t *array = symtable_get_array(clean_name);
-    if (array) {
+    lush_value_view_t view = {0};
+    symtable_lookup(clean_name, &view);
+    if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
+        array_value_t *array = view.array;
         debug_printf(ctx, "%s: %s (%zu element%s)\n", clean_name,
                      debug_var_type_label(SYMVAR_ARRAY, array->is_associative),
                      array->count, array->count == 1 ? "" : "s");
+        lush_value_view_clear(&view);
         return;
     }
 
-    char *value = symtable_get_var(symtable_manager(), clean_name);
+    char *value = view.scalar_value;
+    view.scalar_value = NULL;
+    lush_value_view_clear(&view);
     if (value) {
         debug_printf(ctx, "%s: Scalar\n", clean_name);
         free(value);
