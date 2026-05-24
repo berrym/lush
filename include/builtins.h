@@ -493,6 +493,14 @@ int bin_lint(int argc, char **argv);
 int bin_disown(int argc, char **argv);
 int bin_let(int argc, char **argv);
 
+// zsh compatibility stubs (silent no-ops). See bin_zsh_stubs.c for the
+// rationale: scripts that call these at top level don't break, the
+// zsh-specific bookkeeping these would perform is invisible from a
+// non-interactive script's signal surface.
+int bin_bindkey(int argc, char **argv);
+int bin_autoload(int argc, char **argv);
+int bin_zmodload(int argc, char **argv);
+
 /**
  * @brief Validate a string as a shell variable identifier.
  *

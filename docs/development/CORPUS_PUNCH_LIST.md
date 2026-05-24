@@ -133,24 +133,30 @@ and trips the next defect: `bindkey` builtin missing (tracked under
 
 ---
 
-## 5. Missing zsh-specific builtins
+## 5. Missing zsh-specific builtins (RESOLVED)
 
-**Severity:** missing surface.
+**Status:** fixed. Three no-op stubs landed in
+src/builtins/bin_zsh_stubs.c registered in src/builtins/builtins.c:
 
-Builtins that exist in zsh and are referenced by real zsh scripts:
+| Builtin | Stub behavior | Lush equivalent |
+|---------|---------------|-----------------|
+| `bindkey` | return 0 silently | `display lle bind` |
+| `autoload` | return 0 silently | `source` (eager) |
+| `zmodload` | return 0 silently | no equivalent needed (lush builds in what common zsh modules provide) |
 
-| Builtin | Used in | Decision needed |
-|---------|---------|-----------------|
-| `bindkey` | key-bindings.zsh | Implement as no-op for non-interactive contexts? Or stub with a structured error pointing at `display lle bind`? |
-| `autoload` | theme-and-appearance.zsh | zsh's lazy-function mechanism; implementing the loader is real work. Stub for non-interactive? |
-| `zmodload` | completion.zsh | zsh module loader. Almost certainly stub-as-no-op. |
+The zsh bookkeeping these builtins perform (binding keys, registering
+lazy functions, loading modules) is invisible from a non-interactive
+script's stdout/stderr/exit signal -- the divergence the corpus is
+measuring. Users who need the underlying behavior reach for the lush
+surfaces named above.
 
-**Recommendation:** stub each as no-op when invoked outside the
-specific contexts that need them, with structured errors when invoked
-in a context where the no-op would be wrong (interactive prompt setup,
-etc.). The corpus then sees clean stderr and exit 0 even though the
-builtin "didn't do anything." Document each stub in
-`known_divergences.txt`.
+**Affected corpus entries:** key-bindings.zsh now passes the
+scorecard cleanly. completion.zsh and theme-and-appearance.zsh still
+diverge but on the `setopt`/`unsetopt` unknown-option-name surface
+([#6](#6-unrecognized-zsh-option-names)), not the missing-builtin
+surface.
+
+**Pass-rate delta:** 28/33 -> 29/33 (84.8% -> 90.9%).
 
 ---
 

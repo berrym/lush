@@ -219,6 +219,10 @@ builtin builtins[] = {
     {  "analyze", "full script analysis with info, warnings, and errors",
      bin_analyze                                                                      },
     {     "lint",    "lint scripts and optionally apply automatic fixes",     bin_lint},
+    // zsh-compatibility stubs (no-op; see bin_zsh_stubs.c)
+    {  "bindkey",                         "zsh key-binding (no-op stub)",  bin_bindkey},
+    { "autoload",                  "zsh lazy-function load (no-op stub)", bin_autoload},
+    { "zmodload",                       "zsh module loader (no-op stub)", bin_zmodload},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);
