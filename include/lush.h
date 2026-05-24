@@ -255,8 +255,10 @@ typedef struct shell_options {
     bool vi_mode;         /**< vi: vi-style line editing */
     bool posix_mode;      /**< posix: strict POSIX compliance mode */
     bool pipefail_mode;   /**< pipefail: pipeline fails if any command fails */
-    bool histexpand_mode; /**< histexpand: enable history expansion */
-    bool history_mode;    /**< history: enable command history recording */
+    bool pipeline_diagnostic_mode; ///< pipeline-diagnostic: emit a structured
+                                   ///< error per non-zero pipeline stage
+    bool histexpand_mode;          /**< histexpand: enable history expansion */
+    bool history_mode; /**< history: enable command history recording */
     bool interactive_comments_mode; /**< interactive-comments: enable # comments
                                      */
     bool physical_mode;             /**< physical: resolve symlinks in paths */

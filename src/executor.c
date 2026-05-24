@@ -151,6 +151,7 @@ static void cleanup_procsub_fds(executor_t *executor);
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
 bool is_pipefail_enabled(void);
+bool is_pipeline_diagnostic_enabled(void);
 static int execute_external_command_with_setup(executor_t *executor,
                                                char **argv,
                                                bool redirect_stderr,
@@ -2038,140 +2039,261 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
 }
 
 /**
- * @brief Execute a pipeline of commands
+ * @brief Flatten a right-recursive NODE_PIPE chain into per-stage arrays.
  *
- * Implements a two-command pipeline with proper pipe setup.
- * Supports pipefail mode where failure in any command causes
- * pipeline failure.
+ * The parser builds `a | b | c` as NODE_PIPE(a, NODE_PIPE(b, c)). This walks
+ * that chain, collecting leaf stage nodes and the |& bit between consecutive
+ * stages. The caller owns the output arrays.
+ *
+ * @param pipeline           Root NODE_PIPE.
+ * @param stages_out         Receives N stage nodes (not owned, alias into AST).
+ * @param stderr_to_next_out Receives N-1 booleans; entry i is true iff the
+ *                           junction between stage i and i+1 was `|&`.
+ * @param count_out          Receives N, the total stage count.
+ * @param capacity           Slots available in stages_out / count tracking.
+ * @return true on success, false if capacity exceeded.
+ */
+static bool flatten_pipeline_chain(node_t *pipeline, node_t **stages_out,
+                                   bool *stderr_to_next_out, size_t *count_out,
+                                   size_t capacity) {
+    size_t n = 0;
+    node_t *cur = pipeline;
+    while (cur && cur->type == NODE_PIPE) {
+        node_t *left = cur->first_child;
+        node_t *right = left ? left->next_sibling : NULL;
+        if (!left || !right) {
+            return false;
+        }
+        if (n >= capacity) {
+            return false;
+        }
+        stages_out[n] = left;
+        bool pipe_stderr = (cur->val_type == VAL_SINT && cur->val.sint == 1);
+        stderr_to_next_out[n] = pipe_stderr;
+        n++;
+        cur = right;
+    }
+    if (n >= capacity) {
+        return false;
+    }
+    stages_out[n++] = cur;
+    *count_out = n;
+    return true;
+}
+
+/**
+ * @brief Execute a pipeline of N commands.
+ *
+ * Flattens the right-recursive NODE_PIPE chain to a linear list of N stages,
+ * then forks N children connected by N-1 pipes. Returns the overall pipeline
+ * exit status, applying pipefail when enabled.
  *
  * @param executor Executor context
  * @param pipeline Pipeline node containing commands
- * @return Exit status (last command's status, or first failure with pipefail)
+ * @return Exit status (last command's status, or rightmost non-zero with
+ *         pipefail)
  */
 static int execute_pipeline(executor_t *executor, node_t *pipeline) {
     if (!pipeline || pipeline->type != NODE_PIPE) {
         return 1;
     }
 
-    // Push error context for structured error reporting
     executor_push_context(executor, pipeline->loc, "in pipeline");
 
-    // For now, implement simple two-command pipeline
-    // A more complete implementation would handle N-command pipelines
+    enum { MAX_PIPELINE_STAGES = 256 };
+    node_t *stages[MAX_PIPELINE_STAGES];
+    bool stderr_to_next[MAX_PIPELINE_STAGES];
+    size_t nstages = 0;
 
-    node_t *left = pipeline->first_child;
-    node_t *right = left ? left->next_sibling : NULL;
-
-    if (!left || !right) {
+    if (!flatten_pipeline_chain(pipeline, stages, stderr_to_next, &nstages,
+                                MAX_PIPELINE_STAGES) ||
+        nstages < 2) {
         executor_error_add(executor, SHELL_ERR_MALFORMED_CONSTRUCT,
                            pipeline->loc, "malformed pipeline");
         executor_pop_context(executor);
         return 1;
     }
 
-    int pipe_fd[2];
-    if (pipe(pipe_fd) == -1) {
+    // N-1 pipes connect N stages. pipes[i] connects stage i (writer) to stage
+    // i+1 (reader).
+    size_t npipes = nstages - 1;
+    int (*pipes)[2] = calloc(npipes, sizeof(*pipes));
+    if (!pipes) {
         executor_error_add(executor, SHELL_ERR_PIPE_FAILED, pipeline->loc,
-                           "failed to create pipe: %s", strerror(errno));
+                           "pipeline allocation failed");
         executor_pop_context(executor);
         return 1;
     }
 
-    pid_t left_pid = lush_fork();
-    if (left_pid == -1) {
-        executor_error_add(executor, SHELL_ERR_FORK_FAILED, pipeline->loc,
-                           "failed to fork for pipeline: %s", strerror(errno));
-        close(pipe_fd[0]);
-        close(pipe_fd[1]);
-        executor_pop_context(executor);
-        return 1;
-    }
-
-    if (left_pid == 0) {
-        // Left command: write to pipe
-        close(pipe_fd[0]);
-        dup2(pipe_fd[1], STDOUT_FILENO);
-        // Check if |& was used - also redirect stderr to the pipe
-        if (pipeline->val_type == VAL_SINT && pipeline->val.sint == 1) {
-            dup2(pipe_fd[1], STDERR_FILENO);
+    for (size_t i = 0; i < npipes; i++) {
+        if (pipe(pipes[i]) == -1) {
+            for (size_t j = 0; j < i; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+            free(pipes);
+            executor_error_add(executor, SHELL_ERR_PIPE_FAILED, pipeline->loc,
+                               "failed to create pipe: %s", strerror(errno));
+            executor_pop_context(executor);
+            return 1;
         }
-        close(pipe_fd[1]);
-
-        int result = execute_node(executor, left);
-        fflush(stdout);
-        fflush(stderr);
-        subshell_cleanup();
-        _exit(result);
     }
 
-    pid_t right_pid = lush_fork();
-    if (right_pid == -1) {
-        executor_error_add(executor, SHELL_ERR_FORK_FAILED, pipeline->loc,
-                           "failed to fork for pipeline: %s", strerror(errno));
-        close(pipe_fd[0]);
-        close(pipe_fd[1]);
-        while (waitpid(left_pid, NULL, 0) == -1 && errno == EINTR)
+    pid_t *pids = calloc(nstages, sizeof(pid_t));
+    if (!pids) {
+        for (size_t i = 0; i < npipes; i++) {
+            close(pipes[i][0]);
+            close(pipes[i][1]);
+        }
+        free(pipes);
+        executor_error_add(executor, SHELL_ERR_PIPE_FAILED, pipeline->loc,
+                           "pipeline allocation failed");
+        executor_pop_context(executor);
+        return 1;
+    }
+
+    for (size_t i = 0; i < nstages; i++) {
+        pid_t pid = lush_fork();
+        if (pid == -1) {
+            executor_error_add(executor, SHELL_ERR_FORK_FAILED, pipeline->loc,
+                               "failed to fork for pipeline: %s",
+                               strerror(errno));
+            // Close all pipes and reap any children already forked.
+            for (size_t j = 0; j < npipes; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+            for (size_t j = 0; j < i; j++) {
+                while (waitpid(pids[j], NULL, 0) == -1 && errno == EINTR)
+                    ;
+            }
+            free(pids);
+            free(pipes);
+            executor_pop_context(executor);
+            return 1;
+        }
+
+        if (pid == 0) {
+            // Child: wire stdin from the previous pipe and stdout (plus stderr
+            // if |&) to the next.
+            if (i > 0) {
+                dup2(pipes[i - 1][0], STDIN_FILENO);
+            }
+            if (i < npipes) {
+                dup2(pipes[i][1], STDOUT_FILENO);
+                if (stderr_to_next[i]) {
+                    dup2(pipes[i][1], STDERR_FILENO);
+                }
+            }
+            // Close every pipe fd; dup2 already preserved what we need.
+            for (size_t j = 0; j < npipes; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            int result = execute_node(executor, stages[i]);
+            fflush(stdout);
+            fflush(stderr);
+            subshell_cleanup();
+            _exit(result);
+        }
+
+        pids[i] = pid;
+    }
+
+    // Parent: close all pipes so children see EOF as their stages exit.
+    for (size_t i = 0; i < npipes; i++) {
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+    }
+    free(pipes);
+
+    int *stage_exit = calloc(nstages, sizeof(int));
+    if (!stage_exit) {
+        // Reap children before giving up so we don't leak zombies.
+        for (size_t i = 0; i < nstages; i++) {
+            while (waitpid(pids[i], NULL, 0) == -1 && errno == EINTR)
+                ;
+        }
+        free(pids);
+        executor_pop_context(executor);
+        return 1;
+    }
+
+    for (size_t i = 0; i < nstages; i++) {
+        int status;
+        while (waitpid(pids[i], &status, 0) == -1 && errno == EINTR)
             ;
-        executor_pop_context(executor);
-        return 1;
+        stage_exit[i] =
+            WIFEXITED(status)
+                ? WEXITSTATUS(status)
+                : (WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1);
     }
+    free(pids);
 
-    if (right_pid == 0) {
-        // Right command: read from pipe
-        close(pipe_fd[1]);
-        dup2(pipe_fd[0], STDIN_FILENO);
-        close(pipe_fd[0]);
-
-        int result = execute_node(executor, right);
-        fflush(stdout);
-        fflush(stderr);
-        subshell_cleanup();
-        _exit(result);
-    }
-
-    // Parent: close pipes and wait
-    close(pipe_fd[0]);
-    close(pipe_fd[1]);
-
-    int left_status, right_status;
-    // Wait for children, retrying on EINTR (signal interruption)
-    while (waitpid(left_pid, &left_status, 0) == -1 && errno == EINTR)
-        ;
-    while (waitpid(right_pid, &right_status, 0) == -1 && errno == EINTR)
-        ;
-
-    // Extract exit codes - handle signal termination
-    int left_exit =
-        WIFEXITED(left_status)
-            ? WEXITSTATUS(left_status)
-            : (WIFSIGNALED(left_status) ? 128 + WTERMSIG(left_status) : 1);
-    int right_exit =
-        WIFEXITED(right_status)
-            ? WEXITSTATUS(right_status)
-            : (WIFSIGNALED(right_status) ? 128 + WTERMSIG(right_status) : 1);
-
-    // Pop error context before returning
-    executor_pop_context(executor);
-
-    /* Pipefail behavior: pipeline status is the LAST (rightmost)
-     * non-zero exit status. Bash docs: "Exit status of a pipeline
-     * is the value of the LAST (rightmost) command to exit with a
-     * non-zero status, or zero if all exit successfully." Checking
-     * the right side first preserves this even for the nested 3-stage
-     * case where the inner pipeline's pipefail result becomes the
-     * outer's left_exit. Issue #100. */
+    int last_exit = stage_exit[nstages - 1];
+    int pipefail_exit = 0;
     if (is_pipefail_enabled()) {
-        if (right_exit != 0) {
-            return right_exit;
+        for (size_t i = nstages; i-- > 0;) {
+            if (stage_exit[i] != 0) {
+                pipefail_exit = stage_exit[i];
+                break;
+            }
         }
-        if (left_exit != 0) {
-            return left_exit;
-        }
-        return 0;
     }
 
-    // Standard behavior: return exit status of right (last) command
-    return right_exit;
+    // pipeline-diagnostic: queue a structured error for each non-zero stage so
+    // tools can see exactly which junction failed without parsing exit codes
+    // out of the pipefail collapse.  The overall pipeline exit becomes strict
+    // (rightmost non-zero) under this mode regardless of pipefail.
+    bool diag = is_pipeline_diagnostic_enabled();
+    if (diag) {
+        for (size_t i = 0; i < nstages; i++) {
+            if (stage_exit[i] != 0) {
+                executor_error_add(executor, SHELL_ERR_PIPELINE_STAGE_FAILED,
+                                   stages[i]->loc,
+                                   "pipeline stage %zu of %zu exited %d", i + 1,
+                                   nstages, stage_exit[i]);
+                if (pipefail_exit == 0) {
+                    pipefail_exit = stage_exit[i];
+                }
+            }
+        }
+    }
+
+    // Publish per-stage exit codes under both polyglot names so callers can
+    // diagnose which stage failed.  Both arrays are 0-indexed; the data is
+    // identical.
+    {
+        array_value_t *bash_arr = symtable_array_create(false);
+        array_value_t *lush_arr = symtable_array_create(false);
+        if (bash_arr && lush_arr) {
+            for (size_t i = 0; i < nstages; i++) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d", stage_exit[i]);
+                symtable_array_set_index(bash_arr, (int)i, buf);
+                symtable_array_set_index(lush_arr, (int)i, buf);
+            }
+            if (symtable_set_array("PIPESTATUS", bash_arr) != 0) {
+                symtable_array_free(bash_arr);
+            }
+            if (symtable_set_array("pipestatus", lush_arr) != 0) {
+                symtable_array_free(lush_arr);
+            }
+        } else {
+            if (bash_arr)
+                symtable_array_free(bash_arr);
+            if (lush_arr)
+                symtable_array_free(lush_arr);
+        }
+    }
+
+    free(stage_exit);
+    executor_pop_context(executor);
+    if (diag || is_pipefail_enabled()) {
+        return pipefail_exit;
+    }
+    return last_exit;
 }
 
 /**

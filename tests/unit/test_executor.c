@@ -2561,6 +2561,61 @@ TEST(rt_pe_catalogue_per_element_at_q_via_slice) {
     ASSERT_STDOUT_EQ(r, "['hello' 'world']\n");
 }
 
+TEST(rt_pipeline_three_stages) {
+    run_result_t r = run_shell("echo hello | cat | wc -c\n");
+    // "hello\n" = 6 bytes
+    ASSERT_STDOUT_EQ(r, "       6\n");
+}
+
+TEST(rt_pipeline_four_stages) {
+    run_result_t r = run_shell("echo abcde | cat | cat | rev\n");
+    ASSERT_STDOUT_EQ(r, "edcba\n");
+}
+
+TEST(rt_pipeline_pipestatus_three_stages) {
+    run_result_t r = run_shell(
+        "false | true | false\n"
+        "echo \"${PIPESTATUS[0]} ${PIPESTATUS[1]} ${PIPESTATUS[2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "1 0 1\n");
+}
+
+TEST(rt_pipeline_lush_pipestatus_three_stages) {
+    run_result_t r = run_shell(
+        "true | false | true\n"
+        "echo \"${pipestatus[0]} ${pipestatus[1]} ${pipestatus[2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "0 1 0\n");
+}
+
+TEST(rt_pipeline_pipefail_rightmost_nonzero) {
+    run_result_t r = run_shell("set -o pipefail\n"
+                               "true | false | true\n"
+                               "echo exit=$?\n");
+    ASSERT_STDOUT_EQ(r, "exit=1\n");
+}
+
+TEST(rt_pipeline_pipefail_all_succeed) {
+    run_result_t r = run_shell("set -o pipefail\n"
+                               "true | true | true\n"
+                               "echo exit=$?\n");
+    ASSERT_STDOUT_EQ(r, "exit=0\n");
+}
+
+TEST(rt_pipeline_diagnostic_per_stage_errors) {
+    run_result_t r = run_shell("set -o pipeline-diagnostic\n"
+                               "false | true | false\n"
+                               "echo exit=$?\n");
+    ASSERT_STDERR_CONTAINS(r, "pipeline stage 1 of 3 exited 1");
+    ASSERT_STDERR_CONTAINS(r, "pipeline stage 3 of 3 exited 1");
+    ASSERT_STDOUT_EQ(r, "exit=1\n");
+}
+
+TEST(rt_pipeline_diagnostic_silent_on_success) {
+    run_result_t r = run_shell("set -o pipeline-diagnostic\n"
+                               "true | true | true\n"
+                               "echo exit=$?\n");
+    ASSERT_STDOUT_EQ(r, "exit=0\n");
+}
+
 TEST(rt_pe_catalogue_scalar_conditional_still_works) {
     run_result_t r = run_shell("s=hello\n"
                                "echo \"[${s:-default}]\"\n"
@@ -2812,6 +2867,14 @@ int main(void) {
     RUN_TEST(rt_pe_catalogue_per_element_replace_first_via_slice);
     RUN_TEST(rt_pe_catalogue_per_element_replace_all_via_slice);
     RUN_TEST(rt_pe_catalogue_per_element_at_q_via_slice);
+    RUN_TEST(rt_pipeline_three_stages);
+    RUN_TEST(rt_pipeline_four_stages);
+    RUN_TEST(rt_pipeline_pipestatus_three_stages);
+    RUN_TEST(rt_pipeline_lush_pipestatus_three_stages);
+    RUN_TEST(rt_pipeline_pipefail_rightmost_nonzero);
+    RUN_TEST(rt_pipeline_pipefail_all_succeed);
+    RUN_TEST(rt_pipeline_diagnostic_per_stage_errors);
+    RUN_TEST(rt_pipeline_diagnostic_silent_on_success);
     RUN_TEST(rt_pe_catalogue_scalar_conditional_still_works);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);

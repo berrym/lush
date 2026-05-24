@@ -101,20 +101,22 @@ typedef enum shell_error_code {
     SHELL_ERR_ARITH_MISMATCHED_PARENS,  /**< Unmatched ( ) */
     SHELL_ERR_INTEGER_OVERFLOW,         /**< Arithmetic overflow */
     SHELL_ERR_INVALID_SUBSCRIPT,        /**< Invalid array subscript */
-    SHELL_ERR_READONLY_VAR,        /**< Attempt to modify readonly variable */
-    SHELL_ERR_LOOP_CONTROL,        /**< break/continue outside loop */
-    SHELL_ERR_RETURN_OUTSIDE_FUNC, /**< return outside function */
-    SHELL_ERR_BAD_SUBSTITUTION,    /**< Invalid ${} substitution */
-    SHELL_ERR_UNBOUND_VARIABLE,    /**< Unset variable with set -u */
-    SHELL_ERR_PIPE_FAILED,         /**< Failed to create pipe */
-    SHELL_ERR_FORK_FAILED,         /**< Failed to fork process */
-    SHELL_ERR_EXEC_FAILED,         /**< Failed to exec command */
-    SHELL_ERR_FEATURE_DISABLED,    /**< Shell feature not enabled */
-    SHELL_ERR_MALFORMED_CONSTRUCT, /**< Malformed control structure */
-    SHELL_ERR_LOOP_LIMIT,          /**< Loop iteration limit exceeded */
-    SHELL_ERR_SCOPE_ERROR,         /**< Failed to create/pop scope */
-    SHELL_ERR_FUNCTION_ERROR,      /**< Function definition/call error */
-    SHELL_ERR_BAD_FD,              /**< Bad file descriptor */
+    SHELL_ERR_READONLY_VAR,          /**< Attempt to modify readonly variable */
+    SHELL_ERR_LOOP_CONTROL,          /**< break/continue outside loop */
+    SHELL_ERR_RETURN_OUTSIDE_FUNC,   /**< return outside function */
+    SHELL_ERR_BAD_SUBSTITUTION,      /**< Invalid ${} substitution */
+    SHELL_ERR_UNBOUND_VARIABLE,      /**< Unset variable with set -u */
+    SHELL_ERR_PIPE_FAILED,           /**< Failed to create pipe */
+    SHELL_ERR_PIPELINE_STAGE_FAILED, ///< A pipeline stage exited non-zero
+                                     ///< (emitted by pipeline-diagnostic mode)
+    SHELL_ERR_FORK_FAILED,           /**< Failed to fork process */
+    SHELL_ERR_EXEC_FAILED,           /**< Failed to exec command */
+    SHELL_ERR_FEATURE_DISABLED,      /**< Shell feature not enabled */
+    SHELL_ERR_MALFORMED_CONSTRUCT,   /**< Malformed control structure */
+    SHELL_ERR_LOOP_LIMIT,            /**< Loop iteration limit exceeded */
+    SHELL_ERR_SCOPE_ERROR,           /**< Failed to create/pop scope */
+    SHELL_ERR_FUNCTION_ERROR,        /**< Function definition/call error */
+    SHELL_ERR_BAD_FD,                /**< Bad file descriptor */
     SHELL_ERR_FD_UNAVAILABLE, /**< No available file descriptor for allocation
                                */
     SHELL_ERR_TYPE_MISMATCH,  /**< List/map value in a scalar slot, or

@@ -127,7 +127,10 @@ void init_posix_options(void) {
     shell_opts.vi_mode = false;   // Default to emacs mode, not vi
     shell_opts.posix_mode =
         false; // Default to non-strict mode for compatibility
-    shell_opts.pipefail_mode = false;  // Default to standard pipeline behavior
+    shell_opts.pipefail_mode = false; // Default to standard pipeline behavior
+    shell_opts.pipeline_diagnostic_mode =
+        false;                         // Off by default in posix/bash;
+                                       // lush mode enables it
     shell_opts.histexpand_mode = true; // Default to history expansion enabled
     shell_opts.history_mode =
         true; // Default to command history recording enabled
@@ -224,6 +227,11 @@ bool is_posix_mode_enabled(void) { return shell_opts.posix_mode; }
 /** @brief Check if pipefail is enabled */
 bool is_pipefail_enabled(void) { return shell_opts.pipefail_mode; }
 
+/** @brief Check if pipeline-diagnostic mode is enabled */
+bool is_pipeline_diagnostic_enabled(void) {
+    return shell_opts.pipeline_diagnostic_mode;
+}
+
 /** @brief Check if history expansion (!!) is enabled */
 bool is_histexpand_enabled(void) { return shell_opts.histexpand_mode; }
 
@@ -283,6 +291,7 @@ static option_mapping_t option_map[] = {
     {                  "vi",                   &shell_opts.vi_mode,   0},
     {               "posix",                &shell_opts.posix_mode,   0},
     {            "pipefail",             &shell_opts.pipefail_mode,   0},
+    { "pipeline-diagnostic",  &shell_opts.pipeline_diagnostic_mode,   0},
     {          "histexpand",           &shell_opts.histexpand_mode,   0},
     {             "history",              &shell_opts.history_mode,   0},
     {"interactive-comments", &shell_opts.interactive_comments_mode,   0},

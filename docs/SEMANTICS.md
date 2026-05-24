@@ -499,9 +499,6 @@ document; they are to be decided against it, as their own work.
   resolution pass remain to land. The legacy `return_value` builtin
   was retired at the start of this work; the typed form is the only
   path to a structured return value.
-- **Pipeline status reporting** -- a modern alternative to `pipefail`
-  feeding clean per-stage exit states into the structured-error
-  system.
 - **LLE real-time variable inspection** -- inspection hooks on the
   command line.
 - **Sigil conventions** (`$`, `@`, `%`) once values are first-class.
