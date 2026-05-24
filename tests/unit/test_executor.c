@@ -2525,6 +2525,42 @@ TEST(rt_pe_catalogue_scalar_slice_still_works) {
     ASSERT_STDOUT_EQ(r, "[a]\n");
 }
 
+TEST(rt_pe_catalogue_per_element_case_mod_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]^^}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[HELLO WORLD]\n");
+}
+
+TEST(rt_pe_catalogue_per_element_prefix_strip_via_slice) {
+    run_result_t r = run_shell("arr=(file.txt other.log)\n"
+                               "echo \"[${arr[@]##*.}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[txt log]\n");
+}
+
+TEST(rt_pe_catalogue_per_element_suffix_strip_via_slice) {
+    run_result_t r = run_shell("arr=(file.txt other.log)\n"
+                               "echo \"[${arr[@]%%.*}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[file other]\n");
+}
+
+TEST(rt_pe_catalogue_per_element_replace_first_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]/l/L}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[heLlo worLd]\n");
+}
+
+TEST(rt_pe_catalogue_per_element_replace_all_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]//l/L}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[heLLo worLd]\n");
+}
+
+TEST(rt_pe_catalogue_per_element_at_q_via_slice) {
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr[@]@Q}]\"\n");
+    ASSERT_STDOUT_EQ(r, "['hello' 'world']\n");
+}
+
 TEST(rt_pe_catalogue_scalar_conditional_still_works) {
     run_result_t r = run_shell("s=hello\n"
                                "echo \"[${s:-default}]\"\n"
@@ -2770,6 +2806,12 @@ int main(void) {
     RUN_TEST(rt_pe_catalogue_at_transform_on_bare_list);
     RUN_TEST(rt_pe_catalogue_conditional_on_map);
     RUN_TEST(rt_pe_catalogue_scalar_slice_still_works);
+    RUN_TEST(rt_pe_catalogue_per_element_case_mod_via_slice);
+    RUN_TEST(rt_pe_catalogue_per_element_prefix_strip_via_slice);
+    RUN_TEST(rt_pe_catalogue_per_element_suffix_strip_via_slice);
+    RUN_TEST(rt_pe_catalogue_per_element_replace_first_via_slice);
+    RUN_TEST(rt_pe_catalogue_per_element_replace_all_via_slice);
+    RUN_TEST(rt_pe_catalogue_per_element_at_q_via_slice);
     RUN_TEST(rt_pe_catalogue_scalar_conditional_still_works);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);

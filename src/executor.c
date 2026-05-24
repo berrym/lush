@@ -11351,6 +11351,43 @@ static char *slice_string_graphemes(const char *str, size_t str_len,
     return result;
 }
 
+/* strstr-equivalent that skips over balanced `[...]` regions. The
+ * operator search in parse_parameter_expansion would otherwise pick
+ * `@` (op_type 17, transformations) out of an `[@]` subscript --
+ * e.g. `${arr[@]^^}` would split var_name as "arr[" and op_type 17,
+ * never reaching the `^^` per-element handler. Confining the search
+ * to text outside subscripts makes operator picking correct on
+ * `${arr[@]op}` and `${arr[*]op}` forms regardless of which scalar
+ * operator follows the closing bracket. */
+static const char *find_op_outside_brackets(const char *haystack,
+                                            const char *needle) {
+    if (!haystack || !needle || !*needle) {
+        return NULL;
+    }
+    size_t needle_len = strlen(needle);
+    const char *p = haystack;
+    while (*p) {
+        if (*p == '[') {
+            int depth = 1;
+            p++;
+            while (*p && depth > 0) {
+                if (*p == '[') {
+                    depth++;
+                } else if (*p == ']') {
+                    depth--;
+                }
+                p++;
+            }
+            continue;
+        }
+        if (strncmp(p, needle, needle_len) == 0) {
+            return p;
+        }
+        p++;
+    }
+    return NULL;
+}
+
 static char *parse_parameter_expansion(executor_t *executor,
                                        const char *expansion) {
     if (!expansion) {
@@ -12600,6 +12637,42 @@ static char *parse_parameter_expansion(executor_t *executor,
          * array access. */
         bracket = NULL;
     }
+    /* Per-element passthrough: ${arr[@]op...} and ${arr[*]op...} should
+     * route through the operator dispatch below so the trailing op
+     * applies to each element. The bracket block would otherwise
+     * intercept the [@]/[*] subscript and raise a list-in-scalar-slot
+     * mismatch before the operator gets to dispatch.
+     *
+     * Conditions to skip the bracket block:
+     *   - subscript is exactly @ or *
+     *   - the next char after ] starts a per-element-amenable scalar
+     *     operator (^, ',', #, %, /, @). Notably NOT `:` -- slicing
+     *     ${arr[@]:0:2} and the conditional family ${arr[@]:-default}
+     *     keep their existing handling in the bracket block.
+     *   - the name resolves to a known array (otherwise the bracket
+     *     belongs to something else and the existing block handles
+     *     non-array names correctly). */
+    if (bracket) {
+        const char *close = strchr(bracket, ']');
+        if (close && close[1] != '\0' && close[1] != ':') {
+            char op_char = close[1];
+            bool is_per_element_op =
+                (op_char == '^' || op_char == ',' || op_char == '#' ||
+                 op_char == '%' || op_char == '/' || op_char == '@');
+            size_t sub_len = (size_t)(close - bracket - 1);
+            if (is_per_element_op && sub_len == 1 &&
+                (bracket[1] == '@' || bracket[1] == '*')) {
+                size_t name_len = (size_t)(bracket - expansion);
+                char *probe = strndup(expansion, name_len);
+                if (probe) {
+                    if (symtable_get_array(probe) != NULL) {
+                        bracket = NULL;
+                    }
+                    free(probe);
+                }
+            }
+        }
+    }
     if (bracket) {
         size_t name_len = bracket - expansion;
         char *arr_name = malloc(name_len + 1);
@@ -13162,14 +13235,16 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
     }
 
-    // Find the first valid operator - prioritize longer operators first
+    // Find the first valid operator - prioritize longer operators first.
+    // Use the bracket-aware variant so subscript chars inside `[...]`
+    // (notably `@` in `arr[@]`) don't get picked as operators.
     for (int i = 0; operators[i]; i++) {
-        const char *found = strstr(expansion, operators[i]);
+        const char *found = find_op_outside_brackets(expansion, operators[i]);
         /* If the operator matches at position 0 and the first char is
          * a special-param name, search again starting after it -- the
          * apparent operator at position 0 is really the variable. */
         if (found == expansion && first_is_special_param) {
-            found = strstr(expansion + 1, operators[i]);
+            found = find_op_outside_brackets(expansion + 1, operators[i]);
         }
         if (found) {
             // Skip single-character operators that are part of longer ones
@@ -13350,6 +13425,14 @@ static char *parse_parameter_expansion(executor_t *executor,
          * separate work). */
         bool case_mod_op =
             (op_type == 4 || op_type == 5 || op_type == 8 || op_type == 9);
+        /* Per-element-amenable scalar operators when the variable
+         * is a vector ($@, $* or arr[@] / arr[*]): case-mod, pattern
+         * strip, replace, and the @-transform family. Each applies
+         * to each element independently and the results join with
+         * space. */
+        bool per_element_op = case_mod_op || op_type == 2 || op_type == 3 ||
+                              op_type == 6 || op_type == 7 || op_type == 15 ||
+                              op_type == 16 || op_type == 17;
         bool is_at_or_star =
             (strcmp(var_name, "@") == 0 || strcmp(var_name, "*") == 0);
         size_t vn_len = strlen(var_name);
@@ -13358,7 +13441,7 @@ static char *parse_parameter_expansion(executor_t *executor,
              ((var_name[vn_len - 3] == '[' &&
                (var_name[vn_len - 2] == '@' || var_name[vn_len - 2] == '*') &&
                var_name[vn_len - 1] == ']')));
-        if (case_mod_op && (is_at_or_star || is_arr_at_or_star)) {
+        if (per_element_op && (is_at_or_star || is_arr_at_or_star)) {
             char **elems = NULL;
             int n_elems = 0;
             int cap = 0;
@@ -13405,7 +13488,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
             }
 
-            // Apply the case-mod op to each element.
+            // Apply the per-element scalar op to each element and join
+            // results with a single space. Each branch produces a
+            // freshly allocated transformed string per element; the
+            // join loop then concatenates with growth.
             size_t out_cap = 64;
             size_t out_pos = 0;
             char *joined = malloc(out_cap);
@@ -13413,18 +13499,157 @@ static char *parse_parameter_expansion(executor_t *executor,
                 joined[0] = '\0';
                 for (int i = 0; i < n_elems; i++) {
                     char *converted = NULL;
-                    bool to_upper = (op_type == 4 || op_type == 8);
-                    bool first_only = (op_type == 8 || op_type == 9);
-                    if (expanded_default && expanded_default[0]) {
-                        converted = convert_case_pattern(
-                            elems[i], expanded_default, to_upper, first_only);
-                    } else if (first_only) {
-                        converted = to_upper
-                                        ? convert_case_first_upper(elems[i])
-                                        : convert_case_first_lower(elems[i]);
-                    } else {
-                        converted = to_upper ? convert_case_all_upper(elems[i])
-                                             : convert_case_all_lower(elems[i]);
+                    switch (op_type) {
+                    case 4: // ^^ uppercase all
+                    case 5: // ,, lowercase all
+                    case 8: // ^  uppercase first / match
+                    case 9: // ,  lowercase first / match
+                    {
+                        bool to_upper = (op_type == 4 || op_type == 8);
+                        bool first_only = (op_type == 8 || op_type == 9);
+                        if (expanded_default && expanded_default[0]) {
+                            converted =
+                                convert_case_pattern(elems[i], expanded_default,
+                                                     to_upper, first_only);
+                        } else if (first_only) {
+                            converted =
+                                to_upper ? convert_case_first_upper(elems[i])
+                                         : convert_case_first_lower(elems[i]);
+                        } else {
+                            converted = to_upper
+                                            ? convert_case_all_upper(elems[i])
+                                            : convert_case_all_lower(elems[i]);
+                        }
+                        break;
+                    }
+                    case 2: // ## longest prefix strip
+                    case 6: // #  shortest prefix strip
+                    {
+                        int match = find_prefix_match(
+                            elems[i], expanded_default, op_type == 2);
+                        converted = strdup(elems[i] + match);
+                        break;
+                    }
+                    case 3: // %% longest suffix strip
+                    case 7: // %  shortest suffix strip
+                    {
+                        int match = find_suffix_match(
+                            elems[i], expanded_default, op_type == 3);
+                        int keep = (int)strlen(elems[i]) - match;
+                        if (keep < 0) {
+                            keep = 0;
+                        }
+                        converted = malloc((size_t)keep + 1);
+                        if (converted) {
+                            memcpy(converted, elems[i], (size_t)keep);
+                            converted[keep] = '\0';
+                        }
+                        break;
+                    }
+                    case 15: // // replace all
+                    case 16: // /  replace first
+                    {
+                        // Split expanded_default at first unescaped '/'.
+                        char *sep = NULL;
+                        for (char *p = expanded_default; p && *p; p++) {
+                            if (*p == '\\' && p[1] == '/') {
+                                p++;
+                                continue;
+                            }
+                            if (*p == '/') {
+                                sep = p;
+                                break;
+                            }
+                        }
+                        bool global = (op_type == 15);
+                        char *pattern = NULL;
+                        const char *replacement = "";
+                        if (sep) {
+                            size_t plen = (size_t)(sep - expanded_default);
+                            pattern = malloc(plen + 1);
+                            if (pattern) {
+                                size_t pj = 0;
+                                for (size_t pi = 0; pi < plen; pi++) {
+                                    if (expanded_default[pi] == '\\' &&
+                                        pi + 1 < plen &&
+                                        expanded_default[pi + 1] == '/') {
+                                        pattern[pj++] = '/';
+                                        pi++;
+                                    } else {
+                                        pattern[pj++] = expanded_default[pi];
+                                    }
+                                }
+                                pattern[pj] = '\0';
+                                replacement = sep + 1;
+                            }
+                        } else if (expanded_default) {
+                            pattern = strdup(expanded_default);
+                        }
+                        if (pattern) {
+                            converted = pattern_substitute(elems[i], pattern,
+                                                           replacement, global);
+                            free(pattern);
+                        }
+                        if (!converted) {
+                            converted = strdup(elems[i]);
+                        }
+                        break;
+                    }
+                    case 17: // @transform (Q E P A a)
+                    {
+                        char tcode = (expanded_default && expanded_default[0])
+                                         ? expanded_default[0]
+                                         : '\0';
+                        switch (tcode) {
+                        case 'Q': // shell-quoted form
+                        {
+                            // Conservative: wrap in single quotes and
+                            // escape embedded single quotes. Matches
+                            // bash's @Q for typical strings.
+                            size_t elen = strlen(elems[i]);
+                            size_t qcap = elen * 4 + 3;
+                            converted = malloc(qcap);
+                            if (converted) {
+                                size_t qp = 0;
+                                converted[qp++] = '\'';
+                                for (size_t k = 0; k < elen; k++) {
+                                    if (elems[i][k] == '\'') {
+                                        converted[qp++] = '\'';
+                                        converted[qp++] = '\\';
+                                        converted[qp++] = '\'';
+                                        converted[qp++] = '\'';
+                                    } else {
+                                        converted[qp++] = elems[i][k];
+                                    }
+                                }
+                                converted[qp++] = '\'';
+                                converted[qp] = '\0';
+                            }
+                            break;
+                        }
+                        case 'E': // backslash-escape processing
+                            // Passthrough for now; per-element parity
+                            // with the scalar @E path.
+                            converted = strdup(elems[i]);
+                            break;
+                        case 'P': // prompt expansion
+                            converted = strdup(elems[i]);
+                            break;
+                        case 'A': // assignment form
+                            converted = strdup(elems[i]);
+                            break;
+                        case 'a': // attributes
+                            converted = strdup("");
+                            break;
+                        default:
+                            converted = strdup(elems[i]);
+                            break;
+                        }
+                        break;
+                    }
+                    default:
+                        converted = strdup(elems[i]);
+                        break;
                     }
                     if (!converted) {
                         converted = strdup("");
