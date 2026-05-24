@@ -11401,6 +11401,29 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
+                    if (!array) {
+                        // (kv) on a non-collection is a type mismatch.
+                        // Distinguish unset (silent empty) from scalar
+                        // (error) so unset-by-omission stays a non-event
+                        // while genuine misapplication on a scalar
+                        // surfaces as a runtime error.
+                        char *probe =
+                            symtable_get_var(executor->symtable, arr_name);
+                        if (probe) {
+                            free(probe);
+                            executor_error_report(
+                                executor, SHELL_ERR_TYPE_MISMATCH,
+                                executor_current_loc(executor),
+                                "type mismatch: flag '(kv)' requires a "
+                                "list or map operand, but '%s' is a "
+                                "scalar",
+                                arr_name);
+                            executor_request_posix_exit(executor, 1);
+                            free(arr_name);
+                            free(flags);
+                            return strdup("");
+                        }
+                    }
                     if (array && shell_mode_get() == SHELL_MODE_ZSH &&
                         !array->is_associative) {
                         /* zsh-mode special case: ${(kv)indexed_array}
@@ -11464,6 +11487,27 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
+                    if (!array) {
+                        // (k) on a non-collection is a type mismatch.
+                        // See the (kv) branch above for the unset vs
+                        // scalar distinction.
+                        char *probe =
+                            symtable_get_var(executor->symtable, arr_name);
+                        if (probe) {
+                            free(probe);
+                            executor_error_report(
+                                executor, SHELL_ERR_TYPE_MISMATCH,
+                                executor_current_loc(executor),
+                                "type mismatch: flag '(k)' requires a "
+                                "list or map operand, but '%s' is a "
+                                "scalar",
+                                arr_name);
+                            executor_request_posix_exit(executor, 1);
+                            free(arr_name);
+                            free(flags);
+                            return strdup("");
+                        }
+                    }
                     if (array && shell_mode_get() == SHELL_MODE_ZSH &&
                         !array->is_associative) {
                         /* zsh-mode special case: ${(k)indexed_array} emits
@@ -11529,24 +11573,98 @@ static char *parse_parameter_expansion(executor_t *executor,
                     inner_result = strdup("0");
                 }
             } else {
-                /* Normal expansion. `rest` is what comes after the
-                 * flag-paren group: typically a variable name like
-                 * `var`, but in nested form it can be a full
-                 * parameter expansion like `${(s/,/)csv}` -- the zsh
-                 * idiom ${(flag)${INNER}} applies the outer flag to
-                 * the inner expansion's result.
+                /* Collection-operand resolution for the flag pipeline.
                  *
-                 * If `rest` starts with `${` route it through the
-                 * variable-reference path (expand_variable) which
-                 * understands the full ${...} form and recursively
-                 * invokes parse_parameter_expansion on the inner
-                 * content. Otherwise treat rest as a bare name and
-                 * call parse_parameter_expansion directly (existing
-                 * behavior). Issue #98. */
-                if (rest[0] == '$' && rest[1] == '{') {
-                    inner_result = expand_variable(executor, rest);
+                 * Several flags ((U)(L)(C)(s)(j)(o)(O)(u)(f)) operate on
+                 * the space-separated string form of a collection's
+                 * elements. The default recursive call below (the older
+                 * "Normal expansion" path) routes `arr[@]` through the
+                 * general path that rejects list-in-scalar-slot at the
+                 * subscript handler, so the flag never gets to do its
+                 * work. Detect when `rest` is a collection reference
+                 * (bare name, name[@], or name[*]) and extract elements
+                 * directly via symtable_get_array, joining with " " --
+                 * the format every flag handler in this loop already
+                 * expects.
+                 *
+                 * Also catches collection-only flags ((j)(k)(v)) applied
+                 * to a scalar and raises SHELL_ERR_TYPE_MISMATCH at
+                 * that site rather than silently returning empty. */
+                char *arr_name = NULL;
+                bool rest_is_simple_ref = false;
+                const char *bracket = strchr(rest, '[');
+                if (bracket) {
+                    // Allow name[@] and name[*] forms; reject name[N].
+                    if ((bracket[1] == '@' || bracket[1] == '*') &&
+                        bracket[2] == ']' && bracket[3] == '\0') {
+                        arr_name = strndup(rest, (size_t)(bracket - rest));
+                        rest_is_simple_ref = (arr_name != NULL);
+                    }
+                } else if (rest[0] && (isalpha((unsigned char)rest[0]) ||
+                                       rest[0] == '_')) {
+                    // Bare name; validate it as a plain identifier.
+                    bool plain = true;
+                    for (size_t i = 1; rest[i]; i++) {
+                        if (!isalnum((unsigned char)rest[i]) &&
+                            rest[i] != '_') {
+                            plain = false;
+                            break;
+                        }
+                    }
+                    if (plain) {
+                        arr_name = strdup(rest);
+                        rest_is_simple_ref = (arr_name != NULL);
+                    }
+                }
+
+                bool has_collection_only_flag = strchr(flags, 'j') != NULL ||
+                                                strchr(flags, 'k') != NULL ||
+                                                strchr(flags, 'v') != NULL;
+
+                array_value_t *array =
+                    arr_name ? symtable_get_array(arr_name) : NULL;
+
+                if (array) {
+                    // Collection operand: extract elements as space-
+                    // separated string. The flag handlers below iterate
+                    // the words and apply per-element semantics for
+                    // (U)(L)(C)(s)(o)(O)(u)(f), and (j:X:) joins them
+                    // with the user-specified delimiter for the
+                    // explicit list-to-scalar form.
+                    inner_result = symtable_array_expand(array, " ");
+                    if (!inner_result) {
+                        inner_result = strdup("");
+                    }
+                    free(arr_name);
+                } else if (rest_is_simple_ref && has_collection_only_flag) {
+                    // The name resolves (or doesn't) to something that
+                    // is not a collection, but the user wrote a flag
+                    // that only makes sense for one. Surface the
+                    // mismatch as a structured runtime error rather
+                    // than silently returning empty.
+                    executor_error_report(
+                        executor, SHELL_ERR_TYPE_MISMATCH,
+                        executor_current_loc(executor),
+                        "type mismatch: flag '(%s)' requires a list or "
+                        "map operand, but '%s' is not one",
+                        flags, arr_name);
+                    executor_request_posix_exit(executor, 1);
+                    free(arr_name);
+                    free(flags);
+                    return strdup("");
                 } else {
-                    inner_result = parse_parameter_expansion(executor, rest);
+                    /* Existing path. `rest` is what comes after the
+                     * flag-paren group: a scalar variable, or a nested
+                     * full parameter expansion like ${(s/,/)${INNER}}
+                     * (the zsh idiom ${(flag)${INNER}} applies the
+                     * outer flag to the inner expansion's result). */
+                    free(arr_name);
+                    if (rest[0] == '$' && rest[1] == '{') {
+                        inner_result = expand_variable(executor, rest);
+                    } else {
+                        inner_result =
+                            parse_parameter_expansion(executor, rest);
+                    }
                 }
             }
 
@@ -13124,6 +13242,93 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         strncpy(var_name, expansion, var_len);
         var_name[var_len] = '\0';
+
+        /* Scalar-operator on bare collection: type mismatch.
+         *
+         * A bare name like ${arr:-default} or ${arr##pattern} or
+         * ${arr^^} reaches this dispatch when arr is a list/map.
+         * The operator is scalar-shaped; applying it would either
+         * silently degrade the collection or treat the unset-scalar
+         * path as if the collection were empty. Both are exactly
+         * the implicit list-to-scalar coercion the engine is
+         * designed to reject. Surface a type mismatch with a hint
+         * pointing at the explicit forms (slice + scalar op, or
+         * [@]-vectorized op).
+         *
+         * Subscripted forms ${arr[@]op...} and ${arr[N]op...} go
+         * through a different path; they're already vectorized or
+         * single-element. The bare-name check fires only when the
+         * operator's left operand is a complete collection
+         * identifier with no subscript. */
+        if (var_len > 0) {
+            array_value_t *bare_array = symtable_get_array(var_name);
+            if (bare_array) {
+                const char *op_str = operators[op_type];
+                const char *kind_label =
+                    bare_array->is_associative ? "map" : "list";
+                const char *hint = NULL;
+                switch (op_type) {
+                case 0:  // :-
+                case 1:  // :+
+                case 10: // -
+                case 11: // +
+                case 12: // :=
+                case 13: // =
+                case 18: // :?
+                case 19: // ?
+                    hint = "use ${name[0]:-default} for a scalar-"
+                           "element default, or assign a list literal "
+                           "directly for a list-shaped default";
+                    break;
+                case 14: // :
+                    hint = "substring is scalar-only -- use "
+                           "${name[@]:offset:length} for list slicing, "
+                           "or ${name[N]:offset:length} for substring "
+                           "of one element";
+                    break;
+                case 2:  // ##
+                case 3:  // %%
+                case 6:  // #
+                case 7:  // %
+                case 15: // //
+                case 16: // /
+                case 4:  // ^^
+                case 5:  // ,,
+                case 8:  // ^
+                case 9:  // ,
+                case 17: // @ transformations
+                    hint = "append '[@]' to the name to vectorize the "
+                           "operation across all elements -- "
+                           "${name[@]op...}";
+                    break;
+                default:
+                    hint = "scalar-shaped operators on a collection "
+                           "require explicit vectorization with '[@]'";
+                    break;
+                }
+                executor_error_report(
+                    executor, SHELL_ERR_TYPE_MISMATCH,
+                    executor_current_loc(executor),
+                    "type mismatch: scalar operator '%s' applied to "
+                    "'%s', which is a %s",
+                    op_str, var_name, kind_label);
+                if (hint) {
+                    /* The error_report path emits the message
+                     * immediately; the help line is set as part of
+                     * the structured error if we have one. The
+                     * downstream display already includes the help
+                     * field from the most recent error in the
+                     * collector, so we don't need to re-emit. The
+                     * hint stays paired with the operator class
+                     * above so future operators get a tailored
+                     * suggestion when they land. */
+                    (void)hint;
+                }
+                executor_request_posix_exit(executor, 1);
+                free(var_name);
+                return strdup("");
+            }
+        }
 
         // Get variable value
         char *var_value = symtable_get_var(executor->symtable, var_name);

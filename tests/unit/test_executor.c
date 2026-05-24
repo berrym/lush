@@ -2415,6 +2415,124 @@ TEST(rt_typed_fn_void_no_return) {
     (void)r;
 }
 
+// --- parameter-expansion catalogue --------------------------------------
+// Operators have a defined input-kind to output-kind contract. When the
+// kinds disagree the engine raises a structured runtime type-mismatch
+// rather than silently no-op'ing or producing wrong output. These tests
+// pin the cells of that catalogue.
+
+TEST(rt_pe_catalogue_join_flag_on_list) {
+    // Explicit list-to-scalar join with custom separator. Previously
+    // over-rejected by the bare-${arr[@]} list-in-scalar-slot check;
+    // (j:X:) IS the explicit join, so the runtime allows it.
+    run_result_t r = run_shell("arr=(alpha beta gamma)\n"
+                               "echo \"[${(j:+:)arr[@]}]\"\n"
+                               "echo \"[${(j:+:)arr}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[alpha+beta+gamma]\n[alpha+beta+gamma]\n");
+}
+
+TEST(rt_pe_catalogue_case_mod_flag_per_element) {
+    // (U) flag on a list per-elements; the result is the elements
+    // uppercased and space-joined.
+    run_result_t r = run_shell("arr=(alpha beta)\n"
+                               "echo \"[${(U)arr}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[ALPHA BETA]\n");
+}
+
+TEST(rt_pe_catalogue_sort_flag_on_list) {
+    run_result_t r = run_shell("arr=(c a b)\n"
+                               "echo \"[${(o)arr}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[a b c]\n");
+}
+
+TEST(rt_pe_catalogue_keys_flag_on_scalar) {
+    // Collection-only flag (k) applied to a scalar -> type mismatch.
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(k)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_values_flag_on_scalar) {
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(v)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_kv_flag_on_scalar) {
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(kv)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_join_flag_on_scalar) {
+    // (j:X:) on a non-collection is meaningless: there is nothing to
+    // join. Type mismatch.
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${(j:+:)s}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_conditional_on_bare_list) {
+    // ${list:-default} silently collapses to the first-element-default
+    // form in legacy shells. lush rejects it; the user picks slice for
+    // a scalar element fallback, or assigns a list literal for a
+    // list-shaped fallback.
+    run_result_t r = run_shell("arr=(a b c)\n"
+                               "echo \"[${arr:-default}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_case_mod_on_bare_list) {
+    // ${arr^^} on a bare list name -- scalar operator on collection.
+    // The user must vectorize explicitly via ${arr[@]^^}.
+    run_result_t r = run_shell("arr=(hello world)\n"
+                               "echo \"[${arr^^}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_pattern_strip_on_bare_list) {
+    run_result_t r = run_shell("arr=(file.txt other.log)\n"
+                               "echo \"[${arr##*.}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_substring_on_bare_list) {
+    run_result_t r = run_shell("arr=(alpha beta)\n"
+                               "echo \"[${arr:0:2}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_at_transform_on_bare_list) {
+    // ${arr@Q} on bare list -- the @-transform is scalar-shaped on a
+    // bare name. Vectorize via ${arr[@]@Q}.
+    run_result_t r = run_shell("arr=(a b c)\n"
+                               "echo \"[${arr@Q}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_conditional_on_map) {
+    run_result_t r = run_shell("declare -A m=([a]=1 [b]=2)\n"
+                               "echo \"[${m:-default}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
+TEST(rt_pe_catalogue_scalar_slice_still_works) {
+    // Regression: ${arr[0]:-default} is the scalar-element form and
+    // remains valid -- the slice produces a scalar and the
+    // conditional operates on that scalar.
+    run_result_t r = run_shell("arr=(a b c)\n"
+                               "echo \"[${arr[0]:-default}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n");
+}
+
+TEST(rt_pe_catalogue_scalar_conditional_still_works) {
+    run_result_t r = run_shell("s=hello\n"
+                               "echo \"[${s:-default}]\"\n"
+                               "unset s\n"
+                               "echo \"[${s:-default}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[hello]\n[default]\n");
+}
+
 TEST(rt_typed_fn_lexical_scope) {
     // A typed-fn body resolves free names through its captured
     // declaration-site scope, not through the dynamic caller's
@@ -2638,6 +2756,21 @@ int main(void) {
     RUN_TEST(rt_typed_fn_kind_mismatch_arg);
     RUN_TEST(rt_typed_fn_void_called_via_let);
     RUN_TEST(rt_typed_fn_void_no_return);
+    RUN_TEST(rt_pe_catalogue_join_flag_on_list);
+    RUN_TEST(rt_pe_catalogue_case_mod_flag_per_element);
+    RUN_TEST(rt_pe_catalogue_sort_flag_on_list);
+    RUN_TEST(rt_pe_catalogue_keys_flag_on_scalar);
+    RUN_TEST(rt_pe_catalogue_values_flag_on_scalar);
+    RUN_TEST(rt_pe_catalogue_kv_flag_on_scalar);
+    RUN_TEST(rt_pe_catalogue_join_flag_on_scalar);
+    RUN_TEST(rt_pe_catalogue_conditional_on_bare_list);
+    RUN_TEST(rt_pe_catalogue_case_mod_on_bare_list);
+    RUN_TEST(rt_pe_catalogue_pattern_strip_on_bare_list);
+    RUN_TEST(rt_pe_catalogue_substring_on_bare_list);
+    RUN_TEST(rt_pe_catalogue_at_transform_on_bare_list);
+    RUN_TEST(rt_pe_catalogue_conditional_on_map);
+    RUN_TEST(rt_pe_catalogue_scalar_slice_still_works);
+    RUN_TEST(rt_pe_catalogue_scalar_conditional_still_works);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
     RUN_TEST(rt_case_arm_runs_all);
