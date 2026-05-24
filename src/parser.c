@@ -73,6 +73,7 @@ static node_t *parse_let_fn_call(parser_t *parser);
 static node_t *parse_fn_return_statement(parser_t *parser);
 static bool is_valid_fn_kind_name(const char *text);
 static bool is_let_fn_call_form(parser_t *parser);
+static bool is_typed_fn_call_statement(parser_t *parser);
 
 // Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
@@ -1397,6 +1398,28 @@ static node_t *parse_simple_command(parser_t *parser) {
             // parent constructs - returning NULL here lets the parent detect
             // them
             return NULL;
+        }
+    }
+
+    // Statement-position typed-fn call: `name(args)` or `name()` not
+    // followed by `{`. The peek-and-restore recognizer below
+    // distinguishes this from a POSIX function definition, which has
+    // the same `name(` prefix but requires `{` after `)`.
+    //
+    // The recognizer is checked BEFORE is_function_definition because
+    // both grammars accept `name(...)` at the head; the difference is
+    // what follows the closing paren.
+    //
+    // is_typed_fn_call_statement advances and restores the tokenizer;
+    // the restore frees the prior current+lookahead and re-tokenizes
+    // from the saved position. The outer `current` pointer becomes
+    // dangling, so it must be re-fetched whether the recognizer
+    // matched or not (mirrors the let-fn-call dispatch above).
+    if (token_is_word_like(current->type) && current->text) {
+        bool is_call = is_typed_fn_call_statement(parser);
+        current = tokenizer_current(parser->tokenizer);
+        if (is_call) {
+            return parse_fn_call_expression(parser);
         }
     }
 
@@ -6393,4 +6416,92 @@ static node_t *parse_fn_return_statement(parser_t *parser) {
 
     parser_pop_context(parser);
     return ret_node;
+}
+
+/**
+ * @brief Recognise a statement-position typed-fn call.
+ *
+ * Both POSIX function definition and typed-fn call begin with
+ * `IDENT(`; the discriminator is what follows the closing `)`. A
+ * POSIX-form function definition requires `{` (after optional
+ * whitespace/newlines) -- without it the call is a typed-fn
+ * invocation whose return value is discarded.
+ *
+ * Walks the tokenizer forward past the matching `)`, peeks the next
+ * non-trivial token, and restores. Returns true if the next token
+ * after the closing paren is anything OTHER than `{`. Returns false
+ * if the form does not match `IDENT(...)`, or if `{` follows the
+ * close paren (POSIX function definition).
+ *
+ * Does not consume tokens: the caller re-walks via
+ * parse_fn_call_expression after a true return.
+ */
+static bool is_typed_fn_call_statement(parser_t *parser) {
+    token_t *current = tokenizer_current(parser->tokenizer);
+    if (!current || !token_is_word_like(current->type)) {
+        return false;
+    }
+    // Must be followed by an LPAREN adjacent to the identifier.
+    token_t *next = tokenizer_peek(parser->tokenizer);
+    if (!next || next->type != TOK_LPAREN) {
+        return false;
+    }
+    if (next->position != current->end_position) {
+        // `name (` with whitespace -- existing POSIX-form path
+        // recognises it as a function header; keep that behaviour.
+        return false;
+    }
+
+    size_t saved_pos = current->position;
+    size_t saved_line = parser->tokenizer->line;
+    size_t saved_col = parser->tokenizer->column;
+
+    bool matched = false;
+
+    // Consume the IDENT.
+    tokenizer_advance(parser->tokenizer);
+    // Consume the LPAREN.
+    tokenizer_advance(parser->tokenizer);
+
+    // Walk past everything until the matching RPAREN. Nested parens
+    // (e.g. a nested call as an argument) bump the depth so we don't
+    // exit at the wrong close.
+    int depth = 1;
+    while (depth > 0) {
+        token_t *t = tokenizer_current(parser->tokenizer);
+        if (!t || t->type == TOK_EOF) {
+            goto restore;
+        }
+        if (t->type == TOK_LPAREN) {
+            depth++;
+        } else if (t->type == TOK_RPAREN) {
+            depth--;
+            if (depth == 0) {
+                tokenizer_advance(parser->tokenizer);
+                break;
+            }
+        }
+        tokenizer_advance(parser->tokenizer);
+    }
+
+    // Skip trivial whitespace and newlines between `)` and the next
+    // significant token. parse_function_definition does the same.
+    while (tokenizer_match(parser->tokenizer, TOK_NEWLINE)) {
+        tokenizer_advance(parser->tokenizer);
+    }
+
+    token_t *after = tokenizer_current(parser->tokenizer);
+    if (!after || after->type != TOK_LBRACE) {
+        // Anything other than `{` (including EOF, `;`, newline already
+        // skipped, `&&`, command operators, end-of-statement) makes
+        // this a typed-fn call statement.
+        matched = true;
+    }
+
+restore:
+    parser->tokenizer->position = saved_pos;
+    parser->tokenizer->line = saved_line;
+    parser->tokenizer->column = saved_col;
+    tokenizer_refresh_from_position(parser->tokenizer);
+    return matched;
 }
