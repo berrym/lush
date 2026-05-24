@@ -41,6 +41,8 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
                                 const char *content);
 static void debug_analyze_typed_fns(debug_context_t *ctx, const char *file,
                                     node_t *ast);
+static void debug_analyze_sigils(debug_context_t *ctx, const char *file,
+                                 const char *content);
 
 /**
  * @brief Analyze a script file for various issues
@@ -102,6 +104,7 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
     debug_analyze_portability(ctx, script_path, script_content, ast);
     debug_analyze_types(ctx, script_path, script_content);
     debug_analyze_typed_fns(ctx, script_path, ast);
+    debug_analyze_sigils(ctx, script_path, script_content);
 
     // Generate analysis report
     debug_show_analysis_report(ctx);
@@ -875,6 +878,284 @@ static void debug_analyze_typed_fns(debug_context_t *ctx, const char *file,
         return;
     }
     debug_analyze_typed_fns_recurse(ctx, file, ast);
+}
+
+/* ============================================================================
+ * Kind-sigil static checks (`@scalar` warning, `%scalar` error)
+ *
+ * The runtime sigil dispatcher resolves names through the same scope chain
+ * `$x` uses, but the sigil tag dictates presentation -- `@x` streams vector
+ * elements, `%x` streams structural pairs.  `%scalar` is a hard type
+ * mismatch at runtime; `@scalar` widens silently.  This walker catches the
+ * mismatched cases at edit time by:
+ *
+ *   1. Scanning the script for visible top-level bindings (`name=...`,
+ *      `name=(...)`, `declare -A name`), recording each as scalar / list /
+ *      map.
+ *   2. Walking the script for top-level sigil references (`@NAME` or
+ *      `%NAME` at the start of a fresh token, valid-identifier name).
+ *   3. Cross-referencing each sigil site against the inferred kind and
+ *      emitting:
+ *         %scalar -> error (hard runtime failure ahead)
+ *         @scalar -> warning (silently widens; usually a declaration typo)
+ *
+ * Scope-aware tracking, function-local bindings, conditional assignments,
+ * and indirect bindings (`declare -n`, `eval`, sourced files) are out of
+ * scope for this first pass; the walker only consults top-level visible
+ * bindings.  Unknown identifiers do not fire a warning -- a sigil on a
+ * declared-elsewhere name is the normal case, not a misuse.
+ * ============================================================================
+ */
+
+typedef enum {
+    SIGIL_KIND_UNKNOWN = 0,
+    SIGIL_KIND_SCALAR,
+    SIGIL_KIND_LIST,
+    SIGIL_KIND_MAP,
+} sigil_inferred_kind_t;
+
+typedef struct sigil_binding {
+    char *name;
+    sigil_inferred_kind_t kind;
+    struct sigil_binding *next;
+} sigil_binding_t;
+
+static sigil_binding_t *sigil_binding_lookup(sigil_binding_t *list,
+                                             const char *name, size_t namelen) {
+    for (sigil_binding_t *e = list; e; e = e->next) {
+        if (strlen(e->name) == namelen &&
+            strncmp(e->name, name, namelen) == 0) {
+            return e;
+        }
+    }
+    return NULL;
+}
+
+static void sigil_binding_record(sigil_binding_t **list, const char *name,
+                                 size_t namelen, sigil_inferred_kind_t kind) {
+    sigil_binding_t *existing = sigil_binding_lookup(*list, name, namelen);
+    if (existing) {
+        // Later assignments override earlier ones; the most recent
+        // top-level binding wins for static-analysis purposes.
+        existing->kind = kind;
+        return;
+    }
+    sigil_binding_t *node = calloc(1, sizeof(*node));
+    if (!node) {
+        return;
+    }
+    node->name = strndup(name, namelen);
+    if (!node->name) {
+        free(node);
+        return;
+    }
+    node->kind = kind;
+    node->next = *list;
+    *list = node;
+}
+
+static void sigil_binding_free(sigil_binding_t *list) {
+    while (list) {
+        sigil_binding_t *next = list->next;
+        free(list->name);
+        free(list);
+        list = next;
+    }
+}
+
+// True if `c` can begin a shell identifier (per POSIX: [_A-Za-z]).
+static bool sigil_id_start(unsigned char c) { return isalpha(c) || c == '_'; }
+
+// True if `c` can continue a shell identifier (per POSIX: [_A-Za-z0-9]).
+static bool sigil_id_cont(unsigned char c) { return isalnum(c) || c == '_'; }
+
+// Scan a single source line for top-level bindings and record them.
+static void sigil_collect_bindings_from_line(const char *line, size_t len,
+                                             sigil_binding_t **out) {
+    // Skip leading whitespace and decide what shape this line opens with.
+    size_t i = 0;
+    while (i < len && (line[i] == ' ' || line[i] == '\t')) {
+        i++;
+    }
+    if (i >= len || line[i] == '#') {
+        return;
+    }
+
+    /* `declare -A NAME` / `typeset -A NAME` -> map binding.
+     * Any other `declare`/`typeset` form falls through to the scalar /
+     * list / list-via-`=(` detector below. */
+    static const char *map_prefixes[] = {"declare -A ", "typeset -A ", NULL};
+    for (size_t p = 0; map_prefixes[p]; p++) {
+        size_t plen = strlen(map_prefixes[p]);
+        if (i + plen <= len && strncmp(line + i, map_prefixes[p], plen) == 0) {
+            size_t name_start = i + plen;
+            while (name_start < len &&
+                   (line[name_start] == ' ' || line[name_start] == '\t')) {
+                name_start++;
+            }
+            size_t name_end = name_start;
+            if (name_end < len &&
+                sigil_id_start((unsigned char)line[name_end])) {
+                name_end++;
+                while (name_end < len &&
+                       sigil_id_cont((unsigned char)line[name_end])) {
+                    name_end++;
+                }
+                if (name_end > name_start) {
+                    sigil_binding_record(out, line + name_start,
+                                         name_end - name_start, SIGIL_KIND_MAP);
+                }
+            }
+            return;
+        }
+    }
+
+    // `NAME=VALUE` and `NAME=(...)` at the start of the line.  Strip an
+    // optional `local ` / `export ` / `readonly ` prefix first.
+    static const char *kind_prefixes[] = {"local ", "export ", "readonly ",
+                                          NULL};
+    for (size_t p = 0; kind_prefixes[p]; p++) {
+        size_t plen = strlen(kind_prefixes[p]);
+        if (i + plen <= len && strncmp(line + i, kind_prefixes[p], plen) == 0) {
+            i += plen;
+            while (i < len && (line[i] == ' ' || line[i] == '\t')) {
+                i++;
+            }
+            break;
+        }
+    }
+
+    size_t name_start = i;
+    if (name_start >= len || !sigil_id_start((unsigned char)line[name_start])) {
+        return;
+    }
+    size_t name_end = name_start + 1;
+    while (name_end < len && sigil_id_cont((unsigned char)line[name_end])) {
+        name_end++;
+    }
+    if (name_end >= len || line[name_end] != '=') {
+        return;
+    }
+    // Distinguish `=(` (list) from `=` (scalar).
+    size_t value_start = name_end + 1;
+    sigil_inferred_kind_t kind = (value_start < len && line[value_start] == '(')
+                                     ? SIGIL_KIND_LIST
+                                     : SIGIL_KIND_SCALAR;
+    sigil_binding_record(out, line + name_start, name_end - name_start, kind);
+}
+
+// First pass: walk every line and record top-level bindings.
+static sigil_binding_t *sigil_collect_bindings(const char *content) {
+    sigil_binding_t *out = NULL;
+    size_t len = strlen(content);
+    size_t line_start = 0;
+    for (size_t i = 0; i <= len; i++) {
+        if (i == len || content[i] == '\n') {
+            sigil_collect_bindings_from_line(content + line_start,
+                                             i - line_start, &out);
+            line_start = i + 1;
+        }
+    }
+    return out;
+}
+
+// Second pass: walk source for sigil references and cross-check.
+static void debug_analyze_sigils(debug_context_t *ctx, const char *file,
+                                 const char *content) {
+    if (!ctx || !file || !content) {
+        return;
+    }
+    sigil_binding_t *bindings = sigil_collect_bindings(content);
+
+    size_t len = strlen(content);
+    int line_num = 1;
+    bool in_sgl = false; // inside '...'
+    for (size_t i = 0; i < len; i++) {
+        char c = content[i];
+        if (c == '\n') {
+            line_num++;
+            in_sgl = false;
+            continue;
+        }
+        if (in_sgl) {
+            if (c == '\'') {
+                in_sgl = false;
+            }
+            continue;
+        }
+        if (c == '\'') {
+            in_sgl = true;
+            continue;
+        }
+        if (c != '@' && c != '%') {
+            continue;
+        }
+        // Sigil must be at token start: preceded by start-of-line,
+        // whitespace, or a token-separator character.
+        bool at_token_start = (i == 0);
+        if (!at_token_start) {
+            char prev = content[i - 1];
+            at_token_start =
+                (prev == ' ' || prev == '\t' || prev == '\n' || prev == ';' ||
+                 prev == '|' || prev == '&' || prev == '(' || prev == '"' ||
+                 prev == '<' || prev == '>');
+        }
+        if (!at_token_start) {
+            continue;
+        }
+        if (i + 1 >= len || !sigil_id_start((unsigned char)content[i + 1])) {
+            continue;
+        }
+        size_t name_start = i + 1;
+        size_t name_end = name_start + 1;
+        while (name_end < len &&
+               sigil_id_cont((unsigned char)content[name_end])) {
+            name_end++;
+        }
+        size_t name_len = name_end - name_start;
+        sigil_binding_t *binding =
+            sigil_binding_lookup(bindings, content + name_start, name_len);
+
+        // No visible binding -> stay silent.  The user may be referring
+        // to an environment variable, a sourced binding, or a function
+        // parameter -- not the analyzer's job to flag.
+        if (!binding || binding->kind != SIGIL_KIND_SCALAR) {
+            i = name_end - 1;
+            continue;
+        }
+
+        char namebuf[256];
+        size_t copy =
+            name_len < sizeof(namebuf) - 1 ? name_len : sizeof(namebuf) - 1;
+        memcpy(namebuf, content + name_start, copy);
+        namebuf[copy] = '\0';
+
+        char msg[384];
+        if (c == '%') {
+            snprintf(msg, sizeof(msg),
+                     "%%%s: pair sigil on scalar -- runtime type "
+                     "mismatch ahead; a singleton has no pair component",
+                     namebuf);
+            debug_add_analysis_issue(
+                ctx, file, line_num, "error", "type", msg,
+                "declare the name as a list/map (`arr=(...)` or "
+                "`declare -A`), or use @ for a vector context if a "
+                "single-element widen is what you want");
+        } else {
+            snprintf(msg, sizeof(msg),
+                     "@%s: vector sigil on scalar -- expands to a "
+                     "single-element list (silent widening)",
+                     namebuf);
+            debug_add_analysis_issue(
+                ctx, file, line_num, "warning", "type", msg,
+                "declare the name as a list (`arr=(...)`) if a "
+                "multi-element vector was intended, or use $ for "
+                "scalar context");
+        }
+        i = name_end - 1;
+    }
+
+    sigil_binding_free(bindings);
 }
 
 /**

@@ -511,6 +511,97 @@ TEST(analyze_script_type_at_subscript_in_scalar_assignment) {
     cleanup_test_dir();
 }
 
+TEST(analyze_script_sigil_pct_on_scalar_is_error) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/bin/sh\n"
+                         "x=hello\n"
+                         "echo %x\n";
+    char *path = create_test_script("sigil_pct_scalar.sh", script);
+
+    debug_analyze_script(ctx, path);
+
+    bool found_pct_error = false;
+    analysis_issue_t *issue = ctx->analysis_issues;
+    while (issue) {
+        if (strcmp(issue->category, "type") == 0 &&
+            strcmp(issue->severity, "error") == 0 &&
+            strstr(issue->message, "%x: pair sigil on scalar") != NULL) {
+            found_pct_error = true;
+            break;
+        }
+        issue = issue->next;
+    }
+    ASSERT_TRUE(found_pct_error, "%x on a scalar binding raises a type error");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
+TEST(analyze_script_sigil_at_on_scalar_is_warning) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/bin/sh\n"
+                         "x=hello\n"
+                         "echo @x\n";
+    char *path = create_test_script("sigil_at_scalar.sh", script);
+
+    debug_analyze_script(ctx, path);
+
+    bool found_at_warning = false;
+    analysis_issue_t *issue = ctx->analysis_issues;
+    while (issue) {
+        if (strcmp(issue->category, "type") == 0 &&
+            strcmp(issue->severity, "warning") == 0 &&
+            strstr(issue->message, "@x: vector sigil on scalar") != NULL) {
+            found_at_warning = true;
+            break;
+        }
+        issue = issue->next;
+    }
+    ASSERT_TRUE(found_at_warning,
+                "@x on a scalar binding raises a widening warning");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
+TEST(analyze_script_sigil_on_list_is_silent) {
+    // The analyzer must not flag `@arr` or `%arr` when `arr` is a list --
+    // those are the well-typed cases and a noisy warning would be wrong.
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/bin/sh\n"
+                         "arr=(a b c)\n"
+                         "echo @arr\n"
+                         "echo %arr\n";
+    char *path = create_test_script("sigil_list_ok.sh", script);
+
+    debug_analyze_script(ctx, path);
+
+    int sigil_type_issues = 0;
+    analysis_issue_t *issue = ctx->analysis_issues;
+    while (issue) {
+        if (strcmp(issue->category, "type") == 0 &&
+            (strstr(issue->message, "vector sigil on scalar") != NULL ||
+             strstr(issue->message, "pair sigil on scalar") != NULL)) {
+            sigil_type_issues++;
+        }
+        issue = issue->next;
+    }
+    ASSERT_EQ(sigil_type_issues, 0,
+              "well-typed sigil uses must not flag scalar-mismatch issues");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
 TEST(analyze_script_style_long_lines) {
     setup_test_dir();
     debug_context_t *ctx = debug_init();
@@ -837,6 +928,9 @@ int main(void) {
     RUN_TEST(analyze_script_portability_source);
     RUN_TEST(analyze_script_portability_echo_e);
     RUN_TEST(analyze_script_type_at_subscript_in_scalar_assignment);
+    RUN_TEST(analyze_script_sigil_pct_on_scalar_is_error);
+    RUN_TEST(analyze_script_sigil_at_on_scalar_is_warning);
+    RUN_TEST(analyze_script_sigil_on_list_is_silent);
 
     printf("\nStyle Analysis:\n");
     RUN_TEST(analyze_script_style_long_lines);
