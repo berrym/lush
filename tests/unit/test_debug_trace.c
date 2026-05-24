@@ -581,6 +581,61 @@ TEST(inspect_variable_without_dollar) {
     debug_cleanup(ctx);
 }
 
+// Return a pointer to the inspection-frame portion of a captured debug log,
+// skipping the variable-timestamp preamble that debug_enable() emits.  Falls
+// back to the full buffer if the frame marker is absent.
+static const char *frame_body(const char *buf) {
+    const char *frame = strstr(buf, "[Variable:");
+    return frame ? frame : buf;
+}
+
+TEST(inspect_variable_accepts_at_sigil) {
+    // The @ sigil prefix must be stripped before lookup so `@arr` resolves to
+    // the same binding as bare `arr` -- sigils are presentation-only, not a
+    // namespace.
+    debug_context_t *ctx_a = new_captured_ctx();
+    debug_context_t *ctx_b = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx_a, "ctx_a");
+    ASSERT_NOT_NULL(ctx_b, "ctx_b");
+
+    char with_sigil[2048];
+    char without[2048];
+
+    debug_inspect_variable(ctx_a, "@PATH");
+    read_debug_output(ctx_a, with_sigil, sizeof(with_sigil));
+
+    debug_inspect_variable(ctx_b, "PATH");
+    read_debug_output(ctx_b, without, sizeof(without));
+
+    ASSERT_STR_EQ(frame_body(with_sigil), frame_body(without),
+                  "@PATH inspection matches bare PATH");
+
+    debug_cleanup(ctx_a);
+    debug_cleanup(ctx_b);
+}
+
+TEST(inspect_variable_accepts_pct_sigil) {
+    debug_context_t *ctx_a = new_captured_ctx();
+    debug_context_t *ctx_b = new_captured_ctx();
+    ASSERT_NOT_NULL(ctx_a, "ctx_a");
+    ASSERT_NOT_NULL(ctx_b, "ctx_b");
+
+    char with_sigil[2048];
+    char without[2048];
+
+    debug_inspect_variable(ctx_a, "%PATH");
+    read_debug_output(ctx_a, with_sigil, sizeof(with_sigil));
+
+    debug_inspect_variable(ctx_b, "PATH");
+    read_debug_output(ctx_b, without, sizeof(without));
+
+    ASSERT_STR_EQ(frame_body(with_sigil), frame_body(without),
+                  "%PATH inspection matches bare PATH");
+
+    debug_cleanup(ctx_a);
+    debug_cleanup(ctx_b);
+}
+
 TEST(inspect_variable_special) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
@@ -1009,6 +1064,8 @@ int main(void) {
     RUN_TEST(inspect_variable_null_params);
     RUN_TEST(inspect_variable_with_dollar);
     RUN_TEST(inspect_variable_without_dollar);
+    RUN_TEST(inspect_variable_accepts_at_sigil);
+    RUN_TEST(inspect_variable_accepts_pct_sigil);
     RUN_TEST(inspect_variable_special);
     RUN_TEST(inspect_all_variables_null);
     RUN_TEST(inspect_all_variables_basic);

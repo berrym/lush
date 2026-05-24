@@ -408,7 +408,10 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
     }
 
     // Clean variable name (remove $ prefix if present)
-    const char *clean_name = (name[0] == '$') ? name + 1 : name;
+    // Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
+    // the kind tag itself is presentation-only; inspection is by name.
+    const char *clean_name =
+        (name[0] == '$' || name[0] == '@' || name[0] == '%') ? name + 1 : name;
 
     char frame_title[128];
     snprintf(frame_title, sizeof(frame_title), "Variable: %s", clean_name);
@@ -667,7 +670,10 @@ void debug_watch_variable(debug_context_t *ctx, const char *name) {
     }
 
     // Clean variable name
-    const char *clean_name = (name[0] == '$') ? name + 1 : name;
+    // Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
+    // the kind tag itself is presentation-only; inspection is by name.
+    const char *clean_name =
+        (name[0] == '$' || name[0] == '@' || name[0] == '%') ? name + 1 : name;
 
     debug_printf(ctx, "WATCH: %s\n", clean_name);
 
@@ -703,7 +709,10 @@ void debug_show_variable_type(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    const char *clean_name = (name[0] == '$') ? name + 1 : name;
+    // Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
+    // the kind tag itself is presentation-only; inspection is by name.
+    const char *clean_name =
+        (name[0] == '$' || name[0] == '@' || name[0] == '%') ? name + 1 : name;
 
     lush_value_view_t view = {0};
     symtable_lookup(clean_name, &view);
