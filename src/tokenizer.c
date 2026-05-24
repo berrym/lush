@@ -229,6 +229,8 @@ const char *token_type_name(token_type_t type) {
         return "PIPE";
     case TOK_AND:
         return "AND";
+    case TOK_BACKGROUND_DISOWN:
+        return "BACKGROUND_DISOWN";
     case TOK_LOGICAL_AND:
         return "LOGICAL_AND";
     case TOK_LOGICAL_OR:
@@ -1488,6 +1490,16 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     tokenizer->position += 2;
                     tokenizer->column += 2;
                     return token_new(TOK_LOGICAL_AND, "&&", 2, start_line,
+                                     start_column, start_pos);
+                } else if (next == '|' || next == '!') {
+                    // zsh `&|` and `&!` -- background-and-disown. Treated
+                    // as plain background for execution semantics; the
+                    // disown bookkeeping is an optimization the corpus
+                    // does not observe.
+                    char text[3] = {'&', next, '\0'};
+                    tokenizer->position += 2;
+                    tokenizer->column += 2;
+                    return token_new(TOK_BACKGROUND_DISOWN, text, 2, start_line,
                                      start_column, start_pos);
                 } else if (next == '>') {
                     // Check for &>> (append both stdout and stderr)

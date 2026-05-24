@@ -90,31 +90,30 @@ the typed-fn collision is gone, exposing a deeper parser bug.
 
 ---
 
-## 3. Function body with pipe doesn't parse
+## 3. zsh `&|` background-and-disown operator unrecognized (RESOLVED)
 
-**Severity:** parser bug.
+**Status:** fixed.
+
+Original diagnosis (function body with pipe) was wrong. The error
+report's column-73 caret pointed at the `|` in `&|`, which is zsh's
+"run in background and disown immediately" operator, not a pipe in a
+function body.
 
 ```bash
-function clipcopy() { cat "${1:-/dev/stdin}" | doitclient wclip; }
+function clipcopy() { cat "${1:-/dev/stdin}" | wl-copy &>/dev/null &|; }
 ```
 
-lush reports:
+Fix: new TOK_BACKGROUND_DISOWN token in src/tokenizer.c covering
+both zsh spellings (`&|` and `&!`), accepted in parse_pipeline
+wherever TOK_AND was. Lush treats the disown-bookkeeping difference
+as an optimization the corpus doesn't observe; observable script
+semantics match plain `&` (background + continue).
 
-```
-error[E1001]: expected command name, got '|'
-  --> clipboard.zsh:74:73
-```
-
-The `function name() { body }` form is being parsed with a body
-grammar that doesn't admit `|`. The shape works fine in the same
-parser when the body is a single command; introducing a pipe in the
-body trips the inner-command parser.
-
-**Affected corpus entries:** clipboard.zsh; will affect any zsh/bash
-script using one-liner function bodies with pipes.
-
-**Source location:** `src/parser.c`, likely the `parse_function_body`
-or `parse_compound_command` paths.
+**Follow-up surfaced in clipboard.zsh:** line 113 uses zsh's multi-
+name function-definition syntax `function NAME1 NAME2 { body }`
+(define two functions sharing one body). Lush parser rejects with
+"POSIX functions require '()' after the function name." Tracked as
+[#8](#8-zsh-multi-name-function-definition).
 
 ---
 
@@ -165,6 +164,26 @@ builtin "didn't do anything." Document each stub in
 `known_divergences.txt`.
 
 ---
+
+## 8. zsh multi-name function definition
+
+**Severity:** missing surface.
+
+```bash
+function clipcopy clippaste {
+  unfunction clipcopy clippaste
+  ...
+}
+```
+
+zsh shape: `function NAME1 NAME2 ... { body }` defines all named
+functions to share one body. Real-world idiom for declaring a
+"trampoline" body that multiple aliases route through.
+
+**Source location:** `src/parser.c` `parse_function_definition` --
+needs to admit a list of names between `function` and `{`.
+
+**Affected corpus entries:** clipboard.zsh.
 
 ## 7. `fi` after `((...))` line trips E1001
 

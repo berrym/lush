@@ -990,8 +990,9 @@ static node_t *parse_pipeline(parser_t *parser) {
     }
 
     // Check for background execution
-    if (tokenizer_match(parser->tokenizer, TOK_AND)) {
-        tokenizer_advance(parser->tokenizer); // consume &
+    if (tokenizer_match(parser->tokenizer, TOK_AND) ||
+        tokenizer_match(parser->tokenizer, TOK_BACKGROUND_DISOWN)) {
+        tokenizer_advance(parser->tokenizer); // consume & / &| / &!
 
         node_t *background_node = new_node(NODE_BACKGROUND);
         if (!background_node) {

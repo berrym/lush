@@ -32,6 +32,10 @@ typedef enum {
     TOK_SEMICOLON,         /**< ; */
     TOK_PIPE,              /**< | */
     TOK_AND,               /**< & */
+    TOK_BACKGROUND_DISOWN, ///< `&|` and `&!` -- zsh background-and-disown.
+                           ///< Lush treats the disown bookkeeping as an
+                           ///< optimization; observable script semantics
+                           ///< match plain `&`.
     TOK_LOGICAL_AND,       /**< && */
     TOK_LOGICAL_OR,        /**< || */
     TOK_REDIRECT_IN,       /**< < */
