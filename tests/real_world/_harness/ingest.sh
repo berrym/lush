@@ -35,9 +35,12 @@ CORPUS_ROOT="$(cd "$HARNESS_DIR/.." && pwd)/corpus"
 WAIVERS_LEDGER="$CORPUS_ROOT/WAIVERS.md"
 
 # Categories that may be waived (a real human reason must accompany).
-# Hard-reject categories (sudo, network, write outside /tmp, live VCS)
-# are absent here -- they cannot be waived.
-WAIVABLE_CATEGORIES=("nondet" "filesys")
+# `network` is waivable because the scanner's command-position heuristic
+# is good but not perfect; false positives are real (e.g., command names
+# appearing as data inside quoted arguments). Genuine invocations should
+# never be waived -- waivers are reviewed in the WAIVERS.md ledger.
+# `sudo` and `external` (live VCS remote ops) remain hard-reject.
+WAIVABLE_CATEGORIES=("nondet" "filesys" "network")
 
 source_url=""
 upstream_commit=""

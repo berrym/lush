@@ -26,7 +26,8 @@ fi
 
 SCRIPTS=$(find "$ROOT" \
     -path '*/_harness/*' -prune -o \
-    -name '*.sh' -type f -print | sort)
+    \( -name '*.sh' -o -name '*.bash' -o -name '*.zsh' \) \
+    -type f -print | sort)
 if [ -z "$SCRIPTS" ]; then
     echo "no scripts under $ROOT (yet)"
     exit 0

@@ -65,24 +65,44 @@ while IFS= read -r line; do
         *'$(uuidgen'*|*'`uuidgen'*) emit nondet "$lineno" 'uuidgen' ;;
     esac
 
-    # network
-    for cmd in curl wget ftp nc ssh scp rsync; do
-        case "$line" in
-            *"$cmd "*|*"$cmd"$'\t'*|*';'"$cmd"*|*'|'"$cmd"*)
-                emit network "$lineno" "$cmd" ;;
-        esac
-    done
+    # Network / sudo / VCS: only flag when the command appears in command
+    # position -- at the start of a logical command (after newline, `;`,
+    # `|`, `&&`, `||`, `$(`, `` ` ``, or only-whitespace prefix). This
+    # avoids false positives when the same word appears as data inside a
+    # quoted argument (e.g., `zstyle ':completion:*' users-ignore '... ftp
+    # ...'`).
+    #
+    # Heuristic: extract the first command-position token on the line and
+    # any token immediately following `; | && ||`. The pattern is good
+    # enough to catch genuine invocations; pathological constructions
+    # (e.g., `eval "curl ..."`) get a human eyeball at review time.
+    leading_command=$(printf '%s\n' "$line" |
+        awk '{
+            # Drop leading whitespace.
+            sub(/^[ \t]+/, "", $0);
+            # First chunk before whitespace or a shell separator.
+            match($0, /^[^ \t;|&<>()`#]+/);
+            print substr($0, RSTART, RLENGTH);
+        }')
+    after_separator=$(printf '%s\n' "$line" |
+        awk '{
+            # Pull each command-position token introduced by a separator.
+            n = split($0, parts, /(;|\|\||&&|\||\$\(|`)/);
+            for (i = 2; i <= n; i++) {
+                sub(/^[ \t]+/, "", parts[i]);
+                match(parts[i], /^[^ \t;|&<>()`#]+/);
+                if (RLENGTH > 0) print substr(parts[i], RSTART, RLENGTH);
+            }
+        }')
 
-    # sudo / privilege escalation
-    for cmd in sudo doas pkexec; do
-        case "$line" in
-            *"$cmd "*|*"$cmd"$'\t'*) emit sudo "$lineno" "$cmd" ;;
+    for tok in $leading_command $after_separator; do
+        case "$tok" in
+            curl|wget|ftp|nc|ssh|scp|rsync|telnet)
+                emit network "$lineno" "$tok" ;;
+            sudo|doas|pkexec|su)
+                emit sudo "$lineno" "$tok" ;;
         esac
     done
-    # `su -` and bare `su user` (avoid matching `sum`, `subst`, etc.)
-    case "$line" in
-        *' su '*|*' su -'*|*$'\t''su '*) emit sudo "$lineno" 'su' ;;
-    esac
 
     # filesystem -- write outside /tmp
     case "$line" in
@@ -95,11 +115,15 @@ while IFS= read -r line; do
         *'/sys/'*) emit filesys "$lineno" '/sys read' ;;
     esac
 
-    # external -- live VCS
-    case "$line" in
-        *'git clone '*|*'git fetch '*|*'git pull '*|*'git push '*)
-            emit external "$lineno" 'live git remote op' ;;
-    esac
+    # external -- live VCS remote ops (only when in command position).
+    for tok in $leading_command $after_separator; do
+        if [ "$tok" = "git" ]; then
+            case "$line" in
+                *'git clone '*|*'git fetch '*|*'git pull '*|*'git push '*)
+                    emit external "$lineno" 'live git remote op' ;;
+            esac
+        fi
+    done
 
 done < "$SCRIPT"
 
