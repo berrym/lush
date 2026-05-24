@@ -279,6 +279,22 @@ TEST(expansion_kind_braced_variable_name) {
     ASSERT(ctx->context_type == LLE_CONTEXT_VARIABLE_NAME);
 }
 
+TEST(expansion_kind_at_sigil_variable_name) {
+    // echo @HO|  -- cursor mid-name on @-sigil
+    const char *buf = "echo @HO";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expansion_kind == LLE_EXPANSION_VARIABLE_NAME);
+    ASSERT(ctx->context_type == LLE_CONTEXT_VARIABLE_NAME);
+}
+
+TEST(expansion_kind_pct_sigil_variable_name) {
+    // echo %HO|  -- cursor mid-name on %-sigil
+    const char *buf = "echo %HO";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expansion_kind == LLE_EXPANSION_VARIABLE_NAME);
+    ASSERT(ctx->context_type == LLE_CONTEXT_VARIABLE_NAME);
+}
+
 TEST(expansion_kind_command_subst_open) {
     // echo $(ls|  — cursor inside open $(
     const char *buf = "echo $(ls";
@@ -795,6 +811,8 @@ int main(void) {
     // expansion_kind
     RUN_TEST(expansion_kind_variable_name);
     RUN_TEST(expansion_kind_braced_variable_name);
+    RUN_TEST(expansion_kind_at_sigil_variable_name);
+    RUN_TEST(expansion_kind_pct_sigil_variable_name);
     RUN_TEST(expansion_kind_command_subst_open);
     RUN_TEST(expansion_kind_arithmetic_open);
     RUN_TEST(expansion_kind_brace_list_with_comma);

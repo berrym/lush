@@ -1142,6 +1142,25 @@ detect_expansion_kind(const char *buf, size_t word_start, size_t cursor) {
             i += (size_t)n;
             continue;
         }
+        /* Kind-sigil entry: `@NAME` / `%NAME` start a variable-name context
+         * the same way `$NAME` does, so completion offers variable names
+         * after the sigil character.  Always-on detection regardless of
+         * shell mode -- liblle stays decoupled from the shell-mode feature
+         * matrix, and a stray candidate offer in a non-lush mode is a UI
+         * nit, not a correctness issue.  The runtime expansion path is the
+         * authoritative gate. */
+        if (cp == '@' || cp == '%') {
+            size_t peek_i = i + (size_t)n;
+            uint32_t peek_cp = 0;
+            int peek_n = (peek_i < cursor)
+                             ? decode_at(buf, cursor, peek_i, &peek_cp)
+                             : 0;
+            if (peek_n > 0 && is_var_name_start(peek_cp)) {
+                in_var_name = true;
+            }
+            i += (size_t)n;
+            continue;
+        }
         if (cp == '{') {
             in_brace_list = true;
             brace_d++;
