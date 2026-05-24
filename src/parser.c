@@ -66,7 +66,7 @@ static node_t *parse_coproc(parser_t *parser);
 // Forward declarations for extended language features (Phase 7: Zsh)
 static node_t *parse_anonymous_function(parser_t *parser);
 
-// Typed-function form (SEMANTICS §5.3, §7).
+// Typed-function form (`fn name(p: kind, ...) [-> kind] { body }`).
 static node_t *parse_fn_declaration(parser_t *parser);
 static node_t *parse_fn_call_expression(parser_t *parser);
 static node_t *parse_let_fn_call(parser_t *parser);
@@ -5772,9 +5772,10 @@ static node_t *parse_process_substitution(parser_t *parser) {
 /**
  * @brief Check whether the given text names a valid typed-function kind.
  *
- * The three admitted kinds match SEMANTICS §7 (`scalar`, `list`, `map`).
- * No `any` / polymorphic kind: helpers that want to be untyped use the
- * POSIX function form instead.
+ * The three admitted kinds are `scalar`, `list`, and `map` -- the
+ * same first-class value kinds the executor and symtable use. No
+ * `any` or polymorphic kind: helpers that want to be untyped use
+ * the POSIX function form instead.
  */
 static bool is_valid_fn_kind_name(const char *text) {
     if (!text) {

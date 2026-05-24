@@ -143,9 +143,11 @@ typedef struct executor {
 
     /**
      * Typed-function (`fn`) registry. Stored separately from
-     * `functions` (POSIX form) because the surface forms, scoping
-     * disciplines, and value semantics differ -- see SEMANTICS §5.3.
-     * Owned by the executor; freed by executor_free.
+     * `functions` (POSIX form) because the two have different scoping
+     * disciplines: typed-fn bodies use lexical (closure) scoping over
+     * the captured declaration site, while POSIX-form functions use
+     * dynamic scoping through the live call chain. Owned by the
+     * executor; freed by executor_free.
      */
     struct typed_fn *typed_fns;
 

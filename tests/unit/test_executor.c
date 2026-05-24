@@ -2360,7 +2360,7 @@ TEST(rt_char_class_upper) {
     ASSERT_STDOUT_EQ(r, "[ABC]\n");
 }
 
-// --- typed-function form (SEMANTICS §5.3) -----------------------------
+// --- typed-function form ---------------------------------------------
 
 TEST(rt_typed_fn_scalar_return) {
     run_result_t r = run_shell("fn answer() -> scalar { return \"42\"; }\n"
@@ -2416,10 +2416,10 @@ TEST(rt_typed_fn_void_no_return) {
 }
 
 TEST(rt_typed_fn_lexical_scope) {
-    // SEMANTICS section 5.3: a `fn` body resolves free names through
-    // its captured declaration-site scope, not through the dynamic
-    // caller's locals. The same caller invokes a POSIX function and
-    // a typed function -- the POSIX one sees the caller's `local v`,
+    // A typed-fn body resolves free names through its captured
+    // declaration-site scope, not through the dynamic caller's
+    // locals. The same outer caller invokes a POSIX function and a
+    // typed function -- the POSIX one sees the caller's `local v`,
     // the typed one sees the global `v`.
     run_result_t r = run_shell(
         "v=GLOBAL\n"

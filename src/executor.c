@@ -63,7 +63,7 @@ static int execute_node(executor_t *executor, node_t *node);
 static int execute_command(executor_t *executor, node_t *command);
 static int execute_pipeline(executor_t *executor, node_t *pipeline);
 static int execute_function_definition(executor_t *executor, node_t *function);
-// Typed-function form (SEMANTICS §5.3, §7).
+// Typed-function form -- declaration, call, return, let-capture.
 static void executor_typed_fns_clear(executor_t *executor);
 static int execute_typed_fn_decl(executor_t *executor, node_t *node);
 static int execute_typed_fn_call(executor_t *executor, node_t *node);
@@ -17470,17 +17470,15 @@ int executor_call_chpwd(executor_t *executor) {
 bool executor_in_hook(void) { return g_in_hook_execution; }
 
 /* ============================================================================
- * Typed-function form (SEMANTICS §5.3, §7)
+ * Typed-function form
  *
  * Surface grammar lives in parser.c (parse_fn_declaration,
  * parse_fn_call_expression, parse_let_fn_call, parse_fn_return_statement).
- * The executor owns the registry, the call mechanism, and the typed return
- * unwind. Lexical scope resolution is not yet implemented in this pass --
- * fn bodies use the existing dynamic scope chain; the lexical pass that
- * SEMANTICS §5.3 names is a follow-on. PHILOSOPHY §7's gate currently
- * passes because the surface obligation (parse + execute + render in
- * `debug vars`) is met under dynamic scope; the lexical-vs-dynamic
- * distinction in the gate test will arrive with the resolver pass.
+ * The executor owns the registry, the call mechanism, and the typed
+ * return unwind. Free names inside a fn body resolve through the
+ * captured declaration-site scope via a SCOPE_LEXICAL frame, giving
+ * the body lexical (closure) semantics distinct from POSIX-form
+ * functions which use dynamic scoping.
  * ============================================================================
  */
 
@@ -17553,7 +17551,9 @@ static array_value_t *typed_fn_dup_array(const array_value_t *src) {
         return NULL;
     }
     if (is_assoc) {
-        // Walk insertion order to preserve §4.2.
+        // Walk insertion order so the copy preserves the map's
+        // original key ordering rather than reflecting hashtable
+        // iteration order.
         for (size_t i = 0; i < src->assoc_insertion_count; i++) {
             const char *key = src->assoc_insertion_order[i];
             const char *value =
@@ -17841,8 +17841,9 @@ static int eval_fn_call_argument(executor_t *executor, node_t *arg,
 
     // NODE_VAR carries a bare $name (or ${name}) reference. Strip the
     // leading '$' / '${...}' to get the variable name and look it up
-    // kind-aware via symtable_lookup; a list / map binding crosses the
-    // call boundary with its kind preserved (SEMANTICS section 7).
+    // kind-aware via symtable_lookup. A list or map binding crosses
+    // the call boundary as-is, preserving its kind tag for the
+    // parameter-bind step rather than being flattened to a string.
     if (arg->type == NODE_VAR) {
         const char *var_name = text;
         char name_buf[256];
@@ -17997,12 +17998,12 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
     }
 
     // Push a SCOPE_LEXICAL frame parented at the captured declaration
-    // site rather than the dynamic caller, so the body resolves free
-    // names through its closure environment per SEMANTICS §5.3. If
-    // the fn was declared at top level the captured scope is the
-    // global scope, which behaves identically to dynamic scoping for
-    // global variables -- the distinction surfaces when a POSIX-form
-    // caller has its own locals; those are now invisible to the fn.
+    // site rather than the dynamic caller, so free names in the body
+    // resolve through the closure environment. If the fn was declared
+    // at top level the captured scope is the global scope, which
+    // behaves identically to dynamic scoping for global variables --
+    // the distinction surfaces when a POSIX-form caller has its own
+    // locals; those are now invisible to the typed-fn body.
     int push_rc;
     if (fn->captured_scope) {
         push_rc = symtable_push_lexical_scope(executor->symtable, callee,

@@ -114,7 +114,7 @@ typedef enum {
     TOK_TIME,   /**< time keyword for timing pipelines */
     TOK_COPROC, /**< coproc keyword for coprocesses */
     TOK_REPEAT, /**< zsh repeat keyword (#103) */
-    TOK_FN,     /**< lush typed-function form keyword (SEMANTICS §5.3) */
+    TOK_FN,     ///< Typed-function declaration keyword (`fn ...`)
 
     // Special
     TOK_NEWLINE,    /**< \n (significant in shell) */

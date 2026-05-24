@@ -134,9 +134,10 @@ typedef enum {
     SCOPE_LOOP,        /**< Loop iteration scope (for/while) */
     SCOPE_SUBSHELL,    /**< Subshell scope */
     SCOPE_CONDITIONAL, /**< Conditional execution scope (if/case) */
-    SCOPE_LEXICAL      /**< Typed-function (`fn`) frame; parent is the
-                          captured declaration-time scope, not the
-                          dynamic caller. See SEMANTICS §5.3. */
+    /// Typed-function (`fn`) frame: free names in the body resolve
+    /// through the captured declaration-time scope, not the dynamic
+    /// caller's scope chain.
+    SCOPE_LEXICAL
 } scope_type_t;
 
 /**
@@ -283,9 +284,10 @@ void *symtable_capture_scope_for_lexical(symtable_manager_t *manager);
  * The new frame inherits all lookup semantics of a normal scope
  * frame -- variable resolution walks the parent chain -- but the
  * parent is the capture site, not the live `current_scope` at push
- * time. That is exactly the lexical-scoping discipline SEMANTICS §5.3
- * names. Used by execute_typed_fn_call_node to give a `fn` body its
- * closure environment.
+ * time. The result is lexical (closure) scoping: free names in the
+ * frame's body resolve through the declaration environment of the
+ * enclosing function, not through the dynamic call chain. Used to
+ * give a typed-function body its closure environment at call time.
  *
  * On pop, the frame restores the previous `current_scope` (the dynamic
  * caller) -- the captured-parent linkage exists only for the duration

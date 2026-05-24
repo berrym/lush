@@ -210,7 +210,7 @@ static unsigned int path_hash(const char *str) {
 static const char *shell_keywords[] = {
     "if",     "then",  "else",  "elif", "fi",   "for",    "in",       "do",
     "done",   "while", "until", "case", "esac", "select", "function", "time",
-    "coproc", "!",     "{",     "}",    "[[",   "]]",     NULL};
+    "coproc", "fn",    "!",     "{",    "}",    "[[",     "]]",       NULL};
 
 /** @brief Keywords that END blocks - these don't expect a command after them */
 static const char *block_ending_keywords[] = {"fi", "done", "esac",

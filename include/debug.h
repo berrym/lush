@@ -76,8 +76,8 @@ typedef struct debug_frame {
      * frames whose body resolves free names through a captured
      * declaration-site scope; false for POSIX-form functions and
      * top-level frames whose lookup walks the dynamic call chain.
-     * Rendered as `[lexical]` / `[dynamic]` in `debug stack` per
-     * PHILOSOPHY section 7. Set at debug_push_frame time.
+     * Rendered as `[lexical]` / `[dynamic]` in `debug stack`. Set at
+     * debug_push_frame time.
      */
     bool is_lexical;
 } debug_frame_t;
@@ -294,7 +294,7 @@ debug_frame_t *debug_push_frame(debug_context_t *ctx, const char *function,
  * frame for a `fn` call. The `debug stack` renderer reads this flag
  * to annotate the frame with `[lexical]` instead of the default
  * `[dynamic]`, so a debugger user can see at a glance which scoping
- * discipline each frame is using (PHILOSOPHY section 7).
+ * discipline each frame is using.
  *
  * @param ctx Debug context (no-op if NULL or no current frame)
  */

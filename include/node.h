@@ -89,7 +89,7 @@ typedef enum {
                            executed) */
 
     /**
-     * @brief Typed-function form AST nodes (SEMANTICS §5.3, §7).
+     * @brief Typed-function form AST nodes.
      *
      * NODE_FN_DECL is a typed-function declaration. Its val.str packs
      * the signature as

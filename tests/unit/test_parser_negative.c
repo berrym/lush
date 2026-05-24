@@ -320,12 +320,12 @@ TEST(variable_empty_name) {
  * ============================================================================
  */
 
-/* `foo()` without a body used to be a parse error -- a POSIX function
- * definition stub. With the typed-function form (SEMANTICS section
- * 5.3), `foo()` at statement position is a valid grammar for a bare
- * typed-fn call whose return value is discarded. The error now comes
- * at runtime if `foo` is not a declared `fn`, which is the correct
- * layer for that check. */
+/* `foo()` without a body used to be a parse error -- a POSIX
+ * function-definition stub. With the typed-function form, `foo()`
+ * at statement position is now valid grammar for a bare typed-fn
+ * call whose return value is discarded. The error comes at runtime
+ * if `foo` is not a declared `fn`, which is the correct layer for
+ * that check. */
 
 /* NOTE: function_invalid_name (123() { ... }) - bash actually accepts this
  * at parse time (it's a valid function definition syntactically).
@@ -429,12 +429,12 @@ TEST(array_unclosed) { ASSERT_PARSE_FAILS("arr=(a b c"); }
 // NOTE: array_index_unclosed - validated at expansion time, not parse time
 
 /* `arr(a b c)` used to be a parse error -- the parser inferred the
- * user meant `arr=(a b c)` and bailed. With the typed-function form
- * (SEMANTICS section 5.3), `arr(a b c)` is a syntactically valid
- * bare typed-fn call with three positional arguments. The error
- * surfaces at runtime if `arr` is not a declared `fn`, which is the
- * correct layer for that check. Array literals still use the
- * `arr=(a b c)` form -- that path is unaffected. */
+ * user meant `arr=(a b c)` and bailed. With the typed-function form,
+ * `arr(a b c)` is now syntactically valid as a bare typed-fn call
+ * with three positional arguments. The error surfaces at runtime if
+ * `arr` is not a declared `fn`, which is the correct layer for that
+ * check. Array literals still use the `arr=(a b c)` form -- that
+ * path is unaffected. */
 
 /* ============================================================================
  * INVALID HEREDOC SYNTAX
@@ -766,8 +766,7 @@ int main(void) {
     printf("Invalid Function Syntax:\n");
     reset_category();
     // function_no_body removed -- `foo()` is now valid grammar for a
-    // bare typed-fn call (SEMANTICS section 5.3); see the note above
-    // its old TEST() declaration.
+    // bare typed-fn call; see the note above its old TEST() declaration.
     // function_invalid_name - lush accepts numeric function names
     RUN_TEST(function_missing_paren);
     RUN_TEST(function_extra_paren);
@@ -816,8 +815,8 @@ int main(void) {
     RUN_TEST(array_unclosed);
     // array_index_unclosed - expansion time check
     // array_no_equals removed -- `arr(a b c)` is now valid grammar
-    // for a bare typed-fn call (SEMANTICS section 5.3); see the
-    // note above its old TEST() declaration.
+    // for a bare typed-fn call; see the note above its old TEST()
+    // declaration.
     print_category_summary("Invalid Arrays");
 
     printf("Invalid Heredoc Syntax:\n");

@@ -1,24 +1,27 @@
 /**
  * @file test_debug_integration.c
- * @brief The debugger integration gate -- PHILOSOPHY.md section 7
+ * @brief Debugger integration gate -- drives the debugger over real
+ *        scripts through the real executor and asserts the
+ *        observable surface still works.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
  *
- * Every other debug test calls a debug_*.c function in isolation. None
- * of them answer the question PHILOSOPHY.md section 7 actually asks:
- * when a real script runs through the real executor, does the debugger
- * still see it? This file does. It drives executor_execute_command_line
- * with a live debug context and asserts that breakpoints fire, stay
- * silent when they should, honour the script-execution gate, accumulate
- * hits, and that execution degrades cleanly when no terminal is present.
+ * Every other debug test calls a debug_*.c function in isolation. The
+ * tests here answer a different question: when a real script runs
+ * through the real executor, does the debugger still see it? This file
+ * drives executor_execute_command_line with a live debug context and
+ * asserts that breakpoints fire, stay silent when they should, honour
+ * the script-execution gate, accumulate hits, and that execution
+ * degrades cleanly when no terminal is present.
  *
- * This is the gate the section-7 rule names: "an integration test suite
- * that drives the debugger over representative scripts." When a core
- * change outpaces the debugger, a test here goes red.
+ * When a core change outpaces the debugger -- breakpoints stop firing,
+ * stack frames stop rendering correctly, variable inspection drifts
+ * out of step -- a test here goes red. This is the integration-level
+ * coverage that catches such drift.
  *
  * Scope, honestly stated -- the gate starts against the currently-
- * working surface and grows per debugger tier:
+ * working surface and grows per debugger capability:
  *
  *  - Breakpoints match node->loc.line, the parser-recorded absolute
  *    1-based source line, so they land correctly inside control
@@ -30,8 +33,6 @@
  *    condition() is still a documented TODO stub that returns true for
  *    every comparison. Asserting against a stub would test nothing.
  *    Conditional coverage arrives with a real evaluator.
- *  - Type-aware variable inspection at a break is debugger Tier 1
- *    (task #13); its assertions land here when that work does.
  */
 
 #include "debug.h"
@@ -387,22 +388,20 @@ TEST(step_mode_breaks_at_next_node) {
 /* --------------------------------------------------------------------------
  * Typed-function (`fn`) surface
  *
- * PHILOSOPHY.md section 7 binds the debugger to keep pace with the
- * language. The typed-function form (SEMANTICS section 5.3) introduces
- * a second scoping discipline: bodies resolve free names through a
- * captured declaration-site scope, not the dynamic caller. These tests
- * pin that the debugger:
+ * The typed-function form introduces a second scoping discipline:
+ * bodies resolve free names through a captured declaration-site scope,
+ * not the dynamic caller. These tests pin that the debugger:
  *
  *   - Marks typed-fn frames distinctly in `debug stack` so a debugger
  *     user can read the discipline directly from the call stack.
  *   - Still renders `debug vars` and `debug print` inside a typed-fn
- *     body via the symtable's parent walk -- which, after the lexical
- *     change, is the captured site, not the caller. The framed-gutter
+ *     body via the symtable's parent walk -- which, for lexical
+ *     frames, is the captured site, not the caller. The framed-gutter
  *     output stays consistent (existing kind labels still apply).
  *
  * Both assertions catch the discipline difference, not implementation
- * detail; they go red if the typed-fn surface drifts away from the
- * documented discipline regardless of how the underlying mechanism
+ * detail; they go red if the typed-fn surface drifts away from
+ * lexical scoping regardless of how the underlying mechanism
  * changes.
  * ------------------------------------------------------------------------ */
 
@@ -435,7 +434,7 @@ TEST(debug_stack_marks_typed_fn_frame_as_lexical) {
  */
 
 int main(void) {
-    printf("\n=== Debugger Integration Gate (PHILOSOPHY section 7) ===\n\n");
+    printf("\n=== Debugger Integration Gate ===\n\n");
 
     // Initialize the global symbol table -- executor_new() needs it.
     init_symtable();
@@ -455,7 +454,7 @@ int main(void) {
     printf("\nStep mode:\n");
     RUN_TEST(step_mode_breaks_at_next_node);
 
-    printf("\nTyped-function surface (SEMANTICS section 5.3):\n");
+    printf("\nTyped-function surface:\n");
     RUN_TEST(debug_stack_marks_typed_fn_frame_as_lexical);
 
     return TEST_RESULT();
