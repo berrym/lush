@@ -1013,6 +1013,22 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
+        // Kind sigils `@NAME` / `%NAME`: highlight the whole token like a
+        // variable when the post-sigil span is a valid identifier.  Other
+        // uses of `@` and `%` (mid-word, extglob `@(...)`, git refs `@{-1}`,
+        // job specs `%1`) fail the identifier check and fall through.
+        if ((c == '@' || c == '%') && pos + 1 < input_len &&
+            (isalpha((unsigned char)input[pos + 1]) || input[pos + 1] == '_')) {
+            pos++;
+            while (pos < input_len &&
+                   (isalnum((unsigned char)input[pos]) || input[pos] == '_')) {
+                pos++;
+            }
+            add_token(highlighter, LLE_TOKEN_VARIABLE, token_start, pos);
+            expect_command = false;
+            continue;
+        }
+
         // Variable and $-prefixed constructs
         if (c == '$') {
             pos++;

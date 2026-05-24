@@ -273,6 +273,52 @@ TEST(variables) {
     else
         TEST_FAIL("special variable not detected");
 
+    TEST_START("sigil: @arr");
+    lle_syntax_highlight(h, "echo @arr", 9);
+    tokens = lle_syntax_get_tokens(h, &count);
+    bool found_at_sigil = false;
+    for (size_t i = 0; i < count; i++) {
+        if (tokens[i].type == LLE_TOKEN_VARIABLE &&
+            tokens[i].end - tokens[i].start == 4) {
+            found_at_sigil = true;
+        }
+    }
+    if (found_at_sigil)
+        TEST_PASS();
+    else
+        TEST_FAIL("@-sigil token not detected");
+
+    TEST_START("sigil: %map");
+    lle_syntax_highlight(h, "echo %map", 9);
+    tokens = lle_syntax_get_tokens(h, &count);
+    bool found_pct_sigil = false;
+    for (size_t i = 0; i < count; i++) {
+        if (tokens[i].type == LLE_TOKEN_VARIABLE &&
+            tokens[i].end - tokens[i].start == 4) {
+            found_pct_sigil = true;
+        }
+    }
+    if (found_pct_sigil)
+        TEST_PASS();
+    else
+        TEST_FAIL("%-sigil token not detected");
+
+    TEST_START("non-sigil: user@host stays bare");
+    lle_syntax_highlight(h, "echo user@host", 14);
+    tokens = lle_syntax_get_tokens(h, &count);
+    bool sigil_misfire = false;
+    for (size_t i = 0; i < count; i++) {
+        // The user@host word must not be split into a variable token at the
+        // mid-word `@`.
+        if (tokens[i].type == LLE_TOKEN_VARIABLE) {
+            sigil_misfire = true;
+        }
+    }
+    if (!sigil_misfire)
+        TEST_PASS();
+    else
+        TEST_FAIL("@ inside user@host wrongly highlighted as sigil");
+
     lle_syntax_highlighter_destroy(h);
 }
 
