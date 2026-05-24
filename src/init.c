@@ -35,7 +35,11 @@
 
 #include "display_integration.h"
 #include "lle/adaptive_terminal_integration.h"
+#include "lle/lle_editor.h"
 #include "lle/lle_shell_integration.h"
+#include "lle/widget_system.h"
+
+extern lle_result_t lush_register_inspect_widget(lle_widget_registry_t *);
 #include "lush_memory_pool.h"
 #include "version.h"
 
@@ -735,6 +739,14 @@ int init(int argc, char **argv, FILE **in) {
                          "this session");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
+            }
+        } else {
+            // Shell-side built-in widgets that need the symbol table -- liblle
+            // cannot link symtable directly, so we register them once the
+            // editor exists.
+            lle_editor_t *ed = lle_get_global_editor();
+            if (ed && ed->widget_registry) {
+                lush_register_inspect_widget(ed->widget_registry);
             }
         }
 

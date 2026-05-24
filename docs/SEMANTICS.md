@@ -499,8 +499,6 @@ document; they are to be decided against it, as their own work.
   resolution pass remain to land. The legacy `return_value` builtin
   was retired at the start of this work; the typed form is the only
   path to a structured return value.
-- **LLE real-time variable inspection** -- inspection hooks on the
-  command line.
 - **Sigil conventions** (`$`, `@`, `%`) once values are first-class.
 - **Error catalogue for misapplied transformations** -- e.g. an
   array-only flag applied to a scalar. The principle is settled (an

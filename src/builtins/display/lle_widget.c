@@ -130,6 +130,8 @@ static void print_usage(void) {
     printf(
         "  display lle widget remove NAME      - unregister a user widget\n");
     printf("  display lle widget show NAME        - show widget details\n");
+    printf("  display lle widget invoke NAME      - run a widget against the\n"
+           "                                        current editor state\n");
     printf("  display lle widget help             - this message\n");
     printf("\n");
     printf("Once registered, a user widget can be bound to a key in\n");
@@ -270,6 +272,21 @@ static int do_remove(lle_widget_registry_t *registry, const char *name) {
     return 0;
 }
 
+static int do_invoke(lle_widget_registry_t *registry, const char *name) {
+    if (!registry) {
+        fprintf(stderr, "display lle widget invoke: LLE not active\n");
+        return 1;
+    }
+    lle_editor_t *editor = lle_get_global_editor();
+    lle_result_t r = lle_widget_execute(registry, name, editor);
+    if (r != LLE_SUCCESS) {
+        fprintf(stderr, "display lle widget invoke: '%s' failed (%d)\n", name,
+                (int)r);
+        return 1;
+    }
+    return 0;
+}
+
 /* ============================================================================
  * Public entry: dispatch from bin_display.c's `display lle widget`
  * ============================================================================
@@ -321,6 +338,13 @@ int display_lle_widget(int argc, char **argv) {
             return 1;
         }
         return do_remove(registry, argv[2]);
+    }
+    if (strcmp(sub, "invoke") == 0 || strcmp(sub, "call") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "display lle widget invoke: missing NAME\n");
+            return 1;
+        }
+        return do_invoke(registry, argv[2]);
     }
 
     fprintf(stderr, "display lle widget: unknown subcommand '%s'\n", sub);

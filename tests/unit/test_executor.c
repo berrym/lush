@@ -10,8 +10,13 @@
  */
 
 #include "executor.h"
+#include "lle/buffer_management.h"
+#include "lle/lle_editor.h"
 #include "symtable.h"
 #include "test_shell_harness.h"
+
+extern lle_result_t lush_inspect_widget_callback(lle_editor_t *editor,
+                                                 void *user_data);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2624,6 +2629,66 @@ TEST(rt_pe_catalogue_scalar_conditional_still_works) {
     ASSERT_STDOUT_EQ(r, "[hello]\n[default]\n");
 }
 
+// Helper for the inspect-widget tests.  Stages a synthetic editor with text +
+// cursor, runs the callback, and returns the captured LUSH_INSPECT_* values
+// via the symtable's exit-status-irrelevant get_var path.
+static void run_inspect(const char *text, size_t cursor_pos) {
+    lle_buffer_t buf;
+    memset(&buf, 0, sizeof(buf));
+    buf.data = (char *)text;
+    buf.length = text ? strlen(text) : 0;
+    buf.cursor.byte_offset = cursor_pos;
+
+    lle_editor_t editor;
+    memset(&editor, 0, sizeof(editor));
+    editor.buffer = &buf;
+
+    lush_inspect_widget_callback(&editor, NULL);
+}
+
+static const char *inspect_var(const char *name) {
+    return symtable_get_var(symtable_get_global_manager(), name);
+}
+
+TEST(rt_inspect_scalar_at_cursor) {
+    symtable_set_global("FOO", "hello");
+    run_inspect("echo $FOO", 9); // cursor at end of FOO
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "FOO", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "hello", "value");
+}
+
+TEST(rt_inspect_braced_name) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo ${BAR}!", 11); // cursor just past closing '}'
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "BAR", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "world", "value");
+}
+
+TEST(rt_inspect_unset_variable) {
+    run_inspect("echo $UNDEFINED_VAR_NAME", 24);
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "UNDEFINED_VAR_NAME",
+                  "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "unset", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "", "value");
+}
+
+TEST(rt_inspect_no_ref_under_cursor) {
+    run_inspect("plain text no dollar here", 5);
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "none", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "", "value");
+}
+
+TEST(rt_inspect_cursor_mid_identifier) {
+    symtable_set_global("LONGNAME", "v");
+    run_inspect("echo $LONGNAME tail", 9); // cursor mid 'LONGNAME'
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "LONGNAME", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "v", "value");
+}
+
 TEST(rt_typed_fn_lexical_scope) {
     // A typed-fn body resolves free names through its captured
     // declaration-site scope, not through the dynamic caller's
@@ -2876,6 +2941,11 @@ int main(void) {
     RUN_TEST(rt_pipeline_diagnostic_per_stage_errors);
     RUN_TEST(rt_pipeline_diagnostic_silent_on_success);
     RUN_TEST(rt_pe_catalogue_scalar_conditional_still_works);
+    RUN_TEST(rt_inspect_scalar_at_cursor);
+    RUN_TEST(rt_inspect_braced_name);
+    RUN_TEST(rt_inspect_unset_variable);
+    RUN_TEST(rt_inspect_no_ref_under_cursor);
+    RUN_TEST(rt_inspect_cursor_mid_identifier);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
     RUN_TEST(rt_case_arm_runs_all);
