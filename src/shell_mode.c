@@ -533,6 +533,52 @@ static const struct {
 };
 
 /* ============================================================================
+ * Zsh-compat no-op option names
+ * ============================================================================
+ *
+ * Names that zsh accepts via `setopt`/`unsetopt` whose effect is
+ * either always-on or always-off in lush (or supplanted by a different
+ * lush surface). Accepted silently as no-ops so real-world zsh
+ * scripts that call `setopt prompt_subst` in their init paths run
+ * cleanly. Each entry is here with a one-line rationale; promote to
+ * a real feature flag if the behavior ever needs to be toggleable.
+ */
+static const struct {
+    const char *name;
+    const char *rationale;
+} feature_noop_aliases[] = {
+    {    "prompt_subst","lush prompt always supports parameter / arith / "
+"command expansion; no opt-in needed"                                            },
+    {     "promptsubst",                                  "alias for prompt_subst"},
+    {   "menu_complete",        "lush completion is always menu-shaped; no toggle"},
+    {    "menucomplete",                                 "alias for menu_complete"},
+    {   "always_to_end",         "completion always lands at end of inserted word"},
+    {     "alwaystoend",                                 "alias for always_to_end"},
+    {       "auto_menu",            "lush completion auto-menus on TAB; no toggle"},
+    {        "automenu",                                     "alias for auto_menu"},
+    {"complete_in_word",
+     "lush completion always treats cursor mid-word as completable"               },
+    {  "completeinword",                              "alias for complete_in_word"},
+    {     "flowcontrol",                   "terminal flow-control toggle; lush LLE manages its own "
+                   "tty raw-mode state"                   },
+    {     "correct_all",        "lush has no spelling-correction prompt to toggle"},
+    {      "correctall",                                   "alias for correct_all"},
+    {              NULL,                                                      NULL}
+};
+
+bool shell_feature_is_noop_alias(const char *name) {
+    if (!name) {
+        return false;
+    }
+    for (int i = 0; feature_noop_aliases[i].name != NULL; i++) {
+        if (strcasecmp(name, feature_noop_aliases[i].name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* ============================================================================
  * Mode Query Functions
  * ============================================================================
  */

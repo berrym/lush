@@ -223,6 +223,7 @@ builtin builtins[] = {
     {  "bindkey",                         "zsh key-binding (no-op stub)",  bin_bindkey},
     { "autoload",                  "zsh lazy-function load (no-op stub)", bin_autoload},
     { "zmodload",                       "zsh module loader (no-op stub)", bin_zmodload},
+    {   "colors",                       "zsh colors helper (no-op stub)",   bin_colors},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);

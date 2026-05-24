@@ -89,6 +89,10 @@ int bin_setopt(int argc, char **argv) {
         bool invert = false;
 
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
+            // Zsh-compat names: silently accepted no-op (see bin_unsetopt.c).
+            if (shell_feature_is_noop_alias(argv[i])) {
+                continue;
+            }
             if (!query_mode) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_OPTION,

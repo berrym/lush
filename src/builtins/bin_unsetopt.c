@@ -53,6 +53,10 @@ int bin_unsetopt(int argc, char **argv) {
         bool invert = false;
 
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
+            // Zsh-compat names: silently accepted no-op (see bin_setopt.c).
+            if (shell_feature_is_noop_alias(argv[i])) {
+                continue;
+            }
             executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
                                   builtin_get_source_location(),
                                   "unknown option: %s", argv[i]);

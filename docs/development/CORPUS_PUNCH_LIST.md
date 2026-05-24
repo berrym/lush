@@ -212,19 +212,84 @@ files reach this surface.
 where the next statement-list element is expected after a
 short-circuit `||` chain.
 
-## 6. Unrecognized zsh option names
+## 9. Top-level `return` and zsh `${+name}` is-set test
 
 **Severity:** missing surface.
 
-| Option | Used in | Decision needed |
-|--------|---------|-----------------|
-| `prompt_subst` | theme-and-appearance.zsh | zsh prompt-substitution option. Lush has its own prompt system; option could be accepted as a no-op alias for the equivalent lush behavior. |
-| `menu_complete` | completion.zsh | zsh completion mode. Lush has its own completion. Same story. |
+theme-and-appearance.zsh line 34:
 
-**Recommendation:** add to the `setopt`/`unsetopt` recognized-name list
-with a no-op effect and a documented `known_divergences.txt` entry.
-Refusing the option name produces `unknown option` errors that mask
-the actually-interesting behavior.
+```zsh
+[[ "$DISABLE_LS_COLORS" != true ]] || return 0
+```
+
+- **bash:** prints `return: can only return from a function or
+  sourced script` to stderr, **continues** execution.
+- **zsh:** silently allows; treats top-level `return` as exit-from-
+  script with the given status.
+- **lush:** raises E1119 and aborts the script.
+
+For the zsh-bucket oracle (zsh), lush should match zsh's silent-
+allow behavior. For the bash bucket, the warn-and-continue behavior
+is acceptable.
+
+Line 35 also surfaces `((${+commands[dircolors]}))` -- zsh's
+`${+name}` is "1 if name is set, 0 otherwise" expansion inside an
+arithmetic context. Lush's arithmetic parser rejects it.
+
+**Affected corpus entries:** theme-and-appearance.zsh.
+
+## 10. `zstyle` builtin missing
+
+**Severity:** missing surface.
+
+```zsh
+zstyle ':completion:*:*:*:*:*' menu select
+```
+
+zsh's completion-system configuration builtin. Used pervasively in
+zsh user dotfiles (oh-my-zsh, prezto, p10k).
+
+Like `bindkey` / `autoload` / `zmodload`, the right shape is
+probably a no-op stub: lush has its own completion-configuration
+surface (`display lle completion`) and the zstyle bookkeeping is
+invisible from a non-interactive script.
+
+**Affected corpus entries:** completion.zsh and correction.zsh.
+
+## 6. Unrecognized zsh option names (RESOLVED)
+
+**Status:** fixed.
+
+New `shell_feature_is_noop_alias` mechanism in src/shell_mode.c +
+shell_mode.h. setopt and unsetopt consult it before reporting
+unknown-option. Zsh option names whose effect in lush is either
+always-on, always-off, or supplanted by a different surface are
+silently accepted as no-ops.
+
+Initial set (with rationale per entry, see src/shell_mode.c):
+
+- `prompt_subst` / `promptsubst` -- lush prompt always supports
+  parameter / arith / command expansion
+- `menu_complete` / `menucomplete` -- lush completion is always
+  menu-shaped
+- `always_to_end` / `alwaystoend` -- completion always lands at end
+- `auto_menu` / `automenu` -- lush auto-menus on TAB
+- `complete_in_word` / `completeinword` -- always mid-word completable
+- `flowcontrol` -- lush LLE manages its own tty raw-mode
+- `correct_all` / `correctall` -- no spelling-correction prompt to toggle
+
+Companion fix: src/builtins/bin_zsh_stubs.c gained a `colors`
+builtin stub. `autoload -U colors && colors` was tripping `colors:
+command not found` once autoload became a silent no-op (the
+autoloaded function never gets registered). The `colors` stub
+returns 0 silently so theme init scripts run.
+
+**Pass-rate delta:** the option-name fixes don't flip any specific
+script on their own (theme-and-appearance.zsh and completion.zsh
+have deeper compound issues: top-level `return` semantics, zsh
+`${+name}` is-set syntax in arithmetic, `zstyle` builtin missing).
+Tracked as [#9](#9-top-level-return-and-zsh-name-is-set-test) and
+[#10](#10-zstyle-builtin-missing).
 
 ---
 

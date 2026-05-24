@@ -355,6 +355,16 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode);
  *               feature (caller should flip enable/disable). May be NULL.
  * @return true on success, false if name is not recognized
  */
+/**
+ * @brief True if @p name is a zsh-compat option name lush silently accepts.
+ *
+ * For names whose effect is either always-on or always-off in lush
+ * (e.g., zsh's `prompt_subst`, `menu_complete`) and that would
+ * otherwise trip `setopt`/`unsetopt` with "unknown option". The
+ * builtins consult this before erroring.
+ */
+bool shell_feature_is_noop_alias(const char *name);
+
 bool shell_feature_parse(const char *name, shell_feature_t *feature,
                          bool *invert);
 

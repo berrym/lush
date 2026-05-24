@@ -54,3 +54,17 @@ int bin_zmodload(int argc __attribute__((unused)),
     // either built-in or supplanted by lush's own subsystems.
     return 0;
 }
+
+int bin_colors(int argc __attribute__((unused)),
+               char **argv __attribute__((unused))) {
+    // zsh's `colors` is a function autoloaded from $fpath that
+    // populates $fg, $bg, $FG, $BG arrays / maps and $reset_color
+    // with ANSI escape sequences. Lush's autoload is itself a stub,
+    // so `colors` is unavailable to scripts that source the zsh
+    // autoload module. Provide a builtin no-op so scripts calling
+    // `colors` to set up the maps do not crash; the maps simply
+    // stay unset and downstream `${fg[red]}` lookups expand to
+    // empty (matching the no-color terminal case rather than a
+    // hard error).
+    return 0;
+}
