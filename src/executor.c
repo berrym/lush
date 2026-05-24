@@ -10573,7 +10573,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
  * @param str String to quote
  * @return Quoted string (caller must free)
  */
-static char *transform_quote(const char *str) {
+char *transform_quote(const char *str) {
     if (!str) {
         return strdup("''");
     }

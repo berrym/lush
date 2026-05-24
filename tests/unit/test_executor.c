@@ -2660,10 +2660,42 @@ TEST(rt_inspect_scalar_at_cursor) {
 
 TEST(rt_inspect_braced_name) {
     symtable_set_global("BAR", "world");
-    run_inspect("echo ${BAR}!", 11); // cursor just past closing '}'
+    run_inspect("echo ${BAR}!", 9); // cursor mid-identifier in ${BAR}
     ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "BAR", "name");
     ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
     ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "world", "value");
+}
+
+TEST(rt_inspect_strict_past_closing_brace) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo ${BAR}!", 11); // strict: past closing '}' is outside
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "none", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "", "value");
+}
+
+TEST(rt_inspect_cursor_on_dollar) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo $BAR", 5); // cursor on the `$`
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "BAR", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+}
+
+TEST(rt_inspect_cursor_on_closing_brace) {
+    symtable_set_global("BAR", "world");
+    run_inspect("echo ${BAR}!", 10); // cursor on the `}`
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_NAME"), "BAR", "name");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "scalar", "kind");
+}
+
+TEST(rt_inspect_list_quoted) {
+    // arr=(hello "two words" three) -- the inspector must @Q-quote each
+    // element so a space-containing entry stays unambiguous.
+    run_shell("arr=(hello 'two words' three)\n");
+    run_inspect("echo $arr", 9);
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_KIND"), "list", "kind");
+    ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"),
+                  "'hello' 'two words' 'three'", "value");
 }
 
 TEST(rt_inspect_unset_variable) {
@@ -2943,6 +2975,10 @@ int main(void) {
     RUN_TEST(rt_pe_catalogue_scalar_conditional_still_works);
     RUN_TEST(rt_inspect_scalar_at_cursor);
     RUN_TEST(rt_inspect_braced_name);
+    RUN_TEST(rt_inspect_strict_past_closing_brace);
+    RUN_TEST(rt_inspect_cursor_on_dollar);
+    RUN_TEST(rt_inspect_cursor_on_closing_brace);
+    RUN_TEST(rt_inspect_list_quoted);
     RUN_TEST(rt_inspect_unset_variable);
     RUN_TEST(rt_inspect_no_ref_under_cursor);
     RUN_TEST(rt_inspect_cursor_mid_identifier);

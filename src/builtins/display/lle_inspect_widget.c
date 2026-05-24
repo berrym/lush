@@ -9,8 +9,16 @@
  *
  *   LUSH_INSPECT_NAME   The resolved identifier (empty when no ref found).
  *   LUSH_INSPECT_KIND   One of `none`, `unset`, `scalar`, `list`, `map`.
- *   LUSH_INSPECT_VALUE  Formatted value -- scalar text, joined list, or
- *                       comma-separated map entries; empty for none/unset.
+ *   LUSH_INSPECT_VALUE  Formatted value -- scalar text verbatim, list/map
+ *                       entries `@Q`-quoted so a value containing spaces,
+ *                       `=`, or `,` stays unambiguous and round-trips
+ *                       through `eval "arr=($LUSH_INSPECT_VALUE)"`.  Empty
+ *                       for none/unset.
+ *
+ * Token rule: the cursor must sit strictly inside the variable reference --
+ * range [token_start, token_end).  A cursor on `$`, `{`, name characters, or
+ * `}` resolves; a cursor past the closing `}` is outside the token and
+ * reports `none`.
  *
  * The widget is the primitive.  Bind it via `display lle bind <key>
  * inspect-variable-at-cursor` and drive any surface from the variables:
@@ -35,12 +43,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Shared with the parameter-expansion `@Q` operator in executor.c -- single-
+// quoted escaping for printable strings, ANSI-C $'...' for control chars.
+extern char *transform_quote(const char *str);
+
 /**
  * @brief Scan the buffer near the cursor for a variable reference.
  *
  * On match, fills @p name_out with a NUL-terminated identifier and returns
- * true.  Tolerates the cursor sitting mid-identifier, just past a closing
- * `}`, or directly on `$`.
+ * true.  Strict-token: cursor in [token_start, token_end).  Tolerates the
+ * cursor sitting mid-identifier, on `$`/`{`, or on the closing `}`; a
+ * cursor past the closing `}` is outside the token and returns false.
  *
  * @param text         Buffer contents.
  * @param len          Buffer length in bytes.
@@ -57,15 +70,23 @@ static bool find_var_ref_near_cursor(const char *text, size_t len,
     }
     size_t pos = cursor_pos > len ? len : cursor_pos;
 
-    // Cursor just past a closing '}': pull it back inside the braces so the
-    // name walk below lands on the identifier.
-    if (pos > 0 && text[pos - 1] == '}') {
-        size_t k = pos - 1;
-        while (k > 0 && text[k] != '{') {
-            k--;
-        }
-        if (k > 0 && text[k - 1] == '$') {
-            pos = k + 1;
+    // Strict-token rule: cursor must be in [token_start, token_end).  A
+    // cursor past the closing `}` is outside the token and reports `none`.
+
+    // If the cursor sits on the leading `$` (or on the `{` of `${`), step it
+    // forward into the name so the name-walk below has a name char to anchor
+    // on.  Cursor on the closing `}` walks left over name chars to the name
+    // body; both cases land inside the token.
+    if (pos < len) {
+        if (text[pos] == '$' && pos + 1 < len &&
+            (text[pos + 1] == '{' || isalnum((unsigned char)text[pos + 1]) ||
+             text[pos + 1] == '_')) {
+            pos++;
+            if (pos < len && text[pos] == '{') {
+                pos++;
+            }
+        } else if (text[pos] == '{' && pos > 0 && text[pos - 1] == '$') {
+            pos++;
         }
     }
 
@@ -77,7 +98,9 @@ static bool find_var_ref_near_cursor(const char *text, size_t len,
         scan--;
     }
 
-    // Allow `${NAME` (cursor just inside the brace) by rewinding past one '{'.
+    // After the walk, scan points at the first name char.  Require `$` or
+    // `${` immediately to the left -- this is what makes the result actually
+    // a variable reference rather than a bare word.
     if (scan > 0 && text[scan - 1] == '{' && scan >= 2 &&
         text[scan - 2] == '$') {
         // scan currently points at the first name char; OK.
@@ -105,10 +128,48 @@ static bool find_var_ref_near_cursor(const char *text, size_t len,
 }
 
 /**
- * @brief Format a map's contents as "k1=v1, k2=v2, ...".
+ * @brief Format a list's elements as "'e1' 'e2' ..." (`@Q`-quoted).
  *
- * Bounded write so an oversized map cannot bloat the published shell
- * variable.  Truncation is silent; the caller decides the buffer size.
+ * Each element runs through the parameter-expansion `@Q` formatter so the
+ * output is unambiguous and round-trips through `eval "arr=($VALUE)"` -- the
+ * same quoting rule the rest of the shell already exposes.  Bounded write;
+ * truncation is silent.
+ */
+static void format_list_value(array_value_t *array, char *out, size_t cap) {
+    if (!out || cap == 0) {
+        return;
+    }
+    out[0] = '\0';
+    if (!array) {
+        return;
+    }
+    size_t count = 0;
+    char **values = symtable_array_get_values(array, &count);
+    size_t off = 0;
+    for (size_t i = 0; i < count && off < cap - 1; i++) {
+        char *q = transform_quote(values[i] ? values[i] : "");
+        int written = snprintf(out + off, cap - off, "%s%s", i == 0 ? "" : " ",
+                               q ? q : "''");
+        free(q);
+        if (written < 0) {
+            break;
+        }
+        off += (size_t)written;
+    }
+    out[off < cap ? off : cap - 1] = '\0';
+    if (values) {
+        for (size_t i = 0; i < count; i++) {
+            free(values[i]);
+        }
+        free(values);
+    }
+}
+
+/**
+ * @brief Format a map's contents as "'k1'='v1', 'k2'='v2', ..." (`@Q`-quoted).
+ *
+ * Both keys and values pass through the `@Q` formatter so embedded `=`, `,`,
+ * spaces, or quotes are unambiguous.  Bounded write; truncation is silent.
  */
 static void format_map_value(array_value_t *array, char *out, size_t cap) {
     if (!out || cap == 0) {
@@ -123,8 +184,13 @@ static void format_map_value(array_value_t *array, char *out, size_t cap) {
     size_t off = 0;
     for (size_t i = 0; i < kcount && off < cap - 1; i++) {
         const char *v = symtable_array_get_assoc(array, keys[i]);
-        int written = snprintf(out + off, cap - off, "%s%s=%s",
-                               i == 0 ? "" : ", ", keys[i], v ? v : "");
+        char *qk = transform_quote(keys[i]);
+        char *qv = transform_quote(v ? v : "");
+        int written =
+            snprintf(out + off, cap - off, "%s%s=%s", i == 0 ? "" : ", ",
+                     qk ? qk : "''", qv ? qv : "''");
+        free(qk);
+        free(qv);
         if (written < 0) {
             break;
         }
@@ -165,10 +231,9 @@ static void publish_inspection(const char *name) {
         break;
     case LUSH_VALUE_LIST: {
         symtable_set_global("LUSH_INSPECT_KIND", "list");
-        char *joined =
-            view.array ? symtable_array_expand(view.array, " ") : NULL;
-        symtable_set_global("LUSH_INSPECT_VALUE", joined ? joined : "");
-        free(joined);
+        char buf[1024];
+        format_list_value(view.array, buf, sizeof(buf));
+        symtable_set_global("LUSH_INSPECT_VALUE", buf);
         break;
     }
     case LUSH_VALUE_MAP: {
