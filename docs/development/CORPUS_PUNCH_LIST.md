@@ -117,30 +117,19 @@ name function-definition syntax `function NAME1 NAME2 { body }`
 
 ---
 
-## 4. Empty `(( ))` raises arithmetic syntax error
+## 4. Empty `(( ))` raises arithmetic syntax error (RESOLVED)
 
-**Severity:** executor / arithmetic.
+**Status:** fixed.
 
-```bash
-((  ))
-```
+`execute_arithmetic_command` in src/executor.c now short-circuits an
+all-whitespace expression to exit 1 (bash/zsh "false" placeholder
+convention) without raising `SHELL_ERR_ARITHMETIC_SYNTAX`. The
+existing evaluator is left untouched -- it is only invoked when
+there is actual non-whitespace content to evaluate.
 
-lush reports:
-
-```
-error[E1304]: arithmetic syntax error in expression:
-  = while: evaluating arithmetic command ((  ))
-  = help: (( )) expects arithmetic expressions, not shell commands
-```
-
-Bash and zsh treat an empty `(( ))` as evaluating to 0, which sets
-the command's exit status to 1 (the inverse-of-arithmetic-truth
-convention). Real-world scripts use this as a "false" placeholder.
-
-**Affected corpus entries:** key-bindings.zsh.
-
-**Source location:** `src/arithmetic.c` evaluation entry point; needs
-to accept an empty expression as 0.
+**Affected corpus entries:** key-bindings.zsh -- now reaches line 29
+and trips the next defect: `bindkey` builtin missing (tracked under
+[#5](#5-missing-zsh-specific-builtins)).
 
 ---
 

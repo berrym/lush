@@ -16820,6 +16820,22 @@ static int execute_arithmetic_command(executor_t *executor,
         }
     }
 
+    // Empty arithmetic command `(( ))` is treated as false by bash and zsh
+    // -- the expression evaluates to 0, the command exits 1 (the inverse
+    // convention). No error is raised. Scripts use this idiom as a
+    // placeholder false. Match the convention before invoking the
+    // evaluator, which would otherwise flag empty input as a syntax error.
+    {
+        const char *p = expr;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0') {
+            free(expanded_expr);
+            return 1;
+        }
+    }
+
     // Use the existing arithmetic evaluator with executor context
     // This handles simple variable expansion internally
     arithm_clear_error();
