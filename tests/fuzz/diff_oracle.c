@@ -138,22 +138,32 @@ static size_t g_allowlist_count = 0;
  */
 
 static mode_t_ mode_from_path(const char *path) {
-    // Walk back to find the parent directory name.
-    const char *last_slash = strrchr(path, '/');
-    if (!last_slash) {
-        return MODE_UNKNOWN;
-    }
-    // Find the second-to-last slash to extract the parent dir name.
-    const char *p = last_slash;
-    while (p > path && *(p - 1) != '/') {
-        p--;
-    }
-    // p..last_slash is the parent dir name
-    size_t n = (size_t)(last_slash - p);
-    for (mode_t_ m = MODE_POSIX; m <= MODE_LUSH; m++) {
-        if (strlen(MODE_NAMES[m]) == n && strncmp(p, MODE_NAMES[m], n) == 0) {
-            return m;
+    // Walk every path segment from the leaf up to the root, picking the
+    // nearest-to-leaf segment whose name matches a mode. Originally this
+    // checked only the immediate parent; that worked for the flat
+    // `tests/real_world/<mode>/<file>.sh` layout but breaks once a corpus
+    // is nested (e.g., `tests/real_world/corpus/posix/autoconf/<file>.sh`).
+    // Nearest-to-leaf rule lets per-upstream-set subdirectories live under
+    // their mode without requiring a separate registration mechanism.
+    const char *segment_end = strrchr(path, '/');
+    while (segment_end && segment_end > path) {
+        const char *segment_start = segment_end - 1;
+        while (segment_start > path && *(segment_start - 1) != '/') {
+            segment_start--;
         }
+        size_t n = (size_t)(segment_end - segment_start);
+        for (mode_t_ m = MODE_POSIX; m <= MODE_LUSH; m++) {
+            if (strlen(MODE_NAMES[m]) == n &&
+                strncmp(segment_start, MODE_NAMES[m], n) == 0) {
+                return m;
+            }
+        }
+        if (segment_start == path) {
+            break;
+        }
+        // Move segment_end to the slash before this segment to inspect the
+        // next ancestor up.
+        segment_end = segment_start - 1;
     }
     return MODE_UNKNOWN;
 }
