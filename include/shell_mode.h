@@ -138,6 +138,13 @@ typedef enum {
                                  */
     FEATURE_ZSH_PRINT_BUILTIN,  /**< Zsh `print` builtin (-l/-n/-r/-u/-f) */
     FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
+    FEATURE_KIND_SIGILS,        ///< Top-level @name / %name sigils for vector
+                                ///< and pair presentation contexts.  Stealing
+                                ///< @ and % from word characters at word-start
+                                ///< position is a lush divergence: curated true
+                                ///< in lush mode, false everywhere else so
+                                ///< `@reboot`, `user@host`, and `make %.o:%.c`
+                                ///< keep their bare-word reading.
 
     // Sentinel - must be last
     FEATURE_COUNT /**< Number of features (for array sizing) */

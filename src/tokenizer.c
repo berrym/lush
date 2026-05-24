@@ -2219,6 +2219,41 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                          start_pos);
     }
 
+    /* Kind-sigil dispatch: when FEATURE_KIND_SIGILS is enabled and a `@` or
+     * `%` sits at the start of a fresh token followed immediately by a valid
+     * identifier-start character ([A-Za-z_]), tokenize it as a TOK_VARIABLE
+     * carrying the sigil prefix.  Other uses of `@` and `%` (mid-word
+     * `user@host`, extglob `@(foo|bar)`, git refs `@{-1}`, arithmetic `%`,
+     * job specifiers `%1`) all fail this regex check and fall through to the
+     * normal word/operator paths -- exactly the disambiguation the spec
+     * settled on.  Disabled in posix/bash/zsh modes so those profiles keep
+     * the historical word-character reading of `@` and `%`. */
+    if ((c == '@' || c == '%') && shell_mode_allows(FEATURE_KIND_SIGILS) &&
+        tokenizer->position + 1 < tokenizer->input_length) {
+        unsigned char nx =
+            (unsigned char)tokenizer->input[tokenizer->position + 1];
+        if (isalpha(nx) || nx == '_') {
+            size_t sigil_start = tokenizer->position;
+            size_t sigil_line = tokenizer->line;
+            size_t sigil_col = tokenizer->column;
+            tokenizer->position += 2; // consume sigil + first name char
+            tokenizer->column += 2;
+            while (tokenizer->position < tokenizer->input_length) {
+                unsigned char ch =
+                    (unsigned char)tokenizer->input[tokenizer->position];
+                if (isalnum(ch) || ch == '_') {
+                    tokenizer->position++;
+                    tokenizer->column++;
+                } else {
+                    break;
+                }
+            }
+            size_t length = tokenizer->position - sigil_start;
+            return token_new(TOK_VARIABLE, &tokenizer->input[sigil_start],
+                             length, sigil_line, sigil_col, sigil_start);
+        }
+    }
+
     // Handle words and numbers (UTF-8 aware)
     // First, try to decode the current character as UTF-8
     uint32_t codepoint;

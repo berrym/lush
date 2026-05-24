@@ -2721,6 +2721,62 @@ TEST(rt_inspect_cursor_mid_identifier) {
     ASSERT_STR_EQ(inspect_var("LUSH_INSPECT_VALUE"), "v", "value");
 }
 
+TEST(rt_sigil_at_on_scalar) {
+    run_result_t r = run_shell("x=hello\necho @x\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_sigil_at_on_list) {
+    run_result_t r = run_shell("arr=(a b c)\necho @arr\n");
+    ASSERT_STDOUT_EQ(r, "a b c\n");
+}
+
+TEST(rt_sigil_at_on_map) {
+    run_result_t r = run_shell("declare -A m\nm[k1]=v1\nm[k2]=v2\necho @m\n");
+    ASSERT_STDOUT_EQ(r, "v1 v2\n");
+}
+
+TEST(rt_sigil_pair_on_list) {
+    run_result_t r = run_shell("arr=(a b c)\necho %arr\n");
+    ASSERT_STDOUT_EQ(r, "0 a 1 b 2 c\n");
+}
+
+TEST(rt_sigil_pair_on_map) {
+    run_result_t r = run_shell("declare -A m\nm[k1]=v1\nm[k2]=v2\necho %m\n");
+    ASSERT_STDOUT_EQ(r, "k1 v1 k2 v2\n");
+}
+
+TEST(rt_sigil_pair_on_scalar_type_mismatch) {
+    run_result_t r = run_shell("x=hello\necho %x\n");
+    ASSERT_STDERR_CONTAINS(r, "%x: pair sigil on scalar");
+}
+
+TEST(rt_sigil_compat_user_at_host) {
+    // `user@host` is a bare word -- `@` is mid-token, not at word start.
+    run_result_t r = run_shell("echo user@host\n");
+    ASSERT_STDOUT_EQ(r, "user@host\n");
+}
+
+TEST(rt_sigil_compat_at_invalid_identifier) {
+    // `@{-1}` post-sigil string `{-1}` fails identifier regex; bare word.
+    run_result_t r = run_shell("echo '@{-1}'\n");
+    ASSERT_STDOUT_EQ(r, "@{-1}\n");
+}
+
+TEST(rt_sigil_unset_name_empty) {
+    // Unset name expands to empty (matches default $x behavior; set -u path
+    // is exercised separately).
+    run_result_t r = run_shell("echo \"[@undefined]\"\n");
+    ASSERT_STDOUT_EQ(r, "[]\n");
+}
+
+TEST(rt_sigil_off_in_bash_mode) {
+    // mode bash disables FEATURE_KIND_SIGILS -- @x stays a bare word so
+    // existing bash scripts that pass `@reboot` etc. don't break.
+    run_result_t r = run_shell("mode bash\nx=hello\necho @x\n");
+    ASSERT_STDOUT_EQ(r, "@x\n");
+}
+
 TEST(rt_typed_fn_lexical_scope) {
     // A typed-fn body resolves free names through its captured
     // declaration-site scope, not through the dynamic caller's
@@ -2982,6 +3038,16 @@ int main(void) {
     RUN_TEST(rt_inspect_unset_variable);
     RUN_TEST(rt_inspect_no_ref_under_cursor);
     RUN_TEST(rt_inspect_cursor_mid_identifier);
+    RUN_TEST(rt_sigil_at_on_scalar);
+    RUN_TEST(rt_sigil_at_on_list);
+    RUN_TEST(rt_sigil_at_on_map);
+    RUN_TEST(rt_sigil_pair_on_list);
+    RUN_TEST(rt_sigil_pair_on_map);
+    RUN_TEST(rt_sigil_pair_on_scalar_type_mismatch);
+    RUN_TEST(rt_sigil_compat_user_at_host);
+    RUN_TEST(rt_sigil_compat_at_invalid_identifier);
+    RUN_TEST(rt_sigil_unset_name_empty);
+    RUN_TEST(rt_sigil_off_in_bash_mode);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
     RUN_TEST(rt_case_arm_runs_all);

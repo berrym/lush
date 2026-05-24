@@ -5456,9 +5456,177 @@ cleanup_delimiters:
  * @param text Text to potentially expand
  * @return Expanded string (caller must free), or copy of original
  */
+/**
+ * @brief Expand a top-level kind sigil token (`@name` / `%name`).
+ *
+ * Caller has already established that the text starts with `@` or `%` and the
+ * post-sigil span is a valid identifier.  Resolves the identifier against the
+ * symbol table and produces the kind-aware presentation:
+ *
+ *   @scalar  -> scalar value (one element after field splitting)
+ *   @list    -> space-joined elements (N elements)
+ *   @map     -> space-joined values (N elements, insertion order)
+ *   %scalar  -> SHELL_ERR_TYPE_MISMATCH
+ *   %list    -> "0 v0 1 v1 ... " alternating (2N elements)
+ *   %map     -> "k1 v1 k2 v2 ... " alternating (2N elements)
+ *
+ * Sigil mode (`@` or `%`) is the first character of `text`; the identifier
+ * runs from `text + 1` to the end of the buffer.  Returns an owned string the
+ * caller must free; on type mismatch, returns an empty string after queueing
+ * a structured error.
+ */
+static char *expand_kind_sigil(executor_t *executor, const char *text) {
+    char sigil = text[0];
+    const char *name = text + 1;
+
+    lush_value_view_t view;
+    if (!symtable_lookup(name, &view)) {
+        // Unset name: empty expansion -- matches bash `${var:-}` shape for an
+        // unset variable in unquoted context.
+        return strdup("");
+    }
+
+    char *result = NULL;
+
+    if (sigil == '@') {
+        switch (view.kind) {
+        case LUSH_VALUE_SCALAR:
+            result = strdup(view.scalar_value ? view.scalar_value : "");
+            break;
+        case LUSH_VALUE_LIST:
+            result = view.array ? symtable_array_expand(view.array, " ")
+                                : strdup("");
+            break;
+        case LUSH_VALUE_MAP: {
+            size_t count = 0;
+            char **values = view.array
+                                ? symtable_array_get_values(view.array, &count)
+                                : NULL;
+            size_t total = 1;
+            for (size_t i = 0; i < count; i++) {
+                total += strlen(values[i] ? values[i] : "") + 1;
+            }
+            result = calloc(1, total);
+            if (result) {
+                size_t off = 0;
+                for (size_t i = 0; i < count; i++) {
+                    const char *v = values[i] ? values[i] : "";
+                    if (i > 0) {
+                        result[off++] = ' ';
+                    }
+                    size_t vl = strlen(v);
+                    memcpy(result + off, v, vl);
+                    off += vl;
+                }
+            }
+            if (values) {
+                for (size_t i = 0; i < count; i++) {
+                    free(values[i]);
+                }
+                free(values);
+            }
+            break;
+        }
+        default:
+            result = strdup("");
+            break;
+        }
+    } else { // sigil == '%'
+        switch (view.kind) {
+        case LUSH_VALUE_SCALAR:
+            executor_error_add(
+                executor, SHELL_ERR_TYPE_MISMATCH, SOURCE_LOC_UNKNOWN,
+                "%%%s: pair sigil on scalar -- "
+                "a singleton has no pair component (use @%s for vector "
+                "context or declare %s as a list/map)",
+                name, name, name);
+            result = strdup("");
+            break;
+        case LUSH_VALUE_LIST: {
+            size_t count = 0;
+            char **values = view.array
+                                ? symtable_array_get_values(view.array, &count)
+                                : NULL;
+            // worst case: "INT v INT v ..." -- 32 bytes per entry is plenty
+            size_t total = 1;
+            for (size_t i = 0; i < count; i++) {
+                total += 32 + strlen(values[i] ? values[i] : "") + 2;
+            }
+            result = calloc(1, total);
+            if (result) {
+                size_t off = 0;
+                for (size_t i = 0; i < count; i++) {
+                    const char *v = values[i] ? values[i] : "";
+                    off +=
+                        (size_t)snprintf(result + off, total - off, "%s%zu %s",
+                                         i == 0 ? "" : " ", i, v);
+                }
+            }
+            if (values) {
+                for (size_t i = 0; i < count; i++) {
+                    free(values[i]);
+                }
+                free(values);
+            }
+            break;
+        }
+        case LUSH_VALUE_MAP: {
+            size_t kcount = 0;
+            char **keys = view.array
+                              ? symtable_array_get_keys(view.array, &kcount)
+                              : NULL;
+            size_t total = 1;
+            for (size_t i = 0; i < kcount; i++) {
+                const char *v = symtable_array_get_assoc(view.array, keys[i]);
+                total += strlen(keys[i]) + 1 + strlen(v ? v : "") + 1;
+            }
+            result = calloc(1, total);
+            if (result) {
+                size_t off = 0;
+                for (size_t i = 0; i < kcount; i++) {
+                    const char *v =
+                        symtable_array_get_assoc(view.array, keys[i]);
+                    off += (size_t)snprintf(result + off, total - off,
+                                            "%s%s %s", i == 0 ? "" : " ",
+                                            keys[i], v ? v : "");
+                }
+            }
+            if (keys) {
+                for (size_t i = 0; i < kcount; i++) {
+                    free(keys[i]);
+                }
+                free(keys);
+            }
+            break;
+        }
+        default:
+            result = strdup("");
+            break;
+        }
+    }
+
+    lush_value_view_clear(&view);
+    return result ? result : strdup("");
+}
+
 char *expand_if_needed(executor_t *executor, const char *text) {
     if (!executor || !text) {
         return NULL;
+    }
+
+    // Kind sigil top-level dispatch: `@NAME` / `%NAME` with NAME a valid
+    // identifier.  Tokenizer has already done the regex check; we just need
+    // to verify the shape before routing to expand_kind_sigil.
+    if ((text[0] == '@' || text[0] == '%') &&
+        shell_mode_allows(FEATURE_KIND_SIGILS) &&
+        (isalpha((unsigned char)text[1]) || text[1] == '_')) {
+        const char *p = text + 1;
+        while (*p && (isalnum((unsigned char)*p) || *p == '_')) {
+            p++;
+        }
+        if (*p == '\0') {
+            return expand_kind_sigil(executor, text);
+        }
     }
 
     // Handle strings that contain single quotes - process them specially
@@ -15516,6 +15684,45 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
     size_t i = 0;
 
     while (i < len) {
+        /* Kind sigil inside a double-quoted string: `"@x"` and `"%x"` must
+         * produce the same result as bare `@x` / `%x` per the §3.6 rule
+         * that quoting is irrelevant to presentation.  The check mirrors the
+         * tokenizer: sigil at this slot AND followed by a valid identifier
+         * AND FEATURE_KIND_SIGILS is enabled.  Splice the expanded text into
+         * the result buffer and advance past the consumed span. */
+        if ((str[i] == '@' || str[i] == '%') && i + 1 < len &&
+            shell_mode_allows(FEATURE_KIND_SIGILS) &&
+            (isalpha((unsigned char)str[i + 1]) || str[i + 1] == '_')) {
+            size_t sigil_end = i + 1;
+            while (sigil_end < len && (isalnum((unsigned char)str[sigil_end]) ||
+                                       str[sigil_end] == '_')) {
+                sigil_end++;
+            }
+            size_t span = sigil_end - i;
+            char *sigil_buf = malloc(span + 1);
+            if (sigil_buf) {
+                memcpy(sigil_buf, str + i, span);
+                sigil_buf[span] = '\0';
+                char *expanded = expand_kind_sigil(executor, sigil_buf);
+                free(sigil_buf);
+                if (expanded) {
+                    size_t el = strlen(expanded);
+                    if (result_pos + el + 1 > buffer_size) {
+                        buffer_size = (result_pos + el + 1) * 2;
+                        char *nb = realloc(result, buffer_size);
+                        if (nb) {
+                            result = nb;
+                        }
+                    }
+                    memcpy(result + result_pos, expanded, el);
+                    result_pos += el;
+                    free(expanded);
+                }
+            }
+            i = sigil_end;
+            continue;
+        }
+
         if (str[i] == '$' && i + 1 < len) {
             // NOTE: ANSI-C quoting $'...' is NOT expanded inside double quotes
             // per POSIX/bash behavior. It's only recognized at the outer level.

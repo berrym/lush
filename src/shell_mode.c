@@ -121,6 +121,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_ZSH_BARE_SUBSCRIPT] = false, // No arrays in POSIX
             [FEATURE_ZSH_PRINT_BUILTIN] = false,  // Not a POSIX builtin
             [FEATURE_PLUGIN_SYSTEM] = false,
+                            [FEATURE_KIND_SIGILS] = false,
                             },
 
     // SHELL_MODE_BASH - Bash 5.x compatibility
@@ -206,6 +207,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                 false, // Bash treats $a[N] as $a + literal [N]
             [FEATURE_ZSH_PRINT_BUILTIN] = false, // Bash has no `print` builtin
             [FEATURE_PLUGIN_SYSTEM] = false,     // Not a Bash feature
+            [FEATURE_KIND_SIGILS] = false, // @/% remain word chars in bash
         },
 
     // SHELL_MODE_ZSH - Zsh compatibility
@@ -291,6 +293,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_ZSH_BARE_SUBSCRIPT] = true, // Zsh native
             [FEATURE_ZSH_PRINT_BUILTIN] = true,  // Zsh native builtin
             [FEATURE_PLUGIN_SYSTEM] = false,     // Not a Zsh feature
+            [FEATURE_KIND_SIGILS] = false,       // @/% remain word chars in zsh
         },
 
     // SHELL_MODE_LUSH - Curated best of both (DEFAULT)
@@ -388,6 +391,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PRINT_BUILTIN] = true, /* Curated: -P prompt-expansion
                             uses lush template engine */
             [FEATURE_PLUGIN_SYSTEM] = true,     // Lush extension
+            [FEATURE_KIND_SIGILS] = true,       // Curated: @/% sigils
         },
 };
 
@@ -484,6 +488,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_ZSH_BARE_SUBSCRIPT] = "zsh_bare_subscript",
     [FEATURE_ZSH_PRINT_BUILTIN] = "zsh_print_builtin",
     [FEATURE_PLUGIN_SYSTEM] = "plugin_system",
+    [FEATURE_KIND_SIGILS] = "kind_sigils",
 };
 
 /* Feature short names and cross-shell aliases.
