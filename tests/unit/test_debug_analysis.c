@@ -301,6 +301,111 @@ TEST(analyze_script_performance_useless_cat) {
     cleanup_test_dir();
 }
 
+/* Typed-function (`fn`) static type checks. SEMANTICS section 3.9 /
+ * section 5.3: declared return-kind annotation must match what the
+ * body actually returns. The runtime catches these too, but a debug
+ * analyze hit at edit time saves the runtime trip. */
+
+TEST(analyze_script_typed_fn_void_returns_value) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/usr/bin/env lush\nfn nop() { return \"leak\"; }\n";
+    char *path = create_test_script("void_returns_value.lush", script);
+    debug_analyze_script(ctx, path);
+
+    bool found = false;
+    for (analysis_issue_t *issue = ctx->analysis_issues; issue;
+         issue = issue->next) {
+        if (strcmp(issue->category, "type") == 0 &&
+            strstr(issue->message, "void") != NULL &&
+            strstr(issue->message, "returns a value") != NULL) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found, "void fn returning a value should be flagged");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
+TEST(analyze_script_typed_fn_kind_mismatch) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/usr/bin/env lush\n"
+                         "fn bad() -> list { return \"scalar\"; }\n";
+    char *path = create_test_script("kind_mismatch.lush", script);
+    debug_analyze_script(ctx, path);
+
+    bool found = false;
+    for (analysis_issue_t *issue = ctx->analysis_issues; issue;
+         issue = issue->next) {
+        if (strcmp(issue->category, "type") == 0 &&
+            strstr(issue->message, "list") != NULL &&
+            strstr(issue->message, "scalar") != NULL) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found, "declared list, returned scalar -- flagged");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
+TEST(analyze_script_typed_fn_missing_return_value) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/usr/bin/env lush\n"
+                         "fn bad() -> scalar { return; }\n";
+    char *path = create_test_script("missing_return.lush", script);
+    debug_analyze_script(ctx, path);
+
+    bool found = false;
+    for (analysis_issue_t *issue = ctx->analysis_issues; issue;
+         issue = issue->next) {
+        if (strcmp(issue->category, "type") == 0 &&
+            strstr(issue->message, "no value") != NULL) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found, "bare return in non-void fn should be flagged");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
+TEST(analyze_script_typed_fn_well_typed_no_issue) {
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script =
+        "#!/usr/bin/env lush\nfn good() -> scalar { return \"ok\"; }\n";
+    char *path = create_test_script("well_typed.lush", script);
+    debug_analyze_script(ctx, path);
+
+    bool found = false;
+    for (analysis_issue_t *issue = ctx->analysis_issues; issue;
+         issue = issue->next) {
+        if (strcmp(issue->category, "type") == 0) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_FALSE(found, "well-typed fn should not raise type issues");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
 TEST(analyze_script_portability_source) {
     setup_test_dir();
     debug_context_t *ctx = debug_init();
@@ -725,6 +830,10 @@ int main(void) {
     RUN_TEST(analyze_script_performance_useless_cat);
 
     printf("\nPortability Analysis:\n");
+    RUN_TEST(analyze_script_typed_fn_void_returns_value);
+    RUN_TEST(analyze_script_typed_fn_kind_mismatch);
+    RUN_TEST(analyze_script_typed_fn_missing_return_value);
+    RUN_TEST(analyze_script_typed_fn_well_typed_no_issue);
     RUN_TEST(analyze_script_portability_source);
     RUN_TEST(analyze_script_portability_echo_e);
     RUN_TEST(analyze_script_type_at_subscript_in_scalar_assignment);

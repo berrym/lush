@@ -39,6 +39,8 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
                                       const char *content, node_t *ast);
 static void debug_analyze_types(debug_context_t *ctx, const char *file,
                                 const char *content);
+static void debug_analyze_typed_fns(debug_context_t *ctx, const char *file,
+                                    node_t *ast);
 
 /**
  * @brief Analyze a script file for various issues
@@ -99,6 +101,7 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
     debug_analyze_security(ctx, script_path, script_content);
     debug_analyze_portability(ctx, script_path, script_content, ast);
     debug_analyze_types(ctx, script_path, script_content);
+    debug_analyze_typed_fns(ctx, script_path, ast);
 
     // Generate analysis report
     debug_show_analysis_report(ctx);
@@ -672,6 +675,206 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
             line_num++;
         }
     }
+}
+
+/* ============================================================================
+ * Typed-function (`fn`) static type checks
+ *
+ * Walks each NODE_FN_DECL in the parsed AST and checks the body's
+ * NODE_FN_RETURN statements against the declared return kind. The
+ * encoded signature lives in val.str:
+ *
+ *   "name\x1F<return_kind>\x1F<p1>:<k1>\x1F<p2>:<k2>..."
+ *
+ * Today's surface catches the cases the executor would otherwise raise
+ * at runtime, so a user gets the diagnostic at edit time:
+ *
+ *   - `fn f() -> kind { ... }` with a `return` (no value) -- declared
+ *     non-void but body returns void.
+ *   - `fn f() { ... }` (no return kind) with `return EXPR` -- declared
+ *     void but body returns a value.
+ *   - Return-expression-kind mismatch where the expression's kind is
+ *     statically inferrable (string literal -> scalar, array literal
+ *     -> list). Variable references and nested calls are deferred:
+ *     they need cross-procedure resolution that the parse-time walker
+ *     does not yet have.
+ *
+ * Arg-vs-param kind checks on `let r = name(args)` sites are likewise
+ * deferred until the resolver tracks declared fns through the AST.
+ * ============================================================================
+ */
+
+static const char *static_infer_return_kind(node_t *expr) {
+    if (!expr) {
+        return ""; // void return
+    }
+    switch (expr->type) {
+    case NODE_STRING_LITERAL:
+    case NODE_STRING_EXPANDABLE:
+        return "scalar";
+    case NODE_COMMAND:
+        // Bare word arg as the return expression -- scalar literal.
+        return "scalar";
+    case NODE_ARRAY_LITERAL:
+        return "list";
+    case NODE_VAR:
+        // Could be any kind at runtime; can't infer statically.
+        return NULL;
+    case NODE_FN_CALL:
+        // Could be inferred by looking up the callee in the script's
+        // declared fns. Deferred -- the analyzer does not yet build
+        // that table.
+        return NULL;
+    default:
+        return NULL;
+    }
+}
+
+// Extract the return-kind substring from an encoded fn signature.
+// Returns a borrowed pointer into a static buffer (caller must consume
+// before the next call). NULL if the signature is malformed.
+static const char *static_fn_return_kind(const char *encoded) {
+    static char buf[32];
+    if (!encoded) {
+        return NULL;
+    }
+    const char *sep1 = strchr(encoded, '\x1f');
+    if (!sep1) {
+        return NULL;
+    }
+    const char *cursor = sep1 + 1;
+    const char *sep2 = strchr(cursor, '\x1f');
+    size_t rk_len = sep2 ? (size_t)(sep2 - cursor) : strlen(cursor);
+    if (rk_len == 0) {
+        return ""; // void
+    }
+    if (rk_len >= sizeof(buf)) {
+        return NULL;
+    }
+    memcpy(buf, cursor, rk_len);
+    buf[rk_len] = '\0';
+    return buf;
+}
+
+// Extract the fn name from an encoded signature.
+static const char *static_fn_name(const char *encoded) {
+    static char buf[128];
+    if (!encoded) {
+        return NULL;
+    }
+    const char *sep1 = strchr(encoded, '\x1f');
+    if (!sep1) {
+        return NULL;
+    }
+    size_t name_len = (size_t)(sep1 - encoded);
+    if (name_len >= sizeof(buf)) {
+        return NULL;
+    }
+    memcpy(buf, encoded, name_len);
+    buf[name_len] = '\0';
+    return buf;
+}
+
+// Walk an AST subtree and check every NODE_FN_RETURN it contains
+// against the declared return kind.
+static void check_fn_returns_in_subtree(debug_context_t *ctx, const char *file,
+                                        const char *fn_name,
+                                        const char *declared_rk,
+                                        node_t *subtree) {
+    if (!subtree) {
+        return;
+    }
+
+    if (subtree->type == NODE_FN_DECL) {
+        // A nested fn declaration -- its returns belong to itself, not
+        // the outer fn. The outer walk will pick it up at top level.
+        return;
+    }
+
+    if (subtree->type == NODE_FN_RETURN) {
+        node_t *expr = subtree->first_child;
+        bool declared_void = (declared_rk[0] == '\0');
+
+        if (declared_void && expr) {
+            char msg[256];
+            snprintf(msg, sizeof(msg),
+                     "typed function '%s' has no declared return kind "
+                     "(void) but the body returns a value",
+                     fn_name);
+            debug_add_analysis_issue(
+                ctx, file, (int)subtree->loc.line, "error", "type", msg,
+                "either declare a return kind with `-> scalar` / `-> list` / "
+                "`-> map`, or remove the return expression");
+            return;
+        }
+        if (!declared_void && !expr) {
+            char msg[256];
+            snprintf(msg, sizeof(msg),
+                     "typed function '%s' declared '-> %s' but a return "
+                     "statement yields no value",
+                     fn_name, declared_rk);
+            debug_add_analysis_issue(ctx, file, (int)subtree->loc.line, "error",
+                                     "type", msg,
+                                     "return a value of the declared kind");
+            return;
+        }
+        if (!declared_void && expr) {
+            const char *inferred = static_infer_return_kind(expr);
+            if (inferred && inferred[0] != '\0' &&
+                strcmp(inferred, declared_rk) != 0) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                         "typed function '%s' declared '-> %s' but a "
+                         "return statement yields a %s value",
+                         fn_name, declared_rk, inferred);
+                debug_add_analysis_issue(
+                    ctx, file, (int)subtree->loc.line, "error", "type", msg,
+                    "return a value of the declared kind, or change the "
+                    "fn's return annotation to match");
+                return;
+            }
+        }
+        return;
+    }
+
+    // Recurse into children and siblings.
+    for (node_t *c = subtree->first_child; c; c = c->next_sibling) {
+        check_fn_returns_in_subtree(ctx, file, fn_name, declared_rk, c);
+    }
+}
+
+// Top-level walker: find every NODE_FN_DECL in the AST and check its
+// body for return-statement type compliance.
+static void debug_analyze_typed_fns_recurse(debug_context_t *ctx,
+                                            const char *file, node_t *node) {
+    if (!node) {
+        return;
+    }
+    if (node->type == NODE_FN_DECL) {
+        const char *fn_name = static_fn_name(node->val.str);
+        const char *declared_rk = static_fn_return_kind(node->val.str);
+        if (fn_name && declared_rk) {
+            // node->first_child is the body brace group.
+            for (node_t *c = node->first_child; c; c = c->next_sibling) {
+                check_fn_returns_in_subtree(ctx, file, fn_name, declared_rk, c);
+            }
+        }
+    }
+    for (node_t *c = node->first_child; c; c = c->next_sibling) {
+        if (c->type != NODE_FN_DECL) {
+            debug_analyze_typed_fns_recurse(ctx, file, c);
+        } else {
+            debug_analyze_typed_fns_recurse(ctx, file, c);
+        }
+    }
+}
+
+static void debug_analyze_typed_fns(debug_context_t *ctx, const char *file,
+                                    node_t *ast) {
+    if (!ctx || !file || !ast) {
+        return;
+    }
+    debug_analyze_typed_fns_recurse(ctx, file, ast);
 }
 
 /**
