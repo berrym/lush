@@ -799,6 +799,15 @@ static bool needs_continuation(input_state_t *state) {
         return true;
     }
 
+    // POSIX function header `name()` seen but body brace not yet opened.
+    // The function body may start on a following line; keep reading
+    // until the `{` arrives (analyze_line clears this flag when it does).
+    // Without this, `name()\n{ body }` is split into two statements and
+    // the parser sees `name()` followed by EOF.
+    if (state->saw_posix_func_parens) {
+        return true;
+    }
+
     // Need continuation if we have pending quotes or escapes
     if (state->in_single_quote || state->in_double_quote || state->escaped ||
         state->has_continuation) {

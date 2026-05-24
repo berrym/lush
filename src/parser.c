@@ -11,6 +11,7 @@
 
 #include "parser.h"
 
+#include "debug.h"
 #include "executor.h"
 #include "node.h"
 #include "shell_mode.h"
@@ -6423,16 +6424,21 @@ static node_t *parse_fn_return_statement(parser_t *parser) {
  * @brief Recognise a statement-position typed-fn call.
  *
  * Both POSIX function definition and typed-fn call begin with
- * `IDENT(`; the discriminator is what follows the closing `)`. A
- * POSIX-form function definition requires `{` (after optional
- * whitespace/newlines) -- without it the call is a typed-fn
- * invocation whose return value is discarded.
+ * `IDENT(`; the discriminator must work even when the recognizer
+ * cannot see past end-of-statement (lush feeds the parser one
+ * statement at a time, so a `name()` followed by a newline and a
+ * `{` body on the next line never has the `{` in the recognizer's
+ * window).
  *
- * Walks the tokenizer forward past the matching `)`, peeks the next
- * non-trivial token, and restores. Returns true if the next token
- * after the closing paren is anything OTHER than `{`. Returns false
- * if the form does not match `IDENT(...)`, or if `{` follows the
- * close paren (POSIX function definition).
+ * Discriminator: argument presence between `(` and `)`.
+ *   `name()`            -- empty parens -- POSIX function definition
+ *   `name(arg, ...)`    -- one or more arguments -- typed-fn call
+ *
+ * Discarding the return value of a zero-arg typed-fn call at
+ * statement position is rare (`let _ = name()` is the explicit
+ * form); POSIX `name() { ... }` is common. Disambiguating by
+ * argument presence is unambiguous and avoids the look-past-EOS
+ * problem.
  *
  * Does not consume tokens: the caller re-walks via
  * parse_fn_call_expression after a true return.
@@ -6458,6 +6464,7 @@ static bool is_typed_fn_call_statement(parser_t *parser) {
     size_t saved_col = parser->tokenizer->column;
 
     bool matched = false;
+    bool saw_argument = false;
 
     // Consume the IDENT.
     tokenizer_advance(parser->tokenizer);
@@ -6466,7 +6473,9 @@ static bool is_typed_fn_call_statement(parser_t *parser) {
 
     // Walk past everything until the matching RPAREN. Nested parens
     // (e.g. a nested call as an argument) bump the depth so we don't
-    // exit at the wrong close.
+    // exit at the wrong close. Any non-trivial token between `(` and
+    // `)` at depth 1 counts as an argument; zero non-trivial tokens
+    // means empty parens (`name()` -- POSIX function definition).
     int depth = 1;
     while (depth > 0) {
         token_t *t = tokenizer_current(parser->tokenizer);
@@ -6475,29 +6484,26 @@ static bool is_typed_fn_call_statement(parser_t *parser) {
         }
         if (t->type == TOK_LPAREN) {
             depth++;
+            saw_argument = true;
         } else if (t->type == TOK_RPAREN) {
             depth--;
             if (depth == 0) {
                 tokenizer_advance(parser->tokenizer);
                 break;
             }
+        } else if (t->type != TOK_WHITESPACE && t->type != TOK_NEWLINE &&
+                   t->type != TOK_COMMENT) {
+            saw_argument = true;
         }
         tokenizer_advance(parser->tokenizer);
     }
 
-    // Skip trivial whitespace and newlines between `)` and the next
-    // significant token. parse_function_definition does the same.
-    while (tokenizer_match(parser->tokenizer, TOK_NEWLINE)) {
-        tokenizer_advance(parser->tokenizer);
+    if (g_debug_context) {
+        debug_trace_printf(g_debug_context,
+                           "typed-fn-call recognizer: saw_argument=%d\n",
+                           saw_argument ? 1 : 0);
     }
-
-    token_t *after = tokenizer_current(parser->tokenizer);
-    if (!after || after->type != TOK_LBRACE) {
-        // Anything other than `{` (including EOF, `;`, newline already
-        // skipped, `&&`, command operators, end-of-statement) makes
-        // this a typed-fn call statement.
-        matched = true;
-    }
+    matched = saw_argument;
 
 restore:
     parser->tokenizer->position = saved_pos;

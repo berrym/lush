@@ -53,38 +53,40 @@ a first cut.
 
 ---
 
-## 2. POSIX function definition misread as typed-fn call
+## 2. POSIX function definition misread as typed-fn call (RESOLVED)
 
-**Severity:** parser bug.
+**Status:** fixed. Two-part fix landed.
 
-```bash
-_comp_cmd_alias()
-{
-    ...
-}
-```
+The typed-fn-call recognizer was matching empty-argument-list
+`name()` and trying the call path. Bash-completion uses
+`_comp_cmd_NAME()` POSIX-function form which was being misread.
 
-lush reports:
+Independent compounding bug: the input-buffering layer's
+`needs_continuation` check didn't know about the
+`saw_posix_func_parens` flag, so `name()\n{ body }` (brace on a new
+line) was split into two separate parser invocations and the parser
+never saw the body. POSIX function definitions with the brace on the
+following line silently failed even when the recognizer was correct.
 
-```
-error[E1007]: no typed function named '_comp_cmd_alias' is in scope
-  --> alias.bash:13:17
-```
+**Fixes:**
 
-The typed-fn-call recognizer sees `name()` and tries the call path,
-treating an empty argument list as a typed-fn invocation. The parser
-needs to fall through to POSIX-function-definition when (a) no `let`
-prefix exists at this statement position and (b) the parens are
-followed by a `{`-introduced body.
+- `src/parser.c` `is_typed_fn_call_statement`: discriminate by
+  argument presence inside the parens (zero non-trivial tokens =
+  POSIX function definition; one or more = typed-fn call). The
+  recognizer previously tried to peek past `)` for `{`, which can't
+  work because the parser sees one statement at a time and `{` may
+  be in a later statement.
+- `src/input.c` `needs_continuation`: also return true when
+  `saw_posix_func_parens` is set. This keeps the input buffer
+  collecting lines until the `{` arrives, matching how the buffer
+  already handled `function NAME` (the keyword form) and other
+  compound constructs.
 
-**Affected corpus entries:** every bash-completion file (the bash-
-completion convention is `_comp_cmd_NAME()` POSIX-function form).
-
-**Source location:** `src/parser.c`, the `is_typed_fn_call_statement`
-recognizer or the surrounding statement-dispatch logic.
-
-**Estimated impact:** small fix, large reach. Unblocks the entire
-bash-completion bucket from emitting parse errors.
+**Follow-up surfaced:** the bash-completion files reach further into
+the file now and trip a new `E1001 "expected command name, got ''"`
+parse error at the `fi` of an `if [[ ]]; then ...; fi` block (see
+[#7](#7-fi-after-arithmetic-line-trips-e1001) below). Net progress:
+the typed-fn collision is gone, exposing a deeper parser bug.
 
 ---
 
@@ -163,6 +165,38 @@ builtin "didn't do anything." Document each stub in
 `known_divergences.txt`.
 
 ---
+
+## 7. `fi` after `((...))` line trips E1001
+
+**Severity:** parser bug. Surfaced by the typed-fn collision fix
+landing.
+
+```bash
+if [[ $cur == -* ]]; then
+    _comp_compgen_usage -c help -s "$1"
+    ((${#COMPREPLY[*]} != 1)) || compopt +o nospace
+fi
+```
+
+lush reports at the `fi` line:
+
+```
+error[E1001]: expected command name, got ''
+  --> alias.bash:34:5
+```
+
+The parser successfully consumes the arithmetic command on the
+preceding line but enters a state where the `fi` keyword closing the
+`if` is unrecognized as a keyword. Likely confusion in the
+statement-list terminator between an `((expr))` command and the
+expected `fi`.
+
+**Affected corpus entries:** alias.bash and other bash-completion
+files reach this surface.
+
+**Source location:** `src/parser.c`, the if-statement body parser
+where the next statement-list element is expected after a
+short-circuit `||` chain.
 
 ## 6. Unrecognized zsh option names
 

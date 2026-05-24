@@ -89,3 +89,13 @@ shell_options_t shell_opts = {0};
 
 // Interactive shell stub
 bool is_interactive_shell(void) { return false; }
+
+// Debug subsystem stubs -- parser.c uses debug_trace_printf when
+// instrumenting recognizer decisions. Tests don't link the debug
+// subsystem so stub it as a no-op here.
+struct debug_context;
+struct debug_context *g_debug_context = NULL;
+void debug_trace_printf(struct debug_context *ctx, const char *format, ...) {
+    (void)ctx;
+    (void)format;
+}
