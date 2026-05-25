@@ -365,6 +365,27 @@ bool shell_mode_parse(const char *name, shell_mode_t *mode);
  */
 bool shell_feature_is_noop_alias(const char *name);
 
+/**
+ * @brief Record a setopt / unsetopt call for a noop alias.
+ *
+ * The behaviour the alias would toggle is already always-on in lush;
+ * recording the user's set/unset call lets `[[ -o name ]]` and
+ * `setopt | grep name` return the right answer.
+ *
+ * Names not in the noop-alias list are ignored. Pass @p enabled=true for
+ * `setopt`, false for `unsetopt`.
+ */
+void shell_feature_record_noop_alias_state(const char *name, bool enabled);
+
+/**
+ * @brief Query the recorded state of a noop-alias option.
+ *
+ * Returns false if @p name is not a noop alias. Defaults to true for any
+ * alias that hasn't been explicitly unset (the underlying behaviour is
+ * always-on; the implicit answer matches that).
+ */
+bool shell_feature_noop_alias_is_enabled(const char *name);
+
 bool shell_feature_parse(const char *name, shell_feature_t *feature,
                          bool *invert);
 

@@ -17,6 +17,7 @@
 #include "config_registry.h"
 #include "errors.h"
 #include "executor.h"
+#include "init.h"
 #include "lle/lle_shell_integration.h"
 #include "lush.h"
 #include "shell_error.h"
@@ -313,6 +314,53 @@ static option_mapping_t *find_option_by_name(const char *name) {
         }
     }
     return NULL;
+}
+
+/**
+ * @brief Query the boolean state of a named shell option for `[[ -o name ]]`.
+ *
+ * Consults sources in order:
+ *   1. The interactive-shell pseudo-option (`interactive` is not in
+ *      option_map; resolved via is_interactive_shell()).
+ *   2. The POSIX option_map (errexit, xtrace, nounset, etc.).
+ *   3. The feature-matrix names + aliases (FEATURE_INDEXED_ARRAYS etc.,
+ *      and short aliases like `extglob`, `nullglob`).
+ *   4. The noop-alias recorded-state table (prompt_subst, menu_complete,
+ *      etc. -- behaviour is always-on but introspection sees what the
+ *      user set/unset).
+ *
+ * Returns false for any name not matched by any of the four sources.
+ *
+ * @param name Long option name (case-insensitive for the noop-alias and
+ *             feature-matrix layers; case-sensitive for option_map names
+ *             to match `set -o` exact-match semantics).
+ * @return true if the option is on, false otherwise (including "unknown").
+ */
+bool shell_is_option_set(const char *name) {
+    if (!name || !*name) {
+        return false;
+    }
+    // 1. interactive
+    if (strcasecmp(name, "interactive") == 0) {
+        return is_interactive_shell();
+    }
+    // 2. POSIX option_map (long names like errexit)
+    option_mapping_t *opt = find_option_by_name(name);
+    if (opt) {
+        return *(opt->flag);
+    }
+    // 3. feature matrix names + short aliases
+    shell_feature_t feature;
+    bool invert = false;
+    if (shell_feature_parse(name, &feature, &invert)) {
+        bool effective = shell_mode_allows(feature);
+        return invert ? !effective : effective;
+    }
+    // 4. noop-alias recorded state (default-true for any unset entry)
+    if (shell_feature_is_noop_alias(name)) {
+        return shell_feature_noop_alias_is_enabled(name);
+    }
+    return false;
 }
 
 /**

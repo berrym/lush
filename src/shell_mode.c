@@ -579,6 +579,72 @@ bool shell_feature_is_noop_alias(const char *name) {
 }
 
 /* ============================================================================
+ * Noop-alias state recording
+ * ============================================================================
+ *
+ * shell_feature_is_noop_alias names refer to behaviour lush already provides
+ * (or has supplanted); the underlying behaviour is always-on, but real-world
+ * scripts introspect option state via `[[ -o name ]]` and `setopt | grep
+ * name`. Without recording the user's set/unset call, the introspection
+ * returns the wrong answer (verified divergence vs zsh, 2026-05-25).
+ *
+ * The table below records the user-set state per alias name.  The "default"
+ * for every alias is "set" because the underlying behaviour is always-on; an
+ * explicit `unsetopt name` flips it to false so introspection matches.
+ * Names not in the alias list return false from the query.
+ */
+
+#define NOOP_ALIAS_MAX 64
+static const char *noop_alias_recorded_names[NOOP_ALIAS_MAX];
+static bool noop_alias_recorded_state[NOOP_ALIAS_MAX];
+static size_t noop_alias_recorded_count = 0;
+
+static size_t find_recorded_alias(const char *name) {
+    for (size_t i = 0; i < noop_alias_recorded_count; i++) {
+        if (strcasecmp(name, noop_alias_recorded_names[i]) == 0) {
+            return i;
+        }
+    }
+    return noop_alias_recorded_count;
+}
+
+void shell_feature_record_noop_alias_state(const char *name, bool enabled) {
+    if (!name || !shell_feature_is_noop_alias(name)) {
+        return;
+    }
+    size_t idx = find_recorded_alias(name);
+    if (idx == noop_alias_recorded_count) {
+        if (noop_alias_recorded_count >= NOOP_ALIAS_MAX) {
+            return;
+        }
+        // The table key points into feature_noop_aliases (lifetime: program).
+        for (int i = 0; feature_noop_aliases[i].name != NULL; i++) {
+            if (strcasecmp(name, feature_noop_aliases[i].name) == 0) {
+                noop_alias_recorded_names[noop_alias_recorded_count] =
+                    feature_noop_aliases[i].name;
+                break;
+            }
+        }
+        noop_alias_recorded_count++;
+    }
+    noop_alias_recorded_state[idx] = enabled;
+}
+
+bool shell_feature_noop_alias_is_enabled(const char *name) {
+    if (!name || !shell_feature_is_noop_alias(name)) {
+        return false;
+    }
+    size_t idx = find_recorded_alias(name);
+    if (idx == noop_alias_recorded_count) {
+        // Default for a noop alias is "on" -- the underlying behaviour is
+        // always provided, so a query before any setopt/unsetopt should
+        // return true (matches zsh's behaviour for these always-on options).
+        return true;
+    }
+    return noop_alias_recorded_state[idx];
+}
+
+/* ============================================================================
  * Mode Query Functions
  * ============================================================================
  */

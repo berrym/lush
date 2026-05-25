@@ -55,6 +55,7 @@ int bin_unsetopt(int argc, char **argv) {
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
             // Zsh-compat names: silently accepted no-op (see bin_setopt.c).
             if (shell_feature_is_noop_alias(argv[i])) {
+                shell_feature_record_noop_alias_state(argv[i], false);
                 continue;
             }
             executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,

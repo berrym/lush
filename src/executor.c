@@ -17282,6 +17282,20 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                 }
                 free(arg);
             }
+        } else if (strcmp(op, "-o") == 0) {
+            // `[[ -o NAME ]]` -- query named shell option state.
+            // Single unified entry point in shell_is_option_set walks
+            // POSIX options, feature matrix names + aliases, noop-alias
+            // recorded state, and the `interactive` pseudo-option.
+            char *name = strdup(p);
+            if (name) {
+                char *end = name + strlen(name) - 1;
+                while (end > name && isspace(*end)) {
+                    *end-- = '\0';
+                }
+                result = shell_is_option_set(name);
+                free(name);
+            }
         } else {
             // File tests - get the path (rest of line, trimmed)
             char *path = strdup(p);

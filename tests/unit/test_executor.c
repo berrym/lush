@@ -2777,6 +2777,45 @@ TEST(rt_sigil_off_in_bash_mode) {
     ASSERT_STDOUT_EQ(r, "@x\n");
 }
 
+TEST(rt_test_o_errexit_reflects_set_e) {
+    // `[[ -o errexit ]]` must reflect the current state of `set -e`.
+    // Before lush/posix_opts shipped shell_is_option_set, the operator
+    // always returned false regardless of state -- a hard masking bug
+    // for any script that branches on shell-option state.
+    run_result_t r = run_shell("[[ -o errexit ]] && echo before-on || echo "
+                               "before-off\n"
+                               "set -e\n"
+                               "[[ -o errexit ]] && echo after-on || echo "
+                               "after-off\n"
+                               "set +e\n"
+                               "[[ -o errexit ]] && echo clear-on || echo "
+                               "clear-off\n");
+    ASSERT_STDOUT_EQ(r, "before-off\nafter-on\nclear-off\n");
+}
+
+TEST(rt_test_o_noop_alias_records_state) {
+    // setopt on a noop-alias (prompt_subst etc.) must record state so
+    // `[[ -o name ]]` reports the right answer. The underlying behaviour
+    // is always-on; this is purely about introspection-matching zsh.
+    run_result_t r = run_shell("[[ -o prompt_subst ]] && echo default-on || "
+                               "echo default-off\n"
+                               "unsetopt prompt_subst\n"
+                               "[[ -o prompt_subst ]] && echo unset-on || "
+                               "echo unset-off\n"
+                               "setopt prompt_subst\n"
+                               "[[ -o prompt_subst ]] && echo set-on || echo "
+                               "set-off\n");
+    ASSERT_STDOUT_EQ(r, "default-on\nunset-off\nset-on\n");
+}
+
+TEST(rt_test_o_unknown_option_returns_false) {
+    // An option name lush has no opinion on must return false -- not
+    // crash, not error.
+    run_result_t r =
+        run_shell("[[ -o totally_made_up_option ]] && echo yes || echo no\n");
+    ASSERT_STDOUT_EQ(r, "no\n");
+}
+
 TEST(rt_typed_fn_lexical_scope) {
     // A typed-fn body resolves free names through its captured
     // declaration-site scope, not through the dynamic caller's
@@ -3048,6 +3087,9 @@ int main(void) {
     RUN_TEST(rt_sigil_compat_at_invalid_identifier);
     RUN_TEST(rt_sigil_unset_name_empty);
     RUN_TEST(rt_sigil_off_in_bash_mode);
+    RUN_TEST(rt_test_o_errexit_reflects_set_e);
+    RUN_TEST(rt_test_o_noop_alias_records_state);
+    RUN_TEST(rt_test_o_unknown_option_returns_false);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
     RUN_TEST(rt_case_arm_runs_all);

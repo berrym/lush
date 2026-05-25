@@ -314,6 +314,18 @@ void init_posix_options(void);
 bool is_posix_option_set(char option);
 
 /**
+ * @brief Query shell option state by long name (for `[[ -o name ]]`).
+ *
+ * Single unified entry point that walks the POSIX option map, the feature
+ * matrix names + aliases, the noop-alias recorded-state table, plus the
+ * `interactive` pseudo-option. Returns false for unknown names.
+ *
+ * @param name Long option name (e.g., "errexit", "extglob", "prompt_subst")
+ * @return true if option is on, false otherwise
+ */
+bool shell_is_option_set(const char *name);
+
+/**
  * @brief Check if exit-on-error mode is enabled (-e)
  *
  * @return true if should exit on error

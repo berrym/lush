@@ -287,6 +287,49 @@ invisible from a non-interactive script.
 
 **Affected corpus entries:** completion.zsh and correction.zsh.
 
+## 13. `[[ -o name ]]` not actually implemented (RESOLVED)
+
+**Status:** fixed. Pre-existing structural bug surfaced during the
+zsh-compat-layer investigation.
+
+`[[ -o NAME ]]` always returned false regardless of state -- not even
+core POSIX options (errexit, xtrace, etc.) reported correctly after
+`set -e`. The `-o` arm of the extended-test unary dispatch fell
+through to the file-test handler, which always returns false for
+arbitrary "paths" like `errexit`.
+
+This is independent of the zsh-compat-layer work but had the same
+ratio (~25-35% of setopt usage in real upstream code queries state
+via `[[ -o name ]]`). Fixing the -o operator unblocks the entire
+query class for every shell option, not just the noop-aliases.
+
+**Fix:**
+
+- src/executor.c `evaluate_simple_test`: add an explicit `-o` arm
+  before the file-test fallback that calls the new
+  `shell_is_option_set(name)` query.
+- src/posix_opts.c new `shell_is_option_set(name)` function that
+  walks four sources in order: `interactive` pseudo-option, the
+  POSIX option_map (errexit, xtrace, etc.), the feature-matrix
+  names + aliases (extglob, nullglob, etc.), and the noop-alias
+  recorded-state table.
+- src/shell_mode.c new `shell_feature_record_noop_alias_state` /
+  `shell_feature_noop_alias_is_enabled` pair. setopt/unsetopt
+  record the user's call into a side table; the query consults it
+  for noop-alias names (default-true for any alias that hasn't
+  been explicitly unset).
+
+**Verified probes:**
+
+- `[[ -o errexit ]]` correctly tracks `set -e` / `set +e`.
+- `[[ -o prompt_subst ]]` tracks `setopt prompt_subst` /
+  `unsetopt prompt_subst`.
+- Unknown option names return false (no crash, no error).
+
+**Test coverage:** three new cases in tests/unit/test_executor.c
+locking in errexit, noop-alias-recording, and unknown-name
+behavior.
+
 ## 6. Unrecognized zsh option names (RESOLVED)
 
 **Status:** fixed.
