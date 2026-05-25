@@ -501,6 +501,7 @@ int bin_bindkey(int argc, char **argv);
 int bin_autoload(int argc, char **argv);
 int bin_zmodload(int argc, char **argv);
 int bin_colors(int argc, char **argv);
+int bin_zle(int argc, char **argv);
 
 /**
  * @brief Validate a string as a shell variable identifier.

@@ -225,23 +225,29 @@ semantics. `-g` is meaningful in scope-aware code but lush's
 
 **Affected corpus entries:** spectrum.zsh.
 
-## 12. `zle` builtin missing
+## 12. `zle` builtin (RESOLVED)
 
-**Severity:** missing surface.
+**Status:** real implementation, not a stub.
 
-```zsh
-zle -N up-line-or-beginning-search
-```
+New src/builtins/bin_zle.c with a side-table that records every
+`zle -N WIDGET [FUNCTION]` registration. Supports:
 
-zsh's line-editor builtin -- registers widget callbacks, binds
-keys, manipulates the editing buffer from within widget code. The
-zsh equivalent of `display lle widget` plus `display lle bind`.
+  zle -N WIDGET [FUNCTION]   register widget
+  zle -A OLD NEW             alias new to old
+  zle -D WIDGET              delete widget
+  zle -l                     list widget names
+  zle -L                     list as re-runnable `zle -N ...` lines
 
-**Recommendation:** add to bin_zsh_stubs.c as another no-op stub.
-zsh widget registration is invisible from a non-interactive script's
-signal surface.
+The side-table is the introspection source: a script that registers
+a widget and then calls `zle -l` sees the registration. Investigation
+showed 56 `zle -N` sites in oh-my-zsh alone; silent no-op was masking
+real divergences.
 
-**Affected corpus entries:** key-bindings.zsh.
+Interactive widget invocation (bare `zle WIDGET`) is a documented gap
+-- non-interactive corpus runs never invoke widgets by name.
+
+**Pass-rate delta:** key-bindings.zsh now passes cleanly
+(22/33 -> 23/33, 69.7% -> 72.7%).
 
 ## 9. Top-level `return` and zsh `${+name}` is-set test
 

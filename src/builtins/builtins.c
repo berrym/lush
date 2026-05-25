@@ -220,10 +220,11 @@ builtin builtins[] = {
      bin_analyze                                                                      },
     {     "lint",    "lint scripts and optionally apply automatic fixes",     bin_lint},
     // zsh-compatibility stubs (no-op; see bin_zsh_stubs.c)
-    {  "bindkey",                         "zsh key-binding (no-op stub)",  bin_bindkey},
+    {  "bindkey",            "zsh key-binding (records + routes to LLE)",  bin_bindkey},
     { "autoload",                  "zsh lazy-function load (no-op stub)", bin_autoload},
     { "zmodload",                       "zsh module loader (no-op stub)", bin_zmodload},
     {   "colors",                       "zsh colors helper (no-op stub)",   bin_colors},
+    {      "zle",        "zsh line-editor widget registration / listing",      bin_zle},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);

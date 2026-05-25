@@ -32,14 +32,6 @@
 
 #include "builtins.h"
 
-int bin_bindkey(int argc __attribute__((unused)),
-                char **argv __attribute__((unused))) {
-    // zsh key-binding configuration. Lush uses `display lle bind`;
-    // accepting and ignoring bindkey calls lets zsh init scripts run
-    // without producing a divergence.
-    return 0;
-}
-
 int bin_autoload(int argc __attribute__((unused)),
                  char **argv __attribute__((unused))) {
     // zsh's lazy-function loader. Lush loads functions when their

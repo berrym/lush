@@ -17,6 +17,12 @@
 
 extern lle_result_t lush_inspect_widget_callback(lle_editor_t *editor,
                                                  void *user_data);
+
+// Side-table resets for bindkey/zle tests; the side tables are
+// process-global so leaking state across tests breaks reproducibility.
+extern void bindkey_table_reset(void);
+extern void zle_widget_table_reset(void);
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2808,6 +2814,74 @@ TEST(rt_test_o_noop_alias_records_state) {
     ASSERT_STDOUT_EQ(r, "default-on\nunset-off\nset-on\n");
 }
 
+TEST(rt_bindkey_bind_then_query_round_trips) {
+    bindkey_table_reset();
+    // bindkey now records bindings in a side table so the query form
+    // returns what was set. Previously the silent no-op left every
+    // query empty -- a verified ~17% divergence in oh-my-zsh sites.
+    run_result_t r = run_shell("bindkey '^X^E' some-widget\n"
+                               "bindkey '^X^E'\n");
+    ASSERT_STDOUT_EQ(r, "\"^X^E\" some-widget\n");
+}
+
+TEST(rt_bindkey_list_after_multiple_binds) {
+    bindkey_table_reset();
+    // Listing prints every recorded binding in the active keymap.
+    // We only check that both bindings appear; order isn't contractual.
+    run_result_t r = run_shell("bindkey '^A' alpha-widget\n"
+                               "bindkey '^B' beta-widget\n"
+                               "bindkey\n");
+    ASSERT_STDOUT_CONTAINS(r, "\"^A\" alpha-widget");
+    ASSERT_STDOUT_CONTAINS(r, "\"^B\" beta-widget");
+}
+
+TEST(rt_bindkey_query_unbound_key_returns_nonzero) {
+    bindkey_table_reset();
+    // Query for a key that was never bound must return non-zero
+    // (matches zsh) and emit nothing.
+    run_result_t r = run_shell("bindkey '^Z' && echo bound || echo unbound\n");
+    ASSERT_STDOUT_EQ(r, "unbound\n");
+}
+
+TEST(rt_zle_register_then_list) {
+    zle_widget_table_reset();
+    // zle -N records the widget; zle -l lists the names.
+    run_result_t r = run_shell("my_widget() { echo hi; }\n"
+                               "zle -N my_widget\n"
+                               "zle -l\n");
+    ASSERT_STDOUT_EQ(r, "my_widget\n");
+}
+
+TEST(rt_zle_register_with_body_then_L_form) {
+    zle_widget_table_reset();
+    // zle -N WIDGET FUNCTION records both names; -L emits the
+    // re-runnable `zle -N WIDGET FUNCTION` form.
+    run_result_t r = run_shell("fn_impl() { echo body; }\n"
+                               "zle -N alias_widget fn_impl\n"
+                               "zle -L\n");
+    ASSERT_STDOUT_EQ(r, "zle -N alias_widget fn_impl\n");
+}
+
+TEST(rt_zle_delete_then_list_empty) {
+    zle_widget_table_reset();
+    // zle -D removes the widget; subsequent -l prints nothing.
+    run_result_t r = run_shell("zle -N w1\n"
+                               "zle -N w2\n"
+                               "zle -D w1\n"
+                               "zle -l\n");
+    ASSERT_STDOUT_EQ(r, "w2\n");
+}
+
+TEST(rt_bindkey_remove_then_query_returns_nonzero) {
+    bindkey_table_reset();
+    // bindkey -r KEY removes the binding; subsequent query returns
+    // non-zero (matches zsh).
+    run_result_t r = run_shell("bindkey '^X' some-widget\n"
+                               "bindkey -r '^X'\n"
+                               "bindkey '^X' && echo bound || echo unbound\n");
+    ASSERT_STDOUT_EQ(r, "unbound\n");
+}
+
 TEST(rt_test_o_unknown_option_returns_false) {
     // An option name lush has no opinion on must return false -- not
     // crash, not error.
@@ -3089,6 +3163,13 @@ int main(void) {
     RUN_TEST(rt_sigil_off_in_bash_mode);
     RUN_TEST(rt_test_o_errexit_reflects_set_e);
     RUN_TEST(rt_test_o_noop_alias_records_state);
+    RUN_TEST(rt_bindkey_bind_then_query_round_trips);
+    RUN_TEST(rt_bindkey_list_after_multiple_binds);
+    RUN_TEST(rt_bindkey_query_unbound_key_returns_nonzero);
+    RUN_TEST(rt_bindkey_remove_then_query_returns_nonzero);
+    RUN_TEST(rt_zle_register_then_list);
+    RUN_TEST(rt_zle_register_with_body_then_L_form);
+    RUN_TEST(rt_zle_delete_then_list_empty);
     RUN_TEST(rt_test_o_unknown_option_returns_false);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
