@@ -14,6 +14,7 @@
  */
 
 #include "alias.h"
+#include "builtins.h"
 #include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,8 +80,12 @@ TEST(valid_alias_name_long) {
 }
 
 TEST(valid_alias_name_starts_with_number) {
-    ASSERT(!valid_alias_name("2ls"),
-           "Name starting with number should be invalid");
+    // POSIX bans digit-first names, but bash and zsh both accept them
+    // (zsh uses this for numeric dirstack aliases like `alias 1='cd +1'`).
+    // Lush matches the bash/zsh consensus.
+    ASSERT(valid_alias_name("2ls"),
+           "Name starting with number should be valid (bash/zsh consensus)");
+    ASSERT(valid_alias_name("1"), "Single-digit name should be valid");
 }
 
 TEST(valid_alias_name_empty) {
@@ -525,6 +530,38 @@ TEST(alias_empty_value) {
     teardown_aliases();
 }
 
+TEST(bin_alias_double_dash_ends_options) {
+    setup_aliases();
+
+    // `alias -- -=cd -` should create an alias named "-" with value "cd -".
+    // Without `--` handling, the `--` itself would be treated as a missing
+    // alias-name lookup and the assignment would still apply, but the lookup
+    // would set exit_status=1. With `--` handling, neither happens.
+    char argv0[] = "alias";
+    char argv1[] = "--";
+    char argv2[] = "-=cd -";
+    char *argv[] = {argv0, argv1, argv2};
+    int rc = bin_alias(3, argv);
+    ASSERT_EQ(rc, 0, "alias -- -=cd - should return 0");
+    ASSERT_STR_EQ(lookup_alias("-"), "cd -", "alias `-` should be set");
+
+    teardown_aliases();
+}
+
+TEST(bin_alias_digit_name) {
+    setup_aliases();
+
+    // Zsh-style numeric dirstack aliases.
+    char argv0[] = "alias";
+    char argv1[] = "1=cd +1";
+    char *argv[] = {argv0, argv1};
+    int rc = bin_alias(2, argv);
+    ASSERT_EQ(rc, 0, "alias 1=cd +1 should return 0");
+    ASSERT_STR_EQ(lookup_alias("1"), "cd +1", "alias `1` should be set");
+
+    teardown_aliases();
+}
+
 TEST(many_aliases) {
     setup_aliases();
 
@@ -621,6 +658,8 @@ int main(void) {
     RUN_TEST(alias_with_quotes);
     RUN_TEST(alias_with_variables);
     RUN_TEST(alias_empty_value);
+    RUN_TEST(bin_alias_double_dash_ends_options);
+    RUN_TEST(bin_alias_digit_name);
     RUN_TEST(many_aliases);
 
     return TEST_RESULT();

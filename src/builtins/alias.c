@@ -191,10 +191,9 @@ bool valid_alias_name(const char *key) {
         return false;
     }
 
-    // First character cannot be a digit (POSIX requirement)
-    if (isdigit((unsigned char)*trimmed)) {
-        return false;
-    }
+    // POSIX bans digit-first alias names but both bash and zsh permit them
+    // (e.g. zsh's directory aliases `alias 1='cd +1' ... 9='cd +9'`). Match
+    // the consensus: accept digit-first names too.
 
     const char *p = trimmed;
     while (*p && !isspace((unsigned char)*p)) {
@@ -711,8 +710,23 @@ int bin_alias(int argc, char **argv) {
 
     int exit_status = 0;
 
+    // `--` ends option parsing; subsequent tokens are alias names or
+    // assignments even if they begin with `-`. Both bash and zsh accept
+    // this. Lush has no `-` flags for `alias` today, but the convention
+    // is still required so scripts like `alias -- -='cd -'` parse — the
+    // bare `-` would otherwise be flagged as a not-found lookup target.
+    int start = 1;
+    if (argc >= 2 && strcmp(argv[1], "--") == 0) {
+        start = 2;
+        if (argc == 2) {
+            // `alias --` alone is equivalent to `alias` with no args.
+            print_aliases();
+            return 0;
+        }
+    }
+
     // Process each argument
-    for (int i = 1; i < argc; i++) {
+    for (int i = start; i < argc; i++) {
         char *name = NULL;
         char *value = NULL;
 
