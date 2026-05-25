@@ -1760,6 +1760,9 @@ static int setup_fd_alloc_redirection(executor_t *executor,
             free(var_name);
             return 1;
         }
+        // Drop from the variable-alloc registry so executor_free does not
+        // re-close (or double-close into a recycled fd number).
+        executor_untrack_alloc_fd(executor, (int)fd_val);
         free(var_name);
         return 0;
     }
@@ -1786,6 +1789,7 @@ static int setup_fd_alloc_redirection(executor_t *executor,
             free(var_name);
             return 1;
         }
+        executor_track_alloc_fd(executor, allocated_fd);
         // Store allocated fd in variable
         char fd_str[16];
         snprintf(fd_str, sizeof(fd_str), "%d", allocated_fd);
@@ -1876,6 +1880,8 @@ static int setup_fd_alloc_redirection(executor_t *executor,
         }
         close(fd);
     }
+
+    executor_track_alloc_fd(executor, allocated_fd);
 
     // Store allocated fd in variable
     char fd_str[16];

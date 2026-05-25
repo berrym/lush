@@ -358,6 +358,11 @@ executor_t *executor_new(void) {
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
 
+    // Variable-allocated fd registry starts empty; grown on demand.
+    executor->alloc_fds = NULL;
+    executor->alloc_fd_count = 0;
+    executor->alloc_fd_cap = 0;
+
     /* Source-text retention starts empty; populated per-batch by
      * executor_execute_command_line. */
     executor->source_text = NULL;
@@ -420,6 +425,11 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
 
+    // Variable-allocated fd registry starts empty; grown on demand.
+    executor->alloc_fds = NULL;
+    executor->alloc_fd_count = 0;
+    executor->alloc_fd_cap = 0;
+
     /* Source-text retention starts empty; populated per-batch by
      * executor_execute_command_line. */
     executor->source_text = NULL;
@@ -473,7 +483,58 @@ void executor_free(executor_t *executor) {
         // Free error context stack
         executor_clear_context(executor);
 
+        // Close any variable-allocated fds the script never closed. Done
+        // before freeing the array; errors here are intentionally silent
+        // (the kernel will reclaim on process exit regardless, and a
+        // script-side close that already raced us would return EBADF).
+        if (executor->alloc_fds) {
+            for (size_t i = 0; i < executor->alloc_fd_count; i++) {
+                if (executor->alloc_fds[i] >= 0) {
+                    close(executor->alloc_fds[i]);
+                }
+            }
+            free(executor->alloc_fds);
+            executor->alloc_fds = NULL;
+            executor->alloc_fd_count = 0;
+            executor->alloc_fd_cap = 0;
+        }
+
         free(executor);
+    }
+}
+
+void executor_track_alloc_fd(executor_t *executor, int fd) {
+    if (!executor || fd < 0) {
+        return;
+    }
+    if (executor->alloc_fd_count == executor->alloc_fd_cap) {
+        size_t new_cap =
+            executor->alloc_fd_cap == 0 ? 8 : executor->alloc_fd_cap * 2;
+        int *grown = realloc(executor->alloc_fds, new_cap * sizeof(int));
+        if (!grown) {
+            // OOM during tracking: fd is still allocated and usable; just
+            // not auto-cleaned at shell exit. The kernel reclaims on exit.
+            return;
+        }
+        executor->alloc_fds = grown;
+        executor->alloc_fd_cap = new_cap;
+    }
+    executor->alloc_fds[executor->alloc_fd_count++] = fd;
+}
+
+void executor_untrack_alloc_fd(executor_t *executor, int fd) {
+    if (!executor || fd < 0 || !executor->alloc_fds) {
+        return;
+    }
+    for (size_t i = 0; i < executor->alloc_fd_count; i++) {
+        if (executor->alloc_fds[i] == fd) {
+            // Swap-with-last, then shrink count. Order doesn't matter; the
+            // registry is treated as a set.
+            executor->alloc_fds[i] =
+                executor->alloc_fds[executor->alloc_fd_count - 1];
+            executor->alloc_fd_count--;
+            return;
+        }
     }
 }
 

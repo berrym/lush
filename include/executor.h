@@ -128,6 +128,19 @@ typedef struct executor {
     pid_t procsub_pids[32]; /**< Child PIDs from process substitutions */
     int procsub_fd_count;   /**< Number of tracked fds/pids */
 
+    /* Variable-allocated fd registry. Every `exec {var}<file`/`{var}>file`
+     * / `{var}>&N` redirection that allocates a new fd (via
+     * find_available_fd) appends its number here. `{var}>&-` removes its
+     * entry on explicit close. executor_free() closes whatever remains —
+     * a script that allocates fds without ever closing them does not leak
+     * through shell-exit. Subshells fork()-inherit the array (process-
+     * local from then on), so child cleanup never affects parent fds.
+     * Dynamic-grown; alloc_fd_cap is the allocation, alloc_fd_count the
+     * live entries. Touched only by helpers in redirection.c. */
+    int *alloc_fds;
+    size_t alloc_fd_count;
+    size_t alloc_fd_cap;
+
     /* Source-text retention for the structured-error system. The
      * executor stashes the input text (and its file-relative starting
      * line) for the current parse/execute batch so any error site —
@@ -192,6 +205,35 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable);
  * @param executor Executor to free
  */
 void executor_free(executor_t *executor);
+
+/**
+ * @brief Track a variable-allocated file descriptor for shell-exit cleanup
+ *
+ * Append `fd` to the executor's variable-fd-alloc registry. Called from
+ * setup_fd_alloc_redirection() each time `exec {var}<...` / `exec {var}>...`
+ * / `exec {var}>&N` opens a new descriptor via find_available_fd(). The fd
+ * will be close()d in executor_free() if not explicitly closed sooner via
+ * `{var}>&-`. Idempotent on capacity exhaustion: returns without tracking
+ * (the fd is still allocated and usable; just won't be auto-cleaned at
+ * shell exit).
+ *
+ * @param executor Executor context
+ * @param fd       File descriptor number to track
+ */
+void executor_track_alloc_fd(executor_t *executor, int fd);
+
+/**
+ * @brief Stop tracking a variable-allocated file descriptor
+ *
+ * Remove `fd` from the registry, if present. Called from
+ * setup_fd_alloc_redirection() when `{var}>&-` explicitly closes a fd; the
+ * registry should not double-close on shell exit. No-op if the fd was
+ * never tracked (e.g. user closed an fd they didn't allocate via {var}<).
+ *
+ * @param executor Executor context
+ * @param fd       File descriptor number to stop tracking
+ */
+void executor_untrack_alloc_fd(executor_t *executor, int fd);
 
 /* ============================================================================
  * Primary Execution
