@@ -178,6 +178,7 @@ src = ['src/arithmetic.c',
        'src/node.c',
        'src/opts.c',
        'src/parser.c',
+       'src/pattern_match.c',
        'src/posix_history.c',
        'src/posix_opts.c',
        'src/redirection.c',
@@ -2214,6 +2215,17 @@ if fs.exists('tests/unit/test_redirection.c')
                                 include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Redirection', test_redirection,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Pattern Matcher Tests
+if fs.exists('tests/unit/test_pattern_match.c')
+  test_pattern_match = executable('test_pattern_match',
+                                  'tests/unit/test_pattern_match.c',
+                                  'src/pattern_match.c',
+                                  include_directories: [inc, include_directories('tests')])
+  test('Pattern Match', test_pattern_match,
        suite: 'unit',
        timeout: 30)
 endif

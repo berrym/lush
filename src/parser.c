@@ -5819,6 +5819,14 @@ static node_t *parse_extended_test(parser_t *parser) {
             // Inside a glob char-class or immediately after one: no spaces
             // so [a-z]* stays glued. Issue #104.
             skip_space = true;
+        } else if (paren_depth > 0 &&
+                   (current->type == TOK_PIPE ||
+                    (expr_len > 0 && expr[expr_len - 1] == '|'))) {
+            // Pattern-alternation `|` inside `(...)` (zsh bare or extglob
+            // `@(a|b)`-style) must stay glued: spaces would land in the
+            // pattern text and ruin the match. Logical OR is TOK_LOGICAL_OR
+            // so `||` is not affected.
+            skip_space = true;
         } else {
             // Normal mode: add spaces between tokens with some exceptions
             bool is_operator_char =

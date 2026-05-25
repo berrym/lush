@@ -29,6 +29,7 @@
 #include "lush_fork.h"
 #include "node.h"
 #include "parser.h"
+#include "pattern_match.h"
 #include "redirection.h"
 #include "shell_mode.h"
 #include "signals.h"
@@ -17126,18 +17127,18 @@ static int execute_arithmetic_command(executor_t *executor,
 /**
  * @brief Match a string against a glob pattern
  *
- * Uses fnmatch for shell-style pattern matching.
+ * Delegates to lush_pattern_match, which handles POSIX glob plus bash
+ * extglob (`?(...)`, `*(...)`, `+(...)`, `@(...)`, `!(...)`) plus zsh's
+ * bare-alternation form (`(...)` == `@(...)`). All three families share
+ * one engine so syntax differences alone never produce different match
+ * results (PHILOSOPHY: syntax is polyglot).
  *
  * @param str String to match
  * @param pattern Glob pattern
  * @return true if matches, false otherwise
  */
 static bool extended_test_pattern_match(const char *str, const char *pattern) {
-    if (!str || !pattern) {
-        return false;
-    }
-    // FNM_EXTMATCH would enable extended patterns, but isn't portable
-    return fnmatch(pattern, str, 0) == 0;
+    return lush_pattern_match(str, pattern);
 }
 
 /**
