@@ -531,6 +531,32 @@ static void analyze_line(const char *line, input_state_t *state) {
     }
 
     // Handle remaining word
+    // Trailing logical/pipe operator forces line continuation. A line
+    // ending in `&&`, `||`, or `|` (after trailing whitespace, with the
+    // operator not inside quotes) has its statement obviously not
+    // complete -- the next command appears on the following line. Bash
+    // and zsh both keep reading; without this check, lush treats the
+    // line as one statement and the parser sees the operator with
+    // nothing on its right.
+    if (!state->in_single_quote && !state->in_double_quote &&
+        !state->in_backtick && !state->in_here_doc) {
+        const char *trim_end = line + strlen(line);
+        while (trim_end > line &&
+               (*(trim_end - 1) == ' ' || *(trim_end - 1) == '\t')) {
+            trim_end--;
+        }
+        size_t trim_len = (size_t)(trim_end - line);
+        if (trim_len >= 2 && ((trim_end[-2] == '&' && trim_end[-1] == '&') ||
+                              (trim_end[-2] == '|' && trim_end[-1] == '|'))) {
+            state->has_continuation = true;
+        } else if (trim_len >= 1 && trim_end[-1] == '|' &&
+                   (trim_len < 2 || trim_end[-2] != '|')) {
+            // Bare `|` at end of line (not part of `||`); pipeline
+            // continues on next line.
+            state->has_continuation = true;
+        }
+    }
+
     // Check final word at end of line if any
     if (word_pos > 0) {
         word[word_pos] = '\0';

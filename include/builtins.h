@@ -503,6 +503,13 @@ int bin_zmodload(int argc, char **argv);
 int bin_colors(int argc, char **argv);
 int bin_zle(int argc, char **argv);
 
+// bash-completion compatibility stubs. See bin_zsh_stubs.c for the
+// silent-no-op rationale; full record-and-query parity is a future
+// implementation parallel to bindkey/zle.
+int bin_complete(int argc, char **argv);
+int bin_compgen(int argc, char **argv);
+int bin_compopt(int argc, char **argv);
+
 /**
  * @brief Validate a string as a shell variable identifier.
  *

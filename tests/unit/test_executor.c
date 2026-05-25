@@ -2862,6 +2862,27 @@ TEST(rt_zle_register_with_body_then_L_form) {
     ASSERT_STDOUT_EQ(r, "zle -N alias_widget fn_impl\n");
 }
 
+TEST(rt_logical_op_at_eol_continues_statement) {
+    // `} &&` followed by newline used to break: the input layer didn't
+    // know `&&` at end of line meant "incomplete, keep reading", so the
+    // parser saw `} &&` as one statement and raised E1001 on the empty
+    // right-hand side.
+    run_result_t r = run_shell("_f() {\n"
+                               "    echo body\n"
+                               "} &&\n"
+                               "    echo done\n"
+                               "_f\n");
+    ASSERT_STDOUT_EQ(r, "done\nbody\n");
+}
+
+TEST(rt_pipe_at_eol_continues_statement) {
+    // Same fix covers a trailing `|` at end of line for multi-line
+    // pipelines.
+    run_result_t r = run_shell("echo hello |\n"
+                               "    tr a-z A-Z\n");
+    ASSERT_STDOUT_EQ(r, "HELLO\n");
+}
+
 TEST(rt_typeset_H_flag_accepted) {
     // zsh's typeset -H (hide from listing) is purely a display attribute;
     // lush accepts it silently so `typeset -AHg name` (the spectrum.zsh
@@ -3190,6 +3211,8 @@ int main(void) {
     RUN_TEST(rt_zle_register_then_list);
     RUN_TEST(rt_zle_register_with_body_then_L_form);
     RUN_TEST(rt_zle_delete_then_list_empty);
+    RUN_TEST(rt_logical_op_at_eol_continues_statement);
+    RUN_TEST(rt_pipe_at_eol_continues_statement);
     RUN_TEST(rt_typeset_H_flag_accepted);
     RUN_TEST(rt_typeset_U_flag_accepted);
     RUN_TEST(rt_test_o_unknown_option_returns_false);

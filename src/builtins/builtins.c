@@ -225,6 +225,12 @@ builtin builtins[] = {
     { "zmodload",                       "zsh module loader (no-op stub)", bin_zmodload},
     {   "colors",                       "zsh colors helper (no-op stub)",   bin_colors},
     {      "zle",        "zsh line-editor widget registration / listing",      bin_zle},
+    // bash-completion compatibility (no-op stubs; full record-and-query
+    // implementation tracked in CORPUS_PUNCH_LIST.md)
+    { "complete",            "bash completion registration (no-op stub)", bin_complete},
+    {  "compgen",     "bash completion candidate generator (no-op stub)",
+     bin_compgen                                                                      },
+    {  "compopt",          "bash completion option mutator (no-op stub)",  bin_compopt},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);

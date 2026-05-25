@@ -173,37 +173,41 @@ needs to admit a list of names between `function` and `{`.
 
 **Affected corpus entries:** clipboard.zsh.
 
-## 7. `fi` after `((...))` line trips E1001
+## 7. `} &&\n` at end of line not recognized as continuation (RESOLVED)
 
-**Severity:** parser bug. Surfaced by the typed-fn collision fix
-landing.
+**Status:** fixed. Original diagnosis was wrong -- the `fi` line
+was not the failure site. Investigation 2026-05-25 found the error
+at the `} &&` line where the function-definition close is followed
+by a logical-AND operator on the same line and the next command on
+the line after.
 
 ```bash
-if [[ $cur == -* ]]; then
-    _comp_compgen_usage -c help -s "$1"
-    ((${#COMPREPLY[*]} != 1)) || compopt +o nospace
-fi
+_f()
+{
+    echo body
+} &&
+    echo done
 ```
 
-lush reports at the `fi` line:
+src/input.c analyze_line previously only set `has_continuation` for
+trailing backslash and a handful of keyword terminators. `&&`, `||`,
+and bare `|` at end of line did not trigger continuation, so the
+input buffer treated the line as a complete statement and the
+parser saw `} &&` with no right-hand side.
 
-```
-error[E1001]: expected command name, got ''
-  --> alias.bash:34:5
-```
+Fix: src/input.c analyze_line now scans the trimmed end-of-line for
+trailing `&&`, `||`, or bare `|` (not inside quotes, not part of a
+larger operator) and sets has_continuation in those cases.
 
-The parser successfully consumes the arithmetic command on the
-preceding line but enters a state where the `fi` keyword closing the
-`if` is unrecognized as a keyword. Likely confusion in the
-statement-list terminator between an `((expr))` command and the
-expected `fi`.
+Companion: src/builtins/bin_zsh_stubs.c gained no-op stubs for the
+bash-completion-library builtins `complete`, `compgen`, and
+`compopt`. These were emitting `command not found` on every
+bash-completion file in the corpus. Documented as a future
+record-and-query implementation parallel to bindkey/zle in
+CORPUS_PUNCH_LIST.md.
 
-**Affected corpus entries:** alias.bash and other bash-completion
-files reach this surface.
-
-**Source location:** `src/parser.c`, the if-statement body parser
-where the next statement-list element is expected after a
-short-circuit `||` chain.
+**Pass-rate delta:** 24/33 -> 29/33 (75.8% -> 90.9%). All five
+bash-completion files in the corpus now pass cleanly.
 
 ## 11. `typeset -H` flag unknown (RESOLVED)
 

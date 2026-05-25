@@ -47,6 +47,36 @@ int bin_zmodload(int argc __attribute__((unused)),
     return 0;
 }
 
+int bin_complete(int argc __attribute__((unused)),
+                 char **argv __attribute__((unused))) {
+    // bash's completion registration builtin. The bash-completion
+    // library registers hundreds of completers via `complete -F func
+    // cmd`; this stub keeps those registrations from emitting
+    // `command not found` while a full record-and-query
+    // implementation (parallel to bindkey / zle in bin_bindkey.c /
+    // bin_zle.c) waits its turn. Real implementation: tracked as a
+    // future fix in CORPUS_PUNCH_LIST.md.
+    return 0;
+}
+
+int bin_compgen(int argc __attribute__((unused)),
+                char **argv __attribute__((unused))) {
+    // bash's completion-candidate generator. Used by interactive tab
+    // completion and inside `complete -F` handler bodies. Stub
+    // returns 0 with no candidates; corpus scripts that source the
+    // bash-completion library run cleanly.
+    return 0;
+}
+
+int bin_compopt(int argc __attribute__((unused)),
+                char **argv __attribute__((unused))) {
+    // bash's per-completion option mutator. Used inside completer
+    // bodies to set/clear options like `nospace` on a specific
+    // completion. No-op stub; the underlying completion behaviour
+    // is supplied by lush's own completion engine.
+    return 0;
+}
+
 int bin_colors(int argc __attribute__((unused)),
                char **argv __attribute__((unused))) {
     // zsh's `colors` is a function autoloaded from $fpath that
