@@ -547,23 +547,37 @@ static const struct {
     const char *name;
     const char *rationale;
 } feature_noop_aliases[] = {
-    {    "prompt_subst","lush prompt always supports parameter / arith / "
-"command expansion; no opt-in needed"                                            },
-    {     "promptsubst",                                  "alias for prompt_subst"},
-    {   "menu_complete",        "lush completion is always menu-shaped; no toggle"},
-    {    "menucomplete",                                 "alias for menu_complete"},
-    {   "always_to_end",         "completion always lands at end of inserted word"},
-    {     "alwaystoend",                                 "alias for always_to_end"},
-    {       "auto_menu",            "lush completion auto-menus on TAB; no toggle"},
-    {        "automenu",                                     "alias for auto_menu"},
-    {"complete_in_word",
-     "lush completion always treats cursor mid-word as completable"               },
-    {  "completeinword",                              "alias for complete_in_word"},
-    {     "flowcontrol",                   "terminal flow-control toggle; lush LLE manages its own "
+    {     "prompt_subst","lush prompt always supports parameter / arith / "
+"command expansion; no opt-in needed"                                             },
+    {      "promptsubst",                                  "alias for prompt_subst"},
+    {    "menu_complete",        "lush completion is always menu-shaped; no toggle"},
+    {     "menucomplete",                                 "alias for menu_complete"},
+    {    "always_to_end",         "completion always lands at end of inserted word"},
+    {      "alwaystoend",                                 "alias for always_to_end"},
+    {        "auto_menu",            "lush completion auto-menus on TAB; no toggle"},
+    {         "automenu",                                     "alias for auto_menu"},
+    { "complete_in_word",
+     "lush completion always treats cursor mid-word as completable"                },
+    {   "completeinword",                              "alias for complete_in_word"},
+    {      "flowcontrol",                   "terminal flow-control toggle; lush LLE manages its own "
                    "tty raw-mode state"                   },
-    {     "correct_all",        "lush has no spelling-correction prompt to toggle"},
-    {      "correctall",                                   "alias for correct_all"},
-    {              NULL,                                                      NULL}
+    {      "correct_all",        "lush has no spelling-correction prompt to toggle"},
+    {       "correctall",                                   "alias for correct_all"},
+    {"pushd_ignore_dups",
+     "lush dirstack dedup behaviour is benign and introspection-invisible"         },
+    {  "pushdignoredups",                             "alias for pushd_ignore_dups"},
+    {     "pushd_silent",       "lush pushd/popd never prints the stack; always-on"},
+    {      "pushdsilent",                                  "alias for pushd_silent"},
+    {    "pushd_to_home",                        "zsh-specific pushd-with-no-arg-goes-home; lush requires "
+                        "an argument"                     },
+    {      "pushdtohome",                                 "alias for pushd_to_home"},
+    {          "multios",                       "zsh multiple-redirection-target option; lush has its own "
+                       "redirection engine"               },
+    {          "clobber",
+     "zsh positive CLOBBER (inverse of POSIX noclobber); accepted "
+     "as alias since unsetopt CLOBBER and set -o noclobber express the same "
+     "intent. Full inversion wiring is a future refinement"                        },
+    {               NULL,                                                      NULL}
 };
 
 bool shell_feature_is_noop_alias(const char *name) {
