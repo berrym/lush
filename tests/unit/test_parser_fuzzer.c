@@ -814,8 +814,11 @@ TEST(error_unclosed_brace) {
 }
 
 TEST(error_missing_do) {
-    // Missing do in loop
-    ASSERT_PARSE_FAILS("for x in a b; echo $x; done");
+    // Missing do in `while` loop. The `for` form is intentionally permissive:
+    // zsh's short `for NAME in WORDS<sep> sublist` (no `do`/`done`) is
+    // supported, so a malformed `for` of that shape parses as the short form
+    // and is not an error.
+    ASSERT_PARSE_FAILS("while true; echo yes; done");
 }
 
 TEST(error_missing_then) {

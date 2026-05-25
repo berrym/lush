@@ -150,7 +150,12 @@ TEST(if_no_then_no_fi) { ASSERT_PARSE_FAILS("if true; echo yes"); }
 
 TEST(for_no_done) { ASSERT_PARSE_FAILS("for x in a b; do echo $x"); }
 
-TEST(for_no_do_no_done) { ASSERT_PARSE_FAILS("for x in a b; echo $x"); }
+TEST(for_no_do_no_done) {
+    // Lush accepts zsh's short `for NAME in WORDS<sep> sublist` form, so
+    // omitting `do`/`done` for `for` is no longer an error. `while` retains
+    // the strict-syntax requirement.
+    ASSERT_PARSE_FAILS("while true; echo yes");
+}
 
 TEST(while_no_done) { ASSERT_PARSE_FAILS("while true; do echo loop"); }
 
@@ -177,7 +182,10 @@ TEST(elif_missing_then) {
     ASSERT_PARSE_FAILS("if true; then echo 1; elif true; echo 2; fi");
 }
 
-TEST(for_missing_do) { ASSERT_PARSE_FAILS("for x in a b; echo $x; done"); }
+TEST(for_missing_do) {
+    // See for_no_do_no_done: zsh short form is accepted; substitute `while`.
+    ASSERT_PARSE_FAILS("while true; echo yes; done");
+}
 
 TEST(for_missing_variable) {
     ASSERT_PARSE_FAILS("for in a b; do echo x; done");

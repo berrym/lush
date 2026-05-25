@@ -3830,6 +3830,67 @@ static node_t *parse_for_statement(parser_t *parser) {
         return NULL;
     }
 
+    // Zsh compact paren form: `for NAME (WORD ...) BODY` or
+    // `for NAME (WORD ...) { LIST }`. The paren introduces the iteration
+    // list (terminated by `)`), and the body is either a brace group or a
+    // single sublist (and-or list) terminated by `;` / newline.
+    bool zsh_paren_form = false;
+    if (tokenizer_match(parser->tokenizer, TOK_LPAREN)) {
+        zsh_paren_form = true;
+        tokenizer_advance(parser->tokenizer);
+        while (!tokenizer_match(parser->tokenizer, TOK_RPAREN) &&
+               !tokenizer_match(parser->tokenizer, TOK_EOF)) {
+            token_t *word_token = tokenizer_current(parser->tokenizer);
+            if (token_is_word_like(word_token->type) ||
+                word_token->type == TOK_VARIABLE ||
+                word_token->type == TOK_COMMAND_SUB ||
+                word_token->type == TOK_ARITH_EXP ||
+                word_token->type == TOK_BACKQUOTE) {
+                node_t *word_node = new_node(NODE_VAR);
+                if (!word_node) {
+                    free_node_tree(for_node);
+                    free_node_tree(word_list);
+                    return NULL;
+                }
+                word_node->val.str = strdup(word_token->text);
+                word_node->val_type = VAL_STR;
+                add_child_node(word_list, word_node);
+                tokenizer_advance(parser->tokenizer);
+            } else {
+                tokenizer_advance(parser->tokenizer);
+            }
+        }
+        if (!expect_token_with_help(parser, TOK_RPAREN,
+                                    "expected ')' to close zsh `for NAME "
+                                    "(LIST)` iteration list")) {
+            free_node_tree(for_node);
+            free_node_tree(word_list);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        add_child_node(for_node, word_list);
+        skip_separators(parser);
+        node_t *body = NULL;
+        if (tokenizer_match(parser->tokenizer, TOK_LBRACE)) {
+            body = parse_brace_group(parser);
+        } else {
+            body = parse_logical_expression(parser);
+        }
+        if (!body) {
+            free_node_tree(for_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        add_child_node(for_node, body);
+        parser_pop_context(parser);
+        if (!parse_trailing_redirections(parser, for_node)) {
+            free_node_tree(for_node);
+            return NULL;
+        }
+        return for_node;
+    }
+    (void)zsh_paren_form;
+
     // POSIX: 'in' keyword is optional. If omitted, iterate over "$@"
     // Check if we have 'in' or if we're going directly to ';'/newline/'do'
     if (tokenizer_match(parser->tokenizer, TOK_IN)) {
@@ -3983,6 +4044,26 @@ skip_word_parsing:
 
     // Skip any separators (semicolons, newlines, whitespace)
     skip_separators(parser);
+
+    // Zsh short for-in form: `for NAME in WORDS<newline> sublist` (no
+    // `do`/`done`). If after the iteration list we land on anything other
+    // than `do`, treat the next sublist (and-or list) as the body and
+    // return.
+    if (!tokenizer_match(parser->tokenizer, TOK_DO)) {
+        node_t *body = parse_logical_expression(parser);
+        if (!body) {
+            free_node_tree(for_node);
+            parser_pop_context(parser);
+            return NULL;
+        }
+        add_child_node(for_node, body);
+        parser_pop_context(parser);
+        if (!parse_trailing_redirections(parser, for_node)) {
+            free_node_tree(for_node);
+            return NULL;
+        }
+        return for_node;
+    }
 
     // Now we should see 'do'
     if (!expect_token_with_help(parser, TOK_DO,
