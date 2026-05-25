@@ -22,34 +22,27 @@ because diff_oracle ignores stderr (see [#1](#1-diff_oracle-stderr-blindness)).
 
 ---
 
-## 1. diff_oracle stderr blindness
+## 1. diff_oracle stderr blindness (RESOLVED)
 
-**Severity:** structural / measurement.
+**Status:** fixed.
 
-`diff_oracle` compares exit code and stdout. It does **not** compare
-stderr. The five bash-completion files in `corpus/bash/bash-completion/`
-"pass" only because they exit 0 with empty stdout, even though lush
-emits multiple parse errors and `complete: command not found` on
-stderr that bash does not.
+`results_agree` in tests/fuzz/diff_oracle.c now also checks **stderr
+presence**: agreement requires that lush and the reference shell
+either both emit empty stderr or both emit non-empty stderr. Exact
+content is still not compared (error-message wording differs across
+shells), but the asymmetric case where lush emits parse errors while
+the reference shell runs clean is no longer masked.
 
-Until this is addressed, **the corpus pass rate is a weak signal.**
-A script that bombs out with errors on stderr but happens to exit 0
-looks "agreed."
+**Scorecard delta:** 29/33 (90.9%) -> 22/33 (69.7%). Seven scripts
+that were silently passing are now properly divergent:
 
-**Options:**
+- 5 bash-completion files (lush emits parse errors not in bash)
+- spectrum.zsh (typeset -H unknown option, see [#11](#11-typeset--h-flag-unknown))
+- key-bindings.zsh (zle builtin missing, see [#12](#12-zle-builtin-missing))
 
-- **Strict stderr match.** Compare verbatim. Produces noise from
-  error-message wording differences between shells; lots of
-  "divergences" that aren't real defects.
-- **Loose stderr match.** Compare on "did one side produce stderr
-  and the other not?" boolean. Catches the masking case here without
-  matching on wording. Probably the right shape.
-- **Per-script stderr expectation.** Each corpus entry could declare
-  its expected stderr shape (empty / non-empty / specific lines).
-  Most powerful, most curation cost.
-
-**Resolution:** pending decision. Likely the loose boolean check as
-a first cut.
+This is the honest pass rate. The drop is the point: the
+scorecard is now a real measurement of fitness rather than an
+exit-code-and-stdout shape check.
 
 ---
 
@@ -211,6 +204,44 @@ files reach this surface.
 **Source location:** `src/parser.c`, the if-statement body parser
 where the next statement-list element is expected after a
 short-circuit `||` chain.
+
+## 11. `typeset -H` flag unknown
+
+**Severity:** missing surface.
+
+```zsh
+typeset -AHg FX FG BG
+```
+
+zsh extends `typeset` with `-H` (hide from `typeset -p` listing) and
+`-g` (global scope from within a function). Lush's `typeset` accepts
+neither. The `-A` (associative-array) flag is supported; `-Hg` trips
+"invalid option."
+
+**Recommendation:** silently accept both flags as no-ops in zsh
+mode. `-H` is a display-only attribute that doesn't affect script
+semantics. `-g` is meaningful in scope-aware code but lush's
+`typeset` is shell-side and globalness is the default at top level.
+
+**Affected corpus entries:** spectrum.zsh.
+
+## 12. `zle` builtin missing
+
+**Severity:** missing surface.
+
+```zsh
+zle -N up-line-or-beginning-search
+```
+
+zsh's line-editor builtin -- registers widget callbacks, binds
+keys, manipulates the editing buffer from within widget code. The
+zsh equivalent of `display lle widget` plus `display lle bind`.
+
+**Recommendation:** add to bin_zsh_stubs.c as another no-op stub.
+zsh widget registration is invisible from a non-interactive script's
+signal surface.
+
+**Affected corpus entries:** key-bindings.zsh.
 
 ## 9. Top-level `return` and zsh `${+name}` is-set test
 

@@ -596,10 +596,15 @@ static char *read_file(const char *path, size_t *out_len) {
  * @brief Decide whether two run_result_t agree
  *
  * "Agree" means: either both succeeded (exit 0) or both failed
- * (exit non-zero); AND stdout matches exactly. stderr is not
- * compared because formatting varies too much across reference
- * shells. Timeouts on either side count as disagreement unless
- * both timed out.
+ * (exit non-zero); AND stdout matches exactly; AND stderr-presence
+ * agrees (both empty or both non-empty). Exact stderr content is
+ * NOT compared because error-message wording differs across shells;
+ * the looser presence check catches the masking case where lush
+ * emits parse errors / command-not-found while the reference shell
+ * runs clean.
+ *
+ * Timeouts on either side count as disagreement unless both timed
+ * out.
  */
 static bool results_agree(const run_result_t *a, const run_result_t *b) {
     if (a->timed_out != b->timed_out) {
@@ -613,7 +618,12 @@ static bool results_agree(const run_result_t *a, const run_result_t *b) {
     if (a_ok != b_ok) {
         return false;
     }
-    return strcmp(a->stdout_buf, b->stdout_buf) == 0;
+    if (strcmp(a->stdout_buf, b->stdout_buf) != 0) {
+        return false;
+    }
+    bool a_has_stderr = (a->stderr_buf[0] != '\0');
+    bool b_has_stderr = (b->stderr_buf[0] != '\0');
+    return a_has_stderr == b_has_stderr;
 }
 
 /* ============================================================================
