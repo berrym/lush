@@ -77,6 +77,24 @@ int bin_compopt(int argc __attribute__((unused)),
     return 0;
 }
 
+int bin_compinit(int argc __attribute__((unused)),
+                 char **argv __attribute__((unused))) {
+    // zsh's compinit initializes the completion subsystem. Lush has its
+    // own completion engine; the initialization step has no analogue.
+    // Real-world scripts source `compinit` to enable completion before
+    // running -- in lush completion is always ready.
+    return 0;
+}
+
+int bin_bashcompinit(int argc __attribute__((unused)),
+                     char **argv __attribute__((unused))) {
+    // zsh's bashcompinit provides bash-completion compatibility in zsh
+    // by registering complete/compgen/compopt as zsh functions. Lush
+    // already has those as builtin stubs (see complete/compgen/compopt
+    // entries above), so bashcompinit itself is a no-op.
+    return 0;
+}
+
 int bin_colors(int argc __attribute__((unused)),
                char **argv __attribute__((unused))) {
     // zsh's `colors` is a function autoloaded from $fpath that

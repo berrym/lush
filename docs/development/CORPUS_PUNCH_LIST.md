@@ -281,23 +281,42 @@ arithmetic context. Lush's arithmetic parser rejects it.
 
 **Affected corpus entries:** theme-and-appearance.zsh.
 
-## 10. `zstyle` builtin missing
+## 10. `zstyle` builtin (RESOLVED)
 
-**Severity:** missing surface.
+**Status:** real implementation with record-and-query side table.
 
-```zsh
-zstyle ':completion:*:*:*:*:*' menu select
-```
+New src/builtins/bin_zstyle.c implements:
 
-zsh's completion-system configuration builtin. Used pervasively in
-zsh user dotfiles (oh-my-zsh, prezto, p10k).
+  zstyle PATTERN STYLE VALUE...     set
+  zstyle -t PATTERN STYLE [VALUE]   test if recorded matches
+  zstyle -T PATTERN STYLE           test (unset treated as true)
+  zstyle -s PATTERN STYLE VAR       get value into VAR
+  zstyle -b PATTERN STYLE VAR       boolean form (yes/no)
+  zstyle -a PATTERN STYLE VAR       array-shaped get
+  zstyle -d [PATTERN [STYLE...]]    delete
+  zstyle -L [PATTERN [STYLE...]]    list as re-runnable
+  zstyle -e PATTERN STYLE BODY      evaluated style (recorded
+                                    verbatim, not re-eval'd)
+  zstyle -g VAR PATTERN STYLE       get pattern back
 
-Like `bindkey` / `autoload` / `zmodload`, the right shape is
-probably a no-op stub: lush has its own completion-configuration
-surface (`display lle completion`) and the zstyle bookkeeping is
-invisible from a non-interactive script.
+Pattern matching uses POSIX fnmatch(3) for queries. Specificity
+ranking is a future fix; for the corpus, exact-match plus simple
+fnmatch covers the cases that surface.
 
-**Affected corpus entries:** completion.zsh and correction.zsh.
+Investigation 2026-05-25 showed 53 of 59 oh-my-zsh zstyle sites are
+query forms -- silent no-op would have been a verifiable masking
+divergence.
+
+Companion stubs added to bin_zsh_stubs.c:
+  compinit       zsh completion-subsystem init
+  bashcompinit   zsh's bash-completion compatibility shim
+
+Both are no-ops in lush; the completion engine is always ready and
+the bash-completion compat layer is supplied by the complete/compgen/
+compopt builtin stubs already in place.
+
+**Pass-rate delta:** 29/33 -> 30/33 (90.9% -> 93.9%). completion.zsh
+now passes cleanly.
 
 ## 13. `[[ -o name ]]` not actually implemented (RESOLVED)
 

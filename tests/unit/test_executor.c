@@ -22,6 +22,7 @@ extern lle_result_t lush_inspect_widget_callback(lle_editor_t *editor,
 // process-global so leaking state across tests breaks reproducibility.
 extern void bindkey_table_reset(void);
 extern void zle_widget_table_reset(void);
+extern void zstyle_table_reset(void);
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2883,6 +2884,42 @@ TEST(rt_pipe_at_eol_continues_statement) {
     ASSERT_STDOUT_EQ(r, "HELLO\n");
 }
 
+TEST(rt_zstyle_set_then_query_t_true) {
+    zstyle_table_reset();
+    // zstyle PATTERN STYLE true; zstyle -t PATTERN STYLE returns 0
+    // (matches zsh).
+    run_result_t r = run_shell("zstyle ':completion:*' menu true\n"
+                               "zstyle -t ':completion:*' menu && echo on || "
+                               "echo off\n");
+    ASSERT_STDOUT_EQ(r, "on\n");
+}
+
+TEST(rt_zstyle_set_then_query_s_get) {
+    zstyle_table_reset();
+    // zstyle -s PATTERN STYLE VAR populates VAR with the value.
+    run_result_t r = run_shell("zstyle ':completion:*' format 'completing %d'\n"
+                               "zstyle -s ':completion:*' format result\n"
+                               "echo \"[$result]\"\n");
+    ASSERT_STDOUT_EQ(r, "[completing %d]\n");
+}
+
+TEST(rt_zstyle_T_treats_unset_as_true) {
+    zstyle_table_reset();
+    // zstyle -T returns 0 when the pattern+style is unset (matches zsh
+    // semantics: -T is "true unless explicitly false").
+    run_result_t r =
+        run_shell("zstyle -T ':never:set' style && echo yes || echo no\n");
+    ASSERT_STDOUT_EQ(r, "yes\n");
+}
+
+TEST(rt_zstyle_delete_removes_entry) {
+    zstyle_table_reset();
+    run_result_t r = run_shell("zstyle ':x' k v\n"
+                               "zstyle -d ':x' k\n"
+                               "zstyle -t ':x' k && echo on || echo off\n");
+    ASSERT_STDOUT_EQ(r, "off\n");
+}
+
 TEST(rt_typeset_H_flag_accepted) {
     // zsh's typeset -H (hide from listing) is purely a display attribute;
     // lush accepts it silently so `typeset -AHg name` (the spectrum.zsh
@@ -3213,6 +3250,10 @@ int main(void) {
     RUN_TEST(rt_zle_delete_then_list_empty);
     RUN_TEST(rt_logical_op_at_eol_continues_statement);
     RUN_TEST(rt_pipe_at_eol_continues_statement);
+    RUN_TEST(rt_zstyle_set_then_query_t_true);
+    RUN_TEST(rt_zstyle_set_then_query_s_get);
+    RUN_TEST(rt_zstyle_T_treats_unset_as_true);
+    RUN_TEST(rt_zstyle_delete_removes_entry);
     RUN_TEST(rt_typeset_H_flag_accepted);
     RUN_TEST(rt_typeset_U_flag_accepted);
     RUN_TEST(rt_test_o_unknown_option_returns_false);
