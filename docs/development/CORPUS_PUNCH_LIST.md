@@ -153,25 +153,28 @@ surface.
 
 ---
 
-## 8. zsh multi-name function definition
+## 8. zsh multi-name function definition (RESOLVED)
 
-**Severity:** missing surface.
+**Status:** fixed.
 
-```bash
-function clipcopy clippaste {
-  unfunction clipcopy clippaste
-  ...
-}
-```
+parse_function_definition in src/parser.c was extended:
 
-zsh shape: `function NAME1 NAME2 ... { body }` defines all named
-functions to share one body. Real-world idiom for declaring a
-"trampoline" body that multiple aliases route through.
+  - After consuming the `function` keyword and the first name, the
+    parser now collects any additional word tokens before `{` as
+    extra function names.
+  - After the body is parsed, wrap_multi_name_functions builds a
+    NODE_BRACE_GROUP containing one NODE_FUNCTION per name. The
+    first uses the original body; each extra name gets a deep
+    copy of the body via copy_ast_node (lifted to non-static for
+    cross-translation-unit use).
 
-**Source location:** `src/parser.c` `parse_function_definition` --
-needs to admit a list of names between `function` and `{`.
+copy_ast_node now has a parser-test stub in test_parser_stubs.c
+that returns NULL (parser tests don't exercise the multi-name
+form). The lush binary and full-link tests get the real
+implementation.
 
-**Affected corpus entries:** clipboard.zsh.
+**Pass-rate delta:** 30/33 -> 31/33 (93.9% -> 97.0%). clipboard.zsh
+now passes cleanly.
 
 ## 7. `} &&\n` at end of line not recognized as continuation (RESOLVED)
 

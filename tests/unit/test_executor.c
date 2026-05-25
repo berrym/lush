@@ -2884,6 +2884,18 @@ TEST(rt_pipe_at_eol_continues_statement) {
     ASSERT_STDOUT_EQ(r, "HELLO\n");
 }
 
+TEST(rt_multi_name_function_definition) {
+    // zsh's `function NAME1 NAME2 { body }` defines all names as
+    // functions sharing the body. Each must be independently callable.
+    run_result_t r = run_shell("function foo bar baz {\n"
+                               "    echo args: \"$@\"\n"
+                               "}\n"
+                               "foo arg1\n"
+                               "bar arg2\n"
+                               "baz arg3\n");
+    ASSERT_STDOUT_EQ(r, "args: arg1\nargs: arg2\nargs: arg3\n");
+}
+
 TEST(rt_zstyle_set_then_query_t_true) {
     zstyle_table_reset();
     // zstyle PATTERN STYLE true; zstyle -t PATTERN STYLE returns 0
@@ -3250,6 +3262,7 @@ int main(void) {
     RUN_TEST(rt_zle_delete_then_list_empty);
     RUN_TEST(rt_logical_op_at_eol_continues_statement);
     RUN_TEST(rt_pipe_at_eol_continues_statement);
+    RUN_TEST(rt_multi_name_function_definition);
     RUN_TEST(rt_zstyle_set_then_query_t_true);
     RUN_TEST(rt_zstyle_set_then_query_s_get);
     RUN_TEST(rt_zstyle_T_treats_unset_as_true);

@@ -17,6 +17,12 @@
 #include "shell_mode.h"
 #include "tokenizer.h"
 
+// Lifted from executor.c (non-static). Used by parse_function_definition
+// to deep-copy a parsed body so zsh's `function NAME1 NAME2 { body }`
+// multi-name form can produce one FUNCTION node per name with each
+// owning its own independent body.
+extern node_t *copy_ast_node(node_t *node);
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -4804,6 +4810,65 @@ static bool is_valid_posix_function_name(const char *name) {
  * @param parser Parser instance
  * @return Function definition AST node
  */
+/**
+ * @brief Wrap a single NODE_FUNCTION in a brace-group when extra names exist.
+ *
+ * For zsh's `function NAME1 NAME2 ... { body }` multi-name form: builds a
+ * NODE_BRACE_GROUP containing N NODE_FUNCTION children, each carrying one
+ * of the names and an independent deep-copied body. The original
+ * function_node is reused as the first child (no body copy needed). The
+ * extra_names array (heap-allocated strings) is consumed.
+ *
+ * Returns the new wrapper (caller should `return` it), or NULL on
+ * allocation failure (the caller must still free function_node and the
+ * extra_names array on error to keep the parser's error-path semantics).
+ */
+static node_t *wrap_multi_name_functions(node_t *function_node,
+                                         char **extra_names,
+                                         size_t extra_name_count) {
+    if (extra_name_count == 0) {
+        free(extra_names);
+        return function_node;
+    }
+    node_t *wrapper = new_node(NODE_BRACE_GROUP);
+    if (!wrapper) {
+        return NULL;
+    }
+    add_child_node(wrapper, function_node);
+
+    node_t *original_body = function_node->first_child;
+    for (size_t i = 0; i < extra_name_count; i++) {
+        node_t *fn = new_node(NODE_FUNCTION);
+        if (!fn) {
+            free_node_tree(wrapper);
+            for (size_t j = i; j < extra_name_count; j++) {
+                free(extra_names[j]);
+            }
+            free(extra_names);
+            return NULL;
+        }
+        fn->val_type = VAL_STR;
+        fn->val.str = extra_names[i]; // ownership transferred
+        extra_names[i] = NULL;
+        if (original_body) {
+            node_t *body_copy = copy_ast_node(original_body);
+            if (!body_copy) {
+                free_node_tree(fn);
+                free_node_tree(wrapper);
+                for (size_t j = i + 1; j < extra_name_count; j++) {
+                    free(extra_names[j]);
+                }
+                free(extra_names);
+                return NULL;
+            }
+            add_child_node(fn, body_copy);
+        }
+        add_child_node(wrapper, fn);
+    }
+    free(extra_names);
+    return wrapper;
+}
+
 static node_t *parse_function_definition(parser_t *parser) {
     token_t *current = tokenizer_current(parser->tokenizer);
     bool has_function_keyword = false;
@@ -4857,10 +4922,47 @@ static node_t *parse_function_definition(parser_t *parser) {
 
     // ksh/bash style: "function name { }" - parentheses are optional
     // POSIX style: "name() { }" - parentheses required
-    // Check if we have '(' or if we're going directly to '{'
+    // zsh extension:  "function NAME1 NAME2 { body }" -- multi-name
+    //                 function definition: all listed names share one
+    //                 body. Collect additional names here so the body
+    //                 can be parsed once and then deep-copied per name
+    //                 below.
+    char **extra_names = NULL;
+    size_t extra_name_count = 0;
     current = tokenizer_current(parser->tokenizer);
+    if (has_function_keyword) {
+        while (current && token_is_word_like(current->type) &&
+               current->type != TOK_LBRACE) {
+            char **grown = realloc(extra_names, (extra_name_count + 1) *
+                                                    sizeof(*extra_names));
+            if (!grown) {
+                for (size_t i = 0; i < extra_name_count; i++) {
+                    free(extra_names[i]);
+                }
+                free(extra_names);
+                free_node_tree(function_node);
+                parser_pop_context(parser);
+                return NULL;
+            }
+            extra_names = grown;
+            extra_names[extra_name_count] = strdup(current->text);
+            if (!extra_names[extra_name_count]) {
+                for (size_t i = 0; i < extra_name_count; i++) {
+                    free(extra_names[i]);
+                }
+                free(extra_names);
+                free_node_tree(function_node);
+                parser_pop_context(parser);
+                return NULL;
+            }
+            extra_name_count++;
+            tokenizer_advance(parser->tokenizer);
+            current = tokenizer_current(parser->tokenizer);
+        }
+    }
     if (has_function_keyword && current && current->type == TOK_LBRACE) {
-        // "function name { }" form - skip parameter parsing, go to body
+        // "function name { }" form (with optional extra names already
+        // collected above) -- skip parameter parsing, go to body.
         goto parse_function_body;
     }
 
@@ -5074,11 +5176,19 @@ parse_function_body:
                 "expected '{', '(', '((', '[[', if, while, until, for, "
                 "case, or select");
             free_node_tree(function_node);
+            for (size_t i = 0; i < extra_name_count; i++) {
+                free(extra_names[i]);
+            }
+            free(extra_names);
             parser_pop_context(parser);
             return NULL;
         }
         if (!body) {
             free_node_tree(function_node);
+            for (size_t i = 0; i < extra_name_count; i++) {
+                free(extra_names[i]);
+            }
+            free(extra_names);
             parser_pop_context(parser);
             return NULL;
         }
@@ -5091,9 +5201,14 @@ parse_function_body:
         // attached to the function definition itself.
         if (!parse_trailing_redirections(parser, function_node)) {
             free_node_tree(function_node);
+            for (size_t i = 0; i < extra_name_count; i++) {
+                free(extra_names[i]);
+            }
+            free(extra_names);
             return NULL;
         }
-        return function_node;
+        return wrap_multi_name_functions(function_node, extra_names,
+                                         extra_name_count);
     }
 
     // Brace-group body — consume '{' and parse until '}'
@@ -5101,6 +5216,10 @@ parse_function_body:
                                 "function body must be enclosed in braces { } "
                                 "or be a compound command")) {
         free_node_tree(function_node);
+        for (size_t i = 0; i < extra_name_count; i++) {
+            free(extra_names[i]);
+        }
+        free(extra_names);
         parser_pop_context(parser);
         return NULL;
     }
@@ -5153,10 +5272,15 @@ parse_function_body:
     // and the next statement would error with "expected command name".
     if (!parse_trailing_redirections(parser, function_node)) {
         free_node_tree(function_node);
+        for (size_t i = 0; i < extra_name_count; i++) {
+            free(extra_names[i]);
+        }
+        free(extra_names);
         return NULL;
     }
 
-    return function_node;
+    return wrap_multi_name_functions(function_node, extra_names,
+                                     extra_name_count);
 }
 
 /**

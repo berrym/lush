@@ -82,7 +82,7 @@ static int store_function(executor_t *executor, const char *function_name,
 static int validate_function_parameters(executor_t *executor,
                                         function_def_t *func, char **argv,
                                         int argc, source_location_t loc);
-static node_t *copy_ast_node(node_t *node);
+node_t *copy_ast_node(node_t *node);
 static node_t *copy_ast_chain(node_t *node);
 static int execute_if(executor_t *executor, node_t *if_node);
 static int execute_while(executor_t *executor, node_t *while_node);
@@ -9824,7 +9824,7 @@ static int store_function(executor_t *executor, const char *function_name,
  * @param node Node to copy
  * @return Deep copy of node, or NULL on failure
  */
-static node_t *copy_ast_node(node_t *node) {
+node_t *copy_ast_node(node_t *node) {
     if (!node) {
         return NULL;
     }

@@ -99,3 +99,14 @@ void debug_trace_printf(struct debug_context *ctx, const char *format, ...) {
     (void)ctx;
     (void)format;
 }
+
+// copy_ast_node lives in executor.c and is used by parse_function_definition
+// to deep-copy a body across multi-name function definitions
+// (`function NAME1 NAME2 { body }` zsh extension). Parser tests don't link
+// executor; stub returns NULL which is treated as a body-copy failure by
+// the caller (the parser tests don't exercise the multi-name form).
+#include "node.h"
+node_t *copy_ast_node(node_t *node) {
+    (void)node;
+    return NULL;
+}
