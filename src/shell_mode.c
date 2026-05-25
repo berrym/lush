@@ -577,6 +577,8 @@ static const struct {
      "zsh positive CLOBBER (inverse of POSIX noclobber); accepted "
      "as alias since unsetopt CLOBBER and set -o noclobber express the same "
      "intent. Full inversion wiring is a future refinement"                        },
+    {             "beep",    "zsh line-editor terminal-bell-on-error; LLE has its own bell "
+    "behaviour and never gates on this option"            },
     {               NULL,                                                      NULL}
 };
 

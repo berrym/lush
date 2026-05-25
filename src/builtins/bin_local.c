@@ -7,6 +7,7 @@
  */
 
 #include "builtins.h"
+#include "shell_mode.h"
 #include "symtable.h"
 
 #include <ctype.h>
@@ -37,9 +38,17 @@ int bin_local(int argc, char **argv) {
         return 1;
     }
 
-    // Check if we're in a function scope
+    // Check if we're in a function scope. Zsh accepts `local` at top
+    // level and treats it as `typeset` (declare a global); bash strictly
+    // errors. Match the zsh behaviour when running under zsh mode by
+    // delegating to bin_declare, which already handles the full option
+    // set (-a, -A, -r, -i, -x, ...) and the assignment-or-declaration
+    // dichotomy. Bash mode keeps the strict error.
     size_t current_level = symtable_current_level(manager);
     if (current_level == 0) {
+        if (shell_mode_get() == SHELL_MODE_ZSH) {
+            return bin_declare(argc, argv);
+        }
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
             shell_error_create(SHELL_ERR_FUNCTION_ERROR, SHELL_SEVERITY_ERROR,
