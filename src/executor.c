@@ -5614,6 +5614,28 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         return NULL;
     }
 
+    // zsh `$+NAME` / `$+NAME[SUBSCRIPT]` unbraced is-set test. Rewrite
+    // to the braced ${+NAME...} form so the existing parameter-expansion
+    // handler in parse_parameter_expansion picks it up. The whole
+    // span is one token coming out of the tokenizer (see the $+IDENT
+    // handler in src/tokenizer.c), so the rewrite is just text-shape.
+    if (text[0] == '$' && text[1] == '+' &&
+        (isalpha((unsigned char)text[2]) || text[2] == '_')) {
+        size_t orig_len = strlen(text);
+        char *braced = malloc(orig_len + 3);
+        if (braced) {
+            braced[0] = '$';
+            braced[1] = '{';
+            braced[2] = '+';
+            memcpy(braced + 3, text + 2, orig_len - 2);
+            braced[orig_len + 1] = '}';
+            braced[orig_len + 2] = '\0';
+            char *result = expand_variable(executor, braced);
+            free(braced);
+            return result;
+        }
+    }
+
     // Kind sigil top-level dispatch: `@NAME` / `%NAME` with NAME a valid
     // identifier.  Tokenizer has already done the regex check; we just need
     // to verify the shape before routing to expand_kind_sigil.
@@ -11684,6 +11706,53 @@ static char *parse_parameter_expansion(executor_t *executor,
         return strdup("");
     }
 
+    // zsh `${+NAME}` is-set test: returns "1" if NAME is bound, "0"
+    // otherwise. Used heavily in arithmetic contexts -- `(( ${+v} ))`
+    // is the idiomatic zsh test for variable presence. Real-world
+    // corpus example: `(( ${+commands[dircolors]} ))` checks whether
+    // `dircolors` is on $path via zsh's special `$commands` hash.
+    //
+    // Lush handles the plain `${+NAME}` form by walking the symbol
+    // table, and the `${+commands[NAME]}` shape as a PATH lookup
+    // (since lush has no `$commands` hash but the user-observable
+    // semantic is "is this command available?").
+    if (expansion[0] == '+' && expansion[1] != '\0') {
+        const char *name = expansion + 1;
+        // Special-case zsh's $commands[X] -- treat as a PATH lookup.
+        if (strncmp(name, "commands[", 9) == 0) {
+            const char *cmd_start = name + 9;
+            const char *cmd_end = strchr(cmd_start, ']');
+            if (cmd_end) {
+                char *cmd = strndup(cmd_start, (size_t)(cmd_end - cmd_start));
+                bool found = false;
+                if (cmd && *cmd) {
+                    char *path_resolved = find_command_in_path(cmd);
+                    if (path_resolved) {
+                        found = true;
+                        free(path_resolved);
+                    }
+                }
+                free(cmd);
+                return strdup(found ? "1" : "0");
+            }
+        }
+        // Plain ${+NAME}: ignore any trailing [subscript] for now and
+        // probe the symbol table for the base name.
+        const char *bracket = strchr(name, '[');
+        char *probe_name =
+            bracket ? strndup(name, (size_t)(bracket - name)) : strdup(name);
+        bool bound = false;
+        if (probe_name && *probe_name) {
+            lush_value_view_t view;
+            bound = symtable_lookup(probe_name, &view);
+            if (bound) {
+                lush_value_view_clear(&view);
+            }
+        }
+        free(probe_name);
+        return strdup(bound ? "1" : "0");
+    }
+
     // Handle zsh-style parameter flags: ${(X)var}
     // Flags: U=uppercase, L=lowercase, C=capitalize, f=split on newlines,
     //        o=sort ascending, O=sort descending, k=keys, v=values
@@ -16806,6 +16875,93 @@ static int execute_arithmetic_command(executor_t *executor,
         printf("DEBUG: Executing arithmetic command: (( %s ))\n", expr);
     }
 
+    // zsh `$+NAME` is the unbraced shorthand for `${+NAME}` (is-set
+    // test).  Rewrite to the braced form so the existing ${+NAME}
+    // expansion handler in parse_parameter_expansion picks it up.
+    //
+    // Real-world example: `(( $+commands[dircolors] ))` -- common idiom
+    // for "is command available on $path".  Without this rewrite, the
+    // arithmetic parser splits `$+commands[...]` and chokes on the
+    // bare `$`.
+    char *rewritten_expr = NULL;
+    {
+        const char *needle = strstr(expr, "$+");
+        if (needle) {
+            size_t out_cap = strlen(expr) * 2 + 32;
+            rewritten_expr = malloc(out_cap);
+            if (rewritten_expr) {
+                size_t out_len = 0;
+                const char *p = expr;
+                while (*p) {
+                    if (p[0] == '$' && p[1] == '+' &&
+                        (isalpha((unsigned char)p[2]) || p[2] == '_')) {
+                        // Emit `${+`
+                        if (out_len + 4 >= out_cap) {
+                            out_cap *= 2;
+                            char *grown = realloc(rewritten_expr, out_cap);
+                            if (!grown) {
+                                free(rewritten_expr);
+                                rewritten_expr = NULL;
+                                break;
+                            }
+                            rewritten_expr = grown;
+                        }
+                        memcpy(rewritten_expr + out_len, "${+", 3);
+                        out_len += 3;
+                        p += 2; // consume $+
+                        // Copy the name and optional [subscript].
+                        int bracket_depth = 0;
+                        while (*p && (isalnum((unsigned char)*p) || *p == '_' ||
+                                      (bracket_depth > 0) || *p == '[')) {
+                            if (*p == '[') {
+                                bracket_depth++;
+                            } else if (*p == ']') {
+                                bracket_depth--;
+                                if (bracket_depth < 0) {
+                                    break;
+                                }
+                            }
+                            if (out_len + 2 >= out_cap) {
+                                out_cap *= 2;
+                                char *grown = realloc(rewritten_expr, out_cap);
+                                if (!grown) {
+                                    free(rewritten_expr);
+                                    rewritten_expr = NULL;
+                                    break;
+                                }
+                                rewritten_expr = grown;
+                            }
+                            rewritten_expr[out_len++] = *p++;
+                            if (bracket_depth == 0 && *(p - 1) == ']') {
+                                break;
+                            }
+                        }
+                        if (!rewritten_expr) {
+                            break;
+                        }
+                        rewritten_expr[out_len++] = '}';
+                    } else {
+                        if (out_len + 2 >= out_cap) {
+                            out_cap *= 2;
+                            char *grown = realloc(rewritten_expr, out_cap);
+                            if (!grown) {
+                                free(rewritten_expr);
+                                rewritten_expr = NULL;
+                                break;
+                            }
+                            rewritten_expr = grown;
+                        }
+                        rewritten_expr[out_len++] = *p++;
+                    }
+                }
+                if (rewritten_expr) {
+                    rewritten_expr[out_len] = '\0';
+                    expr = rewritten_expr;
+                }
+            }
+        }
+    }
+
     // Pre-expand ${...} parameter expansions before arithmetic evaluation
     // The arithmetic module handles simple $var but not complex ${...} syntax
     char *expanded_expr = NULL;
@@ -16832,6 +16988,7 @@ static int execute_arithmetic_command(executor_t *executor,
         }
         if (*p == '\0') {
             free(expanded_expr);
+            free(rewritten_expr);
             return 1;
         }
     }
@@ -16883,6 +17040,7 @@ static int execute_arithmetic_command(executor_t *executor,
             free(result_str);
         }
         free(expanded_expr);
+        free(rewritten_expr);
         return 1;
     }
 
@@ -16890,6 +17048,7 @@ static int execute_arithmetic_command(executor_t *executor,
     long long result = strtoll(result_str, NULL, 10);
     free(result_str);
     free(expanded_expr); // Safe to free NULL
+    free(rewritten_expr);
 
     // Update exit status
     executor->exit_status = (result != 0) ? 0 : 1;
@@ -17334,6 +17493,24 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                 } else if (scan[0] == '=' && scan[1] == '~') {
                     op_start = scan;
                     strcpy(op_type, "=~");
+                    break;
+                } else if (scan[0] == '=' && scan[1] != '=' && scan[1] != '~') {
+                    // Single `=` -- bash/zsh alias for `==`. Recognized
+                    // even when scan == lhs_start because empty LHS
+                    // (e.g. `[[ "$EMPTY" = "y" ]]` after expansion) is
+                    // a real-world case where the binary-op scan must
+                    // still split off the operator and RHS. Without
+                    // this, `[[ "" = X ]]` falls through to the "no
+                    // operator -- non-empty string is true" branch and
+                    // reports equality regardless of RHS value.
+                    if (g_debug_context) {
+                        debug_trace_printf(
+                            g_debug_context,
+                            "extended-test = recognized at offset %zd\n",
+                            (ssize_t)(scan - lhs_start));
+                    }
+                    op_start = scan;
+                    strcpy(op_type, "==");
                     break;
                 } else if (scan[0] == '<' && scan[1] != '<') {
                     op_start = scan;

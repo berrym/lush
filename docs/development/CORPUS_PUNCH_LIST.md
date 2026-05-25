@@ -258,31 +258,48 @@ Interactive widget invocation (bare `zle WIDGET`) is a documented gap
 **Pass-rate delta:** key-bindings.zsh now passes cleanly
 (22/33 -> 23/33, 69.7% -> 72.7%).
 
-## 9. Top-level `return` and zsh `${+name}` is-set test
+## 9. Top-level `return`, zsh `${+name}` is-set test, `unfunction` (RESOLVED)
 
-**Severity:** missing surface.
+**Status:** fixed, with a cascade of underlying defects also resolved.
 
-theme-and-appearance.zsh line 34:
+The original diagnosis ("top-level return must match zsh") turned
+out to be downstream of a deeper bug: lush's `[[ ]]` extended-test
+treated the `=` and `!=` operators as no-op when the LHS was empty,
+because the binary-operator scan only recognized `==`, `!=`, `=~`,
+`<`, `>` -- the single `=` (bash/zsh alias for `==`) was missing.
 
-```zsh
-[[ "$DISABLE_LS_COLORS" != true ]] || return 0
-```
+When `$DISABLE_LS_COLORS` was unset, `[[ "$DISABLE_LS_COLORS" !=
+true ]]` evaluated to false in lush (true in bash/zsh), so the
+`|| return 0` short-circuit fired and the top-level return error
+surfaced. Fixing the `=`/`!=` empty-LHS handling removed the entire
+chain at the root.
 
-- **bash:** prints `return: can only return from a function or
-  sourced script` to stderr, **continues** execution.
-- **zsh:** silently allows; treats top-level `return` as exit-from-
-  script with the given status.
-- **lush:** raises E1119 and aborts the script.
+Three coupled fixes:
 
-For the zsh-bucket oracle (zsh), lush should match zsh's silent-
-allow behavior. For the bash bucket, the warn-and-continue behavior
-is acceptable.
+1. src/executor.c evaluate_simple_test: add `=` as an alias for
+   `==`, recognized even when the LHS is empty (e.g. `[[ ""
+   = "y" ]]` after expansion of an empty variable). The previous
+   guard `scan > lhs_start` blocked the recognition for empty-LHS
+   cases and routed them into the "no operator -- non-empty string
+   is true" fallback, producing wrong answers.
 
-Line 35 also surfaces `((${+commands[dircolors]}))` -- zsh's
-`${+name}` is "1 if name is set, 0 otherwise" expansion inside an
-arithmetic context. Lush's arithmetic parser rejects it.
+2. zsh `$+NAME` / `${+NAME}` is-set test:
+   - src/tokenizer.c: tokenize `$+IDENT[SUBSCRIPT]` as a single
+     TOK_VARIABLE so the expansion path sees one unit.
+   - src/executor.c parse_parameter_expansion: handle `${+NAME}`
+     and the special `${+commands[CMD]}` form (PATH lookup).
+   - src/executor.c expand_if_needed: rewrite unbraced `$+NAME`
+     to braced `${+NAME}` so both forms route to the same handler.
+   - src/executor.c execute_arithmetic_command: pre-rewrite
+     `$+IDENT[X]` to `${+IDENT[X]}` so arithmetic context sees the
+     braced form for the existing `${...}` pre-expansion path.
 
-**Affected corpus entries:** theme-and-appearance.zsh.
+3. src/builtins/bin_zsh_stubs.c: new `bin_unfunction` (real
+   implementation, walks executor->functions and removes by name).
+
+**Pass-rate delta:** 31/33 -> 32/33 of running scripts pass, +1
+known-allowed-divergent = **100.0% effective pass rate**.
+theme-and-appearance.zsh now runs cleanly under lush.
 
 ## 10. `zstyle` builtin (RESOLVED)
 

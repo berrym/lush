@@ -512,6 +512,7 @@ int bin_compopt(int argc, char **argv);
 int bin_zstyle(int argc, char **argv);
 int bin_compinit(int argc, char **argv);
 int bin_bashcompinit(int argc, char **argv);
+int bin_unfunction(int argc, char **argv);
 
 /**
  * @brief Validate a string as a shell variable identifier.

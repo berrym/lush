@@ -234,6 +234,7 @@ builtin builtins[] = {
     {      "zstyle",                "zsh pattern-based style configuration",       bin_zstyle},
     {    "compinit",                     "zsh completion init (no-op stub)",     bin_compinit},
     {"bashcompinit",                "zsh bash-completion init (no-op stub)", bin_bashcompinit},
+    {  "unfunction",                           "zsh remove shell functions",   bin_unfunction},
 };
 
 const size_t builtins_count = sizeof(builtins) / sizeof(builtins[0]);

@@ -31,6 +31,8 @@
  */
 
 #include "builtins.h"
+#include "executor.h"
+#include "node.h"
 
 int bin_autoload(int argc __attribute__((unused)),
                  char **argv __attribute__((unused))) {
@@ -92,6 +94,31 @@ int bin_bashcompinit(int argc __attribute__((unused)),
     // by registering complete/compgen/compopt as zsh functions. Lush
     // already has those as builtin stubs (see complete/compgen/compopt
     // entries above), so bashcompinit itself is a no-op.
+    return 0;
+}
+
+int bin_unfunction(int argc, char **argv) {
+    // zsh's `unfunction NAME...` removes shell functions. Real
+    // implementation: walks executor->functions and removes each named
+    // entry. Silent on names that don't exist (matches zsh).
+    if (!current_executor || argc < 2) {
+        return 0;
+    }
+    for (int i = 1; i < argc; i++) {
+        function_def_t **slot = &current_executor->functions;
+        while (*slot) {
+            if (strcmp((*slot)->name, argv[i]) == 0) {
+                function_def_t *victim = *slot;
+                *slot = victim->next;
+                free(victim->name);
+                free_node_tree(victim->body);
+                free_function_params(victim->params);
+                free(victim);
+                break;
+            }
+            slot = &(*slot)->next;
+        }
+    }
     return 0;
 }
 

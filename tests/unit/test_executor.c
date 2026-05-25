@@ -2884,6 +2884,55 @@ TEST(rt_pipe_at_eol_continues_statement) {
     ASSERT_STDOUT_EQ(r, "HELLO\n");
 }
 
+TEST(rt_extended_test_empty_lhs_inequality) {
+    // `[[ "$EMPTY" != true ]]` after $EMPTY expands to "" must return
+    // true (empty != "true"). Lush previously fell through to the "no
+    // operator -- non-empty string is true" branch because the single
+    // `=` / `!=` operator wasn't recognized for empty-LHS cases.
+    run_result_t r = run_shell("v=\"\"\n"
+                               "[[ \"$v\" != true ]] && echo unequal || echo "
+                               "equal\n");
+    ASSERT_STDOUT_EQ(r, "unequal\n");
+}
+
+TEST(rt_extended_test_single_equals_alias) {
+    // Bash/zsh accept `=` as an alias for `==` in [[ ]]. Lush now
+    // routes both through the same pattern-match path.
+    run_result_t r = run_shell("[[ hello = hello ]] && echo eq || echo ne\n"
+                               "[[ hello = world ]] && echo eq || echo ne\n");
+    ASSERT_STDOUT_EQ(r, "eq\nne\n");
+}
+
+TEST(rt_dollar_plus_is_set_test) {
+    // zsh `${+NAME}` returns "1" if NAME is set, "0" otherwise. Both
+    // braced and unbraced (`$+NAME`) forms must work.
+    run_result_t r = run_shell("v=hi\n"
+                               "echo \"${+v}\"\n"
+                               "echo \"${+nonexist}\"\n"
+                               "(( $+v )) && echo set || echo unset\n");
+    ASSERT_STDOUT_EQ(r, "1\n0\nset\n");
+}
+
+TEST(rt_dollar_plus_commands_path_lookup) {
+    // zsh's `${+commands[NAME]}` checks whether NAME is on $path.
+    // Lush implements it as a PATH lookup since there's no `$commands`
+    // hash.  `ls` is essentially universally available.
+    run_result_t r = run_shell("(( $+commands[ls] )) && echo yes || echo no\n");
+    ASSERT_STDOUT_EQ(r, "yes\n");
+}
+
+TEST(rt_unfunction_removes_function) {
+    // `unfunction NAME` removes a defined function. Subsequent call
+    // produces command-not-found behaviour (caught by the test
+    // framework's exit-code check via the conditional).
+    run_result_t r = run_shell("greet() { echo hello; }\n"
+                               "greet\n"
+                               "unfunction greet\n"
+                               "greet 2>/dev/null && echo still-defined || "
+                               "echo removed\n");
+    ASSERT_STDOUT_EQ(r, "hello\nremoved\n");
+}
+
 TEST(rt_multi_name_function_definition) {
     // zsh's `function NAME1 NAME2 { body }` defines all names as
     // functions sharing the body. Each must be independently callable.
@@ -3262,6 +3311,11 @@ int main(void) {
     RUN_TEST(rt_zle_delete_then_list_empty);
     RUN_TEST(rt_logical_op_at_eol_continues_statement);
     RUN_TEST(rt_pipe_at_eol_continues_statement);
+    RUN_TEST(rt_extended_test_empty_lhs_inequality);
+    RUN_TEST(rt_extended_test_single_equals_alias);
+    RUN_TEST(rt_dollar_plus_is_set_test);
+    RUN_TEST(rt_dollar_plus_commands_path_lookup);
+    RUN_TEST(rt_unfunction_removes_function);
     RUN_TEST(rt_multi_name_function_definition);
     RUN_TEST(rt_zstyle_set_then_query_t_true);
     RUN_TEST(rt_zstyle_set_then_query_s_get);

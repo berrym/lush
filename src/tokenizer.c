@@ -1312,6 +1312,50 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 size_t length = tokenizer->position - start;
                 return token_new(TOK_VARIABLE, &tokenizer->input[start], length,
                                  start_line, start_column, start_pos);
+            } else if (next == '+' &&
+                       tokenizer->position + 1 < tokenizer->input_length &&
+                       (isalpha((unsigned char)tokenizer
+                                    ->input[tokenizer->position + 1]) ||
+                        tokenizer->input[tokenizer->position + 1] == '_')) {
+                // zsh `$+NAME` (and `$+NAME[SUBSCRIPT]`) is the unbraced
+                // shorthand for `${+NAME}` is-set test. Consume `+`,
+                // the identifier, and any `[...]` subscript so the
+                // expansion path receives one TOK_VARIABLE token rather
+                // than `$` + word + `+NAME[...]`.
+                tokenizer->position++; // consume +
+                tokenizer->column++;
+                while (tokenizer->position < tokenizer->input_length) {
+                    char curr = tokenizer->input[tokenizer->position];
+                    if (isalnum((unsigned char)curr) || curr == '_') {
+                        tokenizer->position++;
+                        tokenizer->column++;
+                    } else {
+                        break;
+                    }
+                }
+                if (tokenizer->position < tokenizer->input_length &&
+                    tokenizer->input[tokenizer->position] == '[') {
+                    int depth = 0;
+                    while (tokenizer->position < tokenizer->input_length) {
+                        char curr = tokenizer->input[tokenizer->position];
+                        if (curr == '[') {
+                            depth++;
+                        } else if (curr == ']') {
+                            depth--;
+                            tokenizer->position++;
+                            tokenizer->column++;
+                            if (depth == 0) {
+                                break;
+                            }
+                            continue;
+                        }
+                        tokenizer->position++;
+                        tokenizer->column++;
+                    }
+                }
+                size_t length = tokenizer->position - start;
+                return token_new(TOK_VARIABLE, &tokenizer->input[start], length,
+                                 start_line, start_column, start_pos);
             } else if (isalnum(next) || next == '_' || next == '?' ||
                        next == '$' || next == '!' || next == '@' ||
                        next == '*' || next == '#' || next == '-') {
