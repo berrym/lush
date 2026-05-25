@@ -164,6 +164,21 @@ int bin_declare(int argc, char **argv) {
             case 't':
                 opt_trace = true;
                 break;
+            case 'H':
+                // zsh: hide variable from `typeset -p` listing. Pure
+                // display attribute; lush's typeset listing path
+                // doesn't enumerate variables anyway, so the no-op
+                // accept produces observably-identical behaviour.
+                break;
+            case 'U':
+                // zsh: unique-element array attribute. Per-array
+                // dedup is not yet implemented (would need an
+                // attribute on the array storage). Accept silently
+                // for now; declaring an array with -U produces an
+                // ordinary array. Documented limitation: scripts
+                // that depend on automatic dedup will diverge when
+                // duplicates arrive.
+                break;
             default:
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_OPTION,

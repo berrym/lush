@@ -205,25 +205,27 @@ files reach this surface.
 where the next statement-list element is expected after a
 short-circuit `||` chain.
 
-## 11. `typeset -H` flag unknown
+## 11. `typeset -H` flag unknown (RESOLVED)
 
-**Severity:** missing surface.
+**Status:** fixed.
 
-```zsh
-typeset -AHg FX FG BG
-```
+src/builtins/bin_declare.c now accepts two zsh-only typeset flags:
 
-zsh extends `typeset` with `-H` (hide from `typeset -p` listing) and
-`-g` (global scope from within a function). Lush's `typeset` accepts
-neither. The `-A` (associative-array) flag is supported; `-Hg` trips
-"invalid option."
+  -H   Hide from `typeset -p` listing. Pure display attribute; lush's
+       typeset listing path doesn't enumerate variables the way zsh's
+       does, so the no-op accept produces observably-identical
+       behaviour.
+  -U   Unique-element array attribute. Accepted but not enforced --
+       per-array dedup needs an attribute on the array storage that
+       lush doesn't have yet. Documented limitation: scripts that
+       depend on automatic dedup will diverge if duplicates arrive
+       via later operations. Tracked as a future enhancement.
 
-**Recommendation:** silently accept both flags as no-ops in zsh
-mode. `-H` is a display-only attribute that doesn't affect script
-semantics. `-g` is meaningful in scope-aware code but lush's
-`typeset` is shell-side and globalness is the default at top level.
+Lush already accepted -g (global) and -A (assoc array); spectrum.zsh
+uses `typeset -AHg`, all three flags are now valid.
 
-**Affected corpus entries:** spectrum.zsh.
+**Pass-rate delta:** 23/33 -> 24/33 (72.7% -> 75.8%). spectrum.zsh
+now passes cleanly.
 
 ## 12. `zle` builtin (RESOLVED)
 

@@ -2862,6 +2862,26 @@ TEST(rt_zle_register_with_body_then_L_form) {
     ASSERT_STDOUT_EQ(r, "zle -N alias_widget fn_impl\n");
 }
 
+TEST(rt_typeset_H_flag_accepted) {
+    // zsh's typeset -H (hide from listing) is purely a display attribute;
+    // lush accepts it silently so `typeset -AHg name` (the spectrum.zsh
+    // idiom) declares the assoc array without tripping invalid-option.
+    run_result_t r = run_shell("typeset -AHg M\n"
+                               "M[k]=v\n"
+                               "echo \"${M[k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v\n");
+}
+
+TEST(rt_typeset_U_flag_accepted) {
+    // zsh's typeset -U (unique-element array). Lush accepts the flag but
+    // does not enforce dedup yet (documented limitation); script must
+    // still run without invalid-option error.
+    run_result_t r = run_shell("typeset -aU arr\n"
+                               "arr=(a b c)\n"
+                               "echo \"${arr[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "a b c\n");
+}
+
 TEST(rt_zle_delete_then_list_empty) {
     zle_widget_table_reset();
     // zle -D removes the widget; subsequent -l prints nothing.
@@ -3170,6 +3190,8 @@ int main(void) {
     RUN_TEST(rt_zle_register_then_list);
     RUN_TEST(rt_zle_register_with_body_then_L_form);
     RUN_TEST(rt_zle_delete_then_list_empty);
+    RUN_TEST(rt_typeset_H_flag_accepted);
+    RUN_TEST(rt_typeset_U_flag_accepted);
     RUN_TEST(rt_test_o_unknown_option_returns_false);
     RUN_TEST(rt_typed_fn_lexical_scope);
     RUN_TEST(rt_return_from_while_loop);
