@@ -1797,7 +1797,7 @@ static int setup_fd_alloc_redirection(executor_t *executor,
     // {varname}>/file or {varname}</file : allocate fd and open file
     // Get target filename from first child
     node_t *target_node = redir_node->first_child;
-    if (!target_node || !target_node->val.str) {
+    if (!target_node) {
         shell_error_t *error = shell_error_create(
             SHELL_ERR_INVALID_REDIRECT, SHELL_SEVERITY_ERROR,
             SOURCE_LOC_UNKNOWN, "missing redirection target");
@@ -1807,9 +1807,21 @@ static int setup_fd_alloc_redirection(executor_t *executor,
         return 1;
     }
 
-    // Expand the target filename
-    char *target = expand_redirection_target(executor, target_node->val.str);
+    // Process substitution as target: `exec {fd}< <(cmd)` or
+    // `exec {fd}> >(cmd)`. Expand into a /dev/fd/N path and open that.
+    char *target = NULL;
+    if (target_node->type == NODE_PROC_SUB_IN ||
+        target_node->type == NODE_PROC_SUB_OUT) {
+        target = expand_process_substitution(executor, target_node);
+    } else if (target_node->val.str) {
+        target = expand_redirection_target(executor, target_node->val.str);
+    }
     if (!target) {
+        shell_error_t *error = shell_error_create(
+            SHELL_ERR_INVALID_REDIRECT, SHELL_SEVERITY_ERROR,
+            SOURCE_LOC_UNKNOWN, "missing redirection target");
+        shell_error_display(error, stderr, isatty(STDERR_FILENO));
+        shell_error_free(error);
         free(var_name);
         return 1;
     }

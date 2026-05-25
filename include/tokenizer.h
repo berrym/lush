@@ -320,6 +320,17 @@ void tokenizer_enable_keywords(tokenizer_t *tokenizer, bool enable);
 void tokenizer_refresh_lookahead(tokenizer_t *tokenizer);
 
 /**
+ * @brief Refresh both current and lookahead tokens
+ *
+ * Re-tokenizes current and lookahead together using current tokenizer
+ * settings. Use after a setting flip (e.g., re-enabling keywords) when
+ * both already-buffered tokens may be misclassified.
+ *
+ * @param tokenizer Tokenizer context
+ */
+void tokenizer_refresh_current_and_lookahead(tokenizer_t *tokenizer);
+
+/**
  * @brief Refresh tokenizer state from current position
  *
  * @param tokenizer Tokenizer context

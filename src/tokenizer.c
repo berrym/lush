@@ -465,6 +465,39 @@ void tokenizer_refresh_lookahead(tokenizer_t *tokenizer) {
 }
 
 /**
+ * @brief Refresh both current and lookahead tokens with current settings
+ *
+ * Re-tokenizes current and lookahead together. Use this after a tokenizer
+ * setting change (e.g., `enable_keywords` flipping back on) when *both*
+ * already-buffered tokens may be misclassified. Refreshing only the
+ * lookahead leaves the current token stale, which can cause keywords
+ * like `fi`/`done` to be returned as TOK_WORD to the parser.
+ */
+void tokenizer_refresh_current_and_lookahead(tokenizer_t *tokenizer) {
+    if (!tokenizer || !tokenizer->current) {
+        return;
+    }
+
+    size_t saved_position = tokenizer->current->position;
+    size_t saved_line = tokenizer->current->line;
+    size_t saved_column = tokenizer->current->column;
+
+    token_free(tokenizer->current);
+    tokenizer->current = NULL;
+    if (tokenizer->lookahead) {
+        token_free(tokenizer->lookahead);
+        tokenizer->lookahead = NULL;
+    }
+
+    tokenizer->position = saved_position;
+    tokenizer->line = saved_line;
+    tokenizer->column = saved_column;
+
+    tokenizer->current = tokenize_next(tokenizer);
+    tokenizer->lookahead = tokenize_next(tokenizer);
+}
+
+/**
  * @brief Refresh tokenizer from current position
  *
  * Discards current and lookahead tokens and re-tokenizes

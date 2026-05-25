@@ -2582,7 +2582,11 @@ static node_t *parse_redirection(parser_t *parser) {
 
     // For NODE_REDIR_FD, the target is embedded in the redirection token itself
     if (node_type == NODE_REDIR_FD) {
-        // No separate target token needed for file descriptor redirections
+        // No separate target token needed; the now-current token is the next
+        // command's first token, read while keywords were disabled. Refresh
+        // both current and lookahead so a following `fi`/`done`/`then` keyword
+        // is re-classified instead of arriving as TOK_WORD.
+        tokenizer_refresh_current_and_lookahead(parser->tokenizer);
         return redir_node;
     }
 
@@ -2597,7 +2601,8 @@ static node_t *parse_redirection(parser_t *parser) {
             char last = redir_text[len - 1];
             char prev = redir_text[len - 2];
             if (prev == '&' && (last == '-' || isdigit(last))) {
-                // {varname}>&- or {varname}>&N - no target needed
+                // Same keyword-misclassification fix as NODE_REDIR_FD above.
+                tokenizer_refresh_current_and_lookahead(parser->tokenizer);
                 return redir_node;
             }
         }
