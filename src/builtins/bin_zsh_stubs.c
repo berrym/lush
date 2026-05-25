@@ -30,15 +30,36 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "autoload.h"
 #include "builtins.h"
 #include "executor.h"
 #include "node.h"
 
-int bin_autoload(int argc __attribute__((unused)),
-                 char **argv __attribute__((unused))) {
-    // zsh's lazy-function loader. Lush loads functions when their
-    // source file is sourced; the autoload bookkeeping is a no-op.
-    return 0;
+#include <string.h>
+
+int bin_autoload(int argc, char **argv) {
+    // Iterate operands. Skip option flags (-U, -z, -k, -X, -m, +, ...),
+    // which all influence how zsh autoloads but do not change which
+    // names are registered. The lush autoload module always wraps the
+    // file body as `function NAME { ... }` so `-U` (no alias expansion)
+    // and `-z` (zsh syntax) are already implicit.
+    int rc = 0;
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!arg || !*arg) {
+            continue;
+        }
+        if (arg[0] == '-' || arg[0] == '+') {
+            // Option flag; ignore for registration purposes. The `--`
+            // end-of-options marker is handled the same way (its body
+            // is just an empty name, which the empty-check skips).
+            continue;
+        }
+        if (!autoload_register(arg)) {
+            rc = 1;
+        }
+    }
+    return rc;
 }
 
 int bin_zmodload(int argc __attribute__((unused)),
@@ -46,6 +67,43 @@ int bin_zmodload(int argc __attribute__((unused)),
     // zsh module loader. Lush has no module system; the most-used
     // module bodies (e.g., zsh/complist completion list mode) are
     // either built-in or supplanted by lush's own subsystems.
+    return 0;
+}
+
+int bin_emulate(int argc, char **argv) {
+    /* `emulate [-LR] [shell]` switches the shell's emulation context.
+     * Real zsh recognises `zsh`, `sh`, `csh`, `ksh` and -L (local to
+     * the enclosing function) / -R (reset options first) / -c <cmd>.
+     *
+     * Lush's `mode` builtin already does mode switching, but function-
+     * local restoration is not yet plumbed through the call frame, so
+     * a real `emulate -L` would not auto-restore on return. Rather
+     * than do half the job, accept the full option grammar and treat
+     * the call as a no-op when the requested target matches the
+     * current mode (or when no target is given). Any mismatch is
+     * silently accepted: autoloaded zsh functions calling
+     * `emulate -L zsh` while lush is already in zsh mode -- the
+     * actual corpus shape -- get the correct behaviour.
+     *
+     * When the underlying function-scoped option stash lands, this
+     * stub will be retired in favour of the real switch. */
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (!arg || !*arg) {
+            continue;
+        }
+        // Skip flags (-L, -R, -LR, -c <cmd>, ...).
+        if (arg[0] == '-' && arg[1] != '\0') {
+            // -c takes an argument; consume it.
+            if (strchr(arg, 'c') != NULL && i + 1 < argc) {
+                i++;
+            }
+            continue;
+        }
+        // shell-name operand. Recognised names: zsh / sh / csh / ksh.
+        // Anything else is an error in real zsh; we return 0 to keep
+        // corpus scripts running even if their author wrote a typo.
+    }
     return 0;
 }
 

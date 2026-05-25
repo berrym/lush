@@ -500,6 +500,7 @@ int bin_let(int argc, char **argv);
 int bin_bindkey(int argc, char **argv);
 int bin_autoload(int argc, char **argv);
 int bin_zmodload(int argc, char **argv);
+int bin_emulate(int argc, char **argv);
 int bin_colors(int argc, char **argv);
 int bin_zle(int argc, char **argv);
 

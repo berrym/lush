@@ -15,6 +15,7 @@
 #include "alias.h"
 #include "arithmetic.h"
 #include "autocorrect.h"
+#include "autoload.h"
 #include "builtins.h"
 #include "config.h"
 #include "debug.h"
@@ -1883,6 +1884,16 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
             g_debug_context->total_commands++;
             debug_profile_function_enter(g_debug_context, command_name);
         }
+    }
+
+    // Zsh-style autoload: if the name was declared via `autoload NAME`
+    // and the function isn't yet defined, try to resolve it now via
+    // fpath. On success the function joins the live table and the
+    // subsequent is_function_defined check picks it up. Done BEFORE
+    // builtin lookup so an autoloadable name doesn't get shadowed by
+    // a same-named builtin the user explicitly chose to override.
+    if (!is_function_defined(executor, filtered_argv[0])) {
+        (void)autoload_try_resolve(executor, filtered_argv[0]);
     }
 
     if (is_function_defined(executor, filtered_argv[0])) {

@@ -54,6 +54,7 @@ inc = include_directories('include',
 
 src = ['src/arithmetic.c',
        'src/autocorrect.c',
+       'src/autoload.c',
        'src/builtins/alias.c',
        'src/builtins/bin_analyze.c',
        'src/builtins/bin_bg.c',
@@ -2215,6 +2216,25 @@ if fs.exists('tests/unit/test_redirection.c')
                                 include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Redirection', test_redirection,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Autoload Tests
+if fs.exists('tests/unit/test_autoload.c')
+  test_autoload_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_autoload_sources += s
+    endif
+  endforeach
+  test_autoload = executable('test_autoload',
+                             'tests/unit/test_autoload.c',
+                             'tests/unit/test_executor_stubs.c',
+                             test_autoload_sources + lle_shell_sources,
+                             include_directories: [inc, include_directories('tests')],
+                             dependencies: [lle_dep, libm])
+  test('Autoload', test_autoload,
        suite: 'unit',
        timeout: 30)
 endif

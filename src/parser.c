@@ -4554,6 +4554,14 @@ static node_t *parse_case_statement(parser_t *parser) {
             return NULL;
         }
 
+        // POSIX 2.10.2 permits an optional `(` before the pattern list
+        // (`case_item: [(] pattern_list ')' ...`). Zsh scripts use it
+        // routinely (e.g. add-zsh-hook's `case $opt in (d) ... (D) ...`).
+        // Skip it so the pattern collector sees only the pattern tokens.
+        if (tokenizer_match(parser->tokenizer, TOK_LPAREN)) {
+            tokenizer_advance(parser->tokenizer);
+        }
+
         // Terminator will be stored in pattern string prefix (0=break, 1=fall,
         // 2=cont)
         case_terminator_t terminator = CASE_TERM_BREAK;
