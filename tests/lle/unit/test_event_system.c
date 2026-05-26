@@ -40,9 +40,7 @@ static lle_result_t handler_return_value = LLE_SUCCESS;
 /// TEST HELPER FUNCTIONS
 /* ========================================================================== */
 
-/**
- * @brief Reset handler state before each test
- */
+/// @brief Reset handler state before each test
 static void reset_handler_state(void) {
     handler_call_count = 0;
     last_handled_event = NULL;
@@ -50,9 +48,7 @@ static void reset_handler_state(void) {
     handler_return_value = LLE_SUCCESS;
 }
 
-/**
- * @brief Test event handler callback
- */
+/// @brief Test event handler callback
 static lle_result_t test_event_handler(lle_event_t *event, void *user_data) {
     handler_call_count++;
     last_handled_event = event;

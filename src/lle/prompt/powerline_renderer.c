@@ -203,9 +203,7 @@ static size_t strip_ansi(const char *src, char *dst, size_t dst_size) {
  * ============================================================================
  */
 
-/**
- * @brief Collect visible segments with their rendered content and colors
- */
+/// @brief Collect visible segments with their rendered content and colors
 static size_t collect_visible_segments(const lle_theme_t *theme,
                                        lle_segment_registry_t *registry,
                                        const lle_prompt_context_t *ctx,

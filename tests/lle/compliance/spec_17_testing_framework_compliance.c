@@ -64,10 +64,8 @@ static int tests_failed = 0;
  * Testing Framework Constants Compliance Tests
  * ========================================================================== */
 
-/**
- * Test: Verify performance test constants match spec
- * Spec Requirement: Performance testing configuration
- */
+/// @brief Test: Verify performance test constants match spec
+/// Spec Requirement: Performance testing configuration
 static bool test_performance_constants(void) {
     printf("  Testing performance test constants...\n");
 
@@ -90,10 +88,8 @@ static bool test_performance_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify performance threshold constants
- * Spec Requirement: Performance thresholds configuration
- */
+/// @brief Test: Verify performance threshold constants
+/// Spec Requirement: Performance thresholds configuration
 static bool test_performance_thresholds(void) {
     printf("  Testing performance threshold constants...\n");
 
@@ -112,10 +108,8 @@ static bool test_performance_thresholds(void) {
     return true;
 }
 
-/**
- * Test: Verify test limit constants
- * Spec Requirement: Test framework limits
- */
+/// @brief Test: Verify test limit constants
+/// Spec Requirement: Test framework limits
 static bool test_limit_constants(void) {
     printf("  Testing test limit constants...\n");
 

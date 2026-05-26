@@ -28,18 +28,14 @@
  * ============================================================================
  */
 
-/**
- * @brief Get current timestamp in microseconds
- */
+/// @brief Get current timestamp in microseconds
 static uint64_t get_timestamp_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
 }
 
-/**
- * @brief Find last undoable sequence
- */
+/// @brief Find last undoable sequence
 static lle_change_sequence_t *
 find_last_undoable_sequence(lle_change_tracker_t *tracker) {
     if (!tracker || !tracker->current_position) {
@@ -58,9 +54,7 @@ find_last_undoable_sequence(lle_change_tracker_t *tracker) {
     return NULL;
 }
 
-/**
- * @brief Find last redoable sequence
- */
+/// @brief Find last redoable sequence
 static lle_change_sequence_t *
 find_last_redoable_sequence(lle_change_tracker_t *tracker) {
     if (!tracker) {
@@ -83,9 +77,7 @@ find_last_redoable_sequence(lle_change_tracker_t *tracker) {
     return NULL;
 }
 
-/**
- * @brief Free operation and its associated data
- */
+/// @brief Free operation and its associated data
 static void free_operation(lle_change_operation_t *op,
                            lush_memory_pool_t *pool) {
     (void)pool; /// Reserved for future pool-based deallocation
@@ -103,9 +95,7 @@ static void free_operation(lle_change_operation_t *op,
     lle_pool_free(op);
 }
 
-/**
- * @brief Free sequence and all its operations
- */
+/// @brief Free sequence and all its operations
 static void free_sequence(lle_change_sequence_t *seq,
                           lush_memory_pool_t *pool) {
     if (!seq) {

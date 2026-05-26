@@ -54,11 +54,9 @@ bool lle_shell_is_alias(const char *text) {
  * ============================================================================
  */
 
-/**
- * @brief Test whether `prefix` is a prefix of `candidate` using
- *        NFC-aware unicode comparison. Empty prefix matches any
- *        candidate.
- */
+/// @brief Test whether `prefix` is a prefix of `candidate` using
+/// NFC-aware unicode comparison. Empty prefix matches any
+/// candidate.
 static bool nfc_prefix_match(const char *prefix, const char *candidate) {
     if (!prefix || !candidate)
         return false;

@@ -146,9 +146,7 @@ static bool parse_key(const char *key, char *section, size_t section_len,
     return true;
 }
 
-/**
- * @brief Find a registered section by name
- */
+/// @brief Find a registered section by name
 static registered_section_t *find_section(const char *name) {
     for (size_t i = 0; i < g_registry.section_count; i++) {
         if (unicode_streq(g_registry.sections[i].section.name, name)) {
@@ -158,9 +156,7 @@ static registered_section_t *find_section(const char *name) {
     return NULL;
 }
 
-/**
- * @brief Find a stored option by full key
- */
+/// @brief Find a stored option by full key
 static stored_option_t *find_option(const char *key) {
     char section_name[CREG_KEY_MAX];
     char option_name[CREG_KEY_MAX];
@@ -533,9 +529,7 @@ typedef struct {
     char error_msg[256];
 } load_context_t;
 
-/**
- * @brief TOML parser callback for loading config
- */
+/// @brief TOML parser callback for loading config
 static toml_result_t load_callback(const char *section, const char *key,
                                    const toml_value_t *value, void *user_data) {
     load_context_t *ctx = (load_context_t *)user_data;

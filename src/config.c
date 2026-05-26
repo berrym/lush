@@ -688,9 +688,7 @@ static const creg_section_t behavior_section = {
  * Sync Hook Implementations
  * -------------------------------------------------------------------------- */
 
-/**
- * @brief Sync history config from registry to runtime
- */
+/// @brief Sync history config from registry to runtime
 static void history_sync_to_runtime(void) {
     bool bval;
     int64_t ival;
@@ -710,9 +708,7 @@ static void history_sync_to_runtime(void) {
     }
 }
 
-/**
- * @brief Sync history config from runtime to registry
- */
+/// @brief Sync history config from runtime to registry
 static void history_sync_from_runtime(void) {
     config_registry_set_boolean("history.enabled", config.history_enabled);
     config_registry_set_integer("history.size", config.history_size);
@@ -721,9 +717,7 @@ static void history_sync_from_runtime(void) {
                                 config.history_timestamps);
 }
 
-/**
- * @brief Sync shell options from registry to runtime
- */
+/// @brief Sync shell options from registry to runtime
 static void shell_sync_to_runtime(void) {
     bool bval;
     char sval[CREG_VALUE_STRING_MAX];
@@ -760,9 +754,7 @@ static void shell_sync_to_runtime(void) {
     }
 }
 
-/**
- * @brief Sync shell options from runtime to registry
- */
+/// @brief Sync shell options from runtime to registry
 static void shell_sync_from_runtime(void) {
     /// Map mode enum to string
     const char *mode_str = "lush";
@@ -793,9 +785,7 @@ static void shell_sync_from_runtime(void) {
                                 config_get_shell_option("pipefail"));
 }
 
-/**
- * @brief Sync display config from registry to runtime
- */
+/// @brief Sync display config from registry to runtime
 static void display_sync_to_runtime(void) {
     bool bval;
     int64_t ival;
@@ -822,9 +812,7 @@ static void display_sync_to_runtime(void) {
     }
 }
 
-/**
- * @brief Sync display config from runtime to registry
- */
+/// @brief Sync display config from runtime to registry
 static void display_sync_from_runtime(void) {
     config_registry_set_boolean("display.syntax_highlighting",
                                 config.display_syntax_highlighting);
@@ -838,9 +826,7 @@ static void display_sync_from_runtime(void) {
                                 config.display_optimization_level);
 }
 
-/**
- * @brief Sync completion config from registry to runtime
- */
+/// @brief Sync completion config from registry to runtime
 static void completion_sync_to_runtime(void) {
     bool bval;
 
@@ -858,9 +844,7 @@ static void completion_sync_to_runtime(void) {
     }
 }
 
-/**
- * @brief Sync completion config from runtime to registry
- */
+/// @brief Sync completion config from runtime to registry
 static void completion_sync_from_runtime(void) {
     config_registry_set_boolean("completion.enabled",
                                 config.completion_enabled);
@@ -869,9 +853,7 @@ static void completion_sync_from_runtime(void) {
                                 config.completion_case_sensitive);
 }
 
-/**
- * @brief Sync behavior config from registry to runtime
- */
+/// @brief Sync behavior config from registry to runtime
 static void behavior_sync_to_runtime(void) {
     bool bval;
 
@@ -889,9 +871,7 @@ static void behavior_sync_to_runtime(void) {
     }
 }
 
-/**
- * @brief Sync behavior config from runtime to registry
- */
+/// @brief Sync behavior config from runtime to registry
 static void behavior_sync_from_runtime(void) {
     config_registry_set_boolean("behavior.auto_cd", config.auto_cd);
     config_registry_set_boolean("behavior.spell_correction",

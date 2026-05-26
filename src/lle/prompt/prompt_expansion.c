@@ -49,11 +49,9 @@ static void buf_append_char(expand_buf_t *b, char c) {
     }
 }
 
-/**
- * Append a string to the buffer, ensuring UTF-8 sequences are never split.
- * If the remaining buffer space cannot fit a complete UTF-8 sequence,
- * truncation stops before the partial sequence rather than splitting it.
- */
+/// @brief Append a string to the buffer, ensuring UTF-8 sequences are never
+/// split. If the remaining buffer space cannot fit a complete UTF-8 sequence,
+/// truncation stops before the partial sequence rather than splitting it.
 static void buf_append_str(expand_buf_t *b, const char *s) {
     if (!s)
         return;
@@ -109,9 +107,7 @@ static void get_cwd_full(char *buf, size_t size) {
         buf[0] = '\0';
 }
 
-/**
- * Get cwd with home directory replaced by ~
- */
+/// @brief Get cwd with home directory replaced by ~
 static void get_cwd_tilde(char *buf, size_t size) {
     char cwd[PATH_MAX];
     get_cwd_full(cwd, sizeof(cwd));
@@ -128,9 +124,7 @@ static void get_cwd_tilde(char *buf, size_t size) {
     snprintf(buf, size, "%s", cwd);
 }
 
-/**
- * Get basename of cwd (with ~ substitution for home)
- */
+/// @brief Get basename of cwd (with ~ substitution for home)
 static void get_cwd_basename(char *buf, size_t size) {
     char tilde[PATH_MAX];
     get_cwd_tilde(tilde, sizeof(tilde));
@@ -162,10 +156,8 @@ static const char *get_tty_name(void) {
 /// Helper: parse color spec for %F{color} / %K{color}
 /* ========================================================================== */
 
-/**
- * Parse a color name/number/hex and emit the ANSI escape.
- * fg=true for foreground (%F), fg=false for background (%K).
- */
+/// @brief Parse a color name/number/hex and emit the ANSI escape.
+/// fg=true for foreground (%F), fg=false for background (%K).
 static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
                        bool fg) {
     if (color_depth == 0)

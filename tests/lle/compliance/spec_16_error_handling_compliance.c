@@ -63,20 +63,16 @@ static int tests_failed = 0;
  * Error Code Compliance Tests
  * ========================================================================== */
 
-/**
- * Test: Verify LLE_SUCCESS is defined and equals 0
- * Spec Requirement: Line 78 - "LLE_SUCCESS = 0"
- */
+/// @brief Test: Verify LLE_SUCCESS is defined and equals 0
+/// Spec Requirement: Line 78 - "LLE_SUCCESS = 0"
 static bool test_success_code_compliance(void) {
     printf("  Testing LLE_SUCCESS code...\n");
     ASSERT_EQ(0, LLE_SUCCESS, "LLE_SUCCESS must equal 0 per spec");
     return true;
 }
 
-/**
- * Test: Verify all Input Validation error codes exist (1000-1099)
- * Spec Requirement: Lines 81-88
- */
+/// @brief Test: Verify all Input Validation error codes exist (1000-1099)
+/// Spec Requirement: Lines 81-88
 static bool test_input_validation_error_codes_exist(void) {
     printf("  Testing Input Validation error codes (1000-1099)...\n");
 
@@ -100,10 +96,8 @@ static bool test_input_validation_error_codes_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify all Memory Management error codes exist (1100-1199)
- * Spec Requirement: Lines 90-97
- */
+/// @brief Test: Verify all Memory Management error codes exist (1100-1199)
+/// Spec Requirement: Lines 90-97
 static bool test_memory_error_codes_exist(void) {
     printf("  Testing Memory Management error codes (1100-1199)...\n");
 
@@ -124,10 +118,8 @@ static bool test_memory_error_codes_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify all System Integration error codes exist (1200-1299)
- * Spec Requirement: Lines 99-106
- */
+/// @brief Test: Verify all System Integration error codes exist (1200-1299)
+/// Spec Requirement: Lines 99-106
 static bool test_system_integration_error_codes_exist(void) {
     printf("  Testing System Integration error codes (1200-1299)...\n");
 
@@ -149,10 +141,8 @@ static bool test_system_integration_error_codes_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify all Component-Specific error codes exist (1300-1399)
- * Spec Requirement: Lines 108-117
- */
+/// @brief Test: Verify all Component-Specific error codes exist (1300-1399)
+/// Spec Requirement: Lines 108-117
 static bool test_component_error_codes_exist(void) {
     printf("  Testing Component-Specific error codes (1300-1399)...\n");
 
@@ -174,10 +164,8 @@ static bool test_component_error_codes_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify all Feature/Extensibility error codes exist (1400-1499)
- * Spec Requirement: Lines 119-128
- */
+/// @brief Test: Verify all Feature/Extensibility error codes exist (1400-1499)
+/// Spec Requirement: Lines 119-128
 static bool test_feature_error_codes_exist(void) {
     printf("  Testing Feature/Extensibility error codes (1400-1499)...\n");
 
@@ -199,10 +187,8 @@ static bool test_feature_error_codes_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify all Performance/Resource error codes exist (1500-1599)
- * Spec Requirement: Lines 130-137
- */
+/// @brief Test: Verify all Performance/Resource error codes exist (1500-1599)
+/// Spec Requirement: Lines 130-137
 static bool test_performance_error_codes_exist(void) {
     printf("  Testing Performance/Resource error codes (1500-1599)...\n");
 
@@ -223,10 +209,8 @@ static bool test_performance_error_codes_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify all Critical System error codes exist (1600-1699)
- * Spec Requirement: Lines 139-146
- */
+/// @brief Test: Verify all Critical System error codes exist (1600-1699)
+/// Spec Requirement: Lines 139-146
 static bool test_critical_error_codes_exist(void) {
     printf("  Testing Critical System error codes (1600-1699)...\n");
 
@@ -247,10 +231,8 @@ static bool test_critical_error_codes_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify LLE_SUCCESS_WITH_WARNINGS exists
- * Spec Requirement: Line 79
- */
+/// @brief Test: Verify LLE_SUCCESS_WITH_WARNINGS exists
+/// Spec Requirement: Line 79
 static bool test_success_with_warnings_exists(void) {
     printf("  Testing LLE_SUCCESS_WITH_WARNINGS...\n");
 

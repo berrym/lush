@@ -44,9 +44,7 @@
  * - lle_capability_level_to_string()
  */
 
-/**
- * Test Phase 1: Detection System API
- */
+/// @brief Test Phase 1: Detection System API
 static void test_phase1_detection_api(void) {
     printf("Testing Phase 1: Detection System API...\n");
 
@@ -80,9 +78,7 @@ static void test_phase1_detection_api(void) {
     printf("  Phase 1 Detection API: PASS\n");
 }
 
-/**
- * Test Phase 2: Controller System API
- */
+/// @brief Test Phase 2: Controller System API
 static void test_phase2_controller_api(void) {
     printf("Testing Phase 2: Controller System API...\n");
 

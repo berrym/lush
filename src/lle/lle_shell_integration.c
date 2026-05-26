@@ -115,9 +115,7 @@ static void destroy_prompt_composer(lle_shell_integration_t *integ);
  * ============================================================================
  */
 
-/**
- * @brief Get current timestamp in microseconds
- */
+/// @brief Get current timestamp in microseconds
 static uint64_t get_timestamp_us(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
@@ -126,9 +124,7 @@ static uint64_t get_timestamp_us(void) {
     return 0;
 }
 
-/**
- * @brief Populate history config from Lush config system
- */
+/// @brief Populate history config from Lush config system
 static void populate_history_config(lle_history_config_t *hist_config) {
     if (!hist_config) {
         return;
@@ -435,9 +431,7 @@ bool lle_is_active(void) {
  * ============================================================================
  */
 
-/**
- * @brief Create and configure the LLE editor instance
- */
+/// @brief Create and configure the LLE editor instance
 static lle_result_t
 create_and_configure_editor(lle_shell_integration_t *integ) {
     if (!integ) {
@@ -482,9 +476,7 @@ create_and_configure_editor(lle_shell_integration_t *integ) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Destroy the editor instance
- */
+/// @brief Destroy the editor instance
 static void destroy_editor(lle_shell_integration_t *integ) {
     if (!integ || !integ->editor) {
         return;

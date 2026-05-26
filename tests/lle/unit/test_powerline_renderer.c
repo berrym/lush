@@ -49,23 +49,17 @@
 /// Helpers
 /* ========================================================================== */
 
-/**
- * Check that a string contains an ANSI escape sequence (ESC[).
- */
+/// @brief Check that a string contains an ANSI escape sequence (ESC[).
 static bool contains_ansi(const char *str) {
     return strstr(str, "\033[") != NULL;
 }
 
-/**
- * Check that a string contains a specific substring.
- */
+/// @brief Check that a string contains a specific substring.
 static bool contains(const char *haystack, const char *needle) {
     return strstr(haystack, needle) != NULL;
 }
 
-/**
- * Count occurrences of a substring in a string.
- */
+/// @brief Count occurrences of a substring in a string.
 static int count_occurrences(const char *haystack, const char *needle) {
     int count = 0;
     size_t needle_len = strlen(needle);

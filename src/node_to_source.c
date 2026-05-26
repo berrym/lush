@@ -50,9 +50,7 @@ static void strbuf_append(strbuf_t *buf, const char *str) {
 /// Forward declaration
 static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth);
 
-/**
- * @brief Check if node is a redirection type
- */
+/// @brief Check if node is a redirection type
 static int is_redirection(node_t *node) {
     if (!node)
         return 0;
@@ -150,9 +148,7 @@ static void redir_to_source(node_t *node, strbuf_t *buf) {
     }
 }
 
-/**
- * @brief Recursive implementation of node to source conversion
- */
+/// @brief Recursive implementation of node to source conversion
 static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     if (!node)
         return;

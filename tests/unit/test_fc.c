@@ -76,9 +76,7 @@ static bool parse_substitution_pattern(const char *pattern, char **old,
     return true;
 }
 
-/**
- * @brief Apply substitution to command (test helper)
- */
+/// @brief Apply substitution to command (test helper)
 static char *apply_substitution(const char *command, const char *old,
                                 const char *new_str) {
     if (!command || !old || !new_str) {
@@ -416,9 +414,7 @@ TEST(fc_substitute_mode_syntax) {
  * ============================================================================
  */
 
-/**
- * @brief Format a history entry for fc -l output
- */
+/// @brief Format a history entry for fc -l output
 static void format_fc_entry(char *buf, size_t size, int num, const char *cmd,
                             bool show_numbers) {
     if (show_numbers) {

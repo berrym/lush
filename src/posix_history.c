@@ -65,9 +65,7 @@ static void posix_history_set_error(const char *error) {
     }
 }
 
-/**
- * @brief Clear error message
- */
+/// @brief Clear error message
 static void posix_history_clear_error(void) {
     posix_history_error_message[0] = '\0';
 }

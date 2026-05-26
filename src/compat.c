@@ -126,18 +126,14 @@ static const char *fix_type_names[] = {
  * ============================================================================
  */
 
-/**
- * @brief Duplicate a string safely
- */
+/// @brief Duplicate a string safely
 static char *safe_strdup(const char *s) {
     if (!s)
         return NULL;
     return strdup(s);
 }
 
-/**
- * @brief Free an internal entry
- */
+/// @brief Free an internal entry
 static void free_internal_entry(internal_entry_t *entry) {
     if (!entry)
         return;
@@ -162,9 +158,7 @@ static void free_internal_entry(internal_entry_t *entry) {
     memset(entry, 0, sizeof(*entry));
 }
 
-/**
- * @brief Convert internal entry to public entry
- */
+/// @brief Convert internal entry to public entry
 static void internal_to_public(const internal_entry_t *internal,
                                compat_entry_t *public) {
   public
@@ -197,9 +191,7 @@ static void internal_to_public(const internal_entry_t *internal,
     ->lint.replacement = internal->fix_replacement;
 }
 
-/**
- * @brief Compile regex pattern for an entry
- */
+/// @brief Compile regex pattern for an entry
 static void compile_entry_regex(internal_entry_t *entry) {
     if (!entry->lint_pattern || entry->lint_pattern[0] == '\0') {
         entry->regex_valid = false;
@@ -239,9 +231,7 @@ typedef struct {
     bool in_fix;
 } parse_context_t;
 
-/**
- * @brief Find or create entry by ID
- */
+/// @brief Find or create entry by ID
 static internal_entry_t *find_or_create_entry(const char *id) {
     /// Search existing
     for (size_t i = 0; i < g_compat.entry_count; i++) {
@@ -261,9 +251,7 @@ static internal_entry_t *find_or_create_entry(const char *id) {
     return entry;
 }
 
-/**
- * @brief TOML parser callback
- */
+/// @brief TOML parser callback
 static toml_result_t compat_toml_callback(const char *section, const char *key,
                                           const toml_value_t *value,
                                           void *user_data) {
@@ -382,9 +370,7 @@ static toml_result_t compat_toml_callback(const char *section, const char *key,
     return TOML_SUCCESS;
 }
 
-/**
- * @brief Load a single TOML file
- */
+/// @brief Load a single TOML file
 static int load_toml_file(const char *path) {
     FILE *fp = fopen(path, "r");
     if (!fp) {
@@ -433,9 +419,7 @@ static int load_toml_file(const char *path) {
     return (result == TOML_SUCCESS) ? 0 : -1;
 }
 
-/**
- * @brief Load all TOML files from a directory recursively
- */
+/// @brief Load all TOML files from a directory recursively
 static int load_directory(const char *dir_path) {
     DIR *dir = opendir(dir_path);
     if (!dir) {
@@ -1076,9 +1060,7 @@ static bool shell_supports_feature(shell_mode_t shell, const char *feature) {
     return !behavior_indicates_unavailable(behavior);
 }
 
-/**
- * @brief Recursive AST walker for compatibility checking
- */
+/// @brief Recursive AST walker for compatibility checking
 static size_t compat_check_ast_node(node_t *node, shell_mode_t target,
                                     compat_result_t *results,
                                     size_t max_results, size_t found) {
@@ -1138,9 +1120,7 @@ size_t compat_check_ast(node_t *ast, shell_mode_t target,
     return compat_check_ast_node(ast, target, results, max_results, 0);
 }
 
-/**
- * @brief Recursive AST walker for collecting issues with stable strings
- */
+/// @brief Recursive AST walker for collecting issues with stable strings
 static size_t compat_collect_ast_issues(node_t *node, shell_mode_t target,
                                         compat_ast_issue_t *issues,
                                         size_t max_issues, size_t found) {

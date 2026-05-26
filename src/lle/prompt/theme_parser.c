@@ -53,9 +53,7 @@ typedef struct {
     lle_theme_parser_t *theme_parser; ///< For syncing state
 } theme_parser_adapter_t;
 
-/**
- * @brief Adapter callback that converts toml_value_t to lle_theme_value_t
- */
+/// @brief Adapter callback that converts toml_value_t to lle_theme_value_t
 static toml_result_t theme_parser_adapter_callback(const char *section,
                                                    const char *key,
                                                    const toml_value_t *value,
@@ -86,9 +84,7 @@ static toml_result_t theme_parser_adapter_callback(const char *section,
  * ============================================================================
  */
 
-/**
- * @brief Recursively convert toml_value_t to lle_theme_value_t
- */
+/// @brief Recursively convert toml_value_t to lle_theme_value_t
 static void convert_toml_value_to_theme_value(const toml_value_t *src,
                                               lle_theme_value_t *dst) {
     if (!src || !dst) {

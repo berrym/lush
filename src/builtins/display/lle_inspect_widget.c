@@ -205,9 +205,7 @@ static void format_map_value(array_value_t *array, char *out, size_t cap) {
     }
 }
 
-/**
- * @brief Publish inspection data for @p name to the LUSH_INSPECT_* vars.
- */
+/// @brief Publish inspection data for @p name to the LUSH_INSPECT_* vars.
 static void publish_inspection(const char *name) {
     symtable_set_global("LUSH_INSPECT_NAME", name ? name : "");
     if (!name || !name[0]) {

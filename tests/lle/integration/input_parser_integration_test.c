@@ -60,9 +60,7 @@ static int fail_count = 0;
 /// ERROR RECOVERY TESTS
 /* ========================================================================== */
 
-/**
- * Test parser reset functionality
- */
+/// @brief Test parser reset functionality
 static int test_parser_reset(void) {
     lle_sequence_parser_t seq_parser = {0};
     lle_key_detector_t key_detector = {0};
@@ -108,9 +106,7 @@ static int test_parser_reset(void) {
     TEST_PASS();
 }
 
-/**
- * Test UTF-8 validation with valid sequences
- */
+/// @brief Test UTF-8 validation with valid sequences
 static int test_utf8_validation_valid(void) {
     size_t valid_len = 0;
 
@@ -141,9 +137,7 @@ static int test_utf8_validation_valid(void) {
     TEST_PASS();
 }
 
-/**
- * Test UTF-8 validation with invalid sequences
- */
+/// @brief Test UTF-8 validation with invalid sequences
 static int test_utf8_validation_invalid(void) {
     size_t valid_len = 0;
 
@@ -174,9 +168,7 @@ static int test_utf8_validation_invalid(void) {
     TEST_PASS();
 }
 
-/**
- * Test sequence timeout detection - no timeout
- */
+/// @brief Test sequence timeout detection - no timeout
 static int test_sequence_timeout_none(void) {
     lle_sequence_parser_t seq_parser = {0};
     lle_key_detector_t key_detector = {0};
@@ -197,9 +189,7 @@ static int test_sequence_timeout_none(void) {
     TEST_PASS();
 }
 
-/**
- * Test sequence timeout detection - within window
- */
+/// @brief Test sequence timeout detection - within window
 static int test_sequence_timeout_within_window(void) {
     lle_sequence_parser_t seq_parser = {0};
     lle_key_detector_t key_detector = {0};
@@ -220,9 +210,7 @@ static int test_sequence_timeout_within_window(void) {
     TEST_PASS();
 }
 
-/**
- * Test sequence timeout detection - exceeded
- */
+/// @brief Test sequence timeout detection - exceeded
 static int test_sequence_timeout_exceeded(void) {
     lle_sequence_parser_t seq_parser = {0};
     lle_key_detector_t key_detector = {0};
@@ -244,9 +232,7 @@ static int test_sequence_timeout_exceeded(void) {
     TEST_PASS();
 }
 
-/**
- * Test timeout handling
- */
+/// @brief Test timeout handling
 static int test_timeout_handling(void) {
     lle_sequence_parser_t seq_parser = {0};
     lle_key_detector_t key_detector = {0};
@@ -274,9 +260,7 @@ static int test_timeout_handling(void) {
     TEST_PASS();
 }
 
-/**
- * Test error statistics collection
- */
+/// @brief Test error statistics collection
 static int test_error_statistics(void) {
     lle_utf8_processor_t utf8_proc = {0};
     lle_mouse_parser_t mouse_parser = {0};
@@ -305,9 +289,7 @@ static int test_error_statistics(void) {
     TEST_PASS();
 }
 
-/**
- * Test invalid state recovery
- */
+/// @brief Test invalid state recovery
 static int test_invalid_state_recovery(void) {
     lle_sequence_parser_t seq_parser = {0};
     seq_parser.state = LLE_PARSER_STATE_ERROR_RECOVERY;
@@ -326,9 +308,7 @@ static int test_invalid_state_recovery(void) {
     TEST_PASS();
 }
 
-/**
- * Test multiple error types
- */
+/// @brief Test multiple error types
 static int test_multiple_error_types(void) {
     lle_input_parser_system_t parser_sys = {0};
 

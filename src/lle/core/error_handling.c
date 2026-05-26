@@ -325,9 +325,7 @@ const char *lle_generate_technical_details(lle_result_t error_code) {
     return "Unknown error code";
 }
 
-/**
- * @brief Get human-readable error name from error code
- */
+/// @brief Get human-readable error name from error code
 static const char *lle_error_code_to_string(lle_result_t error_code) {
     switch (error_code) {
     case LLE_SUCCESS:
@@ -474,9 +472,7 @@ static const char *lle_error_code_to_string(lle_result_t error_code) {
     }
 }
 
-/**
- * @brief Get severity level name as string
- */
+/// @brief Get severity level name as string
 static const char *lle_severity_to_string(lle_error_severity_t severity) {
     switch (severity) {
     case LLE_SEVERITY_INFO:
@@ -568,9 +564,7 @@ lle_error_severity_t lle_fast_determine_severity(lle_result_t error_code) {
  * ============================================================================
  */
 
-/**
- * @brief Capture current system state into error context
- */
+/// @brief Capture current system state into error context
 static void lle_capture_system_state(lle_error_context_t *ctx) {
     if (!ctx)
         return;

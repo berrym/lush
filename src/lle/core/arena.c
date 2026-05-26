@@ -25,16 +25,12 @@
  * ============================================================================
  */
 
-/**
- * Align a size up to the specified alignment
- */
+/// @brief Align a size up to the specified alignment
 static inline size_t align_up(size_t size, size_t alignment) {
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
-/**
- * Check if alignment is valid (power of 2)
- */
+/// @brief Check if alignment is valid (power of 2)
 static inline bool is_power_of_two(size_t n) {
     return n > 0 && (n & (n - 1)) == 0;
 }
@@ -68,18 +64,14 @@ static lle_arena_chunk_t *arena_alloc_chunk(size_t min_data_size) {
     return chunk;
 }
 
-/**
- * Free a chunk back to lush pool
- */
+/// @brief Free a chunk back to lush pool
 static void arena_free_chunk(lle_arena_chunk_t *chunk) {
     if (chunk) {
         lush_pool_free(chunk);
     }
 }
 
-/**
- * Free all chunks in a chain
- */
+/// @brief Free all chunks in a chain
 static void arena_free_all_chunks(lle_arena_chunk_t *first) {
     lle_arena_chunk_t *chunk = first;
     while (chunk) {
@@ -89,9 +81,7 @@ static void arena_free_all_chunks(lle_arena_chunk_t *first) {
     }
 }
 
-/**
- * Unlink arena from parent's child list
- */
+/// @brief Unlink arena from parent's child list
 static void arena_unlink_from_parent(lle_arena_t *arena) {
     if (!arena || !arena->parent) {
         return;
@@ -117,9 +107,7 @@ static void arena_unlink_from_parent(lle_arena_t *arena) {
     arena->next_sibling = NULL;
 }
 
-/**
- * Link arena as child of parent
- */
+/// @brief Link arena as child of parent
 static void arena_link_to_parent(lle_arena_t *arena, lle_arena_t *parent) {
     if (!arena || !parent) {
         return;

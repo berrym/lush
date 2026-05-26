@@ -22,27 +22,21 @@
  * ============================================================================
  */
 
-/**
- * @brief Get current time in nanoseconds
- */
+/// @brief Get current time in nanoseconds
 static uint64_t get_time_ns(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-/**
- * @brief Duplicate a string safely
- */
+/// @brief Duplicate a string safely
 static char *safe_strdup(const char *s) {
     if (!s)
         return NULL;
     return strdup(s);
 }
 
-/**
- * @brief Set plugin error message
- */
+/// @brief Set plugin error message
 static void set_plugin_error(lush_plugin_t *plugin, const char *fmt, ...) {
     if (!plugin)
         return;

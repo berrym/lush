@@ -430,10 +430,8 @@ static void drain_fd(int fd, char *buf, size_t cap) {
     }
 }
 
-/**
- * @brief Run a binary with argv against an input string, capturing
- *        stdout/stderr/exit and enforcing a wall-clock timeout
- */
+/// @brief Run a binary with argv against an input string, capturing
+/// stdout/stderr/exit and enforcing a wall-clock timeout
 static run_result_t run_with_input(const char *binary, const char *const *argv,
                                    const char *input, int timeout_sec) {
     run_result_t r = {0};

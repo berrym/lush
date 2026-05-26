@@ -37,9 +37,7 @@ static int tests_failed = 0;
 
 #define TEST_FILE "/tmp/lle_integration_test.txt"
 
-/**
- * Get current time in microseconds
- */
+/// @brief Get current time in microseconds
 static uint64_t get_time_us(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);

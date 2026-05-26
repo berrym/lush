@@ -633,9 +633,7 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
 /// DYNAMIC ARGUMENT GENERATORS
 /// ============================================================================
 
-/**
- * @brief Generate signal name completions
- */
+/// @brief Generate signal name completions
 static lle_result_t
 generate_signal_completions(lle_memory_pool_t *pool, const char *prefix,
                             lle_completion_result_t *result) {
@@ -712,9 +710,7 @@ generate_theme_completions(lle_memory_pool_t *pool, const char *prefix,
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Generate alias completions for unalias
- */
+/// @brief Generate alias completions for unalias
 static lle_result_t
 generate_alias_completions(lle_memory_pool_t *pool,
                            const lle_word_context_t *context,

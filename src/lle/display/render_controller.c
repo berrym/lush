@@ -481,9 +481,7 @@ lle_render_config_init_internal(lle_render_config_t **config,
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Clean up buffer renderer
- */
+/// @brief Clean up buffer renderer
 static lle_result_t
 lle_buffer_renderer_cleanup(lle_buffer_renderer_t *renderer) {
     if (!renderer) {
@@ -496,9 +494,7 @@ lle_buffer_renderer_cleanup(lle_buffer_renderer_t *renderer) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Clean up cursor renderer
- */
+/// @brief Clean up cursor renderer
 static lle_result_t
 lle_cursor_renderer_cleanup(lle_cursor_renderer_t *renderer) {
     if (!renderer) {
@@ -508,9 +504,7 @@ lle_cursor_renderer_cleanup(lle_cursor_renderer_t *renderer) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Clean up frame scheduler
- */
+/// @brief Clean up frame scheduler
 static lle_result_t
 lle_frame_scheduler_cleanup(lle_frame_scheduler_t *scheduler) {
     if (!scheduler) {
@@ -520,9 +514,7 @@ lle_frame_scheduler_cleanup(lle_frame_scheduler_t *scheduler) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Clean up render metrics
- */
+/// @brief Clean up render metrics
 static lle_result_t lle_render_metrics_cleanup(lle_render_metrics_t *metrics) {
     if (!metrics) {
         return LLE_ERROR_INVALID_PARAMETER;
@@ -531,9 +523,7 @@ static lle_result_t lle_render_metrics_cleanup(lle_render_metrics_t *metrics) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Clean up render configuration
- */
+/// @brief Clean up render configuration
 static lle_result_t lle_render_config_cleanup(lle_render_config_t *config) {
     if (!config) {
         return LLE_ERROR_INVALID_PARAMETER;

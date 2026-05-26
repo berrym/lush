@@ -6799,9 +6799,7 @@ static bool regex_pattern_is_safe(const char *pattern) {
     return strlen(pattern) <= (size_t)config.regex_pattern_max;
 }
 
-/**
- * @brief Match filename against zsh extglob pattern
- */
+/// @brief Match filename against zsh extglob pattern
 static bool match_zsh_extglob(const char *filename, const char *pattern,
                               bool is_negated) {
     if (!regex_pattern_is_safe(pattern)) {
@@ -6833,9 +6831,7 @@ static bool match_zsh_extglob(const char *filename, const char *pattern,
     return matches;
 }
 
-/**
- * @brief Expand zsh extglob pattern by reading directory and matching
- */
+/// @brief Expand zsh extglob pattern by reading directory and matching
 static char **expand_zsh_extglob_pattern(const char *pattern,
                                          int *expanded_count) {
     *expanded_count = 0;
@@ -17427,9 +17423,7 @@ static bool evaluate_extended_expr(executor_t *executor, char *expr) {
     return evaluate_simple_test(executor, expr);
 }
 
-/**
- * @brief Evaluate a simple test expression (no && or ||)
- */
+/// @brief Evaluate a simple test expression (no && or ||)
 static bool evaluate_simple_test(executor_t *executor, const char *expr) {
     char *p = (char *)expr;
 

@@ -70,10 +70,8 @@ static void test_teardown(void) { lush_pool_shutdown(); }
 
 /// Note: display_controller_get_event_system is provided by libdisplay.a
 
-/**
- * Mock display controller for testing
- * Uses real display_controller structure but minimal initialization
- */
+/// @brief Mock display controller for testing
+/// Uses real display_controller structure but minimal initialization
 static display_controller_t *create_mock_display_controller(void) {
     display_controller_t *display = calloc(1, sizeof(display_controller_t));
     if (!display)
@@ -112,18 +110,14 @@ static void destroy_mock_display_controller(display_controller_t *display) {
     }
 }
 
-/**
- * Mock editor context (opaque pointer for testing)
- */
+/// @brief Mock editor context (opaque pointer for testing)
 static void *create_mock_editor(void) {
     /// Just return a non-NULL pointer for validation tests
     static int dummy = 42;
     return &dummy;
 }
 
-/**
- * Mock display bridge for render controller testing
- */
+/// @brief Mock display bridge for render controller testing
 static lle_display_bridge_t *create_mock_display_bridge(void) {
     void *editor = create_mock_editor();
     display_controller_t *display = create_mock_display_controller();

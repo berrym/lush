@@ -221,40 +221,40 @@ static ssize_t eval_uminus(stack_item_t *a1, stack_item_t *a2) {
     return arithm_wrap_neg(long_value(a1));
 }
 
-/** @brief Unary plus operator (identity) */
+/// @brief Unary plus operator (identity)
 static ssize_t eval_uplus(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
     return long_value(a1);
 }
 
-/** @brief Logical NOT operator */
+/// @brief Logical NOT operator
 static ssize_t eval_lognot(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
     return !long_value(a1);
 }
 
-/** @brief Bitwise NOT (complement) operator */
+/// @brief Bitwise NOT (complement) operator
 static ssize_t eval_bitnot(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
     return ~long_value(a1);
 }
 
-/** @brief Multiplication operator */
+/// @brief Multiplication operator
 static ssize_t eval_mul(stack_item_t *a1, stack_item_t *a2) {
     return arithm_wrap_mul(long_value(a1), long_value(a2));
 }
 
-/** @brief Addition operator */
+/// @brief Addition operator
 static ssize_t eval_add(stack_item_t *a1, stack_item_t *a2) {
     return arithm_wrap_add(long_value(a1), long_value(a2));
 }
 
-/** @brief Subtraction operator */
+/// @brief Subtraction operator
 static ssize_t eval_sub(stack_item_t *a1, stack_item_t *a2) {
     return arithm_wrap_sub(long_value(a1), long_value(a2));
 }
 
-/** @brief Division operator with zero-check */
+/// @brief Division operator with zero-check
 static ssize_t eval_div(stack_item_t *a1, stack_item_t *a2) {
     ssize_t divisor = long_value(a2);
     if (divisor == 0) {
@@ -265,7 +265,7 @@ static ssize_t eval_div(stack_item_t *a1, stack_item_t *a2) {
     return arithm_safe_div(long_value(a1), divisor);
 }
 
-/** @brief Modulo operator with zero-check */
+/// @brief Modulo operator with zero-check
 static ssize_t eval_mod(stack_item_t *a1, stack_item_t *a2) {
     ssize_t divisor = long_value(a2);
     if (divisor == 0) {
@@ -277,78 +277,78 @@ static ssize_t eval_mod(stack_item_t *a1, stack_item_t *a2) {
     return arithm_safe_mod(long_value(a1), divisor);
 }
 
-/** @brief Left shift operator */
+/// @brief Left shift operator
 static ssize_t eval_lsh(stack_item_t *a1, stack_item_t *a2) {
     return arithm_wrap_lsh(long_value(a1), long_value(a2));
 }
 
-/** @brief Right shift operator */
+/// @brief Right shift operator
 static ssize_t eval_rsh(stack_item_t *a1, stack_item_t *a2) {
     return arithm_wrap_rsh(long_value(a1), long_value(a2));
 }
 
-/** @brief Less than comparison */
+/// @brief Less than comparison
 static ssize_t eval_lt(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) < long_value(a2);
 }
 
-/** @brief Less than or equal comparison */
+/// @brief Less than or equal comparison
 static ssize_t eval_le(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) <= long_value(a2);
 }
 
-/** @brief Greater than comparison */
+/// @brief Greater than comparison
 static ssize_t eval_gt(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) > long_value(a2);
 }
 
-/** @brief Greater than or equal comparison */
+/// @brief Greater than or equal comparison
 static ssize_t eval_ge(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) >= long_value(a2);
 }
 
-/** @brief Equality comparison */
+/// @brief Equality comparison
 static ssize_t eval_eq(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) == long_value(a2);
 }
 
-/** @brief Inequality comparison */
+/// @brief Inequality comparison
 static ssize_t eval_ne(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) != long_value(a2);
 }
 
-/** @brief Bitwise AND operator */
+/// @brief Bitwise AND operator
 static ssize_t eval_bitand(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) & long_value(a2);
 }
 
-/** @brief Bitwise XOR operator */
+/// @brief Bitwise XOR operator
 static ssize_t eval_bitxor(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) ^ long_value(a2);
 }
 
-/** @brief Bitwise OR operator */
+/// @brief Bitwise OR operator
 static ssize_t eval_bitor(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) | long_value(a2);
 }
 
-/** @brief Logical AND operator (short-circuit) */
+/// @brief Logical AND operator (short-circuit)
 static ssize_t eval_logand(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) && long_value(a2);
 }
 
-/** @brief Logical OR operator (short-circuit) */
+/// @brief Logical OR operator (short-circuit)
 static ssize_t eval_logor(stack_item_t *a1, stack_item_t *a2) {
     return long_value(a1) || long_value(a2);
 }
 
-/** @brief Comma operator - evaluates both, returns second */
+/// @brief Comma operator - evaluates both, returns second
 static ssize_t eval_comma(stack_item_t *a1, stack_item_t *a2) {
     (void)a1; /// First expression is evaluated but result discarded
     return long_value(a2);
 }
 
-/** @brief Ternary colon - placeholder, actual logic in shunt_op */
+/// @brief Ternary colon - placeholder, actual logic in shunt_op
 static ssize_t eval_ternary_colon(stack_item_t *a1, stack_item_t *a2) {
     (void)a1;
     (void)a2;
@@ -356,7 +356,7 @@ static ssize_t eval_ternary_colon(stack_item_t *a1, stack_item_t *a2) {
     return 0;
 }
 
-/** @brief Ternary question - placeholder, actual logic in shunt_op */
+/// @brief Ternary question - placeholder, actual logic in shunt_op
 static ssize_t eval_ternary_question(stack_item_t *a1, stack_item_t *a2) {
     (void)a1;
     (void)a2;
@@ -448,7 +448,7 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
         }                                                                      \
     } while (0)
 
-/** @brief Simple assignment operator */
+/// @brief Simple assignment operator
 static ssize_t eval_assign(stack_item_t *a1, stack_item_t *a2) {
     ARITHM_REQUIRE_LVALUE(a1, "=");
 
@@ -457,7 +457,7 @@ static ssize_t eval_assign(stack_item_t *a1, stack_item_t *a2) {
     return value;
 }
 
-/** @brief Addition assignment operator (+=) */
+/// @brief Addition assignment operator (+=)
 static ssize_t eval_addeq(stack_item_t *a1, stack_item_t *a2) {
     ARITHM_REQUIRE_LVALUE(a1, "+=");
 
@@ -469,7 +469,7 @@ static ssize_t eval_addeq(stack_item_t *a1, stack_item_t *a2) {
     return result;
 }
 
-/** @brief Subtraction assignment operator (-=) */
+/// @brief Subtraction assignment operator (-=)
 static ssize_t eval_subeq(stack_item_t *a1, stack_item_t *a2) {
     ARITHM_REQUIRE_LVALUE(a1, "-=");
 
@@ -481,7 +481,7 @@ static ssize_t eval_subeq(stack_item_t *a1, stack_item_t *a2) {
     return result;
 }
 
-/** @brief Multiplication assignment operator (*=) */
+/// @brief Multiplication assignment operator (*=)
 static ssize_t eval_muleq(stack_item_t *a1, stack_item_t *a2) {
     ARITHM_REQUIRE_LVALUE(a1, "*=");
 
@@ -493,7 +493,7 @@ static ssize_t eval_muleq(stack_item_t *a1, stack_item_t *a2) {
     return result;
 }
 
-/** @brief Division assignment operator (/=) with zero-check */
+/// @brief Division assignment operator (/=) with zero-check
 static ssize_t eval_diveq(stack_item_t *a1, stack_item_t *a2) {
     ARITHM_REQUIRE_LVALUE(a1, "/=");
 
@@ -511,7 +511,7 @@ static ssize_t eval_diveq(stack_item_t *a1, stack_item_t *a2) {
     return result;
 }
 
-/** @brief Modulo assignment operator (%=) with zero-check */
+/// @brief Modulo assignment operator (%=) with zero-check
 static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
     ARITHM_REQUIRE_LVALUE(a1, "%=");
 
@@ -555,7 +555,7 @@ static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
         }                                                                      \
     } while (0)
 
-/** @brief Pre-increment operator (++x) */
+/// @brief Pre-increment operator (++x)
 static ssize_t eval_preinc(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
     ARITHM_REQUIRE_INC_TARGET(a1, "pre-increment ++");
@@ -565,7 +565,7 @@ static ssize_t eval_preinc(stack_item_t *a1, stack_item_t *a2) {
     return value;
 }
 
-/** @brief Pre-decrement operator (--x) */
+/// @brief Pre-decrement operator (--x)
 static ssize_t eval_predec(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
     ARITHM_REQUIRE_DEC_TARGET(a1, "pre-decrement --");
@@ -575,7 +575,7 @@ static ssize_t eval_predec(stack_item_t *a1, stack_item_t *a2) {
     return value;
 }
 
-/** @brief Post-increment operator (x++) - returns old value */
+/// @brief Post-increment operator (x++) - returns old value
 static ssize_t eval_postinc(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
     ARITHM_REQUIRE_INC_TARGET(a1, "post-increment ++");
@@ -585,7 +585,7 @@ static ssize_t eval_postinc(stack_item_t *a1, stack_item_t *a2) {
     return old_value;
 }
 
-/** @brief Post-decrement operator (x--) - returns old value */
+/// @brief Post-decrement operator (x--) - returns old value
 static ssize_t eval_postdec(stack_item_t *a1, stack_item_t *a2) {
     (void)a2;
     ARITHM_REQUIRE_DEC_TARGET(a1, "post-decrement --");

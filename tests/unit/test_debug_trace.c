@@ -692,9 +692,7 @@ typedef struct {
     symvar_type_t type;
 } scope_probe_t;
 
-/**
- * @brief Symtable enumeration callback that fills a scope_probe_t
- */
+/// @brief Symtable enumeration callback that fills a scope_probe_t
 static void scope_probe_cb(const char *name, const char *value,
                            symvar_type_t type, void *userdata) {
     (void)value;

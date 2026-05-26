@@ -370,9 +370,7 @@ static const size_t upper_to_lower_table_size =
  * ============================================================================
  */
 
-/**
- * @brief Binary search for uppercase -> lowercase mapping
- */
+/// @brief Binary search for uppercase -> lowercase mapping
 static const case_map_entry_t *find_upper_to_lower(uint32_t cp) {
     size_t left = 0;
     size_t right = upper_to_lower_table_size;

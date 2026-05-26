@@ -99,9 +99,7 @@ static bool untrack_malloc_fallback(void *ptr) {
     return false;
 }
 
-/**
- * @brief Free all tracked malloc fallback allocations during shutdown
- */
+/// @brief Free all tracked malloc fallback allocations during shutdown
 static void free_all_malloc_fallbacks(void) {
     if (!malloc_fallback_ptrs)
         return;

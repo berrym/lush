@@ -350,9 +350,7 @@ char *shell_error_collector_get_line(shell_error_collector_t *collector,
  * ============================================================================
  */
 
-/**
- * @brief Print colored text if colors enabled
- */
+/// @brief Print colored text if colors enabled
 static void print_colored(FILE *out, bool use_color, const char *color,
                           const char *fmt, ...) {
     if (use_color && color) {
@@ -369,9 +367,7 @@ static void print_colored(FILE *out, bool use_color, const char *color,
     }
 }
 
-/**
- * @brief Get color for severity
- */
+/// @brief Get color for severity
 static const char *severity_color(shell_error_severity_t severity) {
     switch (severity) {
     case SHELL_SEVERITY_NOTE:

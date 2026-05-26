@@ -2425,9 +2425,7 @@ static size_t array_find_index_pos(array_value_t *array, int index,
     return left; /// Insertion point
 }
 
-/**
- * @brief Ensure array has capacity for one more element
- */
+/// @brief Ensure array has capacity for one more element
 static int array_ensure_capacity(array_value_t *array) {
     if (array->count >= array->capacity) {
         size_t new_capacity = array->capacity * ARRAY_GROWTH_FACTOR;

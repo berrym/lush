@@ -35,27 +35,22 @@
  * ============================================================================
  */
 
-/**
- * @brief Get current thread ID for performance monitoring
- * Note: lle_get_thread_id is defined in error_handling.c, we use a local helper
- */
+/// @brief Get current thread ID for performance monitoring
+/// Note: lle_get_thread_id is defined in error_handling.c, we use a local
+/// helper
 static uint32_t perf_get_thread_id(void) {
     /// Cast through uintptr_t first for portability - pthread_t may be a
     /// pointer type on some platforms (e.g., macOS)
     return (uint32_t)(uintptr_t)pthread_self();
 }
 
-/**
- * @brief Initialize statistics structure to zero
- */
+/// @brief Initialize statistics structure to zero
 static void lle_perf_stats_init(lle_perf_statistics_t *stats) {
     memset(stats, 0, sizeof(lle_perf_statistics_t));
     stats->min_duration_ns = UINT64_MAX;
 }
 
-/**
- * @brief Update running statistics with new measurement
- */
+/// @brief Update running statistics with new measurement
 static void lle_perf_stats_update(lle_perf_statistics_t *stats,
                                   uint64_t duration_ns, bool success) {
     stats->call_count++;

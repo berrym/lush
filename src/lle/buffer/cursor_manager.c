@@ -139,9 +139,7 @@ static lle_result_t calculate_visual_position(lle_cursor_manager_t *manager) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Convert grapheme index to byte offset
- */
+/// @brief Convert grapheme index to byte offset
 static lle_result_t grapheme_index_to_byte_offset(lle_buffer_t *buffer,
                                                   size_t grapheme_index,
                                                   size_t *byte_offset) {
@@ -192,9 +190,7 @@ static lle_result_t grapheme_index_to_byte_offset(lle_buffer_t *buffer,
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Convert codepoint index to byte offset
- */
+/// @brief Convert codepoint index to byte offset
 static lle_result_t codepoint_index_to_byte_offset(lle_buffer_t *buffer,
                                                    size_t codepoint_index,
                                                    size_t *byte_offset) {

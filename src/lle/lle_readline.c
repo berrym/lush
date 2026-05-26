@@ -924,10 +924,8 @@ static void refresh_display(readline_context_t *ctx) {
     lle_render_output_free(render_output);
 }
 
-/**
- * @brief Event handler for character input
- * Step 4: Handler modifies buffer and refreshes display
- */
+/// @brief Event handler for character input
+/// Step 4: Handler modifies buffer and refreshes display
 static lle_result_t handle_character_input(lle_event_t *event,
                                            void *user_data) {
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1001,11 +999,9 @@ static lle_result_t handle_character_input(lle_event_t *event,
     return result;
 }
 
-/**
- * @brief Event handler for backspace
- * Step 4: Handler modifies buffer and refreshes display
- * PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
- */
+/// @brief Event handler for backspace
+/// Step 4: Handler modifies buffer and refreshes display
+/// PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
 static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1095,10 +1091,8 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Enter key
- * Step 6: Check for multiline continuation before completing
- */
+/// @brief Event handler for Enter key
+/// Step 6: Check for multiline continuation before completing
 static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1718,10 +1712,8 @@ lle_result_t lle_escape_context(readline_context_t *ctx) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-L (clear screen and redraw)
- * Step 5 enhancement: Trigger full screen refresh
- */
+/// @brief Event handler for Ctrl-L (clear screen and redraw)
+/// Step 5 enhancement: Trigger full screen refresh
 static lle_result_t handle_clear_screen(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1746,10 +1738,8 @@ static lle_result_t handle_clear_screen(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-W (kill word backwards)
- * Step 5 enhancement: Delete word before cursor and save to kill buffer
- */
+/// @brief Event handler for Ctrl-W (kill word backwards)
+/// Step 5 enhancement: Delete word before cursor and save to kill buffer
 static lle_result_t handle_kill_word(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1810,10 +1800,8 @@ static lle_result_t handle_kill_word(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-Y (yank from kill buffer)
- * Step 5 enhancement: Insert killed text at cursor
- */
+/// @brief Event handler for Ctrl-Y (yank from kill buffer)
+/// Step 5 enhancement: Insert killed text at cursor
 static lle_result_t handle_yank(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1849,10 +1837,8 @@ static lle_result_t handle_yank(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl+_ (undo)
- * Undoes the last change sequence using change_tracker
- */
+/// @brief Event handler for Ctrl+_ (undo)
+/// Undoes the last change sequence using change_tracker
 static lle_result_t handle_undo(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1883,10 +1869,8 @@ static lle_result_t handle_undo(lle_event_t *event, void *user_data) {
     return result;
 }
 
-/**
- * @brief Event handler for Alt+_ or Ctrl+Shift+_ (redo)
- * Redoes the last undone change sequence using change_tracker
- */
+/// @brief Event handler for Alt+_ or Ctrl+Shift+_ (redo)
+/// Redoes the last undone change sequence using change_tracker
 static lle_result_t handle_redo(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1917,10 +1901,8 @@ static lle_result_t handle_redo(lle_event_t *event, void *user_data) {
     return result;
 }
 
-/**
- * @brief Event handler for TAB key
- * Triggers completion via lle_complete()
- */
+/// @brief Event handler for TAB key
+/// Triggers completion via lle_complete()
 static lle_result_t handle_tab(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1942,11 +1924,9 @@ static lle_result_t handle_tab(lle_event_t *event, void *user_data) {
     return result;
 }
 
-/**
- * @brief Event handler for Left arrow key
- * Step 5: Move cursor left one grapheme cluster
- * PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
- */
+/// @brief Event handler for Left arrow key
+/// Step 5: Move cursor left one grapheme cluster
+/// PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
 static lle_result_t handle_arrow_left(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -1971,11 +1951,9 @@ static lle_result_t handle_arrow_left(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Right arrow key
- * Step 5: Move cursor right one grapheme cluster
- * PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
- */
+/// @brief Event handler for Right arrow key
+/// Step 5: Move cursor right one grapheme cluster
+/// PHASE 2 FIX: Use grapheme-based movement instead of codepoint-based
 static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -2011,10 +1989,8 @@ static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Home key
- * Step 5: Move cursor to beginning of line
- */
+/// @brief Event handler for Home key
+/// Step 5: Move cursor to beginning of line
 static lle_result_t handle_home(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -2026,11 +2002,9 @@ static lle_result_t handle_home(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for End key
- * Step 5: Move cursor to end of line
- * Fish-style: Accept autosuggestion if cursor already at end
- */
+/// @brief Event handler for End key
+/// Step 5: Move cursor to end of line
+/// Fish-style: Accept autosuggestion if cursor already at end
 static lle_result_t handle_end(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -2054,11 +2028,9 @@ static lle_result_t handle_end(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Delete key
- * Step 5: Delete character at cursor position
- * PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
- */
+/// @brief Event handler for Delete key
+/// Step 5: Delete character at cursor position
+/// PHASE 2 FIX: Delete entire grapheme cluster, not just one codepoint
 static lle_result_t handle_delete(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -2107,11 +2079,9 @@ static lle_result_t handle_delete(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-K
- * Step 5: Kill (delete) text from cursor to end of line
- * Step 5 enhancement: Save killed text to kill buffer
- */
+/// @brief Event handler for Ctrl-K
+/// Step 5: Kill (delete) text from cursor to end of line
+/// Step 5 enhancement: Save killed text to kill buffer
 static lle_result_t handle_kill_to_end(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -2156,11 +2126,9 @@ static lle_result_t handle_kill_to_end(lle_event_t *event, void *user_data) {
     return LLE_SUCCESS;
 }
 
-/**
- * @brief Event handler for Ctrl-U
- * Step 5: Kill (delete) entire line
- * Step 5 enhancement: Save killed text to kill buffer
- */
+/// @brief Event handler for Ctrl-U
+/// Step 5: Kill (delete) entire line
+/// Step 5 enhancement: Save killed text to kill buffer
 static lle_result_t handle_kill_line(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
@@ -2396,17 +2364,13 @@ lle_result_t lle_smart_down_arrow_context(readline_context_t *ctx) {
     }
 }
 
-/**
- * @brief Event handler wrapper for up arrow (calls context-aware function)
- */
+/// @brief Event handler wrapper for up arrow (calls context-aware function)
 static lle_result_t handle_arrow_up(lle_event_t *event, void *user_data) {
     (void)event;
     return lle_smart_up_arrow_context((readline_context_t *)user_data);
 }
 
-/**
- * @brief Event handler wrapper for down arrow (calls context-aware function)
- */
+/// @brief Event handler wrapper for down arrow (calls context-aware function)
 static lle_result_t handle_arrow_down(lle_event_t *event, void *user_data) {
     (void)event;
     return lle_smart_down_arrow_context((readline_context_t *)user_data);
@@ -2491,9 +2455,7 @@ static void exit_search_mode_and_refresh(readline_context_t *ctx) {
     ctx->suppress_autosuggestion = false;
 }
 
-/**
- * @brief Enter interactive search mode (Ctrl+R handler)
- */
+/// @brief Enter interactive search mode (Ctrl+R handler)
 static lle_result_t handle_interactive_search_start(lle_event_t *event,
                                                     void *user_data) {
     (void)event;

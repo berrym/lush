@@ -64,10 +64,8 @@ static int tests_failed = 0;
  * Performance Constants Compliance Tests
  * ========================================================================== */
 
-/**
- * Test: Verify performance target constants match spec
- * Spec Requirement: Performance targets section
- */
+/// @brief Test: Verify performance target constants match spec
+/// Spec Requirement: Performance targets section
 static bool test_performance_targets(void) {
     printf("  Testing performance target constants...\n");
 
@@ -82,10 +80,8 @@ static bool test_performance_targets(void) {
     return true;
 }
 
-/**
- * Test: Verify cache configuration constants
- * Spec Requirement: Cache configuration section
- */
+/// @brief Test: Verify cache configuration constants
+/// Spec Requirement: Cache configuration section
 static bool test_cache_configuration(void) {
     printf("  Testing cache configuration constants...\n");
 
@@ -103,10 +99,8 @@ static bool test_cache_configuration(void) {
     return true;
 }
 
-/**
- * Test: Verify profiler configuration constants
- * Spec Requirement: Profiler configuration section
- */
+/// @brief Test: Verify profiler configuration constants
+/// Spec Requirement: Profiler configuration section
 static bool test_profiler_configuration(void) {
     printf("  Testing profiler configuration constants...\n");
 
@@ -137,10 +131,8 @@ static bool test_profiler_configuration(void) {
     return true;
 }
 
-/**
- * Test: Verify measurement limits
- * Spec Requirement: Performance measurement configuration
- */
+/// @brief Test: Verify measurement limits
+/// Spec Requirement: Performance measurement configuration
 static bool test_measurement_limits(void) {
     printf("  Testing measurement limit constants...\n");
 
@@ -155,10 +147,8 @@ static bool test_measurement_limits(void) {
     return true;
 }
 
-/**
- * Test: Verify memory pattern analysis constants
- * Spec Requirement: Memory pattern analysis configuration
- */
+/// @brief Test: Verify memory pattern analysis constants
+/// Spec Requirement: Memory pattern analysis configuration
 static bool test_memory_pattern_constants(void) {
     printf("  Testing memory pattern analysis constants...\n");
 
@@ -174,10 +164,8 @@ static bool test_memory_pattern_constants(void) {
     return true;
 }
 
-/**
- * Test: Verify performance operation types exist
- * Spec Requirement: Performance operation types enumeration
- */
+/// @brief Test: Verify performance operation types exist
+/// Spec Requirement: Performance operation types enumeration
 static bool test_performance_operation_types_exist(void) {
     printf("  Testing performance operation types...\n");
 
@@ -205,10 +193,8 @@ static bool test_performance_operation_types_exist(void) {
     return true;
 }
 
-/**
- * Test: Verify component count constant
- * Spec Requirement: Component monitoring configuration
- */
+/// @brief Test: Verify component count constant
+/// Spec Requirement: Component monitoring configuration
 static bool test_component_count(void) {
     printf("  Testing component count constant...\n");
 

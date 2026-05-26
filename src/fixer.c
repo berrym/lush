@@ -34,9 +34,7 @@ int strcasecmp(const char *s1, const char *s2);
  * ============================================================================
  */
 
-/**
- * @brief Compare fixes by position (for sorting end-to-start)
- */
+/// @brief Compare fixes by position (for sorting end-to-start)
 static int compare_fixes_reverse(const void *a, const void *b) {
     const fixer_fix_t *fa = (const fixer_fix_t *)a;
     const fixer_fix_t *fb = (const fixer_fix_t *)b;
@@ -49,9 +47,7 @@ static int compare_fixes_reverse(const void *a, const void *b) {
     return 0;
 }
 
-/**
- * @brief Calculate byte offset from line and column
- */
+/// @brief Calculate byte offset from line and column
 static size_t calc_offset(const char *content, int line, int column) {
     size_t offset = 0;
     int current_line = 1;
@@ -85,9 +81,7 @@ typedef struct {
     size_t line_offset; ///< Byte offset of line start in content
 } collect_ctx_t;
 
-/**
- * @brief Callback to check each compat entry for fixes
- */
+/// @brief Callback to check each compat entry for fixes
 static void collect_fix_callback(const compat_entry_t *entry, void *user_data) {
     collect_ctx_t *ctx = (collect_ctx_t *)user_data;
 
@@ -723,9 +717,7 @@ const char *fixer_result_string(fixer_result_t result) {
  * ============================================================================
  */
 
-/**
- * @brief Get the line content at a given line number
- */
+/// @brief Get the line content at a given line number
 static const char *get_line_at(const char *content, int line_num,
                                size_t *line_len) {
     const char *p = content;

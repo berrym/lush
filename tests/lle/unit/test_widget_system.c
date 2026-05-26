@@ -26,9 +26,7 @@ static int g_test_widget_call_count = 0;
 static lle_editor_t *g_test_editor_arg = NULL;
 static void *g_test_user_data_arg = NULL;
 
-/**
- * Simple test widget that sets a flag when called
- */
+/// @brief Simple test widget that sets a flag when called
 static lle_result_t test_widget_callback(lle_editor_t *editor,
                                          void *user_data) {
     g_test_widget_called = 1;
@@ -38,9 +36,7 @@ static lle_result_t test_widget_callback(lle_editor_t *editor,
     return LLE_SUCCESS;
 }
 
-/**
- * Test widget that returns an error
- */
+/// @brief Test widget that returns an error
 static lle_result_t test_widget_error_callback(lle_editor_t *editor,
                                                void *user_data) {
     (void)editor;
@@ -48,9 +44,7 @@ static lle_result_t test_widget_error_callback(lle_editor_t *editor,
     return LLE_ERROR_INVALID_STATE;
 }
 
-/**
- * Reset test globals
- */
+/// @brief Reset test globals
 static void reset_test_globals(void) {
     g_test_widget_called = 0;
     g_test_widget_call_count = 0;
@@ -58,18 +52,14 @@ static void reset_test_globals(void) {
     g_test_user_data_arg = NULL;
 }
 
-/**
- * Create minimal test editor
- */
+/// @brief Create minimal test editor
 static lle_editor_t *create_test_editor(void) {
     lle_editor_t *editor = malloc(sizeof(lle_editor_t));
     memset(editor, 0, sizeof(lle_editor_t));
     return editor;
 }
 
-/**
- * Free test editor
- */
+/// @brief Free test editor
 static void free_test_editor(lle_editor_t *editor) {
     if (editor) {
         free(editor);

@@ -140,9 +140,7 @@ bool lle_notification_should_dismiss_for_action(
  * ============================================================================
  */
 
-/**
- * @brief Get ANSI color code for notification type
- */
+/// @brief Get ANSI color code for notification type
 static const char *get_color_code(lle_notification_type_t type) {
     switch (type) {
     case LLE_NOTIFICATION_HINT:
