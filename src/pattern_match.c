@@ -17,6 +17,8 @@
 
 #include "pattern_match.h"
 
+#include "lle/utf8_support.h"
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -122,13 +124,44 @@ static const char *find_next_alt_separator(const char *p, const char *close) {
 }
 
 /**
+ * @brief Decode the next UTF-8 codepoint at `p`
+ *
+ * Returns the codepoint and writes its byte length into `*bytes`. On
+ * decode failure (malformed UTF-8 or end-of-string), returns the raw
+ * byte as a codepoint with byte length 1 -- this lets ASCII-only
+ * patterns work unchanged while multi-byte sequences are handled
+ * correctly when present.
+ */
+static uint32_t decode_one(const char *p, size_t *bytes) {
+    if (!p || !*p) {
+        *bytes = 0;
+        return 0;
+    }
+    uint32_t cp = (uint32_t)(unsigned char)*p;
+    *bytes = 1;
+    uint32_t decoded = 0;
+    int consumed = lle_utf8_decode_codepoint(p, strlen(p), &decoded);
+    if (consumed > 0) {
+        cp = decoded;
+        *bytes = (size_t)consumed;
+    }
+    return cp;
+}
+
+/**
  * @brief Match a single character of `s` against a `[...]` class
  *
- * `p` points at the opening `[`. On match, returns 1 and writes the
- * position just past the closing `]` into `*end`. On no-match, returns 0;
- * `*end` is still advanced so the caller can skip the class.
+ * `p` points at the opening `[`. On match, returns 1, writes the
+ * position just past the closing `]` into `*end`, and writes the
+ * byte length of the matched input codepoint into `*s_consumed`. On
+ * no-match, returns 0; `*end` is still advanced so the caller can
+ * skip the class. Pattern codepoints in the bracket -- both literal
+ * characters and the `-` range endpoints -- are decoded as UTF-8
+ * codepoints so ranges like `[α-ω]` and literals like `[äöü]` work
+ * correctly.
  */
-static int match_char_class(const char *s, const char *p, const char **end) {
+static int match_char_class(const char *s, const char *p, const char **end,
+                            size_t *s_consumed) {
     if (*s == '\0') {
         /// Walk past the class so callers see the right end pointer.
         p++;
@@ -149,8 +182,19 @@ static int match_char_class(const char *s, const char *p, const char **end) {
             p++;
         }
         *end = p;
+        if (s_consumed) {
+            *s_consumed = 0;
+        }
         return 0;
     }
+
+    /// Decode the input codepoint once for the whole bracket.
+    size_t cp_bytes = 1;
+    uint32_t input_cp = decode_one(s, &cp_bytes);
+    if (s_consumed) {
+        *s_consumed = cp_bytes;
+    }
+
     p++; /// past `[`
     bool negate = false;
     if (*p == '!' || *p == '^') {
@@ -161,26 +205,31 @@ static int match_char_class(const char *s, const char *p, const char **end) {
     bool first = true;
     while (*p && (first || *p != ']')) {
         first = false;
-        char lo = *p;
-        if (lo == '\\' && p[1]) {
-            lo = p[1];
-            p += 2;
+
+        /// Decode the low codepoint (may be `\`-escaped).
+        uint32_t lo;
+        size_t lo_bytes;
+        if (*p == '\\' && p[1]) {
+            lo = decode_one(p + 1, &lo_bytes);
+            p += 1 + lo_bytes;
         } else {
-            p++;
+            lo = decode_one(p, &lo_bytes);
+            p += lo_bytes;
         }
-        char hi = lo;
+
+        uint32_t hi = lo;
         if (*p == '-' && p[1] && p[1] != ']') {
-            p++;
-            hi = *p;
-            if (hi == '\\' && p[1]) {
-                hi = p[1];
-                p += 2;
+            p++; /// past '-'
+            size_t hi_bytes;
+            if (*p == '\\' && p[1]) {
+                hi = decode_one(p + 1, &hi_bytes);
+                p += 1 + hi_bytes;
             } else {
-                p++;
+                hi = decode_one(p, &hi_bytes);
+                p += hi_bytes;
             }
         }
-        if ((unsigned char)*s >= (unsigned char)lo &&
-            (unsigned char)*s <= (unsigned char)hi) {
+        if (input_cp >= lo && input_cp <= hi) {
             matched = true;
         }
     }
@@ -404,11 +453,21 @@ static bool match(const char *s, const char *p) {
             if (*p == '\0') {
                 return true;
             }
+            /// Step through input by codepoint anchors. Mid-codepoint
+            /// anchor positions are invalid UTF-8 starting points and
+            /// would never match an honest pattern, so codepoint
+            /// stepping is both faster and more principled than the
+            /// prior byte-stepping `s++`.
             while (*s) {
                 if (match(s, p)) {
                     return true;
                 }
-                s++;
+                size_t step;
+                (void)decode_one(s, &step);
+                if (step == 0) {
+                    step = 1; /// defensive against malformed UTF-8
+                }
+                s += step;
             }
             return match(s, p); /// try with empty tail
         }
@@ -416,28 +475,45 @@ static bool match(const char *s, const char *p) {
             if (*s == '\0') {
                 return false;
             }
+            /// `?` matches one codepoint, not one byte. The pattern
+            /// `c?é` against `café` previously failed because `?` ate
+            /// only the first byte of `é` and the literal `é` then
+            /// failed to match starting mid-codepoint.
+            size_t step;
+            (void)decode_one(s, &step);
+            if (step == 0) {
+                step = 1;
+            }
+            s += step;
             p++;
-            s++;
             continue;
         }
         if (*p == '[') {
             const char *end;
-            int matched = match_char_class(s, p, &end);
+            size_t s_consumed = 1;
+            int matched = match_char_class(s, p, &end, &s_consumed);
             if (!matched) {
                 return false;
             }
             p = end;
-            s++;
+            s += s_consumed;
             continue;
         }
+        /// Literal character. Decode both sides as codepoints so a
+        /// multi-byte literal in the pattern matches its multi-byte
+        /// counterpart in the input rather than only the first byte.
         if (*p == '\\' && p[1]) {
             p++;
         }
-        if (*p != *s) {
+        size_t p_bytes;
+        uint32_t pat_cp = decode_one(p, &p_bytes);
+        size_t s_bytes;
+        uint32_t in_cp = decode_one(s, &s_bytes);
+        if (pat_cp != in_cp) {
             return false;
         }
-        p++;
-        s++;
+        p += p_bytes;
+        s += s_bytes;
     }
     return *s == '\0';
 }

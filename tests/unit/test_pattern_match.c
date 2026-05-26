@@ -169,6 +169,67 @@ TEST(unbalanced_paren_treated_as_literal) {
 }
 
 /* ============================================================================
+ * Unicode codepoint awareness (audit C-verdict #6)
+ * ============================================================================
+ */
+
+TEST(question_matches_unicode_codepoint) {
+    ASSERT(lush_pattern_match("café", "c?fé"),
+           "? matches multi-byte é as one codepoint");
+    ASSERT(lush_pattern_match("Naïve", "Na?ve"), "? matches ï in middle");
+    ASSERT(!lush_pattern_match("café", "c?f"),
+           "? + literal mismatch fails cleanly");
+}
+
+TEST(literal_multibyte_matches) {
+    ASSERT(lush_pattern_match("café", "café"),
+           "literal multi-byte pattern matches identical input");
+    ASSERT(lush_pattern_match("中文", "中文"), "CJK literal matches");
+    ASSERT(!lush_pattern_match("café", "cafe"),
+           "é != e, no first-byte ambiguity");
+}
+
+TEST(star_matches_with_unicode_tail) {
+    ASSERT(lush_pattern_match("café", "c*é"), "* + multi-byte tail");
+    ASSERT(lush_pattern_match("café au lait", "c*lait"),
+           "* across multi-byte content");
+}
+
+TEST(bracket_range_unicode_lowercase) {
+    ASSERT(lush_pattern_match("α", "[α-ω]"), "α at lower bound of Greek range");
+    ASSERT(lush_pattern_match("ω", "[α-ω]"), "ω at upper bound");
+    ASSERT(lush_pattern_match("ν", "[α-ω]"), "ν in middle of Greek range");
+    ASSERT(!lush_pattern_match("Α", "[α-ω]"),
+           "uppercase Α outside lowercase Greek range");
+}
+
+TEST(bracket_range_latin1_supplement) {
+    ASSERT(lush_pattern_match("À", "[À-ÿ]"),
+           "À at lower bound of Latin-1 Supplement range");
+    ASSERT(lush_pattern_match("é", "[À-ÿ]"), "é in Latin-1 Supplement range");
+    ASSERT(!lush_pattern_match("a", "[À-ÿ]"), "ASCII a outside Latin-1 range");
+}
+
+TEST(bracket_literal_unicode_chars) {
+    ASSERT(lush_pattern_match("ä", "[äöü]"), "literal ä in Unicode bracket");
+    ASSERT(lush_pattern_match("ö", "[äöü]"), "literal ö in Unicode bracket");
+    ASSERT(!lush_pattern_match("a", "[äöü]"), "ASCII a not in Unicode bracket");
+}
+
+TEST(bracket_mixed_ascii_and_unicode) {
+    ASSERT(lush_pattern_match("a", "[a-zα-ω]"), "ASCII alpha in mixed bracket");
+    ASSERT(lush_pattern_match("ν", "[a-zα-ω]"), "Greek alpha in mixed bracket");
+    ASSERT(!lush_pattern_match("5", "[a-zα-ω]"), "digit not in any range");
+}
+
+TEST(bracket_negation_unicode) {
+    ASSERT(lush_pattern_match("Α", "[!α-ω]"),
+           "uppercase Α matches negated lowercase range");
+    ASSERT(!lush_pattern_match("α", "[!α-ω]"),
+           "α excluded by negated lowercase range");
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -204,6 +265,16 @@ int main(void) {
     RUN_TEST(null_inputs);
     RUN_TEST(empty_pattern_only_matches_empty);
     RUN_TEST(unbalanced_paren_treated_as_literal);
+
+    printf("\nUnicode codepoint awareness:\n");
+    RUN_TEST(question_matches_unicode_codepoint);
+    RUN_TEST(literal_multibyte_matches);
+    RUN_TEST(star_matches_with_unicode_tail);
+    RUN_TEST(bracket_range_unicode_lowercase);
+    RUN_TEST(bracket_range_latin1_supplement);
+    RUN_TEST(bracket_literal_unicode_chars);
+    RUN_TEST(bracket_mixed_ascii_and_unicode);
+    RUN_TEST(bracket_negation_unicode);
 
     return TEST_RESULT();
 }

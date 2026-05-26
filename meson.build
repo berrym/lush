@@ -2318,7 +2318,8 @@ if fs.exists('tests/unit/test_pattern_match.c')
   test_pattern_match = executable('test_pattern_match',
                                   'tests/unit/test_pattern_match.c',
                                   'src/pattern_match.c',
-                                  include_directories: [inc, include_directories('tests')])
+                                  include_directories: [inc, include_directories('tests')],
+                                  dependencies: [lle_dep])
   test('Pattern Match', test_pattern_match,
        suite: 'unit',
        timeout: 30)
