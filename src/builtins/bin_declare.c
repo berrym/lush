@@ -8,6 +8,7 @@
 
 #include "arithmetic.h"
 #include "builtins.h"
+#include "lle/lle_pager.h"
 #include "shell_mode.h"
 #include "symtable.h"
 
@@ -15,8 +16,8 @@
 
 static void declare_print_var_callback(const char *key, const char *value,
                                        void *userdata) {
-    (void)userdata;
-    if (!key)
+    FILE *out = (FILE *)userdata;
+    if (!out || !key)
         return;
     /// Skip internal variables starting with __
     if (key[0] == '_' && key[1] == '_')
@@ -24,16 +25,16 @@ static void declare_print_var_callback(const char *key, const char *value,
     /// Skip if this is actually an array (handled separately)
     if (symtable_is_array(key))
         return;
-    printf("declare -- %s=\"%s\"\n", key, value ? value : "");
+    fprintf(out, "declare -- %s=\"%s\"\n", key, value ? value : "");
 }
 
 static void declare_print_array_callback(const char *name, array_value_t *array,
                                          void *userdata) {
-    (void)userdata;
-    if (!name || !array)
+    FILE *out = (FILE *)userdata;
+    if (!out || !name || !array)
         return;
     if (array->is_associative) {
-        printf("declare -A %s=(", name);
+        fprintf(out, "declare -A %s=(", name);
         /// Print associative array elements. Iteration order matches
         /// the rest of the shell (issue #69): zsh / lush mode use
         /// insertion order for predictable output; bash / POSIX use
@@ -51,7 +52,8 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
                 for (size_t i = 0; i < array->assoc_insertion_count; i++) {
                     const char *k = array->assoc_insertion_order[i];
                     const char *v = ht_strstr_get(array->assoc_map, k);
-                    printf("%s[%s]=\"%s\"", first ? "" : " ", k, v ? v : "");
+                    fprintf(out, "%s[%s]=\"%s\"", first ? "" : " ", k,
+                            v ? v : "");
                     first = false;
                 }
             } else {
@@ -60,28 +62,28 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
                     const char *k, *v;
                     bool first = true;
                     while (ht_strstr_enum_next(e, &k, &v)) {
-                        printf("%s[%s]=\"%s\"", first ? "" : " ", k,
-                               v ? v : "");
+                        fprintf(out, "%s[%s]=\"%s\"", first ? "" : " ", k,
+                                v ? v : "");
                         first = false;
                     }
                     ht_strstr_enum_destroy(e);
                 }
             }
         }
-        printf(")\n");
+        fputs(")\n", out);
     } else {
-        printf("declare -a %s=(", name);
+        fprintf(out, "declare -a %s=(", name);
         /// Print indexed array elements
         bool first = true;
         for (size_t i = 0; i < array->count; i++) {
             if (array->elements[i]) {
                 int idx = array->indices ? array->indices[i] : (int)i;
-                printf("%s[%d]=\"%s\"", first ? "" : " ", idx,
-                       array->elements[i]);
+                fprintf(out, "%s[%d]=\"%s\"", first ? "" : " ", idx,
+                        array->elements[i]);
                 first = false;
             }
         }
-        printf(")\n");
+        fputs(")\n", out);
     }
 }
 
@@ -269,12 +271,26 @@ int bin_declare(int argc, char **argv) {
         return 0;
     }
 
-    /// Handle -p (print) option with no arguments - list all variables
+    /// Handle -p (print) option with no arguments - list all variables.
+    /// Builds the combined arrays + scalars listing into an
+    /// open_memstream buffer and hands it to lle_pager_present so
+    /// large environments paginate in interactive shells. memstream
+    /// allocation failure falls back to streaming directly to stdout
+    /// so the listing still surfaces.
     if (opt_print && opt_idx >= argc) {
+        char *buf = NULL;
+        size_t buf_len = 0;
+        FILE *out = open_memstream(&buf, &buf_len);
+        FILE *sink = out ? out : stdout;
         /// Print all arrays first
-        symtable_enumerate_arrays(declare_print_array_callback, NULL);
+        symtable_enumerate_arrays(declare_print_array_callback, sink);
         /// Then print all scalar variables
-        symtable_enumerate_global_vars(declare_print_var_callback, NULL);
+        symtable_enumerate_global_vars(declare_print_var_callback, sink);
+        if (out) {
+            fclose(out);
+            lle_pager_present(NULL, buf);
+            free(buf);
+        }
         return 0;
     }
 
