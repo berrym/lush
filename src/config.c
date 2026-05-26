@@ -445,6 +445,12 @@ static config_option_t config_options[] = {
     {          "display.optimization_level",    CONFIG_TYPE_INT,    CONFIG_SECTION_DISPLAY,
      &config.display_optimization_level,          "Display optimization level (0-4)",
      config_validate_optimization_level,                     NULL                                                                },
+    {           "display.lle.pager.enabled",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
+     &config.display_lle_pager_enabled,
+     "Master switch for the LLE pager (lle_pager_present)",         config_validate_bool,                     NULL               },
+    {         "display.lle.pager.min_lines",    CONFIG_TYPE_INT,    CONFIG_SECTION_DISPLAY,
+     &config.display_lle_pager_min_lines,
+     "Pager threshold in visual rows (0 = use terminal rows)",          config_validate_int,                     NULL            },
 
     /// v1.3.0: Legacy enhanced display mode option removed
     /// behavior.enhanced_display_mode option removed
@@ -810,6 +816,14 @@ static void display_sync_to_runtime(void) {
         CREG_SUCCESS) {
         config.display_optimization_level = (int)ival;
     }
+    if (config_registry_get_boolean("display.lle.pager.enabled", &bval) ==
+        CREG_SUCCESS) {
+        config.display_lle_pager_enabled = bval;
+    }
+    if (config_registry_get_integer("display.lle.pager.min_lines", &ival) ==
+        CREG_SUCCESS) {
+        config.display_lle_pager_min_lines = (int)ival;
+    }
 }
 
 /// @brief Sync display config from runtime to registry
@@ -824,6 +838,10 @@ static void display_sync_from_runtime(void) {
                                 config.display_theme_hot_reload);
     config_registry_set_integer("display.optimization_level",
                                 config.display_optimization_level);
+    config_registry_set_boolean("display.lle.pager.enabled",
+                                config.display_lle_pager_enabled);
+    config_registry_set_integer("display.lle.pager.min_lines",
+                                config.display_lle_pager_min_lines);
 }
 
 /// @brief Sync completion config from registry to runtime
@@ -1962,6 +1980,12 @@ const char *CONFIG_FILE_TEMPLATE =
     "# Display optimization level (0-4)\n"
     "display.optimization_level = 0\n"
     "\n"
+    "# LLE pager: master switch for paginated output\n"
+    "display.lle.pager.enabled = true\n"
+    "\n"
+    "# LLE pager: row threshold (0 = use terminal rows)\n"
+    "display.lle.pager.min_lines = 0\n"
+    "\n"
     "# "
     "=========================================================================="
     "==\n"
@@ -2266,6 +2290,8 @@ void config_set_defaults(void) {
         true; /// Visual separation before prompt (default on)
     config.display_performance_monitoring = false;
     config.display_optimization_level = 0;
+    config.display_lle_pager_enabled = true;
+    config.display_lle_pager_min_lines = 0;
 
     /// Script execution defaults
     config.script_execution = true;

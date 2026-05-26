@@ -253,6 +253,10 @@ typedef struct {
     int display_optimization_level;      ///< Optimization level (0-4)
     bool enhanced_display_mode; ///< Legacy display setting (deprecated)
 
+    /// LLE pager (lle_pager_present)
+    bool display_lle_pager_enabled;  ///< Master switch for pagination
+    int display_lle_pager_min_lines; ///< Threshold rows; 0 = terminal_rows
+
     /// Network settings
     bool ssh_completion_enabled;  ///< Enable SSH host completion
     bool cloud_discovery_enabled; ///< Enable cloud host discovery

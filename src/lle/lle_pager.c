@@ -16,6 +16,7 @@
 
 #include "lle/lle_pager.h"
 
+#include "config.h"
 #include "display/display_controller.h"
 #include "display/pager_input.h"
 #include "display/pager_layer.h"
@@ -249,10 +250,19 @@ static void restore_termios(const struct termios *saved) {
 /// ============================================================================
 
 int lle_pager_present(struct executor *executor, const char *content) {
-    (void)executor; /// reserved for future config integration
+    (void)executor; /// the central config registry is process-global
 
     if (!content || *content == '\0') {
         return 0;
+    }
+
+    /// Master switch: when the user has set display.lle.pager.enabled
+    /// to false, every call short-circuits to a direct write -- the
+    /// pager view is never activated regardless of content length.
+    /// This is the escape hatch for users (or test harnesses) that
+    /// want builtin output to stream through unchanged.
+    if (!config.display_lle_pager_enabled) {
+        return direct_write(content);
     }
 
     /// Non-tty fallback: stdout is a pipe, file, or otherwise not an
@@ -278,7 +288,20 @@ int lle_pager_present(struct executor *executor, const char *content) {
     }
     int term_width = (int)ws.ws_col;
     int term_rows = (int)ws.ws_row;
+
+    /// The pagination threshold is the smaller of:
+    ///   - terminal_rows - 1 (always leaves room for a status line)
+    ///   - display.lle.pager.min_lines, when set to a positive value
+    /// Content whose visual height does not exceed this threshold is
+    /// printed directly. min_lines=0 (the default) means "use the
+    /// natural terminal-rows threshold"; non-zero values let users
+    /// force pagination earlier (e.g. min_lines=10 paginates anything
+    /// over 10 rows even in a tall terminal).
     size_t view_rows = (term_rows > 1) ? (size_t)(term_rows - 1) : 1;
+    if (config.display_lle_pager_min_lines > 0 &&
+        (size_t)config.display_lle_pager_min_lines < view_rows) {
+        view_rows = (size_t)config.display_lle_pager_min_lines;
+    }
 
     pager_layer_t pager;
     size_t content_len = strlen(content);

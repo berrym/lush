@@ -15,6 +15,7 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "config.h"
 #include "lle/lle_pager.h"
 #include "test_framework.h"
 
@@ -176,6 +177,54 @@ TEST(very_long_content_writes_in_full) {
 }
 
 /* ============================================================================
+ * Config gating
+ * ============================================================================
+ *
+ * The two configs that actually influence lle_pager_present today are
+ * `display.lle.pager.enabled` (master switch) and
+ * `display.lle.pager.min_lines` (pagination threshold). The
+ * non-tty path means these unit tests cannot prove "pager
+ * activates"; they prove "the function still writes the content
+ * directly even when the pager is disabled", which is the user-
+ * visible contract for the master switch.
+ */
+
+TEST(disabled_master_switch_still_writes_content) {
+    bool saved = config.display_lle_pager_enabled;
+    config.display_lle_pager_enabled = false;
+
+    size_t len = 0;
+    char *out = capture_stdout(lle_pager_present, "test-content", &len);
+    ASSERT(out != NULL, "capture helper allocated");
+    ASSERT_STR_EQ(out, "test-content\n",
+                  "disabled pager still writes content to stdout directly");
+    free(out);
+
+    config.display_lle_pager_enabled = saved;
+}
+
+TEST(disabled_master_switch_short_circuits_before_tty_check) {
+    /// The disabled-switch branch fires before the isatty check, so
+    /// disabling the pager makes lle_pager_present a thin direct-write
+    /// wrapper regardless of where stdout is pointing. The capture
+    /// helper already routes stdout through a pipe, so this overlaps
+    /// the previous test's coverage in passive form -- the failure
+    /// signature here would be an attempt to enter pager mode (which
+    /// would either block on read or write escape sequences), neither
+    /// of which the test would tolerate. Trip-wire test.
+    bool saved = config.display_lle_pager_enabled;
+    config.display_lle_pager_enabled = false;
+
+    size_t len = 0;
+    char *out = capture_stdout(lle_pager_present, "x", &len);
+    ASSERT(out != NULL, "capture helper allocated");
+    ASSERT_EQ(len, 2, "disabled pager writes exactly content + newline");
+    free(out);
+
+    config.display_lle_pager_enabled = saved;
+}
+
+/* ============================================================================
  * Driver
  * ============================================================================
  */
@@ -193,6 +242,10 @@ int main(void) {
     RUN_TEST(multi_line_content_preserved_verbatim);
     RUN_TEST(content_without_newline_gets_one_appended);
     RUN_TEST(very_long_content_writes_in_full);
+
+    printf("\nConfig gating:\n");
+    RUN_TEST(disabled_master_switch_still_writes_content);
+    RUN_TEST(disabled_master_switch_short_circuits_before_tty_check);
 
     return TEST_RESULT();
 }
