@@ -46,7 +46,7 @@ find_last_undoable_sequence(lle_change_tracker_t *tracker) {
         return NULL;
     }
 
-    // Start from current position and search backwards
+    /// Start from current position and search backwards
     lle_change_sequence_t *seq = tracker->current_position;
     while (seq) {
         if (seq->can_undo && seq->sequence_complete) {
@@ -67,8 +67,8 @@ find_last_redoable_sequence(lle_change_tracker_t *tracker) {
         return NULL;
     }
 
-    // Start from current position and search forwards
-    // If current_position is NULL, start from first_sequence
+    /// Start from current position and search forwards
+    /// If current_position is NULL, start from first_sequence
     lle_change_sequence_t *seq = tracker->current_position
                                      ? tracker->current_position->next
                                      : tracker->first_sequence;
@@ -88,7 +88,7 @@ find_last_redoable_sequence(lle_change_tracker_t *tracker) {
  */
 static void free_operation(lle_change_operation_t *op,
                            lush_memory_pool_t *pool) {
-    (void)pool; // Reserved for future pool-based deallocation
+    (void)pool; /// Reserved for future pool-based deallocation
     if (!op) {
         return;
     }
@@ -112,7 +112,7 @@ static void free_sequence(lle_change_sequence_t *seq,
         return;
     }
 
-    // Free all operations in sequence
+    /// Free all operations in sequence
     lle_change_operation_t *op = seq->first_op;
     while (op) {
         lle_change_operation_t *next = op->next;
@@ -135,14 +135,14 @@ lle_result_t lle_change_tracker_init(lle_change_tracker_t **tracker,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate tracker structure
+    /// Allocate tracker structure
     lle_change_tracker_t *t =
         (lle_change_tracker_t *)lle_pool_alloc(sizeof(lle_change_tracker_t));
     if (!t) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize all fields
+    /// Initialize all fields
     memset(t, 0, sizeof(lle_change_tracker_t));
 
     t->memory_pool = memory_pool;
@@ -162,7 +162,7 @@ lle_result_t lle_change_tracker_destroy(lle_change_tracker_t *tracker) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Free all sequences
+    /// Free all sequences
     lle_change_sequence_t *seq = tracker->first_sequence;
     while (seq) {
         lle_change_sequence_t *next = seq->next;
@@ -170,7 +170,7 @@ lle_result_t lle_change_tracker_destroy(lle_change_tracker_t *tracker) {
         seq = next;
     }
 
-    // Free tracker itself
+    /// Free tracker itself
     lle_pool_free(tracker);
 
     return LLE_SUCCESS;
@@ -181,7 +181,7 @@ lle_result_t lle_change_tracker_clear(lle_change_tracker_t *tracker) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Free all sequences
+    /// Free all sequences
     lle_change_sequence_t *seq = tracker->first_sequence;
     while (seq) {
         lle_change_sequence_t *next = seq->next;
@@ -189,7 +189,7 @@ lle_result_t lle_change_tracker_clear(lle_change_tracker_t *tracker) {
         seq = next;
     }
 
-    // Reset tracker state
+    /// Reset tracker state
     tracker->first_sequence = NULL;
     tracker->last_sequence = NULL;
     tracker->current_position = NULL;
@@ -217,19 +217,19 @@ lle_change_tracker_begin_sequence(lle_change_tracker_t *tracker,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Check if sequence already in progress
+    /// Check if sequence already in progress
     if (tracker->sequence_in_progress) {
         return LLE_ERROR_OPERATION_IN_PROGRESS;
     }
 
-    // Allocate new sequence
+    /// Allocate new sequence
     lle_change_sequence_t *seq =
         (lle_change_sequence_t *)lle_pool_alloc(sizeof(lle_change_sequence_t));
     if (!seq) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize sequence
+    /// Initialize sequence
     memset(seq, 0, sizeof(lle_change_sequence_t));
 
     seq->sequence_id = tracker->next_sequence_id++;
@@ -245,7 +245,7 @@ lle_change_tracker_begin_sequence(lle_change_tracker_t *tracker,
         strcpy(seq->description, "Untitled operation");
     }
 
-    // Clear any redo history (branching timeline)
+    /// Clear any redo history (branching timeline)
     if (tracker->current_position && tracker->current_position->next) {
         lle_change_sequence_t *redo_seq = tracker->current_position->next;
         while (redo_seq) {
@@ -257,7 +257,7 @@ lle_change_tracker_begin_sequence(lle_change_tracker_t *tracker,
         tracker->last_sequence = tracker->current_position;
     }
 
-    // Add to sequence chain
+    /// Add to sequence chain
     if (!tracker->first_sequence) {
         tracker->first_sequence = seq;
         tracker->last_sequence = seq;
@@ -274,11 +274,11 @@ lle_change_tracker_begin_sequence(lle_change_tracker_t *tracker,
     tracker->sequence_count++;
     tracker->memory_used += sizeof(lle_change_sequence_t);
 
-    // Enforce undo limit
+    /// Enforce undo limit
     while (tracker->sequence_count > tracker->max_undo_levels) {
         lle_change_sequence_t *old = tracker->first_sequence;
         if (old == tracker->current_position) {
-            break; // Don't remove current position
+            break; /// Don't remove current position
         }
 
         tracker->first_sequence = old->next;
@@ -305,11 +305,11 @@ lle_change_tracker_complete_sequence(lle_change_tracker_t *tracker) {
         return LLE_ERROR_NO_OPERATION_IN_PROGRESS;
     }
 
-    // Finalize sequence
+    /// Finalize sequence
     tracker->active_sequence->end_time = get_timestamp_us();
     tracker->active_sequence->sequence_complete = true;
 
-    // Clear tracking state
+    /// Clear tracking state
     tracker->active_sequence = NULL;
     tracker->sequence_in_progress = false;
 
@@ -323,14 +323,14 @@ lle_result_t lle_change_tracker_begin_operation(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate new operation
+    /// Allocate new operation
     lle_change_operation_t *op = (lle_change_operation_t *)lle_pool_alloc(
         sizeof(lle_change_operation_t));
     if (!op) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize operation
+    /// Initialize operation
     memset(op, 0, sizeof(lle_change_operation_t));
 
     op->type = type;
@@ -339,7 +339,7 @@ lle_result_t lle_change_tracker_begin_operation(
     op->affected_length = length;
     op->timestamp = get_timestamp_us();
 
-    // Add to sequence
+    /// Add to sequence
     if (!sequence->first_op) {
         sequence->first_op = op;
         sequence->last_op = op;
@@ -361,7 +361,7 @@ lle_change_tracker_complete_operation(lle_change_operation_t *operation) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Operation is complete - nothing special needed
+    /// Operation is complete - nothing special needed
     return LLE_SUCCESS;
 }
 
@@ -373,7 +373,7 @@ lle_change_tracker_save_deleted_text(lle_change_operation_t *operation,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate and copy deleted text
+    /// Allocate and copy deleted text
     operation->deleted_text = (char *)lle_pool_alloc(deleted_length + 1);
     if (!operation->deleted_text) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -394,7 +394,7 @@ lle_change_tracker_save_inserted_text(lle_change_operation_t *operation,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate and copy inserted text
+    /// Allocate and copy inserted text
     operation->inserted_text = (char *)lle_pool_alloc(inserted_length + 1);
     if (!operation->inserted_text) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -418,7 +418,7 @@ lle_result_t lle_change_tracker_undo(lle_change_tracker_t *tracker,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Find the most recent sequence that can be undone
+    /// Find the most recent sequence that can be undone
     lle_change_sequence_t *sequence = find_last_undoable_sequence(tracker);
     if (!sequence) {
         return LLE_ERROR_NO_UNDO_AVAILABLE;
@@ -426,29 +426,29 @@ lle_result_t lle_change_tracker_undo(lle_change_tracker_t *tracker,
 
     lle_result_t result = LLE_SUCCESS;
 
-    // Step 1: Disable change tracking during undo
+    /// Step 1: Disable change tracking during undo
     bool tracking_was_enabled = buffer->change_tracking_enabled;
     buffer->change_tracking_enabled = false;
 
-    // Step 2: Process operations in reverse order
+    /// Step 2: Process operations in reverse order
     lle_change_operation_t *op = sequence->last_op;
     while (op) {
         switch (op->type) {
         case LLE_CHANGE_TYPE_INSERT:
-            // Undo insert by deleting the inserted text
+            /// Undo insert by deleting the inserted text
             result = lle_buffer_delete_text(buffer, op->start_position,
                                             op->inserted_length);
             break;
 
         case LLE_CHANGE_TYPE_DELETE:
-            // Undo delete by reinserting the deleted text
+            /// Undo delete by reinserting the deleted text
             result =
                 lle_buffer_insert_text(buffer, op->start_position,
                                        op->deleted_text, op->deleted_length);
             break;
 
         case LLE_CHANGE_TYPE_REPLACE:
-            // Undo replace by deleting new text and inserting old text
+            /// Undo replace by deleting new text and inserting old text
             result = lle_buffer_delete_text(buffer, op->start_position,
                                             op->inserted_length);
             if (result == LLE_SUCCESS) {
@@ -459,7 +459,7 @@ lle_result_t lle_change_tracker_undo(lle_change_tracker_t *tracker,
             break;
 
         default:
-            // Other operation types don't modify buffer content
+            /// Other operation types don't modify buffer content
             break;
         }
 
@@ -470,25 +470,25 @@ lle_result_t lle_change_tracker_undo(lle_change_tracker_t *tracker,
         op = op->prev;
     }
 
-    // Step 3: Restore cursor position
+    /// Step 3: Restore cursor position
     if (result == LLE_SUCCESS && sequence->first_op) {
         buffer->cursor = sequence->first_op->cursor_before;
     }
 
-    // Step 4: Mark sequence as undone
+    /// Step 4: Mark sequence as undone
     if (result == LLE_SUCCESS) {
         sequence->can_undo = false;
         sequence->can_redo = true;
         tracker->undo_count++;
 
-        // Move current position back
+        /// Move current position back
         if (tracker->current_position == sequence) {
             tracker->current_position =
-                sequence->prev; // Can be NULL for first sequence
+                sequence->prev; /// Can be NULL for first sequence
         }
     }
 
-    // Step 5: Re-enable change tracking
+    /// Step 5: Re-enable change tracking
     buffer->change_tracking_enabled = tracking_was_enabled;
 
     return result;
@@ -500,7 +500,7 @@ lle_result_t lle_change_tracker_redo(lle_change_tracker_t *tracker,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Find the most recent sequence that can be redone
+    /// Find the most recent sequence that can be redone
     lle_change_sequence_t *sequence = find_last_redoable_sequence(tracker);
     if (!sequence) {
         return LLE_ERROR_NO_REDO_AVAILABLE;
@@ -508,29 +508,29 @@ lle_result_t lle_change_tracker_redo(lle_change_tracker_t *tracker,
 
     lle_result_t result = LLE_SUCCESS;
 
-    // Step 1: Disable change tracking during redo
+    /// Step 1: Disable change tracking during redo
     bool tracking_was_enabled = buffer->change_tracking_enabled;
     buffer->change_tracking_enabled = false;
 
-    // Step 2: Process operations in forward order
+    /// Step 2: Process operations in forward order
     lle_change_operation_t *op = sequence->first_op;
     while (op) {
         switch (op->type) {
         case LLE_CHANGE_TYPE_INSERT:
-            // Redo insert
+            /// Redo insert
             result =
                 lle_buffer_insert_text(buffer, op->start_position,
                                        op->inserted_text, op->inserted_length);
             break;
 
         case LLE_CHANGE_TYPE_DELETE:
-            // Redo delete
+            /// Redo delete
             result = lle_buffer_delete_text(buffer, op->start_position,
                                             op->deleted_length);
             break;
 
         case LLE_CHANGE_TYPE_REPLACE:
-            // Redo replace
+            /// Redo replace
             result = lle_buffer_delete_text(buffer, op->start_position,
                                             op->deleted_length);
             if (result == LLE_SUCCESS) {
@@ -541,7 +541,7 @@ lle_result_t lle_change_tracker_redo(lle_change_tracker_t *tracker,
             break;
 
         default:
-            // Other operation types don't modify buffer content
+            /// Other operation types don't modify buffer content
             break;
         }
 
@@ -552,22 +552,22 @@ lle_result_t lle_change_tracker_redo(lle_change_tracker_t *tracker,
         op = op->next;
     }
 
-    // Step 3: Restore cursor position
+    /// Step 3: Restore cursor position
     if (result == LLE_SUCCESS && sequence->last_op) {
         buffer->cursor = sequence->last_op->cursor_after;
     }
 
-    // Step 4: Mark sequence as redone
+    /// Step 4: Mark sequence as redone
     if (result == LLE_SUCCESS) {
         sequence->can_undo = true;
         sequence->can_redo = false;
         tracker->redo_count++;
 
-        // Move current position forward
+        /// Move current position forward
         tracker->current_position = sequence;
     }
 
-    // Step 5: Re-enable change tracking
+    /// Step 5: Re-enable change tracking
     buffer->change_tracking_enabled = tracking_was_enabled;
 
     return result;

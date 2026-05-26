@@ -90,7 +90,7 @@ static uint64_t get_timestamp_us(void) {
 lle_result_t lle_buffer_create(lle_buffer_t **buffer,
                                lush_memory_pool_t *memory_pool,
                                size_t initial_capacity) {
-    // Validate parameters
+    /// Validate parameters
     if (!buffer) {
         return LLE_ERROR_NULL_POINTER;
     }
@@ -98,7 +98,7 @@ lle_result_t lle_buffer_create(lle_buffer_t **buffer,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Determine actual capacity
+    /// Determine actual capacity
     size_t capacity = initial_capacity;
     if (capacity == 0) {
         capacity = LLE_BUFFER_DEFAULT_CAPACITY;
@@ -110,71 +110,71 @@ lle_result_t lle_buffer_create(lle_buffer_t **buffer,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate buffer structure
+    /// Allocate buffer structure
     lle_buffer_t *buf = (lle_buffer_t *)lle_pool_alloc(sizeof(lle_buffer_t));
     if (!buf) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Zero-initialize entire structure
+    /// Zero-initialize entire structure
     memset(buf, 0, sizeof(lle_buffer_t));
 
-    // Allocate data array
+    /// Allocate data array
     buf->data = (char *)lle_pool_alloc(capacity);
     if (!buf->data) {
         lle_pool_free(buf);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize buffer metadata
+    /// Initialize buffer metadata
     buf->buffer_id = generate_buffer_id();
     snprintf(buf->name, LLE_BUFFER_NAME_MAX, "buffer_%u", buf->buffer_id);
     buf->creation_time = get_timestamp_us();
     buf->last_modified_time = buf->creation_time;
     buf->modification_count = 0;
 
-    // Initialize buffer content storage
+    /// Initialize buffer content storage
     buf->capacity = capacity;
     buf->length = 0;
     buf->used = 0;
     memset(buf->data, 0, capacity);
 
-    // Initialize UTF-8 and Unicode metadata
+    /// Initialize UTF-8 and Unicode metadata
     buf->codepoint_count = 0;
     buf->grapheme_count = 0;
     buf->utf8_index = NULL;
     buf->utf8_index_valid = false;
 
-    // Initialize line structure information
+    /// Initialize line structure information
     buf->lines = NULL;
     buf->line_count = 0;
     buf->line_capacity = 0;
     buf->multiline_active = false;
     buf->multiline_ctx = NULL;
 
-    // Initialize cursor and selection
+    /// Initialize cursor and selection
     memset(&buf->cursor, 0, sizeof(lle_cursor_position_t));
     buf->cursor.position_valid = true;
     buf->cursor.buffer_version = 0;
     buf->selection = NULL;
     buf->selection_active = false;
 
-    // Initialize change tracking integration
+    /// Initialize change tracking integration
     buf->current_sequence = NULL;
     buf->sequence_number = 0;
     buf->change_tracking_enabled = false;
 
-    // Initialize performance optimization
+    /// Initialize performance optimization
     buf->cache = NULL;
     buf->cache_version = 0;
     buf->cache_dirty = false;
 
-    // Initialize validation and integrity
+    /// Initialize validation and integrity
     buf->checksum = 0;
     buf->integrity_valid = true;
     buf->flags = 0;
 
-    // Initialize memory management
+    /// Initialize memory management
     buf->pool = NULL;
     buf->memory_pool = memory_pool;
 
@@ -199,58 +199,58 @@ lle_result_t lle_buffer_create(lle_buffer_t **buffer,
  * @return LLE_SUCCESS or error code
  */
 lle_result_t lle_buffer_destroy(lle_buffer_t *buffer) {
-    // Validate parameter
+    /// Validate parameter
     if (!buffer) {
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Securely wipe data if secure mode is enabled
+    /// Securely wipe data if secure mode is enabled
     if (buffer->data && buffer->secure_mode_enabled) {
         lle_secure_wipe(buffer->data, buffer->capacity);
 
-        // Unlock memory if it was locked
+        /// Unlock memory if it was locked
         if (buffer->memory_locked) {
             lle_memory_unlock(buffer->data, buffer->capacity);
         }
     }
 
-    // Free data array if allocated
+    /// Free data array if allocated
     if (buffer->data) {
         lle_pool_free(buffer->data);
         buffer->data = NULL;
     }
 
-    // Free UTF-8 index if allocated
+    /// Free UTF-8 index if allocated
     if (buffer->utf8_index) {
         lle_pool_free(buffer->utf8_index);
         buffer->utf8_index = NULL;
     }
 
-    // Free line structure array if allocated
+    /// Free line structure array if allocated
     if (buffer->lines) {
         lle_pool_free(buffer->lines);
         buffer->lines = NULL;
     }
 
-    // Free multiline context if allocated
+    /// Free multiline context if allocated
     if (buffer->multiline_ctx) {
         lle_pool_free(buffer->multiline_ctx);
         buffer->multiline_ctx = NULL;
     }
 
-    // Free selection if allocated
+    /// Free selection if allocated
     if (buffer->selection) {
         lle_pool_free(buffer->selection);
         buffer->selection = NULL;
     }
 
-    // Free cache if allocated
+    /// Free cache if allocated
     if (buffer->cache) {
         lle_pool_free(buffer->cache);
         buffer->cache = NULL;
     }
 
-    // Free buffer structure itself
+    /// Free buffer structure itself
     lle_pool_free(buffer);
 
     return LLE_SUCCESS;
@@ -273,7 +273,7 @@ lle_result_t lle_buffer_destroy(lle_buffer_t *buffer) {
  * @return LLE_SUCCESS or error code
  */
 lle_result_t lle_buffer_clear(lle_buffer_t *buffer) {
-    // Validate parameter
+    /// Validate parameter
     if (!buffer) {
         return LLE_ERROR_NULL_POINTER;
     }
@@ -281,44 +281,44 @@ lle_result_t lle_buffer_clear(lle_buffer_t *buffer) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    // Clear data array
+    /// Clear data array
     memset(buffer->data, 0, buffer->capacity);
 
-    // Reset content metadata
+    /// Reset content metadata
     buffer->length = 0;
     buffer->used = 0;
     buffer->last_modified_time = get_timestamp_us();
     buffer->modification_count++;
 
-    // Reset UTF-8 and Unicode metadata
+    /// Reset UTF-8 and Unicode metadata
     buffer->codepoint_count = 0;
     buffer->grapheme_count = 0;
     buffer->utf8_index_valid = false;
 
-    // Reset line structure
+    /// Reset line structure
     buffer->line_count = 0;
     buffer->multiline_active = false;
 
-    // Reset cursor to beginning
+    /// Reset cursor to beginning
     memset(&buffer->cursor, 0, sizeof(lle_cursor_position_t));
     buffer->cursor.position_valid = true;
     buffer->cursor.buffer_version = buffer->modification_count;
 
-    // Clear selection
+    /// Clear selection
     buffer->selection_active = false;
 
-    // Reset change tracking
+    /// Reset change tracking
     buffer->sequence_number = 0;
 
-    // Invalidate cache
+    /// Invalidate cache
     buffer->cache_dirty = true;
     buffer->cache_version++;
 
-    // Update integrity
+    /// Update integrity
     buffer->checksum = 0;
     buffer->integrity_valid = true;
 
-    // Clear dirty flags
+    /// Clear dirty flags
     buffer->flags &=
         ~(LLE_BUFFER_FLAG_MODIFIED | LLE_BUFFER_FLAG_UTF8_DIRTY |
           LLE_BUFFER_FLAG_LINE_DIRTY | LLE_BUFFER_FLAG_CACHE_DIRTY);
@@ -348,7 +348,7 @@ lle_result_t lle_buffer_enable_secure_mode(lle_buffer_t *buffer) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    // Attempt to lock buffer memory to prevent swapping
+    /// Attempt to lock buffer memory to prevent swapping
     bool lock_success = lle_memory_lock(buffer->data, buffer->capacity);
 
     /* Note: mlock may fail due to:
@@ -381,44 +381,44 @@ lle_result_t lle_buffer_secure_clear(lle_buffer_t *buffer) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    // Securely wipe buffer contents
+    /// Securely wipe buffer contents
     lle_secure_wipe(buffer->data, buffer->capacity);
 
-    // Reset all buffer metadata (same as lle_buffer_clear)
+    /// Reset all buffer metadata (same as lle_buffer_clear)
     buffer->length = 0;
     buffer->used = 0;
     buffer->last_modified_time = get_timestamp_us();
     buffer->modification_count++;
 
-    // Reset UTF-8 and Unicode metadata
+    /// Reset UTF-8 and Unicode metadata
     buffer->codepoint_count = 0;
     buffer->grapheme_count = 0;
     buffer->utf8_index_valid = false;
 
-    // Reset line structure
+    /// Reset line structure
     buffer->line_count = 0;
     buffer->multiline_active = false;
 
-    // Reset cursor to beginning
+    /// Reset cursor to beginning
     memset(&buffer->cursor, 0, sizeof(lle_cursor_position_t));
     buffer->cursor.position_valid = true;
     buffer->cursor.buffer_version = buffer->modification_count;
 
-    // Clear selection
+    /// Clear selection
     buffer->selection_active = false;
 
-    // Reset change tracking
+    /// Reset change tracking
     buffer->sequence_number = 0;
 
-    // Invalidate cache
+    /// Invalidate cache
     buffer->cache_dirty = true;
     buffer->cache_version++;
 
-    // Update integrity
+    /// Update integrity
     buffer->checksum = 0;
     buffer->integrity_valid = true;
 
-    // Clear dirty flags
+    /// Clear dirty flags
     buffer->flags &=
         ~(LLE_BUFFER_FLAG_MODIFIED | LLE_BUFFER_FLAG_UTF8_DIRTY |
           LLE_BUFFER_FLAG_LINE_DIRTY | LLE_BUFFER_FLAG_CACHE_DIRTY);
@@ -440,7 +440,7 @@ lle_result_t lle_buffer_disable_secure_mode(lle_buffer_t *buffer) {
         return LLE_ERROR_INVALID_STATE;
     }
 
-    // Unlock buffer memory if it was locked
+    /// Unlock buffer memory if it was locked
     if (buffer->memory_locked) {
         lle_memory_unlock(buffer->data, buffer->capacity);
         buffer->memory_locked = false;
@@ -468,19 +468,19 @@ lle_result_t lle_buffer_disable_secure_mode(lle_buffer_t *buffer) {
  * @return LLE_SUCCESS if valid, error code if validation fails
  */
 lle_result_t lle_buffer_validate(lle_buffer_t *buffer) {
-    // Validate parameter
+    /// Validate parameter
     if (!buffer) {
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Validate data pointer
+    /// Validate data pointer
     if (!buffer->data) {
         buffer->integrity_valid = false;
         buffer->flags |= LLE_BUFFER_FLAG_VALIDATION_FAILED;
         return LLE_ERROR_INVALID_STATE;
     }
 
-    // Validate capacity bounds
+    /// Validate capacity bounds
     if (buffer->capacity < LLE_BUFFER_MIN_CAPACITY ||
         buffer->capacity > LLE_BUFFER_MAX_CAPACITY) {
         buffer->integrity_valid = false;
@@ -488,28 +488,28 @@ lle_result_t lle_buffer_validate(lle_buffer_t *buffer) {
         return LLE_ERROR_MEMORY_CORRUPTION;
     }
 
-    // Validate length <= capacity
+    /// Validate length <= capacity
     if (buffer->length > buffer->capacity) {
         buffer->integrity_valid = false;
         buffer->flags |= LLE_BUFFER_FLAG_VALIDATION_FAILED;
         return LLE_ERROR_MEMORY_CORRUPTION;
     }
 
-    // Validate used <= length
+    /// Validate used <= length
     if (buffer->used > buffer->length) {
         buffer->integrity_valid = false;
         buffer->flags |= LLE_BUFFER_FLAG_VALIDATION_FAILED;
         return LLE_ERROR_MEMORY_CORRUPTION;
     }
 
-    // Validate memory pool reference
+    /// Validate memory pool reference
     if (!buffer->memory_pool) {
         buffer->integrity_valid = false;
         buffer->flags |= LLE_BUFFER_FLAG_VALIDATION_FAILED;
         return LLE_ERROR_INVALID_STATE;
     }
 
-    // Clear validation failed flag
+    /// Clear validation failed flag
     buffer->flags &= ~LLE_BUFFER_FLAG_VALIDATION_FAILED;
     buffer->integrity_valid = true;
 
@@ -530,7 +530,7 @@ lle_result_t lle_buffer_validate(lle_buffer_t *buffer) {
  */
 lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
                                     const char *text, size_t text_length) {
-    // Validate parameters
+    /// Validate parameters
     if (!buffer || !text) {
         return LLE_ERROR_NULL_POINTER;
     }
@@ -540,17 +540,17 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
     }
 
     if (text_length == 0) {
-        return LLE_SUCCESS; // Nothing to insert
+        return LLE_SUCCESS; /// Nothing to insert
     }
 
-    // Step 1: Validate UTF-8 input
+    /// Step 1: Validate UTF-8 input
     if (!lle_utf8_is_valid(text, text_length)) {
         return LLE_ERROR_INVALID_ENCODING;
     }
 
     lle_result_t result = LLE_SUCCESS;
 
-    // Step 2: Check if buffer needs expansion
+    /// Step 2: Check if buffer needs expansion
     if (buffer->length + text_length >= buffer->capacity) {
         size_t new_capacity = buffer->capacity;
         while (new_capacity < buffer->length + text_length + 1) {
@@ -560,7 +560,7 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
             }
         }
 
-        // Reallocate buffer
+        /// Reallocate buffer
         char *new_data = (char *)lle_pool_alloc(new_capacity);
         if (!new_data) {
             return LLE_ERROR_OUT_OF_MEMORY;
@@ -572,7 +572,7 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
         buffer->capacity = new_capacity;
     }
 
-    // Step 3: Start change tracking sequence
+    /// Step 3: Start change tracking sequence
     lle_change_operation_t *change_op = NULL;
     if (buffer->change_tracking_enabled && buffer->current_sequence) {
         result = lle_change_tracker_begin_operation(
@@ -582,12 +582,12 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
             return result;
         }
 
-        // Save cursor state before operation
+        /// Save cursor state before operation
         if (change_op) {
             change_op->cursor_before = buffer->cursor;
         }
 
-        // Save inserted text for undo
+        /// Save inserted text for undo
         result =
             lle_change_tracker_save_inserted_text(change_op, text, text_length);
         if (result != LLE_SUCCESS) {
@@ -595,49 +595,49 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
         }
     }
 
-    // Step 4: Make space for new text
+    /// Step 4: Make space for new text
     if (position < buffer->length) {
         memmove(buffer->data + position + text_length, buffer->data + position,
                 buffer->length - position);
     }
 
-    // Step 5: Insert new text
+    /// Step 5: Insert new text
     memcpy(buffer->data + position, text, text_length);
     buffer->length += text_length;
-    buffer->used = buffer->length;       // Update used space
-    buffer->data[buffer->length] = '\0'; // Ensure null termination
+    buffer->used = buffer->length;       /// Update used space
+    buffer->data[buffer->length] = '\0'; /// Ensure null termination
 
-    // Step 6: Update buffer metadata
+    /// Step 6: Update buffer metadata
     buffer->modification_count++;
     buffer->last_modified_time = get_timestamp_us();
     buffer->flags |= LLE_BUFFER_FLAG_MODIFIED;
 
-    // Step 7: Update UTF-8 counts and invalidate position index
+    /// Step 7: Update UTF-8 counts and invalidate position index
     buffer->codepoint_count += lle_utf8_count_codepoints(text, text_length);
     buffer->grapheme_count += lle_utf8_count_graphemes(text, text_length);
 
-    // Invalidate UTF-8 position index - position mappings need rebuild
+    /// Invalidate UTF-8 position index - position mappings need rebuild
     if (buffer->utf8_index) {
         lle_utf8_index_invalidate(buffer->utf8_index);
     }
     buffer->utf8_index_valid = false;
 
-    // Invalidate line structure - line boundaries need rebuild
+    /// Invalidate line structure - line boundaries need rebuild
     buffer->line_count = 0;
 
-    // Step 8: Update cursor if after insertion point
+    /// Step 8: Update cursor if after insertion point
     if (buffer->cursor.byte_offset >= position) {
         buffer->cursor.byte_offset += text_length;
     }
 
-    // Step 9: Complete change tracking
+    /// Step 9: Complete change tracking
     if (buffer->change_tracking_enabled && change_op) {
-        // Save cursor state after operation
+        /// Save cursor state after operation
         change_op->cursor_after = buffer->cursor;
 
         result = lle_change_tracker_complete_operation(change_op);
         if (result != LLE_SUCCESS) {
-            // Log warning but continue - operation succeeded
+            /// Log warning but continue - operation succeeded
         }
     }
 
@@ -650,7 +650,7 @@ lle_result_t lle_buffer_insert_text(lle_buffer_t *buffer, size_t position,
  */
 lle_result_t lle_buffer_delete_text(lle_buffer_t *buffer, size_t start_position,
                                     size_t delete_length) {
-    // Validate parameters
+    /// Validate parameters
     if (!buffer) {
         return LLE_ERROR_NULL_POINTER;
     }
@@ -664,12 +664,12 @@ lle_result_t lle_buffer_delete_text(lle_buffer_t *buffer, size_t start_position,
     }
 
     if (delete_length == 0) {
-        return LLE_SUCCESS; // Nothing to delete
+        return LLE_SUCCESS; /// Nothing to delete
     }
 
     lle_result_t result = LLE_SUCCESS;
 
-    // Step 1: Start change tracking sequence
+    /// Step 1: Start change tracking sequence
     lle_change_operation_t *change_op = NULL;
     if (buffer->change_tracking_enabled && buffer->current_sequence) {
         result = lle_change_tracker_begin_operation(
@@ -679,12 +679,12 @@ lle_result_t lle_buffer_delete_text(lle_buffer_t *buffer, size_t start_position,
             return result;
         }
 
-        // Save cursor state before operation
+        /// Save cursor state before operation
         if (change_op) {
             change_op->cursor_before = buffer->cursor;
         }
 
-        // Save deleted text for undo
+        /// Save deleted text for undo
         result = lle_change_tracker_save_deleted_text(
             change_op, buffer->data + start_position, delete_length);
         if (result != LLE_SUCCESS) {
@@ -692,13 +692,13 @@ lle_result_t lle_buffer_delete_text(lle_buffer_t *buffer, size_t start_position,
         }
     }
 
-    // Step 2: Calculate UTF-8 statistics of deleted text
+    /// Step 2: Calculate UTF-8 statistics of deleted text
     size_t deleted_codepoints =
         lle_utf8_count_codepoints(buffer->data + start_position, delete_length);
     size_t deleted_graphemes =
         lle_utf8_count_graphemes(buffer->data + start_position, delete_length);
 
-    // Step 3: Remove text by shifting remaining data
+    /// Step 3: Remove text by shifting remaining data
     if (start_position + delete_length < buffer->length) {
         memmove(buffer->data + start_position,
                 buffer->data + start_position + delete_length,
@@ -706,28 +706,28 @@ lle_result_t lle_buffer_delete_text(lle_buffer_t *buffer, size_t start_position,
     }
 
     buffer->length -= delete_length;
-    buffer->used = buffer->length;       // Update used space
-    buffer->data[buffer->length] = '\0'; // Ensure null termination
+    buffer->used = buffer->length;       /// Update used space
+    buffer->data[buffer->length] = '\0'; /// Ensure null termination
 
-    // Step 4: Update buffer metadata
+    /// Step 4: Update buffer metadata
     buffer->modification_count++;
     buffer->last_modified_time = get_timestamp_us();
     buffer->flags |= LLE_BUFFER_FLAG_MODIFIED;
 
-    // Step 5: Update UTF-8 counts and invalidate position index
+    /// Step 5: Update UTF-8 counts and invalidate position index
     buffer->codepoint_count -= deleted_codepoints;
     buffer->grapheme_count -= deleted_graphemes;
 
-    // Invalidate UTF-8 position index - position mappings need rebuild
+    /// Invalidate UTF-8 position index - position mappings need rebuild
     if (buffer->utf8_index) {
         lle_utf8_index_invalidate(buffer->utf8_index);
     }
     buffer->utf8_index_valid = false;
 
-    // Invalidate line structure - line boundaries need rebuild
+    /// Invalidate line structure - line boundaries need rebuild
     buffer->line_count = 0;
 
-    // Step 6: Update cursor if affected
+    /// Step 6: Update cursor if affected
     if (buffer->cursor.byte_offset > start_position) {
         if (buffer->cursor.byte_offset >= start_position + delete_length) {
             buffer->cursor.byte_offset -= delete_length;
@@ -736,14 +736,14 @@ lle_result_t lle_buffer_delete_text(lle_buffer_t *buffer, size_t start_position,
         }
     }
 
-    // Step 7: Complete change tracking
+    /// Step 7: Complete change tracking
     if (buffer->change_tracking_enabled && change_op) {
-        // Save cursor state after operation
+        /// Save cursor state after operation
         change_op->cursor_after = buffer->cursor;
 
         result = lle_change_tracker_complete_operation(change_op);
         if (result != LLE_SUCCESS) {
-            // Log warning but continue - operation succeeded
+            /// Log warning but continue - operation succeeded
         }
     }
 
@@ -761,7 +761,7 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
                                      size_t delete_length,
                                      const char *insert_text,
                                      size_t insert_length) {
-    // Validate parameters
+    /// Validate parameters
     if (!buffer || !insert_text) {
         return LLE_ERROR_NULL_POINTER;
     }
@@ -774,14 +774,14 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
         return LLE_ERROR_INVALID_RANGE;
     }
 
-    // Validate UTF-8 input
+    /// Validate UTF-8 input
     if (!lle_utf8_is_valid(insert_text, insert_length)) {
         return LLE_ERROR_INVALID_ENCODING;
     }
 
     lle_result_t result = LLE_SUCCESS;
 
-    // Step 1: Check if buffer needs expansion
+    /// Step 1: Check if buffer needs expansion
     ssize_t size_delta = (ssize_t)insert_length - (ssize_t)delete_length;
     size_t new_length = buffer->length + size_delta;
 
@@ -794,7 +794,7 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
             }
         }
 
-        // Reallocate buffer
+        /// Reallocate buffer
         char *new_data = (char *)lle_pool_alloc(new_capacity);
         if (!new_data) {
             return LLE_ERROR_OUT_OF_MEMORY;
@@ -806,7 +806,7 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
         buffer->capacity = new_capacity;
     }
 
-    // Step 2: Start change tracking sequence
+    /// Step 2: Start change tracking sequence
     lle_change_operation_t *change_op = NULL;
     if (buffer->change_tracking_enabled && buffer->current_sequence) {
         result = lle_change_tracker_begin_operation(
@@ -816,19 +816,19 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
             return result;
         }
 
-        // Save cursor state before operation
+        /// Save cursor state before operation
         if (change_op) {
             change_op->cursor_before = buffer->cursor;
         }
 
-        // Save deleted text for undo
+        /// Save deleted text for undo
         result = lle_change_tracker_save_deleted_text(
             change_op, buffer->data + start_position, delete_length);
         if (result != LLE_SUCCESS) {
             return result;
         }
 
-        // Save inserted text for undo
+        /// Save inserted text for undo
         result = lle_change_tracker_save_inserted_text(change_op, insert_text,
                                                        insert_length);
         if (result != LLE_SUCCESS) {
@@ -836,7 +836,7 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
         }
     }
 
-    // Step 3: Calculate UTF-8 statistics
+    /// Step 3: Calculate UTF-8 statistics
     size_t deleted_codepoints =
         lle_utf8_count_codepoints(buffer->data + start_position, delete_length);
     size_t deleted_graphemes =
@@ -846,9 +846,9 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
     size_t inserted_graphemes =
         lle_utf8_count_graphemes(insert_text, insert_length);
 
-    // Step 4: Perform replacement
+    /// Step 4: Perform replacement
     if (delete_length != insert_length) {
-        // Need to shift data
+        /// Need to shift data
         if (start_position + delete_length < buffer->length) {
             memmove(buffer->data + start_position + insert_length,
                     buffer->data + start_position + delete_length,
@@ -856,33 +856,33 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
         }
     }
 
-    // Copy new text
+    /// Copy new text
     memcpy(buffer->data + start_position, insert_text, insert_length);
     buffer->length = new_length;
-    buffer->used = buffer->length; // Update used space
+    buffer->used = buffer->length; /// Update used space
     buffer->data[buffer->length] = '\0';
 
-    // Step 5: Update buffer metadata
+    /// Step 5: Update buffer metadata
     buffer->modification_count++;
     buffer->last_modified_time = get_timestamp_us();
     buffer->flags |= LLE_BUFFER_FLAG_MODIFIED;
 
-    // Step 6: Update UTF-8 counts and invalidate position index
+    /// Step 6: Update UTF-8 counts and invalidate position index
     buffer->codepoint_count =
         buffer->codepoint_count - deleted_codepoints + inserted_codepoints;
     buffer->grapheme_count =
         buffer->grapheme_count - deleted_graphemes + inserted_graphemes;
 
-    // Invalidate UTF-8 position index - position mappings need rebuild
+    /// Invalidate UTF-8 position index - position mappings need rebuild
     if (buffer->utf8_index) {
         lle_utf8_index_invalidate(buffer->utf8_index);
     }
     buffer->utf8_index_valid = false;
 
-    // Invalidate line structure - line boundaries need rebuild
+    /// Invalidate line structure - line boundaries need rebuild
     buffer->line_count = 0;
 
-    // Step 7: Update cursor if affected
+    /// Step 7: Update cursor if affected
     if (buffer->cursor.byte_offset > start_position) {
         if (buffer->cursor.byte_offset >= start_position + delete_length) {
             buffer->cursor.byte_offset += size_delta;
@@ -891,14 +891,14 @@ lle_result_t lle_buffer_replace_text(lle_buffer_t *buffer,
         }
     }
 
-    // Step 8: Complete change tracking
+    /// Step 8: Complete change tracking
     if (buffer->change_tracking_enabled && change_op) {
-        // Save cursor state after operation
+        /// Save cursor state after operation
         change_op->cursor_after = buffer->cursor;
 
         result = lle_change_tracker_complete_operation(change_op);
         if (result != LLE_SUCCESS) {
-            // Log warning but continue - operation succeeded
+            /// Log warning but continue - operation succeeded
         }
     }
 
