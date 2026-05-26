@@ -42,9 +42,9 @@ const lle_unicode_compare_options_t LLE_UNICODE_COMPARE_STRICT = {
  * (base character + combining mark).
  */
 typedef struct {
-    uint32_t composed;  /**< Precomposed codepoint */
-    uint32_t base;      /**< Base character */
-    uint32_t combining; /**< Combining character (0 if single) */
+    uint32_t composed;  ///< Precomposed codepoint
+    uint32_t base;      ///< Base character
+    uint32_t combining; ///< Combining character (0 if single)
 } decomposition_entry_t;
 
 /**
@@ -228,7 +228,7 @@ static const size_t decomposition_table_size =
  */
 typedef struct {
     uint32_t codepoint;
-    uint8_t ccc; /**< Canonical Combining Class */
+    uint8_t ccc; ///< Canonical Combining Class
 } combining_class_entry_t;
 
 static const combining_class_entry_t combining_class_table[] = {
