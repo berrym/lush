@@ -10099,11 +10099,24 @@ static bool match_pattern(const char *str, const char *pattern) {
             p++; /// Skip opening [
             bool matched = false;
             bool negated = false;
-            /// Bytes consumed from the input by this bracket as a
-            /// whole. ASCII / literal / range matches consume 1 byte;
-            /// a successful [:class:] match consumes the full UTF-8
-            /// codepoint length of the input character.
+
+            /// Decode the input codepoint once for the whole bracket.
+            /// All match-arms (class / range / literal) test against
+            /// this single codepoint, and the post-bracket `s` advance
+            /// uses its UTF-8 byte length so multi-byte input never
+            /// gets left mid-codepoint. Malformed UTF-8 degrades to a
+            /// byte-as-codepoint so ASCII patterns continue to work.
+            uint32_t input_cp = (uint32_t)(unsigned char)*s;
             size_t s_consumed = 1;
+            if (*s) {
+                uint32_t decoded = 0;
+                int consumed =
+                    lle_utf8_decode_codepoint(s, strlen(s), &decoded);
+                if (consumed > 0) {
+                    input_cp = decoded;
+                    s_consumed = (size_t)consumed;
+                }
+            }
 
             /// Check for negation [!abc] or [^abc]
             if (*p == '!' || *p == '^') {
@@ -10119,70 +10132,49 @@ static bool match_pattern(const char *str, const char *pattern) {
                 /// character set { '[', ':', 's', 'p', 'a', 'c', 'e' }
                 /// because the class form was never parsed
                 /// (real_world/bash/201 trim function). Scan for `:]`
-                /// to delimit the class name, then test via ctype.
+                /// to delimit the class name, then dispatch through
+                /// the Unicode general-category predicates.
                 if (p[0] == '[' && p[1] == ':') {
                     const char *class_start = p + 2;
                     const char *class_end = strstr(class_start, ":]");
                     if (class_end) {
                         size_t cl = (size_t)(class_end - class_start);
-                        /// Decode the next input codepoint so the
-                        /// class predicate evaluates Unicode general-
-                        /// category membership, not single-byte
-                        /// ctype membership. The string-end and
-                        /// invalid-UTF-8 cases degrade to the byte
-                        /// value as a codepoint so ASCII patterns
-                        /// continue to work.
-                        ///
-                        /// Track the codepoint's byte length so the
-                        /// post-bracket `s` advance covers the full
-                        /// multi-byte sequence instead of leaving
-                        /// `s` mid-codepoint.
-                        uint32_t cp = (uint32_t)(unsigned char)*s;
-                        if (*s) {
-                            uint32_t decoded = 0;
-                            int consumed = lle_utf8_decode_codepoint(
-                                s, strlen(s), &decoded);
-                            if (consumed > 0) {
-                                cp = decoded;
-                                s_consumed = (size_t)consumed;
-                            }
-                        }
                         bool cls_match = false;
                         if (cl == 5 && memcmp(class_start, "space", 5) == 0) {
-                            cls_match = lle_unicode_is_space(cp);
+                            cls_match = lle_unicode_is_space(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "alpha", 5) == 0) {
-                            cls_match = lle_unicode_is_alpha(cp);
+                            cls_match = lle_unicode_is_alpha(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "digit", 5) == 0) {
-                            cls_match = lle_unicode_is_digit(cp);
+                            cls_match = lle_unicode_is_digit(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "alnum", 5) == 0) {
-                            cls_match = lle_unicode_is_alnum(cp);
+                            cls_match = lle_unicode_is_alnum(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "upper", 5) == 0) {
-                            cls_match = lle_unicode_is_upper(cp);
+                            cls_match = lle_unicode_is_upper(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "lower", 5) == 0) {
-                            cls_match = lle_unicode_is_lower(cp);
+                            cls_match = lle_unicode_is_lower(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "punct", 5) == 0) {
-                            cls_match = lle_unicode_is_punct(cp);
+                            cls_match = lle_unicode_is_punct(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "print", 5) == 0) {
-                            cls_match = lle_unicode_is_print(cp);
+                            cls_match = lle_unicode_is_print(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "graph", 5) == 0) {
-                            cls_match = lle_unicode_is_graph(cp);
+                            cls_match = lle_unicode_is_graph(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "blank", 5) == 0) {
-                            cls_match = lle_unicode_is_blank(cp);
+                            cls_match = lle_unicode_is_blank(input_cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "cntrl", 5) == 0) {
-                            cls_match = lle_unicode_is_cntrl(cp);
+                            cls_match = lle_unicode_is_cntrl(input_cp);
                         } else if (cl == 6 &&
                                    memcmp(class_start, "xdigit", 6) == 0) {
-                            cls_match = lle_unicode_is_xdigit(cp);
+                            cls_match = lle_unicode_is_xdigit(input_cp);
                         }
                         if (cls_match) {
                             matched = true;
@@ -10191,18 +10183,49 @@ static bool match_pattern(const char *str, const char *pattern) {
                         continue;
                     }
                 }
-                if (p[1] == '-' && p[2] != ']' && p[2] != '\0') {
-                    /// Range pattern like a-z
-                    if (*s >= *p && *s <= p[2]) {
+
+                /// Decode the pattern codepoint at p. UTF-8 multi-byte
+                /// characters in patterns are now first-class: `[α-ω]`
+                /// is one codepoint, one `-`, one codepoint, not five
+                /// independent bytes. Malformed UTF-8 falls back to a
+                /// single byte so ASCII patterns are untouched.
+                uint32_t pat_first = (uint32_t)(unsigned char)*p;
+                size_t pat_first_bytes = 1;
+                {
+                    uint32_t decoded = 0;
+                    int consumed =
+                        lle_utf8_decode_codepoint(p, strlen(p), &decoded);
+                    if (consumed > 0) {
+                        pat_first = decoded;
+                        pat_first_bytes = (size_t)consumed;
+                    }
+                }
+                const char *after_first = p + pat_first_bytes;
+                if (*after_first == '-' && after_first[1] != ']' &&
+                    after_first[1] != '\0') {
+                    /// Range pattern X-Y. Decode the end codepoint.
+                    const char *range_end = after_first + 1;
+                    uint32_t pat_end = (uint32_t)(unsigned char)*range_end;
+                    size_t pat_end_bytes = 1;
+                    {
+                        uint32_t decoded = 0;
+                        int consumed = lle_utf8_decode_codepoint(
+                            range_end, strlen(range_end), &decoded);
+                        if (consumed > 0) {
+                            pat_end = decoded;
+                            pat_end_bytes = (size_t)consumed;
+                        }
+                    }
+                    if (input_cp >= pat_first && input_cp <= pat_end) {
                         matched = true;
                     }
-                    p += 3; /// Skip a-z
+                    p = range_end + pat_end_bytes;
                 } else {
-                    /// Single character
-                    if (*s == *p) {
+                    /// Single codepoint
+                    if (input_cp == pat_first) {
                         matched = true;
                     }
-                    p++;
+                    p += pat_first_bytes;
                 }
             }
 
