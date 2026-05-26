@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Forward declaration for filter apply function (from event_filter.c)
+/// Forward declaration for filter apply function (from event_filter.c)
 extern lle_filter_result_t lle_event_filter_apply(lle_event_system_t *system,
                                                   lle_event_t *event);
 
@@ -39,7 +39,7 @@ lle_result_t lle_event_handler_register(lle_event_system_t *system,
 
     pthread_mutex_lock(&system->system_mutex);
 
-    // Check if we need to grow handler array
+    /// Check if we need to grow handler array
     if (system->handler_count >= system->handler_capacity) {
         size_t new_capacity = system->handler_capacity * 2;
         lle_event_handler_t **new_handlers =
@@ -50,32 +50,32 @@ lle_result_t lle_event_handler_register(lle_event_system_t *system,
             return LLE_ERROR_OUT_OF_MEMORY;
         }
 
-        // Copy existing handlers
+        /// Copy existing handlers
         memcpy(new_handlers, system->handlers,
                sizeof(lle_event_handler_t *) * system->handler_count);
 
-        // Free old array
+        /// Free old array
         lle_pool_free(system->handlers);
 
         system->handlers = new_handlers;
         system->handler_capacity = new_capacity;
     }
 
-    // Allocate new handler
+    /// Allocate new handler
     lle_event_handler_t *h = lle_pool_alloc(sizeof(lle_event_handler_t));
     if (!h) {
         pthread_mutex_unlock(&system->system_mutex);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize handler
+    /// Initialize handler
     h->event_type = type;
     h->handler = handler;
     h->user_data = user_data;
     strncpy(h->name, name, sizeof(h->name) - 1);
     h->name[sizeof(h->name) - 1] = '\0';
 
-    // Add to array
+    /// Add to array
     system->handlers[system->handler_count++] = h;
 
     pthread_mutex_unlock(&system->system_mutex);
@@ -99,15 +99,15 @@ lle_result_t lle_event_handler_unregister(lle_event_system_t *system,
 
     pthread_mutex_lock(&system->system_mutex);
 
-    // Find and remove handler
+    /// Find and remove handler
     for (size_t i = 0; i < system->handler_count; i++) {
         lle_event_handler_t *h = system->handlers[i];
 
         if (h->event_type == type && strcmp(h->name, name) == 0) {
-            // Free handler
+            /// Free handler
             lle_pool_free(h);
 
-            // Shift remaining handlers down
+            /// Shift remaining handlers down
             for (size_t j = i; j < system->handler_count - 1; j++) {
                 system->handlers[j] = system->handlers[j + 1];
             }
@@ -140,15 +140,15 @@ lle_result_t lle_event_handler_unregister_all(lle_event_system_t *system,
 
     size_t removed = 0;
 
-    // Remove all handlers for this type
+    /// Remove all handlers for this type
     for (size_t i = 0; i < system->handler_count;) {
         lle_event_handler_t *h = system->handlers[i];
 
         if (h->event_type == type) {
-            // Free handler
+            /// Free handler
             lle_pool_free(h);
 
-            // Shift remaining handlers down
+            /// Shift remaining handlers down
             for (size_t j = i; j < system->handler_count - 1; j++) {
                 system->handlers[j] = system->handlers[j + 1];
             }
@@ -209,22 +209,22 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Phase 2C: Apply event filters
+    /// Phase 2C: Apply event filters
     if (system->filter_system) {
         lle_filter_result_t filter_result =
             lle_event_filter_apply(system, event);
         if (filter_result == LLE_FILTER_BLOCK) {
-            return LLE_SUCCESS; // Event blocked by filter, but not an error
+            return LLE_SUCCESS; /// Event blocked by filter, but not an error
         }
-        // FILTER_PASS, FILTER_TRANSFORM, or FILTER_ERROR: continue dispatch
+        /// FILTER_PASS, FILTER_TRANSFORM, or FILTER_ERROR: continue dispatch
     }
 
-    // Phase 2C: Call pre-dispatch hook
+    /// Phase 2C: Call pre-dispatch hook
     if (system->pre_dispatch_hook) {
         lle_result_t hook_result =
             system->pre_dispatch_hook(event, system->pre_dispatch_data);
         if (hook_result != LLE_SUCCESS) {
-            return hook_result; // Hook rejected event
+            return hook_result; /// Hook rejected event
         }
     }
 
@@ -236,7 +236,7 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
     lle_system_state_t previous_state = system->current_state;
     system->current_state = LLE_STATE_PROCESSING;
 
-    // Snapshot matching handlers (stack-allocated, no malloc needed)
+    /// Snapshot matching handlers (stack-allocated, no malloc needed)
     lle_event_handler_t *snapshot[64];
     size_t snap_count = 0;
 
@@ -248,7 +248,7 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
 
     pthread_mutex_unlock(&system->system_mutex);
 
-    // Dispatch WITHOUT holding lock - handlers can safely use event system
+    /// Dispatch WITHOUT holding lock - handlers can safely use event system
     lle_result_t dispatch_result = LLE_SUCCESS;
 
     for (size_t i = 0; i < snap_count; i++) {
@@ -259,7 +259,7 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
         }
     }
 
-    // Update statistics and restore state under lock
+    /// Update statistics and restore state under lock
     pthread_mutex_lock(&system->system_mutex);
     if (snap_count > 0) {
         system->events_dispatched++;
@@ -267,7 +267,7 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
     system->current_state = previous_state;
     pthread_mutex_unlock(&system->system_mutex);
 
-    // Phase 2C: Call post-dispatch hook
+    /// Phase 2C: Call post-dispatch hook
     if (system->post_dispatch_hook) {
         system->post_dispatch_hook(event, dispatch_result,
                                    system->post_dispatch_data);
@@ -299,12 +299,12 @@ lle_result_t lle_event_process_queue(lle_event_system_t *system,
     lle_result_t last_result = LLE_SUCCESS;
 
     while (processed < max_events) {
-        // Dequeue event
+        /// Dequeue event
         lle_event_t *event = NULL;
         lle_result_t result = lle_event_dequeue(system, &event);
 
         if (result == LLE_ERROR_QUEUE_EMPTY) {
-            // No more events
+            /// No more events
             break;
         }
 
@@ -313,13 +313,13 @@ lle_result_t lle_event_process_queue(lle_event_system_t *system,
             break;
         }
 
-        // Dispatch event
+        /// Dispatch event
         result = lle_event_dispatch(system, event);
         if (result != LLE_SUCCESS) {
             last_result = result;
         }
 
-        // Destroy event
+        /// Destroy event
         lle_event_destroy(system, event);
 
         processed++;
@@ -340,7 +340,7 @@ lle_result_t lle_event_process_all(lle_event_system_t *system) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Process until queue is empty
+    /// Process until queue is empty
     while (!lle_event_queue_empty(system)) {
         lle_result_t result = lle_event_process_queue(system, 100);
         if (result != LLE_SUCCESS && result != LLE_ERROR_QUEUE_EMPTY) {

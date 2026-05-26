@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Initial capacity for timer array
+/// Initial capacity for timer array
 #define TIMER_INITIAL_CAPACITY 16
 
 /**
@@ -57,7 +57,7 @@ static int find_timer_index(lle_timer_system_t *ts, uint64_t timer_id) {
  */
 static lle_result_t insert_timer_sorted(lle_timer_system_t *ts,
                                         lle_timer_event_t *timer) {
-    // Grow array if needed
+    /// Grow array if needed
     if (ts->timer_count >= ts->timer_capacity) {
         size_t new_capacity = ts->timer_capacity * 2;
         lle_timer_event_t **new_array =
@@ -69,7 +69,7 @@ static lle_result_t insert_timer_sorted(lle_timer_system_t *ts,
         ts->timer_capacity = new_capacity;
     }
 
-    // Find insertion point (keep sorted by trigger_time_us)
+    /// Find insertion point (keep sorted by trigger_time_us)
     size_t insert_pos = ts->timer_count;
     for (size_t i = 0; i < ts->timer_count; i++) {
         if (timer->trigger_time_us < ts->timers[i]->trigger_time_us) {
@@ -78,13 +78,13 @@ static lle_result_t insert_timer_sorted(lle_timer_system_t *ts,
         }
     }
 
-    // Shift elements to make room
+    /// Shift elements to make room
     if (insert_pos < ts->timer_count) {
         memmove(&ts->timers[insert_pos + 1], &ts->timers[insert_pos],
                 (ts->timer_count - insert_pos) * sizeof(lle_timer_event_t *));
     }
 
-    // Insert timer
+    /// Insert timer
     ts->timers[insert_pos] = timer;
     ts->timer_count++;
 
@@ -102,7 +102,7 @@ static void remove_timer_at_index(lle_timer_system_t *ts, size_t index) {
         return;
     }
 
-    // Free the timer and its event
+    /// Free the timer and its event
     if (ts->timers[index]->event) {
         /* Note: We need the event system to properly destroy the event,
          * but we don't have it here. For now, just free the event data. */
@@ -113,7 +113,7 @@ static void remove_timer_at_index(lle_timer_system_t *ts, size_t index) {
     }
     free(ts->timers[index]);
 
-    // Shift remaining timers down
+    /// Shift remaining timers down
     if (index < ts->timer_count - 1) {
         memmove(&ts->timers[index], &ts->timers[index + 1],
                 (ts->timer_count - index - 1) * sizeof(lle_timer_event_t *));
@@ -133,18 +133,18 @@ lle_result_t lle_event_timer_system_init(lle_event_system_t *system) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Already initialized?
+    /// Already initialized?
     if (system->timer_system) {
         return LLE_ERROR_ALREADY_INITIALIZED;
     }
 
-    // Allocate timer system
+    /// Allocate timer system
     lle_timer_system_t *ts = calloc(1, sizeof(lle_timer_system_t));
     if (!ts) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Allocate timer array
+    /// Allocate timer array
     ts->timers = calloc(TIMER_INITIAL_CAPACITY, sizeof(lle_timer_event_t *));
     if (!ts->timers) {
         free(ts);
@@ -158,7 +158,7 @@ lle_result_t lle_event_timer_system_init(lle_event_system_t *system) {
     ts->total_timers_fired = 0;
     ts->total_timers_cancelled = 0;
 
-    // Initialize mutex
+    /// Initialize mutex
     if (pthread_mutex_init(&ts->timer_mutex, NULL) != 0) {
         free(ts->timers);
         free(ts);
@@ -182,7 +182,7 @@ void lle_event_timer_system_destroy(lle_event_system_t *system) {
 
     lle_timer_system_t *ts = system->timer_system;
 
-    // Destroy all timers
+    /// Destroy all timers
     pthread_mutex_lock(&ts->timer_mutex);
     for (size_t i = 0; i < ts->timer_count; i++) {
         if (ts->timers[i]->event) {
@@ -196,10 +196,10 @@ void lle_event_timer_system_destroy(lle_event_system_t *system) {
     free(ts->timers);
     pthread_mutex_unlock(&ts->timer_mutex);
 
-    // Destroy mutex
+    /// Destroy mutex
     pthread_mutex_destroy(&ts->timer_mutex);
 
-    // Free timer system
+    /// Free timer system
     free(ts);
     system->timer_system = NULL;
 }
@@ -222,7 +222,7 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Initialize timer system if needed
+    /// Initialize timer system if needed
     if (!system->timer_system) {
         lle_result_t result = lle_event_timer_system_init(system);
         if (result != LLE_SUCCESS) {
@@ -232,23 +232,23 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
 
     lle_timer_system_t *ts = system->timer_system;
 
-    // Allocate timer
+    /// Allocate timer
     lle_timer_event_t *timer = calloc(1, sizeof(lle_timer_event_t));
     if (!timer) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Clone the event (deep copy)
+    /// Clone the event (deep copy)
     timer->event = calloc(1, sizeof(lle_event_t));
     if (!timer->event) {
         free(timer);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Copy event structure
+    /// Copy event structure
     memcpy(timer->event, event, sizeof(lle_event_t));
 
-    // Deep copy event data if present
+    /// Deep copy event data if present
     if (event->data && event->data_size > 0) {
         timer->event->data = malloc(event->data_size);
         if (!timer->event->data) {
@@ -261,11 +261,11 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
         timer->event->data = NULL;
     }
 
-    // Reset queue linkage (timer event is not in queue)
+    /// Reset queue linkage (timer event is not in queue)
     timer->event->next = NULL;
     timer->event->prev = NULL;
 
-    // Set up timer
+    /// Set up timer
     pthread_mutex_lock(&ts->timer_mutex);
 
     timer->timer_id = ts->next_timer_id++;
@@ -275,7 +275,7 @@ lle_result_t lle_event_timer_add_oneshot(lle_event_system_t *system,
     timer->enabled = true;
     timer->fire_count = 0;
 
-    // Insert in sorted order
+    /// Insert in sorted order
     lle_result_t result = insert_timer_sorted(ts, timer);
     if (result != LLE_SUCCESS) {
         pthread_mutex_unlock(&ts->timer_mutex);
@@ -318,7 +318,7 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Initialize timer system if needed
+    /// Initialize timer system if needed
     if (!system->timer_system) {
         lle_result_t result = lle_event_timer_system_init(system);
         if (result != LLE_SUCCESS) {
@@ -328,23 +328,23 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
 
     lle_timer_system_t *ts = system->timer_system;
 
-    // Allocate timer
+    /// Allocate timer
     lle_timer_event_t *timer = calloc(1, sizeof(lle_timer_event_t));
     if (!timer) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Clone the event (deep copy)
+    /// Clone the event (deep copy)
     timer->event = calloc(1, sizeof(lle_event_t));
     if (!timer->event) {
         free(timer);
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Copy event structure
+    /// Copy event structure
     memcpy(timer->event, event, sizeof(lle_event_t));
 
-    // Deep copy event data if present
+    /// Deep copy event data if present
     if (event->data && event->data_size > 0) {
         timer->event->data = malloc(event->data_size);
         if (!timer->event->data) {
@@ -357,11 +357,11 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
         timer->event->data = NULL;
     }
 
-    // Reset queue linkage
+    /// Reset queue linkage
     timer->event->next = NULL;
     timer->event->prev = NULL;
 
-    // Set up timer
+    /// Set up timer
     pthread_mutex_lock(&ts->timer_mutex);
 
     timer->timer_id = ts->next_timer_id++;
@@ -371,7 +371,7 @@ lle_result_t lle_event_timer_add_repeating(lle_event_system_t *system,
     timer->enabled = true;
     timer->fire_count = 0;
 
-    // Insert in sorted order
+    /// Insert in sorted order
     lle_result_t result = insert_timer_sorted(ts, timer);
     if (result != LLE_SUCCESS) {
         pthread_mutex_unlock(&ts->timer_mutex);
@@ -542,7 +542,7 @@ lle_result_t lle_event_timer_process(lle_event_system_t *system) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // No timer system? Nothing to do
+    /// No timer system? Nothing to do
     if (!system->timer_system) {
         return LLE_SUCCESS;
     }
@@ -552,35 +552,35 @@ lle_result_t lle_event_timer_process(lle_event_system_t *system) {
 
     pthread_mutex_lock(&ts->timer_mutex);
 
-    // Process timers in order (array is sorted by trigger_time_us)
+    /// Process timers in order (array is sorted by trigger_time_us)
     size_t i = 0;
     while (i < ts->timer_count) {
         lle_timer_event_t *timer = ts->timers[i];
 
-        // If this timer is not ready, none of the rest are either
+        /// If this timer is not ready, none of the rest are either
         if (timer->trigger_time_us > current_time) {
             break;
         }
 
-        // Skip disabled timers
+        /// Skip disabled timers
         if (!timer->enabled) {
             i++;
             continue;
         }
 
-        // Clone the event for dispatch
+        /// Clone the event for dispatch
         lle_event_t *event_to_dispatch = calloc(1, sizeof(lle_event_t));
         if (event_to_dispatch) {
             memcpy(event_to_dispatch, timer->event, sizeof(lle_event_t));
 
-            // Clone event data if present
+            /// Clone event data if present
             if (timer->event->data && timer->event->data_size > 0) {
                 event_to_dispatch->data = malloc(timer->event->data_size);
                 if (event_to_dispatch->data) {
                     memcpy(event_to_dispatch->data, timer->event->data,
                            timer->event->data_size);
                 } else {
-                    // Failed to allocate data, just use NULL
+                    /// Failed to allocate data, just use NULL
                     event_to_dispatch->data = NULL;
                     event_to_dispatch->data_size = 0;
                 }
@@ -588,48 +588,48 @@ lle_result_t lle_event_timer_process(lle_event_system_t *system) {
                 event_to_dispatch->data = NULL;
             }
 
-            // Reset queue linkage
+            /// Reset queue linkage
             event_to_dispatch->next = NULL;
             event_to_dispatch->prev = NULL;
 
-            // Update timer
+            /// Update timer
             timer->fire_count++;
             ts->total_timers_fired++;
 
-            // Unlock mutex before dispatching (avoid deadlock)
+            /// Unlock mutex before dispatching (avoid deadlock)
             pthread_mutex_unlock(&ts->timer_mutex);
 
-            // Dispatch the event
+            /// Dispatch the event
             lle_event_dispatch(system, event_to_dispatch);
 
-            // Free the dispatched event (dispatch doesn't take ownership)
+            /// Free the dispatched event (dispatch doesn't take ownership)
             if (event_to_dispatch->data) {
                 free(event_to_dispatch->data);
             }
             free(event_to_dispatch);
 
-            // Re-lock mutex
+            /// Re-lock mutex
             pthread_mutex_lock(&ts->timer_mutex);
 
             /* Timer array may have changed during dispatch - find timer again
              */
             int index = find_timer_index(ts, timer->timer_id);
             if (index < 0) {
-                // Timer was cancelled during dispatch
+                /// Timer was cancelled during dispatch
                 continue;
             }
 
-            // Update i to reflect current position
+            /// Update i to reflect current position
             i = (size_t)index;
             timer = ts->timers[i];
         }
 
-        // Handle repeating vs one-shot
+        /// Handle repeating vs one-shot
         if (timer->repeating) {
-            // Update trigger time
+            /// Update trigger time
             timer->trigger_time_us += timer->interval_us;
 
-            // Remove from current position
+            /// Remove from current position
             lle_timer_event_t *timer_copy = timer;
             if (i < ts->timer_count - 1) {
                 memmove(&ts->timers[i], &ts->timers[i + 1],
@@ -638,14 +638,14 @@ lle_result_t lle_event_timer_process(lle_event_system_t *system) {
             }
             ts->timer_count--;
 
-            // Re-insert in sorted position
+            /// Re-insert in sorted position
             insert_timer_sorted(ts, timer_copy);
 
-            // Don't increment i - we removed this element
+            /// Don't increment i - we removed this element
         } else {
-            // One-shot timer - remove it
+            /// One-shot timer - remove it
             remove_timer_at_index(ts, i);
-            // Don't increment i - we removed this element
+            /// Don't increment i - we removed this element
         }
     }
 
@@ -670,7 +670,7 @@ lle_result_t lle_event_timer_get_stats(lle_event_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // No timer system? Return zeros
+    /// No timer system? Return zeros
     if (!system->timer_system) {
         if (created)
             *created = 0;

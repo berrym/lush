@@ -37,7 +37,7 @@ uint64_t lle_event_get_timestamp_us(void) {
  */
 const char *lle_event_type_name(lle_event_kind_t type) {
     switch (type) {
-    // Terminal Input Events
+    /// Terminal Input Events
     case LLE_EVENT_KEY_PRESS:
         return "KEY_PRESS";
     case LLE_EVENT_KEY_RELEASE:
@@ -47,7 +47,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_KEY_CHORD:
         return "KEY_CHORD";
 
-    // Mouse Events
+    /// Mouse Events
     case LLE_EVENT_MOUSE_PRESS:
         return "MOUSE_PRESS";
     case LLE_EVENT_MOUSE_RELEASE:
@@ -59,7 +59,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_MOUSE_DRAG:
         return "MOUSE_DRAG";
 
-    // Terminal State Events
+    /// Terminal State Events
     case LLE_EVENT_TERMINAL_RESIZE:
         return "TERMINAL_RESIZE";
     case LLE_EVENT_FOCUS_IN:
@@ -69,7 +69,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_TERMINAL_DISCONNECT:
         return "TERMINAL_DISCONNECT";
 
-    // Paste Events
+    /// Paste Events
     case LLE_EVENT_PASTE_START:
         return "PASTE_START";
     case LLE_EVENT_PASTE_DATA:
@@ -79,7 +79,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_PASTE_TIMEOUT:
         return "PASTE_TIMEOUT";
 
-    // Buffer Events
+    /// Buffer Events
     case LLE_EVENT_BUFFER_CHANGED:
         return "BUFFER_CHANGED";
     case LLE_EVENT_CURSOR_MOVED:
@@ -89,7 +89,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_BUFFER_VALIDATION:
         return "BUFFER_VALIDATION";
 
-    // History Events
+    /// History Events
     case LLE_EVENT_HISTORY_CHANGED:
         return "HISTORY_CHANGED";
     case LLE_EVENT_HISTORY_SEARCH:
@@ -97,7 +97,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_HISTORY_NAVIGATE:
         return "HISTORY_NAVIGATE";
 
-    // Completion Events
+    /// Completion Events
     case LLE_EVENT_COMPLETION_REQUESTED:
         return "COMPLETION_REQUESTED";
     case LLE_EVENT_COMPLETION_UPDATED:
@@ -107,7 +107,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_COMPLETION_CANCELLED:
         return "COMPLETION_CANCELLED";
 
-    // Suggestion Events
+    /// Suggestion Events
     case LLE_EVENT_SUGGESTION_UPDATED:
         return "SUGGESTION_UPDATED";
     case LLE_EVENT_SUGGESTION_ACCEPTED:
@@ -115,7 +115,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_SUGGESTION_DISMISSED:
         return "SUGGESTION_DISMISSED";
 
-    // System Events
+    /// System Events
     case LLE_EVENT_SYSTEM_ERROR:
         return "SYSTEM_ERROR";
     case LLE_EVENT_SYSTEM_WARNING:
@@ -125,7 +125,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_MEMORY_PRESSURE:
         return "MEMORY_PRESSURE";
 
-    // Timer Events
+    /// Timer Events
     case LLE_EVENT_TIMER_EXPIRED:
         return "TIMER_EXPIRED";
     case LLE_EVENT_TIMEOUT:
@@ -133,7 +133,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_PERIODIC_UPDATE:
         return "PERIODIC_UPDATE";
 
-    // Plugin Events
+    /// Plugin Events
     case LLE_EVENT_PLUGIN_CUSTOM:
         return "PLUGIN_CUSTOM";
     case LLE_EVENT_PLUGIN_MESSAGE:
@@ -141,7 +141,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_PLUGIN_ERROR:
         return "PLUGIN_ERROR";
 
-    // Display Events
+    /// Display Events
     case LLE_EVENT_DISPLAY_UPDATE:
         return "DISPLAY_UPDATE";
     case LLE_EVENT_DISPLAY_REFRESH:
@@ -149,7 +149,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_DISPLAY_INVALIDATE:
         return "DISPLAY_INVALIDATE";
 
-    // Shell Lifecycle Events
+    /// Shell Lifecycle Events
     case LLE_EVENT_DIRECTORY_CHANGED:
         return "DIRECTORY_CHANGED";
     case LLE_EVENT_PRE_COMMAND:
@@ -161,7 +161,7 @@ const char *lle_event_type_name(lle_event_kind_t type) {
     case LLE_EVENT_PROMPT_DISPLAY:
         return "PROMPT_DISPLAY";
 
-    // Debug/Test Events
+    /// Debug/Test Events
     case LLE_EVENT_DEBUG_MARKER:
         return "DEBUG_MARKER";
     case LLE_EVENT_TEST_TRIGGER:
@@ -190,7 +190,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate system structure
+    /// Allocate system structure
     lle_event_system_t *sys = lle_pool_alloc(sizeof(lle_event_system_t));
     if (!sys) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -198,7 +198,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
 
     memset(sys, 0, sizeof(lle_event_system_t));
 
-    // Initialize main queue
+    /// Initialize main queue
     lle_result_t result =
         lle_event_queue_init(&sys->queue, LLE_EVENT_QUEUE_DEFAULT_CAPACITY);
     if (result != LLE_SUCCESS) {
@@ -206,7 +206,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
         return result;
     }
 
-    // Phase 2: Initialize priority queue
+    /// Phase 2: Initialize priority queue
     result = lle_event_queue_init(&sys->priority_queue,
                                   LLE_EVENT_QUEUE_DEFAULT_CAPACITY / 2);
     if (result != LLE_SUCCESS) {
@@ -215,7 +215,7 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
         return result;
     }
 
-    // Initialize handler array
+    /// Initialize handler array
     sys->handler_capacity = LLE_EVENT_HANDLER_INITIAL_CAPACITY;
     sys->handlers =
         lle_pool_alloc(sizeof(lle_event_handler_t *) * sys->handler_capacity);
@@ -228,56 +228,56 @@ lle_result_t lle_event_system_init(lle_event_system_t **system,
 
     sys->handler_count = 0;
     sys->event_pool = pool;
-    sys->sequence_counter = 1; // Start at 1 so first event gets sequence 1
-    sys->active = true; // System is active after successful initialization
+    sys->sequence_counter = 1; /// Start at 1 so first event gets sequence 1
+    sys->active = true; /// System is active after successful initialization
 
-    // Phase 1 statistics
+    /// Phase 1 statistics
     sys->events_created = 0;
     sys->events_dispatched = 0;
     sys->events_dropped = 0;
 
-    // Phase 2A configuration and statistics
-    sys->use_priority_queue = true; // Enable priority queue by default
+    /// Phase 2A configuration and statistics
+    sys->use_priority_queue = true; /// Enable priority queue by default
     sys->priority_events_queued = 0;
     sys->priority_events_processed = 0;
     for (int i = 0; i < LLE_PRIORITY_COUNT; i++) {
         sys->events_by_priority[i] = 0;
     }
 
-    // Phase 2B: Initialize processing configuration with defaults
+    /// Phase 2B: Initialize processing configuration with defaults
     sys->processing_config.max_events_per_cycle =
-        100; // Default: 100 events per cycle
+        100; /// Default: 100 events per cycle
     sys->processing_config.cycle_time_limit_us =
-        10000;                                   // Default: 10ms per cycle
-    sys->processing_config.auto_process = false; // Default: manual processing
+        10000;                                   /// Default: 10ms per cycle
+    sys->processing_config.auto_process = false; /// Default: manual processing
     sys->processing_config.record_detailed_stats =
-        false; // Default: disabled (opt-in)
+        false; /// Default: disabled (opt-in)
 
-    // Phase 2B: Initialize processing state
-    sys->processing_state = LLE_PROCESSING_RUNNING; // Default: running
+    /// Phase 2B: Initialize processing state
+    sys->processing_state = LLE_PROCESSING_RUNNING; /// Default: running
 
-    // Phase 2B: Enhanced statistics starts NULL (created on demand)
+    /// Phase 2B: Enhanced statistics starts NULL (created on demand)
     sys->enhanced_stats = NULL;
 
-    // Phase 2C: Initialize event filtering and hooks
-    sys->filter_system = NULL; // Filter system created on demand
+    /// Phase 2C: Initialize event filtering and hooks
+    sys->filter_system = NULL; /// Filter system created on demand
     sys->pre_dispatch_hook = NULL;
     sys->pre_dispatch_data = NULL;
     sys->post_dispatch_hook = NULL;
     sys->post_dispatch_data = NULL;
 
-    // Phase 2C: Initialize system state tracking
+    /// Phase 2C: Initialize system state tracking
     sys->current_state = LLE_STATE_INITIALIZING;
     sys->previous_state = LLE_STATE_INITIALIZING;
     sys->state_changed_time = lle_event_get_timestamp_us();
 
-    // Phase 2D: Timer system starts NULL (created on demand)
+    /// Phase 2D: Timer system starts NULL (created on demand)
     sys->timer_system = NULL;
 
-    // Initialize mutex
+    /// Initialize mutex
     pthread_mutex_init(&sys->system_mutex, NULL);
 
-    // Phase 2C: Transition to IDLE state after successful initialization
+    /// Phase 2C: Transition to IDLE state after successful initialization
     sys->current_state = LLE_STATE_IDLE;
     sys->state_changed_time = lle_event_get_timestamp_us();
 
@@ -298,40 +298,40 @@ void lle_event_system_destroy(lle_event_system_t *system) {
         return;
     }
 
-    // Phase 2C: Set state to shutting down
+    /// Phase 2C: Set state to shutting down
     system->current_state = LLE_STATE_SHUTTING_DOWN;
 
-    // Stop system if active
+    /// Stop system if active
     if (system->active) {
         lle_event_system_stop(system);
     }
 
-    // Phase 2D: Destroy timer system if allocated
+    /// Phase 2D: Destroy timer system if allocated
     if (system->timer_system) {
         lle_event_timer_system_destroy(system);
     }
 
-    // Phase 2C: Destroy filter system if allocated
+    /// Phase 2C: Destroy filter system if allocated
     if (system->filter_system) {
         lle_event_filter_system_destroy(system);
     }
 
-    // Phase 2B: Destroy enhanced statistics if allocated
+    /// Phase 2B: Destroy enhanced statistics if allocated
     if (system->enhanced_stats) {
         lle_event_enhanced_stats_destroy(system);
     }
 
-    // Destroy main queue
+    /// Destroy main queue
     if (system->queue) {
         lle_event_queue_destroy(system->queue);
     }
 
-    // Phase 2A: Destroy priority queue
+    /// Phase 2A: Destroy priority queue
     if (system->priority_queue) {
         lle_event_queue_destroy(system->priority_queue);
     }
 
-    // Free handlers
+    /// Free handlers
     if (system->handlers) {
         for (size_t i = 0; i < system->handler_count; i++) {
             if (system->handlers[i]) {
@@ -341,10 +341,10 @@ void lle_event_system_destroy(lle_event_system_t *system) {
         lle_pool_free(system->handlers);
     }
 
-    // Destroy mutex
+    /// Destroy mutex
     pthread_mutex_destroy(&system->system_mutex);
 
-    // Free system structure
+    /// Free system structure
     lle_pool_free(system);
 }
 
@@ -403,49 +403,49 @@ lle_result_t lle_event_system_stop(lle_event_system_t *system) {
  */
 static lle_event_priority_t
 lle_event_get_priority_for_type(lle_event_kind_t type) {
-    // Determine priority based on event type category
+    /// Determine priority based on event type category
     if (type >= 0x1000 && type < 0x2000) {
-        // Terminal Input Events - HIGH
+        /// Terminal Input Events - HIGH
         return LLE_PRIORITY_HIGH;
     } else if (type >= 0x2000 && type < 0x3000) {
-        // Mouse Events - MEDIUM
+        /// Mouse Events - MEDIUM
         return LLE_PRIORITY_MEDIUM;
     } else if (type >= 0x3000 && type < 0x4000) {
-        // Terminal State Events - CRITICAL
+        /// Terminal State Events - CRITICAL
         return LLE_PRIORITY_CRITICAL;
     } else if (type >= 0x4000 && type < 0x5000) {
-        // Paste Events - HIGH
+        /// Paste Events - HIGH
         return LLE_PRIORITY_HIGH;
     } else if (type >= 0x5000 && type < 0x6000) {
-        // Buffer Events - MEDIUM
+        /// Buffer Events - MEDIUM
         return LLE_PRIORITY_MEDIUM;
     } else if (type >= 0x6000 && type < 0x7000) {
-        // History Events - LOW
+        /// History Events - LOW
         return LLE_PRIORITY_LOW;
     } else if (type >= 0x7000 && type < 0x8000) {
-        // Completion Events - MEDIUM
+        /// Completion Events - MEDIUM
         return LLE_PRIORITY_MEDIUM;
     } else if (type >= 0x8000 && type < 0x9000) {
-        // Suggestion Events - LOW
+        /// Suggestion Events - LOW
         return LLE_PRIORITY_LOW;
     } else if (type >= 0x9000 && type < 0xA000) {
-        // System Events - CRITICAL
+        /// System Events - CRITICAL
         return LLE_PRIORITY_CRITICAL;
     } else if (type >= 0xA000 && type < 0xB000) {
-        // Timer Events - LOW
+        /// Timer Events - LOW
         return LLE_PRIORITY_LOW;
     } else if (type >= 0xB000 && type < 0xC000) {
-        // Plugin Events - MEDIUM (configurable)
+        /// Plugin Events - MEDIUM (configurable)
         return LLE_PRIORITY_MEDIUM;
     } else if (type >= 0xC000 && type < 0xD000) {
-        // Display Events - HIGH
+        /// Display Events - HIGH
         return LLE_PRIORITY_HIGH;
     } else if (type >= 0xF000 && type <= 0xFFFF) {
-        // Debug/Test Events - LOWEST
+        /// Debug/Test Events - LOWEST
         return LLE_PRIORITY_LOWEST;
     }
 
-    // Default to MEDIUM priority
+    /// Default to MEDIUM priority
     return LLE_PRIORITY_MEDIUM;
 }
 
@@ -469,7 +469,7 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate event structure
+    /// Allocate event structure
     lle_event_t *evt = lle_pool_alloc(sizeof(lle_event_t));
     if (!evt) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -477,7 +477,7 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
 
     memset(evt, 0, sizeof(lle_event_t));
 
-    // Allocate and copy data if provided
+    /// Allocate and copy data if provided
     if (data && data_size > 0) {
         evt->data = lle_pool_alloc(data_size);
         if (!evt->data) {
@@ -488,15 +488,15 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
         evt->data_size = data_size;
     }
 
-    // Set Phase 1 event fields
+    /// Set Phase 1 event fields
     evt->type = type;
     evt->sequence_number =
         __atomic_fetch_add(&system->sequence_counter, 1, __ATOMIC_SEQ_CST);
     evt->timestamp = lle_event_get_timestamp_us();
     evt->next = NULL;
 
-    // Set Phase 2 event fields
-    evt->source = LLE_EVENT_SOURCE_INTERNAL; // Default source
+    /// Set Phase 2 event fields
+    evt->source = LLE_EVENT_SOURCE_INTERNAL; /// Default source
     evt->priority = lle_event_get_priority_for_type(type);
     evt->flags = LLE_EVENT_FLAG_NONE;
     evt->handler_count = 0;
@@ -504,7 +504,7 @@ lle_result_t lle_event_create(lle_event_system_t *system, lle_event_kind_t type,
     evt->processing_end_time = 0;
     evt->prev = NULL;
 
-    // Update statistics
+    /// Update statistics
     __atomic_fetch_add(&system->events_created, 1, __ATOMIC_SEQ_CST);
 
     *event = evt;
@@ -521,15 +521,15 @@ void lle_event_destroy(lle_event_system_t *system, lle_event_t *event) {
         return;
     }
 
-    // Free event data
+    /// Free event data
     if (event->data) {
         lle_pool_free(event->data);
     }
 
-    // Free event structure
+    /// Free event structure
     lle_pool_free(event);
 
-    (void)system; // Unused for now
+    (void)system; /// Unused for now
 }
 
 /**
@@ -545,7 +545,7 @@ lle_result_t lle_event_clone(lle_event_system_t *system, lle_event_t *source,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Create new event with same type and data
+    /// Create new event with same type and data
     return lle_event_create(system, source->type, source->data,
                             source->data_size, dest);
 }
@@ -610,7 +610,7 @@ lle_result_t lle_event_fire_directory_changed(lle_event_system_t *system,
         return result;
     }
 
-    // Populate shell event data
+    /// Populate shell event data
     event->source = LLE_EVENT_SOURCE_SHELL;
     event->priority = LLE_PRIORITY_HIGH;
 
@@ -630,7 +630,7 @@ lle_result_t lle_event_fire_directory_changed(lle_event_system_t *system,
         .new_directory[sizeof(event->event_data.shell.new_directory) - 1] =
         '\0';
 
-    // Enqueue and dispatch immediately for prompt responsiveness
+    /// Enqueue and dispatch immediately for prompt responsiveness
     result = lle_event_enqueue(system, event);
     if (result != LLE_SUCCESS) {
         lle_event_destroy(system, event);
