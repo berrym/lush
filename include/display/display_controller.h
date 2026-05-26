@@ -39,6 +39,9 @@
 #include "../lle/notification.h"
 #include "autosuggestions_layer.h"
 
+/// Forward declarations; full definitions pulled in by the .c.
+struct pager_layer;
+
 /// Symbol compatibility mode for display rendering
 typedef enum {
     SYMBOL_MODE_UNICODE = 0,   ///< Full Unicode symbols
@@ -285,6 +288,12 @@ typedef struct {
     bool notification_visible; /// Notification visibility state
     bool
         notification_state_changed; /// Flag: notification changed, needs redraw
+
+    /// Pager integration. When non-NULL, the render cycle composes
+    /// from the pager's content + view state instead of the normal
+    /// prompt + command pipeline. Pointer is borrowed; caller owns
+    /// lifetime. See display_controller_attach_pager.
+    struct pager_layer *active_pager;
 } display_controller_t;
 
 /// ============================================================================
@@ -450,6 +459,66 @@ display_controller_clear_screen(display_controller_t *controller);
  * @param controller The display controller to destroy (can be NULL)
  */
 void display_controller_destroy(display_controller_t *controller);
+
+/// ============================================================================
+/// PAGER LAYER INTEGRATION
+/// ============================================================================
+
+/**
+ * @brief Attach a pager layer for paginated rendering
+ *
+ * While a pager is attached, the display controller's render cycle
+ * uses the pager's content + view state as the primary surface and
+ * suppresses prompt + command rendering. The pager pointer is
+ * borrowed -- the caller owns the pager_layer lifetime and must keep
+ * it alive until display_controller_detach_pager is called or the
+ * controller is destroyed.
+ *
+ * Calling attach again with a different (or the same) pager replaces
+ * the prior attachment. Calling with NULL detaches.
+ *
+ * @param controller The display controller
+ * @param pager      The pager layer to attach (NULL to detach)
+ */
+void display_controller_attach_pager(display_controller_t *controller,
+                                     struct pager_layer *pager);
+
+/**
+ * @brief Detach the currently-attached pager layer
+ *
+ * Equivalent to display_controller_attach_pager(controller, NULL).
+ * Idempotent.
+ *
+ * @param controller The display controller
+ */
+void display_controller_detach_pager(display_controller_t *controller);
+
+/**
+ * @brief Render the attached pager view into `output`
+ *
+ * Composes the visible slice of the pager's content (starting at
+ * pager->top_line, up to pager_layer_visible_line_count entries),
+ * pads empty lines to fill the view, and appends a status line:
+ * `Lines X-Y of Z (NN%)`. Each rendered row is newline-terminated.
+ *
+ * Returns DISPLAY_CONTROLLER_ERROR_INVALID_PARAM if no pager is
+ * attached or output is NULL, ERROR_BUFFER_TOO_SMALL if the buffer
+ * cannot hold the rendered view, SUCCESS otherwise.
+ *
+ * No terminal control sequences are written by this function -- it
+ * produces a plain-text view that the caller can wrap in
+ * clear-screen / cursor-position sequences as needed. The pager's
+ * mode (search prompt / help overlay) is not yet rendered; that
+ * lands in the input-loop step.
+ *
+ * @param controller   Controller with attached pager
+ * @param output       Buffer to receive the rendered view
+ * @param output_size  Size of output
+ * @return DISPLAY_CONTROLLER_SUCCESS or an error code
+ */
+display_controller_error_t
+display_controller_render_pager(display_controller_t *controller, char *output,
+                                size_t output_size);
 
 /// ============================================================================
 /// COMPLETION MENU INTEGRATION (LLE Spec 12 - Proper Architecture)

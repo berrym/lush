@@ -33,6 +33,7 @@
 #include "display/display_controller.h"
 #include "display/base_terminal.h"
 #include "display/command_layer.h"
+#include "display/pager_layer.h"
 #include "display/prompt_layer.h"
 #include "display/screen_buffer.h"
 #include "display_integration.h"
@@ -2205,6 +2206,29 @@ display_controller_error_t display_controller_display_with_cursor(
         return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
     }
 
+    /// Pager mode: when a pager layer is attached, the render cycle
+    /// composes from the pager's content + view state and suppresses
+    /// prompt + command. Terminal-control wrapping (clear-screen
+    /// before, cursor-position after) is added on top when requested
+    /// so the pager view replaces the live editing surface.
+    if (controller->active_pager) {
+        if (!apply_terminal_control) {
+            return display_controller_render_pager(controller, output,
+                                                   output_size);
+        }
+        char body[16384];
+        display_controller_error_t rc =
+            display_controller_render_pager(controller, body, sizeof(body));
+        if (rc != DISPLAY_CONTROLLER_SUCCESS) {
+            return rc;
+        }
+        int written = snprintf(output, output_size, "\r\033[J%s", body);
+        if (written < 0 || (size_t)written >= output_size) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        return DISPLAY_CONTROLLER_SUCCESS;
+    }
+
     /// If terminal control is NOT requested, just use normal display
     if (!apply_terminal_control) {
         return display_controller_display(controller, prompt_text, command_text,
@@ -3544,5 +3568,137 @@ display_controller_set_theme_context(display_controller_t *controller,
     DC_DEBUG("Theme context updated: theme=%s, symbol_mode=%d",
              controller->current_theme_name, symbol_mode);
 
+    return DISPLAY_CONTROLLER_SUCCESS;
+}
+
+/// ============================================================================
+/// PAGER LAYER INTEGRATION
+/// ============================================================================
+
+void display_controller_attach_pager(display_controller_t *controller,
+                                     struct pager_layer *pager) {
+    if (!controller) {
+        return;
+    }
+    controller->active_pager = pager;
+    /// Pager attachment invalidates the display cache so the next
+    /// render unconditionally redraws from the new surface rather
+    /// than serving a stale prompt + command from before the pager
+    /// was active.
+    controller->display_cache_valid = false;
+}
+
+void display_controller_detach_pager(display_controller_t *controller) {
+    display_controller_attach_pager(controller, NULL);
+}
+
+/**
+ * @brief Emit `"\n"` into `out` at `pos`, growing pos
+ *
+ * Defensive on overflow: if the buffer would be exceeded, the
+ * function returns false without writing. Otherwise writes the byte
+ * and the trailing NUL terminator, advancing pos.
+ */
+static bool pager_emit_newline(char *out, size_t cap, size_t *pos) {
+    if (*pos + 2 > cap) { /// need room for '\n' + '\0'
+        return false;
+    }
+    out[(*pos)++] = '\n';
+    out[*pos] = '\0';
+    return true;
+}
+
+/**
+ * @brief Copy `len` bytes from `src` into `out`, growing pos
+ *
+ * Returns false on buffer overflow without partial write.
+ */
+static bool pager_emit_bytes(char *out, size_t cap, size_t *pos,
+                             const char *src, size_t len) {
+    if (*pos + len + 1 > cap) { /// +1 for NUL terminator
+        return false;
+    }
+    memcpy(out + *pos, src, len);
+    *pos += len;
+    out[*pos] = '\0';
+    return true;
+}
+
+display_controller_error_t
+display_controller_render_pager(display_controller_t *controller, char *output,
+                                size_t output_size) {
+    if (!controller || !output) {
+        return DISPLAY_CONTROLLER_ERROR_INVALID_PARAM;
+    }
+    pager_layer_t *pager = controller->active_pager;
+    if (!pager) {
+        return DISPLAY_CONTROLLER_ERROR_INVALID_PARAM;
+    }
+    if (output_size == 0) {
+        return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+    }
+
+    size_t pos = 0;
+    output[0] = '\0';
+
+    size_t visible = pager_layer_visible_line_count(pager);
+    size_t rows_emitted = 0;
+
+    /// Emit each visible logical line. Each line is content slice
+    /// followed by '\n'. Lines are written verbatim including any
+    /// ANSI styling already in the content; screen_buffer's render
+    /// path is what aligns them to terminal width when the controller
+    /// composes the full frame, so here we just emit bytes.
+    for (size_t i = 0; i < visible; i++) {
+        const screen_line_index_entry_t *e =
+            &pager->line_index.entries[pager->top_line + i];
+        if (!pager_emit_bytes(output, output_size, &pos,
+                              pager->content + e->byte_offset,
+                              e->byte_length)) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        if (!pager_emit_newline(output, output_size, &pos)) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        rows_emitted += e->visual_height;
+    }
+
+    /// Pad to view_rows with empty lines so the status sits at the
+    /// bottom of the allotted area even when the content underfills
+    /// the view (e.g. when pager_layer_visible_line_count returns 0
+    /// because content is empty).
+    while (rows_emitted < pager->view_rows) {
+        if (!pager_emit_newline(output, output_size, &pos)) {
+            return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+        }
+        rows_emitted++;
+    }
+
+    /// Status line. Format: "Lines X-Y of Z (NN%)" -- 1-based line
+    /// numbering, percentage rounded to nearest integer.
+    char status[128];
+    int status_len = 0;
+    if (pager->line_index.count == 0) {
+        status_len = snprintf(status, sizeof(status), "(empty)");
+    } else {
+        size_t first_line = pager->top_line + 1; /// 1-based
+        size_t last_line = pager->top_line + (visible > 0 ? visible : 1);
+        size_t total = pager->line_index.count;
+        unsigned pct =
+            total > 0 ? (unsigned)((last_line * 100 + total / 2) / total) : 0;
+        if (pct > 100) {
+            pct = 100;
+        }
+        status_len =
+            snprintf(status, sizeof(status), "Lines %zu-%zu of %zu (%u%%)",
+                     first_line, last_line, total, pct);
+    }
+    if (status_len < 0 || (size_t)status_len >= sizeof(status)) {
+        status_len = (int)strlen(status); /// safe fallback
+    }
+    if (!pager_emit_bytes(output, output_size, &pos, status,
+                          (size_t)status_len)) {
+        return DISPLAY_CONTROLLER_ERROR_BUFFER_TOO_SMALL;
+    }
     return DISPLAY_CONTROLLER_SUCCESS;
 }

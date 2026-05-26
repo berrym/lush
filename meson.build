@@ -1849,6 +1849,26 @@ if fs.exists('tests/unit/test_pager_layer.c')
        timeout: 30)
 endif
 
+# Pager Render Tests (display-controller pager branch)
+# ============================================================================
+if fs.exists('tests/unit/test_pager_render.c')
+  test_pager_render_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_pager_render_sources += s
+    endif
+  endforeach
+  test_pager_render = executable('test_pager_render',
+                                 'tests/unit/test_pager_render.c',
+                                 'tests/unit/test_executor_stubs.c',
+                                 test_pager_render_sources + lle_shell_sources,
+                                 include_directories: [inc, include_directories('tests')],
+                                 dependencies: [lle_dep, libm])
+  test('Pager Render', test_pager_render,
+       suite: 'unit',
+       timeout: 30)
+endif
+
 # Screen Buffer Line-Index Tests
 # ============================================================================
 if fs.exists('tests/unit/test_screen_line_index.c')
