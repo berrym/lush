@@ -52,12 +52,12 @@ typedef struct {
  * Keybinding manager structure
  */
 struct lle_keybinding_manager {
-    lle_strstr_hashtable_t *bindings;     /**< Key sequence -> entry mapping */
-    lle_keymap_mode_t current_mode;       /**< Active keymap mode */
-    lle_key_sequence_buffer_t seq_buffer; /**< Multi-key sequence buffer */
-    lush_memory_pool_t *pool;             /**< Memory pool for allocations */
+    lle_strstr_hashtable_t *bindings;     ///< Key sequence -> entry mapping
+    lle_keymap_mode_t current_mode;       ///< Active keymap mode
+    lle_key_sequence_buffer_t seq_buffer; ///< Multi-key sequence buffer
+    lush_memory_pool_t *pool;             ///< Memory pool for allocations
 
-    // Performance tracking
+    /// Performance tracking
     uint64_t total_lookups;
     uint64_t total_lookup_time_us;
     uint64_t max_lookup_time_us;
@@ -181,7 +181,7 @@ static lle_result_t parse_special_key(const char *name,
     } else if (strcmp(name, "ESC") == 0 || strcmp(name, "ESCAPE") == 0) {
         *key_out = LLE_KEY_ESCAPE;
     } else if (name[0] == 'F' && isdigit(name[1])) {
-        // F1-F12
+        /// F1-F12
         int num = atoi(name + 1);
         if (num >= 1 && num <= 12) {
             *key_out = LLE_KEY_F1 + (num - 1);
@@ -212,7 +212,7 @@ lle_result_t lle_keybinding_manager_create(lle_keybinding_manager_t **manager,
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Allocate manager structure
+    /// Allocate manager structure
     lle_keybinding_manager_t *new_manager;
     if (pool != NULL) {
         new_manager = (lle_keybinding_manager_t *)lush_pool_alloc(
@@ -230,7 +230,7 @@ lle_result_t lle_keybinding_manager_create(lle_keybinding_manager_t **manager,
     new_manager->pool = pool;
     new_manager->current_mode = LLE_KEYMAP_EMACS;
 
-    // Create hashtable for bindings
+    /// Create hashtable for bindings
     lle_hashtable_config_t config;
     lle_hashtable_config_init_default(&config);
     config.initial_capacity = LLE_KEYBINDING_INITIAL_SIZE;
@@ -238,7 +238,7 @@ lle_result_t lle_keybinding_manager_create(lle_keybinding_manager_t **manager,
     config.use_memory_pool = (pool != NULL);
     config.hashtable_name = "keybindings";
 
-    // Use factory to create hashtable
+    /// Use factory to create hashtable
     lle_hashtable_factory_t *factory = NULL;
     lle_result_t result = lle_hashtable_factory_init(&factory, pool);
     if (result != LLE_SUCCESS) {
@@ -277,33 +277,33 @@ lle_result_t lle_keybinding_manager_destroy(lle_keybinding_manager_t *manager) {
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Free all keybinding entries before destroying hashtable
+    /// Free all keybinding entries before destroying hashtable
     if (manager->bindings != NULL) {
-        // Use libhashtable enumeration to iterate through all entries
+        /// Use libhashtable enumeration to iterate through all entries
         ht_enum_t *enumerator = ht_strstr_enum_create(manager->bindings->ht);
         if (enumerator != NULL) {
             const char *key;
             const char *value_str;
 
-            // Iterate through all key-value pairs
+            /// Iterate through all key-value pairs
             while (ht_strstr_enum_next(enumerator, &key, &value_str)) {
                 /* Value is a pointer stored as string - convert back to pointer
                  */
                 lle_keybinding_entry_t *entry;
                 sscanf(value_str, "%p", (void **)&entry);
 
-                // Free the entry and its allocated strings
+                /// Free the entry and its allocated strings
                 free_keybinding_entry(manager->pool, entry);
             }
 
             ht_strstr_enum_destroy(enumerator);
         }
 
-        // Now destroy the hashtable itself
+        /// Now destroy the hashtable itself
         lle_strstr_hashtable_destroy(manager->bindings);
     }
 
-    // Free manager structure
+    /// Free manager structure
     if (manager->pool != NULL) {
         lush_pool_free(manager);
     } else {
@@ -334,7 +334,7 @@ lle_result_t lle_key_sequence_parse(const char *key_sequence,
 
     const char *p = key_sequence;
 
-    // Parse modifiers
+    /// Parse modifiers
     while (*p != '\0') {
         if (p[0] == 'C' && p[1] == '-') {
             key_event_out->ctrl = true;
@@ -350,12 +350,12 @@ lle_result_t lle_key_sequence_parse(const char *key_sequence,
         }
     }
 
-    // Parse key
+    /// Parse key
     if (*p == '\0') {
         return LLE_ERROR_INVALID_FORMAT;
     }
 
-    // Check for special key name
+    /// Check for special key name
     if (isupper(*p) || strcmp(p, "RET") == 0) {
         lle_special_key_t special_key;
         lle_result_t result = parse_special_key(p, &special_key);
@@ -366,9 +366,9 @@ lle_result_t lle_key_sequence_parse(const char *key_sequence,
         }
     }
 
-    // Regular character
+    /// Regular character
     if (key_event_out->ctrl && islower(*p)) {
-        // Ctrl+letter is typically uppercase in ASCII control codes
+        /// Ctrl+letter is typically uppercase in ASCII control codes
         key_event_out->codepoint = toupper(*p);
     } else {
         key_event_out->codepoint = (uint32_t)(*p);
@@ -393,7 +393,7 @@ lle_result_t lle_key_event_to_string(const lle_key_event_t *key_event,
     char *p = buffer;
     size_t remaining = buffer_size;
 
-    // Add modifiers
+    /// Add modifiers
     if (key_event->ctrl) {
         if (remaining < 3)
             return LLE_ERROR_BUFFER_OVERFLOW;
@@ -416,7 +416,7 @@ lle_result_t lle_key_event_to_string(const lle_key_event_t *key_event,
         remaining -= 2;
     }
 
-    // Add key
+    /// Add key
     if (key_event->is_special) {
         const char *name = NULL;
         switch (key_event->special_key) {
@@ -481,7 +481,7 @@ lle_result_t lle_key_event_to_string(const lle_key_event_t *key_event,
     } else {
         if (remaining < 2)
             return LLE_ERROR_BUFFER_OVERFLOW;
-        // Convert uppercase back to lowercase for ctrl+letter combinations
+        /// Convert uppercase back to lowercase for ctrl+letter combinations
         char ch = (char)key_event->codepoint;
         if (key_event->ctrl && isupper(ch)) {
             ch = tolower(ch);
@@ -514,7 +514,7 @@ lle_result_t lle_keybinding_manager_bind(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Create keybinding entry
+    /// Create keybinding entry
     lle_keybinding_entry_t *entry;
     if (manager->pool != NULL) {
         entry = (lle_keybinding_entry_t *)lush_pool_alloc(
@@ -528,7 +528,7 @@ lle_result_t lle_keybinding_manager_bind(lle_keybinding_manager_t *manager,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize action as simple type
+    /// Initialize action as simple type
     entry->action.type = LLE_ACTION_TYPE_SIMPLE;
     entry->action.func.simple = action;
     entry->action.name = function_name;
@@ -541,7 +541,7 @@ lle_result_t lle_keybinding_manager_bind(lle_keybinding_manager_t *manager,
     char entry_str[32];
     snprintf(entry_str, sizeof(entry_str), "%p", (void *)entry);
 
-    // Insert into hashtable
+    /// Insert into hashtable
     lle_result_t result =
         lle_strstr_hashtable_insert(manager->bindings, key_sequence, entry_str);
 
@@ -568,7 +568,7 @@ lle_result_t lle_keybinding_manager_bind_context(
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Create keybinding entry
+    /// Create keybinding entry
     lle_keybinding_entry_t *entry;
     if (manager->pool != NULL) {
         entry = (lle_keybinding_entry_t *)lush_pool_alloc(
@@ -582,7 +582,7 @@ lle_result_t lle_keybinding_manager_bind_context(
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize action as context-aware type
+    /// Initialize action as context-aware type
     entry->action.type = LLE_ACTION_TYPE_CONTEXT;
     entry->action.func.context = action;
     entry->action.name = function_name;
@@ -595,7 +595,7 @@ lle_result_t lle_keybinding_manager_bind_context(
     char entry_str[32];
     snprintf(entry_str, sizeof(entry_str), "%p", (void *)entry);
 
-    // Insert into hashtable
+    /// Insert into hashtable
     lle_result_t result =
         lle_strstr_hashtable_insert(manager->bindings, key_sequence, entry_str);
 
@@ -619,7 +619,7 @@ lle_result_t lle_keybinding_manager_unbind(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Lookup entry first to free it
+    /// Lookup entry first to free it
     const char *entry_str =
         lle_strstr_hashtable_lookup(manager->bindings, key_sequence);
     if (entry_str != NULL) {
@@ -628,7 +628,7 @@ lle_result_t lle_keybinding_manager_unbind(lle_keybinding_manager_t *manager,
         free_keybinding_entry(manager->pool, entry);
     }
 
-    // Remove from hashtable
+    /// Remove from hashtable
     return lle_strstr_hashtable_delete(manager->bindings, key_sequence);
 }
 
@@ -673,7 +673,7 @@ lle_keybinding_manager_process_key(lle_keybinding_manager_t *manager,
 
     uint64_t start_time = get_time_us();
 
-    // Convert key event to string
+    /// Convert key event to string
     char key_str[LLE_MAX_KEY_SEQUENCE_LENGTH];
     lle_result_t result =
         lle_key_event_to_string(key_event, key_str, sizeof(key_str));
@@ -681,11 +681,11 @@ lle_keybinding_manager_process_key(lle_keybinding_manager_t *manager,
         return result;
     }
 
-    // Lookup binding
+    /// Lookup binding
     const char *entry_str =
         lle_strstr_hashtable_lookup(manager->bindings, key_str);
     if (entry_str == NULL) {
-        // Update stats
+        /// Update stats
         uint64_t elapsed = get_time_us() - start_time;
         manager->total_lookups++;
         manager->total_lookup_time_us += elapsed;
@@ -696,11 +696,11 @@ lle_keybinding_manager_process_key(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NOT_FOUND;
     }
 
-    // Parse entry pointer
+    /// Parse entry pointer
     lle_keybinding_entry_t *entry;
     sscanf(entry_str, "%p", (void **)&entry);
 
-    // Update stats
+    /// Update stats
     uint64_t elapsed = get_time_us() - start_time;
     manager->total_lookups++;
     manager->total_lookup_time_us += elapsed;
@@ -713,7 +713,7 @@ lle_keybinding_manager_process_key(lle_keybinding_manager_t *manager,
     if (entry->action.type == LLE_ACTION_TYPE_SIMPLE) {
         return entry->action.func.simple(editor);
     } else {
-        // Context-aware actions cannot be executed without readline context
+        /// Context-aware actions cannot be executed without readline context
         return LLE_ERROR_INVALID_STATE;
     }
 }
@@ -790,7 +790,7 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Set mode to emacs
+    /// Set mode to emacs
     manager->current_mode = LLE_KEYMAP_EMACS;
 
     /* ========================================================================
@@ -1007,7 +1007,7 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    // History search - not yet fully implemented but bind for future
+    /// History search - not yet fully implemented but bind for future
     result = lle_keybinding_manager_bind(
         manager, "M-p", lle_history_search_backward, "history-search-backward");
     if (result != LLE_SUCCESS)
@@ -1116,10 +1116,10 @@ lle_result_t lle_keybinding_manager_load_vi_insert_preset(
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Set mode to vi insert
+    /// Set mode to vi insert
     manager->current_mode = LLE_KEYMAP_VI_INSERT;
 
-    // Note: Vi bindings will be implemented in a future phase
+    /// Note: Vi bindings will be implemented in a future phase
 
     return LLE_SUCCESS;
 }
@@ -1144,7 +1144,7 @@ lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
         return LLE_ERROR_NULL_POINTER;
     }
 
-    // Get hashtable size
+    /// Get hashtable size
     size_t count = lle_strstr_hashtable_size(manager->bindings);
     if (count == 0) {
         *bindings_out = NULL;
@@ -1152,7 +1152,7 @@ lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
         return LLE_SUCCESS;
     }
 
-    // Allocate bindings array
+    /// Allocate bindings array
     lle_keybinding_info_t *bindings;
     if (manager->pool != NULL) {
         bindings = (lle_keybinding_info_t *)lush_pool_alloc(
@@ -1199,7 +1199,7 @@ lle_keybinding_manager_lookup(lle_keybinding_manager_t *manager,
     lle_keybinding_entry_t *entry;
     sscanf(entry_str, "%p", (void **)&entry);
 
-    // Return pointer to action structure in entry
+    /// Return pointer to action structure in entry
     *action_out = &entry->action;
     return LLE_SUCCESS;
 }
