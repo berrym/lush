@@ -25,7 +25,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================================
  * NODE TO SOURCE BASIC TESTS
@@ -34,7 +34,7 @@
 
 TEST(node_to_source_null) {
     char *source = node_to_source(NULL);
-    // Implementation returns empty string for NULL, not NULL
+    /// Implementation returns empty string for NULL, not NULL
     ASSERT_NOT_NULL(source,
                     "node_to_source should return empty string for NULL");
     ASSERT_STR_EQ(source, "", "NULL node should produce empty string");
@@ -205,12 +205,12 @@ TEST(round_trip_simple_command) {
     char *source = node_to_source(ast);
     ASSERT_NOT_NULL(source, "node_to_source should succeed");
 
-    // Parse the regenerated source
+    /// Parse the regenerated source
     parser_t *parser2 = parser_new(source);
     node_t *ast2 = parser_parse(parser2);
     ASSERT_NOT_NULL(ast2, "Re-parsing should succeed");
 
-    // ASTs should be structurally equal
+    /// ASTs should be structurally equal
     ASSERT_EQ(node_equals(ast, ast2), 1, "Round-trip AST should be equal");
 
     free(source);

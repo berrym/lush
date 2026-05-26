@@ -21,22 +21,22 @@
 #include <string.h>
 #include <unistd.h>
 
-// External memory pool reference (defined in lush_memory_pool.c)
+/// External memory pool reference (defined in lush_memory_pool.c)
 extern lush_memory_pool_system_t *global_memory_pool;
 
-// Global state for cleanup
+/// Global state for cleanup
 static lle_unix_interface_t *g_interface = NULL;
 static lle_terminal_capabilities_t *g_capabilities = NULL;
 static volatile sig_atomic_t g_running = 1;
 
-// Signal handler for clean exit
+/// Signal handler for clean exit
 static void handle_sigint(int sig) {
     (void)sig;
     g_running = 0;
     printf("\n\nCaught Ctrl+C - exiting...\n");
 }
 
-// Convert key code to string
+/// Convert key code to string
 static const char *key_to_string(lle_special_key_t key) {
     switch (key) {
     case LLE_KEY_F1:
@@ -96,7 +96,7 @@ static const char *key_to_string(lle_special_key_t key) {
     }
 }
 
-// Display help text
+/// Display help text
 static void print_help(void) {
     printf("\n");
     printf("═══════════════════════════════════════════════════════════\n");
@@ -127,10 +127,10 @@ static void print_help(void) {
 }
 
 int main(void) {
-    // Install signal handler
+    /// Install signal handler
     signal(SIGINT, handle_sigint);
 
-    // Initialize memory pool system (required for parser initialization)
+    /// Initialize memory pool system (required for parser initialization)
     lush_pool_config_t pool_config = lush_pool_get_default_config();
     lush_pool_error_t pool_result = lush_pool_init(&pool_config);
     if (pool_result != LUSH_POOL_SUCCESS) {
@@ -138,14 +138,14 @@ int main(void) {
         return 1;
     }
 
-    // Initialize unix interface
+    /// Initialize unix interface
     lle_result_t result = lle_unix_interface_init(&g_interface);
     if (result != LLE_SUCCESS) {
         fprintf(stderr, "Failed to initialize unix interface: %d\n", result);
         return 1;
     }
 
-    // Initialize capabilities
+    /// Initialize capabilities
     result = lle_capabilities_detect_environment(&g_capabilities, g_interface);
     if (result != LLE_SUCCESS) {
         fprintf(stderr, "Failed to detect capabilities: %d\n", result);
@@ -153,7 +153,7 @@ int main(void) {
         return 1;
     }
 
-    // Initialize sequence parser + key_detector
+    /// Initialize sequence parser + key_detector
     result = lle_unix_interface_init_sequence_parser(
         g_interface, g_capabilities, (lle_memory_pool_t *)global_memory_pool);
     if (result != LLE_SUCCESS) {
@@ -163,7 +163,7 @@ int main(void) {
         return 1;
     }
 
-    // Enter raw mode
+    /// Enter raw mode
     result = lle_unix_interface_enter_raw_mode(g_interface);
     if (result != LLE_SUCCESS) {
         fprintf(stderr, "Failed to enter raw mode: %d\n", result);
@@ -172,10 +172,10 @@ int main(void) {
         return 1;
     }
 
-    // Display help
+    /// Display help
     print_help();
 
-    // Event loop
+    /// Event loop
     int event_count = 0;
     while (g_running) {
         lle_input_event_t event;
@@ -188,8 +188,8 @@ int main(void) {
 
         switch (event.type) {
         case LLE_INPUT_TYPE_CHARACTER:
-            // Regular character
-            if (event.data.character.codepoint == 3) { // Ctrl+C
+            /// Regular character
+            if (event.data.character.codepoint == 3) { /// Ctrl+C
                 g_running = 0;
                 printf("[%04d] Ctrl+C detected - exiting\n", ++event_count);
             } else if (event.data.character.codepoint >= 32 &&
@@ -204,11 +204,11 @@ int main(void) {
             break;
 
         case LLE_INPUT_TYPE_SPECIAL_KEY:
-            // Special key - this is what we want to see!
+            /// Special key - this is what we want to see!
             printf("[%04d] SPECIAL KEY: %s", ++event_count,
                    key_to_string(event.data.special_key.key));
 
-            // Show modifiers if any
+            /// Show modifiers if any
             if (event.data.special_key.modifiers) {
                 printf(" (");
                 if (event.data.special_key.modifiers & LLE_MOD_SHIFT)
@@ -219,11 +219,11 @@ int main(void) {
                     printf("Ctrl+");
                 if (event.data.special_key.modifiers & LLE_MOD_META)
                     printf("Meta+");
-                printf("\b)"); // Remove last '+'
+                printf("\b)"); /// Remove last '+'
             }
             printf("\n");
 
-            // Special success message for F-keys
+            /// Special success message for F-keys
             if (event.data.special_key.key >= LLE_KEY_F1 &&
                 event.data.special_key.key <= LLE_KEY_F12) {
                 printf("     >> F-key detected successfully!\n");
@@ -236,7 +236,7 @@ int main(void) {
             break;
 
         case LLE_INPUT_TYPE_TIMEOUT:
-            // Ignore timeouts in display
+            /// Ignore timeouts in display
             break;
 
         case LLE_INPUT_TYPE_EOF:
@@ -258,7 +258,7 @@ int main(void) {
         fflush(stdout);
     }
 
-    // Cleanup
+    /// Cleanup
     printf("\n");
     printf("═══════════════════════════════════════════════════════════\n");
     printf("Test Summary:\n");

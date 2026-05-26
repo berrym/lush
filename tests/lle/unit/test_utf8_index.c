@@ -21,7 +21,7 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
-#include "lle/buffer_management.h" // full struct definition
+#include "lle/buffer_management.h" /// full struct definition
 #include "lle/error_handling.h"
 #include "lle/utf8_index.h"
 #include "test_framework.h"
@@ -35,7 +35,7 @@
 
 TEST(init_zeroes_the_struct_and_invalidates) {
     lle_utf8_index_t idx;
-    // Fill with garbage to confirm init clears it
+    /// Fill with garbage to confirm init clears it
     memset(&idx, 0xAB, sizeof(idx));
     ASSERT_EQ(lle_utf8_index_init(&idx), LLE_SUCCESS, "init returns SUCCESS");
     ASSERT_FALSE(lle_utf8_index_is_valid(&idx), "fresh index is not yet valid");
@@ -52,8 +52,8 @@ TEST(init_rejects_null) {
 }
 
 TEST(cleanup_tolerates_null) {
-    lle_utf8_index_cleanup(NULL); // must not crash
-    // If we got here, the cleanup did not crash.
+    lle_utf8_index_cleanup(NULL); /// must not crash
+    /// If we got here, the cleanup did not crash.
     ASSERT_TRUE(1, "cleanup(NULL) did not crash");
 }
 
@@ -80,7 +80,7 @@ TEST(rebuild_empty_text) {
 }
 
 TEST(rebuild_pure_ascii) {
-    // "abc": 3 bytes, 3 codepoints, 3 graphemes, 3 display columns
+    /// "abc": 3 bytes, 3 codepoints, 3 graphemes, 3 display columns
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, "abc", 3), LLE_SUCCESS,
@@ -93,7 +93,7 @@ TEST(rebuild_pure_ascii) {
 }
 
 TEST(rebuild_multibyte_cjk) {
-    // "中" (U+4E2D) is 3 bytes, 1 codepoint, 1 grapheme, 2 columns wide
+    /// "中" (U+4E2D) is 3 bytes, 1 codepoint, 1 grapheme, 2 columns wide
     const char *text = "\xE4\xB8\xAD";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
@@ -152,7 +152,7 @@ TEST(rebuild_rejects_null_index) {
 }
 
 TEST(rebuild_rejects_invalid_utf8_truncated) {
-    // 0xE4 introduces a 3-byte sequence but the buffer ends after 1 byte
+    /// 0xE4 introduces a 3-byte sequence but the buffer ends after 1 byte
     const char *text = "\xE4";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
@@ -162,7 +162,7 @@ TEST(rebuild_rejects_invalid_utf8_truncated) {
 }
 
 TEST(rebuild_rejects_invalid_utf8_lone_continuation) {
-    // 0x80 alone is a continuation byte with no lead byte
+    /// 0x80 alone is a continuation byte with no lead byte
     const char *text = "\x80";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
@@ -172,7 +172,7 @@ TEST(rebuild_rejects_invalid_utf8_lone_continuation) {
 }
 
 TEST(rebuild_rejects_invalid_utf8_overlong) {
-    // Overlong encoding of '/': 0xC0 0xAF (should be 1 byte)
+    /// Overlong encoding of '/': 0xC0 0xAF (should be 1 byte)
     const char *text = "\xC0\xAF";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
@@ -199,23 +199,23 @@ TEST(roundtrip_byte_codepoint_and_back) {
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 5), LLE_SUCCESS, "rebuild");
 
-    // Byte 0 -> codepoint 0
+    /// Byte 0 -> codepoint 0
     size_t cp;
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 0, &cp), LLE_SUCCESS,
               "byte 0 lookup");
     ASSERT_EQ(cp, 0, "byte 0 -> codepoint 0");
 
-    // Byte 1 (start of '中') -> codepoint 1
+    /// Byte 1 (start of '中') -> codepoint 1
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 1, &cp), LLE_SUCCESS,
               "byte 1 lookup");
     ASSERT_EQ(cp, 1, "byte 1 (CJK lead byte) -> codepoint 1");
 
-    // Byte 4 (start of 'B') -> codepoint 2
+    /// Byte 4 (start of 'B') -> codepoint 2
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 4, &cp), LLE_SUCCESS,
               "byte 4 lookup");
     ASSERT_EQ(cp, 2, "byte 4 -> codepoint 2");
 
-    // And the reverse direction: codepoint -> byte
+    /// And the reverse direction: codepoint -> byte
     size_t b;
     ASSERT_EQ(lle_utf8_index_codepoint_to_byte(&idx, 0, &b), LLE_SUCCESS,
               "cp 0");
@@ -244,23 +244,23 @@ TEST(roundtrip_codepoint_grapheme_and_back) {
     ASSERT_EQ(idx.codepoint_count, 3, "3 codepoints");
     ASSERT_EQ(idx.grapheme_count, 2, "2 graphemes");
 
-    // Codepoint 0 ('e') -> grapheme 0
+    /// Codepoint 0 ('e') -> grapheme 0
     size_t g;
     ASSERT_EQ(lle_utf8_index_codepoint_to_grapheme(&idx, 0, &g), LLE_SUCCESS,
               "cp 0 -> g");
     ASSERT_EQ(g, 0, "'e' -> grapheme 0");
 
-    // Codepoint 1 (combining) attaches to grapheme 0
+    /// Codepoint 1 (combining) attaches to grapheme 0
     ASSERT_EQ(lle_utf8_index_codepoint_to_grapheme(&idx, 1, &g), LLE_SUCCESS,
               "cp 1 -> g");
     ASSERT_EQ(g, 0, "combining mark -> still grapheme 0");
 
-    // Codepoint 2 ('X') -> grapheme 1
+    /// Codepoint 2 ('X') -> grapheme 1
     ASSERT_EQ(lle_utf8_index_codepoint_to_grapheme(&idx, 2, &g), LLE_SUCCESS,
               "cp 2 -> g");
     ASSERT_EQ(g, 1, "'X' -> grapheme 1");
 
-    // Reverse: grapheme -> first codepoint of cluster
+    /// Reverse: grapheme -> first codepoint of cluster
     size_t cp;
     ASSERT_EQ(lle_utf8_index_grapheme_to_codepoint(&idx, 0, &cp), LLE_SUCCESS,
               "g 0 -> cp");
@@ -282,7 +282,7 @@ TEST(roundtrip_grapheme_display_and_back) {
     lle_utf8_index_init(&idx);
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, text, 5), LLE_SUCCESS, "rebuild");
 
-    // grapheme -> display
+    /// grapheme -> display
     size_t col;
     ASSERT_EQ(lle_utf8_index_grapheme_to_display(&idx, 0, &col), LLE_SUCCESS,
               "g 0");
@@ -294,7 +294,7 @@ TEST(roundtrip_grapheme_display_and_back) {
               "g 2");
     ASSERT_EQ(col, 3, "grapheme 2 ('B') at column 3 (after 中's 2 cols)");
 
-    // display -> grapheme
+    /// display -> grapheme
     size_t g;
     ASSERT_EQ(lle_utf8_index_display_to_grapheme(&idx, 0, &g), LLE_SUCCESS,
               "col 0");
@@ -351,7 +351,7 @@ TEST(lookups_reject_null_output) {
 
 TEST(lookups_reject_invalid_state_when_index_not_built) {
     lle_utf8_index_t idx;
-    lle_utf8_index_init(&idx); // not yet rebuilt
+    lle_utf8_index_init(&idx); /// not yet rebuilt
     size_t out;
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 0, &out),
               LLE_ERROR_INVALID_STATE,
@@ -394,7 +394,7 @@ TEST(invalidate_marks_index_invalid) {
     ASSERT_TRUE(lle_utf8_index_is_valid(&idx), "valid after rebuild");
     lle_utf8_index_invalidate(&idx);
     ASSERT_FALSE(lle_utf8_index_is_valid(&idx), "invalid after invalidate()");
-    // Lookups should now refuse to operate
+    /// Lookups should now refuse to operate
     size_t out;
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 0, &out),
               LLE_ERROR_INVALID_STATE,
@@ -403,7 +403,7 @@ TEST(invalidate_marks_index_invalid) {
 }
 
 TEST(invalidate_tolerates_null) {
-    lle_utf8_index_invalidate(NULL); // must not crash
+    lle_utf8_index_invalidate(NULL); /// must not crash
     ASSERT_TRUE(1, "invalidate(NULL) did not crash");
 }
 
@@ -416,7 +416,7 @@ TEST(rebuild_after_invalidate_restores_validity) {
     ASSERT_EQ(lle_utf8_index_rebuild(&idx, "xyz", 3), LLE_SUCCESS,
               "second rebuild succeeds");
     ASSERT_TRUE(lle_utf8_index_is_valid(&idx), "valid again after rebuild");
-    // And the new content is reflected
+    /// And the new content is reflected
     size_t cp;
     ASSERT_EQ(lle_utf8_index_byte_to_codepoint(&idx, 2, &cp), LLE_SUCCESS,
               "byte 2 lookup");

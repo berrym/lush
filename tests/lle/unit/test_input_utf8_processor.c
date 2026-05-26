@@ -19,7 +19,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Mock memory pool (same as test_input_stream.c)
+/// Mock memory pool (same as test_input_stream.c)
 static int mock_pool_dummy = 43;
 static lle_memory_pool_t *mock_pool = (lle_memory_pool_t *)&mock_pool_dummy;
 
@@ -100,7 +100,7 @@ void test_process_two_byte_utf8(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // U+00E9 (é) = C3 A9
+    /// U+00E9 (é) = C3 A9
     result = lle_input_utf8_processor_process_byte(processor, 0xC3, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "First byte should succeed");
@@ -131,7 +131,7 @@ void test_process_three_byte_utf8(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // U+2603 (☃) = E2 98 83
+    /// U+2603 (☃) = E2 98 83
     result = lle_input_utf8_processor_process_byte(processor, 0xE2, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "First byte should succeed");
@@ -167,7 +167,7 @@ void test_process_four_byte_utf8(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // U+1F600 (😀) = F0 9F 98 80
+    /// U+1F600 (😀) = F0 9F 98 80
     result = lle_input_utf8_processor_process_byte(processor, 0xF0, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "First byte should succeed");
@@ -205,7 +205,7 @@ void test_invalid_start_byte(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // 0xFF is invalid UTF-8 start byte
+    /// 0xFF is invalid UTF-8 start byte
     result = lle_input_utf8_processor_process_byte(processor, 0xFF, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_ERROR_INVALID_ENCODING, "Invalid byte should fail");
@@ -229,12 +229,12 @@ void test_invalid_continuation_byte(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Start two-byte sequence
+    /// Start two-byte sequence
     result = lle_input_utf8_processor_process_byte(processor, 0xC3, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "First byte should succeed");
 
-    // Send invalid continuation (should be 10xxxxxx, sending 11xxxxxx)
+    /// Send invalid continuation (should be 10xxxxxx, sending 11xxxxxx)
     result = lle_input_utf8_processor_process_byte(processor, 0xC0, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_ERROR_INVALID_ENCODING,
@@ -257,7 +257,7 @@ void test_process_buffer(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // "Hé☃😀" = 48 C3A9 E29883 F09F9880
+    /// "Hé☃😀" = 48 C3A9 E29883 F09F9880
     const char *text = "H\xC3\xA9\xE2\x98\x83\xF0\x9F\x98\x80";
     size_t text_len = strlen(text);
 
@@ -300,7 +300,7 @@ void test_partial_sequence(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Start three-byte sequence
+    /// Start three-byte sequence
     result = lle_input_utf8_processor_process_byte(processor, 0xE2, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "First byte should succeed");
@@ -311,7 +311,7 @@ void test_partial_sequence(void) {
     size_t needed = lle_input_utf8_processor_bytes_needed(processor);
     ASSERT(needed == 2, "Should need 2 more bytes");
 
-    // Add second byte
+    /// Add second byte
     result = lle_input_utf8_processor_process_byte(processor, 0x98, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "Second byte should succeed");
@@ -319,7 +319,7 @@ void test_partial_sequence(void) {
     needed = lle_input_utf8_processor_bytes_needed(processor);
     ASSERT(needed == 1, "Should need 1 more byte");
 
-    // Complete sequence
+    /// Complete sequence
     result = lle_input_utf8_processor_process_byte(processor, 0x83, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "Third byte should succeed");
@@ -346,7 +346,7 @@ void test_reset(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Start partial sequence
+    /// Start partial sequence
     result = lle_input_utf8_processor_process_byte(processor, 0xE2, &codepoint,
                                                    &is_boundary);
     ASSERT(result == LLE_SUCCESS, "First byte should succeed");
@@ -354,7 +354,7 @@ void test_reset(void) {
     bool has_partial = lle_input_utf8_processor_has_partial(processor);
     ASSERT(has_partial == true, "Should have partial sequence");
 
-    // Reset
+    /// Reset
     result = lle_input_utf8_processor_reset(processor);
     ASSERT(result == LLE_SUCCESS, "Reset should succeed");
 
@@ -379,7 +379,7 @@ void test_get_statistics(void) {
     result = lle_input_utf8_processor_init(&processor, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Process some text
+    /// Process some text
     const char *text = "Hé☃😀";
     lle_codepoint_info_t codepoints[10];
     size_t decoded_count = 0;
@@ -390,7 +390,7 @@ void test_get_statistics(void) {
         &bytes_consumed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
 
-    // Get statistics
+    /// Get statistics
     lle_utf8_processor_stats_t stats;
     result = lle_input_utf8_processor_get_stats(processor, &stats);
     ASSERT(result == LLE_SUCCESS, "Get stats should succeed");
@@ -418,7 +418,7 @@ void test_validate_string(void) {
     valid = lle_input_utf8_validate_string("Hé☃😀", 11);
     ASSERT(valid == true, "UTF-8 should be valid");
 
-    // Invalid UTF-8
+    /// Invalid UTF-8
     const char invalid[] = {0xFF, 0x00};
     valid = lle_input_utf8_validate_string(invalid, 1);
     ASSERT(valid == false, "Invalid UTF-8 should fail");
@@ -435,7 +435,7 @@ void test_count_codepoints(void) {
     size_t count = lle_input_utf8_count_codepoints("Hello", 5);
     ASSERT(count == 5, "ASCII should have 5 codepoints");
 
-    // "Hé☃😀" = H(1) + é(2) + ☃(3) + 😀(4) = 10 bytes
+    /// "Hé☃😀" = H(1) + é(2) + ☃(3) + 😀(4) = 10 bytes
     const char *text = "H\xC3\xA9\xE2\x98\x83\xF0\x9F\x98\x80";
     count = lle_input_utf8_count_codepoints(text, 10);
     ASSERT(count == 4, "UTF-8 should have 4 codepoints");
@@ -452,7 +452,7 @@ void test_count_graphemes(void) {
     size_t count = lle_input_utf8_count_graphemes("Hello", 5);
     ASSERT(count == 5, "ASCII should have 5 graphemes");
 
-    // "Hé☃😀" = H(1) + é(2) + ☃(3) + 😀(4) = 10 bytes
+    /// "Hé☃😀" = H(1) + é(2) + ☃(3) + 😀(4) = 10 bytes
     const char *text = "H\xC3\xA9\xE2\x98\x83\xF0\x9F\x98\x80";
     count = lle_input_utf8_count_graphemes(text, 10);
     ASSERT(count == 4, "Simple UTF-8 should have 4 graphemes");
@@ -472,7 +472,7 @@ void test_get_display_width(void) {
     width = lle_input_utf8_get_display_width("Hé", 3);
     ASSERT(width == 2, "Hé should have width 2");
 
-    // Emoji has width 2
+    /// Emoji has width 2
     width = lle_input_utf8_get_display_width("😀", 4);
     ASSERT(width == 2, "Emoji should have width 2");
 

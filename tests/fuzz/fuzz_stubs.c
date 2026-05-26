@@ -22,10 +22,10 @@
  */
 
 typedef struct function_param {
-    char *name;                  /**< Parameter name */
-    char *default_value;         /**< Default value (NULL if required) */
-    bool is_required;            /**< True if parameter is required */
-    struct function_param *next; /**< Next parameter in list */
+    char *name;                  ///< Parameter name
+    char *default_value;         ///< Default value (NULL if required)
+    bool is_required;            ///< True if parameter is required
+    struct function_param *next; ///< Next parameter in list
 } function_param_t;
 
 function_param_t *create_function_param(const char *name,
@@ -78,13 +78,13 @@ bool is_posix_mode_enabled(void) { return false; }
 int error_return(int errcode, const char *fmt, ...) {
     (void)errcode;
     (void)fmt;
-    // Silent for fuzzing
+    /// Silent for fuzzing
     return errcode;
 }
 
 void error_syscall(const char *str) {
     (void)str;
-    // Silent for fuzzing
+    /// Silent for fuzzing
 }
 
 /* ============================================================================
@@ -92,4 +92,4 @@ void error_syscall(const char *str) {
  * ============================================================================
  */
 
-// last_exit_status is defined in src/globals.c
+/// last_exit_status is defined in src/globals.c

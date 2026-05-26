@@ -29,7 +29,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================================
  * INITIALIZATION TESTS
@@ -41,7 +41,7 @@ TEST(autocorrect_init_cleanup) {
     ASSERT_EQ(result, 0, "autocorrect_init should succeed");
 
     autocorrect_cleanup();
-    // Should not crash on cleanup
+    /// Should not crash on cleanup
 }
 
 TEST(autocorrect_double_init) {
@@ -55,7 +55,7 @@ TEST(autocorrect_double_init) {
 }
 
 TEST(autocorrect_cleanup_without_init) {
-    // Should not crash
+    /// Should not crash
     autocorrect_cleanup();
 }
 
@@ -87,7 +87,7 @@ TEST(autocorrect_validate_config_valid) {
 TEST(autocorrect_validate_config_invalid_suggestions) {
     autocorrect_config_t config;
     autocorrect_get_default_config(&config);
-    config.max_suggestions = 10; // Invalid - too many
+    config.max_suggestions = 10; /// Invalid - too many
 
     bool valid = autocorrect_validate_config(&config);
     ASSERT_FALSE(valid, "Config with too many suggestions should be invalid");
@@ -96,7 +96,7 @@ TEST(autocorrect_validate_config_invalid_suggestions) {
 TEST(autocorrect_validate_config_invalid_threshold) {
     autocorrect_config_t config;
     autocorrect_get_default_config(&config);
-    config.similarity_threshold = 150; // Invalid - over 100
+    config.similarity_threshold = 150; /// Invalid - over 100
 
     bool valid = autocorrect_validate_config(&config);
     ASSERT_FALSE(valid, "Config with threshold > 100 should be invalid");
@@ -259,7 +259,7 @@ TEST(suggest_builtins_basic) {
     correction_t suggestions[5];
     int count = autocorrect_suggest_builtins("ehco", suggestions, 5, true);
 
-    // Should find 'echo' as a suggestion
+    /// Should find 'echo' as a suggestion
     bool found_echo = false;
     for (int i = 0; i < count; i++) {
         if (suggestions[i].command &&
@@ -281,14 +281,14 @@ TEST(suggest_builtins_no_match) {
     correction_t suggestions[5];
     int count = autocorrect_suggest_builtins("xyzabc123", suggestions, 5, true);
 
-    // Clean up any suggestions
+    /// Clean up any suggestions
     for (int i = 0; i < count; i++) {
         if (suggestions[i].command) {
             free(suggestions[i].command);
         }
     }
 
-    // Unlikely to find matches for random string
+    /// Unlikely to find matches for random string
     ASSERT(count <= 1, "Random string should have few or no matches");
 
     autocorrect_cleanup();
@@ -305,7 +305,7 @@ TEST(free_results_empty) {
     results.count = 0;
     results.original_command = NULL;
 
-    // Should not crash
+    /// Should not crash
     autocorrect_free_results(&results);
 }
 
@@ -319,7 +319,7 @@ TEST(free_results_with_data) {
     results.suggestions[0].source = "test";
 
     autocorrect_free_results(&results);
-    // Should not crash and should clean up memory
+    /// Should not crash and should clean up memory
 }
 
 /* ============================================================================
@@ -378,7 +378,7 @@ TEST(stats_learn_command) {
 TEST(debug_mode_toggle) {
     autocorrect_init();
 
-    // Should not crash
+    /// Should not crash
     autocorrect_set_debug(true);
     autocorrect_set_debug(false);
 
@@ -426,7 +426,7 @@ TEST(command_exists_external) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "Executor should be created");
 
-    // 'ls' should exist on most systems
+    /// 'ls' should exist on most systems
     bool exists = autocorrect_command_exists(exec, "ls");
     ASSERT_TRUE(exists, "'ls' should exist in PATH");
 
@@ -439,7 +439,7 @@ TEST(command_exists_external) {
  */
 
 TEST(null_inputs) {
-    // These should not crash
+    /// These should not crash
     autocorrect_similarity_score(NULL, "test", true);
     autocorrect_similarity_score("test", NULL, true);
     autocorrect_levenshtein_distance(NULL, "test");
@@ -468,13 +468,13 @@ TEST(empty_strings) {
 int main(void) {
     printf("\n=== Autocorrect System Unit Tests ===\n\n");
 
-    // Initialization tests
+    /// Initialization tests
     printf("Initialization Tests:\n");
     RUN_TEST(autocorrect_init_cleanup);
     RUN_TEST(autocorrect_double_init);
     RUN_TEST(autocorrect_cleanup_without_init);
 
-    // Configuration tests
+    /// Configuration tests
     printf("\nConfiguration Tests:\n");
     RUN_TEST(autocorrect_default_config);
     RUN_TEST(autocorrect_validate_config_valid);
@@ -484,7 +484,7 @@ int main(void) {
     RUN_TEST(autocorrect_apply_config);
     RUN_TEST(autocorrect_is_enabled);
 
-    // Similarity scoring tests
+    /// Similarity scoring tests
     printf("\nSimilarity Scoring Tests:\n");
     RUN_TEST(levenshtein_identical);
     RUN_TEST(levenshtein_one_char_diff);
@@ -505,33 +505,33 @@ int main(void) {
     RUN_TEST(similarity_score_typo);
     RUN_TEST(similarity_score_case_insensitive);
 
-    // Suggestion tests
+    /// Suggestion tests
     printf("\nSuggestion Tests:\n");
     RUN_TEST(suggest_builtins_basic);
     RUN_TEST(suggest_builtins_no_match);
 
-    // Result management tests
+    /// Result management tests
     printf("\nResult Management Tests:\n");
     RUN_TEST(free_results_empty);
     RUN_TEST(free_results_with_data);
 
-    // Statistics tests
+    /// Statistics tests
     printf("\nStatistics Tests:\n");
     RUN_TEST(stats_initial);
     RUN_TEST(stats_reset);
     RUN_TEST(stats_learn_command);
 
-    // Debug mode tests
+    /// Debug mode tests
     printf("\nDebug Mode Tests:\n");
     RUN_TEST(debug_mode_toggle);
 
-    // Command exists tests
+    /// Command exists tests
     printf("\nCommand Exists Tests:\n");
     RUN_TEST(command_exists_builtin);
     RUN_TEST(command_exists_nonexistent);
     RUN_TEST(command_exists_external);
 
-    // Edge case tests
+    /// Edge case tests
     printf("\nEdge Case Tests:\n");
     RUN_TEST(null_inputs);
     RUN_TEST(empty_strings);

@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// Test counter
+/// Test counter
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -47,13 +47,13 @@ void test_hashtable_config_structure(void) {
     lle_hashtable_config_t config;
     memset(&config, 0, sizeof(config));
 
-    // Verify memory management fields
+    /// Verify memory management fields
     config.use_memory_pool = true;
     config.memory_pool = NULL;
     TEST_ASSERT(config.use_memory_pool == true,
                 "use_memory_pool field accessible");
 
-    // Verify performance tuning fields
+    /// Verify performance tuning fields
     config.initial_capacity = 16;
     config.max_load_factor = 0.75;
     TEST_ASSERT(config.initial_capacity == 16,
@@ -61,12 +61,12 @@ void test_hashtable_config_structure(void) {
     TEST_ASSERT(config.max_load_factor == 0.75,
                 "max_load_factor field accessible");
 
-    // Verify thread safety fields
+    /// Verify thread safety fields
     config.thread_safe = false;
     config.allow_concurrent_reads = false;
     TEST_ASSERT(config.thread_safe == false, "thread_safe field accessible");
 
-    // Verify monitoring fields
+    /// Verify monitoring fields
     config.performance_monitoring = true;
     config.debug_mode = false;
     TEST_ASSERT(config.performance_monitoring == true,
@@ -81,11 +81,11 @@ void test_hashtable_config_structure(void) {
 void test_strstr_hashtable_structure(void) {
     printf("[ TEST ] String-to-string hashtable structure definition\n");
 
-    // Verify structure can be declared
+    /// Verify structure can be declared
     lle_strstr_hashtable_t *ht = NULL;
     TEST_ASSERT(ht == NULL, "Can declare lle_strstr_hashtable_t pointer");
 
-    // Verify size is reasonable
+    /// Verify size is reasonable
     size_t size = sizeof(lle_strstr_hashtable_t);
     TEST_ASSERT(size > 0, "Structure has non-zero size");
     TEST_ASSERT(size < 10000, "Structure size is reasonable");
@@ -102,11 +102,11 @@ void test_memory_context_structure(void) {
     lle_hashtable_memory_context_t ctx;
     memset(&ctx, 0, sizeof(ctx));
 
-    // Verify memory pool field
+    /// Verify memory pool field
     ctx.pool = NULL;
     TEST_ASSERT(ctx.pool == NULL, "pool field accessible");
 
-    // Verify statistics fields
+    /// Verify statistics fields
     ctx.allocations = 0;
     ctx.deallocations = 0;
     ctx.bytes_allocated = 0;
@@ -126,7 +126,7 @@ void test_performance_metrics_structure(void) {
     lle_hashtable_performance_metrics_t metrics;
     memset(&metrics, 0, sizeof(metrics));
 
-    // Verify operation counters
+    /// Verify operation counters
     metrics.insert_operations = 0;
     metrics.lookup_operations = 0;
     metrics.delete_operations = 0;
@@ -135,7 +135,7 @@ void test_performance_metrics_structure(void) {
     TEST_ASSERT(metrics.lookup_operations == 0,
                 "lookup_operations field accessible");
 
-    // Verify timing fields
+    /// Verify timing fields
     metrics.total_insert_time_us = 0;
     metrics.total_lookup_time_us = 0;
     metrics.avg_insert_time_us = 0;
@@ -151,11 +151,11 @@ void test_performance_metrics_structure(void) {
 void test_factory_structure(void) {
     printf("[ TEST ] Hashtable factory structure definition\n");
 
-    // Verify structure can be declared
+    /// Verify structure can be declared
     lle_hashtable_factory_t *factory = NULL;
     TEST_ASSERT(factory == NULL, "Can declare lle_hashtable_factory_t pointer");
 
-    // Verify size is reasonable
+    /// Verify size is reasonable
     size_t size = sizeof(lle_hashtable_factory_t);
     TEST_ASSERT(size > 0, "Structure has non-zero size");
     TEST_ASSERT(size < 10000, "Structure size is reasonable");
@@ -169,11 +169,11 @@ void test_factory_structure(void) {
 void test_system_structure(void) {
     printf("[ TEST ] Hashtable system structure definition\n");
 
-    // Verify structure can be declared
+    /// Verify structure can be declared
     lle_hashtable_system_t *system = NULL;
     TEST_ASSERT(system == NULL, "Can declare lle_hashtable_system_t pointer");
 
-    // Verify size is reasonable
+    /// Verify size is reasonable
     size_t size = sizeof(lle_hashtable_system_t);
     TEST_ASSERT(size > 0, "Structure has non-zero size");
     TEST_ASSERT(size < 10000, "Structure size is reasonable");
@@ -214,7 +214,7 @@ void test_function_declarations(void) {
 void test_lock_type_enum(void) {
     printf("[ TEST ] Lock type enumeration definition\n");
 
-    // Verify enum values exist
+    /// Verify enum values exist
     lle_lock_type_t lock_none = LLE_LOCK_NONE;
     lle_lock_type_t lock_mutex = LLE_LOCK_MUTEX;
     lle_lock_type_t lock_rwlock = LLE_LOCK_RWLOCK;
@@ -241,7 +241,7 @@ int main(void) {
     printf("API verified: 2025-10-30\n");
     printf("========================================\n\n");
 
-    // Layer 0: Type compliance tests
+    /// Layer 0: Type compliance tests
     printf("=== Layer 0: Type Definition Compliance ===\n");
     test_hashtable_config_structure();
     test_strstr_hashtable_structure();
@@ -251,11 +251,11 @@ int main(void) {
     test_system_structure();
     test_lock_type_enum();
 
-    // Layer 1: Function compliance tests
+    /// Layer 1: Function compliance tests
     printf("\n=== Layer 1: Function Declaration Compliance ===\n");
     test_function_declarations();
 
-    // Report results
+    /// Report results
     printf("\n========================================\n");
     printf("Test Results:\n");
     printf("  Passed: %d\n", tests_passed);

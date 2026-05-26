@@ -62,7 +62,7 @@ TEST(render_none_escapes_all_shell_metacharacters) {
     /* Output should be exactly twice the length of input (every byte
      * gets a leading backslash). */
     ASSERT(len == strlen(input) * 2);
-    // And the content is the input with backslashes prepended.
+    /// And the content is the input with backslashes prepended.
     char expected[64];
     size_t e = 0;
     for (size_t i = 0; i < strlen(input); i++) {
@@ -86,10 +86,10 @@ TEST(render_none_escapes_tilde_only_at_position_zero) {
     lle_result_t r = lle_splicer_render_for_context(
         "~/foo", strlen("~/foo"), LLE_QUOTE_NONE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
-    // Leading ~ escaped, / and remaining chars literal.
+    /// Leading ~ escaped, / and remaining chars literal.
     ASSERT(strcmp(out, "\\~/foo") == 0);
 
-    // Same character mid-word does NOT escape.
+    /// Same character mid-word does NOT escape.
     r = lle_splicer_render_for_context("foo~bar", strlen("foo~bar"),
                                        LLE_QUOTE_NONE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
@@ -113,7 +113,7 @@ TEST(render_none_escapes_hash_only_at_position_zero) {
 TEST(render_none_passes_non_ascii_bytes_through) {
     /* Multi-byte UTF-8 bytes (high bit set) are not shell-special
      * regardless of quote_state and must pass through untouched. */
-    // "café" with é = U+00E9 = 0xC3 0xA9
+    /// "café" with é = U+00E9 = 0xC3 0xA9
     const char *input = "caf\xC3\xA9";
     char *out = NULL;
     size_t len = 0;
@@ -135,7 +135,7 @@ TEST(render_double_passes_space_through_unescaped) {
         lle_splicer_render_for_context("my file.txt", strlen("my file.txt"),
                                        LLE_QUOTE_DOUBLE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
-    // Inside double quotes, space is literal — no backslash.
+    /// Inside double quotes, space is literal — no backslash.
     ASSERT(strcmp(out, "my file.txt") == 0);
 }
 
@@ -148,7 +148,7 @@ TEST(render_double_escapes_only_dollar_backtick_backslash_doublequote) {
     lle_result_t r = lle_splicer_render_for_context(
         input, strlen(input), LLE_QUOTE_DOUBLE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
-    // $, `, \, " escaped; *, ?, [ literal.
+    /// $, `, \, " escaped; *, ?, [ literal.
     ASSERT(strcmp(out, "a\\$b\\`c\\\\d\\\"e*f?g[h") == 0);
 }
 
@@ -232,17 +232,17 @@ static void make_item(lle_completion_item_t *item, const char *text,
 
 TEST(compute_preview_phase_emits_no_suffix) {
     lle_word_context_t ctx;
-    make_context(&ctx, LLE_QUOTE_NONE, 4, 6); // simulating "cat my"
+    make_context(&ctx, LLE_QUOTE_NONE, 4, 6); /// simulating "cat my"
     lle_completion_item_t item;
     make_item(&item, "my file.txt", LLE_COMPLETION_TYPE_FILE);
 
     lle_splicer_splice_t splice;
     lle_result_t r = lle_splicer_compute(&ctx, &item, false, POOL, &splice);
     ASSERT(r == LLE_SUCCESS);
-    // Insert text is the rendered candidate, no suffix.
+    /// Insert text is the rendered candidate, no suffix.
     ASSERT(strcmp(splice.insert_text, "my\\ file.txt") == 0);
     ASSERT(splice.delete_start == 4);
-    ASSERT(splice.delete_length == 2); // "my"
+    ASSERT(splice.delete_length == 2); /// "my"
     ASSERT(splice.cursor_after == 4 + splice.insert_length);
 }
 
@@ -255,7 +255,7 @@ TEST(compute_accept_file_no_quote_appends_space) {
     lle_splicer_splice_t splice;
     lle_result_t r = lle_splicer_compute(&ctx, &item, true, POOL, &splice);
     ASSERT(r == LLE_SUCCESS);
-    // Trailing space, no close char.
+    /// Trailing space, no close char.
     ASSERT(strcmp(splice.insert_text, "my\\ file.txt ") == 0);
 }
 
@@ -291,14 +291,14 @@ TEST(compute_accept_file_single_quote_appends_close_and_space) {
 
 TEST(compute_accept_directory_appends_slash_no_close) {
     lle_word_context_t ctx;
-    make_context(&ctx, LLE_QUOTE_DOUBLE, 4, 7); // simulating cd "my
+    make_context(&ctx, LLE_QUOTE_DOUBLE, 4, 7); /// simulating cd "my
     lle_completion_item_t item;
     make_item(&item, "My Documents", LLE_COMPLETION_TYPE_DIRECTORY);
 
     lle_splicer_splice_t splice;
     lle_result_t r = lle_splicer_compute(&ctx, &item, true, POOL, &splice);
     ASSERT(r == LLE_SUCCESS);
-    // Directory: render + "/", no close, no space.
+    /// Directory: render + "/", no close, no space.
     ASSERT(strcmp(splice.insert_text, "My Documents/") == 0);
 }
 
@@ -331,7 +331,7 @@ TEST(compute_delete_range_replaces_filename_portion_only) {
     lle_result_t r = lle_splicer_compute(&ctx, &item, true, POOL, &splice);
     ASSERT(r == LLE_SUCCESS);
     ASSERT(splice.delete_start == 6);
-    ASSERT(splice.delete_length == 3); // "Doc"
+    ASSERT(splice.delete_length == 3); /// "Doc"
     /* Insert is "Documents/" — the path prefix "~/" is NOT in the
      * insert_text because the engine preserves it untouched. */
     ASSERT(strcmp(splice.insert_text, "Documents/") == 0);
@@ -354,7 +354,7 @@ TEST(compute_invalid_inputs_return_error) {
     ASSERT(lle_splicer_compute(&ctx, &item, true, POOL, NULL) ==
            LLE_ERROR_INVALID_PARAMETER);
 
-    // item->text NULL is also invalid.
+    /// item->text NULL is also invalid.
     item.text = NULL;
     ASSERT(lle_splicer_compute(&ctx, &item, true, POOL, &splice) ==
            LLE_ERROR_INVALID_PARAMETER);
@@ -368,7 +368,7 @@ TEST(compute_invalid_inputs_return_error) {
 int main(void) {
     printf("=== LLE Splicer Unit Tests ===\n");
 
-    // NONE rendering
+    /// NONE rendering
     RUN_TEST(render_none_passes_through_plain_alphanumerics);
     RUN_TEST(render_none_escapes_space);
     RUN_TEST(render_none_escapes_all_shell_metacharacters);
@@ -376,18 +376,18 @@ int main(void) {
     RUN_TEST(render_none_escapes_hash_only_at_position_zero);
     RUN_TEST(render_none_passes_non_ascii_bytes_through);
 
-    // DOUBLE rendering
+    /// DOUBLE rendering
     RUN_TEST(render_double_passes_space_through_unescaped);
     RUN_TEST(render_double_escapes_only_dollar_backtick_backslash_doublequote);
 
-    // SINGLE rendering
+    /// SINGLE rendering
     RUN_TEST(render_single_passes_metacharacters_through);
     RUN_TEST(render_single_handles_embedded_single_quote);
 
-    // BACKTICK rendering
+    /// BACKTICK rendering
     RUN_TEST(render_backtick_escapes_dollar_backtick_backslash);
 
-    // compute
+    /// compute
     RUN_TEST(compute_preview_phase_emits_no_suffix);
     RUN_TEST(compute_accept_file_no_quote_appends_space);
     RUN_TEST(compute_accept_file_double_quote_appends_close_and_space);

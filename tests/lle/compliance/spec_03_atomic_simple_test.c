@@ -18,7 +18,7 @@ int main(void) {
     int tests_passed = 0;
     int tests_total = 0;
 
-    // Test 1: Verify change tracking structures exist
+    /// Test 1: Verify change tracking structures exist
     printf("  Testing change tracking structures exist ... ");
     tests_total++;
     if (sizeof(lle_change_operation_t) > 0 &&
@@ -29,7 +29,7 @@ int main(void) {
         printf("FAIL\n");
     }
 
-    // Test 2: Verify buffer structure has required fields
+    /// Test 2: Verify buffer structure has required fields
     printf("  Testing buffer structure has change tracking fields ... ");
     tests_total++;
     lle_buffer_t test_buffer;
@@ -44,7 +44,7 @@ int main(void) {
         printf("FAIL\n");
     }
 
-    // Test 3: Verify change operation structure fields
+    /// Test 3: Verify change operation structure fields
     printf("  Testing change operation structure fields ... ");
     tests_total++;
     lle_change_operation_t test_op;
@@ -61,7 +61,7 @@ int main(void) {
         printf("FAIL\n");
     }
 
-    // Test 4: Verify change sequence structure
+    /// Test 4: Verify change sequence structure
     printf("  Testing change sequence structure ... ");
     tests_total++;
     lle_change_sequence_t test_seq;
@@ -77,7 +77,7 @@ int main(void) {
         printf("FAIL\n");
     }
 
-    // Test 5: Verify cursor position structure
+    /// Test 5: Verify cursor position structure
     printf("  Testing cursor position structure ... ");
     tests_total++;
     lle_cursor_position_t test_cursor;
@@ -94,7 +94,7 @@ int main(void) {
         printf("FAIL\n");
     }
 
-    // Summary
+    /// Summary
     printf("\n");
     printf("=================================================\n");
     printf("Test Summary:\n");

@@ -24,7 +24,7 @@ static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
 
-// Global memory pool for tests
+/// Global memory pool for tests
 static lush_memory_pool_t *test_pool = NULL;
 
 #define TEST(name)                                                             \
@@ -130,13 +130,13 @@ static void test_buffer_clear() {
     lle_result_t result = lle_buffer_create(&buffer, test_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    // Insert some text
+    /// Insert some text
     const char *text = "Hello, World!";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "Text insertion succeeds");
     ASSERT_EQ(buffer->length, strlen(text), "Buffer has text");
 
-    // Clear buffer
+    /// Clear buffer
     result = lle_buffer_clear(buffer);
     ASSERT_SUCCESS(result, "Buffer clear succeeds");
     ASSERT_EQ(buffer->length, 0, "Buffer length is 0");
@@ -301,7 +301,7 @@ static void test_insert_utf8_text() {
     lle_result_t result = lle_buffer_create(&buffer, test_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    // Insert text with Chinese characters
+    /// Insert text with Chinese characters
     const char *text = "Hello 世界";
     result = lle_buffer_insert_text(buffer, 0, text, strlen(text));
     ASSERT_SUCCESS(result, "UTF-8 text insertion succeeds");
@@ -321,7 +321,7 @@ static void test_reject_invalid_utf8() {
     lle_result_t result = lle_buffer_create(&buffer, test_pool, 0);
     ASSERT_SUCCESS(result, "Buffer creation succeeds");
 
-    // Try to insert invalid UTF-8
+    /// Try to insert invalid UTF-8
     char invalid_utf8[3] = {(char)0xFF, (char)0xFF, '\0'};
     result = lle_buffer_insert_text(buffer, 0, invalid_utf8, 2);
 
@@ -393,7 +393,7 @@ static void test_buffer_growth() {
 
     size_t initial_capacity = buffer->capacity;
 
-    // Insert text larger than initial capacity
+    /// Insert text larger than initial capacity
     char large_text[1024];
     memset(large_text, 'A', 1023);
     large_text[1023] = '\0';
@@ -457,16 +457,16 @@ int main(void) {
     printf("LLE Buffer Operations Functional Tests\n");
     printf("=================================================\n\n");
 
-    // Initialize test memory pool (mock implementation uses malloc/free)
+    /// Initialize test memory pool (mock implementation uses malloc/free)
     test_pool = global_memory_pool;
 
-    // Buffer Lifecycle Tests
+    /// Buffer Lifecycle Tests
     printf("Buffer Lifecycle Tests:\n");
     test_buffer_create_destroy();
     test_buffer_create_with_capacity();
     test_buffer_clear();
 
-    // Basic Operation Tests
+    /// Basic Operation Tests
     printf("\nBasic Operation Tests:\n");
     test_insert_text_at_start();
     test_insert_text_at_end();
@@ -476,23 +476,23 @@ int main(void) {
     test_delete_text_from_middle();
     test_replace_text();
 
-    // UTF-8 Handling Tests
+    /// UTF-8 Handling Tests
     printf("\nUTF-8 Handling Tests:\n");
     test_insert_utf8_text();
     test_reject_invalid_utf8();
 
-    // Complex Sequence Tests
+    /// Complex Sequence Tests
     printf("\nComplex Sequence Tests:\n");
     test_multiple_insertions();
     test_insert_delete_sequence();
     test_buffer_growth();
 
-    // Error Handling Tests
+    /// Error Handling Tests
     printf("\nError Handling Tests:\n");
     test_insert_out_of_bounds();
     test_delete_out_of_bounds();
 
-    // Summary
+    /// Summary
     printf("\n");
     printf("=================================================\n");
     printf("Test Summary:\n");

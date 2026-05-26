@@ -50,31 +50,31 @@
 static void test_phase1_detection_api(void) {
     printf("Testing Phase 1: Detection System API...\n");
 
-    // Test 1: Core detection function exists and works
+    /// Test 1: Core detection function exists and works
     lle_terminal_detection_result_t *result = NULL;
     lle_result_t res = lle_detect_terminal_capabilities_comprehensive(&result);
     assert(res == LLE_SUCCESS);
     assert(result != NULL);
 
-    // Test 2: Detection result has all required fields
+    /// Test 2: Detection result has all required fields
     assert(result->recommended_mode >= LLE_ADAPTIVE_MODE_NONE);
     assert(result->recommended_mode <= LLE_ADAPTIVE_MODE_MULTIPLEXED);
     assert(result->capability_level >= LLE_CAPABILITY_NONE);
     assert(result->capability_level <= LLE_CAPABILITY_PREMIUM);
 
-    // Test 3: Terminal signature database accessible
+    /// Test 3: Terminal signature database accessible
     size_t count = 0;
     const lle_terminal_signature_t *signatures =
         lle_get_terminal_signature_database(&count);
     assert(signatures != NULL);
     assert(count > 0);
 
-    // Test 4: Optimized detection with caching
+    /// Test 4: Optimized detection with caching
     lle_terminal_detection_result_t *cached = NULL;
     res = lle_detect_terminal_capabilities_optimized(&cached);
     assert(res == LLE_SUCCESS);
 
-    // Test 5: Detection result cleanup
+    /// Test 5: Detection result cleanup
     lle_terminal_detection_result_destroy(result);
 
     printf("  Phase 1 Detection API: PASS\n");
@@ -86,7 +86,7 @@ static void test_phase1_detection_api(void) {
 static void test_phase2_controller_api(void) {
     printf("Testing Phase 2: Controller System API...\n");
 
-    // Test 1: Context initialization
+    /// Test 1: Context initialization
     lle_terminal_detection_result_t *detection = NULL;
     lle_result_t res =
         lle_detect_terminal_capabilities_comprehensive(&detection);
@@ -95,7 +95,7 @@ static void test_phase2_controller_api(void) {
     lle_adaptive_context_t *context = NULL;
     res = lle_initialize_adaptive_context(&context, detection, NULL);
 
-    // NONE mode may fail initialization (non-interactive)
+    /// NONE mode may fail initialization (non-interactive)
     if (detection->recommended_mode == LLE_ADAPTIVE_MODE_NONE) {
         assert(res == LLE_ERROR_FEATURE_NOT_AVAILABLE);
         printf("  Phase 2 Controller API: PASS (non-interactive mode)\n");
@@ -105,7 +105,7 @@ static void test_phase2_controller_api(void) {
     assert(res == LLE_SUCCESS);
     assert(context != NULL);
 
-    // Test 2: Interface creation
+    /// Test 2: Interface creation
     lle_adaptive_interface_t *interface = NULL;
     res = lle_create_adaptive_interface(&interface, NULL);
     assert(res == LLE_SUCCESS);
@@ -116,25 +116,25 @@ static void test_phase2_controller_api(void) {
     assert(interface->update_display != NULL);
     assert(interface->handle_resize != NULL);
 
-    // Test 3: Configuration recommendations
+    /// Test 3: Configuration recommendations
     lle_adaptive_config_recommendation_t config;
     lle_adaptive_get_recommended_config(&config);
     assert(config.recommended_mode >= LLE_ADAPTIVE_MODE_NONE);
     assert(config.color_support_level >= 0 && config.color_support_level <= 3);
 
-    // Test 4: Shell integration
+    /// Test 4: Shell integration
     bool interactive =
         lle_adaptive_should_shell_be_interactive(false, true, false);
-    assert(interactive == false); // Script file is never interactive
+    assert(interactive == false); /// Script file is never interactive
 
     interactive = lle_adaptive_should_shell_be_interactive(true, false, false);
-    assert(interactive == true); // Forced interactive always works
+    assert(interactive == true); /// Forced interactive always works
 
-    // Test 5: Health monitoring
+    /// Test 5: Health monitoring
     bool healthy = lle_adaptive_perform_health_check(context);
     assert(healthy == true);
 
-    // Test 6: Utility functions
+    /// Test 6: Utility functions
     const char *mode_str =
         lle_adaptive_mode_to_string(LLE_ADAPTIVE_MODE_ENHANCED);
     assert(mode_str != NULL);
@@ -144,7 +144,7 @@ static void test_phase2_controller_api(void) {
     assert(cap_str != NULL);
     assert(strcmp(cap_str, "full") == 0);
 
-    // Cleanup
+    /// Cleanup
     lle_adaptive_interface_destroy(interface);
     lle_adaptive_context_destroy(context);
 

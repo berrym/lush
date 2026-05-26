@@ -30,7 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// Test counter
+/// Test counter
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -50,7 +50,7 @@ static int tests_failed = 0;
 void test_completion_type_enum(void) {
     printf("[ TEST ] Completion type enumeration\n");
 
-    // Verify all 8 required completion types exist
+    /// Verify all 8 required completion types exist
     lle_completion_type_t type;
 
     type = LLE_COMPLETION_TYPE_BUILTIN;
@@ -77,7 +77,7 @@ void test_completion_type_enum(void) {
     type = LLE_COMPLETION_TYPE_UNKNOWN;
     TEST_ASSERT(type == LLE_COMPLETION_TYPE_UNKNOWN, "UNKNOWN type exists");
 
-    // Verify COUNT is correct (8 base types + CUSTOM = 9)
+    /// Verify COUNT is correct (8 base types + CUSTOM = 9)
     TEST_ASSERT(LLE_COMPLETION_TYPE_COUNT == 9, "TYPE_COUNT is 9");
 
     printf("[ PASS ] Completion type enumeration\n");
@@ -92,7 +92,7 @@ void test_completion_item_structure(void) {
     lle_completion_item_t item;
     memset(&item, 0, sizeof(item));
 
-    // Verify all required fields exist
+    /// Verify all required fields exist
     item.text = NULL;
     item.suffix = NULL;
     item.type = LLE_COMPLETION_TYPE_COMMAND;
@@ -121,13 +121,13 @@ void test_completion_result_structure(void) {
     lle_completion_result_t result;
     memset(&result, 0, sizeof(result));
 
-    // Verify core fields
+    /// Verify core fields
     result.items = NULL;
     result.count = 0;
     result.capacity = 0;
     result.memory_pool = NULL;
 
-    // Verify category count fields
+    /// Verify category count fields
     result.builtin_count = 0;
     result.command_count = 0;
     result.file_count = 0;
@@ -177,7 +177,7 @@ void test_menu_state_structure(void) {
     lle_completion_menu_state_t state;
     memset(&state, 0, sizeof(state));
 
-    // Verify core fields
+    /// Verify core fields
     state.result = NULL;
     state.selected_index = 0;
     state.first_visible = 0;
@@ -226,12 +226,12 @@ void test_menu_config_structure(void) {
 void test_phase1_api_functions(void) {
     printf("[ TEST ] Phase 1 API functions (completion_types)\n");
 
-    // These functions must exist and be callable
-    // Just verify they link - actual functionality tested in unit tests
+    /// These functions must exist and be callable
+    /// Just verify they link - actual functionality tested in unit tests
 
     /* Note: We don't actually call these in compliance test to avoid runtime
      * dependencies */
-    // The fact that this compiles and links proves the API exists
+    /// The fact that this compiles and links proves the API exists
 
     TEST_ASSERT(1,
                 "lle_completion_type_get_info exists (verified at link time)");
@@ -253,7 +253,7 @@ void test_phase1_api_functions(void) {
 void test_phase2_api_functions(void) {
     printf("[ TEST ] Phase 2 API functions (completion_sources)\n");
 
-    // Just verify APIs exist at link time
+    /// Just verify APIs exist at link time
     TEST_ASSERT(1, "lle_shell_is_builtin exists (verified at link time)");
     TEST_ASSERT(1, "lle_shell_is_alias exists (verified at link time)");
     TEST_ASSERT(
@@ -278,7 +278,7 @@ void test_phase2_api_functions(void) {
 void test_phase3_api_functions(void) {
     printf("[ TEST ] Phase 3 API functions (completion_generator)\n");
 
-    // Just verify APIs exist at link time
+    /// Just verify APIs exist at link time
     TEST_ASSERT(
         1, "lle_completion_is_command_position exists (verified at link time)");
     TEST_ASSERT(
@@ -302,7 +302,7 @@ void test_phase3_api_functions(void) {
 void test_phase4_api_functions(void) {
     printf("[ TEST ] Phase 4 API functions (completion_menu)\n");
 
-    // Menu config
+    /// Menu config
     lle_completion_menu_config_t config = lle_completion_menu_default_config();
     TEST_ASSERT(config.max_visible_items > 0,
                 "lle_completion_menu_default_config exists and callable");
@@ -322,7 +322,7 @@ void test_phase4_api_functions(void) {
 void test_renderer_structures(void) {
     printf("[ TEST ] Phase 5.1 renderer structures\n");
 
-    // Verify lle_menu_render_options_t structure
+    /// Verify lle_menu_render_options_t structure
     lle_menu_render_options_t options;
     memset(&options, 0, sizeof(options));
 
@@ -338,7 +338,7 @@ void test_renderer_structures(void) {
     TEST_ASSERT(sizeof(options) > 0,
                 "lle_menu_render_options_t structure exists");
 
-    // Verify lle_menu_render_stats_t structure
+    /// Verify lle_menu_render_stats_t structure
     lle_menu_render_stats_t stats;
     memset(&stats, 0, sizeof(stats));
 
@@ -359,7 +359,7 @@ void test_renderer_structures(void) {
 void test_phase5_1_api_functions(void) {
     printf("[ TEST ] Phase 5.1 API functions (completion_menu_renderer)\n");
 
-    // Test default options function
+    /// Test default options function
     lle_menu_render_options_t options = lle_menu_renderer_default_options(80);
     TEST_ASSERT(options.terminal_width == 80,
                 "lle_menu_renderer_default_options exists and callable");
@@ -378,12 +378,12 @@ void test_phase5_1_api_functions(void) {
     size_t cols = lle_menu_renderer_calculate_columns(80, 20, 2);
     TEST_ASSERT(cols >= 1, "lle_menu_renderer_calculate_columns exists");
 
-    // Test estimate size function
+    /// Test estimate size function
     size_t estimate = lle_menu_renderer_estimate_size(NULL, NULL);
     TEST_ASSERT(estimate > 0,
                 "lle_menu_renderer_estimate_size exists and returns estimate");
 
-    // Test main render function exists (verify signature compiles)
+    /// Test main render function exists (verify signature compiles)
     char output[128];
     lle_menu_render_stats_t stats;
     lle_result_t result = lle_completion_menu_render(NULL, &options, output,
@@ -391,7 +391,7 @@ void test_phase5_1_api_functions(void) {
     TEST_ASSERT(result == LLE_ERROR_INVALID_PARAMETER,
                 "lle_completion_menu_render exists and validates params");
 
-    // Test format functions exist (verify signatures compile)
+    /// Test format functions exist (verify signatures compile)
     result = lle_menu_renderer_format_category_header(
         LLE_COMPLETION_TYPE_FILE, output, sizeof(output), true);
     TEST_ASSERT(result == LLE_SUCCESS,
@@ -415,7 +415,7 @@ void test_completion_system_structure(void) {
     lle_completion_system_t system;
     memset(&system, 0, sizeof(system));
 
-    // Verify all required fields exist
+    /// Verify all required fields exist
     system.source_manager = NULL;
     system.current_state = NULL;
     system.menu = NULL;
@@ -449,7 +449,7 @@ void test_completion_system_structure(void) {
 void test_phase5_4_api_functions(void) {
     printf("[ TEST ] Spec 12 API functions (completion_system)\n");
 
-    // Lifecycle functions
+    /// Lifecycle functions
     void (*create_fn)(void) = (void (*)(void))lle_completion_system_create;
     TEST_ASSERT(create_fn != NULL, "lle_completion_system_create exists");
 
@@ -459,11 +459,11 @@ void test_phase5_4_api_functions(void) {
     void (*clear_fn)(void) = (void (*)(void))lle_completion_system_clear;
     TEST_ASSERT(clear_fn != NULL, "lle_completion_system_clear exists");
 
-    // Generation function
+    /// Generation function
     void (*generate_fn)(void) = (void (*)(void))lle_completion_system_generate;
     TEST_ASSERT(generate_fn != NULL, "lle_completion_system_generate exists");
 
-    // State query functions
+    /// State query functions
     void (*is_active_fn)(void) =
         (void (*)(void))lle_completion_system_is_active;
     TEST_ASSERT(is_active_fn != NULL, "lle_completion_system_is_active exists");
@@ -473,7 +473,7 @@ void test_phase5_4_api_functions(void) {
     TEST_ASSERT(is_visible_fn != NULL,
                 "lle_completion_system_is_menu_visible exists");
 
-    // Query functions
+    /// Query functions
     void (*get_state_fn)(void) =
         (void (*)(void))lle_completion_system_get_state;
     TEST_ASSERT(get_state_fn != NULL, "lle_completion_system_get_state exists");
@@ -490,12 +490,12 @@ void test_phase5_4_api_functions(void) {
 void test_error_handling(void) {
     printf("[ TEST ] Error handling compliance\n");
 
-    // All API functions must use lle_result_t for error returns
-    // Verify that functions properly handle NULL parameters
+    /// All API functions must use lle_result_t for error returns
+    /// Verify that functions properly handle NULL parameters
 
     lle_result_t result;
 
-    // Phase 1: completion_types - NULL parameter checks
+    /// Phase 1: completion_types - NULL parameter checks
     result = lle_completion_result_add_item(NULL, NULL);
     TEST_ASSERT(result == LLE_ERROR_INVALID_PARAMETER,
                 "completion_result_add_item handles NULL");
@@ -508,7 +508,7 @@ void test_error_handling(void) {
     TEST_ASSERT(result == LLE_ERROR_INVALID_PARAMETER,
                 "completion_result_free handles NULL");
 
-    // Phase 4: completion_menu - NULL parameter checks
+    /// Phase 4: completion_menu - NULL parameter checks
     result = lle_completion_menu_move_down(NULL);
     TEST_ASSERT(result == LLE_ERROR_INVALID_PARAMETER,
                 "menu_move_down handles NULL");
@@ -529,33 +529,33 @@ int main(void) {
     printf("Spec 12 Completion System - Compliance Test\n");
     printf("========================================\n\n");
 
-    // Phase 1: Type Classification
+    /// Phase 1: Type Classification
     test_completion_type_enum();
     test_completion_item_structure();
     test_completion_result_structure();
     test_phase1_api_functions();
 
-    // Phase 2: Completion Sources
+    /// Phase 2: Completion Sources
     test_phase2_api_functions();
 
-    // Phase 3: Completion Generator
+    /// Phase 3: Completion Generator
     test_completion_context_enum();
     test_phase3_api_functions();
 
-    // Phase 4: Menu State and Logic
+    /// Phase 4: Menu State and Logic
     test_menu_state_structure();
     test_menu_config_structure();
     test_phase4_api_functions();
 
-    // Phase 5.1: Menu Renderer
+    /// Phase 5.1: Menu Renderer
     test_renderer_structures();
     test_phase5_1_api_functions();
 
-    // Phase 5.4: Runtime State
+    /// Phase 5.4: Runtime State
     test_completion_system_structure();
     test_phase5_4_api_functions();
 
-    // Cross-cutting concerns
+    /// Cross-cutting concerns
     test_error_handling();
 
     printf("\n========================================\n");

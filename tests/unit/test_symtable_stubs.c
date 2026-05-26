@@ -7,16 +7,16 @@
 #include "shell_mode.h"
 #include <stdbool.h>
 
-// Global variable stub
+/// Global variable stub
 int last_exit_status = 0;
 
-// Shell options stub
+/// Shell options stub
 shell_options_t shell_opts = {0};
 
-// Shell mode stub
+/// Shell mode stub
 bool shell_mode_allows(shell_feature_t feature) {
     (void)feature;
-    return true; // Allow all features in tests
+    return true; /// Allow all features in tests
 }
 
 /* Shell mode getter stub — symtable.c uses this for issue-#69
@@ -25,5 +25,5 @@ bool shell_mode_allows(shell_feature_t feature) {
  * insertion-order ordering applies. */
 shell_mode_t shell_mode_get(void) { return SHELL_MODE_LUSH; }
 
-// Interactive shell stub
+/// Interactive shell stub
 bool is_interactive_shell(void) { return false; /* Non-interactive in tests */ }

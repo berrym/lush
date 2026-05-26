@@ -60,13 +60,13 @@ static debug_context_t *new_captured_ctx(void) {
     return ctx;
 }
 
-// ============================================================================
-// Test Framework
-// ============================================================================
+/// ============================================================================
+/// Test Framework
+/// ============================================================================
 
-// ============================================================================
-// Node Tracing Tests
-// ============================================================================
+/// ============================================================================
+/// Node Tracing Tests
+/// ============================================================================
 
 TEST(trace_node_null_params) {
     debug_context_t *ctx = debug_init();
@@ -75,7 +75,7 @@ TEST(trace_node_null_params) {
     debug_enable(ctx, true);
     ctx->trace_execution = true;
 
-    // Should not crash with NULL parameters
+    /// Should not crash with NULL parameters
     debug_trace_node(NULL, NULL, NULL, 0);
     debug_trace_node(ctx, NULL, "test.sh", 1);
     debug_trace_node(ctx, NULL, NULL, 1);
@@ -87,7 +87,7 @@ TEST(trace_node_disabled) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    // Debug disabled - should do nothing
+    /// Debug disabled - should do nothing
     ctx->enabled = false;
     ctx->trace_execution = true;
 
@@ -96,7 +96,7 @@ TEST(trace_node_disabled) {
 
     long count_before = ctx->total_commands;
     debug_trace_node(ctx, node, "test.sh", 1);
-    // Should not increment when disabled
+    /// Should not increment when disabled
     ASSERT_EQ(ctx->total_commands, count_before, "Command count unchanged");
 
     free_node_tree(node);
@@ -133,7 +133,7 @@ TEST(trace_node_with_timing) {
     node_t *node = new_node(NODE_PIPELINE);
     ASSERT_NOT_NULL(node, "new_node should succeed");
 
-    // Should not crash with timing enabled
+    /// Should not crash with timing enabled
     debug_trace_node(ctx, node, "script.sh", 5);
 
     free_node_tree(node);
@@ -147,7 +147,7 @@ TEST(trace_node_multiple_types) {
     debug_enable(ctx, true);
     ctx->trace_execution = true;
 
-    // Test various node types
+    /// Test various node types
     node_type_t types[] = {NODE_COMMAND, NODE_PIPELINE, NODE_SUBSHELL,
                            NODE_FOR,     NODE_WHILE,    NODE_IF,
                            NODE_CASE,    NODE_FUNCTION};
@@ -166,9 +166,9 @@ TEST(trace_node_multiple_types) {
     debug_cleanup(ctx);
 }
 
-// ============================================================================
-// Command Tracing Tests
-// ============================================================================
+/// ============================================================================
+/// Command Tracing Tests
+/// ============================================================================
 
 TEST(trace_command_null_params) {
     debug_context_t *ctx = debug_init();
@@ -177,7 +177,7 @@ TEST(trace_command_null_params) {
     debug_enable(ctx, true);
     ctx->trace_execution = true;
 
-    // Should not crash with NULL
+    /// Should not crash with NULL
     debug_trace_command(NULL, "ls", NULL, 0);
     debug_trace_command(ctx, NULL, NULL, 0);
 
@@ -218,15 +218,15 @@ TEST(trace_command_disabled) {
     ctx->trace_execution = true;
 
     char *argv[] = {"echo", "hello", NULL};
-    // Should do nothing when disabled
+    /// Should do nothing when disabled
     debug_trace_command(ctx, "echo", argv, 2);
 
     debug_cleanup(ctx);
 }
 
-// ============================================================================
-// Builtin Tracing Tests
-// ============================================================================
+/// ============================================================================
+/// Builtin Tracing Tests
+/// ============================================================================
 
 TEST(trace_builtin_null_params) {
     debug_context_t *ctx = debug_init();
@@ -235,7 +235,7 @@ TEST(trace_builtin_null_params) {
     debug_enable(ctx, true);
     ctx->trace_execution = true;
 
-    // Should not crash
+    /// Should not crash
     debug_trace_builtin(NULL, "cd", NULL, 0);
     debug_trace_builtin(ctx, NULL, NULL, 0);
 
@@ -268,9 +268,9 @@ TEST(trace_builtin_with_args) {
     debug_cleanup(ctx);
 }
 
-// ============================================================================
-// Function Call Tracing Tests
-// ============================================================================
+/// ============================================================================
+/// Function Call Tracing Tests
+/// ============================================================================
 
 TEST(trace_function_null_params) {
     debug_context_t *ctx = debug_init();
@@ -279,7 +279,7 @@ TEST(trace_function_null_params) {
     debug_enable(ctx, true);
     ctx->trace_execution = true;
 
-    // Should not crash
+    /// Should not crash
     debug_trace_function_call(NULL, "myfunc", NULL, 0);
     debug_trace_function_call(ctx, NULL, NULL, 0);
 
@@ -312,19 +312,19 @@ TEST(trace_function_with_args) {
     debug_cleanup(ctx);
 }
 
-// ============================================================================
-// Stack Frame Management Tests
-// ============================================================================
+/// ============================================================================
+/// Stack Frame Management Tests
+/// ============================================================================
 
 TEST(push_frame_null_params) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    // Should return NULL for NULL ctx
+    /// Should return NULL for NULL ctx
     debug_frame_t *frame = debug_push_frame(NULL, "func", "file.sh", 1);
     ASSERT_NULL(frame, "Should return NULL for NULL ctx");
 
-    // Should return NULL for NULL function
+    /// Should return NULL for NULL function
     frame = debug_push_frame(ctx, NULL, "file.sh", 1);
     ASSERT_NULL(frame, "Should return NULL for NULL function");
 
@@ -378,7 +378,7 @@ TEST(push_frame_max_depth) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    // Set a low max stack depth for testing
+    /// Set a low max stack depth for testing
     ctx->max_stack_depth = 3;
 
     debug_push_frame(ctx, "level1", "test.sh", 1);
@@ -387,7 +387,7 @@ TEST(push_frame_max_depth) {
 
     ASSERT_EQ(ctx->stack_depth, 3, "Should be at max depth");
 
-    // Should return NULL when at max depth
+    /// Should return NULL when at max depth
     debug_frame_t *frame = debug_push_frame(ctx, "level4", "test.sh", 4);
     ASSERT_NULL(frame, "Should return NULL at max depth");
     ASSERT_EQ(ctx->stack_depth, 3, "Depth unchanged");
@@ -408,7 +408,7 @@ TEST(push_frame_null_file) {
 }
 
 TEST(pop_frame_null_ctx) {
-    // Should not crash
+    /// Should not crash
     debug_pop_frame(NULL);
 }
 
@@ -416,7 +416,7 @@ TEST(pop_frame_empty_stack) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    // Should not crash on empty stack
+    /// Should not crash on empty stack
     debug_pop_frame(ctx);
     ASSERT_EQ(ctx->stack_depth, 0, "Depth still 0");
 
@@ -466,13 +466,13 @@ TEST(pop_frame_updates_total_time) {
 
     debug_push_frame(ctx, "func", "test.sh", 1);
 
-    // Small delay to ensure measurable time
-    struct timespec ts = {0, 1000000}; // 1ms
+    /// Small delay to ensure measurable time
+    struct timespec ts = {0, 1000000}; /// 1ms
     nanosleep(&ts, NULL);
 
     debug_pop_frame(ctx);
 
-    // Total time should have increased
+    /// Total time should have increased
     ASSERT_GE(ctx->total_time_ns, time_before, "Total time increased");
 
     debug_cleanup(ctx);
@@ -500,10 +500,10 @@ TEST(update_frame_node_null) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    // Should not crash with NULL ctx
+    /// Should not crash with NULL ctx
     debug_update_frame_node(NULL, NULL);
 
-    // Should not crash with no current frame
+    /// Should not crash with no current frame
     debug_update_frame_node(ctx, NULL);
 
     debug_cleanup(ctx);
@@ -515,7 +515,7 @@ TEST(show_stack_empty) {
 
     debug_enable(ctx, true);
 
-    // Should not crash with empty stack
+    /// Should not crash with empty stack
     debug_show_stack(ctx);
 
     debug_cleanup(ctx);
@@ -532,15 +532,15 @@ TEST(show_stack_with_frames) {
     debug_push_frame(ctx, "helper", "script.sh", 10);
     debug_push_frame(ctx, "worker", "lib.sh", 5);
 
-    // Should not crash
+    /// Should not crash
     debug_show_stack(ctx);
 
     debug_cleanup(ctx);
 }
 
-// ============================================================================
-// Variable Inspection Tests
-// ============================================================================
+/// ============================================================================
+/// Variable Inspection Tests
+/// ============================================================================
 
 TEST(inspect_variable_null_params) {
     debug_context_t *ctx = debug_init();
@@ -548,7 +548,7 @@ TEST(inspect_variable_null_params) {
 
     debug_enable(ctx, true);
 
-    // Should not crash
+    /// Should not crash
     debug_inspect_variable(NULL, "var");
     debug_inspect_variable(ctx, NULL);
 
@@ -561,7 +561,7 @@ TEST(inspect_variable_with_dollar) {
 
     debug_enable(ctx, true);
 
-    // Should handle $ prefix
+    /// Should handle $ prefix
     debug_inspect_variable(ctx, "$PATH");
     debug_inspect_variable(ctx, "$HOME");
 
@@ -574,25 +574,25 @@ TEST(inspect_variable_without_dollar) {
 
     debug_enable(ctx, true);
 
-    // Should handle without $ prefix
+    /// Should handle without $ prefix
     debug_inspect_variable(ctx, "PATH");
     debug_inspect_variable(ctx, "HOME");
 
     debug_cleanup(ctx);
 }
 
-// Return a pointer to the inspection-frame portion of a captured debug log,
-// skipping the variable-timestamp preamble that debug_enable() emits.  Falls
-// back to the full buffer if the frame marker is absent.
+/// Return a pointer to the inspection-frame portion of a captured debug log,
+/// skipping the variable-timestamp preamble that debug_enable() emits.  Falls
+/// back to the full buffer if the frame marker is absent.
 static const char *frame_body(const char *buf) {
     const char *frame = strstr(buf, "[Variable:");
     return frame ? frame : buf;
 }
 
 TEST(inspect_variable_accepts_at_sigil) {
-    // The @ sigil prefix must be stripped before lookup so `@arr` resolves to
-    // the same binding as bare `arr` -- sigils are presentation-only, not a
-    // namespace.
+    /// The @ sigil prefix must be stripped before lookup so `@arr` resolves to
+    /// the same binding as bare `arr` -- sigils are presentation-only, not a
+    /// namespace.
     debug_context_t *ctx_a = new_captured_ctx();
     debug_context_t *ctx_b = new_captured_ctx();
     ASSERT_NOT_NULL(ctx_a, "ctx_a");
@@ -642,7 +642,7 @@ TEST(inspect_variable_special) {
 
     debug_enable(ctx, true);
 
-    // Special variables
+    /// Special variables
     debug_inspect_variable(ctx, "$?");
     debug_inspect_variable(ctx, "$$");
     debug_inspect_variable(ctx, "PWD");
@@ -651,7 +651,7 @@ TEST(inspect_variable_special) {
 }
 
 TEST(inspect_all_variables_null) {
-    // Should not crash
+    /// Should not crash
     debug_inspect_all_variables(NULL);
 }
 
@@ -661,7 +661,7 @@ TEST(inspect_all_variables_basic) {
 
     debug_enable(ctx, true);
 
-    // Should not crash
+    /// Should not crash
     debug_inspect_all_variables(ctx);
 
     debug_cleanup(ctx);
@@ -674,7 +674,7 @@ TEST(inspect_all_variables_with_frame) {
     debug_enable(ctx, true);
     debug_push_frame(ctx, "test_func", "test.sh", 1);
 
-    // Should not crash with active frame
+    /// Should not crash with active frame
     debug_inspect_all_variables(ctx);
 
     debug_cleanup(ctx);
@@ -722,7 +722,7 @@ TEST(enumerate_current_scope_vars_in_function_scope) {
                                           &probe);
     ASSERT_TRUE(probe.found, "fn_local visible in current scope");
 
-    // Scope-only enumeration: a global must NOT appear in this set.
+    /// Scope-only enumeration: a global must NOT appear in this set.
     symtable_set_var(symtable_manager(), "global_unrelated", "world",
                      SYMVAR_NONE);
     scope_probe_t probe_global = {"global_unrelated", false, SYMVAR_STRING};
@@ -753,7 +753,7 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
      * pointing at a temporary executor. */
     extern executor_t *current_executor;
     executor_t *saved = current_executor;
-    current_executor = (executor_t *)0x1; // sentinel non-NULL
+    current_executor = (executor_t *)0x1; /// sentinel non-NULL
 
     debug_inspect_all_variables(ctx);
 
@@ -773,7 +773,7 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
     debug_cleanup(ctx);
 }
 
-// debug_inspect_variable on an indexed array renders Type: List.
+/// debug_inspect_variable on an indexed array renders Type: List.
 TEST(inspect_variable_renders_indexed_array_as_list) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -800,7 +800,7 @@ TEST(inspect_variable_renders_indexed_array_as_list) {
     debug_cleanup(ctx);
 }
 
-// debug_inspect_variable on an associative array renders Type: Map.
+/// debug_inspect_variable on an associative array renders Type: Map.
 TEST(inspect_variable_renders_assoc_array_as_map) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -827,7 +827,7 @@ TEST(inspect_variable_renders_assoc_array_as_map) {
     debug_cleanup(ctx);
 }
 
-// debug_show_variable_type on an indexed array reports List + count.
+/// debug_show_variable_type on an indexed array reports List + count.
 TEST(show_variable_type_indexed_array_is_list) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -848,7 +848,7 @@ TEST(show_variable_type_indexed_array_is_list) {
     debug_cleanup(ctx);
 }
 
-// debug_show_variable_type on an associative array reports Map.
+/// debug_show_variable_type on an associative array reports Map.
 TEST(show_variable_type_assoc_array_is_map) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -869,7 +869,7 @@ TEST(show_variable_type_assoc_array_is_map) {
     debug_cleanup(ctx);
 }
 
-// debug_show_variable_type for a scalar reports Scalar.
+/// debug_show_variable_type for a scalar reports Scalar.
 TEST(show_variable_type_scalar) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -888,7 +888,7 @@ TEST(show_variable_type_scalar) {
     debug_cleanup(ctx);
 }
 
-// debug_show_variable_type for an unbound name says so honestly.
+/// debug_show_variable_type for an unbound name says so honestly.
 TEST(show_variable_type_unset) {
     init_symtable();
     debug_context_t *ctx = new_captured_ctx();
@@ -942,7 +942,7 @@ TEST(view_emit_line_utf8_uses_box_drawing_gutter) {
 
     char log[256];
     read_debug_output(ctx, log, sizeof(log));
-    // U+2502 (BOX DRAWINGS LIGHT VERTICAL) is 0xE2 0x94 0x82 in UTF-8.
+    /// U+2502 (BOX DRAWINGS LIGHT VERTICAL) is 0xE2 0x94 0x82 in UTF-8.
     ASSERT_TRUE(strstr(log, "\xE2\x94\x82 hi\n") != NULL,
                 "UTF-8 vertical-bar gutter present");
 
@@ -979,7 +979,7 @@ TEST(watch_variable_null_params) {
 
     debug_enable(ctx, true);
 
-    // Should not crash
+    /// Should not crash
     debug_watch_variable(NULL, "var");
     debug_watch_variable(ctx, NULL);
 
@@ -1004,15 +1004,15 @@ TEST(show_variable_changes) {
 
     debug_enable(ctx, true);
 
-    // Should not crash
+    /// Should not crash
     debug_show_variable_changes(ctx);
 
     debug_cleanup(ctx);
 }
 
-// ============================================================================
-// Main
-// ============================================================================
+/// ============================================================================
+/// Main
+/// ============================================================================
 
 int main(void) {
     printf("Running debug trace tests...\n\n");

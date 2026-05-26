@@ -15,18 +15,18 @@ void debug_string(const char *label, const char *text) {
     size_t byte_len = strlen(text);
     printf("Byte length: %zu\n", byte_len);
 
-    // Show byte sequence
+    /// Show byte sequence
     printf("Bytes: ");
     for (size_t i = 0; i < byte_len; i++) {
         printf("%02X ", (unsigned char)text[i]);
     }
     printf("\n");
 
-    // Count graphemes
+    /// Count graphemes
     size_t grapheme_count = lle_utf8_count_graphemes(text, byte_len);
     printf("Grapheme count: %zu\n", grapheme_count);
 
-    // Show each codepoint and whether it's a grapheme boundary
+    /// Show each codepoint and whether it's a grapheme boundary
     printf("\nCodepoint analysis:\n");
     const char *ptr = text;
     const char *end = text + byte_len;
@@ -46,7 +46,7 @@ void debug_string(const char *label, const char *text) {
         printf("  [%d] U+%04X (%s) - len=%d bytes", idx, codepoint,
                is_boundary ? "BOUNDARY" : "extend", len);
 
-        // Show the character
+        /// Show the character
         printf(" '");
         for (int i = 0; i < len; i++) {
             printf("%c", ptr[i]);
@@ -65,17 +65,17 @@ int main() {
     printf("Grapheme Cluster Detection Debug\n");
     printf("=================================\n");
 
-    // Test 4: Family emoji (ZWJ sequence)
+    /// Test 4: Family emoji (ZWJ sequence)
     debug_string("Test 4: Family emoji ZWJ sequence",
                  "👨‍👩‍👧‍👦");
 
-    // Test 5: Flag emoji (Regional Indicators)
+    /// Test 5: Flag emoji (Regional Indicators)
     debug_string("Test 5: Flag emoji", "🇺🇸");
 
-    // Test 7: Skin tone modifier
+    /// Test 7: Skin tone modifier
     debug_string("Test 7: Skin tone modifier", "👋🏽");
 
-    // Working test for comparison
+    /// Working test for comparison
     debug_string("Working: Simple emoji", "🎉");
 
     return 0;

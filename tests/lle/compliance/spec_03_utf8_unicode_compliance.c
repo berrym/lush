@@ -52,7 +52,7 @@ static int tests_failed = 0;
         }                                                                      \
     } while (0)
 
-// UTF-8 Encoding Tests
+/// UTF-8 Encoding Tests
 static void test_utf8_ascii() {
     TEST("UTF-8 ASCII encoding");
     ASSERT_EQ(lle_utf8_sequence_length('A'), 1, "ASCII should be 1 byte");
@@ -80,13 +80,13 @@ static void test_utf8_validation() {
 
 static void test_utf8_codepoint_counting() {
     TEST("UTF-8 codepoint counting");
-    const char *text = "AB"; // 2 ASCII chars = 2 codepoints
+    const char *text = "AB"; /// 2 ASCII chars = 2 codepoints
     ASSERT_EQ(lle_utf8_count_codepoints(text, strlen(text)), 2,
               "Count ASCII codepoints");
     PASS();
 }
 
-// Grapheme Cluster Tests
+/// Grapheme Cluster Tests
 static void test_grapheme_ascii() {
     TEST("Grapheme cluster - ASCII");
     const char *text = "AB";
@@ -106,7 +106,7 @@ static void test_grapheme_boundary_start() {
 static void test_grapheme_cr_lf() {
     TEST("Grapheme CR+LF sequence (GB3)");
     const char *text = "\r\n";
-    // CR and LF together should be one grapheme
+    /// CR and LF together should be one grapheme
     size_t count = lle_utf8_count_graphemes(text, strlen(text));
     ASSERT_EQ(count, 1, "CR+LF is one grapheme");
     PASS();
@@ -118,20 +118,20 @@ int main(void) {
     printf("Spec 03: UTF-8 and Unicode TR#29 Compliance Tests\n");
     printf("=================================================\n\n");
 
-    // UTF-8 Tests
+    /// UTF-8 Tests
     printf("UTF-8 Support Module Tests:\n");
     test_utf8_ascii();
     test_utf8_multibyte();
     test_utf8_validation();
     test_utf8_codepoint_counting();
 
-    // Grapheme Cluster Tests
+    /// Grapheme Cluster Tests
     printf("\nUnicode TR#29 Grapheme Detection Tests:\n");
     test_grapheme_ascii();
     test_grapheme_boundary_start();
     test_grapheme_cr_lf();
 
-    // Summary
+    /// Summary
     printf("\n");
     printf("=================================================\n");
     printf("Test Summary:\n");

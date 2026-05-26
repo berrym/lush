@@ -31,7 +31,7 @@
 #define PASS() ((void)0)
 
 /* ========================================================================== */
-// Mock render context callbacks
+/// Mock render context callbacks
 /* ========================================================================== */
 
 typedef struct {
@@ -93,18 +93,18 @@ static const char *mock_get_color(const char *color_name, void *user_data) {
     (void)user_data;
 
     if (strcmp(color_name, "primary") == 0) {
-        return "\033[1;34m"; // Bold blue
+        return "\033[1;34m"; /// Bold blue
     } else if (strcmp(color_name, "success") == 0) {
-        return "\033[1;32m"; // Bold green
+        return "\033[1;32m"; /// Bold green
     } else if (strcmp(color_name, "error") == 0) {
-        return "\033[1;31m"; // Bold red
+        return "\033[1;31m"; /// Bold red
     }
 
     return "";
 }
 
 /* ========================================================================== */
-// Token creation tests
+/// Token creation tests
 /* ========================================================================== */
 
 TEST(token_literal_creation) {
@@ -182,7 +182,7 @@ TEST(token_newline_creation) {
 }
 
 /* ========================================================================== */
-// Template parsing tests
+/// Template parsing tests
 /* ========================================================================== */
 
 TEST(parse_empty_template) {
@@ -191,7 +191,7 @@ TEST(parse_empty_template) {
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(parsed != NULL);
     ASSERT(parsed->valid);
-    ASSERT_EQ(parsed->token_count, 1); // Just end token
+    ASSERT_EQ(parsed->token_count, 1); /// Just end token
     lle_template_free(parsed);
     PASS();
 }
@@ -202,7 +202,7 @@ TEST(parse_literal_only) {
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(parsed != NULL);
     ASSERT(parsed->valid);
-    ASSERT_EQ(parsed->token_count, 2); // literal + end
+    ASSERT_EQ(parsed->token_count, 2); /// literal + end
     ASSERT_EQ(parsed->head->type, LLE_TOKEN_LITERAL);
     ASSERT_STR_EQ(parsed->head->data.literal.text, "hello world");
     lle_template_free(parsed);
@@ -214,7 +214,7 @@ TEST(parse_segment_reference) {
     lle_result_t result = lle_template_parse("${directory}", &parsed);
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(parsed != NULL);
-    ASSERT_EQ(parsed->token_count, 2); // segment + end
+    ASSERT_EQ(parsed->token_count, 2); /// segment + end
     ASSERT_EQ(parsed->head->type, LLE_TOKEN_SEGMENT);
     ASSERT_STR_EQ(parsed->head->data.segment.segment_name, "directory");
     lle_template_free(parsed);
@@ -276,7 +276,7 @@ TEST(parse_newline_escape) {
     lle_result_t result = lle_template_parse("line1\\nline2", &parsed);
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(parsed != NULL);
-    ASSERT_EQ(parsed->token_count, 4); // literal + newline + literal + end
+    ASSERT_EQ(parsed->token_count, 4); /// literal + newline + literal + end
     ASSERT_EQ(parsed->head->type, LLE_TOKEN_LITERAL);
     ASSERT_EQ(parsed->head->next->type, LLE_TOKEN_NEWLINE);
     ASSERT_EQ(parsed->head->next->next->type, LLE_TOKEN_LITERAL);
@@ -302,7 +302,7 @@ TEST(parse_mixed_template) {
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(parsed != NULL);
     ASSERT(parsed->valid);
-    // Should have: segment, literal, conditional, literal, end
+    /// Should have: segment, literal, conditional, literal, end
     ASSERT(parsed->token_count >= 4);
     lle_template_free(parsed);
     PASS();
@@ -323,7 +323,7 @@ TEST(validate_unclosed_brace) {
 }
 
 /* ========================================================================== */
-// Template rendering tests
+/// Template rendering tests
 /* ========================================================================== */
 
 TEST(render_literal_only) {
@@ -422,10 +422,10 @@ TEST(render_color_application) {
     lle_result_t result = lle_template_evaluate("${primary:hello}", &render_ctx,
                                                 output, sizeof(output));
     ASSERT_EQ(result, LLE_SUCCESS);
-    // Should contain color code, text, and reset
-    ASSERT(strstr(output, "\033[1;34m") != NULL); // Blue
+    /// Should contain color code, text, and reset
+    ASSERT(strstr(output, "\033[1;34m") != NULL); /// Blue
     ASSERT(strstr(output, "hello") != NULL);
-    ASSERT(strstr(output, "\033[0m") != NULL); // Reset
+    ASSERT(strstr(output, "\033[0m") != NULL); /// Reset
     PASS();
 }
 
@@ -456,7 +456,7 @@ TEST(render_complex_template) {
                                             .get_color = mock_get_color,
                                             .user_data = &ctx};
 
-    // Test with separate segments - conditional values are literal strings
+    /// Test with separate segments - conditional values are literal strings
     char output[512];
     lle_result_t result =
         lle_template_evaluate("${user}@host:${directory} ${git}$ ", &render_ctx,
@@ -470,7 +470,7 @@ TEST(render_complex_template) {
 }
 
 TEST(render_missing_segment) {
-    mock_context_t ctx = {0}; // No segments set
+    mock_context_t ctx = {0}; /// No segments set
     lle_template_render_ctx_t render_ctx = {.get_segment = mock_get_segment,
                                             .is_visible = mock_is_visible,
                                             .get_color = mock_get_color,
@@ -480,12 +480,12 @@ TEST(render_missing_segment) {
     lle_result_t result = lle_template_evaluate("${nonexistent}", &render_ctx,
                                                 output, sizeof(output));
     ASSERT_EQ(result, LLE_SUCCESS);
-    ASSERT_STR_EQ(output, ""); // Missing segment renders as empty
+    ASSERT_STR_EQ(output, ""); /// Missing segment renders as empty
     PASS();
 }
 
 /* ========================================================================== */
-// Main test runner
+/// Main test runner
 /* ========================================================================== */
 
 int main(void) {
@@ -493,7 +493,7 @@ int main(void) {
     printf("    LLE Template Engine Unit Tests\n");
     printf("===========================================\n\n");
 
-    // Token creation tests
+    /// Token creation tests
     RUN_TEST(token_literal_creation);
     RUN_TEST(token_segment_creation);
     RUN_TEST(token_property_creation);
@@ -502,7 +502,7 @@ int main(void) {
     RUN_TEST(token_color_creation);
     RUN_TEST(token_newline_creation);
 
-    // Parsing tests
+    /// Parsing tests
     RUN_TEST(parse_empty_template);
     RUN_TEST(parse_literal_only);
     RUN_TEST(parse_segment_reference);
@@ -516,7 +516,7 @@ int main(void) {
     RUN_TEST(validate_valid_template);
     RUN_TEST(validate_unclosed_brace);
 
-    // Rendering tests
+    /// Rendering tests
     RUN_TEST(render_literal_only);
     RUN_TEST(render_segment);
     RUN_TEST(render_property);

@@ -27,7 +27,7 @@
 #include "lle/history.h"
 #include "lle/memory_management.h"
 
-// Test harness
+/// Test harness
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -70,19 +70,19 @@ static lle_memory_pool_t *g_pool = NULL;
 static lle_history_core_t *g_core = NULL;
 
 static void setup(void) {
-    // Initialize memory management
+    /// Initialize memory management
     lle_result_t result = lle_memory_init();
     ASSERT_SUCCESS(result);
 
-    // Create history core
+    /// Create history core
     result = lle_history_core_create(&g_core, NULL, NULL);
     ASSERT_SUCCESS(result);
 
-    // Initialize expansion system
+    /// Initialize expansion system
     result = lle_history_expansion_init(g_core);
     ASSERT_SUCCESS(result);
 
-    // Initialize bridge for testing
+    /// Initialize bridge for testing
     result = lle_history_bridge_init(g_core, NULL, NULL);
     ASSERT_SUCCESS(result);
 }
@@ -104,7 +104,7 @@ static void teardown(void) {
  */
 
 static void add_test_commands(void) {
-    // Add some test commands to history
+    /// Add some test commands to history
     lle_history_add_entry(g_core, "ls -la", 0, NULL);
     lle_history_add_entry(g_core, "cd /tmp", 0, NULL);
     lle_history_add_entry(g_core, "git status", 0, NULL);
@@ -122,7 +122,7 @@ static void add_test_commands(void) {
 TEST(test_expansion_needed_detection) {
     setup();
 
-    // Commands that need expansion
+    /// Commands that need expansion
     ASSERT(lle_history_expansion_needed("!!") == true);
     ASSERT(lle_history_expansion_needed("!5") == true);
     ASSERT(lle_history_expansion_needed("!-2") == true);
@@ -131,12 +131,12 @@ TEST(test_expansion_needed_detection) {
     ASSERT(lle_history_expansion_needed("^old^new") == true);
     ASSERT(lle_history_expansion_needed("echo !-1") == true);
 
-    // Commands that don't need expansion
+    /// Commands that don't need expansion
     ASSERT(lle_history_expansion_needed("echo hello") == false);
     ASSERT(lle_history_expansion_needed("ls /tmp") == false);
     ASSERT(lle_history_expansion_needed("") == false);
 
-    // Space prefix disables expansion (default)
+    /// Space prefix disables expansion (default)
     ASSERT(lle_history_expansion_needed(" !!") == false);
 
     teardown();
@@ -149,7 +149,7 @@ TEST(test_double_bang_expansion) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Expand !! - should get last command
+    /// Expand !! - should get last command
     result = lle_history_expand_line("!!", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -166,19 +166,19 @@ TEST(test_number_expansion) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Get history count to know valid IDs
+    /// Get history count to know valid IDs
     size_t count;
     lle_history_get_entry_count(g_core, &count);
     ASSERT(count == 7);
 
-    // Expand !1 - should get first command
+    /// Expand !1 - should get first command
     result = lle_history_expand_line("!1", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "ls -la");
     lle_pool_free(expanded);
 
-    // Expand !3 - should get third command
+    /// Expand !3 - should get third command
     result = lle_history_expand_line("!3", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -195,14 +195,14 @@ TEST(test_relative_expansion) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Expand !-1 - should get last command (same as !!)
+    /// Expand !-1 - should get last command (same as !!)
     result = lle_history_expand_line("!-1", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "echo hello");
     lle_pool_free(expanded);
 
-    // Expand !-3 - should get 3rd from last
+    /// Expand !-3 - should get 3rd from last
     result = lle_history_expand_line("!-3", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -219,14 +219,14 @@ TEST(test_prefix_expansion) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Expand !git - should get most recent git command
+    /// Expand !git - should get most recent git command
     result = lle_history_expand_line("!git", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "git commit -m 'test'");
     lle_pool_free(expanded);
 
-    // Expand !make - should get most recent make command
+    /// Expand !make - should get most recent make command
     result = lle_history_expand_line("!make", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -243,14 +243,14 @@ TEST(test_substring_expansion) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Expand !?status - should find git status
+    /// Expand !?status - should find git status
     result = lle_history_expand_line("!?status", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
     ASSERT_STR_EQ(expanded, "git status");
     lle_pool_free(expanded);
 
-    // Expand !?clean - should find make clean
+    /// Expand !?clean - should find make clean
     result = lle_history_expand_line("!?clean", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -267,7 +267,7 @@ TEST(test_quick_substitution) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // ^hello^world - should substitute in last command
+    /// ^hello^world - should substitute in last command
     result = lle_history_expand_line("^hello^world", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -289,7 +289,7 @@ TEST(test_nonexistent_number) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Try to expand !999 - should fail
+    /// Try to expand !999 - should fail
     result = lle_history_expand_line("!999", &expanded);
     ASSERT_ERROR(result);
     ASSERT(result == LLE_ERROR_NOT_FOUND);
@@ -304,7 +304,7 @@ TEST(test_nonexistent_prefix) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Try to expand !nonexistent - should fail
+    /// Try to expand !nonexistent - should fail
     result = lle_history_expand_line("!nonexistent", &expanded);
     ASSERT_ERROR(result);
     ASSERT(result == LLE_ERROR_NOT_FOUND);
@@ -314,12 +314,12 @@ TEST(test_nonexistent_prefix) {
 
 TEST(test_empty_history) {
     setup();
-    // Don't add any commands
+    /// Don't add any commands
 
     char *expanded = NULL;
     lle_result_t result;
 
-    // Try !! with empty history
+    /// Try !! with empty history
     result = lle_history_expand_line("!!", &expanded);
     ASSERT_ERROR(result);
 
@@ -333,7 +333,7 @@ TEST(test_no_expansion_needed) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Expand regular command - should return as-is
+    /// Expand regular command - should return as-is
     result = lle_history_expand_line("echo test", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -355,25 +355,25 @@ TEST(test_space_disables_expansion) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Default: space disables expansion
+    /// Default: space disables expansion
     ASSERT(lle_history_expansion_get_space_disables() == true);
 
-    // Leading space should prevent expansion
+    /// Leading space should prevent expansion
     result = lle_history_expand_line(" !!", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
-    ASSERT_STR_EQ(expanded, " !!"); // Not expanded
+    ASSERT_STR_EQ(expanded, " !!"); /// Not expanded
     lle_pool_free(expanded);
 
-    // Disable the feature
+    /// Disable the feature
     lle_history_expansion_set_space_disables(false);
     ASSERT(lle_history_expansion_get_space_disables() == false);
 
-    // Now space should not prevent expansion
+    /// Now space should not prevent expansion
     result = lle_history_expand_line(" !!", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
-    ASSERT_STR_EQ(expanded, " echo hello"); // Expanded with leading space
+    ASSERT_STR_EQ(expanded, " echo hello"); /// Expanded with leading space
     lle_pool_free(expanded);
 
     teardown();
@@ -382,14 +382,14 @@ TEST(test_space_disables_expansion) {
 TEST(test_verify_setting) {
     setup();
 
-    // Default: verify disabled
+    /// Default: verify disabled
     ASSERT(lle_history_expansion_get_verify() == false);
 
-    // Enable verify
+    /// Enable verify
     lle_history_expansion_set_verify(true);
     ASSERT(lle_history_expansion_get_verify() == true);
 
-    // Disable verify
+    /// Disable verify
     lle_history_expansion_set_verify(false);
     ASSERT(lle_history_expansion_get_verify() == false);
 
@@ -408,7 +408,7 @@ TEST(test_expansion_in_middle_of_command) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Expansion in the middle of a command
+    /// Expansion in the middle of a command
     result = lle_history_expand_line("echo before !! after", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
@@ -425,11 +425,11 @@ TEST(test_multiple_expansions) {
     char *expanded = NULL;
     lle_result_t result;
 
-    // Multiple expansions in one line
+    /// Multiple expansions in one line
     result = lle_history_expand_line("!git && !make", &expanded);
     ASSERT_SUCCESS(result);
     ASSERT(expanded != NULL);
-    // Should expand both !git and !make
+    /// Should expand both !git and !make
     ASSERT(strstr(expanded, "git commit") != NULL);
     ASSERT(strstr(expanded, "make all") != NULL);
     lle_pool_free(expanded);
@@ -449,7 +449,7 @@ int main(void) {
     printf("================================================================="
            "\n\n");
 
-    // Basic expansion tests
+    /// Basic expansion tests
     run_test_expansion_needed_detection();
     run_test_double_bang_expansion();
     run_test_number_expansion();
@@ -458,21 +458,21 @@ int main(void) {
     run_test_substring_expansion();
     run_test_quick_substitution();
 
-    // Error handling tests
+    /// Error handling tests
     run_test_nonexistent_number();
     run_test_nonexistent_prefix();
     run_test_empty_history();
     run_test_no_expansion_needed();
 
-    // Configuration tests
+    /// Configuration tests
     run_test_space_disables_expansion();
     run_test_verify_setting();
 
-    // Complex expansion tests
+    /// Complex expansion tests
     run_test_expansion_in_middle_of_command();
     run_test_multiple_expansions();
 
-    // Print summary
+    /// Print summary
     printf("\n================================================================="
            "\n");
     printf("Test Summary\n");

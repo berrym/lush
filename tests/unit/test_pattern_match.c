@@ -115,7 +115,7 @@ TEST(extglob_negation) {
 }
 
 TEST(extglob_with_outer_suffix) {
-    // `@(foo|bar).txt`: composition with literal suffix
+    /// `@(foo|bar).txt`: composition with literal suffix
     ASSERT(lush_pattern_match("foo.txt", "@(foo|bar).txt"), "first + suffix");
     ASSERT(lush_pattern_match("bar.txt", "@(foo|bar).txt"), "second + suffix");
     ASSERT(!lush_pattern_match("baz.txt", "@(foo|bar).txt"), "non-alt");
@@ -123,7 +123,7 @@ TEST(extglob_with_outer_suffix) {
 }
 
 TEST(extglob_nested) {
-    // Nested @(...) inside @(...)
+    /// Nested @(...) inside @(...)
     ASSERT(lush_pattern_match("foo", "@(@(foo)|bar)"), "inner first");
     ASSERT(lush_pattern_match("bar", "@(@(foo)|bar)"), "outer alt");
 }
@@ -134,14 +134,14 @@ TEST(extglob_nested) {
  */
 
 TEST(zsh_bare_alt_equiv_to_at) {
-    // Bare paren without operator prefix is the zsh form.
+    /// Bare paren without operator prefix is the zsh form.
     ASSERT(lush_pattern_match("abc", "(abc|def)"), "first alt");
     ASSERT(lush_pattern_match("def", "(abc|def)"), "second alt");
     ASSERT(!lush_pattern_match("xyz", "(abc|def)"), "no alt");
 }
 
 TEST(zsh_bare_alt_with_empty) {
-    // The prezto editor-init `(emacs|)` case.
+    /// The prezto editor-init `(emacs|)` case.
     ASSERT(lush_pattern_match("emacs", "(emacs|)"), "emacs matches");
     ASSERT(lush_pattern_match("", "(emacs|)"), "empty matches");
     ASSERT(!lush_pattern_match("vi", "(emacs|)"), "vi does not");
@@ -164,7 +164,7 @@ TEST(empty_pattern_only_matches_empty) {
 }
 
 TEST(unbalanced_paren_treated_as_literal) {
-    // An unmatched `(` should not crash; treated as a literal character.
+    /// An unmatched `(` should not crash; treated as a literal character.
     ASSERT(lush_pattern_match("(abc", "(abc"), "literal opening paren");
 }
 

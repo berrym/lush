@@ -25,7 +25,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Mock terminal capabilities and memory pool
+/// Mock terminal capabilities and memory pool
 static int mock_terminal_dummy = 42;
 static int mock_pool_dummy = 43;
 static lle_terminal_capabilities_t *mock_terminal =
@@ -88,7 +88,7 @@ void test_detect_f1_key(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // F1 = ESC O P
+    /// F1 = ESC O P
     const char f1_sequence[] = "\x1BOP";
     result =
         lle_key_detector_process_sequence(detector, f1_sequence, 3, &key_info);
@@ -120,7 +120,7 @@ void test_detect_cursor_up(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Up = ESC [ A
+    /// Up = ESC [ A
     const char up_sequence[] = "\x1B[A";
     result =
         lle_key_detector_process_sequence(detector, up_sequence, 3, &key_info);
@@ -151,7 +151,7 @@ void test_detect_ctrl_c(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Ctrl+C = 0x03
+    /// Ctrl+C = 0x03
     const char ctrl_c[] = "\x03";
     result = lle_key_detector_process_sequence(detector, ctrl_c, 1, &key_info);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -183,7 +183,7 @@ void test_detect_shift_up(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Shift+Up = ESC[1;2A
+    /// Shift+Up = ESC[1;2A
     const char shift_up[] = "\x1B[1;2A";
     result =
         lle_key_detector_process_sequence(detector, shift_up, 6, &key_info);
@@ -215,7 +215,7 @@ void test_detect_ctrl_right(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Ctrl+Right = ESC[1;5C
+    /// Ctrl+Right = ESC[1;5C
     const char ctrl_right[] = "\x1B[1;5C";
     result =
         lle_key_detector_process_sequence(detector, ctrl_right, 6, &key_info);
@@ -247,7 +247,7 @@ void test_detect_home_key(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Home = ESC[H
+    /// Home = ESC[H
     const char home[] = "\x1B[H";
     result = lle_key_detector_process_sequence(detector, home, 3, &key_info);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -277,7 +277,7 @@ void test_detect_delete_key(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Delete = ESC[3~
+    /// Delete = ESC[3~
     const char delete_key[] = "\x1B[3~";
     result =
         lle_key_detector_process_sequence(detector, delete_key, 4, &key_info);
@@ -309,7 +309,7 @@ void test_detect_tab_key(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Tab = 0x09
+    /// Tab = 0x09
     const char tab[] = "\x09";
     result = lle_key_detector_process_sequence(detector, tab, 1, &key_info);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -339,13 +339,13 @@ void test_partial_sequence(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Send partial sequence: ESC[
+    /// Send partial sequence: ESC[
     const char partial[] = "\x1B[";
     result = lle_key_detector_process_sequence(detector, partial, 2, &key_info);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
     ASSERT(key_info == NULL, "Should not detect key yet (prefix match)");
 
-    // Check if waiting for more data
+    /// Check if waiting for more data
     bool is_waiting = lle_key_detector_is_waiting(detector);
     ASSERT(is_waiting == true, "Should be waiting for more data");
 
@@ -367,13 +367,13 @@ void test_complete_partial_sequence(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Send first part: ESC[
+    /// Send first part: ESC[
     const char part1[] = "\x1B[";
     result = lle_key_detector_process_sequence(detector, part1, 2, &key_info);
     ASSERT(result == LLE_SUCCESS, "First process should succeed");
     ASSERT(key_info == NULL, "Should not detect key yet");
 
-    // Send second part: A
+    /// Send second part: A
     const char part2[] = "A";
     result = lle_key_detector_process_sequence(detector, part2, 1, &key_info);
     ASSERT(result == LLE_SUCCESS, "Second process should succeed");
@@ -402,7 +402,7 @@ void test_reset_detector(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Send partial sequence
+    /// Send partial sequence
     const char partial[] = "\x1B[";
     result = lle_key_detector_process_sequence(detector, partial, 2, &key_info);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -410,7 +410,7 @@ void test_reset_detector(void) {
     bool is_waiting = lle_key_detector_is_waiting(detector);
     ASSERT(is_waiting == true, "Should be waiting");
 
-    // Reset
+    /// Reset
     result = lle_key_detector_reset(detector);
     ASSERT(result == LLE_SUCCESS, "Reset should succeed");
 
@@ -435,7 +435,7 @@ void test_get_statistics(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Detect a few keys
+    /// Detect a few keys
     const char f1[] = "\x1BOP";
     result = lle_key_detector_process_sequence(detector, f1, 3, &key_info);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -452,7 +452,7 @@ void test_get_statistics(void) {
         key_info = NULL;
     }
 
-    // Get stats
+    /// Get stats
     uint64_t detected, resolved, timeouts;
     result =
         lle_key_detector_get_stats(detector, &detected, &resolved, &timeouts);
@@ -478,7 +478,7 @@ void test_unknown_sequence(void) {
     result = lle_key_detector_init(&detector, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Send unknown sequence
+    /// Send unknown sequence
     const char unknown[] = "\x1B[999Z";
     result = lle_key_detector_process_sequence(detector, unknown, 6, &key_info);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");

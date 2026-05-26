@@ -25,7 +25,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================================
  * SOURCE LOCATION TESTS
@@ -117,7 +117,7 @@ TEST(error_create_all_severities) {
 TEST(error_create_parse_errors) {
     source_location_t loc = SOURCE_LOC_UNKNOWN;
 
-    // Test various parse error codes
+    /// Test various parse error codes
     shell_error_code_t codes[] = {
         SHELL_ERR_UNEXPECTED_TOKEN, SHELL_ERR_UNEXPECTED_EOF,
         SHELL_ERR_UNCLOSED_QUOTE,   SHELL_ERR_UNCLOSED_SUBST,
@@ -153,7 +153,7 @@ TEST(error_create_runtime_errors) {
 }
 
 TEST(error_free_null) {
-    // Should not crash
+    /// Should not crash
     shell_error_free(NULL);
 }
 
@@ -221,7 +221,7 @@ TEST(error_set_cause) {
     shell_error_set_cause(err, cause);
     ASSERT(err->cause == cause, "Cause should be linked");
 
-    // Free should handle chain
+    /// Free should handle chain
     shell_error_free(err);
 }
 
@@ -247,12 +247,12 @@ TEST(error_context_max_depth) {
     shell_error_t *err = shell_error_create(SHELL_ERR_UNEXPECTED_TOKEN,
                                             SHELL_SEVERITY_ERROR, loc, "test");
 
-    // Push more than max contexts
+    /// Push more than max contexts
     for (int i = 0; i < SHELL_ERROR_CONTEXT_MAX + 5; i++) {
         shell_error_push_context(err, "context %d", i);
     }
 
-    // Should cap at max
+    /// Should cap at max
     ASSERT(err->context_depth <= SHELL_ERROR_CONTEXT_MAX,
            "Context depth should be capped");
 
@@ -304,7 +304,7 @@ TEST(collector_add_warning) {
         shell_error_create(SHELL_OK, SHELL_SEVERITY_WARNING, loc, "warning");
     shell_error_collector_add(collector, warn);
 
-    // Warnings go to warning_count, not count
+    /// Warnings go to warning_count, not count
     ASSERT_EQ(collector->warning_count, 1, "Warning count should be 1");
     ASSERT_EQ(collector->count, 0,
               "Error count should be 0 (only warnings added)");
@@ -374,7 +374,7 @@ TEST(collector_get_line) {
 }
 
 TEST(collector_free_null) {
-    // Should not crash
+    /// Should not crash
     shell_error_collector_free(NULL);
 }
 
@@ -398,7 +398,7 @@ TEST(error_code_str_runtime) {
 TEST(error_category_parse) {
     const char *cat = shell_error_category(SHELL_ERR_UNEXPECTED_TOKEN);
     ASSERT_NOT_NULL(cat, "Category should not be NULL");
-    // Parse errors are in range 1000-1099
+    /// Parse errors are in range 1000-1099
     ASSERT(strlen(cat) > 0, "Category should have content");
 }
 
@@ -435,11 +435,11 @@ TEST(error_display_basic) {
                            loc, "unexpected token");
     shell_error_set_source_line(err, "echo hello world", 5, 10);
 
-    // Should not crash - redirect to /dev/null in practice
+    /// Should not crash - redirect to /dev/null in practice
     FILE *null_out = fopen("/dev/null", "w");
     if (null_out) {
         shell_error_display(err, null_out, false);
-        shell_error_display(err, null_out, true); // With color
+        shell_error_display(err, null_out, true); /// With color
         fclose(null_out);
     }
 
@@ -459,7 +459,7 @@ TEST(error_display_all) {
         SHELL_ERR_UNEXPECTED_EOF, SHELL_SEVERITY_WARNING, loc, "warning");
     shell_error_collector_add(collector, err2);
 
-    // Should not crash
+    /// Should not crash
     FILE *null_out = fopen("/dev/null", "w");
     if (null_out) {
         shell_error_display_all(collector, null_out, false);

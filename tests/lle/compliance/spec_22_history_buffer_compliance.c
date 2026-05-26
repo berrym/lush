@@ -24,15 +24,15 @@
  * Date: 2025-11-02
  */
 
-// API verified from include/lle/history_buffer_integration.h on 2025-11-02
-// API verified from include/lle/edit_cache.h on 2025-11-02
-// API verified from include/lle/edit_session_manager.h on 2025-11-02
-// API verified from include/lle/history_buffer_bridge.h on 2025-11-02
-// API verified from include/lle/command_structure.h on 2025-11-02
-// API verified from include/lle/structure_analyzer.h on 2025-11-02
-// API verified from include/lle/multiline_parser.h on 2025-11-02
-// API verified from include/lle/reconstruction_engine.h on 2025-11-02
-// API verified from include/lle/formatting_engine.h on 2025-11-02
+/// API verified from include/lle/history_buffer_integration.h on 2025-11-02
+/// API verified from include/lle/edit_cache.h on 2025-11-02
+/// API verified from include/lle/edit_session_manager.h on 2025-11-02
+/// API verified from include/lle/history_buffer_bridge.h on 2025-11-02
+/// API verified from include/lle/command_structure.h on 2025-11-02
+/// API verified from include/lle/structure_analyzer.h on 2025-11-02
+/// API verified from include/lle/multiline_parser.h on 2025-11-02
+/// API verified from include/lle/reconstruction_engine.h on 2025-11-02
+/// API verified from include/lle/formatting_engine.h on 2025-11-02
 
 /*
  * NOTE: This is a header-only compliance test that verifies API declarations
@@ -52,7 +52,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Test assertion counter
+/// Test assertion counter
 static int assertions_passed = 0;
 
 #define COMPLIANCE_ASSERT(condition, message)                                  \
@@ -76,11 +76,11 @@ int main(void) {
     printf("Phase 1: Core Infrastructure API\n");
     printf("---------------------------------\n");
 
-    // Opaque types
+    /// Opaque types
     COMPLIANCE_ASSERT(sizeof(lle_history_buffer_integration_t *) > 0,
                       "lle_history_buffer_integration_t opaque type defined");
 
-    // Structures from history_buffer_integration.h
+    /// Structures from history_buffer_integration.h
     COMPLIANCE_ASSERT(sizeof(lle_integration_config_t) > 0,
                       "lle_integration_config_t structure defined");
     COMPLIANCE_ASSERT(sizeof(lle_integration_state_t) > 0,
@@ -88,7 +88,7 @@ int main(void) {
     COMPLIANCE_ASSERT(sizeof(lle_history_edit_callbacks_t) > 0,
                       "lle_history_edit_callbacks_t structure defined");
 
-    // Phase 1 API functions
+    /// Phase 1 API functions
     COMPLIANCE_ASSERT(lle_history_buffer_integration_create != NULL,
                       "lle_history_buffer_integration_create declared");
     COMPLIANCE_ASSERT(lle_history_buffer_integration_destroy != NULL,
@@ -115,7 +115,7 @@ int main(void) {
     printf("Phase 2: Multiline Reconstruction Engine API\n");
     printf("---------------------------------------------\n");
 
-    // Command Structure API
+    /// Command Structure API
     COMPLIANCE_ASSERT(sizeof(lle_command_structure_t *) > 0,
                       "lle_command_structure_t opaque type defined");
     COMPLIANCE_ASSERT(lle_command_structure_create != NULL,
@@ -123,7 +123,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_command_structure_destroy != NULL,
                       "lle_command_structure_destroy declared");
 
-    // Structure Analyzer API
+    /// Structure Analyzer API
     COMPLIANCE_ASSERT(sizeof(lle_structure_analyzer_t *) > 0,
                       "lle_structure_analyzer_t opaque type defined");
     COMPLIANCE_ASSERT(lle_structure_analyzer_create != NULL,
@@ -133,7 +133,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_structure_analyzer_analyze != NULL,
                       "lle_structure_analyzer_analyze declared");
 
-    // Multiline Parser API
+    /// Multiline Parser API
     COMPLIANCE_ASSERT(sizeof(lle_multiline_parser_t *) > 0,
                       "lle_multiline_parser_t opaque type defined");
     COMPLIANCE_ASSERT(lle_multiline_parser_create != NULL,
@@ -143,7 +143,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_multiline_parser_parse != NULL,
                       "lle_multiline_parser_parse declared");
 
-    // Reconstruction Engine API
+    /// Reconstruction Engine API
     COMPLIANCE_ASSERT(sizeof(lle_reconstruction_engine_t *) > 0,
                       "lle_reconstruction_engine_t opaque type defined");
     COMPLIANCE_ASSERT(lle_reconstruction_engine_create != NULL,
@@ -153,7 +153,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_reconstruction_engine_reconstruct != NULL,
                       "lle_reconstruction_engine_reconstruct declared");
 
-    // Formatting Engine API
+    /// Formatting Engine API
     COMPLIANCE_ASSERT(sizeof(lle_formatting_engine_t *) > 0,
                       "lle_formatting_engine_t opaque type defined");
     COMPLIANCE_ASSERT(lle_formatting_engine_create != NULL,
@@ -173,7 +173,7 @@ int main(void) {
     printf("Phase 3: Interactive Editing System API\n");
     printf("----------------------------------------\n");
 
-    // Edit Session Manager API
+    /// Edit Session Manager API
     COMPLIANCE_ASSERT(sizeof(lle_edit_session_manager_t *) > 0,
                       "lle_edit_session_manager_t opaque type defined");
     COMPLIANCE_ASSERT(lle_edit_session_manager_create != NULL,
@@ -181,7 +181,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_edit_session_manager_destroy != NULL,
                       "lle_edit_session_manager_destroy declared");
 
-    // History-Buffer Bridge API
+    /// History-Buffer Bridge API
     COMPLIANCE_ASSERT(sizeof(lle_history_buffer_bridge_t *) > 0,
                       "lle_history_buffer_bridge_t opaque type defined");
     COMPLIANCE_ASSERT(lle_history_buffer_bridge_create != NULL,
@@ -189,7 +189,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_history_buffer_bridge_destroy != NULL,
                       "lle_history_buffer_bridge_destroy declared");
 
-    // Interactive editing functions from Phase 1
+    /// Interactive editing functions from Phase 1
     COMPLIANCE_ASSERT(lle_history_edit_entry != NULL,
                       "lle_history_edit_entry declared");
     COMPLIANCE_ASSERT(lle_history_session_complete != NULL,
@@ -207,7 +207,7 @@ int main(void) {
     printf("Phase 4: Performance Optimization API\n");
     printf("--------------------------------------\n");
 
-    // Edit Cache API
+    /// Edit Cache API
     COMPLIANCE_ASSERT(sizeof(lle_edit_cache_t *) > 0,
                       "lle_edit_cache_t opaque type defined");
     COMPLIANCE_ASSERT(sizeof(lle_edit_cache_stats_t) > 0,
@@ -223,7 +223,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_edit_cache_get_stats != NULL,
                       "lle_edit_cache_get_stats declared");
 
-    // Integration Cache Management API
+    /// Integration Cache Management API
     COMPLIANCE_ASSERT(
         lle_history_buffer_integration_get_cache_stats != NULL,
         "lle_history_buffer_integration_get_cache_stats declared");

@@ -52,11 +52,11 @@ char *rebuild_prompt(void) { return build_prompt(); }
 void lle_shell_update_prompt(void) { /* No-op in tests */ }
 
 const char *lle_shell_get_rendered_prompt(void) {
-    return "$ "; // Default prompt in tests
+    return "$ "; /// Default prompt in tests
 }
 
 const char *lle_shell_get_rendered_rprompt(void) {
-    return ""; // No right prompt in tests
+    return ""; /// No right prompt in tests
 }
 
 /* Note: lush_generate_prompt() is now in libdisplay.a via
@@ -78,13 +78,13 @@ void continuation_state_init(continuation_state_t *state) {
 }
 
 void continuation_state_cleanup(continuation_state_t *state) {
-    (void)state; // No-op
+    (void)state; /// No-op
 }
 
 void continuation_analyze_line(const char *line, continuation_state_t *state) {
     (void)line;
     (void)state;
-    // No-op - line is complete
+    /// No-op - line is complete
 }
 
 const char *continuation_get_prompt(const continuation_state_t *state) {
@@ -102,11 +102,11 @@ void lush_autosuggestions_init(void) { /* No-op */ }
 
 char *lush_get_suggestion(const char *prefix) {
     (void)prefix;
-    return NULL; // No suggestions in tests
+    return NULL; /// No suggestions in tests
 }
 
 void lush_free_autosuggestion(char *suggestion) {
-    (void)suggestion; // No-op - our stubs don't allocate
+    (void)suggestion; /// No-op - our stubs don't allocate
 }
 
 /* ============================================================================
@@ -116,7 +116,7 @@ void lush_free_autosuggestion(char *suggestion) {
 
 char *symtable_get_global(const char *name) {
     (void)name;
-    return NULL; // No variables in tests
+    return NULL; /// No variables in tests
 }
 
 /* ============================================================================
@@ -124,12 +124,12 @@ char *symtable_get_global(const char *name) {
  * ============================================================================
  */
 
-// Global aliases hash table - NULL means no aliases defined
+/// Global aliases hash table - NULL means no aliases defined
 ht_strstr_t *aliases = NULL;
 
 const char *lookup_alias(const char *name) {
     (void)name;
-    return NULL; // No aliases in tests
+    return NULL; /// No aliases in tests
 }
 
 /* ============================================================================
@@ -137,15 +137,15 @@ const char *lookup_alias(const char *name) {
  * ============================================================================
  */
 
-// Empty builtins array for tests
+/// Empty builtins array for tests
 builtin builtins[] = {
-    {NULL, NULL, NULL}  // Terminator
+    {NULL, NULL, NULL}  /// Terminator
 };
 const size_t builtins_count = 0;
 
 bool is_builtin(const char *name) {
     (void)name;
-    return false; // No builtins recognized in tests
+    return false; /// No builtins recognized in tests
 }
 
 /* ============================================================================
@@ -154,7 +154,7 @@ bool is_builtin(const char *name) {
  */
 
 bool is_interactive_shell(void) {
-    return false; // Tests run non-interactively
+    return false; /// Tests run non-interactively
 }
 
 /* ============================================================================
@@ -162,7 +162,7 @@ bool is_interactive_shell(void) {
  * ============================================================================
  */
 
-// Note: fuzzy_levenshtein_distance is provided by libfuzzy.a
+/// Note: fuzzy_levenshtein_distance is provided by libfuzzy.a
 
 /* ============================================================================
  * Executor Functions (for job count in prompt context)
@@ -174,16 +174,16 @@ bool is_interactive_shell(void) {
 #include <stdlib.h>
 #include <string.h>
 
-// Mock executor for tests - no jobs
+/// Mock executor for tests - no jobs
 executor_t *current_executor = NULL;
 
 void executor_update_job_status(executor_t *executor) {
-    (void)executor; // No-op in tests
+    (void)executor; /// No-op in tests
 }
 
 int executor_count_jobs(executor_t *executor) {
     (void)executor;
-    return 0; // No jobs in tests
+    return 0; /// No jobs in tests
 }
 
 /* The completion analyzer's resolution layer references these
@@ -194,7 +194,7 @@ int executor_count_jobs(executor_t *executor) {
 char *expand_if_needed(executor_t *executor, const char *text) {
     (void)executor;
     (void)text;
-    return NULL; // No expansion available in tests.
+    return NULL; /// No expansion available in tests.
 }
 
 char **expand_brace_pattern(const char *pattern, int *expanded_count) {
@@ -224,7 +224,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
 }
 
 executor_t *get_global_executor(void) {
-    return NULL; // No executor in tests
+    return NULL; /// No executor in tests
 }
 
 /* ============================================================================
@@ -232,7 +232,7 @@ executor_t *get_global_executor(void) {
  * ============================================================================
  */
 
-// SSH host cache type stub
+/// SSH host cache type stub
 typedef struct ssh_host_cache {
     void *hosts;
     size_t count;
@@ -240,7 +240,7 @@ typedef struct ssh_host_cache {
 } ssh_host_cache_t;
 
 ssh_host_cache_t *get_ssh_host_cache(void) {
-    return NULL; // No SSH hosts in tests
+    return NULL; /// No SSH hosts in tests
 }
 
 /* ============================================================================

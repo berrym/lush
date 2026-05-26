@@ -38,9 +38,9 @@
 #include <string.h>
 #include <time.h>
 
-// Test counters
+/// Test counters
 
-// Category counters for summary
+/// Category counters for summary
 static int category_tests = 0;
 static int category_passed = 0;
 
@@ -53,7 +53,7 @@ static void print_category_summary(const char *name) {
     printf("  [%s: %d/%d passed]\n\n", name, category_passed, category_tests);
 }
 
-// Test framework macros
+/// Test framework macros
 
 /**
  * Assert that parsing the given input produces an error.
@@ -151,9 +151,9 @@ TEST(if_no_then_no_fi) { ASSERT_PARSE_FAILS("if true; echo yes"); }
 TEST(for_no_done) { ASSERT_PARSE_FAILS("for x in a b; do echo $x"); }
 
 TEST(for_no_do_no_done) {
-    // Lush accepts zsh's short `for NAME in WORDS<sep> sublist` form, so
-    // omitting `do`/`done` for `for` is no longer an error. `while` retains
-    // the strict-syntax requirement.
+    /// Lush accepts zsh's short `for NAME in WORDS<sep> sublist` form, so
+    /// omitting `do`/`done` for `for` is no longer an error. `while` retains
+    /// the strict-syntax requirement.
     ASSERT_PARSE_FAILS("while true; echo yes");
 }
 
@@ -183,7 +183,7 @@ TEST(elif_missing_then) {
 }
 
 TEST(for_missing_do) {
-    // See for_no_do_no_done: zsh short form is accepted; substitute `while`.
+    /// See for_no_do_no_done: zsh short form is accepted; substitute `while`.
     ASSERT_PARSE_FAILS("while true; echo yes; done");
 }
 
@@ -204,7 +204,7 @@ TEST(case_missing_in) { ASSERT_PARSE_FAILS("case x a) echo a;; esac"); }
 TEST(case_missing_paren) { ASSERT_PARSE_FAILS("case x in a echo a;; esac"); }
 
 TEST(case_missing_double_semi) {
-    // Note: single ;; is required between case arms
+    /// Note: single ;; is required between case arms
     ASSERT_PARSE_FAILS("case x in a) echo a b) echo b;; esac");
 }
 
@@ -278,7 +278,7 @@ TEST(redirect_append_no_target) { ASSERT_PARSE_FAILS("echo hello >>"); }
 TEST(redirect_fd_no_target) { ASSERT_PARSE_FAILS("cmd 2>"); }
 
 TEST(redirect_double_target) {
-    // Two targets without space between them - may parse as single word
+    /// Two targets without space between them - may parse as single word
     ASSERT_PARSE_FAILS("echo > > file");
 }
 
@@ -287,7 +287,7 @@ TEST(redirect_heredoc_no_delimiter) { ASSERT_PARSE_FAILS("cat <<"); }
 TEST(redirect_herestring_no_content) { ASSERT_PARSE_FAILS("cat <<<"); }
 
 TEST(redirect_invalid_fd) {
-    // Very large fd number - implementation dependent
+    /// Very large fd number - implementation dependent
     ASSERT_PARSE_FAILS("echo hello 999999999999999999999>");
 }
 
@@ -309,7 +309,7 @@ TEST(redirect_fd_dup_invalid) { ASSERT_PARSE_FAILS("echo hello 2>&"); }
 /* NOTE: variable_invalid_name (123=value) - parsed as a command word, not
  * recognized as assignment at parse time. Error at execution. */
 
-// NOTE: variable_invalid_char_in_name (foo-bar=value) - same as above
+/// NOTE: variable_invalid_char_in_name (foo-bar=value) - same as above
 
 TEST(variable_empty_name) {
     /* "=value" with nothing before = is structurally ambiguous but typically
@@ -348,7 +348,7 @@ TEST(function_keyword_no_body) { ASSERT_PARSE_FAILS("function foo"); }
 TEST(function_keyword_no_name) { ASSERT_PARSE_FAILS("function { echo x; }"); }
 
 TEST(function_reserved_name_if) {
-    // Using reserved word as function name
+    /// Using reserved word as function name
     ASSERT_PARSE_FAILS("if() { echo x; }");
 }
 
@@ -378,7 +378,7 @@ TEST(case_trailing_pipe_in_pattern) {
 }
 
 TEST(case_leading_pipe_in_pattern) {
-    // Leading pipe is allowed in some shells, but pattern itself empty
+    /// Leading pipe is allowed in some shells, but pattern itself empty
     ASSERT_PARSE_FAILS("case x in |) echo x;; esac");
 }
 
@@ -434,7 +434,7 @@ TEST(proc_sub_out_unclosed) { ASSERT_PARSE_FAILS("tee >(cat"); }
 
 TEST(array_unclosed) { ASSERT_PARSE_FAILS("arr=(a b c"); }
 
-// NOTE: array_index_unclosed - validated at expansion time, not parse time
+/// NOTE: array_index_unclosed - validated at expansion time, not parse time
 
 /* `arr(a b c)` used to be a parse error -- the parser inferred the
  * user meant `arr=(a b c)` and bailed. With the typed-function form,
@@ -452,7 +452,7 @@ TEST(array_unclosed) { ASSERT_PARSE_FAILS("arr=(a b c"); }
 TEST(heredoc_no_delimiter) { ASSERT_PARSE_FAILS("cat <<"); }
 
 TEST(heredoc_invalid_delimiter) {
-    // Delimiter with special characters - may be implementation dependent
+    /// Delimiter with special characters - may be implementation dependent
     ASSERT_PARSE_FAILS("cat << <<");
 }
 
@@ -465,12 +465,12 @@ TEST(heredoc_invalid_delimiter) {
 TEST(heredoc_unclosed_plain) { ASSERT_PARSE_FAILS("cat <<EOF\nbody line\n"); }
 
 TEST(heredoc_unclosed_strip) {
-    // <<- variant (tab-stripping form)
+    /// <<- variant (tab-stripping form)
     ASSERT_PARSE_FAILS("cat <<-EOF\n\tbody line\n");
 }
 
 TEST(heredoc_unclosed_quoted_delim) {
-    // Quoted delimiter (no expansion) — same diagnostic should apply
+    /// Quoted delimiter (no expansion) — same diagnostic should apply
     ASSERT_PARSE_FAILS("cat <<'EOF'\nbody line\n");
 }
 
@@ -511,7 +511,7 @@ TEST(nested_unclosed_structures) {
  */
 
 TEST(only_semicolons) {
-    // Multiple semicolons with nothing between
+    /// Multiple semicolons with nothing between
     ASSERT_PARSE_FAILS(";;;");
 }
 
@@ -529,10 +529,10 @@ TEST(alternating_unclosed) { ASSERT_PARSE_FAILS("({({({"); }
  * stack overflow without the depth limit.
  */
 TEST(recursion_depth_limit) {
-    // Generate deeply nested subshells: ((( ... )))
-    // PARSER_MAX_RECURSION_DEPTH is 256, so we need more than that
+    /// Generate deeply nested subshells: ((( ... )))
+    /// PARSER_MAX_RECURSION_DEPTH is 256, so we need more than that
     const int depth = 300;
-    size_t len = depth * 2 + 10; // ( * depth + echo + ) * depth
+    size_t len = depth * 2 + 10; /// ( * depth + echo + ) * depth
     char *input = malloc(len);
     if (!input)
         return;
@@ -550,7 +550,7 @@ TEST(recursion_depth_limit) {
     }
     *p = '\0';
 
-    // This should fail due to depth limit, not parse successfully
+    /// This should fail due to depth limit, not parse successfully
     parser_t *parser = parser_new(input);
     if (!parser) {
         free(input);
@@ -568,7 +568,7 @@ TEST(recursion_depth_limit) {
                       depth);
     }
 
-    // Success - parser correctly rejected deeply nested input
+    /// Success - parser correctly rejected deeply nested input
     if (ast)
         free_node_tree(ast);
     parser_free(parser);
@@ -576,7 +576,7 @@ TEST(recursion_depth_limit) {
 }
 
 TEST(control_chars_in_input) {
-    // Control characters in command
+    /// Control characters in command
     ASSERT_PARSE_FAILS("echo \x01\x02\x03");
 }
 
@@ -678,11 +678,11 @@ int main(void) {
     reset_category();
     RUN_TEST(unclosed_subshell);
     RUN_TEST(unclosed_brace_group);
-    // unclosed_variable_brace - expansion time check
+    /// unclosed_variable_brace - expansion time check
     RUN_TEST(unclosed_arithmetic_paren);
     RUN_TEST(unclosed_arithmetic_double);
     RUN_TEST(unclosed_extended_test);
-    // unclosed_array_bracket - expansion time check
+    /// unclosed_array_bracket - expansion time check
     RUN_TEST(extra_close_paren);
     RUN_TEST(extra_close_brace);
     RUN_TEST(mismatched_paren_brace);
@@ -743,7 +743,7 @@ int main(void) {
     RUN_TEST(trailing_pipe);
     RUN_TEST(trailing_and_and);
     RUN_TEST(trailing_or_or);
-    // double_semicolon_outside_case - lush accepts this
+    /// double_semicolon_outside_case - lush accepts this
     RUN_TEST(bare_ampersand_ampersand);
     print_category_summary("Invalid Operators");
 
@@ -763,19 +763,19 @@ int main(void) {
 
     printf("Invalid Variable Syntax:\n");
     reset_category();
-    // variable_invalid_name - execution time check
-    // variable_invalid_char_in_name - execution time check
+    /// variable_invalid_name - execution time check
+    /// variable_invalid_char_in_name - execution time check
     RUN_TEST(variable_empty_name);
-    // variable_brace_no_name - expansion time check
-    // variable_brace_invalid_operator - expansion time check
-    // arithmetic errors - arithmetic evaluator checks
+    /// variable_brace_no_name - expansion time check
+    /// variable_brace_invalid_operator - expansion time check
+    /// arithmetic errors - arithmetic evaluator checks
     print_category_summary("Invalid Variables");
 
     printf("Invalid Function Syntax:\n");
     reset_category();
-    // function_no_body removed -- `foo()` is now valid grammar for a
-    // bare typed-fn call; see the note above its old TEST() declaration.
-    // function_invalid_name - lush accepts numeric function names
+    /// function_no_body removed -- `foo()` is now valid grammar for a
+    /// bare typed-fn call; see the note above its old TEST() declaration.
+    /// function_invalid_name - lush accepts numeric function names
     RUN_TEST(function_missing_paren);
     RUN_TEST(function_extra_paren);
     RUN_TEST(function_keyword_no_body);
@@ -789,7 +789,7 @@ int main(void) {
     reset_category();
     RUN_TEST(case_empty_pattern);
     RUN_TEST(case_pattern_no_close_paren);
-    // case_double_pattern_no_pipe - ambiguous parsing
+    /// case_double_pattern_no_pipe - ambiguous parsing
     RUN_TEST(case_trailing_pipe_in_pattern);
     RUN_TEST(case_leading_pipe_in_pattern);
     print_category_summary("Invalid Case");
@@ -797,34 +797,34 @@ int main(void) {
     printf("Invalid Extended Test:\n");
     reset_category();
     RUN_TEST(extended_test_unclosed);
-    // extended_test_single_bracket_and - [ ] is a command, complex to detect
+    /// extended_test_single_bracket_and - [ ] is a command, complex to detect
     RUN_TEST(extended_test_unbalanced_parens);
-    // extended_test_double_operator - semantic check
-    // extended_test_missing_operand - semantic check
-    // extended_test_trailing_and - semantic check
+    /// extended_test_double_operator - semantic check
+    /// extended_test_missing_operand - semantic check
+    /// extended_test_trailing_and - semantic check
     print_category_summary("Invalid [[]]");
 
     printf("Invalid Arithmetic Command:\n");
     reset_category();
     RUN_TEST(arith_cmd_unclosed);
     RUN_TEST(arith_cmd_extra_close);
-    // arith_cmd_empty - (( )) is valid (evaluates to false)
+    /// arith_cmd_empty - (( )) is valid (evaluates to false)
     print_category_summary("Invalid (())");
 
     printf("Invalid Process Substitution:\n");
     reset_category();
     RUN_TEST(proc_sub_in_unclosed);
     RUN_TEST(proc_sub_out_unclosed);
-    // proc_sub_empty - <() is valid (empty process)
+    /// proc_sub_empty - <() is valid (empty process)
     print_category_summary("Invalid Proc Sub");
 
     printf("Invalid Array Syntax:\n");
     reset_category();
     RUN_TEST(array_unclosed);
-    // array_index_unclosed - expansion time check
-    // array_no_equals removed -- `arr(a b c)` is now valid grammar
-    // for a bare typed-fn call; see the note above its old TEST()
-    // declaration.
+    /// array_index_unclosed - expansion time check
+    /// array_no_equals removed -- `arr(a b c)` is now valid grammar
+    /// for a bare typed-fn call; see the note above its old TEST()
+    /// declaration.
     print_category_summary("Invalid Arrays");
 
     printf("Invalid Heredoc Syntax:\n");
@@ -843,7 +843,7 @@ int main(void) {
     RUN_TEST(pipe_from_keyword);
     RUN_TEST(semicolon_after_pipe);
     RUN_TEST(and_after_pipe);
-    // brace_group_no_semicolon - "hello}" parses as word
+    /// brace_group_no_semicolon - "hello}" parses as word
     RUN_TEST(empty_command_in_pipe);
     RUN_TEST(empty_command_in_and);
     RUN_TEST(nested_unclosed_structures);

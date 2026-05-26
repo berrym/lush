@@ -60,7 +60,7 @@ TEST(is_declared_safe_on_null) {
 
 TEST(clear_is_idempotent) {
     autoload_clear();
-    autoload_clear(); // must not crash on already-empty
+    autoload_clear(); /// must not crash on already-empty
     ASSERT(!autoload_is_declared("anything"), "still empty");
 }
 
@@ -111,7 +111,7 @@ TEST(resolve_via_fpath_defines_function) {
 
     executor_free(executor);
 
-    // Cleanup
+    /// Cleanup
     unlink(tmp_func);
     rmdir(tmp_dir);
     if (old_fpath[0]) {
@@ -151,8 +151,8 @@ TEST(resolve_rejects_path_traversal) {
     autoload_clear();
     executor_t *executor = executor_new();
     ASSERT(executor != NULL, "executor_new");
-    // Name containing `/` would otherwise let an attacker reach
-    // arbitrary paths via FPATH+name composition.
+    /// Name containing `/` would otherwise let an attacker reach
+    /// arbitrary paths via FPATH+name composition.
     ASSERT(autoload_register("../etc/passwd"),
            "register pretends to accept the name");
     ASSERT(!autoload_try_resolve(executor, "../etc/passwd"),

@@ -27,7 +27,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================================
  * HELPER FUNCTIONS
@@ -211,7 +211,7 @@ TEST(bin_test_double_negation) {
 }
 
 TEST(bin_test_file_exists) {
-    // Test -e on a file that exists
+    /// Test -e on a file that exists
     char *argv[] = {"test", "-e", "/tmp", NULL};
     int result = bin_test(3, argv);
     ASSERT_EQ(result, 0, "test -e /tmp should be true");
@@ -230,7 +230,7 @@ TEST(bin_test_directory) {
 }
 
 TEST(bin_test_regular_file) {
-    // Test on /etc/passwd which should exist as regular file
+    /// Test on /etc/passwd which should exist as regular file
     char *argv[] = {"test", "-f", "/etc/passwd", NULL};
     int result = bin_test(3, argv);
     ASSERT_EQ(result, 0, "test -f /etc/passwd should be true");
@@ -243,14 +243,14 @@ TEST(bin_test_readable) {
 }
 
 TEST(bin_test_bracket_form) {
-    // Test [ ... ] form
+    /// Test [ ... ] form
     char *argv[] = {"[", "hello", "]", NULL};
     int result = bin_test(3, argv);
     ASSERT_EQ(result, 0, "[ hello ] should be true");
 }
 
 TEST(bin_test_bracket_missing_close) {
-    // Test [ ... without ] should error
+    /// Test [ ... without ] should error
     char *argv[] = {"[", "hello", NULL};
     int result = bin_test(2, argv);
     ASSERT_EQ(result, 2, "[ without ] should return error status 2");
@@ -300,14 +300,14 @@ TEST(cd_to_tmp) {
     int status = executor_execute_command_line(exec, "cd /tmp", 1);
     ASSERT_EQ(status, 0, "cd /tmp should succeed");
 
-    // Verify we're in /tmp
+    /// Verify we're in /tmp
     char *current = getcwd(NULL, 0);
     ASSERT_NOT_NULL(current, "getcwd should work");
-    // /tmp might be a symlink to /private/tmp on macOS
+    /// /tmp might be a symlink to /private/tmp on macOS
     ASSERT(strstr(current, "tmp") != NULL, "Should be in tmp directory");
     free(current);
 
-    // Return to original directory
+    /// Return to original directory
     ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
     free(original_dir);
 
@@ -324,7 +324,7 @@ TEST(cd_to_home) {
         ASSERT_EQ(status, 0, "cd with no args should succeed");
     }
 
-    // Return to original directory
+    /// Return to original directory
     ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
     free(original_dir);
 
@@ -345,20 +345,20 @@ TEST(cd_dash_oldpwd) {
     executor_t *exec = setup_executor();
     char *original_dir = getcwd(NULL, 0);
 
-    // Go to /tmp first, then to /var - this sets OLDPWD to /tmp
+    /// Go to /tmp first, then to /var - this sets OLDPWD to /tmp
     executor_execute_command_line(exec, "cd /tmp", 1);
     executor_execute_command_line(exec, "cd /var", 1);
 
-    // Now cd - should go back to /tmp
+    /// Now cd - should go back to /tmp
     int status = executor_execute_command_line(exec, "cd -", 1);
     ASSERT_EQ(status, 0, "cd - should succeed");
 
-    // Verify we're back in tmp (might be /private/tmp on macOS)
+    /// Verify we're back in tmp (might be /private/tmp on macOS)
     char *current = getcwd(NULL, 0);
     ASSERT(strstr(current, "tmp") != NULL, "cd - should go to OLDPWD");
     free(current);
 
-    // Restore
+    /// Restore
     ASSERT_EQ(chdir(original_dir), 0, "restore original cwd");
     free(original_dir);
 
@@ -377,7 +377,7 @@ TEST(export_new_variable) {
         executor_execute_command_line(exec, "export TESTVAR=testvalue", 1);
     ASSERT_EQ(status, 0, "export TESTVAR=testvalue should succeed");
 
-    // Check that the variable is set
+    /// Check that the variable is set
     char *value = symtable_get_var(exec->symtable, "TESTVAR");
     ASSERT_NOT_NULL(value, "TESTVAR should be set");
     ASSERT_STR_EQ(value, "testvalue", "TESTVAR should have correct value");
@@ -389,14 +389,14 @@ TEST(export_new_variable) {
 TEST(export_existing_variable) {
     executor_t *exec = setup_executor();
 
-    // First set the variable
+    /// First set the variable
     executor_execute_command_line(exec, "MYEXPORT=myvalue", 1);
 
-    // Then export it
+    /// Then export it
     int status = executor_execute_command_line(exec, "export MYEXPORT", 1);
     ASSERT_EQ(status, 0, "export existing variable should succeed");
 
-    // Verify it's still set correctly
+    /// Verify it's still set correctly
     char *value = symtable_get_var(exec->symtable, "MYEXPORT");
     ASSERT_NOT_NULL(value, "MYEXPORT should be set");
     ASSERT_STR_EQ(value, "myvalue", "MYEXPORT should retain value");
@@ -408,7 +408,7 @@ TEST(export_existing_variable) {
 TEST(export_invalid_identifier) {
     executor_t *exec = setup_executor();
 
-    // Invalid variable name starting with digit
+    /// Invalid variable name starting with digit
     int status =
         executor_execute_command_line(exec, "export 1INVALID=value", 1);
     ASSERT_EQ(status, 1, "export with invalid identifier should fail");
@@ -424,19 +424,19 @@ TEST(export_invalid_identifier) {
 TEST(unset_variable) {
     executor_t *exec = setup_executor();
 
-    // Set a variable
+    /// Set a variable
     executor_execute_command_line(exec, "TOBEDELETED=value", 1);
 
-    // Verify it exists
+    /// Verify it exists
     char *value = symtable_get_var(exec->symtable, "TOBEDELETED");
     ASSERT_NOT_NULL(value, "Variable should be set initially");
     free(value);
 
-    // Unset it
+    /// Unset it
     int status = executor_execute_command_line(exec, "unset TOBEDELETED", 1);
     ASSERT_EQ(status, 0, "unset should succeed");
 
-    // Verify it's gone
+    /// Verify it's gone
     value = symtable_get_var(exec->symtable, "TOBEDELETED");
     ASSERT_NULL(value, "Variable should be unset");
 
@@ -642,7 +642,7 @@ TEST(shift_default) {
 TEST(shift_explicit_count) {
     executor_t *exec = setup_executor();
 
-    // Set up five positional params, then shift by 2.
+    /// Set up five positional params, then shift by 2.
     executor_execute_command_line(exec, "set -- a b c d e", 1);
     int status = executor_execute_command_line(exec, "shift 2", 1);
     ASSERT_EQ(status, 0, "shift 2 should succeed");
@@ -679,7 +679,7 @@ TEST(shift_invalid_arg) {
 TEST(return_outside_function) {
     executor_t *exec = setup_executor();
 
-    // return outside function should fail
+    /// return outside function should fail
     int status = executor_execute_command_line(exec, "return", 1);
     ASSERT_EQ(status, 1, "return outside function should fail");
 
@@ -689,7 +689,7 @@ TEST(return_outside_function) {
 TEST(return_in_function) {
     executor_t *exec = setup_executor();
 
-    // Define and call function with return
+    /// Define and call function with return
     executor_execute_command_line(exec, "testfunc() { return 5; }", 1);
     int status = executor_execute_command_line(exec, "testfunc", 1);
     ASSERT_EQ(status, 5, "Function should return 5");
@@ -700,7 +700,7 @@ TEST(return_in_function) {
 TEST(return_default_status) {
     executor_t *exec = setup_executor();
 
-    // Function with return (no value) should use last exit status
+    /// Function with return (no value) should use last exit status
     executor_execute_command_line(exec, "testfunc2() { true; return; }", 1);
     int status = executor_execute_command_line(exec, "testfunc2", 1);
     ASSERT_EQ(status, 0,
@@ -735,7 +735,7 @@ TEST(continue_outside_loop) {
 TEST(break_in_loop) {
     executor_t *exec = setup_executor();
 
-    // Loop with break should exit early
+    /// Loop with break should exit early
     int status = executor_execute_command_line(
         exec, "for i in 1 2 3; do if [ $i -eq 2 ]; then break; fi; done", 1);
     ASSERT_EQ(status, 0, "for loop with break should succeed");
@@ -746,7 +746,7 @@ TEST(break_in_loop) {
 TEST(continue_in_loop) {
     executor_t *exec = setup_executor();
 
-    // Loop with continue should skip to next iteration
+    /// Loop with continue should skip to next iteration
     int status = executor_execute_command_line(
         exec, "for i in 1 2 3; do if [ $i -eq 2 ]; then continue; fi; done", 1);
     ASSERT_EQ(status, 0, "for loop with continue should succeed");
@@ -776,9 +776,9 @@ TEST(declare_variable) {
 TEST(local_outside_function) {
     executor_t *exec = setup_executor();
 
-    // local outside function might succeed but has no effect
+    /// local outside function might succeed but has no effect
     int status = executor_execute_command_line(exec, "local LOCALVAR=test", 1);
-    // Some shells return error, some succeed - just verify it runs
+    /// Some shells return error, some succeed - just verify it runs
     (void)status;
 
     teardown_executor(exec);
@@ -787,7 +787,7 @@ TEST(local_outside_function) {
 TEST(local_in_function) {
     executor_t *exec = setup_executor();
 
-    // Define function with local variable
+    /// Define function with local variable
     executor_execute_command_line(
         exec, "testlocal() { local X=inside; echo $X; }", 1);
     int status = executor_execute_command_line(exec, "testlocal", 1);
@@ -827,7 +827,7 @@ TEST(readonly_prevents_modification) {
 
     executor_execute_command_line(exec, "readonly ROVAR2=original", 1);
 
-    // For now, just verify readonly command works - enforcement is TODO
+    /// For now, just verify readonly command works - enforcement is TODO
     char *value = symtable_get_var(exec->symtable, "ROVAR2");
     ASSERT_NOT_NULL(value, "ROVAR2 should be set");
     ASSERT_STR_EQ(value, "original", "ROVAR2 should have initial value");
@@ -853,7 +853,7 @@ TEST(command_runs_external) {
 TEST(command_bypasses_alias) {
     executor_t *exec = setup_executor();
 
-    // Even if 'ls' were aliased, command ls should run the real ls
+    /// Even if 'ls' were aliased, command ls should run the real ls
     int status = executor_execute_command_line(exec, "command ls /tmp", 1);
     ASSERT_EQ(status, 0, "command ls should succeed");
 
@@ -877,7 +877,7 @@ TEST(alias_definition) {
 TEST(alias_list) {
     executor_t *exec = setup_executor();
 
-    // alias with no args should list aliases
+    /// alias with no args should list aliases
     int status = executor_execute_command_line(exec, "alias", 1);
     ASSERT_EQ(status, 0, "alias list should succeed");
 
@@ -903,7 +903,7 @@ TEST(hash_list) {
     executor_t *exec = setup_executor();
 
     int status = executor_execute_command_line(exec, "hash", 1);
-    // hash with no commands may return 0 or 1 depending on state
+    /// hash with no commands may return 0 or 1 depending on state
     (void)status;
 
     teardown_executor(exec);
@@ -912,7 +912,7 @@ TEST(hash_list) {
 TEST(hash_command) {
     executor_t *exec = setup_executor();
 
-    // Hash ls to remember its location
+    /// Hash ls to remember its location
     int status = executor_execute_command_line(exec, "hash ls", 1);
     ASSERT_EQ(status, 0, "hash ls should succeed");
 
@@ -945,14 +945,14 @@ TEST(umask_display) {
 TEST(umask_set) {
     executor_t *exec = setup_executor();
 
-    // Save current umask
+    /// Save current umask
     mode_t old_mask = umask(0);
     umask(old_mask);
 
     int status = executor_execute_command_line(exec, "umask 022", 1);
     ASSERT_EQ(status, 0, "umask 022 should succeed");
 
-    // Restore
+    /// Restore
     umask(old_mask);
 
     teardown_executor(exec);
@@ -1142,7 +1142,7 @@ TEST(bin_mode_show_succeeds) {
 
 TEST(bin_mode_reset_drops_overrides) {
     apply_mode_preset(SHELL_MODE_LUSH);
-    // Apply a per-feature override that --reset should drop.
+    /// Apply a per-feature override that --reset should drop.
     shell_feature_disable(FEATURE_INDEXED_ARRAYS);
     ASSERT_TRUE(shell_feature_is_overridden(FEATURE_INDEXED_ARRAYS),
                 "override should be set before --reset");
@@ -1162,10 +1162,10 @@ TEST(bin_mode_reset_drops_overrides) {
 int main(void) {
     printf("=== Builtin Command Tests ===\n\n");
 
-    // Initialize global symbol table - required for executor_new()
+    /// Initialize global symbol table - required for executor_new()
     init_symtable();
 
-    // Initialize alias system
+    /// Initialize alias system
     init_aliases();
 
     printf("--- true/false Tests ---\n");

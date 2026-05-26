@@ -204,7 +204,7 @@ TEST(breakpoint_silent_at_unreached_line) {
     ASSERT_NOT_NULL(exec, "executor_new");
     ASSERT_NOT_NULL(ctx, "debug_ctx_new_captured");
 
-    // Line 99 is never reached by a three-line script.
+    /// Line 99 is never reached by a three-line script.
     int id = debug_add_breakpoint(ctx, "gate.sh", 99, NULL);
     ASSERT_TRUE(id >= 0, "breakpoint added");
 
@@ -281,7 +281,7 @@ TEST(multiple_breakpoints_fire_independently) {
     executor_free(exec);
 }
 
-// Hit counts persist across runs that share a context.
+/// Hit counts persist across runs that share a context.
 TEST(breakpoint_hit_count_accumulates) {
     executor_t *exec = executor_new();
     debug_context_t *ctx = debug_ctx_new_captured();
@@ -436,7 +436,7 @@ TEST(debug_stack_marks_typed_fn_frame_as_lexical) {
 int main(void) {
     printf("\n=== Debugger Integration Gate ===\n\n");
 
-    // Initialize the global symbol table -- executor_new() needs it.
+    /// Initialize the global symbol table -- executor_new() needs it.
     init_symtable();
 
     printf("Breakpoint firing during execution:\n");

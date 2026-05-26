@@ -74,7 +74,7 @@ TEST(echo_escaped_keyword_treated_as_word) {
  */
 
 TEST(echo_double_quoted_string_with_space) {
-    // The canonical "filename with spaces" idiom must not split.
+    /// The canonical "filename with spaces" idiom must not split.
     run_result_t r = run_shell("echo \"a test file.txt\"");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "a test file.txt\n");
@@ -87,7 +87,7 @@ TEST(echo_double_quoted_string_expands_variables) {
 }
 
 TEST(echo_double_quoted_backslash_escapes_dollar) {
-    // Inside "..." the backslash escapes only $, `, \, ".
+    /// Inside "..." the backslash escapes only $, `, \, ".
     run_result_t r = run_shell("X=foo; echo \"\\$X is $X\"");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "$X is foo\n");
@@ -142,7 +142,7 @@ TEST(rm_filename_with_space_via_backslash_escape) {
                          "rmdir \"$DIR\"";
     run_result_t r = run_shell_subprocess(script);
     ASSERT_EXIT_STATUS(r, 0);
-    // ls of an empty directory produces no stdout.
+    /// ls of an empty directory produces no stdout.
     ASSERT_STDOUT_EQ(r, "");
 }
 

@@ -31,7 +31,7 @@ TEST(signature_database) {
     TEST_ASSERT(count > 0, "Database has entries");
     TEST_ASSERT(count >= 10, "Database has at least 10 known terminals");
 
-    // Check for key terminals
+    /// Check for key terminals
     bool found_zed = false;
     bool found_vscode = false;
     bool found_iterm2 = false;
@@ -73,17 +73,17 @@ TEST(basic_detection) {
                     "Detection time is recorded");
         TEST_ASSERT(result->detection_time_us < 10000, "Detection time < 10ms");
 
-        // TTY status should be set
+        /// TTY status should be set
         printf("    stdin_is_tty: %d, stdout_is_tty: %d\n",
                result->stdin_is_tty, result->stdout_is_tty);
 
-        // Mode should be valid
+        /// Mode should be valid
         TEST_ASSERT(result->recommended_mode >= LLE_ADAPTIVE_MODE_NONE &&
                         result->recommended_mode <=
                             LLE_ADAPTIVE_MODE_MULTIPLEXED,
                     "Recommended mode is valid");
 
-        // Capability level should be valid
+        /// Capability level should be valid
         TEST_ASSERT(result->capability_level >= LLE_CAPABILITY_NONE &&
                         result->capability_level <= LLE_CAPABILITY_PREMIUM,
                     "Capability level is valid");
@@ -99,14 +99,14 @@ TEST(basic_detection) {
 TEST(optimized_detection) {
     printf("\nOptimized Detection Tests:\n");
 
-    // First call - should be cache miss
+    /// First call - should be cache miss
     lle_terminal_detection_result_t *result1 = NULL;
     lle_result_t res1 = lle_detect_terminal_capabilities_optimized(&result1);
 
     TEST_ASSERT(res1 == LLE_SUCCESS, "Optimized detection succeeds");
     TEST_ASSERT(result1 != NULL, "First call returns result");
 
-    // Second call - should be cache hit
+    /// Second call - should be cache hit
     lle_terminal_detection_result_t *result2 = NULL;
     lle_result_t res2 = lle_detect_terminal_capabilities_optimized(&result2);
 
@@ -114,7 +114,7 @@ TEST(optimized_detection) {
     TEST_ASSERT(result2 != NULL, "Second call returns result");
     TEST_ASSERT(result1 == result2, "Second call returns cached result");
 
-    // Get stats
+    /// Get stats
     lle_detection_performance_stats_t stats = {0};
     lle_adaptive_get_detection_stats(&stats);
 
@@ -133,18 +133,18 @@ TEST(optimized_detection) {
 TEST(utility_functions) {
     printf("\nUtility Function Tests:\n");
 
-    // Test mode to string
+    /// Test mode to string
     const char *mode_str =
         lle_adaptive_mode_to_string(LLE_ADAPTIVE_MODE_ENHANCED);
     TEST_ASSERT(mode_str != NULL, "Mode to string returns value");
     TEST_ASSERT(strcmp(mode_str, "enhanced") == 0, "Mode string is correct");
 
-    // Test capability to string
+    /// Test capability to string
     const char *cap_str = lle_capability_level_to_string(LLE_CAPABILITY_FULL);
     TEST_ASSERT(cap_str != NULL, "Capability to string returns value");
     TEST_ASSERT(strcmp(cap_str, "full") == 0, "Capability string is correct");
 
-    // Test all modes
+    /// Test all modes
     TEST_ASSERT(lle_adaptive_mode_to_string(LLE_ADAPTIVE_MODE_NONE) != NULL,
                 "NONE mode has string");
     TEST_ASSERT(lle_adaptive_mode_to_string(LLE_ADAPTIVE_MODE_MINIMAL) != NULL,

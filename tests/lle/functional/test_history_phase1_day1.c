@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Test counter
+/// Test counter
 static int tests_passed = 0;
 static int tests_failed = 0;
 
@@ -47,7 +47,7 @@ void test_history_core_lifecycle(void) {
     lle_history_core_t *core = NULL;
     lle_result_t result;
 
-    // Create with default config
+    /// Create with default config
     result = lle_history_core_create(&core, NULL, NULL);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to create history core");
@@ -69,7 +69,7 @@ void test_history_core_lifecycle(void) {
         FAIL("Initial next_entry_id should be 1");
     }
 
-    // Destroy
+    /// Destroy
     result = lle_history_core_destroy(core);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to destroy history core");
@@ -96,7 +96,7 @@ void test_default_config_creation(void) {
         FAIL("Config pointer is NULL");
     }
 
-    // Verify default values
+    /// Verify default values
     if (config->max_entries != 10000) {
         FAIL("Default max_entries should be 10000");
     }
@@ -109,7 +109,7 @@ void test_default_config_creation(void) {
         FAIL("Timestamps should be saved by default");
     }
 
-    // Note: ignore_duplicates is false in Phase 1 (deduplication is Phase 4)
+    /// Note: ignore_duplicates is false in Phase 1 (deduplication is Phase 4)
     if (config->ignore_duplicates != false) {
         FAIL("Duplicate ignoring should be disabled in Phase 1");
     }
@@ -118,7 +118,7 @@ void test_default_config_creation(void) {
         FAIL("History file path should be set");
     }
 
-    // Cleanup
+    /// Cleanup
     result = lle_history_config_destroy(config, NULL);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to destroy config");
@@ -162,7 +162,7 @@ void test_history_entry_lifecycle(void) {
         FAIL("Entry should be in ACTIVE state");
     }
 
-    // Cleanup
+    /// Cleanup
     result = lle_history_entry_destroy(entry, NULL);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to destroy entry");
@@ -181,13 +181,13 @@ void test_add_single_entry(void) {
     lle_result_t result;
     uint64_t entry_id = 0;
 
-    // Create core
+    /// Create core
     result = lle_history_core_create(&core, NULL, NULL);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to create core");
     }
 
-    // Add entry
+    /// Add entry
     const char *cmd = "echo 'Hello, World!'";
     result = lle_history_add_entry(core, cmd, 0, &entry_id);
     if (result != LLE_SUCCESS) {
@@ -210,7 +210,7 @@ void test_add_single_entry(void) {
         FAIL("Stats total_entries should be 1");
     }
 
-    // Cleanup
+    /// Cleanup
     lle_history_core_destroy(core);
     PASS();
 }
@@ -230,7 +230,7 @@ void test_add_multiple_entries(void) {
         FAIL("Failed to create core");
     }
 
-    // Add 10 entries
+    /// Add 10 entries
     const char *commands[] = {
         "ls -la",       "cd /home",          "pwd",  "echo test",
         "cat file.txt", "grep pattern *.c",  "make", "git status",
@@ -259,7 +259,7 @@ void test_add_multiple_entries(void) {
         FAIL("Stats total_entries should be 10");
     }
 
-    // Cleanup
+    /// Cleanup
     lle_history_core_destroy(core);
     PASS();
 }
@@ -280,7 +280,7 @@ void test_get_entry_by_id(void) {
         FAIL("Failed to create core");
     }
 
-    // Add entry
+    /// Add entry
     const char *cmd = "test command";
     result = lle_history_add_entry(core, cmd, 0, &entry_id);
     if (result != LLE_SUCCESS) {
@@ -288,7 +288,7 @@ void test_get_entry_by_id(void) {
         FAIL("Failed to add entry");
     }
 
-    // Retrieve by ID
+    /// Retrieve by ID
     result = lle_history_get_entry_by_id(core, entry_id, &entry);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -310,7 +310,7 @@ void test_get_entry_by_id(void) {
         FAIL("Command text mismatch");
     }
 
-    // Cleanup
+    /// Cleanup
     lle_history_core_destroy(core);
     PASS();
 }
@@ -330,7 +330,7 @@ void test_get_entry_by_index(void) {
         FAIL("Failed to create core");
     }
 
-    // Add entries
+    /// Add entries
     const char *commands[] = {"cmd1", "cmd2", "cmd3"};
     for (int i = 0; i < 3; i++) {
         uint64_t id;
@@ -341,7 +341,7 @@ void test_get_entry_by_index(void) {
         }
     }
 
-    // Retrieve by index (0-based)
+    /// Retrieve by index (0-based)
     result = lle_history_get_entry_by_index(core, 1, &entry);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -358,7 +358,7 @@ void test_get_entry_by_index(void) {
         FAIL("Wrong entry retrieved (expected cmd2)");
     }
 
-    // Cleanup
+    /// Cleanup
     lle_history_core_destroy(core);
     PASS();
 }
@@ -378,7 +378,7 @@ void test_get_entry_count(void) {
         FAIL("Failed to create core");
     }
 
-    // Initial count should be 0
+    /// Initial count should be 0
     result = lle_history_get_entry_count(core, &count);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -390,7 +390,7 @@ void test_get_entry_count(void) {
         FAIL("Initial count should be 0");
     }
 
-    // Add 5 entries
+    /// Add 5 entries
     for (int i = 0; i < 5; i++) {
         uint64_t id;
         result = lle_history_add_entry(core, "test", 0, &id);
@@ -400,7 +400,7 @@ void test_get_entry_count(void) {
         }
     }
 
-    // Count should be 5
+    /// Count should be 5
     result = lle_history_get_entry_count(core, &count);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -412,7 +412,7 @@ void test_get_entry_count(void) {
         FAIL("Count should be 5");
     }
 
-    // Cleanup
+    /// Cleanup
     lle_history_core_destroy(core);
     PASS();
 }
@@ -432,13 +432,13 @@ void test_statistics_tracking(void) {
         FAIL("Failed to create core");
     }
 
-    // Add entries with different exit codes
+    /// Add entries with different exit codes
     uint64_t id;
     result = lle_history_add_entry(core, "success1", 0, &id);
     result = lle_history_add_entry(core, "success2", 0, &id);
     result = lle_history_add_entry(core, "failure", 1, &id);
 
-    // Get stats
+    /// Get stats
     result = lle_history_get_stats(core, &stats);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
@@ -450,7 +450,7 @@ void test_statistics_tracking(void) {
         FAIL("Stats total_entries should be 3");
     }
 
-    // Cleanup
+    /// Cleanup
     lle_history_core_destroy(core);
     PASS();
 }
@@ -470,34 +470,34 @@ void test_clear_history(void) {
         FAIL("Failed to create core");
     }
 
-    // Add entries
+    /// Add entries
     for (int i = 0; i < 5; i++) {
         uint64_t id;
         result = lle_history_add_entry(core, "test", 0, &id);
     }
 
-    // Verify count
+    /// Verify count
     lle_history_get_entry_count(core, &count);
     if (count != 5) {
         lle_history_core_destroy(core);
         FAIL("Count should be 5 before clear");
     }
 
-    // Clear
+    /// Clear
     result = lle_history_clear(core);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core);
         FAIL("Failed to clear history");
     }
 
-    // Verify empty
+    /// Verify empty
     lle_history_get_entry_count(core, &count);
     if (count != 0) {
         lle_history_core_destroy(core);
         FAIL("Count should be 0 after clear");
     }
 
-    // Cleanup
+    /// Cleanup
     lle_history_core_destroy(core);
     PASS();
 }
@@ -510,7 +510,7 @@ int main(void) {
     printf("History System Phase 1 Day 1 - Functional Tests\n");
     printf("=================================================\n");
 
-    // Run all tests
+    /// Run all tests
     test_history_core_lifecycle();
     test_default_config_creation();
     test_history_entry_lifecycle();
@@ -522,7 +522,7 @@ int main(void) {
     test_statistics_tracking();
     test_clear_history();
 
-    // Summary
+    /// Summary
     printf("\n=================================================\n");
     printf("Test Results:\n");
     printf("  Passed: %d\n", tests_passed);

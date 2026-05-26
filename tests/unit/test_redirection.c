@@ -30,7 +30,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================================
  * FILE DESCRIPTOR SAVE/RESTORE TESTS
@@ -43,11 +43,11 @@ TEST(save_file_descriptors_basic) {
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "save_file_descriptors should succeed");
 
-    // At least some FDs should be saved
+    /// At least some FDs should be saved
     ASSERT(state.stdin_saved || state.stdout_saved || state.stderr_saved,
            "At least one FD should be saved");
 
-    // Clean up
+    /// Clean up
     restore_file_descriptors(&state);
 }
 
@@ -101,7 +101,7 @@ TEST(restore_file_descriptors_basic) {
 TEST(restore_file_descriptors_empty_state) {
     redirection_state_t state = {0};
 
-    // Restore without save - should handle gracefully
+    /// Restore without save - should handle gracefully
     int result = restore_file_descriptors(&state);
     ASSERT_EQ(result, 0, "restore empty state should succeed");
 }
@@ -109,21 +109,21 @@ TEST(restore_file_descriptors_empty_state) {
 TEST(save_restore_preserves_fds) {
     redirection_state_t state = {0};
 
-    // Get original FDs
+    /// Get original FDs
     int orig_stdin = dup(STDIN_FILENO);
     int orig_stdout = dup(STDOUT_FILENO);
     int orig_stderr = dup(STDERR_FILENO);
 
     save_file_descriptors(&state);
 
-    // Verify we can still use standard FDs
+    /// Verify we can still use standard FDs
     ASSERT(isatty(STDIN_FILENO) >= 0 || 1, "stdin should still work");
     ASSERT(isatty(STDOUT_FILENO) >= 0 || 1, "stdout should still work");
     ASSERT(isatty(STDERR_FILENO) >= 0 || 1, "stderr should still work");
 
     restore_file_descriptors(&state);
 
-    // Clean up our test dups
+    /// Clean up our test dups
     close(orig_stdin);
     close(orig_stdout);
     close(orig_stderr);
@@ -309,7 +309,7 @@ TEST(count_redirections_null) {
  */
 
 TEST(redirection_error_basic) {
-    // Should not crash - output goes to stderr
+    /// Should not crash - output goes to stderr
     FILE *old_stderr = stderr;
     FILE *null_err = fopen("/dev/null", "w");
     if (null_err) {
@@ -321,7 +321,7 @@ TEST(redirection_error_basic) {
 }
 
 TEST(redirection_error_null_message) {
-    // Should handle NULL gracefully
+    /// Should handle NULL gracefully
     FILE *old_stderr = stderr;
     FILE *null_err = fopen("/dev/null", "w");
     if (null_err) {
@@ -373,8 +373,8 @@ TEST(alloc_fd_untrack_then_executor_free_does_not_double_close) {
     int rc = close(fd);
     ASSERT_EQ(rc, 0, "manual close after untrack succeeds");
 
-    // executor_free must not attempt to close the recycled fd. Test passes
-    // if we exit cleanly without any double-close-on-recycled-fd hazard.
+    /// executor_free must not attempt to close the recycled fd. Test passes
+    /// if we exit cleanly without any double-close-on-recycled-fd hazard.
     executor_free(executor);
 }
 
@@ -382,7 +382,7 @@ TEST(alloc_fd_registry_grows_past_initial_capacity) {
     executor_t *executor = executor_new();
     ASSERT_TRUE(executor != NULL, "executor_new");
 
-    // Initial capacity is 8; allocate enough to force at least one realloc.
+    /// Initial capacity is 8; allocate enough to force at least one realloc.
     int fds[24];
     size_t n = 0;
     for (; n < sizeof(fds) / sizeof(fds[0]); n++) {
@@ -410,8 +410,8 @@ TEST(alloc_fd_untrack_unknown_is_noop) {
     executor_t *executor = executor_new();
     ASSERT_TRUE(executor != NULL, "executor_new");
 
-    // Untrack on never-tracked fd must not crash, even with an empty
-    // registry. The function must also handle invalid fd values silently.
+    /// Untrack on never-tracked fd must not crash, even with an empty
+    /// registry. The function must also handle invalid fd values silently.
     executor_untrack_alloc_fd(executor, 999);
     executor_untrack_alloc_fd(executor, -1);
 
@@ -424,7 +424,7 @@ TEST(alloc_fd_untrack_unknown_is_noop) {
  */
 
 TEST(complex_command_with_redirections) {
-    // Simulate: cmd arg1 > out.txt 2> err.txt < in.txt
+    /// Simulate: cmd arg1 > out.txt 2> err.txt < in.txt
     node_t *cmd = new_node(NODE_COMMAND);
     node_t *var = new_node(NODE_VAR);
     node_t *arg = new_node(NODE_VAR);
@@ -482,8 +482,8 @@ TEST(herestring_detection) {
 TEST(save_with_closed_stdin) {
     redirection_state_t state = {0};
 
-    // This is tricky - we don't want to actually close stdin
-    // Just verify the API handles various states
+    /// This is tricky - we don't want to actually close stdin
+    /// Just verify the API handles various states
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "Should handle current FD state");
 
@@ -492,9 +492,9 @@ TEST(save_with_closed_stdin) {
 
 TEST(state_initialization) {
     redirection_state_t state;
-    memset(&state, 0xFF, sizeof(state)); // Fill with garbage
+    memset(&state, 0xFF, sizeof(state)); /// Fill with garbage
 
-    // Manually initialize
+    /// Manually initialize
     state.saved_stdin = -1;
     state.saved_stdout = -1;
     state.saved_stderr = -1;
@@ -502,7 +502,7 @@ TEST(state_initialization) {
     state.stdout_saved = false;
     state.stderr_saved = false;
 
-    // Should be able to save now
+    /// Should be able to save now
     int result = save_file_descriptors(&state);
     ASSERT_EQ(result, 0, "Should succeed with clean state");
 
@@ -517,8 +517,8 @@ TEST(state_initialization) {
 int main(void) {
     printf("Running redirection.c tests...\n\n");
 
-    // executor_new() pulls from the global symbol table manager; tests
-    // exercising the executor need it initialized.
+    /// executor_new() pulls from the global symbol table manager; tests
+    /// exercising the executor need it initialized.
     init_symtable();
 
     printf("File Descriptor Save/Restore Tests:\n");

@@ -35,7 +35,7 @@
     ASSERT(strstr((haystack), (needle)) != NULL)
 #define PASS() ((void)0)
 
-// Default context for most tests: no template engine, truecolor
+/// Default context for most tests: no template engine, truecolor
 static lle_prompt_expand_ctx_t make_ctx(void) {
     lle_prompt_expand_ctx_t ctx;
     memset(&ctx, 0, sizeof(ctx));
@@ -44,7 +44,7 @@ static lle_prompt_expand_ctx_t make_ctx(void) {
 }
 
 /* ========================================================================== */
-// NULL / edge case tests
+/// NULL / edge case tests
 /* ========================================================================== */
 
 TEST(null_format) {
@@ -96,7 +96,7 @@ TEST(plain_text_passthrough) {
 }
 
 /* ========================================================================== */
-// Bash escape tests
+/// Bash escape tests
 /* ========================================================================== */
 
 TEST(bash_username) {
@@ -115,7 +115,7 @@ TEST(bash_hostname_short) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\h", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should not contain a dot
+    /// Should not contain a dot
     ASSERT(strchr(out, '.') == NULL);
     ASSERT(strlen(out) > 0);
     PASS();
@@ -145,7 +145,7 @@ TEST(bash_cwd_basename) {
     lle_result_t r = lle_prompt_expand("\\W", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT(strlen(out) > 0);
-    // Should not contain / (unless root dir)
+    /// Should not contain / (unless root dir)
     PASS();
 }
 
@@ -154,7 +154,7 @@ TEST(bash_date) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\d", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Format: "Sat Feb 22" - should have two spaces
+    /// Format: "Sat Feb 22" - should have two spaces
     ASSERT(strlen(out) >= 8);
     PASS();
 }
@@ -164,7 +164,7 @@ TEST(bash_time_24h) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\t", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Format: HH:MM:SS
+    /// Format: HH:MM:SS
     ASSERT(strlen(out) == 8);
     ASSERT(out[2] == ':');
     ASSERT(out[5] == ':');
@@ -185,7 +185,7 @@ TEST(bash_time_ampm) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\@", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should contain AM or PM
+    /// Should contain AM or PM
     ASSERT(strstr(out, "AM") || strstr(out, "PM") || strstr(out, "am") ||
            strstr(out, "pm"));
     PASS();
@@ -196,7 +196,7 @@ TEST(bash_time_24h_short) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\A", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Format: HH:MM
+    /// Format: HH:MM
     ASSERT(strlen(out) == 5);
     ASSERT(out[2] == ':');
     PASS();
@@ -207,7 +207,7 @@ TEST(bash_dollar_sign) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\$", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Non-root should get $, root gets #
+    /// Non-root should get $, root gets #
     if (getuid() != 0)
         ASSERT_STR_EQ(out, "$");
     else
@@ -245,13 +245,13 @@ TEST(bash_literal_backslash) {
 TEST(bash_bracket_stripping) {
     char out[64];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    // \[\033[32m\] should strip \[ and \], leaving the ANSI code
+    /// \[\033[32m\] should strip \[ and \], leaving the ANSI code
     lle_result_t r =
         lle_prompt_expand("\\[\\e[32m\\]hi", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT_STR_CONTAINS(out, "\033[32m");
     ASSERT_STR_CONTAINS(out, "hi");
-    // No literal \[ or \] in output
+    /// No literal \[ or \] in output
     ASSERT(strstr(out, "\\[") == NULL);
     ASSERT(strstr(out, "\\]") == NULL);
     PASS();
@@ -292,7 +292,7 @@ TEST(bash_tty_name) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("\\l", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should produce something (or "?" if no tty)
+    /// Should produce something (or "?" if no tty)
     ASSERT(strlen(out) > 0);
     PASS();
 }
@@ -350,7 +350,7 @@ TEST(bash_bell_char) {
 TEST(bash_octal) {
     char out[64];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    // \0101 = octal 101 = 'A'
+    /// \0101 = octal 101 = 'A'
     lle_result_t r = lle_prompt_expand("\\0101", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT_STR_EQ(out, "A");
@@ -360,7 +360,7 @@ TEST(bash_octal) {
 TEST(bash_hex) {
     char out[64];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    // \x41 = 'A'
+    /// \x41 = 'A'
     lle_result_t r = lle_prompt_expand("\\x41", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
     ASSERT_STR_EQ(out, "A");
@@ -377,7 +377,7 @@ TEST(bash_unknown_escape_passthrough) {
 }
 
 /* ========================================================================== */
-// Zsh escape tests
+/// Zsh escape tests
 /* ========================================================================== */
 
 TEST(zsh_username) {
@@ -415,7 +415,7 @@ TEST(zsh_cwd_full) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("%d", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Full path starts with /
+    /// Full path starts with /
     ASSERT(out[0] == '/');
     PASS();
 }
@@ -530,7 +530,7 @@ TEST(zsh_date_format) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("%D{%Y-%m-%d}", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should be YYYY-MM-DD format
+    /// Should be YYYY-MM-DD format
     ASSERT(strlen(out) == 10);
     ASSERT(out[4] == '-');
     ASSERT(out[7] == '-');
@@ -540,10 +540,10 @@ TEST(zsh_date_format) {
 TEST(zsh_date_default) {
     char out[256];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    // %D without braces: default yy-mm-dd format
+    /// %D without braces: default yy-mm-dd format
     lle_result_t r = lle_prompt_expand("%D", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT(strlen(out) == 8); // yy-mm-dd
+    ASSERT(strlen(out) == 8); /// yy-mm-dd
     PASS();
 }
 
@@ -585,9 +585,9 @@ TEST(zsh_fg_color_named) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("%F{red}hi%f", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT_STR_CONTAINS(out, "\033[31m"); // red = 30+1
+    ASSERT_STR_CONTAINS(out, "\033[31m"); /// red = 30+1
     ASSERT_STR_CONTAINS(out, "hi");
-    ASSERT_STR_CONTAINS(out, "\033[39m"); // reset fg
+    ASSERT_STR_CONTAINS(out, "\033[39m"); /// reset fg
     PASS();
 }
 
@@ -617,20 +617,20 @@ TEST(zsh_bg_color) {
     lle_prompt_expand_ctx_t ctx = make_ctx();
     lle_result_t r = lle_prompt_expand("%K{blue}bg%k", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    ASSERT_STR_CONTAINS(out, "\033[44m"); // blue bg = 40+4
+    ASSERT_STR_CONTAINS(out, "\033[44m"); /// blue bg = 40+4
     ASSERT_STR_CONTAINS(out, "bg");
-    ASSERT_STR_CONTAINS(out, "\033[49m"); // reset bg
+    ASSERT_STR_CONTAINS(out, "\033[49m"); /// reset bg
     PASS();
 }
 
 TEST(zsh_color_256_fallback) {
     char out[128];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    ctx.color_depth = 2; // 256-color only
+    ctx.color_depth = 2; /// 256-color only
     lle_result_t r =
         lle_prompt_expand("%F{#FF8000}hi%f", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should use 256-color escape, not truecolor
+    /// Should use 256-color escape, not truecolor
     ASSERT_STR_CONTAINS(out, "\033[38;5;");
     ASSERT(strstr(out, "\033[38;2;") == NULL);
     PASS();
@@ -639,12 +639,12 @@ TEST(zsh_color_256_fallback) {
 TEST(zsh_color_none) {
     char out[128];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    ctx.color_depth = 0; // no color
+    ctx.color_depth = 0; /// no color
     lle_result_t r = lle_prompt_expand("%F{red}hi%f", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // No ANSI escape for color, just the text and reset
+    /// No ANSI escape for color, just the text and reset
     ASSERT_STR_CONTAINS(out, "hi");
-    // The %f still emits \033[39m - that's fine, the fg color is skipped
+    /// The %f still emits \033[39m - that's fine, the fg color is skipped
     PASS();
 }
 
@@ -658,24 +658,24 @@ TEST(zsh_unknown_escape_passthrough) {
 }
 
 /* ========================================================================== */
-// Mixed syntax tests
+/// Mixed syntax tests
 /* ========================================================================== */
 
 TEST(mixed_bash_and_zsh) {
     char out[512];
     lle_prompt_expand_ctx_t ctx = make_ctx();
     ctx.last_exit_status = 0;
-    // Bash \u and zsh %m in same string
+    /// Bash \u and zsh %m in same string
     lle_result_t r =
         lle_prompt_expand("\\u@%m:\\w\\$ ", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should contain username
+    /// Should contain username
     struct passwd *pw = getpwuid(getuid());
     if (pw)
         ASSERT_STR_CONTAINS(out, pw->pw_name);
-    // Should contain @ separator
+    /// Should contain @ separator
     ASSERT_STR_CONTAINS(out, "@");
-    // Should end with $ or #
+    /// Should end with $ or #
     ASSERT(strstr(out, "$ ") || strstr(out, "# "));
     PASS();
 }
@@ -683,15 +683,15 @@ TEST(mixed_bash_and_zsh) {
 TEST(mixed_with_ansi_passthrough) {
     char out[256];
     lle_prompt_expand_ctx_t ctx = make_ctx();
-    // ANSI codes from template engine should pass through unmodified
-    // Simulate: ESC[32m already in input from pass-1, then \u
+    /// ANSI codes from template engine should pass through unmodified
+    /// Simulate: ESC[32m already in input from pass-1, then \u
     lle_result_t r =
         lle_prompt_expand("\033[32m\\u\033[0m", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should contain the ANSI codes intact
+    /// Should contain the ANSI codes intact
     ASSERT_STR_CONTAINS(out, "\033[32m");
     ASSERT_STR_CONTAINS(out, "\033[0m");
-    // Should contain username between them
+    /// Should contain username between them
     struct passwd *pw = getpwuid(getuid());
     if (pw)
         ASSERT_STR_CONTAINS(out, pw->pw_name);
@@ -699,7 +699,7 @@ TEST(mixed_with_ansi_passthrough) {
 }
 
 /* ========================================================================== */
-// Template engine integration test (pass 1)
+/// Template engine integration test (pass 1)
 /* ========================================================================== */
 
 static char *mock_segment(const char *name, const char *property,
@@ -741,7 +741,7 @@ TEST(template_then_bash) {
     };
     ctx.template_ctx = &tctx;
 
-    // LLE segments + bash escapes
+    /// LLE segments + bash escapes
     lle_result_t r =
         lle_prompt_expand("${directory} \\$ ", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
@@ -762,7 +762,7 @@ TEST(template_then_zsh) {
     };
     ctx.template_ctx = &tctx;
 
-    // LLE segments + zsh escapes
+    /// LLE segments + zsh escapes
     lle_result_t r =
         lle_prompt_expand("${git} [%?] %# ", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
@@ -783,7 +783,7 @@ TEST(all_three_syntaxes) {
     };
     ctx.template_ctx = &tctx;
 
-    // All three: LLE ${...}, bash \u, zsh %j
+    /// All three: LLE ${...}, bash \u, zsh %j
     lle_result_t r =
         lle_prompt_expand("\\u ${directory} %j\\$ ", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
@@ -796,7 +796,7 @@ TEST(all_three_syntaxes) {
 }
 
 /* ========================================================================== */
-// Buffer limit test
+/// Buffer limit test
 /* ========================================================================== */
 
 TEST(small_buffer) {
@@ -805,14 +805,14 @@ TEST(small_buffer) {
     lle_result_t r =
         lle_prompt_expand("abcdefghijklmnop", out, sizeof(out), &ctx);
     ASSERT_EQ(r, LLE_SUCCESS);
-    // Should be truncated but not crash
+    /// Should be truncated but not crash
     ASSERT(strlen(out) < sizeof(out));
     ASSERT(out[sizeof(out) - 1] == '\0');
     PASS();
 }
 
 /* ========================================================================== */
-// Main test runner
+/// Main test runner
 /* ========================================================================== */
 
 int main(void) {
@@ -820,7 +820,7 @@ int main(void) {
     printf("    LLE Prompt Expansion Unit Tests\n");
     printf("===========================================\n\n");
 
-    // Edge cases
+    /// Edge cases
     RUN_TEST(null_format);
     RUN_TEST(null_output);
     RUN_TEST(null_ctx);
@@ -828,7 +828,7 @@ int main(void) {
     RUN_TEST(empty_format);
     RUN_TEST(plain_text_passthrough);
 
-    // Bash escapes
+    /// Bash escapes
     RUN_TEST(bash_username);
     RUN_TEST(bash_hostname_short);
     RUN_TEST(bash_hostname_full);
@@ -857,7 +857,7 @@ int main(void) {
     RUN_TEST(bash_hex);
     RUN_TEST(bash_unknown_escape_passthrough);
 
-    // Zsh escapes
+    /// Zsh escapes
     RUN_TEST(zsh_username);
     RUN_TEST(zsh_hostname_short);
     RUN_TEST(zsh_hostname_full);
@@ -886,16 +886,16 @@ int main(void) {
     RUN_TEST(zsh_color_none);
     RUN_TEST(zsh_unknown_escape_passthrough);
 
-    // Mixed syntax
+    /// Mixed syntax
     RUN_TEST(mixed_bash_and_zsh);
     RUN_TEST(mixed_with_ansi_passthrough);
 
-    // Template engine integration
+    /// Template engine integration
     RUN_TEST(template_then_bash);
     RUN_TEST(template_then_zsh);
     RUN_TEST(all_three_syntaxes);
 
-    // Buffer limits
+    /// Buffer limits
     RUN_TEST(small_buffer);
 
     return TEST_RESULT();

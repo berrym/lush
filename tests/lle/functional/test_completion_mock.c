@@ -18,13 +18,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Mock builtin structure
+/// Mock builtin structure
 typedef struct {
     char *name;
     void *function;
 } builtin_t;
 
-// Mock builtins array
+/// Mock builtins array
 static builtin_t mock_builtins[] = {
     {  "cd", NULL},
     {"echo", NULL},
@@ -35,16 +35,16 @@ static builtin_t mock_builtins[] = {
 builtin_t *builtins = mock_builtins;
 int builtins_count = 3;
 
-// Mock aliases hashtable (NULL for now)
+/// Mock aliases hashtable (NULL for now)
 void *aliases = NULL;
 
-// Mock lookup_alias function
+/// Mock lookup_alias function
 char *lookup_alias(const char *name) {
     (void)name;
-    return NULL; // No aliases in mock
+    return NULL; /// No aliases in mock
 }
 
-// Mock environ for variable completion
+/// Mock environ for variable completion
 char **environ = NULL;
 
 /* ---------- Executor stubs for the word_context resolution layer ----------
@@ -68,7 +68,7 @@ char **environ = NULL;
  * non-NULL value.
  */
 
-// Forward-declared opaque type — the stubs never dereference it.
+/// Forward-declared opaque type — the stubs never dereference it.
 typedef struct executor executor_t;
 
 executor_t *current_executor = NULL;
@@ -103,7 +103,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
             *expanded_count = 0;
         return NULL;
     }
-    // Programmed branches: emit them verbatim.
+    /// Programmed branches: emit them verbatim.
     if (mock_brace_branches && mock_brace_branch_count > 0) {
         char **r =
             malloc(sizeof(char *) * (size_t)(mock_brace_branch_count + 1));
@@ -127,7 +127,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         *expanded_count = mock_brace_branch_count;
         return r;
     }
-    // Default: pass through (matches expand_brace_pattern's no-brace case).
+    /// Default: pass through (matches expand_brace_pattern's no-brace case).
     char **r = malloc(sizeof(char *) * 2);
     if (!r) {
         *expanded_count = 0;

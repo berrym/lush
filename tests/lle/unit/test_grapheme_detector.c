@@ -60,7 +60,7 @@ TEST(prop_zwj) {
 }
 
 TEST(prop_extend_combining_marks) {
-    // The five combining-mark blocks the implementation treats as Extend
+    /// The five combining-mark blocks the implementation treats as Extend
     ASSERT_EQ(get_grapheme_break_property(0x0300), GB_EXTEND,
               "first combining diacritical");
     ASSERT_EQ(get_grapheme_break_property(0x036F), GB_EXTEND,
@@ -122,7 +122,7 @@ TEST(prop_hangul_syllable_lv_vs_lvt) {
 }
 
 TEST(prop_extended_pictographic) {
-    // Emoji blocks U+1F300..U+1F9FF and Misc Symbols U+2600..U+27BF
+    /// Emoji blocks U+1F300..U+1F9FF and Misc Symbols U+2600..U+27BF
     ASSERT_EQ(get_grapheme_break_property(0x1F300), GB_EXTENDED_PICTOGRAPHIC,
               "first emoji block");
     ASSERT_EQ(get_grapheme_break_property(0x1F600), GB_EXTENDED_PICTOGRAPHIC,
@@ -151,13 +151,13 @@ TEST(prop_spacing_mark_only_covers_devanagari_visarga) {
 }
 
 TEST(prop_other_default) {
-    // Plain ASCII letters/digits/punctuation are GB_OTHER
+    /// Plain ASCII letters/digits/punctuation are GB_OTHER
     ASSERT_EQ(get_grapheme_break_property('A'), GB_OTHER, "A");
     ASSERT_EQ(get_grapheme_break_property('0'), GB_OTHER, "0");
     ASSERT_EQ(get_grapheme_break_property(' '), GB_OTHER, "space");
-    // CJK ideographs not in any special class
+    /// CJK ideographs not in any special class
     ASSERT_EQ(get_grapheme_break_property(0x4E00), GB_OTHER, "U+4E00");
-    // Latin Supplement
+    /// Latin Supplement
     ASSERT_EQ(get_grapheme_break_property(0x00E9), GB_OTHER, "é (precomposed)");
 }
 
@@ -167,13 +167,13 @@ TEST(prop_other_default) {
  */
 
 TEST(rule_gb3_cr_then_lf_no_break) {
-    // GB3: CR × LF — the CR/LF pair is one grapheme
+    /// GB3: CR × LF — the CR/LF pair is one grapheme
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x000D, 0x000A, false, 0),
                  "CR followed by LF must not break");
 }
 
 TEST(rule_gb4_break_after_control_cr_lf) {
-    // GB4: (Control | CR | LF) ÷
+    /// GB4: (Control | CR | LF) ÷
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x0001, 'A', false, 0),
                 "Control followed by anything must break");
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x000A, 'A', false, 0),
@@ -185,7 +185,7 @@ TEST(rule_gb4_break_after_control_cr_lf) {
 }
 
 TEST(rule_gb5_break_before_control_cr_lf) {
-    // GB5: ÷ (Control | CR | LF)
+    /// GB5: ÷ (Control | CR | LF)
     ASSERT_TRUE(is_grapheme_cluster_boundary('A', 0x0001, false, 0),
                 "Anything followed by Control must break");
     ASSERT_TRUE(is_grapheme_cluster_boundary('A', 0x000A, false, 0),
@@ -195,7 +195,7 @@ TEST(rule_gb5_break_before_control_cr_lf) {
 }
 
 TEST(rule_gb6_l_no_break_to_l_v_lv_lvt) {
-    // GB6: L × (L | V | LV | LVT)
+    /// GB6: L × (L | V | LV | LVT)
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x1100, 0x1101, false, 0),
                  "L × L (Choseong + Choseong)");
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x1100, 0x1161, false, 0),
@@ -204,13 +204,13 @@ TEST(rule_gb6_l_no_break_to_l_v_lv_lvt) {
                  "L × LV");
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x1100, 0xAC01, false, 0),
                  "L × LVT");
-    // L followed by T should break (not in the GB6 set)
+    /// L followed by T should break (not in the GB6 set)
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x1100, 0x11A8, false, 0),
                 "L × T must break (T is not in GB6)");
 }
 
 TEST(rule_gb7_lv_or_v_no_break_to_v_or_t) {
-    // GB7: (LV | V) × (V | T)
+    /// GB7: (LV | V) × (V | T)
     ASSERT_FALSE(is_grapheme_cluster_boundary(0xAC00, 0x1161, false, 0),
                  "LV × V");
     ASSERT_FALSE(is_grapheme_cluster_boundary(0xAC00, 0x11A8, false, 0),
@@ -222,7 +222,7 @@ TEST(rule_gb7_lv_or_v_no_break_to_v_or_t) {
 }
 
 TEST(rule_gb8_lvt_or_t_no_break_to_t) {
-    // GB8: (LVT | T) × T
+    /// GB8: (LVT | T) × T
     ASSERT_FALSE(is_grapheme_cluster_boundary(0xAC01, 0x11A8, false, 0),
                  "LVT × T");
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x11A8, 0x11A9, false, 0),
@@ -230,7 +230,7 @@ TEST(rule_gb8_lvt_or_t_no_break_to_t) {
 }
 
 TEST(rule_gb9_no_break_before_extend_or_zwj) {
-    // GB9: × (Extend | ZWJ) — combining marks attach to the previous char
+    /// GB9: × (Extend | ZWJ) — combining marks attach to the previous char
     ASSERT_FALSE(is_grapheme_cluster_boundary('e', 0x0301, false, 0),
                  "letter × combining acute (Extend)");
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x4E00, 0x0301, false, 0),
@@ -240,7 +240,7 @@ TEST(rule_gb9_no_break_before_extend_or_zwj) {
 }
 
 TEST(rule_gb9a_no_break_before_spacing_mark) {
-    // GB9a: × SpacingMark — only U+0903 is currently classified
+    /// GB9a: × SpacingMark — only U+0903 is currently classified
     ASSERT_FALSE(is_grapheme_cluster_boundary('A', 0x0903, false, 0),
                  "letter × U+0903 (SpacingMark)");
 }
@@ -282,10 +282,10 @@ TEST(rule_gb12_gb13_regional_indicator_pairs) {
      *   Third RI:  count=2 (even) -> BREAK (start of next flag)
      *   Fourth RI: count=3 (odd)  -> NO BREAK (completing it)
      */
-    // RI followed by RI with even count (start of new pair) -> break
+    /// RI followed by RI with even count (start of new pair) -> break
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x1F1E6, 0x1F1E8, false, 0),
                 "RI × RI, count=0 (even) -> break (start of new pair)");
-    // RI followed by RI with odd count (completing a pair) -> no break
+    /// RI followed by RI with odd count (completing a pair) -> no break
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x1F1E6, 0x1F1E8, false, 1),
                  "RI × RI, count=1 (odd) -> no break (completing pair)");
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x1F1E6, 0x1F1E8, false, 2),
@@ -295,7 +295,7 @@ TEST(rule_gb12_gb13_regional_indicator_pairs) {
 }
 
 TEST(rule_gb999_default_break) {
-    // GB999: Any ÷ Any — anything not handled by a specific rule breaks
+    /// GB999: Any ÷ Any — anything not handled by a specific rule breaks
     ASSERT_TRUE(is_grapheme_cluster_boundary('A', 'B', false, 0),
                 "letter × letter (default break)");
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x4E00, 0x4E01, false, 0),
@@ -334,8 +334,8 @@ TEST(pos_between_ascii_letters_is_boundary) {
 }
 
 TEST(pos_before_combining_mark_is_not_boundary) {
-    // "e" + U+0301 (combining acute) -> "é" (one grapheme)
-    // U+0301 in UTF-8 is 0xCC 0x81 (2 bytes). So text is "e\xCC\x81".
+    /// "e" + U+0301 (combining acute) -> "é" (one grapheme)
+    /// U+0301 in UTF-8 is 0xCC 0x81 (2 bytes). So text is "e\xCC\x81".
     const char *text = "e\xCC\x81";
     /* Position 1 is between 'e' and the combining mark; should NOT be a
      * boundary because the mark attaches to the letter. */
@@ -344,7 +344,7 @@ TEST(pos_before_combining_mark_is_not_boundary) {
 }
 
 TEST(pos_after_combining_mark_is_boundary) {
-    // "e\xCC\x81X" — between the combining mark and X is a boundary
+    /// "e\xCC\x81X" — between the combining mark and X is a boundary
     const char *text = "e\xCC\x81X";
     ASSERT_TRUE(is_grapheme_boundary_at_position(text + 3, text, text + 4),
                 "after grapheme cluster, before next character");
@@ -368,7 +368,7 @@ TEST(pos_at_continuation_byte_scans_back) {
      * following 'A' into a single (out-of-range) hex literal. */
     const char *text = "\xE4\xB8\xAD"
                        "A";
-    // Position 3 is just after the CJK char and before 'A' — boundary.
+    /// Position 3 is just after the CJK char and before 'A' — boundary.
     ASSERT_TRUE(is_grapheme_boundary_at_position(text + 3, text, text + 4),
                 "between CJK char and ASCII letter is a boundary");
 }

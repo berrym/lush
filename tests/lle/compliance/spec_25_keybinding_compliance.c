@@ -24,10 +24,10 @@
  * 2025-11-02
  */
 
-// API verified from include/lle/kill_ring.h on 2025-11-02
-// API verified from include/lle/keybinding.h on 2025-11-02
-// API verified from include/lle/keybinding_actions.h on 2025-11-02
-// API verified from include/lle/lle_editor.h on 2025-11-02
+/// API verified from include/lle/kill_ring.h on 2025-11-02
+/// API verified from include/lle/keybinding.h on 2025-11-02
+/// API verified from include/lle/keybinding_actions.h on 2025-11-02
+/// API verified from include/lle/lle_editor.h on 2025-11-02
 
 #include "lle/keybinding.h"
 #include "lle/keybinding_actions.h"
@@ -36,7 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Test assertion counter
+/// Test assertion counter
 static int assertions_passed = 0;
 
 #define COMPLIANCE_ASSERT(condition, message)                                  \
@@ -60,18 +60,18 @@ int main(void) {
     printf("Phase 1: Kill Ring System API\n");
     printf("------------------------------\n");
 
-    // Opaque type - verify pointer type exists
+    /// Opaque type - verify pointer type exists
     lle_kill_ring_t *kill_ring_ptr = NULL;
     COMPLIANCE_ASSERT(kill_ring_ptr == NULL,
                       "lle_kill_ring_t opaque type defined");
 
-    // Kill ring lifecycle
+    /// Kill ring lifecycle
     COMPLIANCE_ASSERT(lle_kill_ring_create != NULL,
                       "lle_kill_ring_create declared");
     COMPLIANCE_ASSERT(lle_kill_ring_destroy != NULL,
                       "lle_kill_ring_destroy declared");
 
-    // Kill ring operations
+    /// Kill ring operations
     COMPLIANCE_ASSERT(lle_kill_ring_add != NULL, "lle_kill_ring_add declared");
     COMPLIANCE_ASSERT(lle_kill_ring_get_current != NULL,
                       "lle_kill_ring_get_current declared");
@@ -91,18 +91,18 @@ int main(void) {
     printf("Phase 2: Keybinding Manager API\n");
     printf("--------------------------------\n");
 
-    // Opaque type - verify pointer type exists
+    /// Opaque type - verify pointer type exists
     lle_keybinding_manager_t *kb_mgr_ptr = NULL;
     COMPLIANCE_ASSERT(kb_mgr_ptr == NULL,
                       "lle_keybinding_manager_t opaque type defined");
 
-    // Keybinding manager lifecycle
+    /// Keybinding manager lifecycle
     COMPLIANCE_ASSERT(lle_keybinding_manager_create != NULL,
                       "lle_keybinding_manager_create declared");
     COMPLIANCE_ASSERT(lle_keybinding_manager_destroy != NULL,
                       "lle_keybinding_manager_destroy declared");
 
-    // Keybinding operations
+    /// Keybinding operations
     COMPLIANCE_ASSERT(lle_keybinding_manager_bind != NULL,
                       "lle_keybinding_manager_bind declared");
     COMPLIANCE_ASSERT(lle_keybinding_manager_unbind != NULL,
@@ -121,7 +121,7 @@ int main(void) {
     printf("Phase 3: Keybinding Actions API\n");
     printf("--------------------------------\n");
 
-    // Movement actions (6)
+    /// Movement actions (6)
     COMPLIANCE_ASSERT(lle_beginning_of_line != NULL,
                       "lle_beginning_of_line declared");
     COMPLIANCE_ASSERT(lle_end_of_line != NULL, "lle_end_of_line declared");
@@ -131,7 +131,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_backward_word != NULL, "lle_backward_word declared");
     printf("  ✓ Movement actions (6 functions)\n");
 
-    // Editing/kill actions (6)
+    /// Editing/kill actions (6)
     COMPLIANCE_ASSERT(lle_delete_char != NULL, "lle_delete_char declared");
     COMPLIANCE_ASSERT(lle_backward_delete_char != NULL,
                       "lle_backward_delete_char declared");
@@ -143,7 +143,7 @@ int main(void) {
                       "lle_backward_kill_word declared");
     printf("  ✓ Editing/kill actions (6 functions)\n");
 
-    // Yank/transpose actions (4)
+    /// Yank/transpose actions (4)
     COMPLIANCE_ASSERT(lle_yank != NULL, "lle_yank declared");
     COMPLIANCE_ASSERT(lle_yank_pop != NULL, "lle_yank_pop declared");
     COMPLIANCE_ASSERT(lle_transpose_chars != NULL,
@@ -152,14 +152,14 @@ int main(void) {
                       "lle_transpose_words declared");
     printf("  ✓ Yank/transpose actions (4 functions)\n");
 
-    // Case change actions (3)
+    /// Case change actions (3)
     COMPLIANCE_ASSERT(lle_upcase_word != NULL, "lle_upcase_word declared");
     COMPLIANCE_ASSERT(lle_downcase_word != NULL, "lle_downcase_word declared");
     COMPLIANCE_ASSERT(lle_capitalize_word != NULL,
                       "lle_capitalize_word declared");
     printf("  ✓ Case change actions (3 functions)\n");
 
-    // History actions (6)
+    /// History actions (6)
     COMPLIANCE_ASSERT(lle_history_previous != NULL,
                       "lle_history_previous declared");
     COMPLIANCE_ASSERT(lle_history_next != NULL, "lle_history_next declared");
@@ -173,7 +173,7 @@ int main(void) {
                       "lle_history_search_forward declared");
     printf("  ✓ History actions (6 functions)\n");
 
-    // Completion actions (3)
+    /// Completion actions (3)
     COMPLIANCE_ASSERT(lle_complete != NULL, "lle_complete declared");
     COMPLIANCE_ASSERT(lle_possible_completions != NULL,
                       "lle_possible_completions declared");
@@ -181,7 +181,7 @@ int main(void) {
                       "lle_insert_completions declared");
     printf("  ✓ Completion actions (3 functions)\n");
 
-    // Shell operations (6)
+    /// Shell operations (6)
     COMPLIANCE_ASSERT(lle_accept_line != NULL, "lle_accept_line declared");
     COMPLIANCE_ASSERT(lle_abort_line != NULL, "lle_abort_line declared");
     COMPLIANCE_ASSERT(lle_send_eof != NULL, "lle_send_eof declared");
@@ -190,7 +190,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_clear_screen != NULL, "lle_clear_screen declared");
     printf("  ✓ Shell operations (6 functions)\n");
 
-    // Utility actions (8)
+    /// Utility actions (8)
     COMPLIANCE_ASSERT(lle_quoted_insert != NULL, "lle_quoted_insert declared");
     COMPLIANCE_ASSERT(lle_unix_line_discard != NULL,
                       "lle_unix_line_discard declared");
@@ -203,7 +203,7 @@ int main(void) {
     COMPLIANCE_ASSERT(lle_tab_insert != NULL, "lle_tab_insert declared");
     printf("  ✓ Utility actions (7 functions)\n");
 
-    // Preset loaders (2)
+    /// Preset loaders (2)
     COMPLIANCE_ASSERT(lle_keybinding_load_emacs_preset != NULL,
                       "lle_keybinding_load_emacs_preset declared");
     COMPLIANCE_ASSERT(lle_keybinding_load_vi_preset != NULL,
@@ -217,11 +217,11 @@ int main(void) {
     printf("Phase 4: Editor Context API\n");
     printf("---------------------------\n");
 
-    // Editor structure - verify type exists
+    /// Editor structure - verify type exists
     lle_editor_t *editor_ptr = NULL;
     COMPLIANCE_ASSERT(editor_ptr == NULL, "lle_editor_t structure defined");
 
-    // Editor lifecycle
+    /// Editor lifecycle
     COMPLIANCE_ASSERT(lle_editor_create != NULL, "lle_editor_create declared");
     COMPLIANCE_ASSERT(lle_editor_destroy != NULL,
                       "lle_editor_destroy declared");

@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================================
  * HELPER FUNCTIONS
@@ -88,7 +88,7 @@ TEST(expand_ctx_check_null) {
 }
 
 TEST(expand_ctx_init_null) {
-    // Should not crash with NULL
+    /// Should not crash with NULL
     expand_ctx_init(NULL, EXPAND_NORMAL);
 }
 
@@ -137,7 +137,7 @@ TEST(var_concatenation) {
      */
     executor_t *exec = setup_executor();
 
-    // Skip actual test until bug is fixed - just verify basic setup works
+    /// Skip actual test until bug is fixed - just verify basic setup works
     executor_execute_command_line(exec, "A=hello", 1);
     executor_execute_command_line(exec, "B=world", 1);
 
@@ -170,7 +170,7 @@ TEST(unset_var_expands_empty) {
 TEST(default_value_unset) {
     executor_t *exec = setup_executor();
 
-    // ${VAR:-default} when VAR is unset
+    /// ${VAR:-default} when VAR is unset
     executor_execute_command_line(exec, "RESULT=${UNSET_VAR:-default_value}",
                                   1);
 
@@ -185,7 +185,7 @@ TEST(default_value_unset) {
 TEST(default_value_empty) {
     executor_t *exec = setup_executor();
 
-    // ${VAR:-default} when VAR is empty
+    /// ${VAR:-default} when VAR is empty
     executor_execute_command_line(exec, "EMPTY_VAR=", 1);
     executor_execute_command_line(exec, "RESULT=${EMPTY_VAR:-default_value}",
                                   1);
@@ -201,7 +201,7 @@ TEST(default_value_empty) {
 TEST(default_value_set) {
     executor_t *exec = setup_executor();
 
-    // ${VAR:-default} when VAR is set
+    /// ${VAR:-default} when VAR is set
     executor_execute_command_line(exec, "SET_VAR=actual", 1);
     executor_execute_command_line(exec, "RESULT=${SET_VAR:-default_value}", 1);
 
@@ -216,7 +216,7 @@ TEST(default_value_set) {
 TEST(alternate_value_set) {
     executor_t *exec = setup_executor();
 
-    // ${VAR:+alt} when VAR is set
+    /// ${VAR:+alt} when VAR is set
     executor_execute_command_line(exec, "SET_VAR=something", 1);
     executor_execute_command_line(exec, "RESULT=${SET_VAR:+alternate}", 1);
 
@@ -231,7 +231,7 @@ TEST(alternate_value_set) {
 TEST(alternate_value_unset) {
     executor_t *exec = setup_executor();
 
-    // ${VAR:+alt} when VAR is unset
+    /// ${VAR:+alt} when VAR is unset
     executor_execute_command_line(exec, "RESULT=${UNSET_VAR_XYZ:+alternate}",
                                   1);
 
@@ -274,7 +274,7 @@ TEST(string_length_empty) {
 TEST(prefix_removal) {
     executor_t *exec = setup_executor();
 
-    // ${VAR#pattern} - remove shortest prefix
+    /// ${VAR#pattern} - remove shortest prefix
     executor_execute_command_line(exec, "VAR=foobar", 1);
     executor_execute_command_line(exec, "RESULT=${VAR#foo}", 1);
 
@@ -289,7 +289,7 @@ TEST(prefix_removal) {
 TEST(suffix_removal) {
     executor_t *exec = setup_executor();
 
-    // ${VAR%pattern} - remove shortest suffix
+    /// ${VAR%pattern} - remove shortest suffix
     executor_execute_command_line(exec, "VAR=foobar", 1);
     executor_execute_command_line(exec, "RESULT=${VAR%bar}", 1);
 
@@ -304,7 +304,7 @@ TEST(suffix_removal) {
 TEST(substitution_first) {
     executor_t *exec = setup_executor();
 
-    // ${VAR/pattern/replacement} - replace first
+    /// ${VAR/pattern/replacement} - replace first
     executor_execute_command_line(exec, "VAR=hello", 1);
     executor_execute_command_line(exec, "RESULT=${VAR/l/L}", 1);
 
@@ -319,7 +319,7 @@ TEST(substitution_first) {
 TEST(substitution_all) {
     executor_t *exec = setup_executor();
 
-    // ${VAR//pattern/replacement} - replace all
+    /// ${VAR//pattern/replacement} - replace all
     executor_execute_command_line(exec, "VAR=hello", 1);
     executor_execute_command_line(exec, "RESULT=${VAR//l/L}", 1);
 
@@ -479,7 +479,7 @@ TEST(arith_increment) {
     ASSERT_STR_EQ(result, "6", "++5 = 6");
     free(result);
 
-    // X should also be updated
+    /// X should also be updated
     char *x = symtable_get_var(exec->symtable, "X");
     ASSERT_NOT_NULL(x, "X should be set");
     ASSERT_STR_EQ(x, "6", "X should be 6 after increment");
@@ -675,7 +675,7 @@ TEST(escaped_dollar) {
      */
     executor_t *exec = setup_executor();
 
-    // Skip actual test until escaping is fixed
+    /// Skip actual test until escaping is fixed
     executor_execute_command_line(exec, "RESULT=literal", 1);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
@@ -700,7 +700,7 @@ TEST(nested_var_expansion) {
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "INNER=world", 1);
-    // Just verify double quote expansion works for now
+    /// Just verify double quote expansion works for now
     executor_execute_command_line(exec, "OUTER=\"hello $INNER\"", 1);
 
     char *result = symtable_get_var(exec->symtable, "OUTER");
@@ -743,7 +743,7 @@ TEST(brace_adjacent_text) {
      */
     executor_t *exec = setup_executor();
 
-    // Skip actual crash-inducing test until bug is fixed
+    /// Skip actual crash-inducing test until bug is fixed
     executor_execute_command_line(exec, "PREFIX=hello", 1);
 
     char *prefix = symtable_get_var(exec->symtable, "PREFIX");
@@ -762,7 +762,7 @@ TEST(brace_adjacent_text) {
 int main(void) {
     printf("=== Expansion Tests ===\n\n");
 
-    // Initialize required subsystems
+    /// Initialize required subsystems
     init_symtable();
     init_aliases();
 

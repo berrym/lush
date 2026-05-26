@@ -27,7 +27,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================================
  * DEBUG CONTEXT LIFECYCLE TESTS
@@ -38,7 +38,7 @@ TEST(debug_init_creates_context) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should return non-NULL");
 
-    // Verify initial state
+    /// Verify initial state
     ASSERT_EQ(ctx->level, DEBUG_NONE, "Initial level should be DEBUG_NONE");
     ASSERT_EQ(ctx->mode, DEBUG_MODE_NORMAL, "Initial mode should be NORMAL");
     ASSERT_FALSE(ctx->enabled, "Debug should not be enabled initially");
@@ -50,7 +50,7 @@ TEST(debug_init_creates_context) {
 }
 
 TEST(debug_cleanup_handles_null) {
-    // Should not crash
+    /// Should not crash
     debug_cleanup(NULL);
 }
 
@@ -158,7 +158,7 @@ TEST(breakpoint_remove) {
     ASSERT_TRUE(removed, "Remove should succeed");
     ASSERT_NULL(ctx->breakpoints, "Breakpoint list should be empty");
 
-    // Try to remove non-existent
+    /// Try to remove non-existent
     removed = debug_remove_breakpoint(ctx, id);
     ASSERT_FALSE(removed, "Remove non-existent should return false");
 
@@ -181,7 +181,7 @@ TEST(breakpoint_enable_disable) {
     ASSERT_TRUE(result, "Enable should succeed");
     ASSERT_TRUE(ctx->breakpoints->enabled, "Should be enabled");
 
-    // Non-existent ID
+    /// Non-existent ID
     result = debug_enable_breakpoint(ctx, 999, true);
     ASSERT_FALSE(result, "Should fail for non-existent ID");
 
@@ -207,11 +207,11 @@ TEST(breakpoint_check_hit) {
     ASSERT_TRUE(hit, "Matching breakpoint should report a hit");
     ASSERT_EQ(ctx->breakpoints->hit_count, 1, "Hit count should be 1");
 
-    // No breakpoint at line 11 -> no hit.
+    /// No breakpoint at line 11 -> no hit.
     bool miss = debug_check_breakpoint(ctx, "test.sh", 11);
     ASSERT_FALSE(miss, "No breakpoint at test.sh:11 should not hit");
 
-    // Same line number, different file -> no hit.
+    /// Same line number, different file -> no hit.
     bool other_file = debug_check_breakpoint(ctx, "other.sh", 10);
     ASSERT_FALSE(other_file, "Breakpoint is file-specific");
 
@@ -229,7 +229,7 @@ TEST(breakpoint_check_disabled) {
     int id = debug_add_breakpoint(ctx, "test.sh", 10, NULL);
     debug_enable_breakpoint(ctx, id, false);
 
-    // A disabled breakpoint is not a hit even at its own location.
+    /// A disabled breakpoint is not a hit even at its own location.
     bool hit = debug_check_breakpoint(ctx, "test.sh", 10);
     ASSERT_FALSE(hit, "Disabled breakpoint should not report a hit");
     ASSERT_EQ(ctx->breakpoints->hit_count, 0,
@@ -291,7 +291,7 @@ TEST(stack_frame_pop_empty) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    // Should not crash when popping empty stack
+    /// Should not crash when popping empty stack
     debug_pop_frame(ctx);
     ASSERT_EQ(ctx->stack_depth, 0, "Depth should still be 0");
 
@@ -319,7 +319,7 @@ TEST(stack_frame_deep_nesting) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
 
-    // Push 10 frames
+    /// Push 10 frames
     for (int i = 0; i < 10; i++) {
         char name[32];
         snprintf(name, sizeof(name), "func_%d", i);
@@ -328,7 +328,7 @@ TEST(stack_frame_deep_nesting) {
     }
     ASSERT_EQ(ctx->stack_depth, 10, "Depth should be 10");
 
-    // Pop all frames
+    /// Pop all frames
     for (int i = 0; i < 10; i++) {
         debug_pop_frame(ctx);
     }
@@ -364,7 +364,7 @@ TEST(profile_function_tracking) {
     debug_profile_start(ctx);
 
     debug_profile_function_enter(ctx, "test_func");
-    // Simulate some work
+    /// Simulate some work
     debug_profile_function_exit(ctx, "test_func");
 
     ASSERT_NOT_NULL(ctx->profile_data, "Profile data should exist");
@@ -396,7 +396,7 @@ TEST(profile_multiple_calls) {
 
     debug_profile_start(ctx);
 
-    // Call same function multiple times - need a frame for profiling to work
+    /// Call same function multiple times - need a frame for profiling to work
     for (int i = 0; i < 5; i++) {
         debug_push_frame(ctx, "repeated_func", "test.sh", 100 + i);
         debug_profile_function_enter(ctx, "repeated_func");
@@ -404,10 +404,10 @@ TEST(profile_multiple_calls) {
         debug_pop_frame(ctx);
     }
 
-    // Profile data should exist and have correct call count
+    /// Profile data should exist and have correct call count
     ASSERT_NOT_NULL(ctx->profile_data, "Profile data should exist");
 
-    // Find the entry for repeated_func
+    /// Find the entry for repeated_func
     profile_data_t *profile = ctx->profile_data;
     bool found = false;
     while (profile) {
@@ -485,7 +485,7 @@ TEST(utility_get_time_ns) {
     long time1 = debug_get_time_ns();
     ASSERT(time1 > 0, "Time should be positive");
 
-    // Small delay
+    /// Small delay
     for (volatile int i = 0; i < 100000; i++)
         ;
 
@@ -544,7 +544,7 @@ TEST(utility_node_description_various_types) {
 TEST(loop_context_enter_exit) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true); // Enable debug mode for loop tracking
+    debug_enable(ctx, true); /// Enable debug mode for loop tracking
 
     ASSERT_FALSE(ctx->execution_context.in_loop, "Not in loop initially");
 
@@ -562,12 +562,12 @@ TEST(loop_context_enter_exit) {
 TEST(loop_context_update_variable) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true); // Enable debug mode for loop tracking
+    debug_enable(ctx, true); /// Enable debug mode for loop tracking
 
     debug_enter_loop(ctx, "for", "i", "1");
 
     debug_update_loop_variable(ctx, "i", "2");
-    // Value should be updated - exact check depends on implementation
+    /// Value should be updated - exact check depends on implementation
 
     debug_exit_loop(ctx);
     debug_cleanup(ctx);
@@ -579,7 +579,7 @@ TEST(loop_context_update_variable) {
  */
 
 TEST(output_null_context_safe) {
-    // These should not crash with NULL context
+    /// These should not crash with NULL context
     debug_printf(NULL, "test %d", 123);
     debug_print_separator(NULL);
     debug_print_header(NULL, "Test");
@@ -593,7 +593,7 @@ TEST(output_null_context_safe) {
 TEST(step_mode_transitions) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true); // Enable debug mode for step operations
+    debug_enable(ctx, true); /// Enable debug mode for step operations
 
     debug_step_into(ctx);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP, "Should be in step mode");
@@ -615,7 +615,7 @@ TEST(step_mode_transitions) {
 TEST(execution_context_cleanup) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
-    debug_enable(ctx, true); // Enable debug mode for execution context
+    debug_enable(ctx, true); /// Enable debug mode for execution context
 
     debug_enter_loop(ctx, "for", "i", "1");
     ASSERT_TRUE(ctx->execution_context.in_loop, "Should be in loop");
@@ -634,7 +634,7 @@ TEST(execution_context_cleanup) {
 int main(void) {
     printf("\n=== Debug Subsystem Unit Tests ===\n\n");
 
-    // Lifecycle tests
+    /// Lifecycle tests
     printf("Debug Context Lifecycle:\n");
     RUN_TEST(debug_init_creates_context);
     RUN_TEST(debug_cleanup_handles_null);
@@ -642,7 +642,7 @@ int main(void) {
     RUN_TEST(debug_set_mode);
     RUN_TEST(debug_enable_disable);
 
-    // Breakpoint tests
+    /// Breakpoint tests
     printf("\nBreakpoint Management:\n");
     RUN_TEST(breakpoint_add_simple);
     RUN_TEST(breakpoint_add_with_condition);
@@ -653,47 +653,47 @@ int main(void) {
     RUN_TEST(breakpoint_check_disabled);
     RUN_TEST(breakpoint_clear_all);
 
-    // Stack frame tests
+    /// Stack frame tests
     printf("\nStack Frame Management:\n");
     RUN_TEST(stack_frame_push_pop);
     RUN_TEST(stack_frame_pop_empty);
     RUN_TEST(stack_frame_update_node);
     RUN_TEST(stack_frame_deep_nesting);
 
-    // Profiling tests
+    /// Profiling tests
     printf("\nProfiling:\n");
     RUN_TEST(profile_start_stop);
     RUN_TEST(profile_function_tracking);
     RUN_TEST(profile_reset);
     RUN_TEST(profile_multiple_calls);
 
-    // Analysis tests
+    /// Analysis tests
     printf("\nScript Analysis:\n");
     RUN_TEST(analysis_add_issue);
     RUN_TEST(analysis_multiple_issues);
     RUN_TEST(analysis_clear_issues);
 
-    // Utility tests
+    /// Utility tests
     printf("\nUtility Functions:\n");
     RUN_TEST(utility_get_time_ns);
     RUN_TEST(utility_format_time);
     RUN_TEST(utility_get_node_description);
     RUN_TEST(utility_node_description_various_types);
 
-    // Loop context tests
+    /// Loop context tests
     printf("\nLoop Context:\n");
     RUN_TEST(loop_context_enter_exit);
     RUN_TEST(loop_context_update_variable);
 
-    // Output control tests
+    /// Output control tests
     printf("\nOutput Control:\n");
     RUN_TEST(output_null_context_safe);
 
-    // Step execution tests
+    /// Step execution tests
     printf("\nStep Execution:\n");
     RUN_TEST(step_mode_transitions);
 
-    // Execution context tests
+    /// Execution context tests
     printf("\nExecution Context:\n");
     RUN_TEST(execution_context_cleanup);
 

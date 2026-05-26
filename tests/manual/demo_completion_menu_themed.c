@@ -13,9 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ============================================================================
-// Mock implementations
-// ============================================================================
+/// ============================================================================
+/// Mock implementations
+/// ============================================================================
 
 typedef struct builtin_s {
     const char *name;
@@ -43,37 +43,37 @@ void lush_add_completion(lush_completions_t *lc, const char *completion) {
     (void)completion;
 }
 
-// Mock theme functions (theme system not available in minimal build)
+/// Mock theme functions (theme system not available in minimal build)
 theme_definition_t *theme_get_active(void) { return NULL; }
 
 int theme_detect_color_support(void) {
-    return 256; // Simulate 256-color support
+    return 256; /// Simulate 256-color support
 }
 
 symbol_compatibility_t symbol_get_compatibility_mode(void) {
-    return SYMBOL_MODE_UNICODE; // Use Unicode symbols
+    return SYMBOL_MODE_UNICODE; /// Use Unicode symbols
 }
 
-// ============================================================================
-// Demo
-// ============================================================================
+/// ============================================================================
+/// Demo
+/// ============================================================================
 
 static completion_result_t *create_demo_completions(void) {
     completion_result_t *result = completion_result_create(32);
 
-    // Add builtins
+    /// Add builtins
     completion_result_add(result, "cd", " ", COMPLETION_TYPE_BUILTIN, 900);
     completion_result_add(result, "echo", " ", COMPLETION_TYPE_BUILTIN, 900);
     completion_result_add(result, "pwd", " ", COMPLETION_TYPE_BUILTIN, 900);
     completion_result_add(result, "exit", " ", COMPLETION_TYPE_BUILTIN, 900);
     completion_result_add(result, "help", " ", COMPLETION_TYPE_BUILTIN, 900);
 
-    // Add aliases
+    /// Add aliases
     completion_result_add(result, "ll", " ", COMPLETION_TYPE_ALIAS, 950);
     completion_result_add(result, "la", " ", COMPLETION_TYPE_ALIAS, 950);
     completion_result_add(result, "gs", " ", COMPLETION_TYPE_ALIAS, 950);
 
-    // Add commands
+    /// Add commands
     completion_result_add(result, "ls", " ", COMPLETION_TYPE_COMMAND, 800);
     completion_result_add(result, "grep", " ", COMPLETION_TYPE_COMMAND, 800);
     completion_result_add(result, "cat", " ", COMPLETION_TYPE_COMMAND, 800);
@@ -81,14 +81,14 @@ static completion_result_t *create_demo_completions(void) {
     completion_result_add(result, "git", " ", COMPLETION_TYPE_COMMAND, 800);
     completion_result_add(result, "make", " ", COMPLETION_TYPE_COMMAND, 800);
 
-    // Add files
+    /// Add files
     completion_result_add(result, "file1.txt", " ", COMPLETION_TYPE_FILE, 600);
     completion_result_add(result, "file2.c", " ", COMPLETION_TYPE_FILE, 600);
     completion_result_add(result, "readme.md", " ", COMPLETION_TYPE_FILE, 600);
     completion_result_add(result, "config.json", " ", COMPLETION_TYPE_FILE,
                           600);
 
-    // Add directories
+    /// Add directories
     completion_result_add(result, "src/", "/", COMPLETION_TYPE_DIRECTORY, 700);
     completion_result_add(result, "include/", "/", COMPLETION_TYPE_DIRECTORY,
                           700);
@@ -96,13 +96,13 @@ static completion_result_t *create_demo_completions(void) {
                           700);
     completion_result_add(result, "docs/", "/", COMPLETION_TYPE_DIRECTORY, 700);
 
-    // Add variables
+    /// Add variables
     completion_result_add(result, "$HOME", "", COMPLETION_TYPE_VARIABLE, 500);
     completion_result_add(result, "$PATH", "", COMPLETION_TYPE_VARIABLE, 500);
     completion_result_add(result, "$USER", "", COMPLETION_TYPE_VARIABLE, 500);
     completion_result_add(result, "$SHELL", "", COMPLETION_TYPE_VARIABLE, 500);
 
-    // Add history
+    /// Add history
     completion_result_add(result, "git commit -m", " ", COMPLETION_TYPE_HISTORY,
                           400);
     completion_result_add(result, "make clean", " ", COMPLETION_TYPE_HISTORY,
@@ -122,14 +122,14 @@ int main(void) {
         "╚════════════════════════════════════════════════════════════════╝\n");
     printf("\n");
 
-    // Initialize theme system
+    /// Initialize theme system
     printf("Initializing theme system...\n");
     if (!completion_menu_theme_init()) {
         fprintf(stderr, "Failed to initialize theme system\n");
         return 1;
     }
 
-    // Get theme configuration
+    /// Get theme configuration
     const completion_menu_theme_config_t *theme_config =
         completion_menu_theme_get_config();
 
@@ -140,7 +140,7 @@ int main(void) {
     printf("  Bold: %s\n", theme_config->use_bold ? "enabled" : "disabled");
     printf("\n");
 
-    // Create completions
+    /// Create completions
     printf("Creating sample completions...\n");
     completion_result_t *result = create_demo_completions();
     if (!result) {
@@ -150,7 +150,7 @@ int main(void) {
 
     printf("Created %zu completions\n\n", result->count);
 
-    // Create menu
+    /// Create menu
     completion_menu_t *menu = completion_menu_create(result, NULL);
     if (!menu) {
         fprintf(stderr, "Failed to create menu\n");
@@ -158,7 +158,7 @@ int main(void) {
         return 1;
     }
 
-    // Display with theme integration
+    /// Display with theme integration
     printf("═══════════════════════════════════════════════════════════════\n");
     printf("Themed Completion Menu Display:\n");
     printf("═══════════════════════════════════════════════════════════════\n");
@@ -168,16 +168,16 @@ int main(void) {
     printf("═══════════════════════════════════════════════════════════════\n");
     printf("\n");
 
-    // Test individual formatting functions
+    /// Test individual formatting functions
     printf("Testing themed formatting functions:\n\n");
 
-    // Test header formatting
+    /// Test header formatting
     char header[256];
     completion_menu_format_header_themed(COMPLETION_TYPE_BUILTIN, 5, header,
                                          sizeof(header));
     printf("Header example: %s\n\n", header);
 
-    // Test item formatting
+    /// Test item formatting
     completion_item_t test_item = {.text = "example_command",
                                    .suffix = " ",
                                    .type = COMPLETION_TYPE_COMMAND,
@@ -195,7 +195,7 @@ int main(void) {
                                        sizeof(item_line));
     printf("Item (selected): %s\n\n", item_line);
 
-    // Test scroll indicators
+    /// Test scroll indicators
     char scroll[128];
     completion_menu_format_scroll_indicator_themed(1, scroll, sizeof(scroll));
     printf("Scroll down: %s\n", scroll);
@@ -203,7 +203,7 @@ int main(void) {
     completion_menu_format_scroll_indicator_themed(-1, scroll, sizeof(scroll));
     printf("Scroll up:   %s\n\n", scroll);
 
-    // Cleanup
+    /// Cleanup
     completion_menu_free(menu);
     completion_result_free(result);
     completion_menu_theme_cleanup();

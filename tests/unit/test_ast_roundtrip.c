@@ -23,7 +23,7 @@
 #define PASS() ((void)0)
 #define FAIL(msg) TEST_FAIL_MSG(msg)
 
-// Test counters
+/// Test counters
 
 /**
  * @brief Perform round-trip test on shell input
@@ -32,7 +32,7 @@
  * @return 1 if passed, 0 if failed
  */
 static int roundtrip_test(const char *input, const char *name) {
-    // Parse original input
+    /// Parse original input
     parser_t *parser1 = parser_new(input);
     if (!parser1) {
         printf("FAIL: %s - could not create parser1\n", name);
@@ -49,7 +49,7 @@ static int roundtrip_test(const char *input, const char *name) {
     }
     parser_free(parser1);
 
-    // Convert AST back to source
+    /// Convert AST back to source
     char *regenerated = node_to_source(ast1);
     if (!regenerated) {
         printf("FAIL: %s - node_to_source failed\n", name);
@@ -57,7 +57,7 @@ static int roundtrip_test(const char *input, const char *name) {
         return 0;
     }
 
-    // Parse regenerated source
+    /// Parse regenerated source
     parser_t *parser2 = parser_new(regenerated);
     if (!parser2) {
         printf("FAIL: %s - could not create parser2\n", name);
@@ -78,7 +78,7 @@ static int roundtrip_test(const char *input, const char *name) {
     }
     parser_free(parser2);
 
-    // Compare ASTs
+    /// Compare ASTs
     int equal = node_equals(ast1, ast2);
 
     if (!equal) {
@@ -86,7 +86,7 @@ static int roundtrip_test(const char *input, const char *name) {
         printf("  Original: %s\n", input);
         printf("  Regenerated: %s\n", regenerated);
 
-        // Show second regeneration for debugging
+        /// Show second regeneration for debugging
         char *regen2 = node_to_source(ast2);
         if (regen2) {
             printf("  Re-regenerated: %s\n", regen2);

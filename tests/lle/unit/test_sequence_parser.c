@@ -24,7 +24,7 @@
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
 
-// Mock terminal capabilities and memory pool
+/// Mock terminal capabilities and memory pool
 static int mock_terminal_dummy = 42;
 static int mock_pool_dummy = 43;
 static lle_terminal_capabilities_t *mock_terminal =
@@ -87,7 +87,7 @@ void test_control_character(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Test Ctrl+C (0x03)
+    /// Test Ctrl+C (0x03)
     const char data[] = {0x03};
     result = lle_sequence_parser_process_data(parser, data, 1, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -116,7 +116,7 @@ void test_csi_simple(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC[A - Cursor up
+    /// ESC[A - Cursor up
     const char data[] = "\x1B[A";
     result = lle_sequence_parser_process_data(parser, data, 3, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -124,7 +124,7 @@ void test_csi_simple(void) {
     ASSERT(parsed->type == LLE_PARSED_INPUT_TYPE_SEQUENCE,
            "Should be sequence input");
 
-    // Check parser state
+    /// Check parser state
     lle_parser_state_t state = lle_sequence_parser_get_state(parser);
     ASSERT(state == LLE_PARSER_STATE_NORMAL, "Should return to normal state");
 
@@ -153,13 +153,13 @@ void test_csi_with_parameters(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC[1;5H - Move cursor to row 1, col 5
+    /// ESC[1;5H - Move cursor to row 1, col 5
     const char data[] = "\x1B[1;5H";
     result = lle_sequence_parser_process_data(parser, data, 7, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
     ASSERT(parsed != NULL, "Should produce parsed input");
 
-    // Get parameters
+    /// Get parameters
     const uint32_t *params;
     uint8_t param_count;
     result = lle_sequence_parser_get_csi_params(parser, &params, &param_count);
@@ -187,7 +187,7 @@ void test_csi_multiple_parameters(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC[38;5;196m - Set foreground color to RGB index 196
+    /// ESC[38;5;196m - Set foreground color to RGB index 196
     const char data[] = "\x1B[38;5;196m";
     result = lle_sequence_parser_process_data(parser, data, 12, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -215,7 +215,7 @@ void test_osc_sequence(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC]0;Window Title\x07 - Set window title (BEL terminated)
+    /// ESC]0;Window Title\x07 - Set window title (BEL terminated)
     const char data[] = "\x1B]0;Window Title\x07";
     result = lle_sequence_parser_process_data(parser, data, 20, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -245,7 +245,7 @@ void test_osc_st_terminator(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC]0;Title\ESC\ - Set window title (ST terminated)
+    /// ESC]0;Title\ESC\ - Set window title (ST terminated)
     const char data[] = "\x1B]0;Title\x1B\\";
     result = lle_sequence_parser_process_data(parser, data, 12, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -273,7 +273,7 @@ void test_dcs_sequence(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC P...ESC\ - DCS sequence
+    /// ESC P...ESC\ - DCS sequence
     const char data[] = "\x1BP0;1;2\x1B\\";
     result = lle_sequence_parser_process_data(parser, data, 10, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -301,7 +301,7 @@ void test_ss3_sequence(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC O P - F1 key (SS3 format)
+    /// ESC O P - F1 key (SS3 format)
     const char data[] = "\x1BOP";
     result = lle_sequence_parser_process_data(parser, data, 3, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -329,21 +329,21 @@ void test_reset_state(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Start a sequence but don't complete it
+    /// Start a sequence but don't complete it
     const char data[] = "\x1B[1";
     lle_parsed_input_t *parsed = NULL;
     result = lle_sequence_parser_process_data(parser, data, 3, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
 
-    // Parser should be in CSI state
+    /// Parser should be in CSI state
     lle_parser_state_t state = lle_sequence_parser_get_state(parser);
     ASSERT(state == LLE_PARSER_STATE_CSI, "Should be in CSI state");
 
-    // Reset
+    /// Reset
     result = lle_sequence_parser_reset_state(parser);
     ASSERT(result == LLE_SUCCESS, "Reset should succeed");
 
-    // Should be back to normal
+    /// Should be back to normal
     state = lle_sequence_parser_get_state(parser);
     ASSERT(state == LLE_PARSER_STATE_NORMAL, "Should be in normal state");
 
@@ -364,13 +364,13 @@ void test_get_buffer(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Start a sequence
+    /// Start a sequence
     const char data[] = "\x1B[1;5";
     lle_parsed_input_t *parsed = NULL;
     result = lle_sequence_parser_process_data(parser, data, 5, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
 
-    // Get buffer
+    /// Get buffer
     const char *buffer;
     size_t buffer_len;
     result = lle_sequence_parser_get_buffer(parser, &buffer, &buffer_len);
@@ -395,7 +395,7 @@ void test_get_statistics(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Get initial stats
+    /// Get initial stats
     uint32_t malformed, timeout;
     result = lle_sequence_parser_get_stats(parser, &malformed, &timeout);
     ASSERT(result == LLE_SUCCESS, "Get stats should succeed");
@@ -420,12 +420,12 @@ void test_multiple_sequences(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // ESC[A followed by ESC[B
+    /// ESC[A followed by ESC[B
     const char data[] = "\x1B[A\x1B[B";
     result = lle_sequence_parser_process_data(parser, data, 6, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
 
-    // First sequence should be parsed
+    /// First sequence should be parsed
     ASSERT(parsed != NULL, "Should produce parsed input");
 
     if (parsed) {
@@ -450,13 +450,13 @@ void test_incomplete_sequence(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Incomplete CSI - just ESC[
+    /// Incomplete CSI - just ESC[
     const char data[] = "\x1B[";
     result = lle_sequence_parser_process_data(parser, data, 2, &parsed);
     ASSERT(result == LLE_SUCCESS, "Process should succeed");
     ASSERT(parsed == NULL, "Should not produce output yet");
 
-    // Parser should be waiting for more data
+    /// Parser should be waiting for more data
     lle_parser_state_t state = lle_sequence_parser_get_state(parser);
     ASSERT(state == LLE_PARSER_STATE_CSI, "Should be in CSI state");
 
@@ -478,13 +478,13 @@ void test_complete_incomplete_sequence(void) {
     result = lle_sequence_parser_init(&parser, mock_terminal, mock_pool);
     ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Send first part: ESC[1
+    /// Send first part: ESC[1
     const char data1[] = "\x1B[1";
     result = lle_sequence_parser_process_data(parser, data1, 3, &parsed);
     ASSERT(result == LLE_SUCCESS, "First process should succeed");
     ASSERT(parsed == NULL, "Should not produce output yet");
 
-    // Send second part: ;5H
+    /// Send second part: ;5H
     const char data2[] = ";5H";
     result = lle_sequence_parser_process_data(parser, data2, 3, &parsed);
     ASSERT(result == LLE_SUCCESS, "Second process should succeed");

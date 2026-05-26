@@ -38,7 +38,7 @@
 #define ASSERT_NOT_NULL(a) ASSERT((a) != NULL)
 
 /* ========================================================================== */
-// Theme Registry Tests
+/// Theme Registry Tests
 /* ========================================================================== */
 
 TEST(registry_init) {
@@ -87,9 +87,9 @@ TEST(registry_register_duplicate) {
     ASSERT_EQ(result1, LLE_SUCCESS);
 
     lle_result_t result2 = lle_theme_registry_register(&registry, theme2);
-    ASSERT_EQ(result2, LLE_ERROR_INVALID_STATE); // Duplicate
+    ASSERT_EQ(result2, LLE_ERROR_INVALID_STATE); /// Duplicate
 
-    // Free theme2 since it wasn't registered
+    /// Free theme2 since it wasn't registered
     lle_theme_free(theme2);
 
     lle_theme_registry_cleanup(&registry);
@@ -126,14 +126,14 @@ TEST(registry_set_active) {
     lle_theme_registry_register(&registry, theme1);
     lle_theme_registry_register(&registry, theme2);
 
-    // Set first theme active
+    /// Set first theme active
     lle_result_t result = lle_theme_registry_set_active(&registry, "theme1");
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(theme1->is_active);
     ASSERT(!theme2->is_active);
     ASSERT_STR_EQ(registry.active_theme_name, "theme1");
 
-    // Switch to second theme
+    /// Switch to second theme
     result = lle_theme_registry_set_active(&registry, "theme2");
     ASSERT_EQ(result, LLE_SUCCESS);
     ASSERT(!theme1->is_active);
@@ -159,11 +159,11 @@ TEST(registry_get_active) {
     lle_theme_registry_t registry;
     lle_theme_registry_init(&registry);
 
-    // No active theme initially
+    /// No active theme initially
     lle_theme_t *active = lle_theme_registry_get_active(&registry);
     ASSERT_NULL(active);
 
-    // Register and activate
+    /// Register and activate
     lle_theme_t *theme =
         lle_theme_create("active", "Active theme", LLE_THEME_CATEGORY_CUSTOM);
     lle_theme_registry_register(&registry, theme);
@@ -202,7 +202,7 @@ TEST(registry_list) {
 }
 
 /* ========================================================================== */
-// Theme Creation Tests
+/// Theme Creation Tests
 /* ========================================================================== */
 
 TEST(theme_create) {
@@ -231,14 +231,14 @@ TEST(theme_create_null_name) {
 }
 
 /* ========================================================================== */
-// Theme Inheritance Tests
+/// Theme Inheritance Tests
 /* ========================================================================== */
 
 TEST(theme_inheritance_basic) {
     lle_theme_registry_t registry;
     lle_theme_registry_init(&registry);
 
-    // Create parent theme with colors
+    /// Create parent theme with colors
     lle_theme_t *parent =
         lle_theme_create("parent", "Parent theme", LLE_THEME_CATEGORY_MODERN);
     parent->colors.primary = lle_color_basic(LLE_COLOR_BLUE);
@@ -249,30 +249,30 @@ TEST(theme_inheritance_basic) {
 
     lle_theme_registry_register(&registry, parent);
 
-    // Create child theme that inherits
+    /// Create child theme that inherits
     lle_theme_t *child =
         lle_theme_create("child", "Child theme", LLE_THEME_CATEGORY_CUSTOM);
     snprintf(child->inherits_from, sizeof(child->inherits_from), "parent");
-    // Child overrides error color
+    /// Child overrides error color
     child->colors.error = lle_color_basic(LLE_COLOR_MAGENTA);
-    // Clear child's layout so it inherits from parent
+    /// Clear child's layout so it inherits from parent
     child->layout.ps1_format[0] = '\0';
-    // Clear child's prompt symbol so it inherits
+    /// Clear child's prompt symbol so it inherits
     child->symbols.prompt[0] = '\0';
 
     lle_result_t result = lle_theme_registry_register(&registry, child);
     ASSERT_EQ(result, LLE_SUCCESS);
 
-    // Verify inheritance
+    /// Verify inheritance
     ASSERT_EQ(child->parent, parent);
-    // Primary inherited from parent (child had MODE_NONE)
+    /// Primary inherited from parent (child had MODE_NONE)
     ASSERT_EQ(child->colors.primary.mode, LLE_COLOR_MODE_BASIC);
     ASSERT_EQ(child->colors.primary.value.basic, LLE_COLOR_BLUE);
-    // Error was overridden by child
+    /// Error was overridden by child
     ASSERT_EQ(child->colors.error.value.basic, LLE_COLOR_MAGENTA);
-    // Symbol inherited (was cleared)
+    /// Symbol inherited (was cleared)
     ASSERT_STR_EQ(child->symbols.prompt, ">");
-    // Layout inherited (was cleared)
+    /// Layout inherited (was cleared)
     ASSERT_STR_EQ(child->layout.ps1_format, "${directory} $ ");
 
     lle_theme_registry_cleanup(&registry);
@@ -294,7 +294,7 @@ TEST(theme_inheritance_not_found) {
 }
 
 /* ========================================================================== */
-// Color Helper Tests
+/// Color Helper Tests
 /* ========================================================================== */
 
 TEST(color_basic) {
@@ -359,7 +359,7 @@ TEST(color_to_ansi_background) {
 }
 
 /* ========================================================================== */
-// Symbol Set Tests
+/// Symbol Set Tests
 /* ========================================================================== */
 
 TEST(symbol_set_unicode) {
@@ -387,7 +387,7 @@ TEST(symbol_set_ascii) {
 }
 
 /* ========================================================================== */
-// Built-in Theme Tests
+/// Built-in Theme Tests
 /* ========================================================================== */
 
 TEST(builtin_minimal) {
@@ -457,7 +457,7 @@ TEST(register_builtins) {
     ASSERT_EQ(registry.count, 11);
     ASSERT_EQ(registry.builtin_count, 11);
 
-    // Verify all themes registered
+    /// Verify all themes registered
     ASSERT_NOT_NULL(lle_theme_registry_find(&registry, "minimal"));
     ASSERT_NOT_NULL(lle_theme_registry_find(&registry, "default"));
     ASSERT_NOT_NULL(lle_theme_registry_find(&registry, "classic"));
@@ -470,7 +470,7 @@ TEST(register_builtins) {
     ASSERT_NOT_NULL(lle_theme_registry_find(&registry, "light"));
     ASSERT_NOT_NULL(lle_theme_registry_find(&registry, "colorful"));
 
-    // Minimal is set as active
+    /// Minimal is set as active
     lle_theme_t *active = lle_theme_registry_get_active(&registry);
     ASSERT_NOT_NULL(active);
     ASSERT_STR_EQ(active->name, "minimal");
@@ -479,7 +479,7 @@ TEST(register_builtins) {
 }
 
 /* ========================================================================== */
-// Main
+/// Main
 /* ========================================================================== */
 
 int main(void) {

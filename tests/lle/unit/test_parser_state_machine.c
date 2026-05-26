@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// External memory pool functions (mock)
+/// External memory pool functions (mock)
 extern void *lle_pool_alloc(size_t size);
 extern void lle_pool_free(void *ptr);
 
@@ -35,17 +35,17 @@ extern void lle_pool_free(void *ptr);
 static void test_init_destroy(void) {
     lle_parser_state_machine_t *sm = NULL;
 
-    // Initialize
+    /// Initialize
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
     TEST_ASSERT(sm != NULL, "State machine should not be NULL");
 
-    // Check initial state
+    /// Check initial state
     lle_parser_state_t state = lle_parser_state_machine_get_state(sm);
     TEST_ASSERT(state == LLE_PARSER_STATE_NORMAL,
                 "Initial state should be NORMAL");
 
-    // Destroy
+    /// Destroy
     result = lle_parser_state_machine_destroy(sm);
     TEST_ASSERT(result == LLE_SUCCESS, "Destroy should succeed");
 
@@ -61,7 +61,7 @@ static void test_state_transitions(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Transition to ESCAPE
+    /// Transition to ESCAPE
     result = lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
     TEST_ASSERT(result == LLE_SUCCESS, "Transition should succeed");
 
@@ -71,7 +71,7 @@ static void test_state_transitions(void) {
     lle_parser_state_t prev = lle_parser_state_machine_get_previous_state(sm);
     TEST_ASSERT(prev == LLE_PARSER_STATE_NORMAL, "Previous should be NORMAL");
 
-    // Transition to CSI
+    /// Transition to CSI
     result = lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_CSI);
     TEST_ASSERT(result == LLE_SUCCESS, "Transition should succeed");
 
@@ -98,7 +98,7 @@ static void test_transition_count(void) {
     uint64_t count = lle_parser_state_machine_get_transitions(sm);
     TEST_ASSERT(count == 0, "Initial transition count should be 0");
 
-    // Make some transitions
+    /// Make some transitions
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_CSI);
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_NORMAL);
@@ -106,7 +106,7 @@ static void test_transition_count(void) {
     count = lle_parser_state_machine_get_transitions(sm);
     TEST_ASSERT(count == 3, "Should have 3 transitions");
 
-    // Transition to same state doesn't count
+    /// Transition to same state doesn't count
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_NORMAL);
     count = lle_parser_state_machine_get_transitions(sm);
     TEST_ASSERT(count == 3, "Same-state transition shouldn't count");
@@ -125,11 +125,11 @@ static void test_process_escape(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Start in NORMAL state
+    /// Start in NORMAL state
     lle_parser_state_t state = lle_parser_state_machine_get_state(sm);
     TEST_ASSERT(state == LLE_PARSER_STATE_NORMAL, "Should start in NORMAL");
 
-    // Process ESC character
+    /// Process ESC character
     const char data[] = "\x1B";
     result = lle_parser_state_machine_process(sm, NULL, data, 1);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -152,16 +152,16 @@ static void test_process_csi(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Process ESC[
+    /// Process ESC[
     const char data[] = "\x1B[";
     result = lle_parser_state_machine_process(sm, NULL, data, 2);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
 
-    // Should still be in ESCAPE (need more data to determine CSI vs mouse)
+    /// Should still be in ESCAPE (need more data to determine CSI vs mouse)
     lle_parser_state_t state = lle_parser_state_machine_get_state(sm);
     TEST_ASSERT(state == LLE_PARSER_STATE_ESCAPE, "Should be in ESCAPE");
 
-    // Process with third character
+    /// Process with third character
     const char data2[] = "\x1B[A";
     result = lle_parser_state_machine_process(sm, NULL, data2, 3);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -183,10 +183,10 @@ static void test_process_mouse(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Set to ESCAPE state first
+    /// Set to ESCAPE state first
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
 
-    // Process ESC[M (X10 mouse)
+    /// Process ESC[M (X10 mouse)
     const char data[] = "\x1B[M";
     result = lle_parser_state_machine_process(sm, NULL, data, 3);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -208,10 +208,10 @@ static void test_process_sgr_mouse(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Set to ESCAPE state
+    /// Set to ESCAPE state
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
 
-    // Process ESC[< (SGR mouse)
+    /// Process ESC[< (SGR mouse)
     const char data[] = "\x1B[<";
     result = lle_parser_state_machine_process(sm, NULL, data, 3);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -233,10 +233,10 @@ static void test_process_osc(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Set to ESCAPE state
+    /// Set to ESCAPE state
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
 
-    // Process ESC]
+    /// Process ESC]
     const char data[] = "\x1B]";
     result = lle_parser_state_machine_process(sm, NULL, data, 2);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -258,10 +258,10 @@ static void test_process_key_ss3(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Set to ESCAPE state
+    /// Set to ESCAPE state
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
 
-    // Process ESC O (SS3)
+    /// Process ESC O (SS3)
     const char data[] = "\x1BO";
     result = lle_parser_state_machine_process(sm, NULL, data, 2);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -287,13 +287,13 @@ static void test_error_recovery(void) {
     uint32_t errors = lle_parser_state_machine_get_error_recoveries(sm);
     TEST_ASSERT(errors == 0, "Should have no errors initially");
 
-    // Transition to error state
+    /// Transition to error state
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ERROR_RECOVERY);
 
     bool is_error = lle_parser_state_machine_is_error_state(sm);
     TEST_ASSERT(is_error == true, "Should be in error state");
 
-    // Process to recover
+    /// Process to recover
     const char data[] = "x";
     result = lle_parser_state_machine_process(sm, NULL, data, 1);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -319,17 +319,17 @@ static void test_time_in_state(void) {
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
     uint64_t time1 = lle_parser_state_machine_time_in_state(sm);
-    // time1 is uint64_t, always non-negative - just verify we got a value
+    /// time1 is uint64_t, always non-negative - just verify we got a value
     (void)time1;
 
-    // Wait a bit and check again
+    /// Wait a bit and check again
     for (volatile int i = 0; i < 100000; i++)
         ;
 
     uint64_t time2 = lle_parser_state_machine_time_in_state(sm);
     TEST_ASSERT(time2 > time1, "Time should increase");
 
-    // Transition to new state resets timer
+    /// Transition to new state resets timer
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
 
     uint64_t time3 = lle_parser_state_machine_time_in_state(sm);
@@ -349,7 +349,7 @@ static void test_reset(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Make some state changes
+    /// Make some state changes
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_CSI);
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ERROR_RECOVERY);
@@ -357,18 +357,18 @@ static void test_reset(void) {
     uint64_t count = lle_parser_state_machine_get_transitions(sm);
     TEST_ASSERT(count == 3, "Should have 3 transitions");
 
-    // Process to increment error count
+    /// Process to increment error count
     const char data[] = "x";
     lle_parser_state_machine_process(sm, NULL, data, 1);
 
     uint32_t errors = lle_parser_state_machine_get_error_recoveries(sm);
     TEST_ASSERT(errors == 1, "Should have 1 error");
 
-    // Reset
+    /// Reset
     result = lle_parser_state_machine_reset(sm);
     TEST_ASSERT(result == LLE_SUCCESS, "Reset should succeed");
 
-    // Check everything is reset
+    /// Check everything is reset
     lle_parser_state_t state = lle_parser_state_machine_get_state(sm);
     TEST_ASSERT(state == LLE_PARSER_STATE_NORMAL, "Should be in NORMAL state");
 
@@ -392,10 +392,10 @@ static void test_process_dcs(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Set to ESCAPE state
+    /// Set to ESCAPE state
     lle_parser_state_machine_transition(sm, LLE_PARSER_STATE_ESCAPE);
 
-    // Process ESC P (DCS)
+    /// Process ESC P (DCS)
     const char data[] = "\x1BP";
     result = lle_parser_state_machine_process(sm, NULL, data, 2);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -417,7 +417,7 @@ static void test_process_normal_text(void) {
     lle_result_t result = lle_parser_state_machine_init(&sm, NULL, NULL);
     TEST_ASSERT(result == LLE_SUCCESS, "Init should succeed");
 
-    // Process normal text
+    /// Process normal text
     const char data[] = "Hello";
     result = lle_parser_state_machine_process(sm, NULL, data, 5);
     TEST_ASSERT(result == LLE_SUCCESS, "Process should succeed");
@@ -436,7 +436,7 @@ static void test_process_normal_text(void) {
 int main(void) {
     printf("=== LLE Parser State Machine Unit Tests ===\n\n");
 
-    // Run tests
+    /// Run tests
     RUN_TEST(init_destroy);
     RUN_TEST(state_transitions);
     RUN_TEST(transition_count);

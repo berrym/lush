@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Test assertion counter
+/// Test assertion counter
 static int assertions_passed = 0;
 static int tests_run = 0;
 
@@ -57,7 +57,7 @@ static int tests_run = 0;
     } while (0)
 
 /* ========================================================================== */
-// Test: Segment Type Definitions
+/// Test: Segment Type Definitions
 /* ========================================================================== */
 
 static void test_segment_type_definitions(void) {
@@ -110,7 +110,7 @@ static void test_segment_type_definitions(void) {
 }
 
 /* ========================================================================== */
-// Test: Segment Registry API
+/// Test: Segment Registry API
 /* ========================================================================== */
 
 static void test_segment_registry_api(void) {
@@ -159,14 +159,14 @@ static void test_segment_registry_api(void) {
     COMPLIANCE_ASSERT(lle_segment_registry_cleanup != NULL,
                       "lle_segment_registry_cleanup declared");
     lle_segment_registry_cleanup(&registry);
-    // No crash = success
+    /// No crash = success
     TEST_PASS();
 
     printf("  Phase 2 complete (5 tests)\n\n");
 }
 
 /* ========================================================================== */
-// Test: Prompt Context API
+/// Test: Prompt Context API
 /* ========================================================================== */
 
 static void test_prompt_context_api(void) {
@@ -204,7 +204,7 @@ static void test_prompt_context_api(void) {
 }
 
 /* ========================================================================== */
-// Test: Segment Lifecycle API
+/// Test: Segment Lifecycle API
 /* ========================================================================== */
 
 static void test_segment_lifecycle_api(void) {
@@ -225,14 +225,14 @@ static void test_segment_lifecycle_api(void) {
     TEST_START("lle_segment_free function");
     COMPLIANCE_ASSERT(lle_segment_free != NULL, "lle_segment_free declared");
     lle_segment_free(seg);
-    // No crash = success
+    /// No crash = success
     TEST_PASS();
 
     printf("  Phase 4 complete (2 tests)\n\n");
 }
 
 /* ========================================================================== */
-// Test: Built-in Segment Factories
+/// Test: Built-in Segment Factories
 /* ========================================================================== */
 
 static void test_builtin_segment_factories(void) {
@@ -316,7 +316,7 @@ static void test_builtin_segment_factories(void) {
 }
 
 /* ========================================================================== */
-// Test: Segment Callback Interface
+/// Test: Segment Callback Interface
 /* ========================================================================== */
 
 static void test_segment_callback_interface(void) {
@@ -341,7 +341,7 @@ static void test_segment_callback_interface(void) {
     TEST_START("segment is_visible callback");
     lle_prompt_segment_t *status = lle_segment_create_status();
     COMPLIANCE_ASSERT(status->is_visible != NULL, "is_visible callback exists");
-    // Status segment visibility depends on last_exit_code != 0
+    /// Status segment visibility depends on last_exit_code != 0
     ctx.last_exit_code = 0;
     bool visible = status->is_visible(status, &ctx);
     COMPLIANCE_ASSERT(visible == false, "status hidden when exit code is 0");
@@ -355,9 +355,9 @@ static void test_segment_callback_interface(void) {
     lle_prompt_segment_t *git = lle_segment_create_git();
     COMPLIANCE_ASSERT(git->get_property != NULL,
                       "get_property callback exists");
-    // Property access without state returns NULL
+    /// Property access without state returns NULL
     const char *branch = git->get_property(git, "branch");
-    // NULL is acceptable when not in git repo
+    /// NULL is acceptable when not in git repo
     (void)branch;
     lle_segment_free(git);
     TEST_PASS();
@@ -367,7 +367,7 @@ static void test_segment_callback_interface(void) {
     COMPLIANCE_ASSERT(dir2->invalidate_cache != NULL,
                       "invalidate_cache callback exists");
     dir2->invalidate_cache(dir2);
-    // No crash = success
+    /// No crash = success
     lle_segment_free(dir2);
     TEST_PASS();
 
@@ -375,7 +375,7 @@ static void test_segment_callback_interface(void) {
 }
 
 /* ========================================================================== */
-// Test: Segment Output Specification
+/// Test: Segment Output Specification
 /* ========================================================================== */
 
 static void test_segment_output_specification(void) {
@@ -390,8 +390,8 @@ static void test_segment_output_specification(void) {
     lle_prompt_segment_t *dir = lle_segment_create_directory();
     memset(&output, 0, sizeof(output));
     dir->render(dir, &ctx, NULL, &output);
-    // Per spec: directory uses ~ for home abbreviation
-    // Content should be non-empty
+    /// Per spec: directory uses ~ for home abbreviation
+    /// Content should be non-empty
     COMPLIANCE_ASSERT(output.content_len > 0, "directory has content");
     COMPLIANCE_ASSERT(output.needs_separator == true, "needs_separator set");
     lle_segment_free(dir);
@@ -411,7 +411,7 @@ static void test_segment_output_specification(void) {
     lle_prompt_segment_t *symbol = lle_segment_create_symbol();
     memset(&output, 0, sizeof(output));
     symbol->render(symbol, &ctx, NULL, &output);
-    // Per spec: $ for user, # for root
+    /// Per spec: $ for user, # for root
     if (ctx.is_root) {
         COMPLIANCE_ASSERT(strcmp(output.content, "#") == 0,
                           "root gets # symbol");
@@ -426,7 +426,7 @@ static void test_segment_output_specification(void) {
     lle_prompt_segment_t *time_seg = lle_segment_create_time();
     memset(&output, 0, sizeof(output));
     time_seg->render(time_seg, &ctx, NULL, &output);
-    // Per spec: HH:MM:SS format = 8 characters
+    /// Per spec: HH:MM:SS format = 8 characters
     COMPLIANCE_ASSERT(output.content_len == 8, "time is HH:MM:SS format");
     COMPLIANCE_ASSERT(output.content[2] == ':', "first colon at position 2");
     COMPLIANCE_ASSERT(output.content[5] == ':', "second colon at position 5");
@@ -437,7 +437,7 @@ static void test_segment_output_specification(void) {
 }
 
 /* ========================================================================== */
-// Test: Registry Builtins Helper
+/// Test: Registry Builtins Helper
 /* ========================================================================== */
 
 static void test_register_builtins(void) {
@@ -491,7 +491,7 @@ static void test_register_builtins(void) {
 }
 
 /* ========================================================================== */
-// Main
+/// Main
 /* ========================================================================== */
 
 int main(void) {

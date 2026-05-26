@@ -63,14 +63,14 @@ static int tests_failed = 0;
         }                                                                      \
     } while (0)
 
-// Test: UTF-8 index structure fields
+/// Test: UTF-8 index structure fields
 static void test_utf8_index_structure() {
     TEST("UTF-8 index structure has all required fields");
 
     lle_utf8_index_t idx;
     memset(&idx, 0, sizeof(idx));
 
-    // Verify all fields exist and can be set
+    /// Verify all fields exist and can be set
     idx.byte_to_codepoint = NULL;
     idx.codepoint_to_byte = NULL;
     idx.grapheme_to_codepoint = NULL;
@@ -97,7 +97,7 @@ static void test_utf8_index_structure() {
     PASS();
 }
 
-// Test: UTF-8 index initialization
+/// Test: UTF-8 index initialization
 static void test_utf8_index_init() {
     TEST("UTF-8 index initialization");
 
@@ -115,7 +115,7 @@ static void test_utf8_index_init() {
     PASS();
 }
 
-// Test: UTF-8 index rebuild with ASCII text
+/// Test: UTF-8 index rebuild with ASCII text
 static void test_utf8_index_rebuild_ascii() {
     TEST("UTF-8 index rebuild with ASCII text");
 
@@ -139,7 +139,7 @@ static void test_utf8_index_rebuild_ascii() {
     PASS();
 }
 
-// Test: UTF-8 index rebuild with multibyte UTF-8
+/// Test: UTF-8 index rebuild with multibyte UTF-8
 static void test_utf8_index_rebuild_multibyte() {
     TEST("UTF-8 index rebuild with multibyte UTF-8");
 
@@ -147,7 +147,7 @@ static void test_utf8_index_rebuild_multibyte() {
     lle_result_t result = lle_utf8_index_init(&index);
     ASSERT_SUCCESS(result, "Index initialization succeeds");
 
-    // "Hello 世界" - 2 Chinese characters (3 bytes each)
+    /// "Hello 世界" - 2 Chinese characters (3 bytes each)
     const char *text = "Hello \xe4\xb8\x96\xe7\x95\x8c";
     size_t text_length = strlen(text);
 
@@ -163,7 +163,7 @@ static void test_utf8_index_rebuild_multibyte() {
     PASS();
 }
 
-// Test: Byte to codepoint lookup
+/// Test: Byte to codepoint lookup
 static void test_byte_to_codepoint_lookup() {
     TEST("Byte to codepoint index lookup");
 
@@ -171,23 +171,23 @@ static void test_byte_to_codepoint_lookup() {
     lle_result_t result = lle_utf8_index_init(&index);
     ASSERT_SUCCESS(result, "Index initialization succeeds");
 
-    const char *text = "Hello \xe4\xb8\x96\xe7\x95\x8c"; // "Hello 世界"
+    const char *text = "Hello \xe4\xb8\x96\xe7\x95\x8c"; /// "Hello 世界"
     result = lle_utf8_index_rebuild(index, text, strlen(text));
     ASSERT_SUCCESS(result, "Index rebuild succeeds");
 
     size_t codepoint_idx;
 
-    // Byte 0 -> codepoint 0 (H)
+    /// Byte 0 -> codepoint 0 (H)
     result = lle_utf8_index_byte_to_codepoint(index, 0, &codepoint_idx);
     ASSERT_SUCCESS(result, "Lookup succeeds");
     ASSERT_EQ(codepoint_idx, 0, "Byte 0 maps to codepoint 0");
 
-    // Byte 6 -> codepoint 6 (first byte of 世)
+    /// Byte 6 -> codepoint 6 (first byte of 世)
     result = lle_utf8_index_byte_to_codepoint(index, 6, &codepoint_idx);
     ASSERT_SUCCESS(result, "Lookup succeeds");
     ASSERT_EQ(codepoint_idx, 6, "Byte 6 maps to codepoint 6");
 
-    // Byte 7 -> codepoint 6 (second byte of 世, same codepoint)
+    /// Byte 7 -> codepoint 6 (second byte of 世, same codepoint)
     result = lle_utf8_index_byte_to_codepoint(index, 7, &codepoint_idx);
     ASSERT_SUCCESS(result, "Lookup succeeds");
     ASSERT_EQ(codepoint_idx, 6,
@@ -197,7 +197,7 @@ static void test_byte_to_codepoint_lookup() {
     PASS();
 }
 
-// Test: Codepoint to byte lookup
+/// Test: Codepoint to byte lookup
 static void test_codepoint_to_byte_lookup() {
     TEST("Codepoint to byte offset lookup");
 
@@ -205,23 +205,23 @@ static void test_codepoint_to_byte_lookup() {
     lle_result_t result = lle_utf8_index_init(&index);
     ASSERT_SUCCESS(result, "Index initialization succeeds");
 
-    const char *text = "Hello \xe4\xb8\x96\xe7\x95\x8c"; // "Hello 世界"
+    const char *text = "Hello \xe4\xb8\x96\xe7\x95\x8c"; /// "Hello 世界"
     result = lle_utf8_index_rebuild(index, text, strlen(text));
     ASSERT_SUCCESS(result, "Index rebuild succeeds");
 
     size_t byte_offset;
 
-    // Codepoint 0 -> byte 0
+    /// Codepoint 0 -> byte 0
     result = lle_utf8_index_codepoint_to_byte(index, 0, &byte_offset);
     ASSERT_SUCCESS(result, "Lookup succeeds");
     ASSERT_EQ(byte_offset, 0, "Codepoint 0 maps to byte 0");
 
-    // Codepoint 6 -> byte 6 (first Chinese character)
+    /// Codepoint 6 -> byte 6 (first Chinese character)
     result = lle_utf8_index_codepoint_to_byte(index, 6, &byte_offset);
     ASSERT_SUCCESS(result, "Lookup succeeds");
     ASSERT_EQ(byte_offset, 6, "Codepoint 6 maps to byte 6");
 
-    // Codepoint 7 -> byte 9 (second Chinese character)
+    /// Codepoint 7 -> byte 9 (second Chinese character)
     result = lle_utf8_index_codepoint_to_byte(index, 7, &byte_offset);
     ASSERT_SUCCESS(result, "Lookup succeeds");
     ASSERT_EQ(byte_offset, 9, "Codepoint 7 maps to byte 9");
@@ -230,7 +230,7 @@ static void test_codepoint_to_byte_lookup() {
     PASS();
 }
 
-// Test: Index invalidation
+/// Test: Index invalidation
 static void test_utf8_index_invalidate() {
     TEST("UTF-8 index invalidation");
 
@@ -247,7 +247,7 @@ static void test_utf8_index_invalidate() {
     ASSERT_SUCCESS(result, "Invalidation succeeds");
     ASSERT_TRUE(!index->index_valid, "Index is invalid after invalidation");
 
-    // Lookups should fail on invalid index
+    /// Lookups should fail on invalid index
     size_t codepoint_idx;
     result = lle_utf8_index_byte_to_codepoint(index, 0, &codepoint_idx);
     ASSERT_TRUE(result == LLE_ERROR_INVALID_STATE,
@@ -257,23 +257,23 @@ static void test_utf8_index_invalidate() {
     PASS();
 }
 
-// Test: Error handling - invalid parameters
+/// Test: Error handling - invalid parameters
 static void test_error_handling() {
     TEST("UTF-8 index error handling");
 
     lle_result_t result;
 
-    // NULL pointer to init
+    /// NULL pointer to init
     result = lle_utf8_index_init(NULL);
     ASSERT_TRUE(result == LLE_ERROR_INVALID_PARAMETER,
                 "Init rejects NULL pointer");
 
-    // NULL pointer to destroy
+    /// NULL pointer to destroy
     result = lle_utf8_index_destroy(NULL);
     ASSERT_TRUE(result == LLE_ERROR_INVALID_PARAMETER,
                 "Destroy rejects NULL pointer");
 
-    // NULL text to rebuild
+    /// NULL text to rebuild
     lle_utf8_index_t *index = NULL;
     lle_utf8_index_init(&index);
     result = lle_utf8_index_rebuild(index, NULL, 10);
@@ -290,27 +290,27 @@ int main(void) {
     printf("Spec 03: UTF-8 Index System Compliance Tests\n");
     printf("=================================================\n\n");
 
-    // Structure Tests
+    /// Structure Tests
     printf("UTF-8 Index Structure Tests:\n");
     test_utf8_index_structure();
     test_utf8_index_init();
 
-    // Functional Tests
+    /// Functional Tests
     printf("\nUTF-8 Index Rebuild Tests:\n");
     test_utf8_index_rebuild_ascii();
     test_utf8_index_rebuild_multibyte();
 
-    // Lookup Tests
+    /// Lookup Tests
     printf("\nUTF-8 Index Lookup Tests:\n");
     test_byte_to_codepoint_lookup();
     test_codepoint_to_byte_lookup();
 
-    // Management Tests
+    /// Management Tests
     printf("\nUTF-8 Index Management Tests:\n");
     test_utf8_index_invalidate();
     test_error_handling();
 
-    // Summary
+    /// Summary
     printf("\n");
     printf("=================================================\n");
     printf("Test Summary:\n");

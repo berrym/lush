@@ -38,14 +38,14 @@
 #define ASSERT_NULL(p) ASSERT_TRUE((p) == NULL, #p " is NULL")
 #define ASSERT_NOT_NULL(p) ASSERT_TRUE((p) != NULL, #p " is non-NULL")
 
-// Test framework macros
+/// Test framework macros
 
 /* ============================================================
  * INITIALIZATION TESTS
  * ============================================================ */
 
 static int test_init_null_buffer(void) {
-    // Should not crash
+    /// Should not crash
     screen_buffer_init(NULL, 80);
     return 1;
 }
@@ -69,7 +69,7 @@ static int test_init_zero_width(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 0);
 
-    // Zero width should default to 80
+    /// Zero width should default to 80
     ASSERT_EQ(buffer.terminal_width, 80);
 
     screen_buffer_cleanup(&buffer);
@@ -80,7 +80,7 @@ static int test_init_negative_width(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, -10);
 
-    // Negative width should default to 80
+    /// Negative width should default to 80
     ASSERT_EQ(buffer.terminal_width, 80);
 
     screen_buffer_cleanup(&buffer);
@@ -115,7 +115,7 @@ static int test_init_prefix_pointers_null(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // All prefix pointers should be NULL initially
+    /// All prefix pointers should be NULL initially
     for (int i = 0; i < 10; i++) {
         ASSERT_NULL(buffer.lines[i].prefix);
         ASSERT_EQ(buffer.lines[i].prefix_dirty, false);
@@ -130,7 +130,7 @@ static int test_init_prefix_pointers_null(void) {
  * ============================================================ */
 
 static int test_clear_null_buffer(void) {
-    // Should not crash
+    /// Should not crash
     screen_buffer_clear(NULL);
     return 1;
 }
@@ -139,10 +139,10 @@ static int test_clear_resets_state(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // Render some content
+    /// Render some content
     screen_buffer_render(&buffer, "$ ", "hello", 5);
 
-    // Clear should reset
+    /// Clear should reset
     screen_buffer_clear(&buffer);
 
     ASSERT_EQ(buffer.num_rows, 0);
@@ -162,7 +162,7 @@ static int test_clear_preserves_terminal_width(void) {
     screen_buffer_render(&buffer, "$ ", "test", 4);
     screen_buffer_clear(&buffer);
 
-    // Terminal width should be preserved
+    /// Terminal width should be preserved
     ASSERT_EQ(buffer.terminal_width, 120);
 
     screen_buffer_cleanup(&buffer);
@@ -174,7 +174,7 @@ static int test_clear_preserves_terminal_width(void) {
  * ============================================================ */
 
 static int test_cleanup_null_buffer(void) {
-    // Should not crash
+    /// Should not crash
     screen_buffer_cleanup(NULL);
     return 1;
 }
@@ -183,14 +183,14 @@ static int test_cleanup_frees_prefixes(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // Set some prefixes
+    /// Set some prefixes
     screen_buffer_set_line_prefix(&buffer, 0, "prefix1> ");
     screen_buffer_set_line_prefix(&buffer, 1, "prefix2> ");
 
     ASSERT_NOT_NULL(buffer.lines[0].prefix);
     ASSERT_NOT_NULL(buffer.lines[1].prefix);
 
-    // Cleanup should free them
+    /// Cleanup should free them
     screen_buffer_cleanup(&buffer);
 
     ASSERT_NULL(buffer.lines[0].prefix);
@@ -207,7 +207,7 @@ static int test_copy_null_dest(void) {
     screen_buffer_t src;
     screen_buffer_init(&src, 80);
 
-    // Should not crash
+    /// Should not crash
     screen_buffer_copy(NULL, &src);
 
     screen_buffer_cleanup(&src);
@@ -218,7 +218,7 @@ static int test_copy_null_src(void) {
     screen_buffer_t dest;
     screen_buffer_init(&dest, 80);
 
-    // Should not crash
+    /// Should not crash
     screen_buffer_copy(&dest, NULL);
 
     screen_buffer_cleanup(&dest);
@@ -230,10 +230,10 @@ static int test_copy_basic(void) {
     screen_buffer_init(&src, 100);
     screen_buffer_init(&dest, 80);
 
-    // Render to source
+    /// Render to source
     screen_buffer_render(&src, "prompt> ", "command", 7);
 
-    // Copy
+    /// Copy
     screen_buffer_copy(&dest, &src);
 
     ASSERT_EQ(dest.terminal_width, src.terminal_width);
@@ -272,38 +272,38 @@ static int test_visual_width_ascii(void) {
 }
 
 static int test_visual_width_with_ansi_color(void) {
-    // ANSI codes should not count toward width
+    /// ANSI codes should not count toward width
     const char *text = "\033[31mred\033[0m";
     size_t width = screen_buffer_visual_width(text, strlen(text));
-    ASSERT_EQ(width, 3); // Just "red"
+    ASSERT_EQ(width, 3); /// Just "red"
     return 1;
 }
 
 static int test_visual_width_with_bold_ansi(void) {
     const char *text = "\033[1mbold\033[0m";
     size_t width = screen_buffer_visual_width(text, strlen(text));
-    ASSERT_EQ(width, 4); // Just "bold"
+    ASSERT_EQ(width, 4); /// Just "bold"
     return 1;
 }
 
 static int test_visual_width_multiple_ansi(void) {
     const char *text = "\033[31;1mbold red\033[0m";
     size_t width = screen_buffer_visual_width(text, strlen(text));
-    ASSERT_EQ(width, 8); // Just "bold red"
+    ASSERT_EQ(width, 8); /// Just "bold red"
     return 1;
 }
 
 static int test_visual_width_readline_markers(void) {
-    // Readline markers \001 and \002 should not count
+    /// Readline markers \001 and \002 should not count
     const char *text = "\001\033[31m\002red\001\033[0m\002";
     size_t width = screen_buffer_visual_width(text, strlen(text));
-    ASSERT_EQ(width, 3); // Just "red"
+    ASSERT_EQ(width, 3); /// Just "red"
     return 1;
 }
 
 static int test_visual_width_utf8_2byte(void) {
-    // é is 2 bytes UTF-8, 1 column width
-    const char *text = "café"; // c a f é
+    /// é is 2 bytes UTF-8, 1 column width
+    const char *text = "café"; /// c a f é
     size_t width = screen_buffer_visual_width(text, strlen(text));
     ASSERT_EQ(width, 4);
     return 1;
@@ -334,7 +334,7 @@ static int test_calculate_visual_width_ascii(void) {
 static int test_calculate_visual_width_ansi(void) {
     size_t width =
         screen_buffer_calculate_visual_width("\033[32mgreen\033[0m", 0);
-    ASSERT_EQ(width, 5); // Just "green"
+    ASSERT_EQ(width, 5); /// Just "green"
     return 1;
 }
 
@@ -343,7 +343,7 @@ static int test_calculate_visual_width_ansi(void) {
  * ============================================================ */
 
 static int test_render_null_buffer(void) {
-    // Should not crash
+    /// Should not crash
     screen_buffer_render(NULL, "$ ", "hello", 5);
     return 1;
 }
@@ -354,7 +354,7 @@ static int test_render_null_prompt(void) {
 
     screen_buffer_render(&buffer, NULL, "hello", 5);
 
-    // Command start should be at 0,0
+    /// Command start should be at 0,0
     ASSERT_EQ(buffer.command_start_row, 0);
     ASSERT_EQ(buffer.command_start_col, 0);
 
@@ -383,8 +383,8 @@ static int test_render_simple_command(void) {
     screen_buffer_render(&buffer, "$ ", "ls -la", 6);
 
     ASSERT_EQ(buffer.num_rows, 1);
-    ASSERT_EQ(buffer.command_start_col, 2); // After "$ "
-    ASSERT_EQ(buffer.cursor_col, 8);        // 2 (prompt) + 6 (command)
+    ASSERT_EQ(buffer.command_start_col, 2); /// After "$ "
+    ASSERT_EQ(buffer.cursor_col, 8);        /// 2 (prompt) + 6 (command)
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -396,9 +396,9 @@ static int test_render_cursor_at_start(void) {
 
     screen_buffer_render(&buffer, "$ ", "hello", 0);
 
-    // Cursor at start of command
+    /// Cursor at start of command
     ASSERT_EQ(buffer.cursor_row, 0);
-    ASSERT_EQ(buffer.cursor_col, 2); // Right after prompt
+    ASSERT_EQ(buffer.cursor_col, 2); /// Right after prompt
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -410,9 +410,9 @@ static int test_render_cursor_in_middle(void) {
 
     screen_buffer_render(&buffer, "$ ", "hello", 2);
 
-    // Cursor after "he"
+    /// Cursor after "he"
     ASSERT_EQ(buffer.cursor_row, 0);
-    ASSERT_EQ(buffer.cursor_col, 4); // 2 (prompt) + 2 (offset)
+    ASSERT_EQ(buffer.cursor_col, 4); /// 2 (prompt) + 2 (offset)
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -435,10 +435,10 @@ static int test_render_prompt_with_newline(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // Multi-line prompt
+    /// Multi-line prompt
     screen_buffer_render(&buffer, "line1\nline2> ", "cmd", 3);
 
-    ASSERT_EQ(buffer.command_start_row, 1); // Second row
+    ASSERT_EQ(buffer.command_start_row, 1); /// Second row
     ASSERT(buffer.num_rows >= 2);
 
     screen_buffer_cleanup(&buffer);
@@ -452,7 +452,7 @@ static int test_render_command_with_newline(void) {
     screen_buffer_render(&buffer, "$ ", "line1\nline2", 11);
 
     ASSERT(buffer.num_rows >= 2);
-    ASSERT_EQ(buffer.command_end_row, 1); // Second row
+    ASSERT_EQ(buffer.command_end_row, 1); /// Second row
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -465,7 +465,7 @@ static int test_render_tracks_command_end(void) {
     screen_buffer_render(&buffer, "$ ", "hello world", 11);
 
     ASSERT_EQ(buffer.command_end_row, 0);
-    ASSERT_EQ(buffer.command_end_col, 13); // 2 + 11
+    ASSERT_EQ(buffer.command_end_col, 13); /// 2 + 11
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -508,11 +508,11 @@ static int test_set_prefix_null_text_clears(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // Set a prefix first
+    /// Set a prefix first
     screen_buffer_set_line_prefix(&buffer, 0, "test> ");
     ASSERT_NOT_NULL(buffer.lines[0].prefix);
 
-    // NULL text should clear it
+    /// NULL text should clear it
     bool result = screen_buffer_set_line_prefix(&buffer, 0, NULL);
     ASSERT_EQ(result, true);
     ASSERT_NULL(buffer.lines[0].prefix);
@@ -547,7 +547,7 @@ static int test_set_prefix_with_ansi(void) {
     ASSERT_EQ(result, true);
     ASSERT_NOT_NULL(buffer.lines[0].prefix);
     ASSERT_EQ(buffer.lines[0].prefix->contains_ansi, true);
-    ASSERT_EQ(buffer.lines[0].prefix->visual_width, 2); // Just "> "
+    ASSERT_EQ(buffer.lines[0].prefix->visual_width, 2); /// Just "> "
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -637,7 +637,7 @@ static int test_clear_prefix_no_prefix(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // Clearing when no prefix exists should still succeed
+    /// Clearing when no prefix exists should still succeed
     bool result = screen_buffer_clear_line_prefix(&buffer, 0);
     ASSERT_EQ(result, true);
 
@@ -713,7 +713,7 @@ static int test_prefix_visual_width_with_ansi(void) {
     screen_buffer_set_line_prefix(&buffer, 0, "\033[31mloop> \033[0m");
 
     size_t width = screen_buffer_get_line_prefix_visual_width(&buffer, 0);
-    ASSERT_EQ(width, 6); // ANSI codes don't count
+    ASSERT_EQ(width, 6); /// ANSI codes don't count
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -754,7 +754,7 @@ static int test_prefix_dirty_after_set(void) {
 }
 
 static int test_clear_prefix_dirty_null_buffer(void) {
-    // Should not crash
+    /// Should not crash
     screen_buffer_clear_line_prefix_dirty(NULL, 0);
     return 1;
 }
@@ -809,7 +809,7 @@ static int test_buffer_to_display_col_no_prefix(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // Without prefix, buffer col == display col
+    /// Without prefix, buffer col == display col
     int result = screen_buffer_translate_buffer_to_display_col(&buffer, 0, 5);
     ASSERT_EQ(result, 5);
 
@@ -821,10 +821,10 @@ static int test_buffer_to_display_col_with_prefix(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    screen_buffer_set_line_prefix(&buffer, 0, "loop> "); // 6 columns
+    screen_buffer_set_line_prefix(&buffer, 0, "loop> "); /// 6 columns
 
     int result = screen_buffer_translate_buffer_to_display_col(&buffer, 0, 5);
-    ASSERT_EQ(result, 11); // 6 + 5
+    ASSERT_EQ(result, 11); /// 6 + 5
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -873,10 +873,10 @@ static int test_display_to_buffer_col_with_prefix(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    screen_buffer_set_line_prefix(&buffer, 0, "loop> "); // 6 columns
+    screen_buffer_set_line_prefix(&buffer, 0, "loop> "); /// 6 columns
 
     int result = screen_buffer_translate_display_to_buffer_col(&buffer, 0, 10);
-    ASSERT_EQ(result, 4); // 10 - 6
+    ASSERT_EQ(result, 4); /// 10 - 6
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -886,9 +886,9 @@ static int test_display_to_buffer_col_within_prefix(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    screen_buffer_set_line_prefix(&buffer, 0, "loop> "); // 6 columns
+    screen_buffer_set_line_prefix(&buffer, 0, "loop> "); /// 6 columns
 
-    // Display col 3 is within prefix, should return 0
+    /// Display col 3 is within prefix, should return 0
     int result = screen_buffer_translate_display_to_buffer_col(&buffer, 0, 3);
     ASSERT_EQ(result, 0);
 
@@ -942,7 +942,7 @@ static int test_render_line_with_prefix_no_prefix(void) {
     bool result = screen_buffer_render_line_with_prefix(&buffer, 0, output,
                                                         sizeof(output));
     ASSERT_EQ(result, true);
-    // Should contain just the command content
+    /// Should contain just the command content
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -1026,8 +1026,8 @@ static int test_add_text_rows_null_text(void) {
     screen_buffer_init(&buffer, 80);
 
     int result = screen_buffer_add_text_rows(&buffer, 0, NULL);
-    // Should return 0 for empty/null text
-    ASSERT(result >= 0 || result == -1); // Implementation dependent
+    /// Should return 0 for empty/null text
+    ASSERT(result >= 0 || result == -1); /// Implementation dependent
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -1065,7 +1065,7 @@ static int test_get_rows_below_cursor_single_row(void) {
     screen_buffer_render(&buffer, "$ ", "hello", 5);
 
     int rows = screen_buffer_get_rows_below_cursor(&buffer);
-    ASSERT_EQ(rows, 0); // Cursor on last row
+    ASSERT_EQ(rows, 0); /// Cursor on last row
 
     screen_buffer_cleanup(&buffer);
     return 1;
@@ -1075,7 +1075,7 @@ static int test_get_rows_below_cursor_single_row(void) {
  * RENDER WITH CONTINUATION TESTS
  * ============================================================ */
 
-// Simple continuation callback for testing
+/// Simple continuation callback for testing
 static const char *test_continuation_cb(const char *line_text, size_t line_len,
                                         int line_number, void *user_data) {
     (void)line_text;
@@ -1086,7 +1086,7 @@ static const char *test_continuation_cb(const char *line_text, size_t line_len,
 }
 
 static int test_render_with_continuation_null_buffer(void) {
-    // Should not crash
+    /// Should not crash
     screen_buffer_render_with_continuation(NULL, "$ ", "cmd", 3,
                                            test_continuation_cb, NULL);
     return 1;
@@ -1096,7 +1096,7 @@ static int test_render_with_continuation_null_callback(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // NULL callback should work (no prefixes added)
+    /// NULL callback should work (no prefixes added)
     screen_buffer_render_with_continuation(&buffer, "$ ", "line1\nline2", 11,
                                            NULL, NULL);
 
@@ -1113,7 +1113,7 @@ static int test_render_with_continuation_adds_prefix(void) {
     screen_buffer_render_with_continuation(&buffer, "$ ", "line1\nline2", 11,
                                            test_continuation_cb, NULL);
 
-    // Check that continuation prefix was set on line 1
+    /// Check that continuation prefix was set on line 1
     const char *prefix = screen_buffer_get_line_prefix(&buffer, 1);
     ASSERT_NOT_NULL(prefix);
     ASSERT_STR_EQ(prefix, "> ");
@@ -1126,11 +1126,11 @@ static int test_render_with_continuation_single_line(void) {
     screen_buffer_t buffer;
     screen_buffer_init(&buffer, 80);
 
-    // No newline means callback never called
+    /// No newline means callback never called
     screen_buffer_render_with_continuation(&buffer, "$ ", "hello", 5,
                                            test_continuation_cb, NULL);
 
-    // No continuation prompt on first line
+    /// No continuation prompt on first line
     ASSERT_NULL(screen_buffer_get_line_prefix(&buffer, 0));
 
     screen_buffer_cleanup(&buffer);

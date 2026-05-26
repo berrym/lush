@@ -70,8 +70,8 @@ static void test_case_mixed_ascii(void) {
 static void test_case_latin1_upper(void) {
     TEST("Latin-1 uppercase conversion (accented)");
     char out[32];
-    // cafe with accented e (U+00E9) -> CAFE with E-acute (U+00C9)
-    const char *input = "caf\xC3\xA9"; // cafe in UTF-8
+    /// cafe with accented e (U+00E9) -> CAFE with E-acute (U+00C9)
+    const char *input = "caf\xC3\xA9"; /// cafe in UTF-8
     size_t len = lle_utf8_toupper(input, strlen(input), out, sizeof(out));
     ASSERT_TRUE(len != (size_t)-1, "Conversion should succeed");
     out[len] = '\0';
@@ -82,8 +82,8 @@ static void test_case_latin1_upper(void) {
 static void test_case_latin1_lower(void) {
     TEST("Latin-1 lowercase conversion (accented)");
     char out[32];
-    // CAFE with E-acute (U+00C9) -> cafe with e-acute (U+00E9)
-    const char *input = "CAF\xC3\x89"; // CAFE in UTF-8
+    /// CAFE with E-acute (U+00C9) -> cafe with e-acute (U+00E9)
+    const char *input = "CAF\xC3\x89"; /// CAFE in UTF-8
     size_t len = lle_utf8_tolower(input, strlen(input), out, sizeof(out));
     ASSERT_TRUE(len != (size_t)-1, "Conversion should succeed");
     out[len] = '\0';
@@ -158,7 +158,7 @@ static void test_case_empty_string(void) {
 
 static void test_case_buffer_too_small(void) {
     TEST("Buffer too small returns error");
-    char out[3]; // Too small for "HELLO"
+    char out[3]; /// Too small for "HELLO"
     size_t len = lle_utf8_toupper("hello", 5, out, sizeof(out));
     ASSERT_EQ(len, (size_t)-1, "Should return error for small buffer");
     PASS();
@@ -211,7 +211,7 @@ static void test_compare_with_length(void) {
 
 static void test_compare_unicode_strings(void) {
     TEST("Unicode string comparison");
-    // cafe with e-acute should equal itself
+    /// cafe with e-acute should equal itself
     const char *cafe = "caf\xC3\xA9";
     ASSERT_TRUE(lle_unicode_strings_equal(cafe, cafe, NULL),
                 "Unicode string equals itself");
@@ -289,7 +289,7 @@ static void test_nfc_precomposed(void) {
     TEST("NFC normalization - precomposed characters");
     char out[32];
     size_t out_len;
-    // e-acute (U+00E9) is already NFC
+    /// e-acute (U+00E9) is already NFC
     const char *input = "caf\xC3\xA9";
     int result = lle_unicode_normalize_nfc(input, strlen(input), out,
                                            sizeof(out), &out_len);
@@ -306,10 +306,10 @@ static void test_nfc_precomposed(void) {
 
 static void test_combining_class(void) {
     TEST("Combining class detection");
-    // Regular characters have class 0
+    /// Regular characters have class 0
     ASSERT_EQ(lle_unicode_combining_class('A'), 0, "A has class 0");
     ASSERT_EQ(lle_unicode_combining_class('a'), 0, "a has class 0");
-    // Combining acute accent (U+0301) has class 230
+    /// Combining acute accent (U+0301) has class 230
     ASSERT_EQ(lle_unicode_combining_class(0x0301), 230,
               "Combining acute has class 230");
     PASS();

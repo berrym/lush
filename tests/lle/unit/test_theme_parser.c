@@ -152,7 +152,7 @@ TEST(reset_brings_state_back_to_start) {
 }
 
 TEST(reset_tolerates_null) {
-    lle_theme_parser_reset(NULL); // must not crash
+    lle_theme_parser_reset(NULL); /// must not crash
     ASSERT_TRUE(1, "reset(NULL) survived");
 }
 
@@ -397,10 +397,10 @@ TEST(callback_error_stops_parse) {
     const char *input = "first = 1\nsecond = 2\nthird = 3\n";
     collector_t c;
     collector_init(&c);
-    c.return_code = LLE_ERROR_INVALID_STATE; // propagate from callback
+    c.return_code = LLE_ERROR_INVALID_STATE; /// propagate from callback
     lle_result_t r = parse_to_collector(input, &c);
     ASSERT_NE(r, LLE_SUCCESS, "callback's error code propagates");
-    // Exactly the first key should have been collected, then parser bailed.
+    /// Exactly the first key should have been collected, then parser bailed.
     ASSERT_EQ(c.count, 1, "parser stopped after first callback error");
     ASSERT_STR_EQ(c.items[0].key, "first",
                   "first key was the one that triggered the stop");
@@ -443,14 +443,14 @@ TEST(value_set_boolean_populates_boolean) {
 }
 
 TEST(value_free_tolerates_null) {
-    lle_theme_value_free(NULL); // must not crash
+    lle_theme_value_free(NULL); /// must not crash
     ASSERT_TRUE(1, "free(NULL) survived");
 }
 
 TEST(value_free_clears_scalar_safely) {
     lle_theme_value_t v;
     lle_theme_value_set_integer(&v, 99);
-    lle_theme_value_free(&v); // scalar with no owned memory
+    lle_theme_value_free(&v); /// scalar with no owned memory
     ASSERT_TRUE(1, "free of scalar value survived");
 }
 

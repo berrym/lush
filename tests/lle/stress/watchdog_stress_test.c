@@ -26,7 +26,7 @@
 #include <time.h>
 #include <unistd.h>
 
-// Test tracking
+/// Test tracking
 static int tests_run = 0;
 static int tests_passed = 0;
 static int tests_failed = 0;
@@ -51,7 +51,7 @@ static int tests_failed = 0;
         tests_failed++;                                                        \
     } while (0)
 
-// Helper to get current time in nanoseconds
+/// Helper to get current time in nanoseconds
 static uint64_t get_nanos(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -59,7 +59,7 @@ static uint64_t get_nanos(void) {
 }
 
 /* ========================================================================== */
-// TEST 1: WATCHDOG INITIALIZATION
+/// TEST 1: WATCHDOG INITIALIZATION
 /* ========================================================================== */
 
 void test_watchdog_init(void) {
@@ -67,10 +67,10 @@ void test_watchdog_init(void) {
 
     printf("Testing watchdog init/cleanup cycle...\n");
 
-    // Clean state
+    /// Clean state
     lle_watchdog_cleanup();
 
-    // Initialize
+    /// Initialize
     lle_result_t result = lle_watchdog_init();
     if (result != LLE_SUCCESS) {
         FAIL("Watchdog init failed");
@@ -78,14 +78,14 @@ void test_watchdog_init(void) {
     }
     printf("  Watchdog initialized successfully\n");
 
-    // Check initial state
+    /// Check initial state
     if (lle_watchdog_is_armed()) {
         FAIL("Watchdog should not be armed after init");
         return;
     }
     printf("  Initial state: not armed (correct)\n");
 
-    // Get stats
+    /// Get stats
     lle_watchdog_stats_t stats;
     result = lle_watchdog_get_stats(&stats);
     if (result != LLE_SUCCESS) {
@@ -95,7 +95,7 @@ void test_watchdog_init(void) {
     printf("  Stats accessible: pets=%u, fires=%u, recoveries=%u\n",
            stats.total_pets, stats.total_fires, stats.total_recoveries);
 
-    // Cleanup
+    /// Cleanup
     lle_watchdog_cleanup();
     printf("  Cleanup completed\n");
 
@@ -103,7 +103,7 @@ void test_watchdog_init(void) {
 }
 
 /* ========================================================================== */
-// TEST 2: WATCHDOG PET AND ARM
+/// TEST 2: WATCHDOG PET AND ARM
 /* ========================================================================== */
 
 void test_watchdog_pet(void) {
@@ -118,7 +118,7 @@ void test_watchdog_pet(void) {
 
     printf("Testing pet operation...\n");
 
-    // Pet with default timeout
+    /// Pet with default timeout
     lle_watchdog_pet(0);
 
     if (!lle_watchdog_is_armed()) {
@@ -137,7 +137,7 @@ void test_watchdog_pet(void) {
         return;
     }
 
-    // Check stats
+    /// Check stats
     lle_watchdog_stats_t stats;
     lle_watchdog_get_stats(&stats);
     if (stats.total_pets < 1) {
@@ -147,7 +147,7 @@ void test_watchdog_pet(void) {
     }
     printf("  Pet count: %u\n", stats.total_pets);
 
-    // Stop and cleanup
+    /// Stop and cleanup
     lle_watchdog_stop();
     if (lle_watchdog_is_armed()) {
         FAIL("Watchdog should not be armed after stop");
@@ -161,7 +161,7 @@ void test_watchdog_pet(void) {
 }
 
 /* ========================================================================== */
-// TEST 3: WATCHDOG TIMEOUT DETECTION
+/// TEST 3: WATCHDOG TIMEOUT DETECTION
 /* ========================================================================== */
 
 void test_watchdog_timeout(void) {
@@ -176,16 +176,16 @@ void test_watchdog_timeout(void) {
 
     printf("Testing timeout detection with 1-second timeout...\n");
 
-    // Pet with 1-second timeout
+    /// Pet with 1-second timeout
     lle_watchdog_pet(1);
     printf("  Watchdog armed with 1s timeout\n");
 
-    // Wait for timeout (1.5 seconds to be safe)
+    /// Wait for timeout (1.5 seconds to be safe)
     printf("  Waiting 1.5 seconds for timeout...\n");
-    struct timespec sleep_time = {1, 500000000}; // 1.5 seconds
+    struct timespec sleep_time = {1, 500000000}; /// 1.5 seconds
     nanosleep(&sleep_time, NULL);
 
-    // Check if watchdog fired
+    /// Check if watchdog fired
     bool fired = lle_watchdog_check();
     printf("  Watchdog fired: %s\n", fired ? "YES" : "no");
 
@@ -195,7 +195,7 @@ void test_watchdog_timeout(void) {
         return;
     }
 
-    // Check and clear
+    /// Check and clear
     bool cleared = lle_watchdog_check_and_clear();
     if (!cleared) {
         FAIL("check_and_clear should return true");
@@ -204,7 +204,7 @@ void test_watchdog_timeout(void) {
     }
     printf("  check_and_clear returned: true\n");
 
-    // Verify flag is now clear
+    /// Verify flag is now clear
     if (lle_watchdog_check()) {
         FAIL("Flag should be clear after check_and_clear");
         lle_watchdog_cleanup();
@@ -212,7 +212,7 @@ void test_watchdog_timeout(void) {
     }
     printf("  Flag cleared after check_and_clear: yes\n");
 
-    // Check stats
+    /// Check stats
     lle_watchdog_stats_t stats;
     lle_watchdog_get_stats(&stats);
     printf("  Stats: pets=%u, fires=%u, recoveries=%u\n", stats.total_pets,
@@ -235,7 +235,7 @@ void test_watchdog_timeout(void) {
 }
 
 /* ========================================================================== */
-// TEST 4: WATCHDOG RAPID PET (NO TIMEOUT)
+/// TEST 4: WATCHDOG RAPID PET (NO TIMEOUT)
 /* ========================================================================== */
 
 void test_watchdog_rapid_pet(void) {
@@ -256,15 +256,15 @@ void test_watchdog_rapid_pet(void) {
 
     uint64_t start = get_nanos();
 
-    // Simulate 100 rapid input events, each resetting the timer
+    /// Simulate 100 rapid input events, each resetting the timer
     for (int i = 0; i < 100; i++) {
-        lle_watchdog_pet(2); // 2 second timeout
+        lle_watchdog_pet(2); /// 2 second timeout
 
-        // Small delay (10ms) - simulates processing time
-        struct timespec delay = {0, 10000000}; // 10ms
+        /// Small delay (10ms) - simulates processing time
+        struct timespec delay = {0, 10000000}; /// 10ms
         nanosleep(&delay, NULL);
 
-        // Check that watchdog hasn't fired
+        /// Check that watchdog hasn't fired
         if (lle_watchdog_check()) {
             FAIL("Watchdog should not fire during rapid petting");
             lle_watchdog_cleanup();
@@ -276,7 +276,7 @@ void test_watchdog_rapid_pet(void) {
     printf("  Completed 100 events in %llu ms\n",
            (unsigned long long)elapsed_ms);
 
-    // Verify no timeouts occurred
+    /// Verify no timeouts occurred
     lle_watchdog_stats_t stats_after;
     lle_watchdog_get_stats(&stats_after);
 
@@ -296,7 +296,7 @@ void test_watchdog_rapid_pet(void) {
 }
 
 /* ========================================================================== */
-// TEST 5: WATCHDOG EFFECTIVENESS METRIC
+/// TEST 5: WATCHDOG EFFECTIVENESS METRIC
 /* ========================================================================== */
 
 void test_watchdog_effectiveness(void) {
@@ -318,14 +318,14 @@ void test_watchdog_effectiveness(void) {
     for (int i = 0; i < total_freezes; i++) {
         printf("  Cycle %d: ", i + 1);
 
-        // Pet with 1-second timeout
+        /// Pet with 1-second timeout
         lle_watchdog_pet(1);
 
-        // Simulate freeze (wait for timeout)
-        struct timespec sleep_time = {1, 200000000}; // 1.2 seconds
+        /// Simulate freeze (wait for timeout)
+        struct timespec sleep_time = {1, 200000000}; /// 1.2 seconds
         nanosleep(&sleep_time, NULL);
 
-        // Check if we detected the freeze
+        /// Check if we detected the freeze
         if (lle_watchdog_check_and_clear()) {
             successful_recoveries++;
             printf("freeze detected, recovered\n");
@@ -364,7 +364,7 @@ void test_watchdog_effectiveness(void) {
 }
 
 /* ========================================================================== */
-// TEST 6: SIGNAL HANDLER SAFETY
+/// TEST 6: SIGNAL HANDLER SAFETY
 /* ========================================================================== */
 
 void test_signal_safety(void) {
@@ -400,7 +400,7 @@ void test_signal_safety(void) {
 
     printf("  Completed 10 init/cleanup cycles without issues\n");
 
-    // Verify SIGALRM handler is properly restored
+    /// Verify SIGALRM handler is properly restored
     struct sigaction sa;
     sigaction(SIGALRM, NULL, &sa);
     printf("  SIGALRM handler after cleanup: %s\n",
@@ -410,7 +410,7 @@ void test_signal_safety(void) {
 }
 
 /* ========================================================================== */
-// MAIN
+/// MAIN
 /* ========================================================================== */
 
 int main(void) {
@@ -428,7 +428,7 @@ int main(void) {
     printf(
         "#################################################################\n");
 
-    // Run all tests
+    /// Run all tests
     test_watchdog_init();
     test_watchdog_pet();
     test_watchdog_timeout();
@@ -436,7 +436,7 @@ int main(void) {
     test_watchdog_effectiveness();
     test_signal_safety();
 
-    // Summary
+    /// Summary
     printf("\n");
     printf(
         "=================================================================\n");

@@ -74,7 +74,7 @@ int parse_and_execute(const char *command) {
             return 1;
         }
     }
-    // Fuzz inputs are independent batches; line 1 of their own slice.
+    /// Fuzz inputs are independent batches; line 1 of their own slice.
     return executor_execute_command_line(global_executor, command, 1);
 }
 
@@ -137,13 +137,13 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
         setenv("TMPDIR", tmpdir, 1);
     }
 
-    // Initialize shell mode system once for the whole fuzz session.
+    /// Initialize shell mode system once for the whole fuzz session.
     shell_mode_init();
 
     /* The global symbol table manager must exist before
      * executor_new() will succeed; it normally gets initialised
      * during shell startup in src/init.c (which we exclude). */
-    init_symtable(); // idempotent
+    init_symtable(); /// idempotent
 
     return 0;
 }
@@ -160,7 +160,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         return 0;
     }
 
-    // Null-terminate input as a C string (the executor expects one).
+    /// Null-terminate input as a C string (the executor expects one).
     char *input = malloc(size + 1);
     if (!input) {
         return 0;
@@ -237,4 +237,4 @@ int main(int argc, char **argv) {
     }
     return 0;
 }
-#endif // FUZZ_AFL_MAIN
+#endif /// FUZZ_AFL_MAIN
