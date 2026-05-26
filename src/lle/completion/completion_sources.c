@@ -233,7 +233,7 @@ static lle_result_t files_internal(lle_memory_pool_t *pool,
 
     DIR *d = opendir(dir_path);
     if (!d)
-        return LLE_SUCCESS; // unreadable directory is not an error
+        return LLE_SUCCESS; /// unreadable directory is not an error
 
     lle_result_t final_result = LLE_SUCCESS;
     struct dirent *entry;
@@ -417,7 +417,7 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
         memcpy(user_prefix, prefix, user_prefix_len);
         user_prefix[user_prefix_len] = '\0';
     } else if (user_prefix_len >= sizeof(user_prefix)) {
-        // Pathologically long user segment -- bail rather than truncate.
+        /// Pathologically long user segment -- bail rather than truncate.
         return LLE_SUCCESS;
     }
 
@@ -428,7 +428,7 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
         if (nfc_prefix_match(host_prefix, host->hostname)) {
             char completion[320];
             if (user_prefix[0]) {
-                // User typed `alice@...`; preserve their literal user.
+                /// User typed `alice@...`; preserve their literal user.
                 snprintf(completion, sizeof(completion), "%s%s", user_prefix,
                          host->hostname);
             } else if (host->user[0]) {

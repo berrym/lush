@@ -68,7 +68,7 @@ static bool needs_escape_in_none(unsigned char b, size_t out_pos) {
 }
 
 static bool needs_escape_in_double(unsigned char b) {
-    // Inside "..." only $ ` \ " keep their special meaning.
+    /// Inside "..." only $ ` \ " keep their special meaning.
     return b == '$' || b == '`' || b == '\\' || b == '"';
 }
 
@@ -137,7 +137,7 @@ static lle_result_t rb_puts(render_buf_t *rb, const char *s, size_t n,
 
 static lle_result_t rb_finish(render_buf_t *rb, lle_memory_pool_t *pool,
                               char **out, size_t *out_len) {
-    // NUL-terminate. rb_grow always reserves +1 for the terminator.
+    /// NUL-terminate. rb_grow always reserves +1 for the terminator.
     lle_result_t r = rb_grow(rb, 1, pool);
     if (r != LLE_SUCCESS)
         return r;
@@ -299,7 +299,7 @@ lle_result_t lle_splicer_compute(const lle_word_context_t *context,
     if (r != LLE_SUCCESS)
         return r;
 
-    // Build the final insert string: rendered + optional suffix.
+    /// Build the final insert string: rendered + optional suffix.
     render_buf_t rb = {0};
     r = rb_puts(&rb, rendered, rendered_len, pool);
     if (r != LLE_SUCCESS)

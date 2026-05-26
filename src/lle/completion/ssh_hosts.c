@@ -24,7 +24,7 @@
 #include <time.h>
 #include <unistd.h>
 
-// Forward declaration for portability (see ht_fnv1a.c)
+/// Forward declaration for portability (see ht_fnv1a.c)
 int strncasecmp(const char *s1, const char *s2, size_t n);
 
 /* ============================================================================
@@ -32,7 +32,7 @@ int strncasecmp(const char *s1, const char *s2, size_t n);
  * ============================================================================
  */
 
-#define SSH_CONFIG_CACHE_TIMEOUT 300 // 5 minutes
+#define SSH_CONFIG_CACHE_TIMEOUT 300 /// 5 minutes
 #define MAX_SSH_HOSTS 1000
 #define MAX_CONFIG_LINE_LEN 1024
 #define MAX_HOSTNAME_LEN 253
@@ -117,7 +117,7 @@ int ssh_host_cache_add(ssh_host_cache_t *cache, const ssh_host_t *host) {
         return -1;
     }
 
-    // Grow if needed
+    /// Grow if needed
     if (cache->count >= cache->capacity) {
         size_t new_capacity = cache->capacity * 2;
         ssh_host_t *new_hosts =
@@ -129,7 +129,7 @@ int ssh_host_cache_add(ssh_host_cache_t *cache, const ssh_host_t *host) {
         cache->capacity = new_capacity;
     }
 
-    // Copy host entry
+    /// Copy host entry
     cache->hosts[cache->count] = *host;
     cache->count++;
 
@@ -192,7 +192,7 @@ int ssh_parse_config(const char *config_path, ssh_host_cache_t *cache) {
         }
 
         if (is_ssh_host_line(line)) {
-            // Save previous host if valid
+            /// Save previous host if valid
             if (in_host_block && current_host.hostname[0]) {
                 current_host.from_config = true;
                 current_host.priority = 80;
@@ -201,12 +201,12 @@ int ssh_parse_config(const char *config_path, ssh_host_cache_t *cache) {
                 }
             }
 
-            // Start new host block
+            /// Start new host block
             memset(&current_host, 0, sizeof(current_host));
             extract_ssh_config_value(line, current_host.alias,
                                      MAX_HOSTNAME_LEN);
 
-            // If alias doesn't contain wildcards, use as hostname too
+            /// If alias doesn't contain wildcards, use as hostname too
             if (!strchr(current_host.alias, '*') &&
                 !strchr(current_host.alias, '?')) {
                 strncpy(current_host.hostname, current_host.alias,
@@ -228,7 +228,7 @@ int ssh_parse_config(const char *config_path, ssh_host_cache_t *cache) {
         }
     }
 
-    // Save last host
+    /// Save last host
     if (in_host_block && current_host.hostname[0]) {
         current_host.from_config = true;
         current_host.priority = 80;
@@ -264,12 +264,12 @@ int ssh_parse_known_hosts(const char *known_hosts_path,
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\n")] = '\0';
 
-        // Skip empty lines, comments, and hashed entries
+        /// Skip empty lines, comments, and hashed entries
         if (line[0] == '\0' || line[0] == '#' || line[0] == '|') {
             continue;
         }
 
-        // Extract hostname (first field before space)
+        /// Extract hostname (first field before space)
         char *space = strchr(line, ' ');
         if (!space) {
             continue;
@@ -284,7 +284,7 @@ int ssh_parse_known_hosts(const char *known_hosts_path,
         strncpy(host.hostname, line, hostname_len);
         host.hostname[hostname_len] = '\0';
 
-        // Handle [host]:port format
+        /// Handle [host]:port format
         if (host.hostname[0] == '[') {
             char *bracket = strchr(host.hostname, ']');
             if (bracket) {
@@ -294,13 +294,13 @@ int ssh_parse_known_hosts(const char *known_hosts_path,
             }
         }
 
-        // Remove any comma-separated aliases, keep first
+        /// Remove any comma-separated aliases, keep first
         char *comma = strchr(host.hostname, ',');
         if (comma) {
             *comma = '\0';
         }
 
-        // Skip if already in cache
+        /// Skip if already in cache
         if (ssh_host_cache_find(cache, host.hostname)) {
             continue;
         }
@@ -347,28 +347,28 @@ int ssh_parse_etc_hosts(const char *etc_hosts_path, ssh_host_cache_t *cache) {
     int hosts_added = 0;
 
     while (fgets(line, sizeof(line), file)) {
-        // Strip newline and trailing CR.
+        /// Strip newline and trailing CR.
         line[strcspn(line, "\r\n")] = '\0';
 
-        // Truncate at any '#' (comment to end of line).
+        /// Truncate at any '#' (comment to end of line).
         char *hash = strchr(line, '#');
         if (hash) {
             *hash = '\0';
         }
 
-        // Skip the IP address (first whitespace-separated field).
+        /// Skip the IP address (first whitespace-separated field).
         char *p = line;
         while (*p == ' ' || *p == '\t') {
             p++;
         }
         if (*p == '\0') {
-            continue; // blank or comment-only
+            continue; /// blank or comment-only
         }
         while (*p != '\0' && *p != ' ' && *p != '\t') {
-            p++; // consume IP
+            p++; /// consume IP
         }
 
-        // Each remaining whitespace-separated token is a hostname/alias.
+        /// Each remaining whitespace-separated token is a hostname/alias.
         while (*p != '\0') {
             while (*p == ' ' || *p == '\t') {
                 p++;
@@ -389,7 +389,7 @@ int ssh_parse_etc_hosts(const char *etc_hosts_path, ssh_host_cache_t *cache) {
             memcpy(host.hostname, name_start, name_len);
             host.hostname[name_len] = '\0';
 
-            // Skip duplicates (priority: earlier sources win).
+            /// Skip duplicates (priority: earlier sources win).
             if (ssh_host_cache_find(cache, host.hostname)) {
                 continue;
             }
@@ -418,7 +418,7 @@ int ssh_parse_etc_hosts(const char *etc_hosts_path, ssh_host_cache_t *cache) {
  */
 int ssh_hosts_init(void) {
     if (g_ssh_host_cache) {
-        return 0; // Already initialized
+        return 0; /// Already initialized
     }
 
     g_ssh_host_cache = ssh_host_cache_create(MAX_SSH_HOSTS);
@@ -448,10 +448,10 @@ void ssh_hosts_refresh(void) {
         return;
     }
 
-    // Clear existing entries
+    /// Clear existing entries
     g_ssh_host_cache->count = 0;
 
-    // Get home directory
+    /// Get home directory
     const char *home = getenv("HOME");
     if (!home) {
         return;
@@ -475,18 +475,18 @@ void ssh_hosts_refresh(void) {
      * enough that they should be opted into by the user copying the
      * relevant stanzas to ~/.ssh/config. */
 
-    // User SSH config
+    /// User SSH config
     snprintf(path, sizeof(path), "%s/.ssh/config", home);
     ssh_parse_config(path, g_ssh_host_cache);
 
-    // User known_hosts
+    /// User known_hosts
     snprintf(path, sizeof(path), "%s/.ssh/known_hosts", home);
     ssh_parse_known_hosts(path, g_ssh_host_cache);
 
-    // System-wide known_hosts
+    /// System-wide known_hosts
     ssh_parse_known_hosts("/etc/ssh/ssh_known_hosts", g_ssh_host_cache);
 
-    // NSS hostname database
+    /// NSS hostname database
     ssh_parse_etc_hosts("/etc/hosts", g_ssh_host_cache);
 
     g_ssh_host_cache->last_updated = time(NULL);
@@ -502,12 +502,12 @@ ssh_host_cache_t *get_ssh_host_cache(void) {
         ssh_hosts_init();
     }
 
-    // Check if refresh needed
+    /// Check if refresh needed
     if (g_ssh_host_cache && g_ssh_host_cache->needs_refresh) {
         ssh_hosts_refresh();
     }
 
-    // Check cache timeout
+    /// Check cache timeout
     if (g_ssh_host_cache) {
         time_t now = time(NULL);
         if (now - g_ssh_host_cache->last_updated > SSH_CONFIG_CACHE_TIMEOUT) {
@@ -611,18 +611,18 @@ static void extract_ssh_config_value(const char *line, char *value,
         return;
     }
 
-    // Skip keyword
+    /// Skip keyword
     const char *p = line;
     while (*p && !isspace((unsigned char)*p)) {
         p++;
     }
 
-    // Skip whitespace
+    /// Skip whitespace
     while (*p && isspace((unsigned char)*p)) {
         p++;
     }
 
-    // Copy value
+    /// Copy value
     size_t len = strlen(p);
     if (len >= max_len) {
         len = max_len - 1;
@@ -630,6 +630,6 @@ static void extract_ssh_config_value(const char *line, char *value,
     strncpy(value, p, len);
     value[len] = '\0';
 
-    // Remove trailing whitespace
+    /// Remove trailing whitespace
     trim_whitespace(value);
 }

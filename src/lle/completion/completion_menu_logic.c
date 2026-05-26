@@ -28,17 +28,17 @@ static void ensure_visible(lle_completion_menu_state_t *state) {
         return;
     }
 
-    // If selected is before visible range, scroll up
+    /// If selected is before visible range, scroll up
     if (state->selected_index < state->first_visible) {
         state->first_visible = state->selected_index;
     }
-    // If selected is after visible range, scroll down
+    /// If selected is after visible range, scroll down
     else if (state->selected_index >=
              state->first_visible + state->visible_count) {
         state->first_visible = state->selected_index - state->visible_count + 1;
     }
 
-    // Ensure first_visible doesn't go past the end
+    /// Ensure first_visible doesn't go past the end
     if (state->first_visible + state->visible_count > total_items) {
         if (total_items >= state->visible_count) {
             state->first_visible = total_items - state->visible_count;
@@ -61,7 +61,7 @@ static size_t get_columns(const lle_completion_menu_state_t *state) {
     if (state && state->num_columns > 0) {
         return state->num_columns;
     }
-    return 1; // Default to single column
+    return 1; /// Default to single column
 }
 
 /**
@@ -76,7 +76,7 @@ static size_t find_category_for_index(const lle_completion_menu_state_t *state,
                                       size_t item_index, size_t *category_start,
                                       size_t *category_end) {
     if (!state || state->category_count == 0) {
-        // No categories, treat all items as one category
+        /// No categories, treat all items as one category
         if (category_start)
             *category_start = 0;
         if (category_end)
@@ -105,7 +105,7 @@ static size_t find_category_for_index(const lle_completion_menu_state_t *state,
         }
     }
 
-    // Fallback: return last category
+    /// Fallback: return last category
     if (category_start)
         *category_start = state->category_positions[state->category_count - 1];
     if (category_end)
@@ -137,22 +137,22 @@ lle_result_t lle_completion_menu_move_down(lle_completion_menu_state_t *state) {
 
     size_t columns = get_columns(state);
 
-    // Find current category
+    /// Find current category
     size_t cat_start, cat_end;
     size_t current_cat = find_category_for_index(state, state->selected_index,
                                                  &cat_start, &cat_end);
 
-    // Calculate position within current category
+    /// Calculate position within current category
     size_t index_in_cat = state->selected_index - cat_start;
     size_t items_in_cat = cat_end - cat_start;
     size_t current_row_in_cat = index_in_cat / columns;
     size_t rows_in_cat = (items_in_cat + columns - 1) / columns;
 
-    // Try to move to next row in same category
+    /// Try to move to next row in same category
     size_t next_row = current_row_in_cat + 1;
 
     if (next_row < rows_in_cat) {
-        // Stay in same category, move to next row
+        /// Stay in same category, move to next row
         size_t row_start = cat_start + next_row * columns;
         size_t row_end = row_start + columns;
         if (row_end > cat_end) {
@@ -160,23 +160,23 @@ lle_result_t lle_completion_menu_move_down(lle_completion_menu_state_t *state) {
         }
         size_t items_in_row = row_end - row_start;
 
-        // Use target column, fall back to last item in row
+        /// Use target column, fall back to last item in row
         size_t new_col = state->target_column;
         if (new_col >= items_in_row) {
             new_col = items_in_row - 1;
         }
         state->selected_index = row_start + new_col;
     } else {
-        // Move to next category (or wrap to first)
+        /// Move to next category (or wrap to first)
         size_t next_cat;
         if (state->category_count > 0 &&
             current_cat + 1 < state->category_count) {
             next_cat = current_cat + 1;
         } else {
-            next_cat = 0; // Wrap to first category
+            next_cat = 0; /// Wrap to first category
         }
 
-        // Get next category boundaries
+        /// Get next category boundaries
         size_t next_cat_start, next_cat_end;
         if (state->category_count > 0) {
             next_cat_start = state->category_positions[next_cat];
@@ -190,7 +190,7 @@ lle_result_t lle_completion_menu_move_down(lle_completion_menu_state_t *state) {
             next_cat_end = state->result->count;
         }
 
-        // Go to first row of next category, preserving target column
+        /// Go to first row of next category, preserving target column
         size_t items_in_next_cat = next_cat_end - next_cat_start;
         size_t items_in_first_row =
             items_in_next_cat < columns ? items_in_next_cat : columns;
@@ -230,17 +230,17 @@ lle_result_t lle_completion_menu_move_up(lle_completion_menu_state_t *state) {
 
     size_t columns = get_columns(state);
 
-    // Find current category
+    /// Find current category
     size_t cat_start, cat_end;
     size_t current_cat = find_category_for_index(state, state->selected_index,
                                                  &cat_start, &cat_end);
 
-    // Calculate position within current category
+    /// Calculate position within current category
     size_t index_in_cat = state->selected_index - cat_start;
     size_t current_row_in_cat = index_in_cat / columns;
 
     if (current_row_in_cat > 0) {
-        // Stay in same category, move to previous row
+        /// Stay in same category, move to previous row
         size_t prev_row = current_row_in_cat - 1;
         size_t row_start = cat_start + prev_row * columns;
         size_t row_end = row_start + columns;
@@ -249,24 +249,24 @@ lle_result_t lle_completion_menu_move_up(lle_completion_menu_state_t *state) {
         }
         size_t items_in_row = row_end - row_start;
 
-        // Use target column, fall back to last item in row
+        /// Use target column, fall back to last item in row
         size_t new_col = state->target_column;
         if (new_col >= items_in_row) {
             new_col = items_in_row - 1;
         }
         state->selected_index = row_start + new_col;
     } else {
-        // Move to previous category (or wrap to last)
+        /// Move to previous category (or wrap to last)
         size_t prev_cat;
         if (state->category_count > 0 && current_cat > 0) {
             prev_cat = current_cat - 1;
         } else if (state->category_count > 0) {
-            prev_cat = state->category_count - 1; // Wrap to last category
+            prev_cat = state->category_count - 1; /// Wrap to last category
         } else {
             prev_cat = 0;
         }
 
-        // Get previous category boundaries
+        /// Get previous category boundaries
         size_t prev_cat_start, prev_cat_end;
         if (state->category_count > 0) {
             prev_cat_start = state->category_positions[prev_cat];
@@ -280,7 +280,7 @@ lle_result_t lle_completion_menu_move_up(lle_completion_menu_state_t *state) {
             prev_cat_end = state->result->count;
         }
 
-        // Go to last row of previous category, preserving target column
+        /// Go to last row of previous category, preserving target column
         size_t items_in_prev_cat = prev_cat_end - prev_cat_start;
         size_t rows_in_prev_cat = (items_in_prev_cat + columns - 1) / columns;
         size_t last_row = rows_in_prev_cat > 0 ? rows_in_prev_cat - 1 : 0;
@@ -327,7 +327,7 @@ lle_result_t lle_completion_menu_page_down(lle_completion_menu_state_t *state) {
 
     size_t total_items = state->result->count;
 
-    // Move down by visible_count, stop at last item (no wrap)
+    /// Move down by visible_count, stop at last item (no wrap)
     state->selected_index += state->visible_count;
     if (state->selected_index >= total_items) {
         state->selected_index = total_items - 1;
@@ -359,7 +359,7 @@ lle_result_t lle_completion_menu_page_up(lle_completion_menu_state_t *state) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Move up by visible_count, stop at first item (no wrap)
+    /// Move up by visible_count, stop at first item (no wrap)
     if (state->selected_index < state->visible_count) {
         state->selected_index = 0;
     } else {
@@ -391,16 +391,16 @@ lle_completion_menu_move_right(lle_completion_menu_state_t *state) {
 
     size_t columns = get_columns(state);
 
-    // Find current category
+    /// Find current category
     size_t cat_start, cat_end;
     find_category_for_index(state, state->selected_index, &cat_start, &cat_end);
 
-    // Calculate position within current category
+    /// Calculate position within current category
     size_t index_in_cat = state->selected_index - cat_start;
     size_t current_row_in_cat = index_in_cat / columns;
     size_t current_col = index_in_cat % columns;
 
-    // Calculate row boundaries within category
+    /// Calculate row boundaries within category
     size_t row_start_in_cat = current_row_in_cat * columns;
     size_t row_end_in_cat = row_start_in_cat + columns;
     size_t items_in_cat = cat_end - cat_start;
@@ -409,17 +409,17 @@ lle_completion_menu_move_right(lle_completion_menu_state_t *state) {
     }
     size_t items_in_row = row_end_in_cat - row_start_in_cat;
 
-    // Move to next column
+    /// Move to next column
     current_col++;
 
-    // If we went past the last item in row, wrap to first column
+    /// If we went past the last item in row, wrap to first column
     if (current_col >= items_in_row) {
         current_col = 0;
     }
 
     state->selected_index = cat_start + row_start_in_cat + current_col;
 
-    // Update target column for sticky behavior
+    /// Update target column for sticky behavior
     state->target_column = current_col;
 
     ensure_visible(state);
@@ -446,16 +446,16 @@ lle_result_t lle_completion_menu_move_left(lle_completion_menu_state_t *state) {
 
     size_t columns = get_columns(state);
 
-    // Find current category
+    /// Find current category
     size_t cat_start, cat_end;
     find_category_for_index(state, state->selected_index, &cat_start, &cat_end);
 
-    // Calculate position within current category
+    /// Calculate position within current category
     size_t index_in_cat = state->selected_index - cat_start;
     size_t current_row_in_cat = index_in_cat / columns;
     size_t current_col = index_in_cat % columns;
 
-    // Calculate row boundaries within category
+    /// Calculate row boundaries within category
     size_t row_start_in_cat = current_row_in_cat * columns;
     size_t row_end_in_cat = row_start_in_cat + columns;
     size_t items_in_cat = cat_end - cat_start;
@@ -464,9 +464,9 @@ lle_result_t lle_completion_menu_move_left(lle_completion_menu_state_t *state) {
     }
     size_t items_in_row = row_end_in_cat - row_start_in_cat;
 
-    // Move to previous column
+    /// Move to previous column
     if (current_col == 0) {
-        // Wrap to last item in this row
+        /// Wrap to last item in this row
         current_col = items_in_row - 1;
     } else {
         current_col--;
@@ -474,7 +474,7 @@ lle_result_t lle_completion_menu_move_left(lle_completion_menu_state_t *state) {
 
     state->selected_index = cat_start + row_start_in_cat + current_col;
 
-    // Update target column for sticky behavior
+    /// Update target column for sticky behavior
     state->target_column = current_col;
 
     ensure_visible(state);
@@ -496,13 +496,13 @@ lle_result_t lle_completion_menu_move_next(lle_completion_menu_state_t *state) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Simple sequential increment with wrap
+    /// Simple sequential increment with wrap
     state->selected_index++;
     if (state->selected_index >= state->result->count) {
         state->selected_index = 0;
     }
 
-    // Update target column for arrow key navigation
+    /// Update target column for arrow key navigation
     size_t columns = get_columns(state);
     size_t cat_start, cat_end;
     find_category_for_index(state, state->selected_index, &cat_start, &cat_end);
@@ -528,14 +528,14 @@ lle_result_t lle_completion_menu_move_prev(lle_completion_menu_state_t *state) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Simple sequential decrement with wrap
+    /// Simple sequential decrement with wrap
     if (state->selected_index == 0) {
         state->selected_index = state->result->count - 1;
     } else {
         state->selected_index--;
     }
 
-    // Update target column for arrow key navigation
+    /// Update target column for arrow key navigation
     size_t columns = get_columns(state);
     size_t cat_start, cat_end;
     find_category_for_index(state, state->selected_index, &cat_start, &cat_end);
@@ -573,7 +573,7 @@ lle_completion_menu_next_category(lle_completion_menu_state_t *state) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Find current category
+    /// Find current category
     size_t current_category = 0;
     for (size_t i = 0; i < state->category_count; i++) {
         if (state->selected_index >= state->category_positions[i]) {
@@ -583,7 +583,7 @@ lle_completion_menu_next_category(lle_completion_menu_state_t *state) {
         }
     }
 
-    // Move to next category (wrap to first if at end)
+    /// Move to next category (wrap to first if at end)
     current_category++;
     if (current_category >= state->category_count) {
         current_category = 0;
@@ -621,7 +621,7 @@ lle_completion_menu_prev_category(lle_completion_menu_state_t *state) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Find current category
+    /// Find current category
     size_t current_category = 0;
     for (size_t i = 0; i < state->category_count; i++) {
         if (state->selected_index >= state->category_positions[i]) {
@@ -631,7 +631,7 @@ lle_completion_menu_prev_category(lle_completion_menu_state_t *state) {
         }
     }
 
-    // Move to previous category (wrap to last if at beginning)
+    /// Move to previous category (wrap to last if at beginning)
     if (current_category == 0) {
         current_category = state->category_count - 1;
     } else {
@@ -725,10 +725,10 @@ lle_completion_menu_accept(lle_completion_menu_state_t *state,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Return pointer to selected item
+    /// Return pointer to selected item
     *selected_item = &state->result->items[state->selected_index];
 
-    // Deactivate menu
+    /// Deactivate menu
     state->menu_active = false;
 
     return LLE_SUCCESS;
@@ -768,9 +768,9 @@ lle_result_t lle_completion_menu_handle_char(lle_completion_menu_state_t *state,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // For now, any character input cancels the menu
-    // Future: implement incremental filtering
-    (void)c; // Unused for now
+    /// For now, any character input cancels the menu
+    /// Future: implement incremental filtering
+    (void)c; /// Unused for now
     *should_cancel = true;
     state->menu_active = false;
 

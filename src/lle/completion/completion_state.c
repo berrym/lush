@@ -13,9 +13,9 @@
 #include "lle/completion/word_context.h"
 #include <string.h>
 
-// ============================================================================
-// PUBLIC API
-// ============================================================================
+/// ============================================================================
+/// PUBLIC API
+/// ============================================================================
 
 /**
  * @brief Create a new completion state
@@ -41,7 +41,7 @@ lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Copy buffer snapshot
+    /// Copy buffer snapshot
     size_t buf_len = strlen(buffer);
     state->buffer_snapshot = lle_pool_alloc(buf_len + 1);
     if (!state->buffer_snapshot) {
@@ -49,7 +49,7 @@ lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
     }
     memcpy(state->buffer_snapshot, buffer, buf_len + 1);
 
-    // Copy original partial word from the context's dequoted prefix.
+    /// Copy original partial word from the context's dequoted prefix.
     if (context->dequoted_filename_prefix) {
         size_t word_len = strlen(context->dequoted_filename_prefix);
         state->original_word = lle_pool_alloc(word_len + 1);
@@ -69,10 +69,10 @@ lle_result_t lle_completion_state_create(lle_memory_pool_t *pool,
     state->cursor_position = cursor_pos;
     state->context = context;
     state->results = results;
-    state->current_index = -1;     // No selection yet
-    state->generation_time_us = 0; // Timing tracking not implemented yet
+    state->current_index = -1;     /// No selection yet
+    state->generation_time_us = 0; /// Timing tracking not implemented yet
     state->active = true;
-    state->menu_mode = false; // Determined by caller
+    state->menu_mode = false; /// Determined by caller
     state->pool = pool;
 
     *out_state = state;
@@ -88,7 +88,7 @@ void lle_completion_state_free(lle_completion_state_t *state) {
         return;
     }
 
-    // Free the completion results - the state owns them
+    /// Free the completion results - the state owns them
     if (state->results) {
         lle_completion_result_free(state->results);
         state->results = NULL;
@@ -101,7 +101,7 @@ void lle_completion_state_free(lle_completion_state_t *state) {
         state->context = NULL;
     }
 
-    // Mark as inactive
+    /// Mark as inactive
     state->active = false;
 
     /* Note: The state structure itself and string fields (buffer_snapshot,
@@ -122,7 +122,7 @@ const char *lle_completion_state_cycle_next(lle_completion_state_t *state) {
         return NULL;
     }
 
-    // Move to next index
+    /// Move to next index
     state->current_index =
         (state->current_index + 1) % (int)state->results->count;
 
@@ -143,7 +143,7 @@ const char *lle_completion_state_cycle_prev(lle_completion_state_t *state) {
         return NULL;
     }
 
-    // Move to previous index (with wrap-around)
+    /// Move to previous index (with wrap-around)
     if (state->current_index <= 0) {
         state->current_index = (int)state->results->count - 1;
     } else {

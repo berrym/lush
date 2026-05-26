@@ -22,70 +22,70 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// Forward declarations for shell integration
-// These will be properly integrated via completion_sources module
+/// Forward declarations for shell integration
+/// These will be properly integrated via completion_sources module
 extern bool lle_shell_is_builtin(const char *text);
 extern bool lle_shell_is_alias(const char *text);
 
-// ============================================================================
-// TYPE INFORMATION DATABASE
-// ============================================================================
+/// ============================================================================
+/// TYPE INFORMATION DATABASE
+/// ============================================================================
 
 static const lle_completion_type_info_t TYPE_INFO_DATABASE[] = {
     {  .type = LLE_COMPLETION_TYPE_BUILTIN,
      .type_name = "Built-in",
      .category_name = "BUILT-INS",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 900},
     {  .type = LLE_COMPLETION_TYPE_COMMAND,
      .type_name = "Command",
      .category_name = "COMMANDS",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 800},
     {     .type = LLE_COMPLETION_TYPE_FILE,
      .type_name = "File",
      .category_name = "FILES",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 600},
     {.type = LLE_COMPLETION_TYPE_DIRECTORY,
      .type_name = "Directory",
      .category_name = "DIRECTORIES",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 700},
     { .type = LLE_COMPLETION_TYPE_VARIABLE,
      .type_name = "Variable",
      .category_name = "VARIABLES",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 500},
     {    .type = LLE_COMPLETION_TYPE_ALIAS,
      .type_name = "Alias",
      .category_name = "ALIASES",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 950},
     {  .type = LLE_COMPLETION_TYPE_HISTORY,
      .type_name = "History",
      .category_name = "HISTORY",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 400},
     {   .type = LLE_COMPLETION_TYPE_CUSTOM,
      .type_name = "Custom",
      .category_name = "CUSTOM",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 600},
     {  .type = LLE_COMPLETION_TYPE_UNKNOWN,
      .type_name = "Other",
      .category_name = "OTHER",
-     .indicator = "", // No symbols by default - user customizable via theme
+     .indicator = "", /// No symbols by default - user customizable via theme
  .default_priority = 100}
 };
 
-// Note: TYPE_INFO_COUNT not currently used but kept for future validation
+/// Note: TYPE_INFO_COUNT not currently used but kept for future validation
 #define TYPE_INFO_COUNT                                                        \
     (sizeof(TYPE_INFO_DATABASE) / sizeof(TYPE_INFO_DATABASE[0]))
 
-// ============================================================================
-// TYPE INFORMATION QUERIES
-// ============================================================================
+/// ============================================================================
+/// TYPE INFORMATION QUERIES
+/// ============================================================================
 
 /**
  * @brief Get type information for a completion type
@@ -133,9 +133,9 @@ const char *lle_completion_type_get_indicator(lle_completion_type_t type) {
     return info->indicator;
 }
 
-// ============================================================================
-// HELPER: STRING DUPLICATION WITH MEMORY POOL
-// ============================================================================
+/// ============================================================================
+/// HELPER: STRING DUPLICATION WITH MEMORY POOL
+/// ============================================================================
 
 /**
  * @brief Duplicate a string using the memory pool
@@ -162,9 +162,9 @@ static char *lle_strdup_pool(const char *str) {
     return copy;
 }
 
-// ============================================================================
-// COMPLETION ITEM MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// COMPLETION ITEM MANAGEMENT
+/// ============================================================================
 
 /**
  * @brief Create a new completion item
@@ -212,14 +212,14 @@ lle_result_t lle_completion_item_create_with_description(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate item structure
+    /// Allocate item structure
     lle_completion_item_t *new_item =
         (lle_completion_item_t *)lle_pool_alloc(sizeof(lle_completion_item_t));
     if (!new_item) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Duplicate text
+    /// Duplicate text
     new_item->text = lle_strdup_pool(text);
     if (!new_item->text) {
         lle_pool_free(new_item);
@@ -227,7 +227,7 @@ lle_result_t lle_completion_item_create_with_description(
     }
     new_item->owns_text = true;
 
-    // Duplicate suffix if provided
+    /// Duplicate suffix if provided
     if (suffix) {
         new_item->suffix = lle_strdup_pool(suffix);
         if (!new_item->suffix) {
@@ -241,18 +241,18 @@ lle_result_t lle_completion_item_create_with_description(
         new_item->owns_suffix = false;
     }
 
-    // Set type and get indicator
+    /// Set type and get indicator
     new_item->type = type;
     new_item->type_indicator = lle_completion_type_get_indicator(type);
 
-    // Set relevance score (clamp to valid range)
+    /// Set relevance score (clamp to valid range)
     if (relevance_score < 0)
         relevance_score = 0;
     if (relevance_score > 1000)
         relevance_score = 1000;
     new_item->relevance_score = relevance_score;
 
-    // Duplicate description if provided
+    /// Duplicate description if provided
     if (description) {
         new_item->description = lle_strdup_pool(description);
         new_item->owns_description = (new_item->description != NULL);
@@ -297,9 +297,9 @@ lle_result_t lle_completion_item_free(lle_memory_pool_t *memory_pool,
     return LLE_SUCCESS;
 }
 
-// ============================================================================
-// COMPLETION RESULT MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// COMPLETION RESULT MANAGEMENT
+/// ============================================================================
 
 /**
  * @brief Create a new completion result set
@@ -320,10 +320,10 @@ lle_result_t lle_completion_result_create(lle_memory_pool_t *memory_pool,
     }
 
     if (initial_capacity == 0) {
-        initial_capacity = 16; // Default capacity
+        initial_capacity = 16; /// Default capacity
     }
 
-    // Allocate result structure
+    /// Allocate result structure
     lle_completion_result_t *new_result =
         (lle_completion_result_t *)lle_pool_alloc(
             sizeof(lle_completion_result_t));
@@ -331,7 +331,7 @@ lle_result_t lle_completion_result_create(lle_memory_pool_t *memory_pool,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Allocate items array
+    /// Allocate items array
     new_result->items = (lle_completion_item_t *)lle_pool_alloc(
         sizeof(lle_completion_item_t) * initial_capacity);
     if (!new_result->items) {
@@ -343,7 +343,7 @@ lle_result_t lle_completion_result_create(lle_memory_pool_t *memory_pool,
     new_result->capacity = initial_capacity;
     new_result->memory_pool = memory_pool;
 
-    // Initialize category counts
+    /// Initialize category counts
     new_result->builtin_count = 0;
     new_result->command_count = 0;
     new_result->file_count = 0;
@@ -372,7 +372,7 @@ lle_result_t lle_completion_result_add_item(lle_completion_result_t *result,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Grow array if needed
+    /// Grow array if needed
     if (result->count >= result->capacity) {
         size_t new_capacity = result->capacity * 2;
         lle_completion_item_t *new_items =
@@ -382,22 +382,22 @@ lle_result_t lle_completion_result_add_item(lle_completion_result_t *result,
             return LLE_ERROR_OUT_OF_MEMORY;
         }
 
-        // Copy existing items
+        /// Copy existing items
         memcpy(new_items, result->items,
                sizeof(lle_completion_item_t) * result->count);
 
-        // Free old array
+        /// Free old array
         lle_pool_free(result->items);
 
         result->items = new_items;
         result->capacity = new_capacity;
     }
 
-    // Add item (transfer ownership)
+    /// Add item (transfer ownership)
     result->items[result->count] = *item;
     result->count++;
 
-    // Update category count
+    /// Update category count
     switch (item->type) {
     case LLE_COMPLETION_TYPE_BUILTIN:
         result->builtin_count++;
@@ -427,7 +427,7 @@ lle_result_t lle_completion_result_add_item(lle_completion_result_t *result,
         break;
     }
 
-    // Free the item wrapper (contents now owned by result)
+    /// Free the item wrapper (contents now owned by result)
     lle_pool_free(item);
 
     return LLE_SUCCESS;
@@ -513,17 +513,17 @@ static int compare_completion_items(const void *a, const void *b) {
     const lle_completion_item_t *item_a = (const lle_completion_item_t *)a;
     const lle_completion_item_t *item_b = (const lle_completion_item_t *)b;
 
-    // First sort by type (category)
+    /// First sort by type (category)
     if (item_a->type != item_b->type) {
         return item_a->type - item_b->type;
     }
 
-    // Within same type, sort by relevance score (descending)
+    /// Within same type, sort by relevance score (descending)
     if (item_a->relevance_score != item_b->relevance_score) {
         return item_b->relevance_score - item_a->relevance_score;
     }
 
-    // Finally, alphabetical order
+    /// Finally, alphabetical order
     return strcmp(item_a->text, item_b->text);
 }
 
@@ -563,7 +563,7 @@ lle_result_t lle_completion_result_free(lle_completion_result_t *result) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Free all items
+    /// Free all items
     for (size_t i = 0; i < result->count; i++) {
         lle_completion_item_t *item = &result->items[i];
         if (item->owns_text && item->text) {
@@ -583,9 +583,9 @@ lle_result_t lle_completion_result_free(lle_completion_result_t *result) {
     return LLE_SUCCESS;
 }
 
-// ============================================================================
-// CLASSIFICATION HELPERS
-// ============================================================================
+/// ============================================================================
+/// CLASSIFICATION HELPERS
+/// ============================================================================
 
 /**
  * @brief Check if text is a shell builtin command
@@ -601,8 +601,8 @@ bool lle_completion_is_builtin(const char *text) {
         return false;
     }
 
-    // This will be properly implemented in completion_sources module
-    // For now, use weak symbol that can be overridden
+    /// This will be properly implemented in completion_sources module
+    /// For now, use weak symbol that can be overridden
     return lle_shell_is_builtin(text);
 }
 
@@ -620,8 +620,8 @@ bool lle_completion_is_alias(const char *text) {
         return false;
     }
 
-    // This will be properly implemented in completion_sources module
-    // For now, use weak symbol that can be overridden
+    /// This will be properly implemented in completion_sources module
+    /// For now, use weak symbol that can be overridden
     return lle_shell_is_alias(text);
 }
 
@@ -663,12 +663,12 @@ lle_completion_type_t lle_completion_classify_text(const char *text,
         return LLE_COMPLETION_TYPE_UNKNOWN;
     }
 
-    // Check for variable
+    /// Check for variable
     if (text[0] == '$') {
         return LLE_COMPLETION_TYPE_VARIABLE;
     }
 
-    // If not at command position, likely a file/directory
+    /// If not at command position, likely a file/directory
     if (!is_command_position) {
         if (lle_completion_is_directory(text)) {
             return LLE_COMPLETION_TYPE_DIRECTORY;
@@ -676,7 +676,7 @@ lle_completion_type_t lle_completion_classify_text(const char *text,
         return LLE_COMPLETION_TYPE_FILE;
     }
 
-    // At command position - classify command type
+    /// At command position - classify command type
     if (lle_completion_is_alias(text)) {
         return LLE_COMPLETION_TYPE_ALIAS;
     }
@@ -685,7 +685,7 @@ lle_completion_type_t lle_completion_classify_text(const char *text,
         return LLE_COMPLETION_TYPE_BUILTIN;
     }
 
-    // Check if it's a path
+    /// Check if it's a path
     if (strchr(text, '/') != NULL) {
         if (lle_completion_is_directory(text)) {
             return LLE_COMPLETION_TYPE_DIRECTORY;
@@ -693,13 +693,13 @@ lle_completion_type_t lle_completion_classify_text(const char *text,
         return LLE_COMPLETION_TYPE_FILE;
     }
 
-    // Assume it's a command from PATH
+    /// Assume it's a command from PATH
     return LLE_COMPLETION_TYPE_COMMAND;
 }
 
-// ============================================================================
-// STATISTICS AND QUERIES
-// ============================================================================
+/// ============================================================================
+/// STATISTICS AND QUERIES
+/// ============================================================================
 
 /**
  * @brief Count items of a specific type in result set
@@ -759,12 +759,12 @@ lle_completion_result_get_item(const lle_completion_result_t *result,
     return &result->items[index];
 }
 
-// ============================================================================
-// WEAK SYMBOLS FOR SHELL INTEGRATION
-// ============================================================================
+/// ============================================================================
+/// WEAK SYMBOLS FOR SHELL INTEGRATION
+/// ============================================================================
 
-// These weak symbols can be overridden by the actual shell integration
-// in the completion_sources module
+/// These weak symbols can be overridden by the actual shell integration
+/// in the completion_sources module
 
 __attribute__((weak)) bool lle_shell_is_builtin(const char *text) {
     (void)text;

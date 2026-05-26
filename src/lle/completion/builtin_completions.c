@@ -14,9 +14,9 @@
 
 #include <string.h>
 
-// ============================================================================
-// SIGNAL NAMES FOR TRAP
-// ============================================================================
+/// ============================================================================
+/// SIGNAL NAMES FOR TRAP
+/// ============================================================================
 
 static const char *signal_names[] = {
     "EXIT", "HUP",    "INT",  "QUIT",  "ILL",  "TRAP", "ABRT", "BUS",
@@ -26,18 +26,18 @@ static const char *signal_names[] = {
 
 const char **lle_builtin_get_signal_names(void) { return signal_names; }
 
-// ============================================================================
-// OPTION DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// OPTION DEFINITIONS
+/// ============================================================================
 
-// echo options
+/// echo options
 static const lle_builtin_option_t echo_options[] = {
     {"-n",              "Do not output trailing newline"},
     {"-e",  "Enable interpretation of backslash escapes"},
     {"-E", "Disable interpretation of backslash escapes"},
 };
 
-// read options
+/// read options
 static const lle_builtin_option_t read_options[] = {
     {"-p",                              "Prompt string"},
     {"-r", "Do not treat backslash as escape character"},
@@ -46,14 +46,14 @@ static const lle_builtin_option_t read_options[] = {
     {"-s",            "Silent mode (do not echo input)"},
 };
 
-// type options
+/// type options
 static const lle_builtin_option_t type_options[] = {
     {"-t",             "Print only type name"},
     {"-p", "Print path for external commands"},
     {"-a",                "Print all matches"},
 };
 
-// ulimit options
+/// ulimit options
 static const lle_builtin_option_t ulimit_options[] = {
     {"-a",                 "Show all current limits"},
     {"-H",                          "Set hard limit"},
@@ -67,7 +67,7 @@ static const lle_builtin_option_t ulimit_options[] = {
     {"-h",                               "Show help"},
 };
 
-// fc options
+/// fc options
 static const lle_builtin_option_t fc_options[] = {
     {"-e",              "Editor to use"},
     {"-l",              "List commands"},
@@ -76,29 +76,29 @@ static const lle_builtin_option_t fc_options[] = {
     {"-s", "Re-execute without editing"},
 };
 
-// command options
+/// command options
 static const lle_builtin_option_t command_options[] = {
     {"-v",         "Print command description"},
     {"-V", "Print verbose command description"},
     {"-p",                  "Use default PATH"},
 };
 
-// trap options
+/// trap options
 static const lle_builtin_option_t trap_options[] = {
     {"-l", "List signal names"},
 };
 
-// unalias options
+/// unalias options
 static const lle_builtin_option_t unalias_options[] = {
     {"-a", "Remove all aliases"},
 };
 
-// hash options
+/// hash options
 static const lle_builtin_option_t hash_options[] = {
     {"-r", "Forget all remembered locations"},
 };
 
-// set options
+/// set options
 static const lle_builtin_option_t set_options[] = {
     {"-a",                              "Export all variables"},
     {"-C", "Prevent output redirection from overwriting files"},
@@ -112,17 +112,17 @@ static const lle_builtin_option_t set_options[] = {
     {"+o",                              "Unset option by name"},
 };
 
-// export options
+/// export options
 static const lle_builtin_option_t export_options[] = {
     {"-p", "Print all exported variables"},
 };
 
-// readonly options
+/// readonly options
 static const lle_builtin_option_t readonly_options[] = {
     {"-p", "Print all readonly variables"},
 };
 
-// history options
+/// history options
 static const lle_builtin_option_t history_options[] = {
     {"-c",          "Clear history"},
     {"-d", "Delete entry at offset"},
@@ -130,26 +130,26 @@ static const lle_builtin_option_t history_options[] = {
     {"-w",     "Write history file"},
 };
 
-// jobs options
+/// jobs options
 static const lle_builtin_option_t jobs_options[] = {
     {"-l", "Long format with process IDs"},
     {"-p",        "Show only process IDs"},
 };
 
-// setopt options
+/// setopt options
 static const lle_builtin_option_t setopt_options[] = {
     {"-p",         "Print in re-usable format"},
     {"-q", "Query silently (exit status only)"},
 };
 
-// disown options
+/// disown options
 static const lle_builtin_option_t disown_options[] = {
     {"-h", "Mark jobs to not receive SIGHUP instead of removing"},
     {"-a",                                   "Apply to all jobs"},
     {"-r",                          "Apply to running jobs only"},
 };
 
-// mapfile/readarray options
+/// mapfile/readarray options
 static const lle_builtin_option_t mapfile_options[] = {
     {"-d", "Use specified delimiter instead of newline"},
     {"-n",                   "Read at most count lines"},
@@ -161,7 +161,7 @@ static const lle_builtin_option_t mapfile_options[] = {
     {"-c",        "Quantum for callback (default 5000)"},
 };
 
-// env options
+/// env options
 static const lle_builtin_option_t env_options[] = {
     {    "-i",          "Start with empty environment"},
     {    "-u",      "Remove variable from environment"},
@@ -169,7 +169,7 @@ static const lle_builtin_option_t env_options[] = {
     {"--help",                  "Display help message"},
 };
 
-// analyze options
+/// analyze options
 static const lle_builtin_option_t analyze_options[] = {
     {      "-t", "Target shell (posix, bash, zsh)"},
     {"--target", "Target shell (posix, bash, zsh)"},
@@ -179,7 +179,7 @@ static const lle_builtin_option_t analyze_options[] = {
     {  "--help",               "Show help message"},
 };
 
-// lint options
+/// lint options
 static const lle_builtin_option_t lint_options[] = {
     {               "-t", "Target shell (posix, bash, zsh)"},
     {         "--target", "Target shell (posix, bash, zsh)"},
@@ -195,13 +195,13 @@ static const lle_builtin_option_t lint_options[] = {
     {           "--help",               "Show help message"},
 };
 
-// getopts - no options, just takes optstring and varname
+/// getopts - no options, just takes optstring and varname
 
-// ============================================================================
-// DISPLAY SUBCOMMAND HIERARCHY
-// ============================================================================
+/// ============================================================================
+/// DISPLAY SUBCOMMAND HIERARCHY
+/// ============================================================================
 
-// display lle theme subcommands
+/// display lle theme subcommands
 static const lle_builtin_subcommand_t display_lle_theme_subcmds[] = {
     {  "list", NULL, 0, NULL, 0,  LLE_BUILTIN_ARG_NONE},
     {   "set", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_THEME},
@@ -209,7 +209,7 @@ static const lle_builtin_subcommand_t display_lle_theme_subcmds[] = {
     {"reload", NULL, 0, NULL, 0,  LLE_BUILTIN_ARG_NONE},
 };
 
-// display lle history dedup scope values
+/// display lle history dedup scope values
 static const lle_builtin_subcommand_t display_lle_history_dedup_scope_vals[] = {
     {   "none", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"session", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -217,7 +217,7 @@ static const lle_builtin_subcommand_t display_lle_history_dedup_scope_vals[] = {
     { "global", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// display lle history dedup strategy values
+/// display lle history dedup strategy values
 static const lle_builtin_subcommand_t
     display_lle_history_dedup_strategy_vals[] = {
         {       "ignore", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -227,7 +227,7 @@ static const lle_builtin_subcommand_t
         {     "keep-all", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// display lle history dedup subcommands
+/// display lle history dedup subcommands
 static const lle_builtin_subcommand_t display_lle_history_dedup_subcmds[] = {
     {      "on",                                    NULL,0,NULL, 0, LLE_BUILTIN_ARG_NONE                                                            },
     {     "off",                                    NULL, 0,  NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -249,7 +249,7 @@ static const lle_builtin_subcommand_t lle_onoff_vals[] = {
     {"off", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// display lle history subcommands
+/// display lle history subcommands
 static const lle_builtin_subcommand_t display_lle_history_subcmds[] = {
     {    "status",                              NULL,0,NULL, 0,LLE_BUILTIN_ARG_NONE             },
     {     "dedup", display_lle_history_dedup_subcmds,
@@ -264,7 +264,7 @@ static const lle_builtin_subcommand_t display_lle_history_subcmds[] = {
      LLE_BUILTIN_ARG_NONE         },
 };
 
-// display lle completion sources subcommands
+/// display lle completion sources subcommands
 static const lle_builtin_subcommand_t display_lle_completion_sources_subcmds[] =
     {
         {  "list", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -272,7 +272,7 @@ static const lle_builtin_subcommand_t display_lle_completion_sources_subcmds[] =
         {  "help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// display lle completion subcommands
+/// display lle completion subcommands
 static const lle_builtin_subcommand_t display_lle_completion_subcmds[] = {
     {          "sources", display_lle_completion_sources_subcmds,
      sizeof(display_lle_completion_sources_subcmds) /
@@ -284,7 +284,7 @@ static const lle_builtin_subcommand_t display_lle_completion_subcmds[] = {
     {             "help",                                   NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// display lle subcommands
+/// display lle subcommands
 static const lle_builtin_subcommand_t display_lle_subcmds[] = {
     {         "status",                           NULL,0,NULL, 0, LLE_BUILTIN_ARG_NONE                                                                              },
     {    "diagnostics",                           NULL,                     0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -306,7 +306,7 @@ static const lle_builtin_subcommand_t display_lle_subcmds[] = {
      NULL, 0, LLE_BUILTIN_ARG_NONE                                                                          },
 };
 
-// display performance subcommands
+/// display performance subcommands
 static const lle_builtin_subcommand_t display_performance_subcmds[] = {
     {      "init", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {    "report", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -319,7 +319,7 @@ static const lle_builtin_subcommand_t display_performance_subcmds[] = {
     {     "debug", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// display top-level subcommands
+/// display top-level subcommands
 static const lle_builtin_subcommand_t display_subcmds[] = {
     {     "status",                        NULL,0,NULL, 0,LLE_BUILTIN_ARG_NONE                                                                           },
     {     "config",                        NULL,                0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -336,11 +336,11 @@ static const lle_builtin_subcommand_t display_subcmds[] = {
     {       "help",                        NULL,                0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// ============================================================================
-// DEBUG SUBCOMMAND HIERARCHY
-// ============================================================================
+/// ============================================================================
+/// DEBUG SUBCOMMAND HIERARCHY
+/// ============================================================================
 
-// debug break subcommands
+/// debug break subcommands
 static const lle_builtin_subcommand_t debug_break_subcmds[] = {
     {   "add", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
     {"remove", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -349,7 +349,7 @@ static const lle_builtin_subcommand_t debug_break_subcmds[] = {
     { "clear", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// debug top-level subcommands
+/// debug top-level subcommands
 static const lle_builtin_subcommand_t debug_subcmds[] = {
     {       "on",                NULL,0, NULL, 0,LLE_BUILTIN_ARG_NONE                                                                           },
     {      "off",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -371,9 +371,9 @@ static const lle_builtin_subcommand_t debug_subcmds[] = {
     {     "help",                NULL,                          0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// ============================================================================
-// CONFIG SUBCOMMAND HIERARCHY
-// ============================================================================
+/// ============================================================================
+/// CONFIG SUBCOMMAND HIERARCHY
+/// ============================================================================
 
 static const lle_builtin_subcommand_t config_subcmds[] = {
     {  "show", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -383,9 +383,9 @@ static const lle_builtin_subcommand_t config_subcmds[] = {
     {  "save", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// ============================================================================
-// MODE SUBCOMMAND HIERARCHY
-// ============================================================================
+/// ============================================================================
+/// MODE SUBCOMMAND HIERARCHY
+/// ============================================================================
 
 static const lle_builtin_subcommand_t mode_subcmds[] = {
     {   "lush", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -396,9 +396,9 @@ static const lle_builtin_subcommand_t mode_subcmds[] = {
     { "--show", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// ============================================================================
-// NETWORK SUBCOMMAND HIERARCHY
-// ============================================================================
+/// ============================================================================
+/// NETWORK SUBCOMMAND HIERARCHY
+/// ============================================================================
 
 static const lle_builtin_subcommand_t network_subcmds[] = {
     {  "hosts", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
@@ -406,12 +406,12 @@ static const lle_builtin_subcommand_t network_subcmds[] = {
     {   "help", NULL, 0, NULL, 0, LLE_BUILTIN_ARG_NONE},
 };
 
-// ============================================================================
-// MASTER BUILTIN SPECIFICATION REGISTRY
-// ============================================================================
+/// ============================================================================
+/// MASTER BUILTIN SPECIFICATION REGISTRY
+/// ============================================================================
 
 static const lle_builtin_completion_spec_t builtin_specs[] = {
-    // Builtins with options
+    /// Builtins with options
     {     "echo",     echo_options,sizeof(echo_options) / sizeof(echo_options[0]),NULL,
      0,LLE_BUILTIN_ARG_NONE                                                                                                                                             },
     {     "read",     read_options, sizeof(read_options) / sizeof(read_options[0]),            NULL,
@@ -451,7 +451,7 @@ static const lle_builtin_completion_spec_t builtin_specs[] = {
      LLE_BUILTIN_ARG_FEATURE                                                                                                                                           },
     { "unsetopt",             NULL,                                              0,            NULL,                                       0,   LLE_BUILTIN_ARG_FEATURE},
 
-    // Builtins with subcommands
+    /// Builtins with subcommands
     {  "display",             NULL,                                              0, display_subcmds,
      sizeof(display_subcmds) / sizeof(display_subcmds[0]),
      LLE_BUILTIN_ARG_NONE                                                                                                                                              },
@@ -465,7 +465,7 @@ static const lle_builtin_completion_spec_t builtin_specs[] = {
     {     "mode",             NULL,                                              0,    mode_subcmds,
      sizeof(mode_subcmds) / sizeof(mode_subcmds[0]),      LLE_BUILTIN_ARG_NONE                                                                                         },
 
-    // Builtins with only dynamic arguments
+    /// Builtins with only dynamic arguments
     {       "cd",             NULL,                                              0,            NULL,                                       0, LLE_BUILTIN_ARG_DIRECTORY},
     {   "source",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
     {        ".",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
@@ -475,12 +475,12 @@ static const lle_builtin_completion_spec_t builtin_specs[] = {
     {       "bg",             NULL,                                              0,            NULL,                                       0,       LLE_BUILTIN_ARG_JOB},
     {     "wait",             NULL,                                              0,            NULL,                                       0,       LLE_BUILTIN_ARG_JOB},
 
-    // Directory stack builtins
+    /// Directory stack builtins
     {    "pushd",             NULL,                                              0,            NULL,                                       0, LLE_BUILTIN_ARG_DIRECTORY},
     {     "popd",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
     {     "dirs",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
 
-    // Simple builtins (no special completions, but registered for lookup)
+    /// Simple builtins (no special completions, but registered for lookup)
     {     "exit",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
     {      "pwd",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
     {     "true",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
@@ -503,12 +503,12 @@ static const lle_builtin_completion_spec_t builtin_specs[] = {
     {        "[",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_FILE},
     {     "eval",             NULL,                                              0,            NULL,                                       0,      LLE_BUILTIN_ARG_NONE},
 
-    // Job control builtins
+    /// Job control builtins
     {   "disown",   disown_options,
      sizeof(disown_options) / sizeof(disown_options[0]),            NULL,                                       0,
      LLE_BUILTIN_ARG_JOB                                                                                                                                               },
 
-    // Array builtins
+    /// Array builtins
     {  "mapfile",  mapfile_options,
      sizeof(mapfile_options) / sizeof(mapfile_options[0]),            NULL,                                       0,
      LLE_BUILTIN_ARG_NONE                                                                                                                                              },
@@ -516,13 +516,13 @@ static const lle_builtin_completion_spec_t builtin_specs[] = {
      sizeof(mapfile_options) / sizeof(mapfile_options[0]),            NULL,                                       0,
      LLE_BUILTIN_ARG_NONE                                                                                                                                              },
 
-    // Environment builtins
+    /// Environment builtins
     {      "env",      env_options,   sizeof(env_options) / sizeof(env_options[0]),            NULL,                                       0,
      LLE_BUILTIN_ARG_COMMAND                                                                                                                                           },
     { "printenv",      env_options,   sizeof(env_options) / sizeof(env_options[0]),
      NULL,                                       0,  LLE_BUILTIN_ARG_VARIABLE                                                                                          },
 
-    // Script analysis builtins
+    /// Script analysis builtins
     {  "analyze",  analyze_options,
      sizeof(analyze_options) / sizeof(analyze_options[0]),            NULL,                                       0,
      LLE_BUILTIN_ARG_FILE                                                                                                                                              },
@@ -533,9 +533,9 @@ static const lle_builtin_completion_spec_t builtin_specs[] = {
 static const size_t builtin_specs_count =
     sizeof(builtin_specs) / sizeof(builtin_specs[0]);
 
-// ============================================================================
-// SPEC LOOKUP
-// ============================================================================
+/// ============================================================================
+/// SPEC LOOKUP
+/// ============================================================================
 
 const lle_builtin_completion_spec_t *lle_builtin_get_spec(const char *name) {
     if (!name) {
@@ -553,9 +553,9 @@ const lle_builtin_completion_spec_t *lle_builtin_get_spec(const char *name) {
 
 size_t lle_builtin_get_spec_count(void) { return builtin_specs_count; }
 
-// ============================================================================
-// CONTEXT PARSING
-// ============================================================================
+/// ============================================================================
+/// CONTEXT PARSING
+/// ============================================================================
 
 /**
  * @brief Parse command arguments to find current subcommand position
@@ -578,12 +578,12 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
         return;
     }
 
-    // If no arguments yet, we're at top level
+    /// If no arguments yet, we're at top level
     if (context->argument_count == 0 || !context->arguments) {
         return;
     }
 
-    // Traverse the subcommand hierarchy using the typed arguments
+    /// Traverse the subcommand hierarchy using the typed arguments
     const lle_builtin_subcommand_t *subcommands = spec->subcommands;
     size_t subcommand_count = spec->subcommand_count;
     const lle_builtin_subcommand_t *current = NULL;
@@ -594,12 +594,12 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
             break;
         }
 
-        // Skip options (arguments starting with -)
+        /// Skip options (arguments starting with -)
         if (arg[0] == '-') {
             continue;
         }
 
-        // Find matching subcommand at current level
+        /// Find matching subcommand at current level
         bool found = false;
         for (size_t j = 0; j < subcommand_count; j++) {
             if (strcmp(subcommands[j].name, arg) == 0) {
@@ -607,12 +607,12 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
                 (*out_depth)++;
                 found = true;
 
-                // Descend into this subcommand's children if it has any
+                /// Descend into this subcommand's children if it has any
                 if (current->subcommands && current->subcommand_count > 0) {
                     subcommands = current->subcommands;
                     subcommand_count = current->subcommand_count;
                 } else {
-                    // No more children - stop here
+                    /// No more children - stop here
                     subcommands = NULL;
                     subcommand_count = 0;
                 }
@@ -620,7 +620,7 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
             }
         }
 
-        // If no match found at this level, stop traversing
+        /// If no match found at this level, stop traversing
         if (!found) {
             break;
         }
@@ -629,9 +629,9 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
     *out_subcmd = current;
 }
 
-// ============================================================================
-// DYNAMIC ARGUMENT GENERATORS
-// ============================================================================
+/// ============================================================================
+/// DYNAMIC ARGUMENT GENERATORS
+/// ============================================================================
 
 /**
  * @brief Generate signal name completions
@@ -639,7 +639,7 @@ static void find_current_subcommand(const lle_builtin_completion_spec_t *spec,
 static lle_result_t
 generate_signal_completions(lle_memory_pool_t *pool, const char *prefix,
                             lle_completion_result_t *result) {
-    (void)pool; // Completions allocated via result's pool
+    (void)pool; /// Completions allocated via result's pool
     size_t prefix_len = prefix ? strlen(prefix) : 0;
 
     for (const char **sig = signal_names; *sig != NULL; sig++) {
@@ -663,8 +663,8 @@ generate_signal_completions(lle_memory_pool_t *pool, const char *prefix,
 static lle_result_t generate_job_completions(lle_memory_pool_t *pool,
                                              const char *prefix,
                                              lle_completion_result_t *result) {
-    (void)pool; // Completions allocated via result's pool
-    // Add common job specifiers
+    (void)pool; /// Completions allocated via result's pool
+    /// Add common job specifiers
     static const char *job_specs[] = {"%+", "%-", "%1", "%2", "%3", NULL};
 
     size_t prefix_len = prefix ? strlen(prefix) : 0;
@@ -690,8 +690,8 @@ static lle_result_t generate_job_completions(lle_memory_pool_t *pool,
 static lle_result_t
 generate_theme_completions(lle_memory_pool_t *pool, const char *prefix,
                            lle_completion_result_t *result) {
-    (void)pool; // Completions allocated via result's pool
-    // All built-in theme names
+    (void)pool; /// Completions allocated via result's pool
+    /// All built-in theme names
     static const char *themes[] = {"default",  "minimal",   "powerline",
                                    "classic",  "nerd",      "informative",
                                    "two_line", "corporate", "dark",
@@ -729,29 +729,29 @@ generate_alias_completions(lle_memory_pool_t *pool,
  * This avoids linking dependency on shell_mode for test binaries.
  */
 static const char *shell_feature_names[] = {
-    // Arrays
+    /// Arrays
     "indexed_arrays", "associative_arrays", "array_zero_indexed",
     "array_append",
-    // Arithmetic
+    /// Arithmetic
     "arith_command", "let_builtin",
-    // Tests
+    /// Tests
     "extended_test", "regex_match", "pattern_match",
-    // Redirection
+    /// Redirection
     "process_substitution", "pipe_stderr", "append_both", "coproc",
-    // Parameter expansion
+    /// Parameter expansion
     "case_modification", "substring_expansion", "pattern_substitution",
     "indirect_expansion", "param_transformation",
-    // Globbing
+    /// Globbing
     "extended_glob", "null_glob", "dot_glob",
-    // Brace expansion
+    /// Brace expansion
     "brace_expansion",
-    // Control flow
+    /// Control flow
     "case_fallthrough", "select_loop", "time_keyword",
-    // Behavior
+    /// Behavior
     "word_split_default", "auto_cd", "auto_pushd", "cdable_vars",
-    // Advanced
+    /// Advanced
     "nameref", "anonymous_functions", "return_anywhere",
-    // Zsh-specific
+    /// Zsh-specific
     "glob_qualifiers", "hook_functions", "zsh_param_flags", "plugin_system",
     NULL};
 
@@ -763,10 +763,10 @@ static const char *shell_feature_names[] = {
 static lle_result_t
 generate_feature_completions(lle_memory_pool_t *pool, const char *prefix,
                              lle_completion_result_t *result) {
-    (void)pool; // Completions allocated via result's pool
+    (void)pool; /// Completions allocated via result's pool
     size_t prefix_len = prefix ? strlen(prefix) : 0;
 
-    // Iterate through all shell feature names
+    /// Iterate through all shell feature names
     for (const char **name = shell_feature_names; *name != NULL; name++) {
         if (prefix_len == 0 || strncmp(*name, prefix, prefix_len) == 0) {
             lle_result_t res = lle_completion_result_add(
@@ -829,9 +829,9 @@ static lle_result_t generate_dynamic_completions(
     return LLE_SUCCESS;
 }
 
-// ============================================================================
-// APPLICABILITY CHECK
-// ============================================================================
+/// ============================================================================
+/// APPLICABILITY CHECK
+/// ============================================================================
 
 bool lle_builtin_completions_applicable(const lle_word_context_t *context) {
     if (!context) {
@@ -844,12 +844,12 @@ bool lle_builtin_completions_applicable(const lle_word_context_t *context) {
         return false;
     }
 
-    // Only applicable when completing arguments to a command
+    /// Only applicable when completing arguments to a command
     if (context->context_type != LLE_CONTEXT_ARGUMENT) {
         return false;
     }
 
-    // Check if the command is a builtin
+    /// Check if the command is a builtin
     if (!context->command_name) {
         return false;
     }
@@ -857,9 +857,9 @@ bool lle_builtin_completions_applicable(const lle_word_context_t *context) {
     return lle_builtin_get_spec(context->command_name) != NULL;
 }
 
-// ============================================================================
-// MAIN COMPLETION GENERATOR
-// ============================================================================
+/// ============================================================================
+/// MAIN COMPLETION GENERATOR
+/// ============================================================================
 
 lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
                                               const lle_word_context_t *context,
@@ -868,11 +868,11 @@ lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Get the builtin spec
+    /// Get the builtin spec
     const lle_builtin_completion_spec_t *spec =
         lle_builtin_get_spec(context->command_name);
     if (!spec) {
-        return LLE_SUCCESS; // Not a builtin we know about
+        return LLE_SUCCESS; /// Not a builtin we know about
     }
 
     const char *match_prefix = context->dequoted_filename_prefix
@@ -880,12 +880,12 @@ lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
                                    : "";
     size_t prefix_len = strlen(match_prefix);
 
-    // Find current position in subcommand hierarchy
+    /// Find current position in subcommand hierarchy
     const lle_builtin_subcommand_t *current_subcmd = NULL;
     int depth = 0;
     find_current_subcommand(spec, context, &current_subcmd, &depth);
 
-    // Determine what to complete based on context
+    /// Determine what to complete based on context
     const lle_builtin_option_t *options = NULL;
     size_t option_count = 0;
     const lle_builtin_subcommand_t *subcommands = NULL;
@@ -893,14 +893,14 @@ lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
     lle_builtin_arg_type_t arg_type = LLE_BUILTIN_ARG_NONE;
 
     if (current_subcmd) {
-        // We're inside a subcommand - use its options/subcommands
+        /// We're inside a subcommand - use its options/subcommands
         options = current_subcmd->options;
         option_count = current_subcmd->option_count;
         subcommands = current_subcmd->subcommands;
         subcommand_count = current_subcmd->subcommand_count;
         arg_type = current_subcmd->arg_type;
     } else {
-        // At top level - use spec's options/subcommands
+        /// At top level - use spec's options/subcommands
         options = spec->options;
         option_count = spec->option_count;
         subcommands = spec->subcommands;
@@ -908,7 +908,7 @@ lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
         arg_type = spec->default_arg_type;
     }
 
-    // Add matching options (if prefix starts with -)
+    /// Add matching options (if prefix starts with -)
     if (prefix_len == 0 || match_prefix[0] == '-') {
         for (size_t i = 0; i < option_count; i++) {
             const char *opt_name = options[i].name;
@@ -924,7 +924,7 @@ lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
         }
     }
 
-    // Add matching subcommands (if prefix doesn't start with -)
+    /// Add matching subcommands (if prefix doesn't start with -)
     if (prefix_len == 0 || match_prefix[0] != '-') {
         for (size_t i = 0; i < subcommand_count; i++) {
             const char *subcmd_name = subcommands[i].name;
@@ -939,7 +939,7 @@ lle_result_t lle_builtin_completions_generate(lle_memory_pool_t *pool,
         }
     }
 
-    // Add dynamic completions based on arg type
+    /// Add dynamic completions based on arg type
     if (arg_type != LLE_BUILTIN_ARG_NONE) {
         lle_result_t res =
             generate_dynamic_completions(pool, arg_type, context, result);

@@ -96,7 +96,7 @@ static bool file_source_applicable(const lle_word_context_t *context) {
         return true;
     }
 
-    // Path-shaped command-position completion (./local-script, etc.).
+    /// Path-shaped command-position completion (./local-script, etc.).
     if (context->context_type == LLE_CONTEXT_COMMAND_POSITION) {
         /* The user's typed bytes between word_start and
          * filename_portion_start carry any path markers. We use the
@@ -325,7 +325,7 @@ lle_result_t lle_source_manager_create(lle_memory_pool_t *pool,
     if (res != LLE_SUCCESS)
         return res;
 
-    // Builtin argument completions (options, subcommands, dynamic args).
+    /// Builtin argument completions (options, subcommands, dynamic args).
     res = lle_source_manager_register(
         manager, LLE_SOURCE_CUSTOM, "builtin_args",
         lle_builtin_completions_generate, lle_builtin_completions_applicable);
@@ -355,7 +355,7 @@ lle_result_t lle_source_manager_create(lle_memory_pool_t *pool,
 }
 
 void lle_source_manager_free(lle_source_manager_t *manager) {
-    // Pool-backed; nothing to free here.
+    /// Pool-backed; nothing to free here.
     (void)manager;
 }
 
@@ -417,7 +417,7 @@ lle_result_t lle_source_manager_query(lle_source_manager_t *manager,
         return LLE_SUCCESS;
     }
 
-    // Single-directory dispatch: each applicable source is called once.
+    /// Single-directory dispatch: each applicable source is called once.
     for (size_t i = 0; i < manager->num_sources; i++) {
         lle_completion_source_t *source = manager->sources[i];
         if (source->is_applicable && !source->is_applicable(context))
