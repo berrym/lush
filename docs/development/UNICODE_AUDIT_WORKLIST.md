@@ -247,8 +247,8 @@ Almost the entire file is `strcmp(key, "fixed.config.path") == 0` for option dis
 | Line | Call | Context | Verdict | Reasoning |
 |---|---|---|---|---|
 | 156-157 | `strlen(command)` / `strlen(query)` | byte-length math | A | bytes are storage. |
-| 212-218 | `stristr(haystack, needle)` implementation: for each byte position, `strncasecmp(p, needle, needle_len) == 0` | **C** | interactive history substring search: needle is user-typed (can include accented letters, emoji), history entries can include arbitrary Unicode; case-insensitive comparison via bytewise `strncasecmp` only folds ASCII A-Z. Searching `café` won't match a history line `CAFÉ`. **High-priority.** |
-| 233-236 | `str_starts_with_i(str, prefix)` using `strncasecmp` | **C** | same — case-insensitive prefix used for history prefix search; same Unicode failure. |
+| 212-218 | `stristr(haystack, needle)` implementation: for each byte position, `strncasecmp(p, needle, needle_len) == 0` | **C / DONE c6dd8fb8** | interactive history substring search: needle is user-typed (can include accented letters, emoji), history entries can include arbitrary Unicode; case-insensitive comparison via bytewise `strncasecmp` only folded ASCII A-Z. Searching `café` would not match a history line `CAFÉ`. **Resolved**: rewritten as codepoint-iterating `cf_prefix_match_bytes` over `lle_utf8_decode_codepoint` + `lle_unicode_tolower_codepoint`. |
+| 233-236 | `str_starts_with_i(str, prefix)` using `strncasecmp` | **C / DONE c6dd8fb8** | same — case-insensitive prefix used for history prefix search; same Unicode failure. **Resolved** alongside the substring helper. |
 | 447 | `strcmp(entry->command, query) == 0` | exact match | B | user values; NFC-equal. |
 
 ### src/lle/completion/completion_sources.c, builtin_completions.c, completion_config.c
@@ -290,6 +290,7 @@ Sorted by likelihood-of-impact (how often a real user hits this):
 3. **`src/executor.c:10173`** — pattern range `[a-z]` walks bytes, not codepoints. `[α-ω]` is undefined; `[À-ÿ]` matches first-byte range, not codepoint range.
 
 4. **`src/lle/history/history_search.c:212-236`** — interactive history search (`stristr` and `str_starts_with_i`) is case-insensitive over ASCII only via `strncasecmp`. Users searching history with mixed-case Unicode (filenames, paths, prior `echo café` commands) won't get hits.
+   - **DONE** (c6dd8fb8): replaced both helpers with codepoint-iterating implementations built on `lle_utf8_decode_codepoint` + `lle_unicode_tolower_codepoint`; tests in `tests/lle/functional/test_history_phase3_day8.c` cover `café`/`naïve`/`ångström` substring and `über` prefix matching across mixed-case Unicode entries.
 
 5. **`src/autocorrect.c:608-619`** — fuzzy "did you mean…" edit-distance iterates bytes with ASCII-only case fold via `c += 32`. Non-ASCII command names won't fuzzy-match. Combined with **autocorrect.c:587-588** byte-length cap of 32, non-ASCII names of moderate visual length get rejected before edit-distance even runs.
 
