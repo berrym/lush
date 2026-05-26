@@ -462,6 +462,114 @@ int screen_buffer_get_total_display_rows(const screen_buffer_t *buffer);
  */
 int screen_buffer_get_rows_below_cursor(const screen_buffer_t *buffer);
 
+/// ============================================================================
+/// LINE INDEX (paginator cursor-math helper)
+/// ============================================================================
+///
+/// A line-index splits a `const char *` content blob into logical lines
+/// (\n-terminated) and records, per line: the byte offset into the
+/// content, the byte length (excluding the trailing newline), and the
+/// visual_height when wrapped at the given terminal width. Visual width
+/// per line is computed using screen_buffer_visual_width, which already
+/// handles ANSI escape skipping and UTF-8 wide-character (CJK / emoji)
+/// width.
+///
+/// The index is *immutable* with respect to its source content: the
+/// caller owns the content blob and must keep it alive as long as the
+/// index is in use. A SIGWINCH-style terminal width change is handled
+/// by recomputing visual_height per entry via screen_line_index_rewidth.
+///
+/// This module is pure cursor math — no terminal I/O, no allocation
+/// of the source content, no concurrency. The pager layer (which lives
+/// elsewhere) composes a screen_buffer view from a slice of the index;
+/// streaming / append-aware variants are layered on top in later steps.
+
+/**
+ * @brief One logical line in a paginated content blob
+ */
+typedef struct {
+    size_t byte_offset;   ///< Byte offset into the source content
+    size_t byte_length;   ///< Length in bytes; excludes the trailing '\n'
+    size_t visual_height; ///< Wrapped rows on the index's terminal_width
+} screen_line_index_entry_t;
+
+/**
+ * @brief Line-index over a const-char content blob
+ *
+ * `entries` is a malloc'd array of `count` items; `capacity` is the
+ * current allocation. `terminal_width` is the width used to compute
+ * each entry's `visual_height` (used for resize invalidation, see
+ * screen_line_index_rewidth). `total_visual_rows` is the sum of all
+ * `visual_height` values across entries — useful for pager scroll
+ * math (how many rows the paginated view will take when fully
+ * unrolled).
+ */
+typedef struct {
+    screen_line_index_entry_t *entries;
+    size_t count;
+    size_t capacity;
+    int terminal_width;
+    size_t total_visual_rows;
+} screen_line_index_t;
+
+/**
+ * @brief Build a line index over `content`
+ *
+ * `content` may contain embedded NULs (caller passes explicit `len`),
+ * may or may not end with a newline, may contain ANSI escape sequences
+ * (skipped for visual-width purposes), and may contain UTF-8 wide
+ * characters (counted as 2 visual columns each).
+ *
+ * `terminal_width` must be positive. A width of 0 or negative is
+ * treated as 1 for safety (each visual column always contributes at
+ * least one row).
+ *
+ * Empty content (`len == 0`) yields a zero-entry index; the function
+ * still initialises the struct to a safe state and returns 0.
+ *
+ * On success, returns 0; the caller releases the entries array with
+ * screen_line_index_free. On OOM, returns -1 and the struct is
+ * left in a safe (empty) state.
+ *
+ * @param out             Index to populate; freed first if non-empty
+ * @param content         Source content (caller owns; must outlive index)
+ * @param len             Length of content in bytes
+ * @param terminal_width  Width in columns for visual_height calculation
+ * @return 0 on success, -1 on OOM
+ */
+int screen_line_index_build(screen_line_index_t *out, const char *content,
+                            size_t len, int terminal_width);
+
+/**
+ * @brief Recompute visual_height entries for a new terminal width
+ *
+ * Used on SIGWINCH-style resize: byte_offset and byte_length are
+ * width-invariant and stay the same; only visual_height per entry
+ * and total_visual_rows change. Idempotent — re-calling with the same
+ * width is a no-op other than CPU cost.
+ *
+ * Requires the original content to still be live (the function does
+ * not re-derive byte spans; it just recomputes visual widths using
+ * the byte_offset / byte_length already on each entry).
+ *
+ * @param idx               Index to recompute in place
+ * @param content           Original content the index was built from
+ * @param len               Length of content
+ * @param new_terminal_width New terminal width in columns
+ */
+void screen_line_index_rewidth(screen_line_index_t *idx, const char *content,
+                               size_t len, int new_terminal_width);
+
+/**
+ * @brief Release the index's entries array
+ *
+ * Leaves the struct in a safe re-buildable state (entries=NULL,
+ * count=0, capacity=0). Does not free the struct itself.
+ *
+ * @param idx Index to release
+ */
+void screen_line_index_free(screen_line_index_t *idx);
+
 #ifdef __cplusplus
 }
 #endif

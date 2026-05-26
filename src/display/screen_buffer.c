@@ -1181,3 +1181,176 @@ size_t screen_buffer_calculate_visual_width(const char *text,
 
     return visual_width;
 }
+
+/// ============================================================================
+/// LINE INDEX
+/// ============================================================================
+///
+/// See include/display/screen_buffer.h for the public contract. Pure
+/// cursor math: split a `const char *` content blob into logical lines
+/// and compute per-line visual_height for a given terminal width.
+
+static size_t line_index_visual_width(const char *text, size_t byte_length) {
+    /// Compute visual columns occupied by a logical line. Matches the
+    /// width semantics of screen_buffer_render: ANSI escape sequences
+    /// take 0 columns, UTF-8 codepoints are decoded and weighed via
+    /// lle_utf8_codepoint_width (CJK / emoji count as 2 columns each).
+    /// Readline markers \001 and \002 take 0 columns (consistent with
+    /// screen_buffer_visual_width).
+    if (!text || byte_length == 0) {
+        return 0;
+    }
+    size_t i = 0;
+    size_t visual = 0;
+    bool in_escape = false;
+    while (i < byte_length) {
+        unsigned char ch = (unsigned char)text[i];
+        if (ch == '\033' || ch == '\x1b') {
+            in_escape = true;
+            i++;
+            continue;
+        }
+        if (in_escape) {
+            i++;
+            if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+                ch == 'm' || ch == 'H' || ch == 'J' || ch == 'K' || ch == 'G') {
+                in_escape = false;
+            }
+            continue;
+        }
+        if (ch == '\001' || ch == '\002') {
+            i++;
+            continue;
+        }
+        uint32_t cp = 0;
+        int consumed =
+            lle_utf8_decode_codepoint(text + i, byte_length - i, &cp);
+        if (consumed <= 0) {
+            /// Malformed UTF-8: count one column, advance one byte
+            visual += 1;
+            i += 1;
+            continue;
+        }
+        int w = lle_utf8_codepoint_width(cp);
+        if (w < 0) {
+            w = 0; /// Control characters take no visible columns
+        }
+        visual += (size_t)w;
+        i += (size_t)consumed;
+    }
+    return visual;
+}
+
+static size_t line_index_visual_height(size_t visual_width,
+                                       int terminal_width) {
+    /// Empty visible content still occupies one row (the row exists).
+    /// A line whose visual width is N on a W-column terminal occupies
+    /// ceil(N / W) rows, with the floor at 1.
+    if (terminal_width <= 0) {
+        terminal_width = 1;
+    }
+    if (visual_width == 0) {
+        return 1;
+    }
+    size_t w = (size_t)terminal_width;
+    return (visual_width + w - 1) / w;
+}
+
+static int line_index_append(screen_line_index_t *idx, size_t offset,
+                             size_t length, size_t visual_height) {
+    if (idx->count == idx->capacity) {
+        size_t new_cap = idx->capacity == 0 ? 16 : idx->capacity * 2;
+        screen_line_index_entry_t *grown =
+            realloc(idx->entries, new_cap * sizeof(*grown));
+        if (!grown) {
+            return -1;
+        }
+        idx->entries = grown;
+        idx->capacity = new_cap;
+    }
+    idx->entries[idx->count].byte_offset = offset;
+    idx->entries[idx->count].byte_length = length;
+    idx->entries[idx->count].visual_height = visual_height;
+    idx->total_visual_rows += visual_height;
+    idx->count++;
+    return 0;
+}
+
+int screen_line_index_build(screen_line_index_t *out, const char *content,
+                            size_t len, int terminal_width) {
+    if (!out) {
+        return -1;
+    }
+    /// Free any prior entries so the caller can reuse a stack-allocated
+    /// or previously-built index without leaks.
+    if (out->entries) {
+        free(out->entries);
+    }
+    out->entries = NULL;
+    out->count = 0;
+    out->capacity = 0;
+    out->terminal_width = terminal_width > 0 ? terminal_width : 1;
+    out->total_visual_rows = 0;
+
+    if (!content || len == 0) {
+        return 0;
+    }
+
+    size_t line_start = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (content[i] == '\n') {
+            size_t line_len = i - line_start;
+            size_t vw = line_index_visual_width(content + line_start, line_len);
+            size_t vh = line_index_visual_height(vw, out->terminal_width);
+            if (line_index_append(out, line_start, line_len, vh) != 0) {
+                screen_line_index_free(out);
+                return -1;
+            }
+            line_start = i + 1;
+        }
+    }
+    /// Trailing content without a final newline: still a logical line.
+    if (line_start < len) {
+        size_t line_len = len - line_start;
+        size_t vw = line_index_visual_width(content + line_start, line_len);
+        size_t vh = line_index_visual_height(vw, out->terminal_width);
+        if (line_index_append(out, line_start, line_len, vh) != 0) {
+            screen_line_index_free(out);
+            return -1;
+        }
+    }
+    return 0;
+}
+
+void screen_line_index_rewidth(screen_line_index_t *idx, const char *content,
+                               size_t len, int new_terminal_width) {
+    if (!idx || !idx->entries) {
+        return;
+    }
+    if (new_terminal_width <= 0) {
+        new_terminal_width = 1;
+    }
+    idx->terminal_width = new_terminal_width;
+    idx->total_visual_rows = 0;
+    for (size_t i = 0; i < idx->count; i++) {
+        screen_line_index_entry_t *e = &idx->entries[i];
+        size_t span_end = e->byte_offset + e->byte_length;
+        size_t safe_end = (span_end <= len) ? span_end : len;
+        size_t safe_off = (e->byte_offset <= len) ? e->byte_offset : len;
+        size_t safe_len = safe_end - safe_off;
+        size_t vw = line_index_visual_width(content + safe_off, safe_len);
+        e->visual_height = line_index_visual_height(vw, idx->terminal_width);
+        idx->total_visual_rows += e->visual_height;
+    }
+}
+
+void screen_line_index_free(screen_line_index_t *idx) {
+    if (!idx) {
+        return;
+    }
+    free(idx->entries);
+    idx->entries = NULL;
+    idx->count = 0;
+    idx->capacity = 0;
+    idx->total_visual_rows = 0;
+}

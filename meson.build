@@ -1815,6 +1815,26 @@ if fs.exists('tests/unit/test_screen_buffer.c')
        timeout: 30)
 endif
 
+# Screen Buffer Line-Index Tests
+# ============================================================================
+if fs.exists('tests/unit/test_screen_line_index.c')
+  test_screen_line_index_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_screen_line_index_sources += s
+    endif
+  endforeach
+  test_screen_line_index = executable('test_screen_line_index',
+                                      'tests/unit/test_screen_line_index.c',
+                                      'tests/unit/test_executor_stubs.c',
+                                      test_screen_line_index_sources + lle_shell_sources,
+                                      include_directories: [inc, include_directories('tests')],
+                                      dependencies: [lle_dep, libm])
+  test('Screen Line Index', test_screen_line_index,
+       suite: 'unit',
+       timeout: 30)
+endif
+
 # Composition Engine Tests
 # ============================================================================
 if fs.exists('tests/unit/test_composition_engine.c')
