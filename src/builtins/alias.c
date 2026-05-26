@@ -15,6 +15,7 @@
 #include "errors.h"
 #include "executor.h"
 #include "ht.h"
+#include "lle/lle_pager.h"
 #include "shell_error.h"
 #include "tokenizer.h"
 
@@ -80,18 +81,38 @@ char *lookup_alias(const char *key) {
 /**
  * @brief Print all defined aliases
  *
- * Iterates through the alias hash table and prints each alias
- * in POSIX format: alias name='value'
+ * Iterates through the alias hash table, builds the full listing
+ * into an open_memstream buffer, and hands the buffer to
+ * lle_pager_present. POSIX format per line: `alias name='value'`.
+ *
+ * The pager's own decision tree resolves the call -- non-tty,
+ * disabled master switch, or short listings stream directly; long
+ * listings paginate. On memstream allocation failure the function
+ * falls back to the prior per-iteration printf loop so the listing
+ * still surfaces.
  */
 void print_aliases(void) {
     const char *k = NULL, *v = NULL;
-    aliases_e = ht_strstr_enum_create(aliases);
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
 
+    aliases_e = ht_strstr_enum_create(aliases);
     while (ht_strstr_enum_next(aliases_e, &k, &v)) {
-        /// POSIX format: alias name='value'
-        printf("alias %s='%s'\n", k, v);
+        if (out) {
+            fprintf(out, "alias %s='%s'\n", k, v);
+        } else {
+            /// open_memstream allocation failure path
+            printf("alias %s='%s'\n", k, v);
+        }
     }
     ht_strstr_enum_destroy(aliases_e);
+
+    if (out) {
+        fclose(out);
+        lle_pager_present(NULL, buf);
+        free(buf);
+    }
 }
 
 /**
