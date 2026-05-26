@@ -19,10 +19,10 @@
  */
 
 #define ANSI_RESET "\033[0m"
-#define ANSI_DIM_GRAY "\033[90m" // For HINT type
-#define ANSI_CYAN "\033[36m"     // For INFO type
-#define ANSI_YELLOW "\033[33m"   // For WARNING type
-#define ANSI_RED "\033[31m"      // For ERROR type
+#define ANSI_DIM_GRAY "\033[90m" /// For HINT type
+#define ANSI_CYAN "\033[36m"     /// For INFO type
+#define ANSI_YELLOW "\033[33m"   /// For WARNING type
+#define ANSI_RED "\033[31m"      /// For ERROR type
 
 /* ============================================================================
  * INITIALIZATION AND CLEANUP
@@ -45,7 +45,7 @@ void lle_notification_cleanup(lle_notification_state_t *state) {
         return;
     }
 
-    // Simply clear the state - no dynamic allocations to free
+    /// Simply clear the state - no dynamic allocations to free
     lle_notification_init(state);
 }
 
@@ -73,7 +73,7 @@ lle_result_t lle_notification_show_with_trigger(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Copy message, truncating if necessary
+    /// Copy message, truncating if necessary
     size_t msg_len = strlen(message);
     if (msg_len >= LLE_NOTIFICATION_MAX_MESSAGE) {
         msg_len = LLE_NOTIFICATION_MAX_MESSAGE - 1;
@@ -122,7 +122,7 @@ bool lle_notification_should_dismiss_for_action(
     const lle_notification_state_t *state,
     lle_notification_trigger_action_t action) {
     if (!state || !state->visible) {
-        return false; // Nothing to dismiss
+        return false; /// Nothing to dismiss
     }
 
     /* If the incoming action matches the trigger, don't dismiss
@@ -131,7 +131,7 @@ bool lle_notification_should_dismiss_for_action(
         return false;
     }
 
-    // Different action or generic action - dismiss
+    /// Different action or generic action - dismiss
     return true;
 }
 
@@ -146,7 +146,7 @@ bool lle_notification_should_dismiss_for_action(
 static const char *get_color_code(lle_notification_type_t type) {
     switch (type) {
     case LLE_NOTIFICATION_HINT:
-        return ANSI_CYAN; // Use cyan for visibility during testing
+        return ANSI_CYAN; /// Use cyan for visibility during testing
     case LLE_NOTIFICATION_INFO:
         return ANSI_CYAN;
     case LLE_NOTIFICATION_WARNING:
@@ -171,7 +171,7 @@ lle_notification_get_styled_text(const lle_notification_state_t *state,
 
     const char *color = get_color_code(state->type);
 
-    // Format: for HINT type, prefix with "Tip: ", otherwise just the message
+    /// Format: for HINT type, prefix with "Tip: ", otherwise just the message
     int written;
     if (state->type == LLE_NOTIFICATION_HINT) {
         written = snprintf(buf, size, "%sTip: %s%s", color, state->message,
@@ -182,7 +182,7 @@ lle_notification_get_styled_text(const lle_notification_state_t *state,
     }
 
     if (written < 0 || (size_t)written >= size) {
-        // Truncated or error - ensure null termination
+        /// Truncated or error - ensure null termination
         buf[size - 1] = '\0';
     }
 

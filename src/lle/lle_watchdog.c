@@ -64,15 +64,15 @@ static atomic_uint g_stats_recoveries = 0;
  * @param sig Signal number (unused, but required by signal handler signature)
  */
 static void watchdog_signal_handler(int sig) {
-    (void)sig; // Unused, but required by signal handler signature
+    (void)sig; /// Unused, but required by signal handler signature
 
-    // Set the fired flag atomically
+    /// Set the fired flag atomically
     atomic_store(&g_watchdog_fired, true);
 
-    // Disarm the watchdog to prevent repeated firing
+    /// Disarm the watchdog to prevent repeated firing
     atomic_store(&g_watchdog_armed, false);
 
-    // Increment fire counter (atomic)
+    /// Increment fire counter (atomic)
     atomic_fetch_add(&g_stats_fires, 1);
 }
 
@@ -93,12 +93,12 @@ static void watchdog_signal_handler(int sig) {
  */
 lle_result_t lle_watchdog_init(void) {
     if (g_initialized) {
-        return LLE_SUCCESS; // Already initialized
+        return LLE_SUCCESS; /// Already initialized
     }
 
     struct sigaction sa;
     sa.sa_handler = watchdog_signal_handler;
-    sa.sa_flags = 0; // No SA_RESTART - we want to interrupt syscalls
+    sa.sa_flags = 0; /// No SA_RESTART - we want to interrupt syscalls
     sigemptyset(&sa.sa_mask);
 
     if (sigaction(SIGALRM, &sa, &g_old_sigalrm_action) < 0) {
@@ -123,10 +123,10 @@ void lle_watchdog_cleanup(void) {
         return;
     }
 
-    // Cancel any pending alarm
+    /// Cancel any pending alarm
     alarm(0);
 
-    // Restore previous handler
+    /// Restore previous handler
     sigaction(SIGALRM, &g_old_sigalrm_action, NULL);
 
     g_initialized = false;
@@ -152,15 +152,15 @@ void lle_watchdog_pet(unsigned int timeout_seconds) {
         timeout_seconds = LLE_WATCHDOG_TIMEOUT_DEFAULT;
     }
 
-    // Clear fired flag and arm the watchdog
+    /// Clear fired flag and arm the watchdog
     atomic_store(&g_watchdog_fired, false);
     atomic_store(&g_watchdog_armed, true);
     g_current_timeout = timeout_seconds;
 
-    // Set the alarm
+    /// Set the alarm
     alarm(timeout_seconds);
 
-    // Increment pet counter
+    /// Increment pet counter
     atomic_fetch_add(&g_stats_pets, 1);
 }
 
@@ -174,10 +174,10 @@ void lle_watchdog_stop(void) {
         return;
     }
 
-    // Cancel any pending alarm
+    /// Cancel any pending alarm
     alarm(0);
 
-    // Disarm and clear flags
+    /// Disarm and clear flags
     atomic_store(&g_watchdog_armed, false);
     atomic_store(&g_watchdog_fired, false);
     g_current_timeout = 0;
@@ -195,7 +195,7 @@ bool lle_watchdog_check_and_clear(void) {
     bool was_fired = atomic_exchange(&g_watchdog_fired, false);
 
     if (was_fired) {
-        // Count successful recovery (we caught the timeout)
+        /// Count successful recovery (we caught the timeout)
         atomic_fetch_add(&g_stats_recoveries, 1);
     }
 

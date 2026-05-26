@@ -91,7 +91,7 @@ bool lle_shell_function_exists(const char *name) {
 /** Global shell integration instance */
 lle_shell_integration_t *g_lle_integration = NULL;
 
-// Forward declarations (definitions live further down; see step 5.5 etc.)
+/// Forward declarations (definitions live further down; see step 5.5 etc.)
 struct lle_segment_registry;
 struct lle_segment_registry *lle_get_global_segment_registry(void);
 
@@ -136,12 +136,12 @@ static void populate_history_config(lle_history_config_t *hist_config) {
 
     memset(hist_config, 0, sizeof(lle_history_config_t));
 
-    // Capacity settings
+    /// Capacity settings
     hist_config->max_entries =
         config.history_size > 0 ? config.history_size : 5000;
     hist_config->max_command_length = 8192;
 
-    // File settings
+    /// File settings
     if (config.lle_history_file && config.lle_history_file[0] != '\0') {
         hist_config->history_file_path = config.lle_history_file;
     } else {
@@ -150,12 +150,12 @@ static void populate_history_config(lle_history_config_t *hist_config) {
     hist_config->auto_save = true;
     hist_config->load_on_init = true;
 
-    // Deduplication behavior
+    /// Deduplication behavior
     hist_config->ignore_duplicates =
         config.lle_enable_deduplication &&
         (config.lle_dedup_scope != LLE_DEDUP_SCOPE_NONE);
 
-    // Map dedup strategy
+    /// Map dedup strategy
     switch (config.lle_dedup_strategy) {
     case LLE_DEDUP_STRATEGY_IGNORE:
         hist_config->dedup_strategy = LLE_DEDUP_IGNORE;
@@ -175,7 +175,7 @@ static void populate_history_config(lle_history_config_t *hist_config) {
         break;
     }
 
-    // Map dedup scope (issue #41)
+    /// Map dedup scope (issue #41)
     switch (config.lle_dedup_scope) {
     case LLE_DEDUP_SCOPE_NONE:
         hist_config->dedup_scope = LLE_HISTORY_DEDUP_SCOPE_NONE;
@@ -197,12 +197,12 @@ static void populate_history_config(lle_history_config_t *hist_config) {
     hist_config->unicode_normalize = config.lle_dedup_unicode_normalize;
     hist_config->ignore_space_prefix = false;
 
-    // Metadata
+    /// Metadata
     hist_config->save_timestamps = config.history_timestamps;
     hist_config->save_working_dir = config.lle_enable_forensic_tracking;
     hist_config->save_exit_codes = config.lle_enable_forensic_tracking;
 
-    // Performance
+    /// Performance
     hist_config->initial_capacity =
         config.lle_enable_history_cache && config.lle_cache_size > 0
             ? config.lle_cache_size
@@ -226,12 +226,12 @@ static void populate_history_config(lle_history_config_t *hist_config) {
  * @return LLE_SUCCESS on success, or error code on failure
  */
 lle_result_t lle_shell_integration_init(void) {
-    // Already initialized?
+    /// Already initialized?
     if (g_lle_integration) {
         return LLE_SUCCESS;
     }
 
-    // Step 1: Verify global memory pool exists
+    /// Step 1: Verify global memory pool exists
     if (!global_memory_pool) {
         return LLE_ERROR_NOT_INITIALIZED;
     }
@@ -244,7 +244,7 @@ lle_result_t lle_shell_integration_init(void) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Allocate integration structure from session arena
+    /// Allocate integration structure from session arena
     lle_shell_integration_t *integ =
         lle_arena_calloc(session_arena, 1, sizeof(lle_shell_integration_t));
     if (!integ) {
@@ -261,7 +261,7 @@ lle_result_t lle_shell_integration_init(void) {
      * so we just verify it has been initialized */
     integ->init_state.terminal_detected = true;
 
-    // Step 4: Create shell event hub
+    /// Step 4: Create shell event hub
     lle_result_t result = lle_shell_event_hub_create(&integ->event_hub);
     if (result != LLE_SUCCESS) {
         lle_arena_destroy(session_arena);
@@ -272,12 +272,12 @@ lle_result_t lle_shell_integration_init(void) {
     /* Step 4.5: Initialize shell hook function bridge (Phase 7)
      * This registers handlers that call user-defined hook functions
      * (precmd, preexec, chpwd) when shell events fire. */
-    // Note: We set g_lle_integration temporarily so hooks can register
+    /// Note: We set g_lle_integration temporarily so hooks can register
     g_lle_integration = integ;
     lle_shell_hooks_init();
-    g_lle_integration = NULL; // Will be set permanently at end
+    g_lle_integration = NULL; /// Will be set permanently at end
 
-    // Step 5: Create and configure LLE editor
+    /// Step 5: Create and configure LLE editor
     result = create_and_configure_editor(integ);
     if (result != LLE_SUCCESS) {
         lle_shell_event_hub_destroy(integ->event_hub);
@@ -286,13 +286,13 @@ lle_result_t lle_shell_integration_init(void) {
     }
     integ->init_state.editor_initialized = true;
 
-    // Step 5.5: Bridge shell event hub -> widget hooks manager so the
-    // editor's PRE_COMMAND / POST_COMMAND hooks fire when the shell
-    // emits the matching lifecycle events from lush.c. The bridge
-    // handlers live in widget_hooks.c; they take the editor as
-    // user_data and trigger the corresponding hook on its
-    // widget_hooks_manager. Lets user widgets registered via
-    // `display lle hook add` participate in shell lifecycle.
+    /// Step 5.5: Bridge shell event hub -> widget hooks manager so the
+    /// editor's PRE_COMMAND / POST_COMMAND hooks fire when the shell
+    /// emits the matching lifecycle events from lush.c. The bridge
+    /// handlers live in widget_hooks.c; they take the editor as
+    /// user_data and trigger the corresponding hook on its
+    /// widget_hooks_manager. Lets user widgets registered via
+    /// `display lle hook add` participate in shell lifecycle.
     if (integ->editor && integ->editor->widget_hooks_manager) {
         lle_widget_hooks_bridge_install(integ->event_hub, integ->editor);
     }
@@ -301,16 +301,16 @@ lle_result_t lle_shell_integration_init(void) {
      */
     integ->init_state.history_initialized = true;
 
-    // Step 7: Create and configure prompt composer (Spec 25)
+    /// Step 7: Create and configure prompt composer (Spec 25)
     result = create_and_configure_prompt_composer(integ);
     if (result != LLE_SUCCESS) {
-        // Prompt composer is optional - log warning but continue
-        // The shell can still function without the fancy prompt system
+        /// Prompt composer is optional - log warning but continue
+        /// The shell can still function without the fancy prompt system
     } else {
         integ->init_state.prompt_initialized = true;
     }
 
-    // Step 8: Register atexit handler for cleanup
+    /// Step 8: Register atexit handler for cleanup
     if (!atexit_registered) {
         if (atexit(lle_shell_integration_atexit_handler) == 0) {
             atexit_registered = true;
@@ -318,17 +318,17 @@ lle_result_t lle_shell_integration_init(void) {
         }
     }
 
-    // Step 9: Initialize watchdog subsystem for deadlock detection
+    /// Step 9: Initialize watchdog subsystem for deadlock detection
     result = lle_watchdog_init();
     if (result != LLE_SUCCESS) {
-        // Watchdog is optional - log warning but continue
-        // Shell can still function without watchdog protection
+        /// Watchdog is optional - log warning but continue
+        /// Shell can still function without watchdog protection
     }
 
-    // Mark shell hooks as installed
+    /// Mark shell hooks as installed
     integ->init_state.shell_hooks_installed = true;
 
-    // Set global pointer
+    /// Set global pointer
     g_lle_integration = integ;
 
     return LLE_SUCCESS;
@@ -348,7 +348,7 @@ void lle_shell_integration_shutdown(void) {
 
     lle_shell_integration_t *integ = g_lle_integration;
 
-    // Save history before shutdown
+    /// Save history before shutdown
     if (integ->editor && integ->editor->history_system) {
         const char *home = getenv("HOME");
         if (home) {
@@ -360,40 +360,40 @@ void lle_shell_integration_shutdown(void) {
         }
     }
 
-    // Cleanup global display integration (created in lle_readline)
+    /// Cleanup global display integration (created in lle_readline)
     lle_display_integration_t *display_integ =
         lle_display_integration_get_global();
     if (display_integ) {
         lle_display_integration_cleanup(display_integ);
     }
 
-    // Destroy prompt composer (unregisters from event hub)
+    /// Destroy prompt composer (unregisters from event hub)
     destroy_prompt_composer(integ);
 
-    // Destroy editor
+    /// Destroy editor
     destroy_editor(integ);
 
-    // Cleanup shell hook function bridge (Phase 7)
+    /// Cleanup shell hook function bridge (Phase 7)
     lle_shell_hooks_cleanup();
 
-    // Destroy event hub
+    /// Destroy event hub
     if (integ->event_hub) {
         lle_shell_event_hub_destroy(integ->event_hub);
         integ->event_hub = NULL;
     }
 
-    // Cleanup watchdog subsystem
+    /// Cleanup watchdog subsystem
     lle_watchdog_cleanup();
 
     /* Clear global pointer before destroying arena
      * (integ is allocated from session_arena) */
     g_lle_integration = NULL;
 
-    // Destroy session arena - frees ALL LLE memory including integ itself
+    /// Destroy session arena - frees ALL LLE memory including integ itself
     if (integ->session_arena) {
         lle_arena_destroy(integ->session_arena);
     }
-    // Note: integ is now invalid - do not access after this point
+    /// Note: integ is now invalid - do not access after this point
 }
 
 /**
@@ -445,13 +445,13 @@ create_and_configure_editor(lle_shell_integration_t *integ) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Create editor
+    /// Create editor
     lle_result_t result = lle_editor_create(&integ->editor, global_memory_pool);
     if (result != LLE_SUCCESS || !integ->editor) {
         return result != LLE_SUCCESS ? result : LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize history subsystem
+    /// Initialize history subsystem
     lle_history_config_t hist_config;
     populate_history_config(&hist_config);
 
@@ -459,7 +459,7 @@ create_and_configure_editor(lle_shell_integration_t *integ) {
                                      integ->editor->lle_pool, &hist_config);
 
     if (result == LLE_SUCCESS && integ->editor->history_system) {
-        // Load existing history from file
+        /// Load existing history from file
         const char *home = getenv("HOME");
         if (home) {
             char history_path[1024];
@@ -473,10 +473,10 @@ create_and_configure_editor(lle_shell_integration_t *integ) {
          * This connects the LLE history core to the shell's history builtin */
         lle_result_t bridge_result =
             lle_history_bridge_init(integ->editor->history_system,
-                                    NULL, // No POSIX manager - LLE-only now
+                                    NULL, /// No POSIX manager - LLE-only now
                                     integ->editor->lle_pool);
         if (bridge_result != LLE_SUCCESS) {
-            // Non-fatal - history builtin won't work but shell continues
+            /// Non-fatal - history builtin won't work but shell continues
         }
     }
 
@@ -502,7 +502,7 @@ static void destroy_editor(lle_shell_integration_t *integ) {
  * ============================================================================
  */
 
-// Static registries for prompt composer
+/// Static registries for prompt composer
 static lle_segment_registry_t g_segment_registry;
 static lle_theme_registry_t g_theme_registry;
 static bool g_registries_initialized = false;
@@ -537,14 +537,14 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     /* Initialize registries only if not already initialized
      * This prevents double-init issues during hard reset */
     if (!g_registries_initialized) {
-        // Initialize segment registry and register built-in segments
+        /// Initialize segment registry and register built-in segments
         lle_result_t result = lle_segment_registry_init(&g_segment_registry);
         if (result != LLE_SUCCESS) {
             return result;
         }
         lle_segment_register_builtins(&g_segment_registry);
 
-        // Initialize theme registry and register built-in themes
+        /// Initialize theme registry and register built-in themes
         result = lle_theme_registry_init(&g_theme_registry);
         if (result != LLE_SUCCESS) {
             lle_segment_registry_cleanup(&g_segment_registry);
@@ -564,16 +564,16 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
 
     lle_result_t result;
 
-    // Set default theme as active
+    /// Set default theme as active
     lle_theme_registry_set_active(&g_theme_registry, "default");
 
-    // Allocate prompt composer
+    /// Allocate prompt composer
     integ->prompt_composer = calloc(1, sizeof(lle_prompt_composer_t));
     if (!integ->prompt_composer) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize the composer with segment and theme registries
+    /// Initialize the composer with segment and theme registries
     result = lle_composer_init(integ->prompt_composer, &g_segment_registry,
                                &g_theme_registry);
     if (result != LLE_SUCCESS) {
@@ -582,7 +582,7 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         return result;
     }
 
-    // Sync composer config with global config settings
+    /// Sync composer config with global config settings
     integ->prompt_composer->config.enable_transient =
         config.display_transient_prompt;
     integ->prompt_composer->config.newline_before_prompt =
@@ -613,14 +613,14 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     } else {
         symtable_set_global("PS2", "> ");
     }
-    // Sync PROMPT = PS1 (zsh alias)
+    /// Sync PROMPT = PS1 (zsh alias)
     char *ps1_val = symtable_get_global("PS1");
     if (ps1_val) {
         symtable_set_global("PROMPT", ps1_val);
         free(ps1_val);
     }
 
-    // Seed RPROMPT from theme's rps1_format if right prompt is enabled
+    /// Seed RPROMPT from theme's rps1_format if right prompt is enabled
     if (theme && theme->layout.enable_right_prompt &&
         strlen(theme->layout.rps1_format) > 0) {
         symtable_set_global("RPROMPT", theme->layout.rps1_format);
@@ -640,16 +640,16 @@ static void destroy_prompt_composer(lle_shell_integration_t *integ) {
         return;
     }
 
-    // Unregister from event hub first
+    /// Unregister from event hub first
     lle_composer_unregister_shell_events(integ->prompt_composer);
 
-    // Cleanup and free
+    /// Cleanup and free
     lle_composer_cleanup(integ->prompt_composer);
     free(integ->prompt_composer);
     integ->prompt_composer = NULL;
     integ->init_state.prompt_initialized = false;
 
-    // Cleanup registries only once - prevents double-free on exit
+    /// Cleanup registries only once - prevents double-free on exit
     if (g_registries_initialized) {
         lle_theme_registry_cleanup(&g_theme_registry);
         lle_segment_registry_cleanup(&g_segment_registry);
@@ -675,15 +675,15 @@ void lle_soft_reset(void) {
 
     lle_editor_t *editor = g_lle_integration->editor;
 
-    // Set abort flag to signal readline to return
+    /// Set abort flag to signal readline to return
     editor->abort_requested = true;
 
-    // Clear buffer if present
+    /// Clear buffer if present
     if (editor->buffer) {
         lle_buffer_clear(editor->buffer);
     }
 
-    // Reset history navigation
+    /// Reset history navigation
     editor->history_navigation_pos = 0;
     editor->history_nav_seen_count = 0;
 }
@@ -702,7 +702,7 @@ void lle_hard_reset(void) {
 
     lle_shell_integration_t *integ = g_lle_integration;
 
-    // Save history before destroying editor
+    /// Save history before destroying editor
     if (integ->editor && integ->editor->history_system) {
         const char *home = getenv("HOME");
         if (home) {
@@ -714,22 +714,22 @@ void lle_hard_reset(void) {
         }
     }
 
-    // Destroy current editor
+    /// Destroy current editor
     destroy_editor(integ);
 
-    // Recreate editor
+    /// Recreate editor
     lle_result_t result = create_and_configure_editor(integ);
     if (result == LLE_SUCCESS) {
         integ->init_state.editor_initialized = true;
         integ->init_state.history_initialized = true;
     }
 
-    // Reset error counters
+    /// Reset error counters
     integ->error_count = 0;
     integ->ctrl_g_count = 0;
     integ->recovery_mode = false;
 
-    // Update statistics
+    /// Update statistics
     integ->hard_reset_count++;
     integ->last_reset_time_us = get_timestamp_us();
 }
@@ -745,18 +745,18 @@ void lle_nuclear_reset(void) {
         return;
     }
 
-    // Perform hard reset first
+    /// Perform hard reset first
     lle_hard_reset();
 
-    // Send terminal reset sequence
+    /// Send terminal reset sequence
     /* ESC c = RIS (Reset to Initial State); best-effort -- if the write
      * is short or fails we have no recovery in nuclear-reset path. */
     (void)!write(STDOUT_FILENO, "\033c", 2);
 
-    // Give terminal time to process reset
-    usleep(50000); // 50ms
+    /// Give terminal time to process reset
+    usleep(50000); /// 50ms
 
-    // Update statistics
+    /// Update statistics
     g_lle_integration->nuclear_reset_count++;
 }
 
@@ -782,7 +782,7 @@ static int detect_prompt_color_depth(void) {
             return 1;
         return 0;
     }
-    return 3; // Fallback: assume truecolor
+    return 3; /// Fallback: assume truecolor
 }
 
 /**
@@ -811,7 +811,7 @@ static char s_rendered_rprompt[LLE_PROMPT_OUTPUT_MAX];
 const char *lle_shell_get_rendered_rprompt(void) { return s_rendered_rprompt; }
 
 void lle_shell_update_prompt(void) {
-    // Use minimal fallback if LLE integration not available
+    /// Use minimal fallback if LLE integration not available
     if (!g_lle_integration || !g_lle_integration->prompt_composer) {
         snprintf(s_rendered_ps1, sizeof(s_rendered_ps1), "%s",
                  (getuid() > 0) ? "$ " : "# ");
@@ -820,7 +820,7 @@ void lle_shell_update_prompt(void) {
 
     lle_prompt_composer_t *composer = g_lle_integration->prompt_composer;
 
-    // Theme hot-reload: check if the active theme's file changed on disk
+    /// Theme hot-reload: check if the active theme's file changed on disk
     if (config.display_theme_hot_reload && composer->themes) {
         if (lle_theme_check_hot_reload(composer->themes)) {
             lle_composer_set_theme(composer,
@@ -828,7 +828,7 @@ void lle_shell_update_prompt(void) {
         }
     }
 
-    // Update background job count from executor
+    /// Update background job count from executor
     executor_t *executor = get_global_executor();
     if (executor) {
         executor_update_job_status(executor);
@@ -860,7 +860,7 @@ void lle_shell_update_prompt(void) {
             snprintf(s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset,
                      "$ ");
         } else {
-            // Append trailing space for cursor separation
+            /// Append trailing space for cursor separation
             size_t len = strlen(s_rendered_ps1);
             if (len + 1 < sizeof(s_rendered_ps1)) {
                 s_rendered_ps1[len] = ' ';
@@ -868,7 +868,7 @@ void lle_shell_update_prompt(void) {
             }
         }
 
-        // Strip newlines when multiline is disabled
+        /// Strip newlines when multiline is disabled
         if (!active_theme->layout.enable_multiline) {
             size_t i = 0, j = 0;
             while (s_rendered_ps1[i] != '\0') {
@@ -879,7 +879,7 @@ void lle_shell_update_prompt(void) {
             s_rendered_ps1[j] = '\0';
         }
 
-        // Powerline RPROMPT
+        /// Powerline RPROMPT
         s_rendered_rprompt[0] = '\0';
         if (active_theme->layout.enable_right_prompt) {
             lle_powerline_render(
@@ -892,7 +892,7 @@ void lle_shell_update_prompt(void) {
         return;
     }
 
-    // Read PS1 format string from symtable
+    /// Read PS1 format string from symtable
     char *ps1_fmt = symtable_get_global("PS1");
     if (!ps1_fmt) {
         ps1_fmt = strdup((getuid() > 0) ? "$ " : "# ");
@@ -913,7 +913,7 @@ void lle_shell_update_prompt(void) {
         }
     }
 
-    // Build the expansion context with template engine callbacks
+    /// Build the expansion context with template engine callbacks
     lle_template_render_ctx_t render_ctx =
         lle_composer_create_render_ctx(composer);
     lle_prompt_expand_ctx_t expand_ctx;
@@ -923,7 +923,7 @@ void lle_shell_update_prompt(void) {
     expand_ctx.job_count = composer->context.background_job_count;
     expand_ctx.color_depth = detect_prompt_color_depth();
 
-    // Prepend newline if configured (compact_mode suppresses)
+    /// Prepend newline if configured (compact_mode suppresses)
     size_t offset = 0;
     if (composer->config.newline_before_prompt &&
         !(active_theme && active_theme->layout.compact_mode)) {
@@ -931,18 +931,18 @@ void lle_shell_update_prompt(void) {
         offset = 1;
     }
 
-    // Expand PS1 format → rendered output
+    /// Expand PS1 format → rendered output
     lle_result_t result =
         lle_prompt_expand(ps1_fmt, s_rendered_ps1 + offset,
                           sizeof(s_rendered_ps1) - offset, &expand_ctx);
 
     if (result != LLE_SUCCESS) {
-        // Write fallback after the newline prefix (if any)
+        /// Write fallback after the newline prefix (if any)
         snprintf(s_rendered_ps1 + offset, sizeof(s_rendered_ps1) - offset, "%s",
                  (getuid() > 0) ? "$ " : "# ");
     }
 
-    // Strip newlines when multiline is disabled
+    /// Strip newlines when multiline is disabled
     if (active_theme && !active_theme->layout.enable_multiline) {
         size_t i = 0, j = 0;
         while (s_rendered_ps1[i] != '\0') {
@@ -987,22 +987,22 @@ void lle_shell_notify_prompt_var_set(const char *var_name, const char *value) {
 
     if (strcmp(var_name, "PS1") == 0) {
         lle_prompt_notify_ps1_changed(composer);
-        // Sync PROMPT = PS1
+        /// Sync PROMPT = PS1
         if (value)
             symtable_set_global("PROMPT", value);
     } else if (strcmp(var_name, "PROMPT") == 0) {
         lle_prompt_notify_ps1_changed(composer);
-        // Sync PS1 = PROMPT
+        /// Sync PS1 = PROMPT
         if (value)
             symtable_set_global("PS1", value);
     } else if (strcmp(var_name, "PS2") == 0) {
         lle_prompt_notify_ps2_changed(composer);
     } else if (strcmp(var_name, "RPROMPT") == 0) {
-        // Sync RPS1 = RPROMPT
+        /// Sync RPS1 = RPROMPT
         if (value)
             symtable_set_global("RPS1", value);
     } else if (strcmp(var_name, "RPS1") == 0) {
-        // Sync RPROMPT = RPS1
+        /// Sync RPROMPT = RPS1
         if (value)
             symtable_set_global("RPROMPT", value);
     }
@@ -1026,11 +1026,11 @@ void lle_record_error(lle_result_t error) {
         return;
     }
 
-    (void)error; // Could log specific error in future
+    (void)error; /// Could log specific error in future
 
     g_lle_integration->error_count++;
 
-    // Check if we've hit the threshold for automatic hard reset
+    /// Check if we've hit the threshold for automatic hard reset
     if (g_lle_integration->error_count >= LLE_ERROR_THRESHOLD) {
         g_lle_integration->recovery_mode = true;
         g_lle_integration->recovery_count++;
@@ -1067,20 +1067,20 @@ void lle_record_ctrl_g(void) {
 
     uint64_t now = get_timestamp_us();
 
-    // Check if this Ctrl+G is within the panic window
+    /// Check if this Ctrl+G is within the panic window
     if (now - g_lle_integration->last_ctrl_g_time_us <
         LLE_CTRL_G_PANIC_WINDOW_US) {
         g_lle_integration->ctrl_g_count++;
     } else {
-        // Reset counter - too much time passed
+        /// Reset counter - too much time passed
         g_lle_integration->ctrl_g_count = 1;
     }
 
     g_lle_integration->last_ctrl_g_time_us = now;
 
-    // Check for panic threshold
+    /// Check for panic threshold
     if (g_lle_integration->ctrl_g_count >= LLE_CTRL_G_PANIC_COUNT) {
-        // Triple Ctrl+G detected - trigger hard reset
+        /// Triple Ctrl+G detected - trigger hard reset
         g_lle_integration->ctrl_g_count = 0;
         lle_hard_reset();
     }
@@ -1102,7 +1102,7 @@ void lush_update_editing_mode(void) {
     if (shell_opts.vi_mode) {
         editor->editing_mode = LLE_EDITING_MODE_VI_INSERT;
     } else {
-        // Default to emacs mode
+        /// Default to emacs mode
         editor->editing_mode = LLE_EDITING_MODE_EMACS;
     }
 }
