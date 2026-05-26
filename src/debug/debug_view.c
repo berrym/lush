@@ -61,18 +61,18 @@
  */
 
 typedef struct {
-    const char *gutter;          /**< per-line left marker, e.g. "| " */
-    const char *frame_corner_tl; /**< top-left, e.g. "+-" */
-    const char *frame_corner_bl; /**< bottom-left, e.g. "+-" */
-    const char *frame_horiz;     /**< horizontal fill, "-" */
-    const char *frame_open;      /**< between title and trailing fill, " " */
+    const char *gutter;          ///< per-line left marker, e.g. "| "
+    const char *frame_corner_tl; ///< top-left, e.g. "+-"
+    const char *frame_corner_bl; ///< bottom-left, e.g. "+-"
+    const char *frame_horiz;     ///< horizontal fill, "-"
+    const char *frame_open;      ///< between title and trailing fill, " "
 } debug_view_glyphs_t;
 
 static const debug_view_glyphs_t glyphs_utf8 = {
-    .gutter = "\xe2\x94\x82 ", // U+2502 BOX DRAWINGS LIGHT VERTICAL + space
-    .frame_corner_tl = "\xe2\x94\x8c\xe2\x94\x80", // U+250C U+2500
-    .frame_corner_bl = "\xe2\x94\x94\xe2\x94\x80", // U+2514 U+2500
-    .frame_horiz = "\xe2\x94\x80",                 // U+2500
+    .gutter = "\xe2\x94\x82 ", /// U+2502 BOX DRAWINGS LIGHT VERTICAL + space
+    .frame_corner_tl = "\xe2\x94\x8c\xe2\x94\x80", /// U+250C U+2500
+    .frame_corner_bl = "\xe2\x94\x94\xe2\x94\x80", /// U+2514 U+2500
+    .frame_horiz = "\xe2\x94\x80",                 /// U+2500
     .frame_open = " ",
 };
 
@@ -84,8 +84,8 @@ static const debug_view_glyphs_t glyphs_ascii = {
     .frame_open = " ",
 };
 
-// Lazy-resolved once per process: the locale + TERM at start determine
-// which glyph set the debugger uses for the rest of the run.
+/// Lazy-resolved once per process: the locale + TERM at start determine
+/// which glyph set the debugger uses for the rest of the run.
 static const debug_view_glyphs_t *g_glyphs = NULL;
 
 /**
@@ -115,17 +115,17 @@ static bool env_indicates_utf8_locale(const char *locale) {
  * @return Pointer to one of the static glyph_sets (UTF-8 or ASCII).
  */
 static const debug_view_glyphs_t *resolve_glyphs(void) {
-    // The linux framebuffer console renders box-drawing characters
-    // unreliably; match LLE's terminal_capabilities.c which treats it
-    // as the one common terminal lacking solid Unicode support.
+    /// The linux framebuffer console renders box-drawing characters
+    /// unreliably; match LLE's terminal_capabilities.c which treats it
+    /// as the one common terminal lacking solid Unicode support.
     const char *term = getenv("TERM");
     if (term && strcmp(term, "linux") == 0) {
         return &glyphs_ascii;
     }
 
-    // If the locale does not advertise UTF-8, fall back to ASCII --
-    // the gutter and frame glyphs are multi-byte UTF-8 and a non-UTF-8
-    // locale risks misrendering.
+    /// If the locale does not advertise UTF-8, fall back to ASCII --
+    /// the gutter and frame glyphs are multi-byte UTF-8 and a non-UTF-8
+    /// locale risks misrendering.
     const char *locale = getenv("LC_ALL");
     if (!locale || !*locale) {
         locale = getenv("LC_CTYPE");
@@ -152,9 +152,9 @@ static const debug_view_glyphs_t *view_glyphs(void) {
     return g_glyphs;
 }
 
-// Inner width of a frame, in display columns. Fixed to 76 -- wide
-// enough to comfortably hold variable-state tables, narrow enough to
-// fit on a standard 80-column terminal alongside the gutter.
+/// Inner width of a frame, in display columns. Fixed to 76 -- wide
+/// enough to comfortably hold variable-state tables, narrow enough to
+/// fit on a standard 80-column terminal alongside the gutter.
 #define DEBUG_VIEW_FRAME_WIDTH 76
 
 /* ============================================================================
@@ -203,8 +203,8 @@ static void emit_block_with_gutter(debug_context_t *ctx,
 
     screen_buffer_t *sb = calloc(1, sizeof(screen_buffer_t));
     if (!sb) {
-        // Fall back to a direct write so a malloc failure doesn't
-        // swallow the diagnostic the user is waiting for.
+        /// Fall back to a direct write so a malloc failure doesn't
+        /// swallow the diagnostic the user is waiting for.
         fputs(view_glyphs()->gutter, ctx->debug_output);
         fputs(block_text, ctx->debug_output);
         fputc('\n', ctx->debug_output);
@@ -216,8 +216,8 @@ static void emit_block_with_gutter(debug_context_t *ctx,
 
     int rows_added = screen_buffer_add_text_rows(sb, 0, block_text);
     if (rows_added <= 0) {
-        // add_text_rows declined the input (overflow, etc.). Same
-        // pragmatic fall-through as the malloc-failed branch above.
+        /// add_text_rows declined the input (overflow, etc.). Same
+        /// pragmatic fall-through as the malloc-failed branch above.
         fputs(view_glyphs()->gutter, ctx->debug_output);
         fputs(block_text, ctx->debug_output);
         fputc('\n', ctx->debug_output);
@@ -232,8 +232,8 @@ static void emit_block_with_gutter(debug_context_t *ctx,
         screen_buffer_set_line_prefix(sb, i, gutter);
     }
 
-    // SCREEN_BUFFER_MAX_ROWS * (gutter + MAX_COLS * 4 UTF-8 bytes).
-    // Heap-alloc to stay off the stack; 100*512*4 + slack ~= 220KB.
+    /// SCREEN_BUFFER_MAX_ROWS * (gutter + MAX_COLS * 4 UTF-8 bytes).
+    /// Heap-alloc to stay off the stack; 100*512*4 + slack ~= 220KB.
     size_t out_cap =
         (size_t)rows_added * (size_t)(SCREEN_BUFFER_MAX_COLS * 4 + 32);
     char *out = malloc(out_cap);
@@ -243,7 +243,7 @@ static void emit_block_with_gutter(debug_context_t *ctx,
         fputc('\n', ctx->debug_output);
         fflush(ctx->debug_output);
     } else {
-        // Render declined; emit raw with gutter so the message lands.
+        /// Render declined; emit raw with gutter so the message lands.
         for (int i = 0; i < rows_added; i++) {
             fputs(gutter, ctx->debug_output);
         }
@@ -298,8 +298,8 @@ void debug_view_emit_line(debug_context_t *ctx, const char *format, ...) {
     vsnprintf(line, cap, format, args);
     va_end(args);
 
-    // Strip a trailing newline if the caller embedded one -- the
-    // screen-buffer emit path adds its own.
+    /// Strip a trailing newline if the caller embedded one -- the
+    /// screen-buffer emit path adds its own.
     if (needed > 0 && line[needed - 1] == '\n') {
         line[needed - 1] = '\0';
     }
@@ -367,9 +367,9 @@ void debug_view_begin_frame(debug_context_t *ctx, const char *title) {
         return;
     }
 
-    // The frame border itself is bounded by DEBUG_VIEW_FRAME_WIDTH
-    // display columns; with UTF-8 box characters at up to 3 bytes
-    // each plus title and slack, 512 bytes is comfortable.
+    /// The frame border itself is bounded by DEBUG_VIEW_FRAME_WIDTH
+    /// display columns; with UTF-8 box characters at up to 3 bytes
+    /// each plus title and slack, 512 bytes is comfortable.
     char border[512];
     format_top_border(border, sizeof(border), title);
     emit_block_with_gutter(ctx, border);

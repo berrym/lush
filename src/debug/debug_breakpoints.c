@@ -46,7 +46,7 @@ int debug_add_breakpoint(debug_context_t *ctx, const char *file, int line,
         return -1;
     }
 
-    // Initialize breakpoint
+    /// Initialize breakpoint
     bp->id = ctx->next_breakpoint_id++;
     bp->file = strdup(file);
     bp->line = line;
@@ -55,7 +55,7 @@ int debug_add_breakpoint(debug_context_t *ctx, const char *file, int line,
     bp->enabled = true;
     bp->next = ctx->breakpoints;
 
-    // Add to list
+    /// Add to list
     ctx->breakpoints = bp;
 
     debug_printf(ctx, "Breakpoint %d set at %s:%d\n", bp->id, file, line);
@@ -150,7 +150,7 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
             debug_view_emit_line(ctx, "Breakpoint %d at %s:%d (hit count: %d)",
                                  bp->id, file, line, bp->hit_count);
 
-            // Evaluate condition if present
+            /// Evaluate condition if present
             if (bp->condition) {
                 bool condition_met =
                     debug_evaluate_condition(ctx, bp->condition);
@@ -159,18 +159,18 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
                 if (!condition_met) {
                     debug_view_end_frame(ctx);
                     debug_trace_printf(ctx, "Condition not met, continuing\n");
-                    return false; // Continue execution if condition not met
+                    return false; /// Continue execution if condition not met
                 }
             }
             debug_view_end_frame(ctx);
 
-            // Show current context
+            /// Show current context
             debug_show_context(ctx, file, line);
 
-            // Enter interactive debugging mode
+            /// Enter interactive debugging mode
             debug_trace_printf(ctx, "About to enter interactive debug mode\n");
-            // A breakpoint hit leaves the debugger single-stepping
-            // (step-into semantics) until the user says otherwise.
+            /// A breakpoint hit leaves the debugger single-stepping
+            /// (step-into semantics) until the user says otherwise.
             ctx->step_mode = true;
             ctx->step_target_depth = INT_MAX;
             debug_enter_interactive_mode(ctx);
@@ -181,9 +181,9 @@ bool debug_check_breakpoint(debug_context_t *ctx, const char *file, int line) {
         bp = bp->next;
     }
 
-    // Single-stepping stops here only when this node is not deeper than
-    // the step target -- that is what makes step-over skip nested
-    // function bodies and step-out run on to the caller.
+    /// Single-stepping stops here only when this node is not deeper than
+    /// the step target -- that is what makes step-over skip nested
+    /// function bodies and step-out run on to the caller.
     if (ctx->step_mode && ctx->stack_depth <= ctx->step_target_depth) {
         debug_view_begin_frame(ctx, "STEP");
         debug_view_emit_line(ctx, "At %s:%d", file, line);
@@ -261,7 +261,7 @@ void debug_step_into(debug_context_t *ctx) {
 
     ctx->mode = DEBUG_MODE_STEP;
     ctx->step_mode = true;
-    // Stop at the next node, at any depth.
+    /// Stop at the next node, at any depth.
     ctx->step_target_depth = INT_MAX;
 
     debug_printf(ctx, "Stepping into...\n");
@@ -278,8 +278,8 @@ void debug_step_over(debug_context_t *ctx) {
 
     ctx->mode = DEBUG_MODE_STEP_OVER;
     ctx->step_mode = true;
-    // Stop at the next node no deeper than here -- a called function's
-    // body runs to completion without stopping.
+    /// Stop at the next node no deeper than here -- a called function's
+    /// body runs to completion without stopping.
     ctx->step_target_depth = ctx->stack_depth;
 
     debug_printf(ctx, "Stepping over...\n");
@@ -294,8 +294,8 @@ void debug_step_out(debug_context_t *ctx) {
         return;
     }
 
-    // Step out: keep stepping, but suppressed until the stack unwinds
-    // past the current command frame -- then stop in the caller.
+    /// Step out: keep stepping, but suppressed until the stack unwinds
+    /// past the current command frame -- then stop in the caller.
     ctx->mode = DEBUG_MODE_STEP_OVER;
     ctx->step_mode = true;
     ctx->step_target_depth = ctx->stack_depth - 1;
@@ -328,24 +328,24 @@ bool debug_handle_user_input(debug_context_t *ctx, const char *input) {
         return false;
     }
 
-    // Resume execution after this command? continue / step / next /
-    // finish / quit / empty say yes; inspection commands say no.
+    /// Resume execution after this command? continue / step / next /
+    /// finish / quit / empty say yes; inspection commands say no.
     bool resume = false;
 
-    // Remove newline and trim whitespace
+    /// Remove newline and trim whitespace
     char *cmd = strdup(input);
     char *newline = strchr(cmd, '\n');
     if (newline) {
         *newline = '\0';
     }
 
-    // Skip leading whitespace
+    /// Skip leading whitespace
     char *trimmed = cmd;
     while (*trimmed == ' ' || *trimmed == '\t') {
         trimmed++;
     }
 
-    // Handle empty input (default to continue)
+    /// Handle empty input (default to continue)
     if (strlen(trimmed) == 0) {
         debug_printf(ctx, "Continuing execution...\n");
         ctx->step_mode = false;
@@ -354,7 +354,7 @@ bool debug_handle_user_input(debug_context_t *ctx, const char *input) {
         return true;
     }
 
-    // Parse and handle commands
+    /// Parse and handle commands
     if (strcmp(trimmed, "c") == 0 || strcmp(trimmed, "continue") == 0) {
         debug_continue(ctx);
         resume = true;
@@ -380,39 +380,39 @@ bool debug_handle_user_input(debug_context_t *ctx, const char *input) {
         debug_show_current_location(ctx);
     } else if (strncmp(trimmed, "p ", 2) == 0 ||
                strncmp(trimmed, "print ", 6) == 0) {
-        // Variable inspection
+        /// Variable inspection
         char *var = trimmed + (trimmed[1] == ' ' ? 2 : 6);
         debug_inspect_variable(ctx, var);
     } else if (strncmp(trimmed, "type ", 5) == 0 ||
                strncmp(trimmed, "t ", 2) == 0) {
-        // Variable type query -- short answer (Scalar / List / Map).
+        /// Variable type query -- short answer (Scalar / List / Map).
         char *var = trimmed + (trimmed[1] == ' ' ? 2 : 5);
         debug_show_variable_type(ctx, var);
     } else if (strncmp(trimmed, "set ", 4) == 0) {
-        // Variable assignment
+        /// Variable assignment
         char *assignment = trimmed + 4;
         debug_set_variable(ctx, assignment);
     } else if (strncmp(trimmed, "watch ", 6) == 0) {
-        // Add variable to watch list
+        /// Add variable to watch list
         char *var = trimmed + 6;
         debug_watch_variable(ctx, var);
     } else if (strncmp(trimmed, "eval ", 5) == 0) {
-        // Evaluate expression
+        /// Evaluate expression
         char *expr = trimmed + 5;
         debug_evaluate_expression(ctx, expr);
     } else if (strcmp(trimmed, "vars") == 0) {
         debug_inspect_all_variables(ctx);
     } else if (strcmp(trimmed, "mode") == 0) {
-        // Show current shell mode
+        /// Show current shell mode
         debug_printf(ctx, "Shell mode: %s\n",
                      shell_mode_name(shell_mode_get()));
         debug_printf(ctx, "Strict mode: %s\n",
                      shell_mode_is_strict() ? "enabled" : "disabled");
     } else if (strncmp(trimmed, "mode ", 5) == 0) {
-        // Set shell mode
+        /// Set shell mode
         char *mode_name = trimmed + 5;
         while (*mode_name == ' ')
-            mode_name++; // Skip whitespace
+            mode_name++; /// Skip whitespace
         shell_mode_t new_mode;
         if (strcmp(mode_name, "posix") == 0 || strcmp(mode_name, "sh") == 0) {
             new_mode = SHELL_MODE_POSIX;
@@ -436,7 +436,7 @@ bool debug_handle_user_input(debug_context_t *ctx, const char *input) {
             debug_printf(ctx, "Cannot change mode (strict mode enabled)\n");
         }
     } else if (strcmp(trimmed, "features") == 0) {
-        // List all features and their status
+        /// List all features and their status
         debug_printf(ctx, "Shell features (mode: %s):\n",
                      shell_mode_name(shell_mode_get()));
         for (int i = 0; i < FEATURE_COUNT; i++) {
@@ -445,7 +445,7 @@ bool debug_handle_user_input(debug_context_t *ctx, const char *input) {
             debug_printf(ctx, "  %s: %s\n", name, enabled ? "ON" : "OFF");
         }
     } else if (strncmp(trimmed, "feature ", 8) == 0) {
-        // Query or toggle a specific feature
+        /// Query or toggle a specific feature
         char *feat_name = trimmed + 8;
         while (*feat_name == ' ')
             feat_name++;
@@ -484,7 +484,7 @@ void debug_stack_up(debug_context_t *ctx) {
     }
 
     debug_printf(ctx, "Stack navigation not yet implemented\n");
-    // TODO: Implement stack frame navigation
+    /// TODO: Implement stack frame navigation
 }
 
 /**
@@ -497,7 +497,7 @@ void debug_stack_down(debug_context_t *ctx) {
     }
 
     debug_printf(ctx, "Stack navigation not yet implemented\n");
-    // TODO: Implement stack frame navigation
+    /// TODO: Implement stack frame navigation
 }
 
 /**
@@ -536,7 +536,7 @@ void debug_set_variable(debug_context_t *ctx, const char *assignment) {
 
     debug_printf(ctx, "Variable assignment: %s\n", assignment);
     debug_printf(ctx, "(Variable setting not yet implemented)\n");
-    // TODO: Implement variable assignment
+    /// TODO: Implement variable assignment
 }
 
 /**
@@ -551,7 +551,7 @@ void debug_evaluate_expression(debug_context_t *ctx, const char *expression) {
 
     debug_printf(ctx, "Evaluating: %s\n", expression);
     debug_printf(ctx, "(Expression evaluation not yet implemented)\n");
-    // TODO: Implement expression evaluator
+    /// TODO: Implement expression evaluator
 }
 
 /**
@@ -567,7 +567,7 @@ void debug_show_context(debug_context_t *ctx, const char *file, int line) {
 
     debug_printf(ctx, "\nContext at %s:%d:\n", file, line);
 
-    // Try to read and show file context
+    /// Try to read and show file context
     FILE *f = fopen(file, "r");
     if (f) {
         char buffer[256];
@@ -587,7 +587,7 @@ void debug_show_context(debug_context_t *ctx, const char *file, int line) {
         debug_printf(ctx, "  (source file not available)\n");
     }
 
-    // Show current stack frame info
+    /// Show current stack frame info
     if (ctx->current_frame) {
         debug_printf(ctx, "\nCurrent function: %s\n",
                      ctx->current_frame->function_name);
@@ -606,7 +606,7 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
     debug_printf(
         ctx, "\nEntering interactive debug mode. Type 'help' for commands.\n");
 
-    // Show loop context if in loop
+    /// Show loop context if in loop
     if (ctx->execution_context.in_loop &&
         ctx->execution_context.loop_variable) {
         debug_printf(ctx, "Currently in loop: variable '%s' = '%s'\n",
@@ -614,7 +614,7 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
                      ctx->execution_context.loop_variable_value ?: "unknown");
     }
 
-    // Show available commands
+    /// Show available commands
     debug_printf(
         ctx,
         "Common commands: c/continue, s/step, n/next, vars, help, q/quit\n");
@@ -650,8 +650,8 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
     }
 
     debug_printf(ctx, "Exited interactive debug mode\n");
-    // Don't clean up execution context here - let the loop manage its own
-    // context
+    /// Don't clean up execution context here - let the loop manage its own
+    /// context
 }
 
 /**
@@ -662,29 +662,29 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
  */
 bool debug_evaluate_condition(debug_context_t *ctx, const char *condition) {
     if (!ctx || !condition) {
-        return true; // No condition means always true
+        return true; /// No condition means always true
     }
 
-    // Simple condition evaluation for now
-    // TODO: Implement full expression evaluator
+    /// Simple condition evaluation for now
+    /// TODO: Implement full expression evaluator
 
-    // Handle simple variable comparisons
+    /// Handle simple variable comparisons
     if (strstr(condition, "==") || strstr(condition, "!=") ||
         strstr(condition, "<") || strstr(condition, ">")) {
-        // For now, just return true for any comparison
-        // In a full implementation, this would parse and evaluate the
-        // expression
+        /// For now, just return true for any comparison
+        /// In a full implementation, this would parse and evaluate the
+        /// expression
         return true;
     }
 
-    // Handle variable existence checks
+    /// Handle variable existence checks
     if (condition[0] == '$') {
-        // Check if variable exists
-        // TODO: Implement variable lookup
+        /// Check if variable exists
+        /// TODO: Implement variable lookup
         return true;
     }
 
-    return true; // Default to true
+    return true; /// Default to true
 }
 
 /**
@@ -748,7 +748,7 @@ void debug_save_execution_context(debug_context_t *ctx, executor_t *executor,
         ctx, "debug_save_execution_context: Called with node type %d\n",
         node->type);
 
-    // Detect if we're in a loop
+    /// Detect if we're in a loop
     ctx->execution_context.in_loop =
         (node->type == NODE_FOR || node->type == NODE_WHILE ||
          node->type == NODE_UNTIL);
@@ -757,14 +757,15 @@ void debug_save_execution_context(debug_context_t *ctx, executor_t *executor,
         debug_trace_printf(
             ctx, "Saving loop execution context - node type: %d\n", node->type);
 
-        // Save loop-specific context
+        /// Save loop-specific context
         if (node->type == NODE_FOR) {
-            // For now, we'll detect the loop variable from execution context
-            // This is a simplified approach until we can properly parse the AST
+            /// For now, we'll detect the loop variable from execution context
+            /// This is a simplified approach until we can properly parse the
+            /// AST
             debug_trace_printf(ctx, "FOR loop detected, saving context\n");
         }
 
-        // Save reference to loop AST node
+        /// Save reference to loop AST node
         ctx->execution_context.loop_node = node;
     } else {
         debug_trace_printf(ctx, "Not a loop node - type: %d\n", node->type);
@@ -779,8 +780,8 @@ void debug_save_execution_context(debug_context_t *ctx, executor_t *executor,
  */
 void debug_restore_execution_context(debug_context_t *ctx, executor_t *executor,
                                      node_t *node) {
-    (void)executor; // Reserved for execution state restoration
-    (void)node;     // Reserved for node-specific restoration
+    (void)executor; /// Reserved for execution state restoration
+    (void)node;     /// Reserved for node-specific restoration
     if (!ctx) {
         return;
     }
@@ -793,8 +794,8 @@ void debug_restore_execution_context(debug_context_t *ctx, executor_t *executor,
 
     debug_trace_printf(ctx, "Restoring loop execution context\n");
 
-    // For now, just log that we're restoring context
-    // TODO: Full variable restoration
+    /// For now, just log that we're restoring context
+    /// TODO: Full variable restoration
     debug_trace_printf(ctx, "Loop context restoration (placeholder)\n");
 }
 
@@ -840,12 +841,12 @@ void debug_enter_loop(debug_context_t *ctx, const char *loop_type,
                        value ? value : "unknown");
 
     ctx->execution_context.in_loop = true;
-    // Save the current line as the loop body start line (will be set to body
-    // start on first iteration)
+    /// Save the current line as the loop body start line (will be set to body
+    /// start on first iteration)
     ctx->execution_context.loop_body_start_line =
-        0; // Will be set when we hit the first loop body statement
+        0; /// Will be set when we hit the first loop body statement
 
-    // Save loop variable information
+    /// Save loop variable information
     free(ctx->execution_context.loop_variable);
     free(ctx->execution_context.loop_variable_value);
 
@@ -870,7 +871,7 @@ void debug_update_loop_variable(debug_context_t *ctx, const char *variable,
                        variable ? variable : "unknown",
                        value ? value : "unknown");
 
-    // Update the stored loop variable value
+    /// Update the stored loop variable value
     free(ctx->execution_context.loop_variable_value);
     ctx->execution_context.loop_variable_value = value ? strdup(value) : NULL;
     ctx->execution_context.loop_iteration++;
@@ -888,7 +889,7 @@ void debug_exit_loop(debug_context_t *ctx) {
     debug_trace_printf(ctx, "Exiting loop after %d iterations\n",
                        ctx->execution_context.loop_iteration);
 
-    // Clean up loop context
+    /// Clean up loop context
     ctx->execution_context.in_loop = false;
     ctx->execution_context.loop_body_start_line = 0;
     free(ctx->execution_context.loop_variable);

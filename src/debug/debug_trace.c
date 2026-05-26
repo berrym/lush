@@ -109,7 +109,7 @@ void debug_trace_node(debug_context_t *ctx, node_t *node, const char *file,
                  desc);
     free(desc);
 
-    // Show timing if enabled
+    /// Show timing if enabled
     if (ctx->show_timing) {
         long current_time = debug_get_time_ns();
         char time_str[64];
@@ -120,7 +120,7 @@ void debug_trace_node(debug_context_t *ctx, node_t *node, const char *file,
         debug_printf(ctx, "  Time: %s\n", time_str);
     }
 
-    // Show variables if enabled and we are inside a non-global scope.
+    /// Show variables if enabled and we are inside a non-global scope.
     if (ctx->show_variables &&
         symtable_current_scope_type(symtable_manager()) != SCOPE_GLOBAL) {
         debug_printf(ctx, "  Variables in scope:\n");
@@ -146,7 +146,7 @@ void debug_trace_command(debug_context_t *ctx, const char *command, char **argv,
 
     debug_printf(ctx, "COMMAND: %s", command);
 
-    // Show arguments
+    /// Show arguments
     if (argv && argc > 1) {
         debug_printf(ctx, " with args: ");
         for (int i = 1; i < argc; i++) {
@@ -178,7 +178,7 @@ void debug_trace_builtin(debug_context_t *ctx, const char *builtin, char **argv,
 
     debug_printf(ctx, "BUILTIN: %s", builtin);
 
-    // Show arguments
+    /// Show arguments
     if (argv && argc > 1) {
         debug_printf(ctx, " with args: ");
         for (int i = 1; i < argc; i++) {
@@ -210,7 +210,7 @@ void debug_trace_function_call(debug_context_t *ctx, const char *function,
 
     debug_printf(ctx, "FUNCTION: %s", function);
 
-    // Show arguments
+    /// Show arguments
     if (argv && argc > 1) {
         debug_printf(ctx, " with args: ");
         for (int i = 1; i < argc; i++) {
@@ -241,7 +241,7 @@ debug_frame_t *debug_push_frame(debug_context_t *ctx, const char *function,
         return NULL;
     }
 
-    // Check stack depth limit
+    /// Check stack depth limit
     if (ctx->stack_depth >= ctx->max_stack_depth) {
         debug_printf(ctx, "WARNING: Maximum stack depth reached (%d)\n",
                      ctx->max_stack_depth);
@@ -254,23 +254,23 @@ debug_frame_t *debug_push_frame(debug_context_t *ctx, const char *function,
         return NULL;
     }
 
-    // Initialize frame
+    /// Initialize frame
     frame->function_name = strdup(function);
     frame->file_path = file ? strdup(file) : NULL;
     frame->line_number = line;
     frame->current_node = NULL;
     frame->parent = ctx->current_frame;
-    // Default discipline is dynamic. The typed-fn executor opts in to
-    // lexical via debug_mark_current_frame_lexical immediately after
-    // this push completes.
+    /// Default discipline is dynamic. The typed-fn executor opts in to
+    /// lexical via debug_mark_current_frame_lexical immediately after
+    /// this push completes.
     frame->is_lexical = false;
 
-    // Set timing
+    /// Set timing
     clock_gettime(CLOCK_MONOTONIC, &frame->start_time);
     frame->end_time.tv_sec = 0;
     frame->end_time.tv_nsec = 0;
 
-    // Update context
+    /// Update context
     ctx->current_frame = frame;
     ctx->stack_depth++;
 
@@ -309,10 +309,10 @@ void debug_pop_frame(debug_context_t *ctx) {
 
     debug_frame_t *frame = ctx->current_frame;
 
-    // Set end time
+    /// Set end time
     clock_gettime(CLOCK_MONOTONIC, &frame->end_time);
 
-    // Calculate execution time
+    /// Calculate execution time
     long duration_ns =
         (frame->end_time.tv_sec - frame->start_time.tv_sec) * 1000000000L +
         (frame->end_time.tv_nsec - frame->start_time.tv_nsec);
@@ -324,14 +324,14 @@ void debug_pop_frame(debug_context_t *ctx) {
                      frame->function_name, time_str, ctx->stack_depth);
     }
 
-    // Update context
+    /// Update context
     ctx->current_frame = frame->parent;
     ctx->stack_depth--;
 
-    // Update total time
+    /// Update total time
     ctx->total_time_ns += duration_ns;
 
-    // Clean up frame
+    /// Clean up frame
     free(frame->function_name);
     free(frame->file_path);
     free(frame);
@@ -378,7 +378,7 @@ void debug_show_stack(debug_context_t *ctx) {
                     frame->line_number);
         }
 
-        // Show timing for current frame
+        /// Show timing for current frame
         if (ctx->show_timing && frame == ctx->current_frame) {
             struct timespec current_time;
             clock_gettime(CLOCK_MONOTONIC, &current_time);
@@ -407,9 +407,9 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    // Clean variable name (remove $ prefix if present)
-    // Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
-    // the kind tag itself is presentation-only; inspection is by name.
+    /// Clean variable name (remove $ prefix if present)
+    /// Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
+    /// the kind tag itself is presentation-only; inspection is by name.
     const char *clean_name =
         (name[0] == '$' || name[0] == '@' || name[0] == '%') ? name + 1 : name;
 
@@ -423,10 +423,10 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    // Unified value-view lookup -- single kind-tagged query covers
-    // both array and scalar paths. Arrays carry the richest type info
-    // (List vs Map) so they're handled first; scalars fall through to
-    // the scope-chain + environment lookup below.
+    /// Unified value-view lookup -- single kind-tagged query covers
+    /// both array and scalar paths. Arrays carry the richest type info
+    /// (List vs Map) so they're handled first; scalars fall through to
+    /// the scope-chain + environment lookup below.
     lush_value_view_t view = {0};
     symtable_lookup(clean_name, &view);
     if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
@@ -485,7 +485,7 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
     }
     free(owned_value);
 
-    // Special-variable fallback.
+    /// Special-variable fallback.
     if (strcmp(clean_name, "?") == 0) {
         const char *exit_status = symtable_get_global("?") ?: "0";
         debug_view_emit_line(ctx, "Value: \"%s\" (last exit status)",
@@ -531,8 +531,8 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
  * @brief Structure for passing callback data during variable enumeration
  */
 typedef struct {
-    debug_context_t *ctx; /**< Debug context for output */
-    bool found_any;       /**< Flag indicating if any variables were found */
+    debug_context_t *ctx; ///< Debug context for output
+    bool found_any;       ///< Flag indicating if any variables were found
 } debug_var_callback_data_t;
 
 /**
@@ -551,14 +551,14 @@ static void debug_var_enum_callback(const char *key, const char *value,
 
     data->found_any = true;
 
-    // Parse the serialized value to extract just the actual value
-    // Format: value|type|flags|scope_level
+    /// Parse the serialized value to extract just the actual value
+    /// Format: value|type|flags|scope_level
     char *clean_value = strdup(value);
     if (clean_value) {
         char *separator = strstr(clean_value, "|");
         if (separator) {
             *separator =
-                '\0'; // Terminate at first separator to get clean value
+                '\0'; /// Terminate at first separator to get clean value
         }
 
         debug_view_emit_line(data->ctx, "%-12s = \"%s\"", key, clean_value);
@@ -594,9 +594,9 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
                          current_scope_name ? current_scope_name : "global");
     debug_view_end_frame(ctx);
 
-    // Show local variables when inside any non-global scope (function
-    // body, loop body, etc.). Iterates the current scope's vars_ht
-    // directly so values shadowed from outer scopes are not included.
+    /// Show local variables when inside any non-global scope (function
+    /// body, loop body, etc.). Iterates the current scope's vars_ht
+    /// directly so values shadowed from outer scopes are not included.
     if (symtable_current_scope_type(symtable_manager()) != SCOPE_GLOBAL) {
         debug_view_begin_frame(ctx, "Local Variables");
         symtable_enumerate_current_scope_vars(symtable_manager(),
@@ -604,7 +604,7 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
         debug_view_end_frame(ctx);
     }
 
-    // Globals: shell variables from the symtable.
+    /// Globals: shell variables from the symtable.
     debug_view_begin_frame(ctx, "Shell Variables");
     debug_var_callback_data_t callback_data = {ctx, false};
     symtable_debug_enumerate_global_vars(debug_var_enum_callback,
@@ -614,14 +614,14 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
     }
     debug_view_end_frame(ctx);
 
-    // Arrays (Lists and Maps) -- not in any scope's vars_ht; lush stores
-    // them in separate global array storage. Render with the
-    // is_associative-derived type label and element count.
+    /// Arrays (Lists and Maps) -- not in any scope's vars_ht; lush stores
+    /// them in separate global array storage. Render with the
+    /// is_associative-derived type label and element count.
     debug_view_begin_frame(ctx, "Arrays");
     symtable_enumerate_arrays(debug_array_print_cb, ctx);
     debug_view_end_frame(ctx);
 
-    // Commonly accessed system variables for context.
+    /// Commonly accessed system variables for context.
     debug_view_begin_frame(ctx, "System Variables");
     const char *common_vars[] = {"PWD", "HOME",   "PATH", "USER", "SHELL", "?",
                                  "$",   "OLDPWD", "PS1",  "PS2",  NULL};
@@ -646,7 +646,7 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
         if (eq) {
             *eq = '\0';
             debug_view_emit_line(ctx, "%-12s = \"%s\"", *env, eq + 1);
-            *eq = '='; // Restore
+            *eq = '='; /// Restore
         }
     }
     debug_view_end_frame(ctx);
@@ -669,18 +669,18 @@ void debug_watch_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    // Clean variable name
-    // Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
-    // the kind tag itself is presentation-only; inspection is by name.
+    /// Clean variable name
+    /// Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
+    /// the kind tag itself is presentation-only; inspection is by name.
     const char *clean_name =
         (name[0] == '$' || name[0] == '@' || name[0] == '%') ? name + 1 : name;
 
     debug_printf(ctx, "WATCH: %s\n", clean_name);
 
-    // Resolve the current binding via the unified value view -- arrays
-    // carry a richer label than the scope-chain scalar lookup. Either
-    // render the type alongside the value, or report that the name is
-    // unbound.
+    /// Resolve the current binding via the unified value view -- arrays
+    /// carry a richer label than the scope-chain scalar lookup. Either
+    /// render the type alongside the value, or report that the name is
+    /// unbound.
     lush_value_view_t view = {0};
     symtable_lookup(clean_name, &view);
     if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
@@ -700,8 +700,8 @@ void debug_watch_variable(debug_context_t *ctx, const char *name) {
     }
     lush_value_view_clear(&view);
 
-    // TODO: Implement proper watch list management
-    // For now, just acknowledge the watch request
+    /// TODO: Implement proper watch list management
+    /// For now, just acknowledge the watch request
 }
 
 void debug_show_variable_type(debug_context_t *ctx, const char *name) {
@@ -709,8 +709,8 @@ void debug_show_variable_type(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    // Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
-    // the kind tag itself is presentation-only; inspection is by name.
+    /// Accept any value sigil ($ scalar / @ vector / % pair) as the prefix --
+    /// the kind tag itself is presentation-only; inspection is by name.
     const char *clean_name =
         (name[0] == '$' || name[0] == '@' || name[0] == '%') ? name + 1 : name;
 

@@ -31,7 +31,7 @@ void debug_profile_start(debug_context_t *ctx) {
     ctx->profile_enabled = true;
     ctx->timing_enabled = true;
 
-    // Reset profile data
+    /// Reset profile data
     debug_profile_reset(ctx);
 
     debug_printf(ctx, "Performance profiling started\n");
@@ -62,7 +62,7 @@ void debug_profile_function_enter(debug_context_t *ctx, const char *function) {
         return;
     }
 
-    // Find or create profile data entry
+    /// Find or create profile data entry
     profile_data_t *profile = ctx->profile_data;
     while (profile) {
         if (strcmp(profile->function_name, function) == 0) {
@@ -71,7 +71,7 @@ void debug_profile_function_enter(debug_context_t *ctx, const char *function) {
         profile = profile->next;
     }
 
-    // Create new profile entry if not found
+    /// Create new profile entry if not found
     if (!profile) {
         profile = malloc(sizeof(profile_data_t));
         if (!profile) {
@@ -89,7 +89,7 @@ void debug_profile_function_enter(debug_context_t *ctx, const char *function) {
         ctx->profile_data = profile;
     }
 
-    // Record function entry time in current frame
+    /// Record function entry time in current frame
     if (ctx->current_frame) {
         clock_gettime(CLOCK_MONOTONIC, &ctx->current_frame->start_time);
     }
@@ -105,7 +105,7 @@ void debug_profile_function_exit(debug_context_t *ctx, const char *function) {
         return;
     }
 
-    // Calculate execution time
+    /// Calculate execution time
     struct timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
 
@@ -114,11 +114,11 @@ void debug_profile_function_exit(debug_context_t *ctx, const char *function) {
             1000000000L +
         (end_time.tv_nsec - ctx->current_frame->start_time.tv_nsec);
 
-    // Find profile data entry
+    /// Find profile data entry
     profile_data_t *profile = ctx->profile_data;
     while (profile) {
         if (strcmp(profile->function_name, function) == 0) {
-            // Update profile statistics
+            /// Update profile statistics
             profile->total_time_ns += duration_ns;
             profile->call_count++;
 
@@ -147,7 +147,7 @@ void debug_profile_report(debug_context_t *ctx) {
 
     debug_print_header(ctx, "Performance Profile Report");
 
-    // Calculate session duration
+    /// Calculate session duration
     struct timespec current_time;
     clock_gettime(CLOCK_MONOTONIC, &current_time);
     long session_duration_ns =
@@ -162,17 +162,17 @@ void debug_profile_report(debug_context_t *ctx) {
     debug_printf(ctx, "Total Commands: %ld\n", ctx->total_commands);
     debug_printf(ctx, "\n");
 
-    // Header
+    /// Header
     debug_printf(ctx, "%-20s %8s %12s %12s %12s %12s\n", "Function", "Calls",
                  "Total", "Average", "Min", "Max");
     debug_printf(ctx, "%-20s %8s %12s %12s %12s %12s\n", "--------", "-----",
                  "-----", "-------", "---", "---");
 
-    // Sort profile data by total time (simple bubble sort for now)
+    /// Sort profile data by total time (simple bubble sort for now)
     profile_data_t *sorted_list = NULL;
     profile_data_t *current = ctx->profile_data;
 
-    // Copy to sorted list
+    /// Copy to sorted list
     while (current) {
         profile_data_t *new_entry = malloc(sizeof(profile_data_t));
         if (!new_entry) {
@@ -185,7 +185,7 @@ void debug_profile_report(debug_context_t *ctx) {
             current->file_path ? strdup(current->file_path) : NULL;
         new_entry->next = NULL;
 
-        // Insert in sorted order (by total time, descending)
+        /// Insert in sorted order (by total time, descending)
         if (!sorted_list ||
             new_entry->total_time_ns > sorted_list->total_time_ns) {
             new_entry->next = sorted_list;
@@ -203,7 +203,7 @@ void debug_profile_report(debug_context_t *ctx) {
         current = current->next;
     }
 
-    // Print sorted results
+    /// Print sorted results
     profile_data_t *profile = sorted_list;
     while (profile) {
         char total_str[32], avg_str[32], min_str[32], max_str[32];
@@ -227,10 +227,10 @@ void debug_profile_report(debug_context_t *ctx) {
 
     debug_printf(ctx, "\n");
 
-    // Performance analysis
+    /// Performance analysis
     debug_printf(ctx, "Performance Analysis:\n");
 
-    // Find hotspots
+    /// Find hotspots
     profile_data_t *hotspot = sorted_list;
     if (hotspot) {
         debug_printf(ctx, "  Hotspot: %s (%.1f%% of total time)\n",
@@ -239,7 +239,7 @@ void debug_profile_report(debug_context_t *ctx) {
                          100.0);
     }
 
-    // Find most called function
+    /// Find most called function
     profile_data_t *most_called = sorted_list;
     profile_data_t *temp = sorted_list;
     while (temp) {
@@ -254,7 +254,7 @@ void debug_profile_report(debug_context_t *ctx) {
                      most_called->function_name, most_called->call_count);
     }
 
-    // Find slowest average
+    /// Find slowest average
     profile_data_t *slowest_avg = sorted_list;
     long slowest_avg_time = 0;
     temp = sorted_list;
@@ -275,7 +275,7 @@ void debug_profile_report(debug_context_t *ctx) {
                      slowest_avg->function_name, avg_str);
     }
 
-    // Cleanup sorted list
+    /// Cleanup sorted list
     while (sorted_list) {
         profile_data_t *next = sorted_list->next;
         free(sorted_list->function_name);
@@ -294,7 +294,7 @@ void debug_profile_reset(debug_context_t *ctx) {
         return;
     }
 
-    // Clean up existing profile data
+    /// Clean up existing profile data
     profile_data_t *profile = ctx->profile_data;
     while (profile) {
         profile_data_t *next = profile->next;

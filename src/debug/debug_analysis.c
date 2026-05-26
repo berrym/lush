@@ -26,7 +26,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// Forward declarations for static functions
+/// Forward declarations for static functions
 static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
                                     const char *content);
 static void debug_analyze_style(debug_context_t *ctx, const char *file,
@@ -56,21 +56,21 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
 
     debug_printf(ctx, "Analyzing script: %s\n", script_path);
 
-    // Check if file exists
+    /// Check if file exists
     struct stat st;
     if (stat(script_path, &st) != 0) {
         debug_printf(ctx, "ERROR: Script file not found: %s\n", script_path);
         return;
     }
 
-    // Read script file
+    /// Read script file
     FILE *file = fopen(script_path, "r");
     if (!file) {
         debug_printf(ctx, "ERROR: Cannot open script file: %s\n", script_path);
         return;
     }
 
-    // Read entire file
+    /// Read entire file
     fseek(file, 0, SEEK_END);
     long file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
@@ -92,11 +92,11 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
     }
     script_content[file_size] = '\0';
 
-    // Clear previous analysis results
+    /// Clear previous analysis results
     debug_clear_analysis_issues(ctx);
 
-    // Perform various analysis checks
-    // Syntax analysis returns the AST for use by other analyzers
+    /// Perform various analysis checks
+    /// Syntax analysis returns the AST for use by other analyzers
     node_t *ast = debug_analyze_syntax(ctx, script_path, script_content);
     debug_analyze_style(ctx, script_path, script_content);
     debug_analyze_performance(ctx, script_path, script_content);
@@ -106,10 +106,10 @@ void debug_analyze_script(debug_context_t *ctx, const char *script_path) {
     debug_analyze_typed_fns(ctx, script_path, ast);
     debug_analyze_sigils(ctx, script_path, script_content);
 
-    // Generate analysis report
+    /// Generate analysis report
     debug_show_analysis_report(ctx);
 
-    // Cleanup
+    /// Cleanup
     if (ast) {
         free_node_tree(ast);
     }
@@ -163,8 +163,8 @@ static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
         return NULL;
     }
 
-    // Try to parse the script — content is the entire script body, so
-    // its first character is line 1 of the source file.
+    /// Try to parse the script — content is the entire script body, so
+    /// its first character is line 1 of the source file.
     parser_t *parser = parser_new_with_source(content, file, 1);
     if (!parser) {
         debug_add_analysis_issue(ctx, file, 1, "error", "syntax",
@@ -173,19 +173,19 @@ static node_t *debug_analyze_syntax(debug_context_t *ctx, const char *file,
         return NULL;
     }
 
-    // Parse and check for errors
+    /// Parse and check for errors
     node_t *ast = parser_parse(parser);
     if (!ast) {
         debug_add_analysis_issue(
             ctx, file, 1, "error", "syntax", "Syntax error in script",
             "Check parentheses, quotes, and command structure");
     } else {
-        // Basic syntax validation passed
+        /// Basic syntax validation passed
         debug_printf(ctx, "Syntax validation: PASSED\n");
     }
 
     parser_free(parser);
-    return ast; // Caller is responsible for freeing
+    return ast; /// Caller is responsible for freeing
 }
 
 /**
@@ -206,7 +206,7 @@ static void debug_analyze_style(debug_context_t *ctx, const char *file,
 
     while (*pos) {
         if (*pos == '\n') {
-            // Check line length
+            /// Check line length
             int line_length = pos - line_start;
             if (line_length > 120) {
                 debug_add_analysis_issue(ctx, file, line_number, "warning",
@@ -214,7 +214,7 @@ static void debug_analyze_style(debug_context_t *ctx, const char *file,
                                          "Consider breaking long lines");
             }
 
-            // Check for trailing whitespace
+            /// Check for trailing whitespace
             if (pos > line_start && (*(pos - 1) == ' ' || *(pos - 1) == '\t')) {
                 debug_add_analysis_issue(ctx, file, line_number, "info",
                                          "style", "Trailing whitespace",
@@ -227,14 +227,14 @@ static void debug_analyze_style(debug_context_t *ctx, const char *file,
         pos++;
     }
 
-    // Check for shebang
+    /// Check for shebang
     if (strncmp(content, "#!", 2) != 0) {
         debug_add_analysis_issue(ctx, file, 1, "warning", "style",
                                  "Missing shebang",
                                  "Add #!/bin/sh or #!/usr/bin/env lush");
     }
 
-    // Check for consistent indentation
+    /// Check for consistent indentation
     bool uses_tabs = false;
     bool uses_spaces = false;
     pos = content;
@@ -244,7 +244,7 @@ static void debug_analyze_style(debug_context_t *ctx, const char *file,
         if (*pos == '\n') {
             line_number++;
             pos++;
-            // Check indentation at start of line
+            /// Check indentation at start of line
             while (*pos == ' ' || *pos == '\t') {
                 if (*pos == '\t') {
                     uses_tabs = true;
@@ -280,13 +280,13 @@ static void debug_analyze_performance(debug_context_t *ctx, const char *file,
     int line_number = 1;
     const char *pos = content;
 
-    // Look for performance anti-patterns
+    /// Look for performance anti-patterns
     while (*pos) {
         if (*pos == '\n') {
             line_number++;
         }
 
-        // Check for inefficient patterns
+        /// Check for inefficient patterns
         if (strncmp(pos, "cat ", 4) == 0 && strstr(pos, " | ") != NULL) {
             debug_add_analysis_issue(ctx, file, line_number, "info",
                                      "performance", "Useless use of cat",
@@ -324,18 +324,18 @@ static void debug_analyze_security(debug_context_t *ctx, const char *file,
     int line_number = 1;
     const char *pos = content;
 
-    // Look for security issues
+    /// Look for security issues
     while (*pos) {
         if (*pos == '\n') {
             line_number++;
         }
 
-        // Check for unquoted variables
+        /// Check for unquoted variables
         if (*pos == '$' && *(pos + 1) != '(' && *(pos + 1) != '{') {
             const char *var_start = pos + 1;
             const char *var_end = var_start;
 
-            // Find end of variable name
+            /// Find end of variable name
             while (*var_end && (isalnum(*var_end) || *var_end == '_')) {
                 var_end++;
             }
@@ -348,14 +348,14 @@ static void debug_analyze_security(debug_context_t *ctx, const char *file,
             }
         }
 
-        // Check for eval usage
+        /// Check for eval usage
         if (strncmp(pos, "eval ", 5) == 0) {
             debug_add_analysis_issue(ctx, file, line_number, "error",
                                      "security", "Use of eval",
                                      "Avoid eval for security reasons");
         }
 
-        // Check for dangerous commands
+        /// Check for dangerous commands
         if (strncmp(pos, "rm -rf ", 7) == 0) {
             debug_add_analysis_issue(ctx, file, line_number, "warning",
                                      "security", "Dangerous rm command",
@@ -390,26 +390,26 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
         return;
     }
 
-    // Initialize compat system if not already done. compat_init() already
-    // preserves any pre-set target across the reset, so no caller-side
-    // save/restore is needed — and attempting one (passing the buffer
-    // pointer returned by compat_get_target() back into compat_set_target())
-    // produces a strncpy src/dst overlap.
+    /// Initialize compat system if not already done. compat_init() already
+    /// preserves any pre-set target across the reset, so no caller-side
+    /// save/restore is needed — and attempting one (passing the buffer
+    /// pointer returned by compat_get_target() back into compat_set_target())
+    /// produces a strncpy src/dst overlap.
     if (compat_get_entry_count() == 0) {
         compat_init(NULL);
     }
 
     const char *target_str = compat_get_target();
 
-    // Convert string target to enum for API functions that still use
-    // shell_mode_t
+    /// Convert string target to enum for API functions that still use
+    /// shell_mode_t
     shell_mode_t target = SHELL_MODE_POSIX;
     if (target_str) {
         shell_mode_parse(target_str, &target);
     }
 
-    // === Level 1: AST-based checking (most accurate) ===
-    // Process AST findings one at a time to avoid static buffer issues
+    /// === Level 1: AST-based checking (most accurate) ===
+    /// Process AST findings one at a time to avoid static buffer issues
     if (ast) {
         compat_ast_issue_t ast_issues[64];
         size_t ast_found = compat_check_ast_issues(ast, target, ast_issues, 64);
@@ -421,8 +421,8 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
         }
     }
 
-    // === Level 2: Pattern-based TOML database checks ===
-    // These catch constructs that may not have dedicated AST node types
+    /// === Level 2: Pattern-based TOML database checks ===
+    /// These catch constructs that may not have dedicated AST node types
     compat_result_t results[64];
     size_t found = compat_check_script(content, target, results, 64);
 
@@ -431,11 +431,11 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
         if (!entry)
             continue;
 
-        // Skip entries that are covered by AST-based checking to avoid
-        // duplicates AST covers: extended_test, arithmetic_command,
-        // arithmetic_for, process_substitution, arrays, here_string,
-        // redirect_both, redirect_append_both, redirect_fd, coproc,
-        // select_loop, time_keyword, anonymous_function
+        /// Skip entries that are covered by AST-based checking to avoid
+        /// duplicates AST covers: extended_test, arithmetic_command,
+        /// arithmetic_for, process_substitution, arrays, here_string,
+        /// redirect_both, redirect_append_both, redirect_fd, coproc,
+        /// select_loop, time_keyword, anonymous_function
         if (entry->feature) {
             static const char *ast_covered_features[] = {"extended_test",
                                                          "arithmetic_command",
@@ -461,7 +461,7 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
                 }
             }
             if (skip) {
-                continue; // Already handled by AST analysis
+                continue; /// Already handled by AST analysis
             }
         }
 
@@ -474,9 +474,9 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
             entry->lint.suggestion);
     }
 
-    // === Level 3: Legacy pattern-based checks ===
-    // These are simple checks not yet in the TOML database
-    // Only report if targeting POSIX (these features work in bash/zsh/lush)
+    /// === Level 3: Legacy pattern-based checks ===
+    /// These are simple checks not yet in the TOML database
+    /// Only report if targeting POSIX (these features work in bash/zsh/lush)
     if (target == SHELL_MODE_POSIX) {
         int line_number = 1;
         const char *pos = content;
@@ -486,7 +486,7 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
                 line_number++;
             }
 
-            // Check for bash-specific function syntax (not yet in AST)
+            /// Check for bash-specific function syntax (not yet in AST)
             if (strncmp(pos, "function ", 9) == 0) {
                 debug_add_analysis_issue(ctx, file, line_number, "info",
                                          "portability",
@@ -494,7 +494,7 @@ static void debug_analyze_portability(debug_context_t *ctx, const char *file,
                                          "Use POSIX function syntax");
             }
 
-            // Check for non-portable commands
+            /// Check for non-portable commands
             if (strncmp(pos, "echo -e ", 8) == 0) {
                 debug_add_analysis_issue(
                     ctx, file, line_number, "warning", "portability",
@@ -573,7 +573,7 @@ static bool scan_vector_expansion(const char *start, size_t avail,
             }
         } else if (c == '[' && i + 2 < avail && start[i + 1] == '@' &&
                    start[i + 2] == ']') {
-            // The [@] subscript is the canonical vector trigger.
+            /// The [@] subscript is the canonical vector trigger.
             has_vector = true;
         } else if (c == '(' && i + 2 < avail && depth == 1) {
             /* Parameter-flag operators (k) / (v) / (kv) yield vectors
@@ -589,7 +589,7 @@ static bool scan_vector_expansion(const char *start, size_t avail,
         i++;
     }
     if (depth != 0) {
-        return false; // no closing brace -- bail
+        return false; /// no closing brace -- bail
     }
     *out_has_vector = has_vector;
     *out_end = i;
@@ -624,7 +624,7 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
         if (i == content_len || content[i] == '\n') {
             size_t line_len = (size_t)(content + i - line_start);
 
-            // Skip blank lines and shell comments outright.
+            /// Skip blank lines and shell comments outright.
             const char *trim = line_start;
             const char *end = line_start + line_len;
             while (trim < end && (*trim == ' ' || *trim == '\t')) {
@@ -640,7 +640,7 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
                 if (line_start[k] != '=') {
                     continue;
                 }
-                // Skip "==" (string equality), not assignment.
+                /// Skip "==" (string equality), not assignment.
                 if (k + 1 < line_len && line_start[k + 1] == '=') {
                     continue;
                 }
@@ -669,7 +669,7 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
                         "use ${name[*]} for a space-joined scalar, "
                         "or use the array directly in a vector-"
                         "accepting position (argv, for-in list)");
-                    k = e + end_pos; // don't double-flag
+                    k = e + end_pos; /// don't double-flag
                 }
             }
 
@@ -709,33 +709,33 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
 
 static const char *static_infer_return_kind(node_t *expr) {
     if (!expr) {
-        return ""; // void return
+        return ""; /// void return
     }
     switch (expr->type) {
     case NODE_STRING_LITERAL:
     case NODE_STRING_EXPANDABLE:
         return "scalar";
     case NODE_COMMAND:
-        // Bare word arg as the return expression -- scalar literal.
+        /// Bare word arg as the return expression -- scalar literal.
         return "scalar";
     case NODE_ARRAY_LITERAL:
         return "list";
     case NODE_VAR:
-        // Could be any kind at runtime; can't infer statically.
+        /// Could be any kind at runtime; can't infer statically.
         return NULL;
     case NODE_FN_CALL:
-        // Could be inferred by looking up the callee in the script's
-        // declared fns. Deferred -- the analyzer does not yet build
-        // that table.
+        /// Could be inferred by looking up the callee in the script's
+        /// declared fns. Deferred -- the analyzer does not yet build
+        /// that table.
         return NULL;
     default:
         return NULL;
     }
 }
 
-// Extract the return-kind substring from an encoded fn signature.
-// Returns a borrowed pointer into a static buffer (caller must consume
-// before the next call). NULL if the signature is malformed.
+/// Extract the return-kind substring from an encoded fn signature.
+/// Returns a borrowed pointer into a static buffer (caller must consume
+/// before the next call). NULL if the signature is malformed.
 static const char *static_fn_return_kind(const char *encoded) {
     static char buf[32];
     if (!encoded) {
@@ -749,7 +749,7 @@ static const char *static_fn_return_kind(const char *encoded) {
     const char *sep2 = strchr(cursor, '\x1f');
     size_t rk_len = sep2 ? (size_t)(sep2 - cursor) : strlen(cursor);
     if (rk_len == 0) {
-        return ""; // void
+        return ""; /// void
     }
     if (rk_len >= sizeof(buf)) {
         return NULL;
@@ -759,7 +759,7 @@ static const char *static_fn_return_kind(const char *encoded) {
     return buf;
 }
 
-// Extract the fn name from an encoded signature.
+/// Extract the fn name from an encoded signature.
 static const char *static_fn_name(const char *encoded) {
     static char buf[128];
     if (!encoded) {
@@ -778,8 +778,8 @@ static const char *static_fn_name(const char *encoded) {
     return buf;
 }
 
-// Walk an AST subtree and check every NODE_FN_RETURN it contains
-// against the declared return kind.
+/// Walk an AST subtree and check every NODE_FN_RETURN it contains
+/// against the declared return kind.
 static void check_fn_returns_in_subtree(debug_context_t *ctx, const char *file,
                                         const char *fn_name,
                                         const char *declared_rk,
@@ -789,8 +789,8 @@ static void check_fn_returns_in_subtree(debug_context_t *ctx, const char *file,
     }
 
     if (subtree->type == NODE_FN_DECL) {
-        // A nested fn declaration -- its returns belong to itself, not
-        // the outer fn. The outer walk will pick it up at top level.
+        /// A nested fn declaration -- its returns belong to itself, not
+        /// the outer fn. The outer walk will pick it up at top level.
         return;
     }
 
@@ -840,14 +840,14 @@ static void check_fn_returns_in_subtree(debug_context_t *ctx, const char *file,
         return;
     }
 
-    // Recurse into children and siblings.
+    /// Recurse into children and siblings.
     for (node_t *c = subtree->first_child; c; c = c->next_sibling) {
         check_fn_returns_in_subtree(ctx, file, fn_name, declared_rk, c);
     }
 }
 
-// Top-level walker: find every NODE_FN_DECL in the AST and check its
-// body for return-statement type compliance.
+/// Top-level walker: find every NODE_FN_DECL in the AST and check its
+/// body for return-statement type compliance.
 static void debug_analyze_typed_fns_recurse(debug_context_t *ctx,
                                             const char *file, node_t *node) {
     if (!node) {
@@ -857,7 +857,7 @@ static void debug_analyze_typed_fns_recurse(debug_context_t *ctx,
         const char *fn_name = static_fn_name(node->val.str);
         const char *declared_rk = static_fn_return_kind(node->val.str);
         if (fn_name && declared_rk) {
-            // node->first_child is the body brace group.
+            /// node->first_child is the body brace group.
             for (node_t *c = node->first_child; c; c = c->next_sibling) {
                 check_fn_returns_in_subtree(ctx, file, fn_name, declared_rk, c);
             }
@@ -935,8 +935,8 @@ static void sigil_binding_record(sigil_binding_t **list, const char *name,
                                  size_t namelen, sigil_inferred_kind_t kind) {
     sigil_binding_t *existing = sigil_binding_lookup(*list, name, namelen);
     if (existing) {
-        // Later assignments override earlier ones; the most recent
-        // top-level binding wins for static-analysis purposes.
+        /// Later assignments override earlier ones; the most recent
+        /// top-level binding wins for static-analysis purposes.
         existing->kind = kind;
         return;
     }
@@ -963,16 +963,16 @@ static void sigil_binding_free(sigil_binding_t *list) {
     }
 }
 
-// True if `c` can begin a shell identifier (per POSIX: [_A-Za-z]).
+/// True if `c` can begin a shell identifier (per POSIX: [_A-Za-z]).
 static bool sigil_id_start(unsigned char c) { return isalpha(c) || c == '_'; }
 
-// True if `c` can continue a shell identifier (per POSIX: [_A-Za-z0-9]).
+/// True if `c` can continue a shell identifier (per POSIX: [_A-Za-z0-9]).
 static bool sigil_id_cont(unsigned char c) { return isalnum(c) || c == '_'; }
 
-// Scan a single source line for top-level bindings and record them.
+/// Scan a single source line for top-level bindings and record them.
 static void sigil_collect_bindings_from_line(const char *line, size_t len,
                                              sigil_binding_t **out) {
-    // Skip leading whitespace and decide what shape this line opens with.
+    /// Skip leading whitespace and decide what shape this line opens with.
     size_t i = 0;
     while (i < len && (line[i] == ' ' || line[i] == '\t')) {
         i++;
@@ -1010,8 +1010,8 @@ static void sigil_collect_bindings_from_line(const char *line, size_t len,
         }
     }
 
-    // `NAME=VALUE` and `NAME=(...)` at the start of the line.  Strip an
-    // optional `local ` / `export ` / `readonly ` prefix first.
+    /// `NAME=VALUE` and `NAME=(...)` at the start of the line.  Strip an
+    /// optional `local ` / `export ` / `readonly ` prefix first.
     static const char *kind_prefixes[] = {"local ", "export ", "readonly ",
                                           NULL};
     for (size_t p = 0; kind_prefixes[p]; p++) {
@@ -1036,7 +1036,7 @@ static void sigil_collect_bindings_from_line(const char *line, size_t len,
     if (name_end >= len || line[name_end] != '=') {
         return;
     }
-    // Distinguish `=(` (list) from `=` (scalar).
+    /// Distinguish `=(` (list) from `=` (scalar).
     size_t value_start = name_end + 1;
     sigil_inferred_kind_t kind = (value_start < len && line[value_start] == '(')
                                      ? SIGIL_KIND_LIST
@@ -1044,7 +1044,7 @@ static void sigil_collect_bindings_from_line(const char *line, size_t len,
     sigil_binding_record(out, line + name_start, name_end - name_start, kind);
 }
 
-// First pass: walk every line and record top-level bindings.
+/// First pass: walk every line and record top-level bindings.
 static sigil_binding_t *sigil_collect_bindings(const char *content) {
     sigil_binding_t *out = NULL;
     size_t len = strlen(content);
@@ -1059,7 +1059,7 @@ static sigil_binding_t *sigil_collect_bindings(const char *content) {
     return out;
 }
 
-// Second pass: walk source for sigil references and cross-check.
+/// Second pass: walk source for sigil references and cross-check.
 static void debug_analyze_sigils(debug_context_t *ctx, const char *file,
                                  const char *content) {
     if (!ctx || !file || !content) {
@@ -1069,7 +1069,7 @@ static void debug_analyze_sigils(debug_context_t *ctx, const char *file,
 
     size_t len = strlen(content);
     int line_num = 1;
-    bool in_sgl = false; // inside '...'
+    bool in_sgl = false; /// inside '...'
     for (size_t i = 0; i < len; i++) {
         char c = content[i];
         if (c == '\n') {
@@ -1090,8 +1090,8 @@ static void debug_analyze_sigils(debug_context_t *ctx, const char *file,
         if (c != '@' && c != '%') {
             continue;
         }
-        // Sigil must be at token start: preceded by start-of-line,
-        // whitespace, or a token-separator character.
+        /// Sigil must be at token start: preceded by start-of-line,
+        /// whitespace, or a token-separator character.
         bool at_token_start = (i == 0);
         if (!at_token_start) {
             char prev = content[i - 1];
@@ -1116,9 +1116,9 @@ static void debug_analyze_sigils(debug_context_t *ctx, const char *file,
         sigil_binding_t *binding =
             sigil_binding_lookup(bindings, content + name_start, name_len);
 
-        // No visible binding -> stay silent.  The user may be referring
-        // to an environment variable, a sourced binding, or a function
-        // parameter -- not the analyzer's job to flag.
+        /// No visible binding -> stay silent.  The user may be referring
+        /// to an environment variable, a sourced binding, or a function
+        /// parameter -- not the analyzer's job to flag.
         if (!binding || binding->kind != SIGIL_KIND_SCALAR) {
             i = name_end - 1;
             continue;
@@ -1174,7 +1174,7 @@ void debug_show_analysis_report(debug_context_t *ctx) {
         return;
     }
 
-    // Count issues by severity
+    /// Count issues by severity
     int error_count = 0, warning_count = 0, info_count = 0;
     analysis_issue_t *issue = ctx->analysis_issues;
     while (issue) {
@@ -1192,7 +1192,7 @@ void debug_show_analysis_report(debug_context_t *ctx) {
                  "Issues found: %d total (%d errors, %d warnings, %d info)\n\n",
                  ctx->issue_count, error_count, warning_count, info_count);
 
-    // Show issues by category
+    /// Show issues by category
     const char *categories[] = {"syntax", "security",    "performance",
                                 "style",  "portability", "type"};
     const char *category_names[] = {"Syntax", "Security",    "Performance",
@@ -1202,7 +1202,7 @@ void debug_show_analysis_report(debug_context_t *ctx) {
         bool has_issues = false;
         issue = ctx->analysis_issues;
 
-        // Check if we have issues in this category
+        /// Check if we have issues in this category
         while (issue) {
             if (strcmp(issue->category, categories[i]) == 0) {
                 has_issues = true;
@@ -1234,7 +1234,7 @@ void debug_show_analysis_report(debug_context_t *ctx) {
         debug_printf(ctx, "\n");
     }
 
-    // Summary and recommendations
+    /// Summary and recommendations
     debug_printf(ctx, "Summary:\n");
     if (error_count > 0) {
         debug_printf(
@@ -1281,7 +1281,7 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
         (mode == ANALYSIS_MODE_LINT) ? "Lint Report" : "Script Analysis Report";
     debug_print_header(ctx, header);
 
-    // Count issues by severity (respecting mode filter)
+    /// Count issues by severity (respecting mode filter)
     int error_count = 0, warning_count = 0, info_count = 0;
     analysis_issue_t *issue = ctx->analysis_issues;
     while (issue) {
@@ -1295,7 +1295,7 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
         issue = issue->next;
     }
 
-    // In lint mode, only count actionable items
+    /// In lint mode, only count actionable items
     int actionable_count = error_count + warning_count;
     if (mode == ANALYSIS_MODE_LINT) {
         if (actionable_count == 0) {
@@ -1314,7 +1314,7 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
             ctx->issue_count, error_count, warning_count, info_count);
     }
 
-    // Show issues by category
+    /// Show issues by category
     const char *categories[] = {"syntax", "security",    "performance",
                                 "style",  "portability", "type"};
     const char *category_names[] = {"Syntax", "Security",    "Performance",
@@ -1324,10 +1324,10 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
         bool has_issues = false;
         issue = ctx->analysis_issues;
 
-        // Check if we have issues in this category (respecting mode filter)
+        /// Check if we have issues in this category (respecting mode filter)
         while (issue) {
             if (strcmp(issue->category, categories[i]) == 0) {
-                // In lint mode, skip info items
+                /// In lint mode, skip info items
                 if (mode == ANALYSIS_MODE_LINT &&
                     strcmp(issue->severity, "info") == 0) {
                     issue = issue->next;
@@ -1350,7 +1350,7 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
         issue = ctx->analysis_issues;
         while (issue) {
             if (strcmp(issue->category, categories[i]) == 0) {
-                // In lint mode, skip info items
+                /// In lint mode, skip info items
                 if (mode == ANALYSIS_MODE_LINT &&
                     strcmp(issue->severity, "info") == 0) {
                     issue = issue->next;
@@ -1368,7 +1368,7 @@ void debug_show_analysis_report_filtered(debug_context_t *ctx,
         debug_printf(ctx, "\n");
     }
 
-    // Summary (different for lint vs analyze)
+    /// Summary (different for lint vs analyze)
     if (mode == ANALYSIS_MODE_LINT) {
         debug_printf(ctx, "Summary:\n");
         if (error_count > 0) {
@@ -1433,14 +1433,14 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
 
     debug_printf(ctx, "Linting script: %s\n", script_path);
 
-    // Check if file exists
+    /// Check if file exists
     struct stat st;
     if (stat(script_path, &st) != 0) {
         debug_printf(ctx, "ERROR: Script file not found: %s\n", script_path);
         return -1;
     }
 
-    // Read script file
+    /// Read script file
     FILE *file = fopen(script_path, "r");
     if (!file) {
         debug_printf(ctx, "ERROR: Cannot open script file: %s\n", script_path);
@@ -1468,17 +1468,17 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
     }
     script_content[file_size] = '\0';
 
-    // Clear previous analysis results
+    /// Clear previous analysis results
     debug_clear_analysis_issues(ctx);
 
-    // Perform analysis (same as analyze, we'll filter in the report)
+    /// Perform analysis (same as analyze, we'll filter in the report)
     node_t *ast = debug_analyze_syntax(ctx, script_path, script_content);
     debug_analyze_style(ctx, script_path, script_content);
     debug_analyze_performance(ctx, script_path, script_content);
     debug_analyze_security(ctx, script_path, script_content);
     debug_analyze_portability(ctx, script_path, script_content, ast);
 
-    // Count actionable issues (errors + warnings only)
+    /// Count actionable issues (errors + warnings only)
     int error_count = 0, warning_count = 0;
     analysis_issue_t *issue = ctx->analysis_issues;
     while (issue) {
@@ -1492,13 +1492,13 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
 
     int actionable_count = error_count + warning_count;
 
-    // Handle fix mode
+    /// Handle fix mode
     if (fix && actionable_count > 0) {
         fixer_context_t fixer_ctx;
         if (fixer_init(&fixer_ctx) == FIXER_OK) {
             if (fixer_load_string(&fixer_ctx, script_content, script_path) ==
                 FIXER_OK) {
-                // Convert string target to enum for fixer API
+                /// Convert string target to enum for fixer API
                 shell_mode_t target = SHELL_MODE_POSIX;
                 const char *target_str = compat_get_target();
                 if (target_str) {
@@ -1526,7 +1526,7 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
                                                     &fixed_content,
                                                     &applied) == FIXER_OK) {
                             if (applied > 0) {
-                                // Verify syntax before writing
+                                /// Verify syntax before writing
                                 if (fixer_verify_syntax(fixed_content,
                                                         target)) {
                                     if (fixer_write_file(script_path,
@@ -1563,15 +1563,15 @@ int debug_lint_script(debug_context_t *ctx, const char *script_path, bool fix,
         }
     }
 
-    // Show filtered report (lint mode - no info items)
+    /// Show filtered report (lint mode - no info items)
     debug_show_analysis_report_filtered(ctx, ANALYSIS_MODE_LINT);
 
-    // Cleanup
+    /// Cleanup
     if (ast) {
         free_node_tree(ast);
     }
     free(script_content);
 
-    // Return remaining unfixed issues
+    /// Return remaining unfixed issues
     return (actionable_count > 0) ? actionable_count : 0;
 }
