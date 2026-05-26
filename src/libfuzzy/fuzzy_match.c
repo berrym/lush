@@ -9,6 +9,7 @@
  */
 
 #include "fuzzy_match.h"
+#include "lle/unicode_case.h"
 #include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
 #include <ctype.h>
@@ -99,18 +100,13 @@ static int decode_to_codepoints(const char *str, codepoint_array_t *out,
             continue;
         }
 
-        // Case folding if case-insensitive
+        // Case folding if case-insensitive. lle_unicode_tolower_codepoint
+        // folds across the project's Unicode case table (ASCII A-Z, Latin-1
+        // Supplement, Latin Extended-A/B, IPA, Greek, Cyrillic, Cyrillic
+        // Supplement); returns the codepoint unchanged when no mapping
+        // applies, so ASCII inputs hit a single comparison and exit.
         if (opts && !opts->case_sensitive) {
-            // Simple ASCII case folding - for full Unicode would need ICU
-            if (cp >= 'A' && cp <= 'Z') {
-                cp = cp - 'A' + 'a';
-            }
-            // Latin-1 Supplement uppercase
-            else if (cp >= 0x00C0 && cp <= 0x00D6) {
-                cp += 0x20;
-            } else if (cp >= 0x00D8 && cp <= 0x00DE) {
-                cp += 0x20;
-            }
+            cp = lle_unicode_tolower_codepoint(cp);
         }
 
         out->codepoints[out->length++] = cp;
