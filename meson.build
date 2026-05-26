@@ -1871,6 +1871,26 @@ if fs.exists('tests/unit/test_pager_input.c')
        timeout: 30)
 endif
 
+# lle_pager_present Public API Tests
+# ============================================================================
+if fs.exists('tests/unit/test_lle_pager_present.c')
+  test_lle_pager_present_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_lle_pager_present_sources += s
+    endif
+  endforeach
+  test_lle_pager_present = executable('test_lle_pager_present',
+                                      'tests/unit/test_lle_pager_present.c',
+                                      'tests/unit/test_executor_stubs.c',
+                                      test_lle_pager_present_sources + lle_shell_sources,
+                                      include_directories: [inc, include_directories('tests')],
+                                      dependencies: [lle_dep, libm])
+  test('LLE Pager Present', test_lle_pager_present,
+       suite: 'unit',
+       timeout: 30)
+endif
+
 # Pager Render Tests (display-controller pager branch)
 # ============================================================================
 if fs.exists('tests/unit/test_pager_render.c')
