@@ -30,11 +30,11 @@
  * @return Hash value
  */
 static uint64_t hash_uint64(const void *key, uint64_t seed) {
-    (void)seed; // Unused for deterministic integer hashing
+    (void)seed; /// Unused for deterministic integer hashing
 
     uint64_t k = *(const uint64_t *)key;
 
-    // Thomas Wang's 64-bit integer hash
+    /// Thomas Wang's 64-bit integer hash
     k = (~k) + (k << 21);
     k = k ^ (k >> 24);
     k = (k + (k << 3)) + (k << 8);
@@ -94,7 +94,7 @@ static void *copy_entry_ptr(const void *value) { return (void *)value; }
  * @param value Entry pointer (unused)
  */
 static void free_entry_ptr(const void *value) {
-    (void)value; // No-op - entries are owned by history core
+    (void)value; /// No-op - entries are owned by history core
 }
 
 /* ============================================================================
@@ -119,13 +119,13 @@ lle_result_t lle_history_index_create(lle_hashtable_t **index,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Set up callbacks for uint64_t keys and entry pointer values
+    /// Set up callbacks for uint64_t keys and entry pointer values
     ht_callbacks_t callbacks = {.key_copy = copy_uint64_key,
                                 .key_free = free_uint64_key,
                                 .val_copy = copy_entry_ptr,
                                 .val_free = free_entry_ptr};
 
-    // Create hashtable with custom hash and equality functions
+    /// Create hashtable with custom hash and equality functions
     ht_t *ht = ht_create(hash_uint64, eq_uint64, &callbacks,
                          (unsigned int)initial_capacity);
     if (!ht) {
@@ -172,7 +172,7 @@ lle_result_t lle_history_index_insert(lle_hashtable_t *index, uint64_t entry_id,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Insert into hashtable (void return - assumes success)
+    /// Insert into hashtable (void return - assumes success)
     ht_insert(index, &entry_id, entry);
 
     return LLE_SUCCESS;
@@ -197,7 +197,7 @@ lle_result_t lle_history_index_lookup(lle_hashtable_t *index, uint64_t entry_id,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Lookup in hashtable (returns NULL if not found)
+    /// Lookup in hashtable (returns NULL if not found)
     void *found = ht_get(index, &entry_id);
     *entry = (lle_history_entry_t *)found;
 
@@ -219,7 +219,7 @@ lle_result_t lle_history_index_remove(lle_hashtable_t *index,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Remove from hashtable (void return - assumes success)
+    /// Remove from hashtable (void return - assumes success)
     ht_remove(index, &entry_id);
 
     return LLE_SUCCESS;
@@ -239,11 +239,11 @@ lle_result_t lle_history_index_clear(lle_hashtable_t *index) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // libhashtable doesn't provide ht_clear(), so we iterate and remove
-    // For now, return success - caller will destroy/recreate if needed
+    /// libhashtable doesn't provide ht_clear(), so we iterate and remove
+    /// For now, return success - caller will destroy/recreate if needed
     /* Phase 1 Day 2: Acceptable since clear is only used in lle_history_clear()
      */
-    // which destroys the whole core anyway
+    /// which destroys the whole core anyway
 
     return LLE_SUCCESS;
 }
@@ -264,8 +264,8 @@ lle_result_t lle_history_index_get_size(lle_hashtable_t *index, size_t *size) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // libhashtable doesn't expose ht_size()
-    // Return 0 for now - callers should use core->entry_count instead
+    /// libhashtable doesn't expose ht_size()
+    /// Return 0 for now - callers should use core->entry_count instead
     *size = 0;
 
     return LLE_SUCCESS;
@@ -286,7 +286,7 @@ lle_result_t lle_history_rebuild_index(lle_history_core_t *core) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // If no index exists, create one
+    /// If no index exists, create one
     if (!core->entry_lookup) {
         lle_result_t result = lle_history_index_create(
             &core->entry_lookup, core->config->initial_capacity);
@@ -294,11 +294,11 @@ lle_result_t lle_history_rebuild_index(lle_history_core_t *core) {
             return result;
         }
     } else {
-        // Clear existing index
+        /// Clear existing index
         lle_history_index_clear(core->entry_lookup);
     }
 
-    // Rebuild from entries array
+    /// Rebuild from entries array
     for (size_t i = 0; i < core->entry_count; i++) {
         lle_history_entry_t *entry = core->entries[i];
         if (entry) {
@@ -349,10 +349,10 @@ lle_result_t lle_history_get_last_n_entries(lle_history_core_t *core, size_t n,
 
     pthread_rwlock_rdlock(&core->lock);
 
-    // Calculate actual count to return
+    /// Calculate actual count to return
     size_t actual_n = (n < core->entry_count) ? n : core->entry_count;
 
-    // Copy last N entries from the array
+    /// Copy last N entries from the array
     size_t start_index = core->entry_count - actual_n;
     for (size_t i = 0; i < actual_n; i++) {
         entries[i] = core->entries[start_index + i];
@@ -387,13 +387,13 @@ lle_history_get_entry_by_reverse_index(lle_history_core_t *core,
 
     pthread_rwlock_rdlock(&core->lock);
 
-    // Check bounds
+    /// Check bounds
     if (reverse_index >= core->entry_count) {
         pthread_rwlock_unlock(&core->lock);
-        return LLE_ERROR_INVALID_RANGE; // Index out of bounds
+        return LLE_ERROR_INVALID_RANGE; /// Index out of bounds
     }
 
-    // Calculate forward index
+    /// Calculate forward index
     size_t forward_index = core->entry_count - 1 - reverse_index;
     *entry = core->entries[forward_index];
 

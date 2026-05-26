@@ -34,7 +34,7 @@
 
 #define LLE_HISTORY_FILE_VERSION_STR "1.0"
 #define LLE_HISTORY_MAGIC_HEADER "# LLE History File v"
-#define LLE_HISTORY_MAX_LINE_LENGTH 65536 // 64KB per line
+#define LLE_HISTORY_MAX_LINE_LENGTH 65536 /// 64KB per line
 
 /* ============================================================================
  * FILE LOCKING
@@ -57,7 +57,7 @@ static lle_result_t lle_history_file_lock(int fd) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Try to acquire exclusive lock with timeout
+    /// Try to acquire exclusive lock with timeout
     struct timespec timeout = {.tv_sec = 1, .tv_nsec = 0};
     int attempts = 5;
 
@@ -70,7 +70,7 @@ static lle_result_t lle_history_file_lock(int fd) {
             return LLE_ERROR_SYSTEM_CALL;
         }
 
-        // Wait before retry
+        /// Wait before retry
         nanosleep(&timeout, NULL);
         attempts--;
     }
@@ -209,7 +209,7 @@ static lle_result_t lle_history_format_entry(const lle_history_entry_t *entry,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate temporary buffers for escaped strings
+    /// Allocate temporary buffers for escaped strings
     char *escaped_cmd = lle_pool_alloc(LLE_HISTORY_MAX_COMMAND_LENGTH * 2);
     char *escaped_wd = lle_pool_alloc(LLE_HISTORY_MAX_PATH_LENGTH * 2);
 
@@ -221,14 +221,14 @@ static lle_result_t lle_history_format_entry(const lle_history_entry_t *entry,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Escape command and working directory
+    /// Escape command and working directory
     lle_escape_string(entry->command, escaped_cmd,
                       LLE_HISTORY_MAX_COMMAND_LENGTH * 2);
 
     const char *wd = entry->working_directory ? entry->working_directory : "";
     lle_escape_string(wd, escaped_wd, LLE_HISTORY_MAX_PATH_LENGTH * 2);
 
-    // Format line
+    /// Format line
     int written = snprintf(line, line_size, "%lu\t%s\t%d\t%s\n",
                            (unsigned long)entry->timestamp, escaped_cmd,
                            entry->exit_code, escaped_wd);
@@ -262,13 +262,13 @@ static lle_result_t lle_history_parse_line(const char *line,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Skip comments and empty lines
+    /// Skip comments and empty lines
     if (line[0] == '#' || line[0] == '\0' || line[0] == '\n') {
         *entry = NULL;
         return LLE_SUCCESS;
     }
 
-    // Parse fields
+    /// Parse fields
     uint64_t timestamp = 0;
     char cmd_buffer[LLE_HISTORY_MAX_COMMAND_LENGTH * 2];
     int exit_code = 0;
@@ -279,16 +279,16 @@ static lle_result_t lle_history_parse_line(const char *line,
                cmd_buffer, &exit_code, wd_buffer);
 
     if (parsed < 2) {
-        // Malformed line - skip it
+        /// Malformed line - skip it
         *entry = NULL;
         return LLE_SUCCESS;
     }
 
-    // Unescape command
+    /// Unescape command
     char unescaped_cmd[LLE_HISTORY_MAX_COMMAND_LENGTH];
     lle_unescape_string(cmd_buffer, unescaped_cmd, sizeof(unescaped_cmd));
 
-    // Create entry
+    /// Create entry
     lle_result_t result =
         lle_history_entry_create(entry, unescaped_cmd, memory_pool);
     if (result != LLE_SUCCESS) {
@@ -298,12 +298,12 @@ static lle_result_t lle_history_parse_line(const char *line,
     (*entry)->timestamp = timestamp;
     (*entry)->exit_code = exit_code;
 
-    // Set working directory if present
+    /// Set working directory if present
     if (parsed >= 4 && wd_buffer[0] != '\0') {
         char unescaped_wd[LLE_HISTORY_MAX_PATH_LENGTH];
         lle_unescape_string(wd_buffer, unescaped_wd, sizeof(unescaped_wd));
 
-        // Free the working_directory allocated by lle_history_entry_create
+        /// Free the working_directory allocated by lle_history_entry_create
         if ((*entry)->working_directory) {
             lle_pool_free((*entry)->working_directory);
         }
@@ -342,14 +342,14 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
 
     pthread_rwlock_rdlock(&core->lock);
 
-    // Open file for writing
+    /// Open file for writing
     int fd = open(file_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd < 0) {
         pthread_rwlock_unlock(&core->lock);
         return LLE_ERROR_IO_ERROR;
     }
 
-    // Acquire lock
+    /// Acquire lock
     lle_result_t result = lle_history_file_lock(fd);
     if (result != LLE_SUCCESS) {
         close(fd);
@@ -357,7 +357,7 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
         return result;
     }
 
-    // Write header
+    /// Write header
     char header[256];
     snprintf(header, sizeof(header), "%s%s\n# Generated: %lu\n# Entries: %zu\n",
              LLE_HISTORY_MAGIC_HEADER, LLE_HISTORY_FILE_VERSION_STR,
@@ -370,7 +370,7 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
         return LLE_ERROR_IO_ERROR;
     }
 
-    // Write entries
+    /// Write entries
     char *line_buffer = lle_pool_alloc(LLE_HISTORY_MAX_LINE_LENGTH);
     if (!line_buffer) {
         lle_history_file_unlock(fd);
@@ -384,14 +384,14 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
         if (!entry)
             continue;
 
-        // Skip deleted entries - they were removed by deduplication
+        /// Skip deleted entries - they were removed by deduplication
         if (entry->state == LLE_HISTORY_STATE_DELETED)
             continue;
 
         result = lle_history_format_entry(entry, line_buffer,
                                           LLE_HISTORY_MAX_LINE_LENGTH);
         if (result != LLE_SUCCESS) {
-            continue; // Skip malformed entries
+            continue; /// Skip malformed entries
         }
 
         if (write(fd, line_buffer, strlen(line_buffer)) < 0) {
@@ -405,10 +405,10 @@ lle_result_t lle_history_save_to_file(lle_history_core_t *core,
 
     lle_pool_free(line_buffer);
 
-    // Update statistics
+    /// Update statistics
     core->stats.save_count++;
 
-    // Release lock and close
+    /// Release lock and close
     lle_history_file_unlock(fd);
     close(fd);
 
@@ -434,20 +434,20 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Open file for appending
+    /// Open file for appending
     int fd = open(file_path, O_WRONLY | O_CREAT | O_APPEND, 0600);
     if (fd < 0) {
         return LLE_ERROR_IO_ERROR;
     }
 
-    // Acquire lock
+    /// Acquire lock
     lle_result_t result = lle_history_file_lock(fd);
     if (result != LLE_SUCCESS) {
         close(fd);
         return result;
     }
 
-    // Format and write entry
+    /// Format and write entry
     char *line_buffer = lle_pool_alloc(LLE_HISTORY_MAX_LINE_LENGTH);
     if (!line_buffer) {
         lle_history_file_unlock(fd);
@@ -473,7 +473,7 @@ lle_result_t lle_history_append_entry(const lle_history_entry_t *entry,
 
     lle_pool_free(line_buffer);
 
-    // Release lock and close
+    /// Release lock and close
     lle_history_file_unlock(fd);
     close(fd);
 
@@ -502,14 +502,14 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Check if file exists
+    /// Check if file exists
     struct stat st;
     if (stat(file_path, &st) != 0) {
-        // File doesn't exist - not an error, just empty history
+        /// File doesn't exist - not an error, just empty history
         return LLE_SUCCESS;
     }
 
-    // Open file for reading
+    /// Open file for reading
     FILE *fp = fopen(file_path, "r");
     if (!fp) {
         return LLE_ERROR_IO_ERROR;
@@ -517,7 +517,7 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
 
     pthread_rwlock_wrlock(&core->lock);
 
-    // Read and parse lines
+    /// Read and parse lines
     char *line_buffer = lle_pool_alloc(LLE_HISTORY_MAX_LINE_LENGTH);
     if (!line_buffer) {
         fclose(fp);
@@ -526,9 +526,9 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
     }
 
     size_t loaded_count = 0;
-    (void)loaded_count; // Reserved for load statistics
+    (void)loaded_count; /// Reserved for load statistics
     size_t skipped_count = 0;
-    (void)skipped_count; // Reserved for skip statistics
+    (void)skipped_count; /// Reserved for skip statistics
 
     while (fgets(line_buffer, LLE_HISTORY_MAX_LINE_LENGTH, fp) != NULL) {
         lle_history_entry_t *entry = NULL;
@@ -541,14 +541,14 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
         }
 
         if (!entry) {
-            // Comment or empty line
+            /// Comment or empty line
             continue;
         }
 
-        // Manually add to history without calling lle_history_add_entry
-        // (to avoid deadlock - we already have write lock)
+        /// Manually add to history without calling lle_history_add_entry
+        /// (to avoid deadlock - we already have write lock)
 
-        // Check capacity
+        /// Check capacity
         if (core->entry_count >= core->entry_capacity) {
             result = lle_history_expand_capacity(core);
             if (result != LLE_SUCCESS) {
@@ -557,13 +557,13 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
             }
         }
 
-        // Assign entry ID
+        /// Assign entry ID
         entry->entry_id = core->next_entry_id++;
 
-        // Add to array
+        /// Add to array
         core->entries[core->entry_count] = entry;
 
-        // Update linked list
+        /// Update linked list
         if (core->last_entry) {
             core->last_entry->next = entry;
             entry->prev = core->last_entry;
@@ -574,13 +574,13 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
 
         core->entry_count++;
 
-        // Add to index if enabled
+        /// Add to index if enabled
         if (core->entry_lookup) {
             lle_history_index_insert(core->entry_lookup, entry->entry_id,
                                      entry);
         }
 
-        // Update statistics
+        /// Update statistics
         core->stats.total_entries++;
         core->stats.active_entries++;
 
@@ -590,7 +590,7 @@ lle_result_t lle_history_load_from_file(lle_history_core_t *core,
     lle_pool_free(line_buffer);
     fclose(fp);
 
-    // Update statistics
+    /// Update statistics
     core->stats.load_count++;
 
     pthread_rwlock_unlock(&core->lock);

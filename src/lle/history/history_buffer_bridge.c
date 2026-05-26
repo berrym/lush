@@ -15,7 +15,7 @@
 #include "lle/reconstruction_engine.h"
 #include <string.h>
 
-// History-buffer bridge implementation
+/// History-buffer bridge implementation
 struct lle_history_buffer_bridge {
     lle_memory_pool_t *memory_pool;
     lle_history_core_t *history_core;
@@ -70,7 +70,7 @@ lle_result_t lle_history_buffer_bridge_create(
     lle_history_core_t *history_core, lle_multiline_parser_t *parser,
     lle_reconstruction_engine_t *reconstruction) {
     if (!bridge || !history_core || !parser ||
-        !reconstruction) { // memory_pool can be NULL
+        !reconstruction) { /// memory_pool can be NULL
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
@@ -102,7 +102,7 @@ lle_history_buffer_bridge_destroy(lle_history_buffer_bridge_t *bridge) {
     }
 
     bridge->active = false;
-    // Memory pool owns all allocations, no explicit frees needed
+    /// Memory pool owns all allocations, no explicit frees needed
 
     return LLE_SUCCESS;
 }
@@ -123,7 +123,7 @@ lle_history_buffer_bridge_get_buffer_text(lle_history_buffer_bridge_t *bridge,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Get buffer text directly from buffer structure
+    /// Get buffer text directly from buffer structure
     const char *buffer_text = buffer->data;
     if (!buffer_text) {
         *text = NULL;
@@ -133,7 +133,7 @@ lle_history_buffer_bridge_get_buffer_text(lle_history_buffer_bridge_t *bridge,
 
     size_t text_len = buffer->length;
 
-    // Allocate and copy
+    /// Allocate and copy
     char *text_copy = lle_pool_alloc(text_len + 1);
     if (!text_copy) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -164,13 +164,13 @@ lle_history_buffer_bridge_set_buffer_text(lle_history_buffer_bridge_t *bridge,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Clear buffer first
+    /// Clear buffer first
     lle_result_t result = lle_buffer_clear(buffer);
     if (result != LLE_SUCCESS) {
         return result;
     }
 
-    // Insert text at beginning
+    /// Insert text at beginning
     if (length > 0) {
         result = lle_buffer_insert_text(buffer, 0, text, length);
         if (result != LLE_SUCCESS) {
@@ -214,20 +214,20 @@ lle_result_t lle_history_buffer_bridge_load_to_buffer(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Get default options if not provided
+    /// Get default options if not provided
     lle_transfer_options_t default_options;
     if (!options) {
         lle_history_buffer_bridge_get_default_options(&default_options);
         options = &default_options;
     }
 
-    // Initialize result
+    /// Initialize result
     if (result) {
         memset(result, 0, sizeof(lle_transfer_result_t));
         result->entry_index = history_index;
     }
 
-    // Get history entry text
+    /// Get history entry text
     char *entry_text = NULL;
     size_t entry_length = 0;
     lle_result_t res = get_history_entry_text(
@@ -239,7 +239,7 @@ lle_result_t lle_history_buffer_bridge_load_to_buffer(
         return res;
     }
 
-    // Apply reconstruction if requested
+    /// Apply reconstruction if requested
     char *final_text = entry_text;
     size_t final_length = entry_length;
 
@@ -254,7 +254,7 @@ lle_result_t lle_history_buffer_bridge_load_to_buffer(
         }
     }
 
-    // Parse multiline structure if requested
+    /// Parse multiline structure if requested
     bool is_multiline = false;
     if (options->parse_multiline && bridge->parser) {
         lle_multiline_parse_result_t *parse_result = NULL;
@@ -268,7 +268,7 @@ lle_result_t lle_history_buffer_bridge_load_to_buffer(
         }
     }
 
-    // Set buffer text
+    /// Set buffer text
     res = lle_history_buffer_bridge_set_buffer_text(bridge, buffer, final_text,
                                                     final_length);
 
@@ -296,19 +296,19 @@ lle_result_t lle_history_buffer_bridge_save_from_buffer(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Get default options if not provided
+    /// Get default options if not provided
     lle_transfer_options_t default_options;
     if (!options) {
         lle_history_buffer_bridge_get_default_options(&default_options);
         options = &default_options;
     }
 
-    // Initialize result
+    /// Initialize result
     if (result) {
         memset(result, 0, sizeof(lle_transfer_result_t));
     }
 
-    // Get buffer text
+    /// Get buffer text
     char *buffer_text = NULL;
     size_t buffer_length = 0;
     lle_result_t res = lle_history_buffer_bridge_get_buffer_text(
@@ -320,7 +320,7 @@ lle_result_t lle_history_buffer_bridge_save_from_buffer(
         return res;
     }
 
-    // Add to history
+    /// Add to history
     if (buffer_text && buffer_length > 0) {
         uint64_t entry_id = 0;
         res = lle_history_add_entry(bridge->history_core, buffer_text, -1,
@@ -330,7 +330,7 @@ lle_result_t lle_history_buffer_bridge_save_from_buffer(
             result->success = true;
             result->bytes_transferred = buffer_length;
 
-            // Get the index of the newly added entry
+            /// Get the index of the newly added entry
             size_t entry_count = 0;
             if (lle_history_get_entry_count(bridge->history_core,
                                             &entry_count) == LLE_SUCCESS) {

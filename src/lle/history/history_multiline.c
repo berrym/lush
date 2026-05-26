@@ -18,7 +18,7 @@
  * - Integration with buffer system for seamless editing
  */
 
-#include "input_continuation.h" // Lush multiline infrastructure
+#include "input_continuation.h" /// Lush multiline infrastructure
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/memory_management.h"
@@ -73,13 +73,13 @@ static lle_result_t flatten_command(const char *original, char *flattened,
 
     const char *src = original;
     char *dst = flattened;
-    size_t remaining = flattened_size - 1; // Reserve for null terminator
+    size_t remaining = flattened_size - 1; /// Reserve for null terminator
     bool prev_was_space = false;
 
     while (*src && remaining > 0) {
         char c = *src++;
 
-        // Replace newlines with spaces
+        /// Replace newlines with spaces
         if (c == '\n' || c == '\r') {
             if (!prev_was_space && dst > flattened) {
                 *dst++ = ' ';
@@ -89,7 +89,7 @@ static lle_result_t flatten_command(const char *original, char *flattened,
             continue;
         }
 
-        // Skip redundant spaces
+        /// Skip redundant spaces
         if (c == ' ' || c == '\t') {
             if (!prev_was_space) {
                 *dst++ = ' ';
@@ -99,13 +99,13 @@ static lle_result_t flatten_command(const char *original, char *flattened,
             continue;
         }
 
-        // Copy normal character
+        /// Copy normal character
         *dst++ = c;
         remaining--;
         prev_was_space = false;
     }
 
-    // Trim trailing space
+    /// Trim trailing space
     if (dst > flattened && dst[-1] == ' ') {
         dst--;
     }
@@ -162,7 +162,7 @@ lle_result_t lle_history_detect_multiline(const char *command,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Simple check: does it contain newlines?
+    /// Simple check: does it contain newlines?
     *is_multiline = (strchr(command, '\n') != NULL);
 
     return LLE_SUCCESS;
@@ -187,10 +187,10 @@ lle_history_detect_multiline_structure(const char *command,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Initialize info structure
+    /// Initialize info structure
     memset(info, 0, sizeof(lle_history_multiline_info_t));
 
-    // Count newlines
+    /// Count newlines
     info->line_count = count_newlines(command) + 1;
     info->is_multiline = (info->line_count > 1);
 
@@ -198,14 +198,14 @@ lle_history_detect_multiline_structure(const char *command,
         return LLE_SUCCESS;
     }
 
-    // Use Lush continuation system to analyze structure
+    /// Use Lush continuation system to analyze structure
     continuation_state_t state;
     continuation_state_init(&state);
 
-    // Analyze the command
+    /// Analyze the command
     continuation_analyze_line(command, &state);
 
-    // Extract structural information
+    /// Extract structural information
     info->has_unclosed_quotes =
         (state.in_single_quote || state.in_double_quote || state.in_backtick);
     info->has_unclosed_brackets =
@@ -217,10 +217,10 @@ lle_history_detect_multiline_structure(const char *command,
          state.in_until_loop || state.in_case_statement);
     info->is_here_doc = state.in_here_doc;
 
-    // Calculate total length
+    /// Calculate total length
     info->total_length = strlen(command);
 
-    // Cleanup continuation state
+    /// Cleanup continuation state
     continuation_state_cleanup(&state);
 
     return LLE_SUCCESS;
@@ -244,13 +244,13 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Free existing multiline storage if present
+    /// Free existing multiline storage if present
     if (entry->original_multiline) {
         lle_pool_free(entry->original_multiline);
         entry->original_multiline = NULL;
     }
 
-    // Detect if it's actually multiline
+    /// Detect if it's actually multiline
     bool is_multiline = false;
     lle_result_t result =
         lle_history_detect_multiline(original_multiline, &is_multiline);
@@ -261,17 +261,17 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
     entry->is_multiline = is_multiline;
 
     if (!is_multiline) {
-        // Not multiline - no need to preserve separate original
+        /// Not multiline - no need to preserve separate original
         return LLE_SUCCESS;
     }
 
-    // Store original multiline format
+    /// Store original multiline format
     entry->original_multiline = pool_strdup(original_multiline);
     if (!entry->original_multiline) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Flatten the command into the main command field (for searching, etc.)
+    /// Flatten the command into the main command field (for searching, etc.)
     char flattened[LLE_HISTORY_MAX_COMMAND_LENGTH];
     result = flatten_command(original_multiline, flattened, sizeof(flattened));
     if (result != LLE_SUCCESS) {
@@ -280,8 +280,8 @@ lle_result_t lle_history_preserve_multiline(lle_history_entry_t *entry,
         return result;
     }
 
-    // Update the main command field with flattened version
-    // Note: entry->command should already be allocated
+    /// Update the main command field with flattened version
+    /// Note: entry->command should already be allocated
     if (entry->command) {
         lle_pool_free(entry->command);
     }
@@ -324,7 +324,7 @@ lle_history_reconstruct_multiline(const lle_history_entry_t *entry,
 
     switch (format) {
     case LLE_MULTILINE_FORMAT_ORIGINAL:
-        // Use original formatting if available
+        /// Use original formatting if available
         if (entry->is_multiline && entry->original_multiline) {
             source = entry->original_multiline;
         } else {
@@ -333,12 +333,12 @@ lle_history_reconstruct_multiline(const lle_history_entry_t *entry,
         break;
 
     case LLE_MULTILINE_FORMAT_FLATTENED:
-        // Use flattened version
+        /// Use flattened version
         source = entry->command;
         break;
 
     case LLE_MULTILINE_FORMAT_COMPACT:
-        // Use flattened version (same as FLATTENED for now)
+        /// Use flattened version (same as FLATTENED for now)
         source = entry->command;
         break;
 
@@ -350,7 +350,7 @@ lle_history_reconstruct_multiline(const lle_history_entry_t *entry,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    // Copy to buffer
+    /// Copy to buffer
     size_t source_len = strlen(source);
     if (source_len >= buffer_size) {
         return LLE_ERROR_BUFFER_OVERFLOW;
@@ -386,7 +386,7 @@ lle_history_get_multiline_for_buffer(const lle_history_entry_t *entry,
         *is_multiline = entry->is_multiline;
     }
 
-    // Return original multiline format if available, otherwise flattened
+    /// Return original multiline format if available, otherwise flattened
     if (entry->is_multiline && entry->original_multiline) {
         *command = entry->original_multiline;
         *command_length = strlen(entry->original_multiline);
@@ -429,7 +429,7 @@ lle_history_load_multiline_into_buffer(const lle_history_entry_t *entry,
         return result;
     }
 
-    // Call the buffer load function
+    /// Call the buffer load function
     return load_fn(buffer_context, command, command_length, is_multiline);
 }
 
@@ -454,10 +454,10 @@ lle_history_analyze_multiline_lines(const char *command,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Count lines first
+    /// Count lines first
     size_t count = count_newlines(command) + 1;
 
-    // Allocate line array
+    /// Allocate line array
     lle_history_multiline_line_t *line_array =
         lle_pool_alloc(sizeof(lle_history_multiline_line_t) * count);
 
@@ -465,35 +465,35 @@ lle_history_analyze_multiline_lines(const char *command,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Parse lines
+    /// Parse lines
     const char *start = command;
     const char *end = NULL;
     size_t index = 0;
 
     while (*start && index < count) {
-        // Find end of line
+        /// Find end of line
         end = strchr(start, '\n');
         if (!end) {
             end = start + strlen(start);
         }
 
-        // Calculate line length
+        /// Calculate line length
         size_t line_len = end - start;
 
-        // Store line information
+        /// Store line information
         line_array[index].line_text =
-            start; // Note: Not duplicating, just pointing
+            start; /// Note: Not duplicating, just pointing
         line_array[index].line_length = line_len;
         line_array[index].line_number = index + 1;
 
-        // Calculate indentation
+        /// Calculate indentation
         size_t indent = 0;
         for (const char *p = start; p < end && (*p == ' ' || *p == '\t'); p++) {
             indent++;
         }
         line_array[index].indentation = indent;
 
-        // Move to next line
+        /// Move to next line
         start = (*end == '\n') ? (end + 1) : end;
         index++;
     }
@@ -546,12 +546,12 @@ lle_result_t lle_history_format_multiline(const char *command, char *formatted,
     size_t remaining = formatted_size - 1;
     bool at_line_start = true;
     size_t indent_added = 0;
-    (void)indent_added; // Reserved for indentation tracking
+    (void)indent_added; /// Reserved for indentation tracking
 
     while (*src && remaining > 0) {
         char c = *src++;
 
-        // Add indentation at start of each line
+        /// Add indentation at start of each line
         if (at_line_start && c != '\n') {
             for (size_t i = 0; i < base_indent && remaining > 0; i++) {
                 *dst++ = ' ';
@@ -561,11 +561,11 @@ lle_result_t lle_history_format_multiline(const char *command, char *formatted,
             at_line_start = false;
         }
 
-        // Copy character
+        /// Copy character
         *dst++ = c;
         remaining--;
 
-        // Track line starts
+        /// Track line starts
         if (c == '\n') {
             at_line_start = true;
         }
@@ -624,7 +624,7 @@ lle_history_get_original_multiline(const lle_history_entry_t *entry) {
  */
 size_t lle_history_get_multiline_line_count(const lle_history_entry_t *entry) {
     if (!entry || !entry->is_multiline || !entry->original_multiline) {
-        return 1; // Single line
+        return 1; /// Single line
     }
 
     return count_newlines(entry->original_multiline) + 1;
