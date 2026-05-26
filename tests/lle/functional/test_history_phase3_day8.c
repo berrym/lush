@@ -365,6 +365,68 @@ void test_substring_search_case_insensitive(void) {
     TEST_PASS();
 }
 
+void test_substring_search_case_insensitive_unicode(void) {
+    TEST_START("Substring Search - Case Insensitive Unicode");
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+
+    /// Mixed-case entries with non-ASCII letters that the previous
+    /// strncasecmp-based search could not fold (only A-Z -> a-z).
+    lle_history_add_entry(core, "echo Café", 0, NULL);
+    lle_history_add_entry(core, "echo NAÏVE", 0, NULL);
+    lle_history_add_entry(core, "echo Ångström", 0, NULL);
+    lle_history_add_entry(core, "echo straße", 0, NULL);
+
+    /// Lowercase needle must match the uppercase Unicode entries.
+    lle_history_search_results_t *results =
+        lle_history_search_substring(core, "café", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "Should find 'echo Café' via 'café'");
+    lle_history_search_results_destroy(results);
+
+    results = lle_history_search_substring(core, "naïve", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "Should find 'echo NAÏVE' via 'naïve'");
+    lle_history_search_results_destroy(results);
+
+    results = lle_history_search_substring(core, "ångström", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "Should find 'echo Ångström' via 'ångström'");
+    lle_history_search_results_destroy(results);
+
+    lle_history_core_destroy(core);
+
+    TEST_PASS();
+}
+
+void test_prefix_search_case_insensitive_unicode(void) {
+    TEST_START("Prefix Search - Case Insensitive Unicode");
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+
+    lle_history_add_entry(core, "Über alle Berge", 0, NULL);
+    lle_history_add_entry(core, "ÜBER LASTIG", 0, NULL);
+    lle_history_add_entry(core, "über die Brücke", 0, NULL);
+    lle_history_add_entry(core, "git status", 0, NULL);
+
+    /// Lowercase 'ü' prefix must match all three Unicode entries.
+    lle_history_search_results_t *results =
+        lle_history_search_prefix(core, "über", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 3,
+              "Should find all 3 'Über' / 'ÜBER' / 'über' prefix variants");
+
+    lle_history_search_results_destroy(results);
+    lle_history_core_destroy(core);
+
+    TEST_PASS();
+}
+
 void test_substring_search_partial_match(void) {
     TEST_START("Substring Search - Partial Word Match");
 
@@ -671,11 +733,13 @@ int main(void) {
     printf("\n--- PREFIX SEARCH ---\n");
     test_prefix_search();
     test_prefix_search_case_insensitive();
+    test_prefix_search_case_insensitive_unicode();
     test_prefix_search_empty_results();
 
     printf("\n--- SUBSTRING SEARCH ---\n");
     test_substring_search();
     test_substring_search_case_insensitive();
+    test_substring_search_case_insensitive_unicode();
     test_substring_search_partial_match();
 
     printf("\n--- FUZZY SEARCH ---\n");

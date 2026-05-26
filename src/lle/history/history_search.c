@@ -28,21 +28,19 @@
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/performance.h"
+#include "lle/unicode_case.h"
+#include "lle/utf8_support.h"
 #include <ctype.h>
 #include <inttypes.h>
 #include <stdio.h> /// for printf
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h> /// for strncasecmp - must be after other includes
 #include <time.h>
 
 /* ============================================================================
  * CONSTANTS AND MACROS
  * ============================================================================
  */
-
-/// Forward declare POSIX function that may not be visible in strict C99 mode
-extern int strncasecmp(const char *s1, const char *s2, size_t n);
 
 #define DEFAULT_MAX_SEARCH_RESULTS 100
 #define FUZZY_MAX_DISTANCE                                                     \
@@ -194,46 +192,102 @@ static int compare_results_by_score(const void *a, const void *b) {
 }
 
 /**
- * @brief Case-insensitive substring search
+ * @brief Codepoint-level case-fold prefix match
  *
- * Finds the first occurrence of needle in haystack, ignoring case.
+ * Returns the number of bytes of `str` consumed by a case-insensitive
+ * prefix match against `prefix`, or 0 if no match. Iterates both
+ * strings by UTF-8 codepoint and case-folds each via
+ * lle_unicode_tolower_codepoint, so prefixes like `caf` correctly
+ * match input `Café` and prefixes like `naïv` correctly match
+ * `Naïve`. ASCII-only inputs degrade to single-byte iteration with
+ * the same semantics strncasecmp had previously.
+ *
+ * Returns 0 for empty `prefix` -- callers that treat empty-prefix as
+ * vacuously-true must handle the empty case explicitly.
+ *
+ * @param str    String to check (must not be NULL)
+ * @param prefix Prefix to test (must not be NULL)
+ * @return Number of bytes of str matched, or 0 on no-match / empty prefix
+ */
+static size_t cf_prefix_match_bytes(const char *str, const char *prefix) {
+    size_t s_pos = 0, p_pos = 0;
+    size_t s_len = strlen(str);
+    size_t p_len = strlen(prefix);
+    while (p_pos < p_len) {
+        uint32_t s_cp, p_cp;
+        int s_bytes =
+            lle_utf8_decode_codepoint(str + s_pos, s_len - s_pos, &s_cp);
+        int p_bytes =
+            lle_utf8_decode_codepoint(prefix + p_pos, p_len - p_pos, &p_cp);
+        if (s_bytes <= 0 || p_bytes <= 0) {
+            return 0;
+        }
+        if (lle_unicode_tolower_codepoint(s_cp) !=
+            lle_unicode_tolower_codepoint(p_cp)) {
+            return 0;
+        }
+        s_pos += (size_t)s_bytes;
+        p_pos += (size_t)p_bytes;
+    }
+    return s_pos;
+}
+
+/**
+ * @brief Unicode-aware case-insensitive substring search
+ *
+ * Walks `haystack` by codepoint, testing for a case-insensitive
+ * prefix match against `needle` at each codepoint boundary. Returns
+ * a pointer into haystack to the first match, or NULL if not found.
+ * Empty needle returns `haystack` (vacuous match), matching the C
+ * library convention for strstr.
+ *
+ * Replaces the previous strncasecmp-based implementation which only
+ * folded ASCII A-Z and produced no matches against history entries
+ * containing case-varying non-ASCII letters (filenames with é, Ä,
+ * etc.).
  *
  * @param haystack String to search in (may be NULL)
- * @param needle String to search for (may be NULL)
- * @return Pointer to first match in haystack, or NULL if not found or NULL
- * inputs
+ * @param needle   String to search for (may be NULL)
+ * @return Pointer to first match in haystack, or NULL
  */
 static const char *stristr(const char *haystack, const char *needle) {
     if (!haystack || !needle)
         return NULL;
     if (*needle == '\0')
         return haystack;
-
-    size_t needle_len = strlen(needle);
-
-    for (const char *p = haystack; *p != '\0'; p++) {
-        if (strncasecmp(p, needle, needle_len) == 0) {
-            return p;
+    size_t h_len = strlen(haystack);
+    size_t h_pos = 0;
+    while (h_pos < h_len) {
+        if (cf_prefix_match_bytes(haystack + h_pos, needle) > 0) {
+            return haystack + h_pos;
         }
+        uint32_t cp;
+        int bytes =
+            lle_utf8_decode_codepoint(haystack + h_pos, h_len - h_pos, &cp);
+        if (bytes <= 0) {
+            bytes = 1; /// defensive against malformed UTF-8
+        }
+        h_pos += (size_t)bytes;
     }
-
     return NULL;
 }
 
 /**
- * @brief Case-insensitive prefix match
+ * @brief Unicode-aware case-insensitive prefix match
  *
- * Checks if a string starts with the given prefix, ignoring case.
+ * Replaces the prior strncasecmp-based implementation. Empty prefix
+ * is vacuously true.
  *
- * @param str String to check (may be NULL)
+ * @param str    String to check (may be NULL)
  * @param prefix Prefix to match (may be NULL)
- * @return true if str starts with prefix (case-insensitive), false otherwise or
- * on NULL inputs
+ * @return true if str starts with prefix (codepoint-level case-insensitive)
  */
 static bool str_starts_with_i(const char *str, const char *prefix) {
     if (!str || !prefix)
         return false;
-    return strncasecmp(str, prefix, strlen(prefix)) == 0;
+    if (*prefix == '\0')
+        return true;
+    return cf_prefix_match_bytes(str, prefix) > 0;
 }
 
 /* ============================================================================
