@@ -1,4 +1,12 @@
 /**
+ * @file spec_22_history_buffer_compliance.c
+ * @brief Spec 22 history buffer compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * spec_22_history_buffer_compliance.c - Spec 22 Compliance Test
  *
  * Tests for LLE Specification 22: History-Buffer Integration

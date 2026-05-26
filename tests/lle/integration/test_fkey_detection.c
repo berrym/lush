@@ -1,3 +1,11 @@
+/**
+ * @file test_fkey_detection.c
+ * @brief Integration tests for fkey detection
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_fkey_detection.c - Integration test for F-key detection
  *

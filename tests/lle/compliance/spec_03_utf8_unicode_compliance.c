@@ -1,4 +1,12 @@
 /**
+ * @file spec_03_utf8_unicode_compliance.c
+ * @brief Spec 03 UTF-8 Unicode compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Spec 03 UTF-8 and Unicode TR#29 Compliance Tests
  *
  * Verifies foundation modules for buffer management comply with:

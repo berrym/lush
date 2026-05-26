@@ -1,4 +1,12 @@
 /**
+ * @file test_kill_ring.c
+ * @brief Unit tests for kill ring
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_kill_ring.c - Unit tests for kill ring system
  *
  * Tests GNU Readline compatible kill/yank operations.

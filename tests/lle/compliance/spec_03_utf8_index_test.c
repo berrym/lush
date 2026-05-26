@@ -1,4 +1,12 @@
 /**
+ * @file spec_03_utf8_index_test.c
+ * @brief Spec 03 utf8 index compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Spec 03 UTF-8 Index Compliance Tests
  *
  * Verifies that UTF-8 index implementation complies with:

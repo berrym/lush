@@ -1,3 +1,11 @@
+/**
+ * @file test_word_context.c
+ * @brief Unit tests for word context
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Lush Shell - LLE Word-Context Analyzer Unit Tests
  * Copyright (C) 2021-2026  Michael Berry

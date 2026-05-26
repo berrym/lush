@@ -1,4 +1,12 @@
 /**
+ * @file spec_03_cursor_manager_test.c
+ * @brief Spec 03 cursor manager compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Spec 03 Cursor Manager Compliance Tests
  *
  * Verifies that cursor manager implementation complies with:

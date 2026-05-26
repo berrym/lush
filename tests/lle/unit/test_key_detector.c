@@ -1,3 +1,11 @@
+/**
+ * @file test_key_detector.c
+ * @brief Unit tests for key detector
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_key_detector.c - Unit Tests for Key Sequence Detector
  *

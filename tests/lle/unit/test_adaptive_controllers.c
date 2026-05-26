@@ -1,4 +1,12 @@
 /**
+ * @file test_adaptive_controllers.c
+ * @brief Unit tests for adaptive controllers
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_adaptive_controllers.c - Phase 2 Controller Tests
  *
  * Comprehensive tests for all four adaptive terminal controllers:

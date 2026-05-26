@@ -1,4 +1,12 @@
 /**
+ * @file spec_26_adaptive_terminal_compliance.c
+ * @brief Spec 26 adaptive terminal compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * spec_26_adaptive_terminal_compliance.c - Spec 26 Compliance Verification
  *
  * Validates that Spec 26 (Adaptive Terminal Integration) implementation

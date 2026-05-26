@@ -1,3 +1,11 @@
+/**
+ * @file test_terminal_capabilities.c
+ * @brief Unit tests for terminal capabilities
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_terminal_capabilities.c - Unit tests for terminal capability detection
  *

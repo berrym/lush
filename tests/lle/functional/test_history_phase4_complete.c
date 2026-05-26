@@ -1,4 +1,12 @@
 /**
+ * @file test_history_phase4_complete.c
+ * @brief Functional tests for history phase4 complete
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_history_phase4_complete.c - Comprehensive Phase 4 Feature Tests
  *
  * Tests forensic tracking, deduplication, and multiline support together.

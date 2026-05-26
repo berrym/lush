@@ -1,4 +1,12 @@
 /**
+ * @file test_grapheme_nav.c
+ * @brief Manual grapheme nav manual test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Test grapheme navigation with complex emoji
  * Compile: gcc -o test_grapheme_nav test_grapheme_nav.c -I../../include
  * -L../../build/src/lle -llle -L../../build/src/pool -llush_pool

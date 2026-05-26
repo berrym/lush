@@ -1,4 +1,12 @@
 /**
+ * @file test_completion_mock.c
+ * @brief Functional tests for completion mock
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Mock Shell Data for Completion Testing
  *
  * Provides minimal mock implementations of shell data structures

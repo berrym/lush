@@ -1,3 +1,11 @@
+/**
+ * @file test_terminal_state.c
+ * @brief Unit tests for terminal state
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_terminal_state.c - Unit tests for terminal state management
  *

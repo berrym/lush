@@ -1,3 +1,11 @@
+/**
+ * @file demo_completion_menu.c
+ * @brief Manual completion menu demo
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Interactive Completion Menu Demo
  *

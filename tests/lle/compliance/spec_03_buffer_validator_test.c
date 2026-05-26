@@ -1,4 +1,12 @@
 /**
+ * @file spec_03_buffer_validator_test.c
+ * @brief Spec 03 buffer validator compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Spec 03 Buffer Validator Compliance Tests
  *
  * Verifies that buffer validator implementation complies with:

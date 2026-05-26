@@ -1,3 +1,11 @@
+/**
+ * @file test_utf8_movement.c
+ * @brief LLE tests for utf8 movement
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * UTF-8 Movement Function Test
  *

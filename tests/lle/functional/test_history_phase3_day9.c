@@ -1,4 +1,12 @@
 /**
+ * @file test_history_phase3_day9.c
+ * @brief Functional tests for history phase3 day9
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_history_phase3_day9.c - Interactive Search Tests (Spec 09 Phase 3 Day 9)
  *
  * Comprehensive test suite for the LLE History Interactive Search (Ctrl+R):

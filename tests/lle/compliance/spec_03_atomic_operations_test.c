@@ -1,4 +1,12 @@
 /**
+ * @file spec_03_atomic_operations_test.c
+ * @brief Spec 03 atomic operations compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Spec 03 Atomic Buffer Operations and Undo/Redo Compliance Tests
  *
  * Verifies that:

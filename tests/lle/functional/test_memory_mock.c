@@ -1,4 +1,12 @@
 /**
+ * @file test_memory_mock.c
+ * @brief Functional tests for memory mock
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Mock Memory Pool for LLE Testing
  *
  * Provides simple malloc/free based implementations of memory pool

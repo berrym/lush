@@ -1,4 +1,12 @@
 /**
+ * @file test_keybinding.c
+ * @brief Unit tests for keybinding
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_keybinding.c - Unit tests for keybinding engine
  *
  * Tests GNU Readline compatible keybinding system.

@@ -1,4 +1,12 @@
 /**
+ * @file spec_03_atomic_simple_test.c
+ * @brief Spec 03 atomic simple compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Spec 03 Atomic Buffer Operations - Simple Verification Test
  *
  * This test verifies basic functionality without requiring full memory system.

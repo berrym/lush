@@ -1,4 +1,12 @@
 /**
+ * @file test_segment_system.c
+ * @brief Unit tests for segment system
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Unit tests for LLE Segment System (Spec 25 Section 5)
  *
  * Tests segment registry, prompt context, and built-in segments.

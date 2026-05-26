@@ -1,3 +1,11 @@
+/**
+ * @file debug_grapheme.c
+ * @brief Manual grapheme manual test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Debug grapheme cluster detection for failing test cases
  */

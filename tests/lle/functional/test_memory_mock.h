@@ -1,4 +1,12 @@
 /**
+ * @file test_memory_mock.h
+ * @brief Functional tests for memory mock
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Mock Memory Pool Header for LLE Testing
  *
  * Declares mock memory pool functions for standalone unit tests.

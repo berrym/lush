@@ -1,4 +1,12 @@
 /**
+ * @file test_input_stream.c
+ * @brief Unit tests for input stream
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Unit Tests for LLE Input Stream Management
  *
  * Tests the input stream buffering and flow control implementation.

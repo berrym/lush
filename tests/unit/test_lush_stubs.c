@@ -1,3 +1,11 @@
+/**
+ * @file test_lush_stubs.c
+ * @brief Unit tests for lush stubs
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Stub implementations for lush dependencies
  *

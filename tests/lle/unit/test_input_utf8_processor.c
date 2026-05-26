@@ -1,3 +1,11 @@
+/**
+ * @file test_input_utf8_processor.c
+ * @brief Unit tests for input utf8 processor
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_input_utf8_processor.c - Unit Tests for Input UTF-8 Processor
  *

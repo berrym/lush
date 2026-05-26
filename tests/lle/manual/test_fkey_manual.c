@@ -1,3 +1,11 @@
+/**
+ * @file test_fkey_manual.c
+ * @brief Manual test harness for fkey manual
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_fkey_manual.c - Manual F-key detection test
  *

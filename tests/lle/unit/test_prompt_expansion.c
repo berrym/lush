@@ -1,4 +1,12 @@
 /**
+ * @file test_prompt_expansion.c
+ * @brief Unit tests for prompt expansion
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Unit tests for LLE Prompt Expansion Engine (Spec 28 Phase 1)
  *
  * Tests the unified two-pass expansion:

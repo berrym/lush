@@ -1,4 +1,12 @@
 /**
+ * @file test_history_phase3_day8.c
+ * @brief Functional tests for history phase3 day8
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_history_phase3_day8.c - Search Engine Tests (Spec 09 Phase 3 Day 8)
  *
  * Comprehensive test suite for the LLE History Search Engine:

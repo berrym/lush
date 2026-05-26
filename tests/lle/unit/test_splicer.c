@@ -1,3 +1,11 @@
+/**
+ * @file test_splicer.c
+ * @brief Unit tests for splicer
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Lush Shell - LLE Splicer Unit Tests
  * Copyright (C) 2021-2026  Michael Berry

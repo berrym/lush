@@ -1,4 +1,12 @@
 /**
+ * @file test_adaptive_fallback.c
+ * @brief Unit tests for adaptive fallback
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_adaptive_fallback.c - Fallback Mode Testing
  *
  * Tests graceful degradation when controllers fail.

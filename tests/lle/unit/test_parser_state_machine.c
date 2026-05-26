@@ -1,3 +1,11 @@
+/**
+ * @file test_parser_state_machine.c
+ * @brief Unit tests for parser state machine
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_parser_state_machine.c - Unit tests for Parser State Machine
  *

@@ -1,4 +1,12 @@
 /**
+ * @file test_template_engine.c
+ * @brief Unit tests for template engine
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Unit tests for LLE Template Engine (Spec 25 Section 6)
  *
  * Tests template parsing and rendering with segments, properties,

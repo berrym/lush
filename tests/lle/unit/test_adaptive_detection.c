@@ -1,4 +1,12 @@
 /**
+ * @file test_adaptive_detection.c
+ * @brief Unit tests for adaptive detection
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * test_adaptive_detection.c - Adaptive Terminal Detection Tests
  *
  * Tests for Spec 26 Phase 1: Core Detection System

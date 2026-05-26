@@ -1,4 +1,12 @@
 /**
+ * @file spec_25_keybinding_compliance.c
+ * @brief Spec 25 keybinding compliance test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * spec_25_keybinding_compliance.c - Spec 25 Compliance Test
  *
  * Tests for LLE Specification 25: Default Keybindings

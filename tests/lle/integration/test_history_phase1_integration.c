@@ -1,4 +1,12 @@
 /**
+ * @file test_history_phase1_integration.c
+ * @brief Integration tests for history phase1 integration
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Integration Test: History System Phase 1
  *
  * Tests complete workflows combining multiple features:

@@ -1,3 +1,11 @@
+/**
+ * @file test_terminal_event_reading.c
+ * @brief Unit tests for terminal event reading
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_terminal_event_reading.c - Unit tests for terminal event reading
  *

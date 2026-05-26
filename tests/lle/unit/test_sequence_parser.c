@@ -1,3 +1,11 @@
+/**
+ * @file test_sequence_parser.c
+ * @brief Unit tests for sequence parser
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_sequence_parser.c - Unit Tests for Terminal Sequence Parser
  *

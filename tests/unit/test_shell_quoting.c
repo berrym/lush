@@ -1,3 +1,11 @@
+/**
+ * @file test_shell_quoting.c
+ * @brief Unit tests for shell quoting
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * Lush Shell - Quoting and Escape Functional Tests
  * Copyright (C) 2021-2026 Michael Berry

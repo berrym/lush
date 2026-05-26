@@ -1,4 +1,12 @@
 /**
+ * @file test_history_phase1_day3.c
+ * @brief Functional tests for history phase1 day3
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * Functional Test: History System Phase 1 Day 3
  *
  * Tests persistence functionality:

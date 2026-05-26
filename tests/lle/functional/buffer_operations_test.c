@@ -1,4 +1,12 @@
 /**
+ * @file buffer_operations_test.c
+ * @brief Buffer operations test
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
+/**
  * LLE Buffer Operations Functional Tests
  *
  * Comprehensive test suite for buffer operations that actually USE the

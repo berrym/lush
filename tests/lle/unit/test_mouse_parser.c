@@ -1,3 +1,11 @@
+/**
+ * @file test_mouse_parser.c
+ * @brief Unit tests for mouse parser
+ *
+ * @author Michael Berry <trismegustis@gmail.com>
+ * @copyright Copyright (C) 2021-2026 Michael Berry
+ */
+
 /*
  * test_mouse_parser.c - Unit tests for Mouse Parser
  *
