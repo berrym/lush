@@ -28,7 +28,7 @@ typedef struct {
     lle_color_t bg;
 } powerline_segment_t;
 
-// Maximum visible segments in a single render
+/// Maximum visible segments in a single render
 #define POWERLINE_MAX_VISIBLE 32
 
 /* ============================================================================
@@ -45,35 +45,35 @@ static lle_color_t default_segment_bg(const char *name) {
     /* True color backgrounds — palette indices get remapped by terminal
      * colorschemes and produce unpredictable results. */
     if (strcmp(name, "user") == 0)
-        return lle_color_rgb(68, 68, 68); // #444444 dark gray
+        return lle_color_rgb(68, 68, 68); /// #444444 dark gray
     if (strcmp(name, "host") == 0)
-        return lle_color_rgb(68, 68, 68); // #444444 dark gray
+        return lle_color_rgb(68, 68, 68); /// #444444 dark gray
     if (strcmp(name, "directory") == 0)
-        return lle_color_rgb(0, 95, 175); // #005FAF strong blue
+        return lle_color_rgb(0, 95, 175); /// #005FAF strong blue
     if (strcmp(name, "git") == 0)
-        return lle_color_rgb(135, 95, 175); // #875FAF medium purple
+        return lle_color_rgb(135, 95, 175); /// #875FAF medium purple
     if (strcmp(name, "status") == 0)
-        return lle_color_rgb(175, 0, 0); // #AF0000 strong red
+        return lle_color_rgb(175, 0, 0); /// #AF0000 strong red
     if (strcmp(name, "jobs") == 0)
-        return lle_color_rgb(175, 95, 0); // #AF5F00 orange
+        return lle_color_rgb(175, 95, 0); /// #AF5F00 orange
     if (strcmp(name, "time") == 0)
-        return lle_color_rgb(58, 58, 58); // #3A3A3A dim gray
+        return lle_color_rgb(58, 58, 58); /// #3A3A3A dim gray
     if (strcmp(name, "shlvl") == 0)
-        return lle_color_rgb(68, 68, 68); // #444444 dark gray
+        return lle_color_rgb(68, 68, 68); /// #444444 dark gray
     if (strcmp(name, "ssh") == 0)
-        return lle_color_rgb(175, 95, 0); // #AF5F00 amber
+        return lle_color_rgb(175, 95, 0); /// #AF5F00 amber
     if (strcmp(name, "cmd_duration") == 0)
-        return lle_color_rgb(175, 95, 0); // #AF5F00 orange
+        return lle_color_rgb(175, 95, 0); /// #AF5F00 orange
     if (strcmp(name, "virtualenv") == 0)
-        return lle_color_rgb(0, 135, 0); // #008700 green
+        return lle_color_rgb(0, 135, 0); /// #008700 green
     if (strcmp(name, "container") == 0)
-        return lle_color_rgb(0, 135, 135); // #008787 teal
+        return lle_color_rgb(0, 135, 135); /// #008787 teal
     if (strcmp(name, "aws") == 0)
-        return lle_color_rgb(175, 95, 0); // #AF5F00 orange
+        return lle_color_rgb(175, 95, 0); /// #AF5F00 orange
     if (strcmp(name, "kubernetes") == 0)
-        return lle_color_rgb(0, 95, 175); // #005FAF blue
-    // Fallback: dark gray
-    return lle_color_rgb(68, 68, 68); // #444444
+        return lle_color_rgb(0, 95, 175); /// #005FAF blue
+    /// Fallback: dark gray
+    return lle_color_rgb(68, 68, 68); /// #444444
 }
 
 /**
@@ -92,12 +92,12 @@ static void resolve_segment_colors(const lle_theme_t *theme,
     fg.bold = true;
     lle_color_t bg = default_segment_bg(segment_name);
 
-    // Check theme text color
+    /// Check theme text color
     if (theme->colors.text.mode != LLE_COLOR_MODE_NONE) {
         fg = theme->colors.text;
     }
 
-    // Check per-segment config overrides
+    /// Check per-segment config overrides
     for (size_t i = 0; i < theme->segment_config_count; i++) {
         if (strcmp(theme->segment_configs[i].name, segment_name) == 0 &&
             theme->segment_configs[i].configured) {
@@ -111,7 +111,7 @@ static void resolve_segment_colors(const lle_theme_t *theme,
         }
     }
 
-    // Downgrade colors based on terminal capability
+    /// Downgrade colors based on terminal capability
     *fg_out = lle_color_downgrade(&fg, ctx->has_true_color, ctx->has_256_color);
     *bg_out = lle_color_downgrade(&bg, ctx->has_true_color, ctx->has_256_color);
 }
@@ -130,7 +130,7 @@ typedef struct {
 
 static void buf_append(append_ctx_t *a, const char *str, size_t len) {
     if (a->pos + len >= a->size)
-        return; // Silently truncate
+        return; /// Silently truncate
     memcpy(a->buf + a->pos, str, len);
     a->pos += len;
     a->buf[a->pos] = '\0';
@@ -178,7 +178,7 @@ static size_t strip_ansi(const char *src, char *dst, size_t dst_size) {
 
     for (size_t i = 0; src[i] != '\0'; i++) {
         if (src[i] == '\033' && src[i + 1] == '[') {
-            // Skip ESC [ ... until final byte (0x40-0x7E)
+            /// Skip ESC [ ... until final byte (0x40-0x7E)
             i += 2;
             while (src[i] != '\0' && !((unsigned char)src[i] >= 0x40 &&
                                        (unsigned char)src[i] <= 0x7E)) {
@@ -217,17 +217,17 @@ static size_t collect_visible_segments(const lle_theme_t *theme,
          i++) {
         const char *name = theme->enabled_segments[i];
 
-        // Find segment in registry
+        /// Find segment in registry
         const lle_prompt_segment_t *seg =
             lle_segment_registry_find(registry, name);
         if (!seg)
             continue;
 
-        // Check visibility
+        /// Check visibility
         if (seg->is_visible && !seg->is_visible(seg, ctx))
             continue;
 
-        // Check per-segment show flag
+        /// Check per-segment show flag
         for (size_t j = 0; j < theme->segment_config_count; j++) {
             if (strcmp(theme->segment_configs[j].name, name) == 0 &&
                 theme->segment_configs[j].configured &&
@@ -237,7 +237,7 @@ static size_t collect_visible_segments(const lle_theme_t *theme,
             }
         }
 
-        // Render segment content
+        /// Render segment content
         lle_segment_output_t output;
         memset(&output, 0, sizeof(output));
         if (seg->render(seg, ctx, theme, &output) != LLE_SUCCESS)
@@ -245,7 +245,7 @@ static size_t collect_visible_segments(const lle_theme_t *theme,
         if (output.is_empty || output.content_len == 0)
             continue;
 
-        // Store with resolved colors, stripping embedded ANSI codes
+        /// Store with resolved colors, stripping embedded ANSI codes
         powerline_segment_t *ps = &out[count];
         ps->content_len =
             strip_ansi(output.content, ps->content, sizeof(ps->content));
@@ -269,22 +269,22 @@ static void render_left_to_right(const powerline_segment_t *segs, size_t count,
     for (size_t i = 0; i < count; i++) {
         const powerline_segment_t *seg = &segs[i];
 
-        // Segment content: bg + fg + space + content + space
+        /// Segment content: bg + fg + space + content + space
         buf_append_color_bg(a, &seg->bg);
         buf_append_color_fg(a, &seg->fg);
         buf_append_str(a, " ");
         buf_append(a, seg->content, seg->content_len);
         buf_append_str(a, " ");
 
-        // Separator
+        /// Separator
         if (i + 1 < count) {
-            // Between segments: fg=this.bg, bg=next.bg
+            /// Between segments: fg=this.bg, bg=next.bg
             const powerline_segment_t *next = &segs[i + 1];
             buf_append_color_fg(a, &seg->bg);
             buf_append_color_bg(a, &next->bg);
             buf_append_str(a, separator);
         } else {
-            // Final: reset, then fg=this.bg on default bg
+            /// Final: reset, then fg=this.bg on default bg
             buf_append_reset(a);
             buf_append_color_fg(a, &seg->bg);
             buf_append_str(a, separator);
@@ -304,20 +304,20 @@ static void render_right_to_left(const powerline_segment_t *segs, size_t count,
     for (size_t i = 0; i < count; i++) {
         const powerline_segment_t *seg = &segs[i];
 
-        // Separator before segment
+        /// Separator before segment
         if (i == 0) {
-            // First: fg=this.bg on default bg
+            /// First: fg=this.bg on default bg
             buf_append_color_fg(a, &seg->bg);
             buf_append_str(a, separator);
         } else {
-            // Between: fg=this.bg, bg=prev.bg
+            /// Between: fg=this.bg, bg=prev.bg
             const powerline_segment_t *prev = &segs[i - 1];
             buf_append_color_fg(a, &seg->bg);
             buf_append_color_bg(a, &prev->bg);
             buf_append_str(a, separator);
         }
 
-        // Segment content: bg + fg + space + content + space
+        /// Segment content: bg + fg + space + content + space
         buf_append_color_bg(a, &seg->bg);
         buf_append_color_fg(a, &seg->fg);
         buf_append_str(a, " ");
@@ -348,7 +348,7 @@ lle_result_t lle_powerline_render(const lle_theme_t *theme,
         return LLE_SUCCESS;
     }
 
-    // Collect visible segments
+    /// Collect visible segments
     powerline_segment_t visible[POWERLINE_MAX_VISIBLE];
     size_t count = collect_visible_segments(theme, segments, context, visible,
                                             POWERLINE_MAX_VISIBLE);
@@ -357,19 +357,19 @@ lle_result_t lle_powerline_render(const lle_theme_t *theme,
         return LLE_SUCCESS;
     }
 
-    // Get separator character from theme
+    /// Get separator character from theme
     const char *separator;
     if (direction == LLE_POWERLINE_LEFT_TO_RIGHT) {
         separator = theme->symbols.separator_left;
         if (!separator[0])
-            separator = "\xee\x82\xb0"; // U+E0B0
+            separator = "\xee\x82\xb0"; /// U+E0B0
     } else {
         separator = theme->symbols.separator_right;
         if (!separator[0])
-            separator = "\xee\x82\xb2"; // U+E0B2
+            separator = "\xee\x82\xb2"; /// U+E0B2
     }
 
-    // Assemble output
+    /// Assemble output
     append_ctx_t a = {output, output_size, 0};
 
     if (direction == LLE_POWERLINE_LEFT_TO_RIGHT) {

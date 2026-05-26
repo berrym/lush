@@ -21,11 +21,11 @@
 #include <time.h>
 #include <unistd.h>
 
-// Internal buffer for intermediate pass-1 output
+/// Internal buffer for intermediate pass-1 output
 #define EXPAND_BUF_SIZE 4096
 
 /* ========================================================================== */
-// Helper: safe append to output buffer
+/// Helper: safe append to output buffer
 /* ========================================================================== */
 
 typedef struct {
@@ -60,10 +60,10 @@ static void buf_append_str(expand_buf_t *b, const char *s) {
     while (*s && b->pos + 1 < b->size) {
         int seq_len = lle_utf8_sequence_length((unsigned char)*s);
         if (seq_len < 1)
-            seq_len = 1; // Invalid lead byte: copy as single byte
-        // Check if the full sequence fits (plus NUL terminator)
+            seq_len = 1; /// Invalid lead byte: copy as single byte
+        /// Check if the full sequence fits (plus NUL terminator)
         if (b->pos + (size_t)seq_len >= b->size)
-            break; // Would split a UTF-8 sequence — stop here
+            break; /// Would split a UTF-8 sequence — stop here
         for (int i = 0; i < seq_len && *s; i++)
             b->buf[b->pos++] = *s++;
     }
@@ -78,7 +78,7 @@ static void buf_append_int(expand_buf_t *b, int val) {
 }
 
 /* ========================================================================== */
-// Helper: get cached system values
+/// Helper: get cached system values
 /* ========================================================================== */
 
 static const char *get_username(void) {
@@ -135,12 +135,12 @@ static void get_cwd_basename(char *buf, size_t size) {
     char tilde[PATH_MAX];
     get_cwd_tilde(tilde, sizeof(tilde));
 
-    // Home dir itself → ~
+    /// Home dir itself → ~
     if (strcmp(tilde, "~") == 0) {
         snprintf(buf, size, "~");
         return;
     }
-    // Root → /
+    /// Root → /
     if (strcmp(tilde, "/") == 0) {
         snprintf(buf, size, "/");
         return;
@@ -153,13 +153,13 @@ static const char *get_tty_name(void) {
     const char *tty = ttyname(STDIN_FILENO);
     if (!tty)
         return "?";
-    // Return just the device part (e.g., "pts/0")
+    /// Return just the device part (e.g., "pts/0")
     const char *dev = strstr(tty, "/dev/");
     return dev ? dev + 5 : tty;
 }
 
 /* ========================================================================== */
-// Helper: parse color spec for %F{color} / %K{color}
+/// Helper: parse color spec for %F{color} / %K{color}
 /* ========================================================================== */
 
 /**
@@ -171,7 +171,7 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
     if (color_depth == 0)
         return;
 
-    // Hex color: #RRGGBB
+    /// Hex color: #RRGGBB
     if (spec[0] == '#' && strlen(spec) == 7) {
         unsigned int r, g, bl;
         if (sscanf(spec + 1, "%2x%2x%2x", &r, &g, &bl) == 3) {
@@ -181,7 +181,7 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
                          r, g, bl);
                 buf_append_str(b, esc);
             } else if (color_depth >= 2) {
-                // Approximate to 256-color cube
+                /// Approximate to 256-color cube
                 int ri = (r > 47) ? (r - 35) / 40 : 0;
                 int gi = (g > 47) ? (g - 35) / 40 : 0;
                 int bi = (bl > 47) ? (bl - 35) / 40 : 0;
@@ -190,12 +190,12 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
                 snprintf(esc, sizeof(esc), "\033[%d;5;%dm", fg ? 38 : 48, idx);
                 buf_append_str(b, esc);
             }
-            // color_depth==1: skip, no good 8-color approximation
+            /// color_depth==1: skip, no good 8-color approximation
             return;
         }
     }
 
-    // Numeric: 0-255
+    /// Numeric: 0-255
     char *end;
     long num = strtol(spec, &end, 10);
     if (*end == '\0' && end != spec && num >= 0 && num <= 255) {
@@ -204,7 +204,7 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
             snprintf(esc, sizeof(esc), "\033[%d;5;%ldm", fg ? 38 : 48, num);
             buf_append_str(b, esc);
         } else {
-            // Map 256-color index to basic 8
+            /// Map 256-color index to basic 8
             int code = (int)(num % 8);
             char esc[16];
             snprintf(esc, sizeof(esc), "\033[%dm", (fg ? 30 : 40) + code);
@@ -213,7 +213,7 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
         return;
     }
 
-    // Named colors
+    /// Named colors
     static const struct {
         const char *name;
         int code;
@@ -237,11 +237,11 @@ static void emit_color(expand_buf_t *b, const char *spec, int color_depth,
             return;
         }
     }
-    // Unknown color: silently ignore
+    /// Unknown color: silently ignore
 }
 
 /* ========================================================================== */
-// Pass 2: Expand bash \X and zsh %X escapes
+/// Pass 2: Expand bash \X and zsh %X escapes
 /* ========================================================================== */
 
 static lle_result_t expand_prompt_escapes(const char *input, char *output,
@@ -252,62 +252,62 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
 
     const char *p = input;
     while (*p) {
-        // ------------------------------------------------------------
-        // Skip ANSI escape sequences (from pass-1 template rendering)
-        // ESC (0x1B) followed by [ ... final byte
-        // ------------------------------------------------------------
+        /// ------------------------------------------------------------
+        /// Skip ANSI escape sequences (from pass-1 template rendering)
+        /// ESC (0x1B) followed by [ ... final byte
+        /// ------------------------------------------------------------
         if (*p == '\033') {
             buf_append_char(&b, *p++);
             if (*p == '[') {
                 buf_append_char(&b, *p++);
-                // Copy parameter bytes + final byte
+                /// Copy parameter bytes + final byte
                 while (*p && *p < 0x40) {
                     buf_append_char(&b, *p++);
                 }
                 if (*p) {
-                    buf_append_char(&b, *p++); // final byte
+                    buf_append_char(&b, *p++); /// final byte
                 }
             }
             continue;
         }
 
-        // ------------------------------------------------------------
-        // Bash escapes: \X
-        // ------------------------------------------------------------
+        /// ------------------------------------------------------------
+        /// Bash escapes: \X
+        /// ------------------------------------------------------------
         if (*p == '\\' && *(p + 1)) {
             char next = *(p + 1);
-            p += 2; // consume \ and next char
+            p += 2; /// consume \ and next char
 
             switch (next) {
-            case 'u': { // username
+            case 'u': { /// username
                 buf_append_str(&b, get_username());
                 break;
             }
-            case 'h': { // short hostname
+            case 'h': { /// short hostname
                 char host[256];
                 get_hostname_short(host, sizeof(host));
                 buf_append_str(&b, host);
                 break;
             }
-            case 'H': { // full hostname
+            case 'H': { /// full hostname
                 char host[256];
                 get_hostname_full(host, sizeof(host));
                 buf_append_str(&b, host);
                 break;
             }
-            case 'w': { // cwd with ~
+            case 'w': { /// cwd with ~
                 char cwd[PATH_MAX];
                 get_cwd_tilde(cwd, sizeof(cwd));
                 buf_append_str(&b, cwd);
                 break;
             }
-            case 'W': { // cwd basename
+            case 'W': { /// cwd basename
                 char cwd[PATH_MAX];
                 get_cwd_basename(cwd, sizeof(cwd));
                 buf_append_str(&b, cwd);
                 break;
             }
-            case 'd': { // date: "Sat Feb 22"
+            case 'd': { /// date: "Sat Feb 22"
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -316,7 +316,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, date);
                 break;
             }
-            case 't': { // time: HH:MM:SS 24h
+            case 't': { /// time: HH:MM:SS 24h
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -325,7 +325,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case 'T': { // time: HH:MM:SS 12h
+            case 'T': { /// time: HH:MM:SS 12h
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -334,7 +334,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case '@': { // time: 12h am/pm
+            case '@': { /// time: 12h am/pm
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -343,7 +343,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case 'A': { // time: HH:MM 24h
+            case 'A': { /// time: HH:MM 24h
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -352,70 +352,70 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case '$': { // # if root, $ otherwise
+            case '$': { /// # if root, $ otherwise
                 buf_append_char(&b, getuid() == 0 ? '#' : '$');
                 break;
             }
-            case 'n': { // newline
+            case 'n': { /// newline
                 buf_append_char(&b, '\n');
                 break;
             }
-            case 'r': { // carriage return
+            case 'r': { /// carriage return
                 buf_append_char(&b, '\r');
                 break;
             }
-            case '\\': { // literal backslash
+            case '\\': { /// literal backslash
                 buf_append_char(&b, '\\');
                 break;
             }
-            case '[': { // begin non-printing: stripped
+            case '[': { /// begin non-printing: stripped
                 break;
             }
-            case ']': { // end non-printing: stripped
+            case ']': { /// end non-printing: stripped
                 break;
             }
-            case '!': { // history number
+            case '!': { /// history number
                 buf_append_int(&b, ctx->history_number);
                 break;
             }
-            case '#': { // command number
+            case '#': { /// command number
                 buf_append_int(&b, ctx->command_number);
                 break;
             }
-            case 'j': { // job count
+            case 'j': { /// job count
                 buf_append_int(&b, ctx->job_count);
                 break;
             }
-            case 'l': { // tty device basename
+            case 'l': { /// tty device basename
                 const char *tty = get_tty_name();
                 const char *base = strrchr(tty, '/');
                 buf_append_str(&b, base ? base + 1 : tty);
                 break;
             }
-            case 's': { // shell name
+            case 's': { /// shell name
                 buf_append_str(&b, LUSH_NAME);
                 break;
             }
-            case 'v': { // shell version short
+            case 'v': { /// shell version short
                 char ver[16];
                 snprintf(ver, sizeof(ver), "%d.%d", LUSH_VERSION_MAJOR,
                          LUSH_VERSION_MINOR);
                 buf_append_str(&b, ver);
                 break;
             }
-            case 'V': { // shell version full
+            case 'V': { /// shell version full
                 buf_append_str(&b, LUSH_VERSION_STRING);
                 break;
             }
-            case 'e': { // ESC character
+            case 'e': { /// ESC character
                 buf_append_char(&b, '\033');
                 break;
             }
-            case 'a': { // BEL character
+            case 'a': { /// BEL character
                 buf_append_char(&b, '\a');
                 break;
             }
-            case '0': { // octal: \0NNN
+            case '0': { /// octal: \0NNN
                 unsigned int val = 0;
                 int digits = 0;
                 while (digits < 3 && *p >= '0' && *p <= '7') {
@@ -427,7 +427,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                     buf_append_char(&b, (char)val);
                 break;
             }
-            case 'x': { // hex: \xNN
+            case 'x': { /// hex: \xNN
                 unsigned int val = 0;
                 int digits = 0;
                 while (digits < 2 &&
@@ -447,7 +447,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 break;
             }
             default:
-                // Unknown bash escape: pass through literally
+                /// Unknown bash escape: pass through literally
                 buf_append_char(&b, '\\');
                 buf_append_char(&b, next);
                 break;
@@ -455,59 +455,59 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
             continue;
         }
 
-        // ------------------------------------------------------------
-        // Zsh escapes: %X
-        // ------------------------------------------------------------
+        /// ------------------------------------------------------------
+        /// Zsh escapes: %X
+        /// ------------------------------------------------------------
         if (*p == '%' && *(p + 1)) {
             char next = *(p + 1);
             p += 2;
 
             switch (next) {
-            case 'n': { // username
+            case 'n': { /// username
                 buf_append_str(&b, get_username());
                 break;
             }
-            case 'm': { // short hostname
+            case 'm': { /// short hostname
                 char host[256];
                 get_hostname_short(host, sizeof(host));
                 buf_append_str(&b, host);
                 break;
             }
-            case 'M': { // full hostname
+            case 'M': { /// full hostname
                 char host[256];
                 get_hostname_full(host, sizeof(host));
                 buf_append_str(&b, host);
                 break;
             }
-            case 'd':   // fall through
-            case '/': { // full cwd
+            case 'd':   /// fall through
+            case '/': { /// full cwd
                 char cwd[PATH_MAX];
                 get_cwd_full(cwd, sizeof(cwd));
                 buf_append_str(&b, cwd);
                 break;
             }
-            case '~': { // cwd with ~
+            case '~': { /// cwd with ~
                 char cwd[PATH_MAX];
                 get_cwd_tilde(cwd, sizeof(cwd));
                 buf_append_str(&b, cwd);
                 break;
             }
-            case 'c':   // fall through
-            case '.': { // cwd tail component
+            case 'c':   /// fall through
+            case '.': { /// cwd tail component
                 char cwd[PATH_MAX];
                 get_cwd_basename(cwd, sizeof(cwd));
                 buf_append_str(&b, cwd);
                 break;
             }
-            case '#': { // # if root, % otherwise (zsh convention)
+            case '#': { /// # if root, % otherwise (zsh convention)
                 buf_append_char(&b, getuid() == 0 ? '#' : '%');
                 break;
             }
-            case '%': { // literal %
+            case '%': { /// literal %
                 buf_append_char(&b, '%');
                 break;
             }
-            case 'T': { // time HH:MM 24h
+            case 'T': { /// time HH:MM 24h
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -516,8 +516,8 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case 't':   // fall through
-            case '@': { // time 12h am/pm
+            case 't':   /// fall through
+            case '@': { /// time 12h am/pm
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -526,7 +526,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case '*': { // time HH:MM:SS 24h
+            case '*': { /// time HH:MM:SS 24h
                 time_t now = time(NULL);
                 struct tm tm_buf;
                 localtime_r(&now, &tm_buf);
@@ -535,27 +535,27 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 buf_append_str(&b, t);
                 break;
             }
-            case 'j': { // job count
+            case 'j': { /// job count
                 buf_append_int(&b, ctx->job_count);
                 break;
             }
-            case 'l': { // tty device name
+            case 'l': { /// tty device name
                 buf_append_str(&b, get_tty_name());
                 break;
             }
-            case '?': { // last exit status
+            case '?': { /// last exit status
                 buf_append_int(&b, ctx->last_exit_status);
                 break;
             }
-            case 'D': { // date with format: %D{fmt}
+            case 'D': { /// date with format: %D{fmt}
                 if (*p == '{') {
-                    p++; // skip {
+                    p++; /// skip {
                     const char *start = p;
                     while (*p && *p != '}')
                         p++;
                     size_t fmtlen = (size_t)(p - start);
                     if (*p == '}')
-                        p++; // skip }
+                        p++; /// skip }
                     char fmt[128];
                     if (fmtlen >= sizeof(fmt))
                         fmtlen = sizeof(fmt) - 1;
@@ -568,7 +568,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                     strftime(date, sizeof(date), fmt, &tm_buf);
                     buf_append_str(&b, date);
                 } else {
-                    // %D without {}: output date in default format
+                    /// %D without {}: output date in default format
                     time_t now = time(NULL);
                     struct tm tm_buf;
                     localtime_r(&now, &tm_buf);
@@ -578,31 +578,31 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 }
                 break;
             }
-            case 'B': { // bold on
+            case 'B': { /// bold on
                 buf_append_str(&b, "\033[1m");
                 break;
             }
-            case 'b': { // bold off
+            case 'b': { /// bold off
                 buf_append_str(&b, "\033[22m");
                 break;
             }
-            case 'U': { // underline on
+            case 'U': { /// underline on
                 buf_append_str(&b, "\033[4m");
                 break;
             }
-            case 'u': { // underline off
+            case 'u': { /// underline off
                 buf_append_str(&b, "\033[24m");
                 break;
             }
-            case 'S': { // standout (reverse) on
+            case 'S': { /// standout (reverse) on
                 buf_append_str(&b, "\033[7m");
                 break;
             }
-            case 's': { // standout off
+            case 's': { /// standout off
                 buf_append_str(&b, "\033[27m");
                 break;
             }
-            case 'F': { // foreground color: %F{spec}
+            case 'F': { /// foreground color: %F{spec}
                 if (*p == '{') {
                     p++;
                     const char *start = p;
@@ -620,11 +620,11 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 }
                 break;
             }
-            case 'f': { // reset foreground
+            case 'f': { /// reset foreground
                 buf_append_str(&b, "\033[39m");
                 break;
             }
-            case 'K': { // background color: %K{spec}
+            case 'K': { /// background color: %K{spec}
                 if (*p == '{') {
                     p++;
                     const char *start = p;
@@ -642,7 +642,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 }
                 break;
             }
-            case 'k': { // reset background
+            case 'k': { /// reset background
                 buf_append_str(&b, "\033[49m");
                 break;
             }
@@ -653,7 +653,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                           display columns). Zsh-compatible. */
                 while (*p) {
                     if (*p == '%' && *(p + 1) == '}') {
-                        p += 2; // skip closing %}
+                        p += 2; /// skip closing %}
                         break;
                     }
                     buf_append_char(&b, *p++);
@@ -661,7 +661,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
                 break;
             }
             default:
-                // Unknown zsh escape: pass through literally
+                /// Unknown zsh escape: pass through literally
                 buf_append_char(&b, '%');
                 buf_append_char(&b, next);
                 break;
@@ -669,15 +669,15 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
             continue;
         }
 
-        // ------------------------------------------------------------
-        // Regular character: copy complete UTF-8 sequence
-        // ------------------------------------------------------------
+        /// ------------------------------------------------------------
+        /// Regular character: copy complete UTF-8 sequence
+        /// ------------------------------------------------------------
         {
             int seq_len = lle_utf8_sequence_length((unsigned char)*p);
             if (seq_len < 1)
-                seq_len = 1; // Invalid lead byte: copy single byte
+                seq_len = 1; /// Invalid lead byte: copy single byte
             if (b.pos + (size_t)seq_len >= b.size) {
-                break; // Would split UTF-8 sequence — stop
+                break; /// Would split UTF-8 sequence — stop
             }
             for (int i = 0; i < seq_len && *p; i++)
                 buf_append_char(&b, *p++);
@@ -688,7 +688,7 @@ static lle_result_t expand_prompt_escapes(const char *input, char *output,
 }
 
 /* ========================================================================== */
-// Public API: lle_prompt_expand
+/// Public API: lle_prompt_expand
 /* ========================================================================== */
 
 lle_result_t lle_prompt_expand(const char *format, char *output,
@@ -703,7 +703,7 @@ lle_result_t lle_prompt_expand(const char *format, char *output,
      * corrupted terminal output.  Fall back to the format string as-is if
      * it happens to be mostly ASCII (lle_utf8_is_valid is strict). */
     if (!lle_utf8_is_valid(format, strlen(format))) {
-        // Best-effort: copy what we can, replacing invalid bytes
+        /// Best-effort: copy what we can, replacing invalid bytes
         snprintf(output, output_size, "%s", "$ ");
         return LLE_ERROR_INVALID_ENCODING;
     }
@@ -731,6 +731,6 @@ lle_result_t lle_prompt_expand(const char *format, char *output,
         pass2_input = intermediate;
     }
 
-    // Pass 2: Expand bash \X and zsh %X escapes
+    /// Pass 2: Expand bash \X and zsh %X escapes
     return expand_prompt_escapes(pass2_input, output, output_size, ctx);
 }
