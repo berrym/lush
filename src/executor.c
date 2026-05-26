@@ -24,6 +24,7 @@
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
+#include "lle/unicode_class.h"
 #include "lle/unicode_grapheme.h"
 #include "lle/utf8_support.h"
 #include "lush.h"
@@ -10098,6 +10099,11 @@ static bool match_pattern(const char *str, const char *pattern) {
             p++; /// Skip opening [
             bool matched = false;
             bool negated = false;
+            /// Bytes consumed from the input by this bracket as a
+            /// whole. ASCII / literal / range matches consume 1 byte;
+            /// a successful [:class:] match consumes the full UTF-8
+            /// codepoint length of the input character.
+            size_t s_consumed = 1;
 
             /// Check for negation [!abc] or [^abc]
             if (*p == '!' || *p == '^') {
@@ -10119,43 +10125,64 @@ static bool match_pattern(const char *str, const char *pattern) {
                     const char *class_end = strstr(class_start, ":]");
                     if (class_end) {
                         size_t cl = (size_t)(class_end - class_start);
-                        unsigned char uc = (unsigned char)*s;
+                        /// Decode the next input codepoint so the
+                        /// class predicate evaluates Unicode general-
+                        /// category membership, not single-byte
+                        /// ctype membership. The string-end and
+                        /// invalid-UTF-8 cases degrade to the byte
+                        /// value as a codepoint so ASCII patterns
+                        /// continue to work.
+                        ///
+                        /// Track the codepoint's byte length so the
+                        /// post-bracket `s` advance covers the full
+                        /// multi-byte sequence instead of leaving
+                        /// `s` mid-codepoint.
+                        uint32_t cp = (uint32_t)(unsigned char)*s;
+                        if (*s) {
+                            uint32_t decoded = 0;
+                            int consumed = lle_utf8_decode_codepoint(
+                                s, strlen(s), &decoded);
+                            if (consumed > 0) {
+                                cp = decoded;
+                                s_consumed = (size_t)consumed;
+                            }
+                        }
                         bool cls_match = false;
                         if (cl == 5 && memcmp(class_start, "space", 5) == 0) {
-                            cls_match = isspace(uc) != 0;
+                            cls_match = lle_unicode_is_space(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "alpha", 5) == 0) {
-                            cls_match = isalpha(uc) != 0;
+                            cls_match = lle_unicode_is_alpha(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "digit", 5) == 0) {
-                            cls_match = isdigit(uc) != 0;
+                            cls_match = lle_unicode_is_digit(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "alnum", 5) == 0) {
-                            cls_match = isalnum(uc) != 0;
+                            cls_match = lle_unicode_is_alnum(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "upper", 5) == 0) {
-                            cls_match = isupper(uc) != 0;
+                            cls_match = lle_unicode_is_upper(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "lower", 5) == 0) {
-                            cls_match = islower(uc) != 0;
+                            cls_match = lle_unicode_is_lower(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "punct", 5) == 0) {
-                            cls_match = ispunct(uc) != 0;
+                            cls_match = lle_unicode_is_punct(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "print", 5) == 0) {
-                            cls_match = isprint(uc) != 0;
+                            cls_match = lle_unicode_is_print(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "graph", 5) == 0) {
-                            cls_match = isgraph(uc) != 0;
+                            cls_match = lle_unicode_is_graph(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "blank", 5) == 0) {
-                            cls_match = (uc == ' ' || uc == '\t');
+                            cls_match = lle_unicode_is_blank(cp);
                         } else if (cl == 5 &&
                                    memcmp(class_start, "cntrl", 5) == 0) {
-                            cls_match = iscntrl(uc) != 0;
+                            cls_match = lle_unicode_is_cntrl(cp);
                         } else if (cl == 6 &&
                                    memcmp(class_start, "xdigit", 6) == 0) {
-                            cls_match = isxdigit(uc) != 0;
+                            cls_match = lle_unicode_is_xdigit(cp);
                         }
                         if (cls_match) {
                             matched = true;
@@ -10192,7 +10219,7 @@ static bool match_pattern(const char *str, const char *pattern) {
                 return false;
             }
 
-            s++;
+            s += s_consumed;
         } else {
             /// Literal character match (including special chars like : @ /
             /// etc.)

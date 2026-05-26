@@ -984,6 +984,18 @@ endif
          timeout: 30)
   endif
 
+  # Unicode General-Category Classification Unit Tests
+  # Tests unicode_class.h predicates (is_alpha, is_digit, is_space, etc.)
+  if fs.exists('tests/lle/unit/test_unicode_class.c')
+    test_unicode_class = executable('test_unicode_class',
+                                    'tests/lle/unit/test_unicode_class.c',
+                                    include_directories: [inc, include_directories('tests')],
+                                    dependencies: [lle_dep])
+    test('LLE Unicode Class', test_unicode_class,
+         suite: 'lle-unit',
+         timeout: 30)
+  endif
+
   # Char Width Unit Tests
   # Tests lle_codepoint_width() and lle_is_wide_character() across the
   # Unicode East Asian Width ranges the implementation distinguishes.
