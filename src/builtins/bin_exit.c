@@ -21,17 +21,17 @@
  * @return The exit code (though the shell will exit before this matters)
  */
 int bin_exit(int argc, char **argv) {
-    int exit_code = last_exit_status; // Default to last command's status
+    int exit_code = last_exit_status; /// Default to last command's status
 
-    // Parse exit code argument if provided
+    /// Parse exit code argument if provided
     if (argc > 1) {
         exit_code = atoi(argv[1]);
     }
 
-    // Set exit flag to break main loop - allows proper cleanup
+    /// Set exit flag to break main loop - allows proper cleanup
     exit_flag = true;
 
-    // Store exit code for use after main loop exits
+    /// Store exit code for use after main loop exits
     last_exit_status = exit_code;
 
     return exit_code;

@@ -24,10 +24,10 @@ int bin_eval(int argc, char **argv) {
         return 0;
     }
 
-    // Concatenate all arguments
+    /// Concatenate all arguments
     size_t total_len = 0;
     for (int i = 1; i < argc; i++) {
-        total_len += strlen(argv[i]) + 1; // +1 for space
+        total_len += strlen(argv[i]) + 1; /// +1 for space
     }
 
     char *command = malloc(total_len);

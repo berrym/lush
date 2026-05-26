@@ -26,7 +26,7 @@
  * @return 0 on success, 1 on error
  */
 int bin_debug(int argc __attribute__((unused)), char **argv) {
-    // Initialize debug context if not already done
+    /// Initialize debug context if not already done
     if (!g_debug_context) {
         g_debug_context = debug_init();
         if (!g_debug_context) {
@@ -37,13 +37,13 @@ int bin_debug(int argc __attribute__((unused)), char **argv) {
 
     debug_context_t *ctx = g_debug_context;
 
-    // Count arguments
+    /// Count arguments
     int argc_real = 0;
     while (argv[argc_real]) {
         argc_real++;
     }
 
-    // No arguments - show current debug status
+    /// No arguments - show current debug status
     if (argc_real == 1) {
         printf("Debug Status:\n");
         printf("  Enabled: %s\n", ctx->enabled ? "yes" : "no");
@@ -73,13 +73,13 @@ int bin_debug(int argc __attribute__((unused)), char **argv) {
         return 0;
     }
 
-    // Process subcommands - comprehensive implementation
+    /// Process subcommands - comprehensive implementation
     const char *subcmd = argv[1];
 
     if (strcmp(subcmd, "on") == 0 || strcmp(subcmd, "enable") == 0) {
         debug_enable(ctx, true);
         if (argc_real > 2) {
-            // Set level if provided
+            /// Set level if provided
             int level = atoi(argv[2]);
             if (level >= DEBUG_NONE && level <= DEBUG_PROFILE) {
                 debug_set_level(ctx, (debug_level_t)level);

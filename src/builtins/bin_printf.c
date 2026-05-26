@@ -42,7 +42,7 @@ char *process_escape_sequences(const char *str) {
 
     while (*src) {
         if (*src == '\\' && *(src + 1)) {
-            src++; // Skip the backslash
+            src++; /// Skip the backslash
             switch (*src) {
             case 'n':
                 *dst++ = '\n';
@@ -140,31 +140,31 @@ int bin_printf(int argc, char **argv) {
     const char *format = argv[1];
     int arg_index = 2;
 
-    // POSIX: The format string is reused as often as necessary to satisfy
-    // the remaining arguments. If the format string contains no conversion
-    // specifications, and there are arguments, the format is used once and
-    // subsequent arguments are ignored.
+    /// POSIX: The format string is reused as often as necessary to satisfy
+    /// the remaining arguments. If the format string contains no conversion
+    /// specifications, and there are arguments, the format is used once and
+    /// subsequent arguments are ignored.
     do {
         int args_used_this_pass = 0;
 
         for (int i = 0; format[i] != '\0'; i++) {
             if (format[i] == '%' && format[i + 1] != '\0') {
-                int spec_start = i; // points at '%' for forwarding to libc
-                i++;                // Skip the %
+                int spec_start = i; /// points at '%' for forwarding to libc
+                i++;                /// Skip the %
 
-                // Handle literal %
+                /// Handle literal %
                 if (format[i] == '%') {
                     putchar('%');
                     continue;
                 }
 
-                // Parse flags, width, precision
+                /// Parse flags, width, precision
                 int width = 0;
                 int precision = -1;
                 bool zero_pad = false;
                 bool left_align = false;
 
-                // Parse flags
+                /// Parse flags
                 while (format[i] == '-' || format[i] == '+' ||
                        format[i] == ' ' || format[i] == '#' ||
                        format[i] == '0') {
@@ -177,9 +177,9 @@ int bin_printf(int argc, char **argv) {
                     i++;
                 }
 
-                // Parse width
+                /// Parse width
                 if (format[i] == '*') {
-                    // Dynamic width from argument
+                    /// Dynamic width from argument
                     if (arg_index < argc) {
                         width = atoi(argv[arg_index]);
                         if (width < 0) {
@@ -196,11 +196,11 @@ int bin_printf(int argc, char **argv) {
                     }
                 }
 
-                // Parse precision
+                /// Parse precision
                 if (format[i] == '.') {
                     i++;
                     if (format[i] == '*') {
-                        // Dynamic precision from argument
+                        /// Dynamic precision from argument
                         if (arg_index < argc) {
                             precision = atoi(argv[arg_index]);
                             arg_index++;
@@ -215,9 +215,9 @@ int bin_printf(int argc, char **argv) {
                     }
                 }
 
-                // Handle conversion specifier
+                /// Handle conversion specifier
                 char specifier = format[i];
-                // Get the argument for the format specifier
+                /// Get the argument for the format specifier
                 const char *format_arg =
                     (arg_index < argc) ? argv[arg_index] : "";
 
@@ -241,19 +241,19 @@ int bin_printf(int argc, char **argv) {
 
                 switch (specifier) {
                 case 's': {
-                    // String format
+                    /// String format
                     int len = strlen(format_arg);
                     int padding = (width > len) ? width - len : 0;
 
                     if (!left_align && padding > 0) {
-                        // Right-align with padding
+                        /// Right-align with padding
                         char pad_char = zero_pad ? '0' : ' ';
                         for (int p = 0; p < padding; p++) {
                             putchar(pad_char);
                         }
                     }
 
-                    // Print the string (truncated if precision specified)
+                    /// Print the string (truncated if precision specified)
                     if (precision >= 0 && precision < len) {
                         for (int j = 0; j < precision; j++) {
                             putchar(format_arg[j]);
@@ -263,7 +263,7 @@ int bin_printf(int argc, char **argv) {
                     }
 
                     if (left_align && padding > 0) {
-                        // Left-align with padding
+                        /// Left-align with padding
                         for (int p = 0; p < padding; p++) {
                             putchar(' ');
                         }
@@ -286,11 +286,11 @@ int bin_printf(int argc, char **argv) {
                     break;
                 }
                 case 'c': {
-                    // Character format
+                    /// Character format
                     int value = (arg_index < argc) ? atoi(format_arg) : 0;
 
                     if (!left_align && width > 1) {
-                        // Right-align with padding
+                        /// Right-align with padding
                         for (int p = 1; p < width; p++) {
                             putchar(' ');
                         }
@@ -299,7 +299,7 @@ int bin_printf(int argc, char **argv) {
                     putchar(value);
 
                     if (left_align && width > 1) {
-                        // Left-align with padding
+                        /// Left-align with padding
                         for (int p = 1; p < width; p++) {
                             putchar(' ');
                         }
@@ -342,13 +342,13 @@ int bin_printf(int argc, char **argv) {
                     break;
                 }
                 default:
-                    // Unknown specifier - just print as is
+                    /// Unknown specifier - just print as is
                     putchar('%');
                     putchar(specifier);
                     break;
                 }
             } else if (format[i] == '\\' && format[i + 1] != '\0') {
-                // Handle escaped characters
+                /// Handle escaped characters
                 i++;
                 switch (format[i]) {
                 case 'n':
@@ -382,19 +382,19 @@ int bin_printf(int argc, char **argv) {
                     putchar('\'');
                     break;
                 default:
-                    // Unknown escape - print as literal
+                    /// Unknown escape - print as literal
                     putchar('\\');
                     putchar(format[i]);
                     break;
                 }
             } else {
-                // Regular character
+                /// Regular character
                 putchar(format[i]);
             }
         }
 
-        // If no format specifiers consumed arguments, stop to avoid infinite
-        // loop
+        /// If no format specifiers consumed arguments, stop to avoid infinite
+        /// loop
         if (args_used_this_pass == 0) {
             break;
         }

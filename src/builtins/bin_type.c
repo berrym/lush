@@ -23,12 +23,12 @@
  * @return 0 if all commands found, 1 if any not found
  */
 int bin_type(int argc, char **argv) {
-    bool type_only = false; // -t flag: output only the type
-    bool path_only = false; // -p flag: output only the path
-    bool show_all = false;  // -a flag: show all locations
+    bool type_only = false; /// -t flag: output only the type
+    bool path_only = false; /// -p flag: output only the path
+    bool show_all = false;  /// -a flag: show all locations
     int name_start = 1;
 
-    // Parse options
+    /// Parse options
     for (int i = 1; i < argc && argv[i][0] == '-'; i++) {
         if (strcmp(argv[i], "-t") == 0) {
             type_only = true;
@@ -92,13 +92,13 @@ int bin_type(int argc, char **argv) {
 
         bool found_any = false;
 
-        // Check if it's a builtin command
+        /// Check if it's a builtin command
         if (is_builtin(name)) {
             found_any = true;
             if (type_only) {
                 printf("builtin\n");
             } else if (path_only) {
-                // -p flag: builtins have no path, so output nothing
+                /// -p flag: builtins have no path, so output nothing
             } else {
                 printf("%s is a shell builtin\n", name);
             }
@@ -106,14 +106,14 @@ int bin_type(int argc, char **argv) {
                 continue;
         }
 
-        // Check if it's an alias (simplified - would need full alias parsing)
+        /// Check if it's an alias (simplified - would need full alias parsing)
         char *alias_value = symtable_get_global("alias");
         if (alias_value) {
             found_any = true;
             if (type_only) {
                 printf("alias\n");
             } else if (path_only) {
-                // -p flag: aliases have no path, so output nothing
+                /// -p flag: aliases have no path, so output nothing
             } else {
                 printf("%s is aliased\n", name);
             }
@@ -121,14 +121,14 @@ int bin_type(int argc, char **argv) {
                 continue;
         }
 
-        // Check if it's a function (stored in symbol table)
+        /// Check if it's a function (stored in symbol table)
         char *func_value = symtable_get_global(name);
         if (func_value && strstr(func_value, "function")) {
             found_any = true;
             if (type_only) {
                 printf("function\n");
             } else if (path_only) {
-                // -p flag: functions have no path, so output nothing
+                /// -p flag: functions have no path, so output nothing
             } else {
                 printf("%s is a function\n", name);
             }
@@ -136,7 +136,7 @@ int bin_type(int argc, char **argv) {
                 continue;
         }
 
-        // Check if it's an executable file in PATH
+        /// Check if it's an executable file in PATH
         char *path_env = getenv("PATH");
         if (path_env) {
             char *path_copy = strdup(path_env);
@@ -171,10 +171,10 @@ int bin_type(int argc, char **argv) {
             }
         }
 
-        // Not found anywhere
+        /// Not found anywhere
         if (!found_any) {
             if (type_only || path_only) {
-                // For -t and -p, output nothing for not found commands
+                /// For -t and -p, output nothing for not found commands
             } else {
                 printf("%s: not found\n", name);
             }

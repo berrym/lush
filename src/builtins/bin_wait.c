@@ -23,17 +23,17 @@
  * @return Exit status of the last waited process
  */
 int bin_wait(int argc, char **argv) {
-    // Get the current executor to access job control
+    /// Get the current executor to access job control
     if (!current_executor) {
-        // If no executor, there are no jobs to wait for
+        /// If no executor, there are no jobs to wait for
         return 0;
     }
 
-    // If no arguments, wait for all background jobs
+    /// If no arguments, wait for all background jobs
     if (argc == 1) {
         executor_update_job_status(current_executor);
 
-        // Wait for all running jobs
+        /// Wait for all running jobs
         job_t *job = current_executor->jobs;
         int last_exit_status = 0;
 
@@ -51,33 +51,33 @@ int bin_wait(int argc, char **argv) {
                         last_exit_status = 1;
                     }
 
-                    // Mark job as done
+                    /// Mark job as done
                     job->state = JOB_DONE;
                 }
             }
             job = job->next;
         }
 
-        // Clean up completed jobs
+        /// Clean up completed jobs
         executor_update_job_status(current_executor);
 
         return last_exit_status;
     }
 
-    // Wait for specific job(s) or process(es)
+    /// Wait for specific job(s) or process(es)
     int overall_exit_status = 0;
 
     for (int i = 1; i < argc; i++) {
         char *endptr;
         long target = strtol(argv[i], &endptr, 10);
 
-        // Check for job ID syntax (%n)
+        /// Check for job ID syntax (%n)
         bool is_job_id = false;
         int job_or_pid = (int)target;
 
         if (argv[i][0] == '%') {
             is_job_id = true;
-            // Re-parse without the % sign
+            /// Re-parse without the % sign
             job_or_pid = (int)strtol(argv[i] + 1, &endptr, 10);
             if (*endptr != '\0' || job_or_pid <= 0) {
                 executor_error_report(current_executor,
@@ -97,7 +97,7 @@ int bin_wait(int argc, char **argv) {
         }
 
         if (is_job_id) {
-            // Wait for specific job
+            /// Wait for specific job
             job_t *job = executor_find_job(current_executor, job_or_pid);
             if (!job) {
                 executor_error_report(current_executor, SHELL_ERR_JOB_NOT_FOUND,
@@ -122,17 +122,17 @@ int bin_wait(int argc, char **argv) {
                     job->state = JOB_DONE;
                 }
             } else if (job->state == JOB_DONE) {
-                // Job already completed - return 0
+                /// Job already completed - return 0
                 overall_exit_status = 0;
             }
         } else {
-            // Wait for specific PID
+            /// Wait for specific PID
             int status;
             pid_t result = waitpid(job_or_pid, &status, 0);
 
             if (result == -1) {
                 if (errno == ECHILD) {
-                    // Process doesn't exist or not a child
+                    /// Process doesn't exist or not a child
                     executor_error_report(
                         current_executor, SHELL_ERR_JOB_NOT_FOUND,
                         builtin_get_source_location(),
@@ -188,7 +188,7 @@ int bin_wait(int argc, char **argv) {
         }
     }
 
-    // Clean up completed jobs
+    /// Clean up completed jobs
     executor_update_job_status(current_executor);
 
     return overall_exit_status;

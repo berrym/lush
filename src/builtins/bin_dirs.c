@@ -37,7 +37,7 @@ int bin_dirs(int argc, char **argv) {
         } else if (strcmp(argv[i], "-c") == 0) {
             clear_stack = true;
         } else if (strcmp(argv[i], "-l") == 0) {
-            // Full paths (currently default, ~ substitution not implemented)
+            /// Full paths (currently default, ~ substitution not implemented)
         } else if (argv[i][0] == '-') {
             {
                 source_location_t loc = builtin_get_source_location();

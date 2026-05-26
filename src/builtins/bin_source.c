@@ -69,7 +69,7 @@ int bin_source(int argc, char **argv) {
         return 1;
     }
 
-    // Get global executor for script context tracking
+    /// Get global executor for script context tracking
     executor_t *executor = get_global_executor();
     if (!executor) {
         fclose(file);
@@ -79,13 +79,13 @@ int bin_source(int argc, char **argv) {
         return 1;
     }
 
-    // Track source depth for return support
-    // Save and reset source_return flag for this source level
+    /// Track source depth for return support
+    /// Save and reset source_return flag for this source level
     bool saved_source_return = executor->source_return;
     executor->source_depth++;
     executor->source_return = false;
 
-    // Set script execution context so breakpoints can match this file.
+    /// Set script execution context so breakpoints can match this file.
     executor_set_script_context(executor, argv[1]);
 
     char *complete_input;
@@ -96,15 +96,15 @@ int bin_source(int argc, char **argv) {
      * breakpoints and structured-error snippets match against. */
     size_t source_line = 1;
 
-    // Read complete multi-line constructs instead of line by line
+    /// Read complete multi-line constructs instead of line by line
     while ((complete_input = get_input_complete(file)) != NULL) {
-        // Check if return was called in sourced script
+        /// Check if return was called in sourced script
         if (executor->source_return) {
             free(complete_input);
             break;
         }
 
-        // Physical lines this construct spans, for advancing source_line.
+        /// Physical lines this construct spans, for advancing source_line.
         size_t construct_lines = 0;
         for (const char *p = complete_input; *p; p++) {
             if (*p == '\n') {
@@ -112,7 +112,7 @@ int bin_source(int argc, char **argv) {
             }
         }
 
-        // Skip empty constructs
+        /// Skip empty constructs
         char *trimmed = complete_input;
         while (*trimmed == ' ' || *trimmed == '\t' || *trimmed == '\n')
             trimmed++;
@@ -122,11 +122,11 @@ int bin_source(int argc, char **argv) {
             continue;
         }
 
-        // Parse and execute the complete construct at its true file line.
+        /// Parse and execute the complete construct at its true file line.
         int construct_result = parse_and_execute(complete_input, source_line);
         source_line += construct_lines;
 
-        // Check for return from sourced script (exit code 200+)
+        /// Check for return from sourced script (exit code 200+)
         if (construct_result >= 200 && construct_result <= 455) {
             result = construct_result - 200;
             executor->source_return = true;
@@ -141,11 +141,11 @@ int bin_source(int argc, char **argv) {
         free(complete_input);
     }
 
-    // Clear source tracking and restore parent's source_return state
+    /// Clear source tracking and restore parent's source_return state
     executor->source_depth--;
     executor->source_return = saved_source_return;
 
-    // Clear script execution context
+    /// Clear script execution context
     executor_clear_script_context(executor);
 
     fclose(file);

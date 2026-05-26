@@ -23,10 +23,10 @@
  * @return 0 on success, 1 on error
  */
 int bin_pwd(int argc, char **argv) {
-    // Default to shell's physical_mode setting, but allow -P/-L to override
+    /// Default to shell's physical_mode setting, but allow -P/-L to override
     bool physical = shell_opts.physical_mode;
 
-    // Parse options: -P (physical), -L (logical)
+    /// Parse options: -P (physical), -L (logical)
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-P") == 0) {
             physical = true;
@@ -78,26 +78,26 @@ int bin_pwd(int argc, char **argv) {
     }
 
     if (physical) {
-        // In physical mode, resolve symlinks and show physical path
+        /// In physical mode, resolve symlinks and show physical path
         char *physical_path = realpath(".", NULL);
         if (physical_path) {
             printf("%s\n", physical_path);
             free(physical_path);
             return 0;
         }
-        // Fall through to error handling if realpath fails
+        /// Fall through to error handling if realpath fails
     } else {
-        // In logical mode, use PWD from symbol table if available
+        /// In logical mode, use PWD from symbol table if available
         char *pwd_value = symtable_get_global("PWD");
         if (pwd_value) {
             printf("%s\n", pwd_value);
             free(pwd_value);
             return 0;
         }
-        // Fall through to getcwd if PWD not available
+        /// Fall through to getcwd if PWD not available
     }
 
-    // Fallback - use getcwd
+    /// Fallback - use getcwd
     char cwd[MAXLINE] = {'\0'};
     if (getcwd(cwd, MAXLINE) == NULL) {
         int saved_errno = errno;

@@ -50,9 +50,9 @@
  */
 
 typedef struct zstyle_entry {
-    char *pattern; /**< Matching pattern (e.g., ":completion:*:cd:*") */
-    char *style;   /**< Style name (e.g., "menu", "list-colors") */
-    char *value;   /**< Space-joined value as the user supplied it */
+    char *pattern; ///< Matching pattern (e.g., ":completion:*:cd:*")
+    char *style;   ///< Style name (e.g., "menu", "list-colors")
+    char *value;   ///< Space-joined value as the user supplied it
     struct zstyle_entry *next;
 } zstyle_entry_t;
 
@@ -78,24 +78,24 @@ static zstyle_entry_t *find_exact(const char *pattern, const char *style) {
     return NULL;
 }
 
-// Find the recorded entry whose pattern matches the query pattern via
-// fnmatch (i.e., the query pattern is the "context" being looked up).
-// Returns the first match; future enhancement: specificity ranking.
+/// Find the recorded entry whose pattern matches the query pattern via
+/// fnmatch (i.e., the query pattern is the "context" being looked up).
+/// Returns the first match; future enhancement: specificity ranking.
 static zstyle_entry_t *find_matching(const char *query_pattern,
                                      const char *style) {
     if (!query_pattern || !style) {
         return NULL;
     }
-    // Exact match first.
+    /// Exact match first.
     zstyle_entry_t *exact = find_exact(query_pattern, style);
     if (exact) {
         return exact;
     }
-    // Then fnmatch: recorded pattern's wildcards expand against the
-    // query pattern. (Reverse of the conventional zsh lookup, where the
-    // query is a specific context string and recorded patterns match
-    // against it. For corpus purposes both directions cover the same
-    // cases; refining is a future enhancement.)
+    /// Then fnmatch: recorded pattern's wildcards expand against the
+    /// query pattern. (Reverse of the conventional zsh lookup, where the
+    /// query is a specific context string and recorded patterns match
+    /// against it. For corpus purposes both directions cover the same
+    /// cases; refining is a future enhancement.)
     for (zstyle_entry_t *e = g_zstyle_table; e; e = e->next) {
         if (strcmp(e->style, style) != 0) {
             continue;
@@ -108,7 +108,7 @@ static zstyle_entry_t *find_matching(const char *query_pattern,
     return NULL;
 }
 
-// Join argv[start..end) with single spaces.
+/// Join argv[start..end) with single spaces.
 static char *join_args(char **argv, int start, int end) {
     if (start >= end) {
         return strdup("");
@@ -172,7 +172,7 @@ static void detach(zstyle_entry_t *target) {
 
 int bin_zstyle(int argc, char **argv) {
     if (argc < 2) {
-        // Bare zstyle: list everything in re-runnable form.
+        /// Bare zstyle: list everything in re-runnable form.
         for (zstyle_entry_t *e = g_zstyle_table; e; e = e->next) {
             printf("zstyle %s %s %s\n", e->pattern, e->style, e->value);
         }
@@ -181,7 +181,7 @@ int bin_zstyle(int argc, char **argv) {
 
     const char *first = argv[1];
     if (first[0] != '-' || first[1] == '\0') {
-        // Set form: zstyle PATTERN STYLE VALUE...
+        /// Set form: zstyle PATTERN STYLE VALUE...
         if (argc < 4) {
             return 1;
         }
@@ -194,17 +194,17 @@ int bin_zstyle(int argc, char **argv) {
         return 0;
     }
 
-    // Flag forms.
+    /// Flag forms.
     char mode = first[1];
     switch (mode) {
     case 'd':
-        // zstyle -d [PATTERN [STYLE ...]]
+        /// zstyle -d [PATTERN [STYLE ...]]
         if (argc == 2) {
             zstyle_table_reset();
             return 0;
         }
         if (argc == 3) {
-            // Delete every entry with this pattern.
+            /// Delete every entry with this pattern.
             zstyle_entry_t *e = g_zstyle_table;
             while (e) {
                 zstyle_entry_t *next = e->next;
@@ -224,7 +224,7 @@ int bin_zstyle(int argc, char **argv) {
         return 0;
 
     case 'L':
-        // List as re-runnable form, optionally filtered.
+        /// List as re-runnable form, optionally filtered.
         for (zstyle_entry_t *e = g_zstyle_table; e; e = e->next) {
             if (argc >= 3 && strcmp(e->pattern, argv[2]) != 0) {
                 continue;
@@ -237,10 +237,10 @@ int bin_zstyle(int argc, char **argv) {
         return 0;
 
     case 'e':
-        // zstyle -e PATTERN STYLE BODY -- evaluated style. Record the
-        // body verbatim; lush doesn't re-evaluate the body on query
-        // (a future enhancement). Most corpus uses set a constant
-        // value via -e for compatibility with later -t / -s queries.
+        /// zstyle -e PATTERN STYLE BODY -- evaluated style. Record the
+        /// body verbatim; lush doesn't re-evaluate the body on query
+        /// (a future enhancement). Most corpus uses set a constant
+        /// value via -e for compatibility with later -t / -s queries.
         if (argc < 5) {
             return 1;
         }
@@ -248,10 +248,10 @@ int bin_zstyle(int argc, char **argv) {
         return 0;
 
     case 't': {
-        // zstyle -t PATTERN STYLE [VALUE]
-        // Exit 0 if pattern+style is recorded and (value matches OR
-        // recorded value == "true"). Exit 1 if recorded with a
-        // different value. Exit 2 if not recorded.
+        /// zstyle -t PATTERN STYLE [VALUE]
+        /// Exit 0 if pattern+style is recorded and (value matches OR
+        /// recorded value == "true"). Exit 1 if recorded with a
+        /// different value. Exit 2 if not recorded.
         if (argc < 4) {
             return 2;
         }
@@ -266,8 +266,8 @@ int bin_zstyle(int argc, char **argv) {
     }
 
     case 'T': {
-        // zstyle -T PATTERN STYLE
-        // Like -t but treats not-recorded as true (returns 0).
+        /// zstyle -T PATTERN STYLE
+        /// Like -t but treats not-recorded as true (returns 0).
         if (argc < 4) {
             return 2;
         }
@@ -279,9 +279,9 @@ int bin_zstyle(int argc, char **argv) {
     }
 
     case 's': {
-        // zstyle -s PATTERN STYLE VAR [SEP]
-        // Set VAR to the value (joined by SEP if multiple values; we
-        // store the joined form already). Exit 0 if found, 1 if not.
+        /// zstyle -s PATTERN STYLE VAR [SEP]
+        /// Set VAR to the value (joined by SEP if multiple values; we
+        /// store the joined form already). Exit 0 if found, 1 if not.
         if (argc < 5) {
             return 1;
         }
@@ -295,7 +295,7 @@ int bin_zstyle(int argc, char **argv) {
     }
 
     case 'b': {
-        // zstyle -b PATTERN STYLE VAR -- boolean form
+        /// zstyle -b PATTERN STYLE VAR -- boolean form
         if (argc < 5) {
             return 1;
         }
@@ -312,9 +312,9 @@ int bin_zstyle(int argc, char **argv) {
     }
 
     case 'a': {
-        // zstyle -a PATTERN STYLE VAR -- array form. Set VAR to the
-        // joined value; full array-of-words support would need to
-        // route through the array storage. Documented limitation.
+        /// zstyle -a PATTERN STYLE VAR -- array form. Set VAR to the
+        /// joined value; full array-of-words support would need to
+        /// route through the array storage. Documented limitation.
         if (argc < 5) {
             return 1;
         }
@@ -328,8 +328,8 @@ int bin_zstyle(int argc, char **argv) {
     }
 
     case 'g':
-        // zstyle -g VAR PATTERN STYLE -- get the pattern that matched.
-        // Niche; covered minimally for completeness.
+        /// zstyle -g VAR PATTERN STYLE -- get the pattern that matched.
+        /// Niche; covered minimally for completeness.
         if (argc < 5) {
             return 1;
         }
@@ -344,7 +344,7 @@ int bin_zstyle(int argc, char **argv) {
         }
 
     default:
-        // Unknown flag: silent no-op so scripts continue.
+        /// Unknown flag: silent no-op so scripts continue.
         return 0;
     }
 }

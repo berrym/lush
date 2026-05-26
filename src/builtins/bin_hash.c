@@ -9,7 +9,7 @@
 #include "builtins.h"
 #include "ht.h"
 
-// command_hash is owned by src/builtins/builtins.c (registry-side).
+/// command_hash is owned by src/builtins/builtins.c (registry-side).
 extern ht_strstr_t *command_hash;
 
 /**
@@ -27,7 +27,7 @@ extern ht_strstr_t *command_hash;
 int bin_hash(int argc, char **argv) {
     init_command_hash();
 
-    // Handle -r option (forget all remembered locations)
+    /// Handle -r option (forget all remembered locations)
     if (argc == 2 && strcmp(argv[1], "-r") == 0) {
         if (command_hash) {
             ht_strstr_destroy(command_hash);
@@ -37,7 +37,7 @@ int bin_hash(int argc, char **argv) {
         return 0;
     }
 
-    // Handle -t option (print remembered pathname)
+    /// Handle -t option (print remembered pathname)
     if (argc >= 2 && strcmp(argv[1], "-t") == 0) {
         if (argc < 3) {
             executor_error_report(current_executor, SHELL_ERR_MISSING_ARGUMENT,
@@ -62,14 +62,14 @@ int bin_hash(int argc, char **argv) {
         return ret;
     }
 
-    // Handle invalid options
+    /// Handle invalid options
     if (argc >= 2 && argv[1][0] == '-' && strcmp(argv[1], "-r") != 0) {
         executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
                               builtin_get_source_location(), "invalid option");
         return 2;
     }
 
-    // No arguments - display all remembered locations
+    /// No arguments - display all remembered locations
     if (argc == 1) {
         if (!command_hash) {
             return 0;
@@ -88,19 +88,19 @@ int bin_hash(int argc, char **argv) {
         return 0;
     }
 
-    // Arguments provided - find and remember utility locations
+    /// Arguments provided - find and remember utility locations
     for (int i = 1; i < argc; i++) {
         const char *utility = argv[i];
 
-        // Skip if it's a builtin (POSIX requirement)
+        /// Skip if it's a builtin (POSIX requirement)
         if (is_builtin(utility)) {
             continue;
         }
 
-        // Find the utility in PATH
+        /// Find the utility in PATH
         char *path = find_command_in_path(utility);
         if (path) {
-            // Remember this location
+            /// Remember this location
             ht_strstr_insert(command_hash, utility, path);
             free(path);
         } else {

@@ -24,7 +24,7 @@
  * @return 0 on success, 1 on error
  */
 int bin_unsetopt(int argc, char **argv) {
-    // No option specified - list disabled options
+    /// No option specified - list disabled options
     if (argc < 2) {
         printf("Disabled options:\n");
         for (int i = 0; i < (int)FEATURE_COUNT; i++) {
@@ -36,9 +36,9 @@ int bin_unsetopt(int argc, char **argv) {
         return 0;
     }
 
-    // Process each option
+    /// Process each option
     for (int i = 1; i < argc; i++) {
-        // Skip flags
+        /// Skip flags
         if (argv[i][0] == '-') {
             if (strcmp(argv[i], "--") == 0) {
                 continue;
@@ -53,7 +53,7 @@ int bin_unsetopt(int argc, char **argv) {
         bool invert = false;
 
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
-            // Zsh-compat names: silently accepted no-op (see bin_setopt.c).
+            /// Zsh-compat names: silently accepted no-op (see bin_setopt.c).
             if (shell_feature_is_noop_alias(argv[i])) {
                 shell_feature_record_noop_alias_state(argv[i], false);
                 continue;
@@ -73,7 +73,7 @@ int bin_unsetopt(int argc, char **argv) {
             shell_feature_disable(feature);
         }
 
-        // Sync to registry if initialized
+        /// Sync to registry if initialized
         if (config_registry_is_initialized()) {
             char key[CREG_KEY_MAX];
             snprintf(key, sizeof(key), "shell.features.%s",

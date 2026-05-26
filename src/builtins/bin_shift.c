@@ -63,30 +63,30 @@ static int report_shift_overflow(int shift_count, int available) {
  * @return 0 on success, 1 on invalid argument or overshift
  */
 int bin_shift(int argc, char **argv) {
-    int shift_count = 1; // Default shift by 1
+    int shift_count = 1; /// Default shift by 1
 
-    // Parse optional shift count argument
+    /// Parse optional shift count argument
     if (argc > 1) {
         char *endptr;
         shift_count = strtol(argv[1], &endptr, 10);
 
-        // Validate that the argument is a valid number
+        /// Validate that the argument is a valid number
         if (*endptr != '\0' || shift_count < 0) {
             fprintf(stderr, "shift: %s: numeric argument required\n", argv[1]);
             return 1;
         }
     }
 
-    // Check if we're in a function scope
+    /// Check if we're in a function scope
     symtable_manager_t *mgr = symtable_get_global_manager();
     if (mgr && symtable_in_function_scope(mgr)) {
-        // In function scope - shift local positional parameters
+        /// In function scope - shift local positional parameters
         char *argc_str = symtable_get_var(mgr, "#");
         int func_argc = argc_str ? atoi(argc_str) : 0;
         free(argc_str);
 
-        // POSIX leaves overshift unspecified; dash, bash, and zsh all
-        // diagnose and return non-zero. Match the reference shells.
+        /// POSIX leaves overshift unspecified; dash, bash, and zsh all
+        /// diagnose and return non-zero. Match the reference shells.
         if (shift_count > func_argc) {
             return report_shift_overflow(shift_count, func_argc);
         }
@@ -94,7 +94,7 @@ int bin_shift(int argc, char **argv) {
         if (shift_count > 0 && func_argc > 0) {
             int new_argc = func_argc - shift_count;
 
-            // Collect values of parameters that will remain after shift
+            /// Collect values of parameters that will remain after shift
             char **new_values = malloc((new_argc + 1) * sizeof(char *));
             if (!new_values) {
                 return 1;
@@ -108,25 +108,25 @@ int bin_shift(int argc, char **argv) {
             }
             new_values[new_argc] = NULL;
 
-            // Update positional parameters with shifted values
+            /// Update positional parameters with shifted values
             for (int i = 1; i <= func_argc; i++) {
                 char param_name[16];
                 snprintf(param_name, sizeof(param_name), "%d", i);
                 if (i <= new_argc && new_values[i - 1]) {
                     symtable_set_local_var(mgr, param_name, new_values[i - 1]);
                 } else {
-                    // Clear parameters beyond new count
+                    /// Clear parameters beyond new count
                     symtable_set_local_var(mgr, param_name, "");
                 }
             }
 
-            // Free collected values
+            /// Free collected values
             for (int i = 0; i < new_argc; i++) {
                 free(new_values[i]);
             }
             free(new_values);
 
-            // Update $#
+            /// Update $#
             char new_argc_str[16];
             snprintf(new_argc_str, sizeof(new_argc_str), "%d", new_argc);
             symtable_set_local_var(mgr, "#", new_argc_str);
@@ -135,36 +135,36 @@ int bin_shift(int argc, char **argv) {
         return 0;
     }
 
-    // Not in function scope - shift global shell_argv
-    // Calculate available parameters to shift (excluding script name at
-    // argv[0])
+    /// Not in function scope - shift global shell_argv
+    /// Calculate available parameters to shift (excluding script name at
+    /// argv[0])
     int available_params = shell_argc > 1 ? shell_argc - 1 : 0;
 
-    // POSIX leaves overshift unspecified; dash, bash, and zsh all
-    // diagnose and return non-zero. Match the reference shells.
+    /// POSIX leaves overshift unspecified; dash, bash, and zsh all
+    /// diagnose and return non-zero. Match the reference shells.
     if (shift_count > available_params) {
         return report_shift_overflow(shift_count, available_params);
     }
 
-    // Perform the shift by adjusting shell_argc and shell_argv
+    /// Perform the shift by adjusting shell_argc and shell_argv
     if (shift_count > 0 && shell_argc > 1) {
-        // Shift the argv array
+        /// Shift the argv array
         for (int i = 1; i < shell_argc - shift_count; i++) {
             shell_argv[i] = shell_argv[i + shift_count];
         }
 
-        // Update argc to reflect the new parameter count
+        /// Update argc to reflect the new parameter count
         shell_argc -= shift_count;
 
-        // Update shell variables to reflect the new parameter count
-        // Update $# (parameter count)
+        /// Update shell variables to reflect the new parameter count
+        /// Update $# (parameter count)
         char param_count_str[16];
         snprintf(param_count_str, sizeof(param_count_str), "%d",
                  shell_argc > 1 ? shell_argc - 1 : 0);
         symtable_set_global("#", param_count_str);
 
-        // Update individual positional parameters ($1, $2, etc.)
-        // Clear old parameters first
+        /// Update individual positional parameters ($1, $2, etc.)
+        /// Clear old parameters first
         for (int i = 1; i <= 9; i++) {
             char param_name[3];
             snprintf(param_name, sizeof(param_name), "%d", i);

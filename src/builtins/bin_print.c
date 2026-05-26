@@ -83,7 +83,7 @@ int bin_print(int argc, char **argv) {
     while (i < argc) {
         const char *arg = argv[i];
         if (arg[0] != '-' || arg[1] == '\0') {
-            break; // positional, or bare "-"
+            break; /// positional, or bare "-"
         }
         if (strcmp(arg, "--") == 0) {
             i++;

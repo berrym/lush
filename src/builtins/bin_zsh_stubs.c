@@ -38,11 +38,11 @@
 #include <string.h>
 
 int bin_autoload(int argc, char **argv) {
-    // Iterate operands. Skip option flags (-U, -z, -k, -X, -m, +, ...),
-    // which all influence how zsh autoloads but do not change which
-    // names are registered. The lush autoload module always wraps the
-    // file body as `function NAME { ... }` so `-U` (no alias expansion)
-    // and `-z` (zsh syntax) are already implicit.
+    /// Iterate operands. Skip option flags (-U, -z, -k, -X, -m, +, ...),
+    /// which all influence how zsh autoloads but do not change which
+    /// names are registered. The lush autoload module always wraps the
+    /// file body as `function NAME { ... }` so `-U` (no alias expansion)
+    /// and `-z` (zsh syntax) are already implicit.
     int rc = 0;
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
@@ -50,9 +50,9 @@ int bin_autoload(int argc, char **argv) {
             continue;
         }
         if (arg[0] == '-' || arg[0] == '+') {
-            // Option flag; ignore for registration purposes. The `--`
-            // end-of-options marker is handled the same way (its body
-            // is just an empty name, which the empty-check skips).
+            /// Option flag; ignore for registration purposes. The `--`
+            /// end-of-options marker is handled the same way (its body
+            /// is just an empty name, which the empty-check skips).
             continue;
         }
         if (!autoload_register(arg)) {
@@ -64,9 +64,9 @@ int bin_autoload(int argc, char **argv) {
 
 int bin_zmodload(int argc __attribute__((unused)),
                  char **argv __attribute__((unused))) {
-    // zsh module loader. Lush has no module system; the most-used
-    // module bodies (e.g., zsh/complist completion list mode) are
-    // either built-in or supplanted by lush's own subsystems.
+    /// zsh module loader. Lush has no module system; the most-used
+    /// module bodies (e.g., zsh/complist completion list mode) are
+    /// either built-in or supplanted by lush's own subsystems.
     return 0;
 }
 
@@ -92,73 +92,73 @@ int bin_emulate(int argc, char **argv) {
         if (!arg || !*arg) {
             continue;
         }
-        // Skip flags (-L, -R, -LR, -c <cmd>, ...).
+        /// Skip flags (-L, -R, -LR, -c <cmd>, ...).
         if (arg[0] == '-' && arg[1] != '\0') {
-            // -c takes an argument; consume it.
+            /// -c takes an argument; consume it.
             if (strchr(arg, 'c') != NULL && i + 1 < argc) {
                 i++;
             }
             continue;
         }
-        // shell-name operand. Recognised names: zsh / sh / csh / ksh.
-        // Anything else is an error in real zsh; we return 0 to keep
-        // corpus scripts running even if their author wrote a typo.
+        /// shell-name operand. Recognised names: zsh / sh / csh / ksh.
+        /// Anything else is an error in real zsh; we return 0 to keep
+        /// corpus scripts running even if their author wrote a typo.
     }
     return 0;
 }
 
 int bin_complete(int argc __attribute__((unused)),
                  char **argv __attribute__((unused))) {
-    // bash's completion registration builtin. The bash-completion
-    // library registers hundreds of completers via `complete -F func
-    // cmd`; this stub keeps those registrations from emitting
-    // `command not found` while a full record-and-query
-    // implementation (parallel to bindkey / zle in bin_bindkey.c /
-    // bin_zle.c) waits its turn. Real implementation: tracked as a
-    // future fix in CORPUS_PUNCH_LIST.md.
+    /// bash's completion registration builtin. The bash-completion
+    /// library registers hundreds of completers via `complete -F func
+    /// cmd`; this stub keeps those registrations from emitting
+    /// `command not found` while a full record-and-query
+    /// implementation (parallel to bindkey / zle in bin_bindkey.c /
+    /// bin_zle.c) waits its turn. Real implementation: tracked as a
+    /// future fix in CORPUS_PUNCH_LIST.md.
     return 0;
 }
 
 int bin_compgen(int argc __attribute__((unused)),
                 char **argv __attribute__((unused))) {
-    // bash's completion-candidate generator. Used by interactive tab
-    // completion and inside `complete -F` handler bodies. Stub
-    // returns 0 with no candidates; corpus scripts that source the
-    // bash-completion library run cleanly.
+    /// bash's completion-candidate generator. Used by interactive tab
+    /// completion and inside `complete -F` handler bodies. Stub
+    /// returns 0 with no candidates; corpus scripts that source the
+    /// bash-completion library run cleanly.
     return 0;
 }
 
 int bin_compopt(int argc __attribute__((unused)),
                 char **argv __attribute__((unused))) {
-    // bash's per-completion option mutator. Used inside completer
-    // bodies to set/clear options like `nospace` on a specific
-    // completion. No-op stub; the underlying completion behaviour
-    // is supplied by lush's own completion engine.
+    /// bash's per-completion option mutator. Used inside completer
+    /// bodies to set/clear options like `nospace` on a specific
+    /// completion. No-op stub; the underlying completion behaviour
+    /// is supplied by lush's own completion engine.
     return 0;
 }
 
 int bin_compinit(int argc __attribute__((unused)),
                  char **argv __attribute__((unused))) {
-    // zsh's compinit initializes the completion subsystem. Lush has its
-    // own completion engine; the initialization step has no analogue.
-    // Real-world scripts source `compinit` to enable completion before
-    // running -- in lush completion is always ready.
+    /// zsh's compinit initializes the completion subsystem. Lush has its
+    /// own completion engine; the initialization step has no analogue.
+    /// Real-world scripts source `compinit` to enable completion before
+    /// running -- in lush completion is always ready.
     return 0;
 }
 
 int bin_bashcompinit(int argc __attribute__((unused)),
                      char **argv __attribute__((unused))) {
-    // zsh's bashcompinit provides bash-completion compatibility in zsh
-    // by registering complete/compgen/compopt as zsh functions. Lush
-    // already has those as builtin stubs (see complete/compgen/compopt
-    // entries above), so bashcompinit itself is a no-op.
+    /// zsh's bashcompinit provides bash-completion compatibility in zsh
+    /// by registering complete/compgen/compopt as zsh functions. Lush
+    /// already has those as builtin stubs (see complete/compgen/compopt
+    /// entries above), so bashcompinit itself is a no-op.
     return 0;
 }
 
 int bin_unfunction(int argc, char **argv) {
-    // zsh's `unfunction NAME...` removes shell functions. Real
-    // implementation: walks executor->functions and removes each named
-    // entry. Silent on names that don't exist (matches zsh).
+    /// zsh's `unfunction NAME...` removes shell functions. Real
+    /// implementation: walks executor->functions and removes each named
+    /// entry. Silent on names that don't exist (matches zsh).
     if (!current_executor || argc < 2) {
         return 0;
     }
@@ -182,14 +182,14 @@ int bin_unfunction(int argc, char **argv) {
 
 int bin_colors(int argc __attribute__((unused)),
                char **argv __attribute__((unused))) {
-    // zsh's `colors` is a function autoloaded from $fpath that
-    // populates $fg, $bg, $FG, $BG arrays / maps and $reset_color
-    // with ANSI escape sequences. Lush's autoload is itself a stub,
-    // so `colors` is unavailable to scripts that source the zsh
-    // autoload module. Provide a builtin no-op so scripts calling
-    // `colors` to set up the maps do not crash; the maps simply
-    // stay unset and downstream `${fg[red]}` lookups expand to
-    // empty (matching the no-color terminal case rather than a
-    // hard error).
+    /// zsh's `colors` is a function autoloaded from $fpath that
+    /// populates $fg, $bg, $FG, $BG arrays / maps and $reset_color
+    /// with ANSI escape sequences. Lush's autoload is itself a stub,
+    /// so `colors` is unavailable to scripts that source the zsh
+    /// autoload module. Provide a builtin no-op so scripts calling
+    /// `colors` to set up the maps do not crash; the maps simply
+    /// stay unset and downstream `${fg[red]}` lookups expand to
+    /// empty (matching the no-color terminal case rather than a
+    /// hard error).
     return 0;
 }

@@ -35,7 +35,7 @@ int bin_setopt(int argc, char **argv) {
     bool query_mode = false;
     int start_idx = 1;
 
-    // Parse flags
+    /// Parse flags
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
             if (strcmp(argv[i], "-p") == 0) {
@@ -59,7 +59,7 @@ int bin_setopt(int argc, char **argv) {
         }
     }
 
-    // No option specified - list all options
+    /// No option specified - list all options
     if (start_idx >= argc) {
         if (query_mode) {
             executor_error_report(current_executor, SHELL_ERR_MISSING_ARGUMENT,
@@ -83,13 +83,13 @@ int bin_setopt(int argc, char **argv) {
         return 0;
     }
 
-    // Process each option
+    /// Process each option
     for (int i = start_idx; i < argc; i++) {
         shell_feature_t feature;
         bool invert = false;
 
         if (!shell_feature_parse(argv[i], &feature, &invert)) {
-            // Zsh-compat names: silently accepted no-op (see bin_unsetopt.c).
+            /// Zsh-compat names: silently accepted no-op (see bin_unsetopt.c).
             if (shell_feature_is_noop_alias(argv[i])) {
                 shell_feature_record_noop_alias_state(argv[i], true);
                 continue;
@@ -119,7 +119,7 @@ int bin_setopt(int argc, char **argv) {
             shell_feature_disable(feature);
         }
 
-        // Sync to registry if initialized
+        /// Sync to registry if initialized
         if (config_registry_is_initialized()) {
             char key[CREG_KEY_MAX];
             snprintf(key, sizeof(key), "shell.features.%s",

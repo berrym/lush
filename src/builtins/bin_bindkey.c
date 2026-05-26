@@ -59,9 +59,9 @@
  */
 
 typedef struct bindkey_entry {
-    char *keymap;       /**< Keymap name (default "main") */
-    char *key_sequence; /**< Raw key text as given to bindkey */
-    char *action_name;  /**< Action / widget name */
+    char *keymap;       ///< Keymap name (default "main")
+    char *key_sequence; ///< Raw key text as given to bindkey
+    char *action_name;  ///< Action / widget name
     struct bindkey_entry *next;
 } bindkey_entry_t;
 
@@ -145,8 +145,8 @@ static bool try_route_to_lle(const char *key, const char *action) {
     }
     lle_editor_t *editor = lle_get_global_editor();
     if (!editor || !editor->keybinding_manager) {
-        // LLE not active (non-interactive); the side-table record is the
-        // authoritative view here.
+        /// LLE not active (non-interactive); the side-table record is the
+        /// authoritative view here.
         return false;
     }
     lle_result_t result = LLE_ERROR_INVALID_PARAMETER;
@@ -196,11 +196,11 @@ void bindkey_table_reset(void) {
 }
 
 int bin_bindkey(int argc, char **argv) {
-    // Walk args to consume flags first; collect positionals.
-    const char *keymap = NULL; // -M KEYMAP overrides the active keymap
-    bool list_mode = false;    // -L
-    bool delete_mode = false;  // -r / -D KEY (we treat both as remove)
-    bool mode_switch = false;  // -e / -v / -a (emacs / vi-insert / vi-command)
+    /// Walk args to consume flags first; collect positionals.
+    const char *keymap = NULL; /// -M KEYMAP overrides the active keymap
+    bool list_mode = false;    /// -L
+    bool delete_mode = false;  /// -r / -D KEY (we treat both as remove)
+    bool mode_switch = false;  /// -e / -v / -a (emacs / vi-insert / vi-command)
     const char *mode_target = NULL;
     int positional_start = argc;
 
@@ -210,8 +210,8 @@ int bin_bindkey(int argc, char **argv) {
             positional_start = i;
             break;
         }
-        // Treat each `-X` independently rather than as combined flags --
-        // zsh's bindkey doesn't combine.
+        /// Treat each `-X` independently rather than as combined flags --
+        /// zsh's bindkey doesn't combine.
         if (strcmp(a, "-L") == 0 || strcmp(a, "-l") == 0) {
             list_mode = true;
         } else if (strcmp(a, "-M") == 0 && i + 1 < argc) {
@@ -229,11 +229,11 @@ int bin_bindkey(int argc, char **argv) {
             delete_mode = true;
         } else if (strcmp(a, "-A") == 0 || strcmp(a, "-N") == 0 ||
                    strcmp(a, "-d") == 0 || strcmp(a, "-s") == 0) {
-            // Keymap aliasing / creation / reset / string-binding:
-            // recognise the flag and let the remaining args fall
-            // through; the side-table records whatever is provided.
+            /// Keymap aliasing / creation / reset / string-binding:
+            /// recognise the flag and let the remaining args fall
+            /// through; the side-table records whatever is provided.
         } else if (a[0] == '-') {
-            // Unknown flag -- skip and continue.
+            /// Unknown flag -- skip and continue.
         } else {
             positional_start = i;
             break;
@@ -246,7 +246,7 @@ int bin_bindkey(int argc, char **argv) {
 
     if (mode_switch) {
         set_active_keymap(mode_target);
-        // No further work for `bindkey -e` / `-v` / `-a` alone.
+        /// No further work for `bindkey -e` / `-v` / `-a` alone.
         if (positional_start >= argc) {
             return 0;
         }
@@ -255,13 +255,13 @@ int bin_bindkey(int argc, char **argv) {
     int positional_count = argc - positional_start;
     char **positional = argv + positional_start;
 
-    // 0 args -> list active keymap
+    /// 0 args -> list active keymap
     if (positional_count == 0) {
         list_keymap(keymap);
         return 0;
     }
 
-    // 1 arg, delete-mode -> remove binding
+    /// 1 arg, delete-mode -> remove binding
     if (delete_mode && positional_count >= 1) {
         bindkey_entry_t *e = find_binding(keymap, positional[0]);
         if (e) {
@@ -270,7 +270,7 @@ int bin_bindkey(int argc, char **argv) {
         return 0;
     }
 
-    // 1 arg, list-mode -> print this binding (zsh's `bindkey -L KEY`)
+    /// 1 arg, list-mode -> print this binding (zsh's `bindkey -L KEY`)
     if (list_mode && positional_count >= 1) {
         bindkey_entry_t *e = find_binding(keymap, positional[0]);
         if (e) {
@@ -279,7 +279,7 @@ int bin_bindkey(int argc, char **argv) {
         return e ? 0 : 1;
     }
 
-    // 1 arg -> query
+    /// 1 arg -> query
     if (positional_count == 1) {
         bindkey_entry_t *e = find_binding(keymap, positional[0]);
         if (e) {
@@ -289,7 +289,7 @@ int bin_bindkey(int argc, char **argv) {
         return 1;
     }
 
-    // 2 args -> bind
+    /// 2 args -> bind
     if (positional_count >= 2) {
         record_binding(keymap, positional[0], positional[1]);
         try_route_to_lle(positional[0], positional[1]);

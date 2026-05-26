@@ -56,14 +56,14 @@ int bin_display(int argc, char **argv) {
         return 0;
     }
 
-    // NOTE: testsuggestion command was removed in v1.3.0 cleanup.
-    // Legacy autosuggestions system was abandoned. LLE has its own
-    // autosuggestions.
+    /// NOTE: testsuggestion command was removed in v1.3.0 cleanup.
+    /// Legacy autosuggestions system was abandoned. LLE has its own
+    /// autosuggestions.
 
     const char *subcmd = argv[1];
 
     if (strcmp(subcmd, "status") == 0) {
-        // Show display integration status
+        /// Show display integration status
         printf("Display Integration: ACTIVE (Layered display exclusive)\n");
         display_integration_health_t health = display_integration_get_health();
         printf("Health Status: %s\n",
@@ -85,7 +85,7 @@ int bin_display(int argc, char **argv) {
         return 0;
 
     } else if (strcmp(subcmd, "config") == 0) {
-        // Show detailed configuration
+        /// Show detailed configuration
         display_integration_config_t config;
         if (!display_integration_get_config(&config)) {
             executor_error_report(current_executor,
@@ -138,7 +138,7 @@ int bin_display(int argc, char **argv) {
         return 0;
 
     } else if (strcmp(subcmd, "stats") == 0) {
-        // Show performance statistics
+        /// Show performance statistics
         display_integration_stats_t stats;
         if (!display_integration_get_stats(&stats)) {
             executor_error_report(current_executor,
@@ -185,12 +185,12 @@ int bin_display(int argc, char **argv) {
         return 0;
 
     } else if (strcmp(subcmd, "diagnostics") == 0) {
-        // Show detailed diagnostics
+        /// Show detailed diagnostics
         display_integration_print_diagnostics();
         return 0;
 
     } else if (strcmp(subcmd, "test") == 0) {
-        // Test layered display with actual content
+        /// Test layered display with actual content
         printf("Testing layered display system with actual content...\n");
 
         if (!display_integration_is_layered_active()) {
@@ -199,7 +199,7 @@ int bin_display(int argc, char **argv) {
             return 1;
         }
 
-        // Force a redisplay with current content
+        /// Force a redisplay with current content
         printf("Triggering display_integration_redisplay()...\n");
         display_integration_redisplay();
         printf("Display test completed.\n");
@@ -207,7 +207,7 @@ int bin_display(int argc, char **argv) {
         return 0;
 
     } else if (strcmp(subcmd, "performance") == 0) {
-        // Performance monitoring commands
+        /// Performance monitoring commands
         if (argc < 3) {
             printf("Performance Monitoring Commands:\n");
             printf("  display performance init          - Initialize "
@@ -359,10 +359,10 @@ int bin_display(int argc, char **argv) {
             }
 
         } else if (strcmp(perf_cmd, "debug") == 0) {
-            // Debug command to troubleshoot data collection
+            /// Debug command to troubleshoot data collection
             printf("Performance Monitoring Debug Information:\n");
 
-            // Check initialization status
+            /// Check initialization status
             display_perf_metrics_t metrics;
             if (display_integration_perf_monitor_get_metrics(&metrics)) {
                 printf("  Monitoring initialized: YES\n");
@@ -378,7 +378,7 @@ int bin_display(int argc, char **argv) {
                 printf("  Monitoring initialized: NO\n");
             }
 
-            // Check integration stats
+            /// Check integration stats
             display_integration_stats_t stats;
             if (display_integration_get_stats(&stats)) {
                 printf("  Total display calls: %" PRIu64 "\n",
@@ -390,12 +390,12 @@ int bin_display(int argc, char **argv) {
                        display_integration_is_layered_active() ? "YES" : "NO");
             }
 
-            // Force a measurement test
+            /// Force a measurement test
             printf("Triggering test measurements...\n");
-            display_integration_record_display_timing(5000000); // 5ms test
-            display_integration_record_cache_operation(true); // Test cache hit
+            display_integration_record_display_timing(5000000); /// 5ms test
+            display_integration_record_cache_operation(true); /// Test cache hit
             display_integration_record_cache_operation(
-                false); // Test cache miss
+                false); /// Test cache miss
             printf("Test measurements recorded.\n");
 
             return 0;
@@ -435,7 +435,7 @@ int bin_display(int argc, char **argv) {
         }
 
     } else if (strcmp(subcmd, "lle") == 0) {
-        // LLE (Lush Line Editor) control commands
+        /// LLE (Lush Line Editor) control commands
         if (argc < 3) {
             printf("LLE (Lush Line Editor) Commands\n");
             printf("Usage: display lle <command> [options]\n");
@@ -564,7 +564,7 @@ int bin_display(int argc, char **argv) {
         }
 
     } else if (strcmp(subcmd, "help") == 0) {
-        // Show help
+        /// Show help
         printf("Display Integration System\n");
         printf(
             "\nThe display integration system provides coordinated display\n");

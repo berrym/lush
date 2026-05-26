@@ -22,7 +22,7 @@
  */
 int bin_readonly(int argc, char **argv) {
     if (argc == 1) {
-        // No arguments - print all readonly variables
+        /// No arguments - print all readonly variables
         symtable_manager_t *manager = symtable_get_global_manager();
         if (!manager) {
             executor_error_report(current_executor, SHELL_ERR_STATE_CORRUPTION,
@@ -31,23 +31,23 @@ int bin_readonly(int argc, char **argv) {
             return 1;
         }
 
-        // Print readonly variables in the format: readonly name=value
+        /// Print readonly variables in the format: readonly name=value
         printf("readonly functionality not fully implemented for listing\n");
         return 0;
     }
 
-    // Process each argument
+    /// Process each argument
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
-        // Parser-internal array-literal sentinel (\x1F): an argv
-        // element with this prefix came from the unquoted `name=(...)`
-        // form. Per SEMANTICS section 3.4 (no implicit list-to-string
-        // coercion) and section 3.9 (list in a scalar-requiring slot
-        // is a runtime type error), reject rather than silently
-        // join the elements into a string. bash supports readonly
-        // arrays via the `-a` flag; lush will add that surface
-        // alongside; for now the unflagged `readonly arr=(...)` is
-        // a type error rather than a silent scalar coercion.
+        /// Parser-internal array-literal sentinel (\x1F): an argv
+        /// element with this prefix came from the unquoted `name=(...)`
+        /// form. Per SEMANTICS section 3.4 (no implicit list-to-string
+        /// coercion) and section 3.9 (list in a scalar-requiring slot
+        /// is a runtime type error), reject rather than silently
+        /// join the elements into a string. bash supports readonly
+        /// arrays via the `-a` flag; lush will add that surface
+        /// alongside; for now the unflagged `readonly arr=(...)` is
+        /// a type error rather than a silent scalar coercion.
         if (arg[0] == '\x1F') {
             const char *name_start = arg + 1;
             const char *name_end = strchr(name_start, '=');
@@ -85,31 +85,31 @@ int bin_readonly(int argc, char **argv) {
         char *equals = strchr(arg, '=');
 
         if (equals) {
-            // Variable assignment: readonly var=value
+            /// Variable assignment: readonly var=value
             *equals = '\0';
             char *name = arg;
             char *value = equals + 1;
 
-            // Validate variable name
+            /// Validate variable name
             if (!is_valid_identifier(name)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
                                       builtin_get_source_location(),
                                       "'%s' not a valid identifier", name);
-                *equals = '='; // Restore the string
+                *equals = '='; /// Restore the string
                 return 1;
             }
 
-            // Set the variable value
+            /// Set the variable value
             symtable_set_global(name, value);
 
-            // Mark as readonly (note: this is a simplified implementation)
-            // In a full implementation, we would need to track readonly status
-            // and prevent future modifications
+            /// Mark as readonly (note: this is a simplified implementation)
+            /// In a full implementation, we would need to track readonly status
+            /// and prevent future modifications
 
-            *equals = '='; // Restore the string
+            *equals = '='; /// Restore the string
         } else {
-            // No assignment: readonly var (make existing variable readonly)
+            /// No assignment: readonly var (make existing variable readonly)
             if (!is_valid_identifier(arg)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -118,16 +118,16 @@ int bin_readonly(int argc, char **argv) {
                 return 1;
             }
 
-            // Check if variable exists
+            /// Check if variable exists
             char *value = symtable_get_global(arg);
             if (!value) {
-                // Variable doesn't exist, create it with empty value
+                /// Variable doesn't exist, create it with empty value
                 symtable_set_global(arg, "");
             }
 
-            // Mark as readonly (simplified implementation)
-            // Note: Full readonly implementation would require symbol table
-            // modifications to track and enforce readonly status
+            /// Mark as readonly (simplified implementation)
+            /// Note: Full readonly implementation would require symbol table
+            /// modifications to track and enforce readonly status
         }
     }
 

@@ -36,7 +36,7 @@ int bin_echo(int argc, char **argv) {
     bool no_newline = false;
     int arg_start = 1;
 
-    // Parse options
+    /// Parse options
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-e") == 0) {
             interpret_escapes = true;
@@ -48,17 +48,17 @@ int bin_echo(int argc, char **argv) {
             interpret_escapes = false;
             arg_start = i + 1;
         } else if (argv[i][0] == '-') {
-            // Unknown option, treat as argument
+            /// Unknown option, treat as argument
             break;
         } else {
             break;
         }
     }
 
-    // Clear any previous error state on stdout
+    /// Clear any previous error state on stdout
     clearerr(stdout);
 
-    // Print arguments
+    /// Print arguments
     for (int i = arg_start; i < argc; i++) {
         if (i > arg_start) {
             printf(" ");
@@ -81,7 +81,7 @@ int bin_echo(int argc, char **argv) {
         printf("\n");
     }
 
-    // Flush and check for write errors (e.g., writing to closed/invalid fd)
+    /// Flush and check for write errors (e.g., writing to closed/invalid fd)
     if (fflush(stdout) == EOF || ferror(stdout)) {
         shell_error_t *error = shell_error_create(
             SHELL_ERR_IO_ERROR, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,

@@ -22,7 +22,7 @@
  */
 int bin_export(int argc, char **argv) {
     if (argc == 1) {
-        // Print all exported variables
+        /// Print all exported variables
         extern char **environ;
         for (char **env = environ; *env; env++) {
             printf("export %s\n", *env);
@@ -32,17 +32,17 @@ int bin_export(int argc, char **argv) {
 
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
-        // Parser-internal array-literal sentinel (\x1F): an argv
-        // element with this prefix came from the unquoted `name=(...)`
-        // form. The process environment is a key=string map -- list
-        // values cannot be exported. Per SEMANTICS section 3.4 (no
-        // implicit list-to-string coercion) and section 3.9 (list in
-        // a scalar-requiring slot is a runtime type error), reject
-        // with the structured-error type-mismatch rather than
-        // silently joining the elements into a string. bash silently
-        // flattens; lush does not.
+        /// Parser-internal array-literal sentinel (\x1F): an argv
+        /// element with this prefix came from the unquoted `name=(...)`
+        /// form. The process environment is a key=string map -- list
+        /// values cannot be exported. Per SEMANTICS section 3.4 (no
+        /// implicit list-to-string coercion) and section 3.9 (list in
+        /// a scalar-requiring slot is a runtime type error), reject
+        /// with the structured-error type-mismatch rather than
+        /// silently joining the elements into a string. bash silently
+        /// flattens; lush does not.
         if (arg[0] == '\x1F') {
-            // Recover the name for the diagnostic.
+            /// Recover the name for the diagnostic.
             const char *name_start = arg + 1;
             const char *name_end = strchr(name_start, '=');
             size_t nlen =
@@ -80,7 +80,7 @@ int bin_export(int argc, char **argv) {
         }
         char *eq = strchr(arg, '=');
         if (eq) {
-            // Variable assignment: VAR=value
+            /// Variable assignment: VAR=value
             size_t name_len = eq - arg;
             char *name = malloc(name_len + 1);
             if (!name) {
@@ -94,7 +94,7 @@ int bin_export(int argc, char **argv) {
 
             const char *value = eq + 1;
 
-            // Validate variable name
+            /// Validate variable name
             if (!is_valid_identifier(name)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -104,19 +104,19 @@ int bin_export(int argc, char **argv) {
                 return 1;
             }
 
-            // Set variable value using modern API
+            /// Set variable value using modern API
             symtable_set_global(name, value);
 
-            // Export the variable using modern API
+            /// Export the variable using modern API
             symtable_export_global(name);
 
             free(name);
         } else if (i + 2 < argc && strcmp(argv[i + 1], "=") == 0) {
-            // Handle tokenized assignment: VAR = value
+            /// Handle tokenized assignment: VAR = value
             const char *name = argv[i];
             const char *value = argv[i + 2];
 
-            // Validate variable name
+            /// Validate variable name
             if (!is_valid_identifier(name)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -125,16 +125,16 @@ int bin_export(int argc, char **argv) {
                 return 1;
             }
 
-            // Set variable value using modern API
+            /// Set variable value using modern API
             symtable_set_global(name, value);
 
-            // Export the variable using modern API
+            /// Export the variable using modern API
             symtable_export_global(name);
 
-            // Skip the = and value tokens
+            /// Skip the = and value tokens
             i += 2;
         } else {
-            // Just export existing variable
+            /// Just export existing variable
             if (!is_valid_identifier(argv[i])) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -143,13 +143,13 @@ int bin_export(int argc, char **argv) {
                 return 1;
             }
 
-            // Check if variable exists and get its value
+            /// Check if variable exists and get its value
             char *current_value = symtable_get_global(argv[i]);
             if (current_value) {
-                // Variable exists - just export it
+                /// Variable exists - just export it
                 symtable_export_global(argv[i]);
             } else {
-                // Variable doesn't exist - create with empty value and export
+                /// Variable doesn't exist - create with empty value and export
                 symtable_set_global(argv[i], "");
                 symtable_export_global(argv[i]);
             }

@@ -50,8 +50,8 @@
  */
 
 typedef struct zle_widget_entry {
-    char *name; /**< Widget name */
-    char *body; /**< Function name implementing the widget */
+    char *name; ///< Widget name
+    char *body; ///< Function name implementing the widget
     struct zle_widget_entry *next;
 } zle_widget_entry_t;
 
@@ -113,8 +113,8 @@ void zle_widget_table_reset(void) {
 }
 
 int bin_zle(int argc, char **argv) {
-    // Walk args for a recognised mode flag; lush handles one mode at a
-    // time (no flag stacking) which matches zsh's zle.
+    /// Walk args for a recognised mode flag; lush handles one mode at a
+    /// time (no flag stacking) which matches zsh's zle.
     char mode = 0;
     int positional_start = argc;
     for (int i = 1; i < argc; i++) {
@@ -125,12 +125,12 @@ int bin_zle(int argc, char **argv) {
             break;
         }
         if (a[0] != '-') {
-            // No flag seen -- bare `zle WIDGET` invocation form.
+            /// No flag seen -- bare `zle WIDGET` invocation form.
             positional_start = i;
             break;
         }
-        // Longer dash-prefixed args (e.g., `-N` followed by a string
-        // starting with `-`): treat as unrecognised, skip.
+        /// Longer dash-prefixed args (e.g., `-N` followed by a string
+        /// starting with `-`): treat as unrecognised, skip.
     }
 
     int positional_count = argc - positional_start;
@@ -138,7 +138,7 @@ int bin_zle(int argc, char **argv) {
 
     switch (mode) {
     case 'N':
-        // zle -N WIDGET [FUNCTION]
+        /// zle -N WIDGET [FUNCTION]
         if (positional_count < 1) {
             return 1;
         }
@@ -147,7 +147,7 @@ int bin_zle(int argc, char **argv) {
         return 0;
 
     case 'D':
-        // zle -D widget [widget2 ...]
+        /// zle -D widget [widget2 ...]
         for (int i = 0; i < positional_count; i++) {
             zle_widget_entry_t *e = find_widget(positional[i]);
             if (e) {
@@ -157,14 +157,14 @@ int bin_zle(int argc, char **argv) {
         return 0;
 
     case 'A': {
-        // zle -A OLD NEW -- alias NEW to OLD (NEW becomes a widget
-        // whose body is OLD's body).
+        /// zle -A OLD NEW -- alias NEW to OLD (NEW becomes a widget
+        /// whose body is OLD's body).
         if (positional_count < 2) {
             return 1;
         }
         zle_widget_entry_t *src = find_widget(positional[0]);
         if (!src) {
-            // zsh exits non-zero if the source widget doesn't exist.
+            /// zsh exits non-zero if the source widget doesn't exist.
             return 1;
         }
         record_widget(positional[1], src->body);
@@ -173,8 +173,8 @@ int bin_zle(int argc, char **argv) {
 
     case 'l':
     case 'L':
-        // List widgets. -L emits the zsh re-runnable form
-        // (`zle -N name body`); -l emits just the names.
+        /// List widgets. -L emits the zsh re-runnable form
+        /// (`zle -N name body`); -l emits just the names.
         for (zle_widget_entry_t *e = g_zle_table; e; e = e->next) {
             if (mode == 'L') {
                 if (e->body && strcmp(e->body, e->name) != 0) {
@@ -189,13 +189,13 @@ int bin_zle(int argc, char **argv) {
         return 0;
 
     case 0:
-        // No mode flag -- `zle WIDGET` invocation form. Out of scope
-        // for now (non-interactive scripts don't typically invoke
-        // widgets directly). Documented as a known gap.
+        /// No mode flag -- `zle WIDGET` invocation form. Out of scope
+        /// for now (non-interactive scripts don't typically invoke
+        /// widgets directly). Documented as a known gap.
         return 0;
 
     default:
-        // Unknown flag -- silent no-op so scripts continue.
+        /// Unknown flag -- silent no-op so scripts continue.
         return 0;
     }
 }

@@ -18,10 +18,10 @@ static void declare_print_var_callback(const char *key, const char *value,
     (void)userdata;
     if (!key)
         return;
-    // Skip internal variables starting with __
+    /// Skip internal variables starting with __
     if (key[0] == '_' && key[1] == '_')
         return;
-    // Skip if this is actually an array (handled separately)
+    /// Skip if this is actually an array (handled separately)
     if (symtable_is_array(key))
         return;
     printf("declare -- %s=\"%s\"\n", key, value ? value : "");
@@ -71,7 +71,7 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
         printf(")\n");
     } else {
         printf("declare -a %s=(", name);
-        // Print indexed array elements
+        /// Print indexed array elements
         bool first = true;
         for (size_t i = 0; i < array->count; i++) {
             if (array->elements[i]) {
@@ -118,17 +118,17 @@ int bin_declare(int argc, char **argv) {
 
     int opt_idx = 1;
 
-    // Parse options
+    /// Parse options
     while (opt_idx < argc && argv[opt_idx][0] == '-') {
         const char *opt = argv[opt_idx];
 
-        // Handle -- to stop option processing
+        /// Handle -- to stop option processing
         if (strcmp(opt, "--") == 0) {
             opt_idx++;
             break;
         }
 
-        // Process each character in the option string
+        /// Process each character in the option string
         for (int i = 1; opt[i]; i++) {
             switch (opt[i]) {
             case 'a':
@@ -165,19 +165,19 @@ int bin_declare(int argc, char **argv) {
                 opt_trace = true;
                 break;
             case 'H':
-                // zsh: hide variable from `typeset -p` listing. Pure
-                // display attribute; lush's typeset listing path
-                // doesn't enumerate variables anyway, so the no-op
-                // accept produces observably-identical behaviour.
+                /// zsh: hide variable from `typeset -p` listing. Pure
+                /// display attribute; lush's typeset listing path
+                /// doesn't enumerate variables anyway, so the no-op
+                /// accept produces observably-identical behaviour.
                 break;
             case 'U':
-                // zsh: unique-element array attribute. Per-array
-                // dedup is not yet implemented (would need an
-                // attribute on the array storage). Accept silently
-                // for now; declaring an array with -U produces an
-                // ordinary array. Documented limitation: scripts
-                // that depend on automatic dedup will diverge when
-                // duplicates arrive.
+                /// zsh: unique-element array attribute. Per-array
+                /// dedup is not yet implemented (would need an
+                /// attribute on the array storage). Accept silently
+                /// for now; declaring an array with -U produces an
+                /// ordinary array. Documented limitation: scripts
+                /// that depend on automatic dedup will diverge when
+                /// duplicates arrive.
                 break;
             default:
                 executor_error_report(current_executor,
@@ -190,7 +190,7 @@ int bin_declare(int argc, char **argv) {
         opt_idx++;
     }
 
-    // Can't have both -l and -u
+    /// Can't have both -l and -u
     if (opt_lowercase && opt_uppercase) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
@@ -227,7 +227,7 @@ int bin_declare(int argc, char **argv) {
         return 1;
     }
 
-    // Can't have both -a and -A
+    /// Can't have both -a and -A
     if (opt_indexed_array && opt_assoc_array) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
@@ -264,29 +264,29 @@ int bin_declare(int argc, char **argv) {
         return 1;
     }
 
-    // If no variable names provided and -p not specified, just return success
+    /// If no variable names provided and -p not specified, just return success
     if (opt_idx >= argc && !opt_print) {
         return 0;
     }
 
-    // Handle -p (print) option with no arguments - list all variables
+    /// Handle -p (print) option with no arguments - list all variables
     if (opt_print && opt_idx >= argc) {
-        // Print all arrays first
+        /// Print all arrays first
         symtable_enumerate_arrays(declare_print_array_callback, NULL);
-        // Then print all scalar variables
+        /// Then print all scalar variables
         symtable_enumerate_global_vars(declare_print_var_callback, NULL);
         return 0;
     }
 
-    // Process each variable argument
+    /// Process each variable argument
     for (int i = opt_idx; i < argc; i++) {
         char *arg = argv[i];
-        // Parser-internal sentinel: an arg whose first byte is \x1F
-        // came from the unquoted `name=(...)` array-literal form
-        // (see src/parser.c). Strip it; this is implicitly the -a
-        // (indexed array) case unless -A is set. The same value
-        // shape from a quoted scalar `declare data="(...)"` does
-        // NOT carry the sentinel and stays a scalar.
+        /// Parser-internal sentinel: an arg whose first byte is \x1F
+        /// came from the unquoted `name=(...)` array-literal form
+        /// (see src/parser.c). Strip it; this is implicitly the -a
+        /// (indexed array) case unless -A is set. The same value
+        /// shape from a quoted scalar `declare data="(...)"` does
+        /// NOT carry the sentinel and stays a scalar.
         if (arg[0] == '\x1F') {
             arg++;
             if (!opt_indexed_array && !opt_assoc_array) {
@@ -298,7 +298,7 @@ int bin_declare(int argc, char **argv) {
         char *value = NULL;
 
         if (eq) {
-            // Assignment: declare var=value or declare -a arr=(...)
+            /// Assignment: declare var=value or declare -a arr=(...)
             size_t name_len = eq - arg;
             name = malloc(name_len + 1);
             if (!name) {
@@ -311,7 +311,7 @@ int bin_declare(int argc, char **argv) {
             name[name_len] = '\0';
             value = eq + 1;
         } else {
-            // Declaration only: declare var
+            /// Declaration only: declare var
             name = strdup(arg);
             if (!name) {
                 executor_error_report(current_executor, SHELL_ERR_OUT_OF_MEMORY,
@@ -322,7 +322,7 @@ int bin_declare(int argc, char **argv) {
             value = NULL;
         }
 
-        // Validate variable name
+        /// Validate variable name
         if (!name[0] || (!isalpha(name[0]) && name[0] != '_')) {
             executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                                   builtin_get_source_location(),
@@ -341,10 +341,10 @@ int bin_declare(int argc, char **argv) {
             }
         }
 
-        // Handle -p for specific variable
+        /// Handle -p for specific variable
         if (opt_print) {
             symtable_manager_t *manager = symtable_get_global_manager();
-            // Check if it's an array
+            /// Check if it's an array
             array_value_t *arr = symtable_get_array(name);
             if (arr) {
                 if (arr->is_associative) {
@@ -370,7 +370,7 @@ int bin_declare(int argc, char **argv) {
             continue;
         }
 
-        // Handle array declarations
+        /// Handle array declarations
         if (opt_indexed_array || opt_assoc_array) {
             array_value_t *arr = symtable_array_create(opt_assoc_array);
             if (!arr) {
@@ -381,20 +381,20 @@ int bin_declare(int argc, char **argv) {
                 return 1;
             }
 
-            // If value is provided and starts with (, parse as array literal
+            /// If value is provided and starts with (, parse as array literal
             if (value && value[0] == '(') {
-                // Parse array literal (elem1 elem2 ...)
+                /// Parse array literal (elem1 elem2 ...)
                 const char *p = value + 1;
                 int idx = 0;
 
                 while (*p && *p != ')') {
-                    // Skip whitespace
+                    /// Skip whitespace
                     while (*p && isspace(*p))
                         p++;
                     if (*p == ')' || !*p)
                         break;
 
-                    // Find end of element
+                    /// Find end of element
                     const char *elem_start = p;
                     bool in_quote = false;
                     char quote_char = 0;
@@ -416,7 +416,7 @@ int bin_declare(int argc, char **argv) {
                             strncpy(elem, elem_start, elem_len);
                             elem[elem_len] = '\0';
 
-                            // Check for [n]=value syntax
+                            /// Check for [n]=value syntax
                             if (elem[0] == '[') {
                                 char *bracket_end = strchr(elem, ']');
                                 if (bracket_end && bracket_end[1] == '=') {
@@ -434,7 +434,7 @@ int bin_declare(int argc, char **argv) {
                                     }
                                 }
                             } else {
-                                // Regular element
+                                /// Regular element
                                 symtable_array_set_index(arr, idx++, elem);
                             }
                             free(elem);
@@ -452,7 +452,7 @@ int bin_declare(int argc, char **argv) {
                 return 1;
             }
         }
-        // Handle integer declaration
+        /// Handle integer declaration
         else if (opt_integer) {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (!manager) {
@@ -463,14 +463,14 @@ int bin_declare(int argc, char **argv) {
                 free(name);
                 return 1;
             }
-            // For integer variables, evaluate value as arithmetic
+            /// For integer variables, evaluate value as arithmetic
             if (value) {
                 char *result = arithm_expand(value);
                 if (result) {
                     symtable_set(manager, name, result);
                     free(result);
                 } else {
-                    // If arithmetic eval fails, set to 0
+                    /// If arithmetic eval fails, set to 0
                     symtable_set(manager, name, "0");
                 }
             } else {
@@ -484,7 +484,7 @@ int bin_declare(int argc, char **argv) {
             symvar_flags_t flags = symtable_get_flags(manager, name);
             symtable_set_flags(manager, name, flags | SYMVAR_INTEGER_ATTR);
         }
-        // Handle nameref declaration (-n)
+        /// Handle nameref declaration (-n)
         else if (opt_nameref) {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (!manager) {
@@ -546,7 +546,7 @@ int bin_declare(int argc, char **argv) {
                 return 1;
             }
         }
-        // Regular variable declaration
+        /// Regular variable declaration
         else {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (!manager) {
@@ -558,7 +558,7 @@ int bin_declare(int argc, char **argv) {
                 return 1;
             }
 
-            // Apply case transformations if requested
+            /// Apply case transformations if requested
             char *final_value = NULL;
             if (value) {
                 if (opt_lowercase) {
@@ -580,7 +580,7 @@ int bin_declare(int argc, char **argv) {
                 }
             }
 
-            // Build flags
+            /// Build flags
             symvar_flags_t flags = SYMVAR_NONE;
             if (opt_readonly) {
                 flags |= SYMVAR_READONLY;
@@ -603,14 +603,14 @@ int bin_declare(int argc, char **argv) {
 
             if (final_value) {
                 if (opt_global) {
-                    // Use global scope for -g flag
+                    /// Use global scope for -g flag
                     symtable_set_global_var(manager, name, final_value);
                 } else {
                     symtable_set_var(manager, name, final_value, flags);
                 }
                 free(final_value);
             } else {
-                // Just declare without value
+                /// Just declare without value
                 if (opt_global) {
                     symtable_set_global_var(manager, name, "");
                 } else {
@@ -619,7 +619,7 @@ int bin_declare(int argc, char **argv) {
             }
         }
 
-        // Handle export (also set in environment)
+        /// Handle export (also set in environment)
         if (opt_export) {
             symtable_manager_t *manager = symtable_get_global_manager();
             if (manager) {

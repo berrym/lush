@@ -35,11 +35,11 @@ int bin_disown(int argc, char **argv) {
         return 1;
     }
 
-    bool flag_h = false; // Mark no_sighup instead of removing
-    bool flag_a = false; // Apply to all jobs
-    bool flag_r = false; // Apply to running jobs only
+    bool flag_h = false; /// Mark no_sighup instead of removing
+    bool flag_a = false; /// Apply to all jobs
+    bool flag_r = false; /// Apply to running jobs only
 
-    // Parse options
+    /// Parse options
     int optind_local = 1;
     while (optind_local < argc && argv[optind_local][0] == '-' &&
            argv[optind_local][1] != '\0') {
@@ -98,20 +98,20 @@ int bin_disown(int argc, char **argv) {
         optind_local++;
     }
 
-    // -a and -r are mutually exclusive in practice
-    // -a means all, -r means running only
+    /// -a and -r are mutually exclusive in practice
+    /// -a means all, -r means running only
 
     int result = 0;
 
     if (flag_a || flag_r) {
-        // Apply to all jobs (or running jobs if -r)
+        /// Apply to all jobs (or running jobs if -r)
         job_t *job = current_executor->jobs;
         job_t *prev = NULL;
 
         while (job) {
             job_t *next = job->next;
 
-            // Skip non-running jobs if -r flag is set
+            /// Skip non-running jobs if -r flag is set
             if (flag_r && job->state != JOB_RUNNING) {
                 prev = job;
                 job = next;
@@ -119,17 +119,17 @@ int bin_disown(int argc, char **argv) {
             }
 
             if (flag_h) {
-                // Mark job to not receive SIGHUP
+                /// Mark job to not receive SIGHUP
                 job->no_sighup = true;
                 prev = job;
             } else {
-                // Remove job from table
+                /// Remove job from table
                 if (prev) {
                     prev->next = next;
                 } else {
                     current_executor->jobs = next;
                 }
-                // Free job resources
+                /// Free job resources
                 if (job->processes) {
                     process_t *p = job->processes;
                     while (p) {
@@ -141,18 +141,18 @@ int bin_disown(int argc, char **argv) {
                 }
                 free(job->command_line);
                 free(job);
-                // Don't update prev since we removed current
+                /// Don't update prev since we removed current
             }
 
             job = next;
         }
     } else if (optind_local < argc) {
-        // Apply to specified jobspecs
+        /// Apply to specified jobspecs
         for (int i = optind_local; i < argc; i++) {
             const char *jobspec = argv[i];
             int job_id;
 
-            // Parse jobspec (accept %N or just N)
+            /// Parse jobspec (accept %N or just N)
             if (jobspec[0] == '%') {
                 job_id = atoi(jobspec + 1);
             } else {
@@ -184,8 +184,8 @@ int bin_disown(int argc, char **argv) {
             }
         }
     } else {
-        // Apply to current job (most recent background job)
-        // Find the highest job_id (most recent)
+        /// Apply to current job (most recent background job)
+        /// Find the highest job_id (most recent)
         job_t *current_job = NULL;
         int max_id = 0;
         for (job_t *j = current_executor->jobs; j; j = j->next) {

@@ -22,15 +22,15 @@
  * @return 0 on success, 1 on error
  */
 int bin_trap(int argc, char **argv) {
-    // If no arguments, list all traps
+    /// If no arguments, list all traps
     if (argc == 1) {
         list_traps();
         return 0;
     }
 
-    // Handle special options
+    /// Handle special options
     if (argc == 2 && strcmp(argv[1], "-l") == 0) {
-        // List available signals
+        /// List available signals
         printf("EXIT  0) exit from shell\n");
         printf("HUP   1) hangup\n");
         printf("INT   2) interrupt\n");
@@ -41,15 +41,15 @@ int bin_trap(int argc, char **argv) {
         return 0;
     }
 
-    // Parse arguments: trap [-l] [action] [signal ...]
+    /// Parse arguments: trap [-l] [action] [signal ...]
     int arg_index = 1;
 
-    // Skip -l option if present
+    /// Skip -l option if present
     if (argc > 1 && strcmp(argv[1], "-l") == 0) {
         arg_index = 2;
     }
 
-    // Need at least action argument
+    /// Need at least action argument
     if (arg_index >= argc) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
@@ -88,7 +88,7 @@ int bin_trap(int argc, char **argv) {
 
     const char *action = argv[arg_index++];
 
-    // If no signals specified, this is an error
+    /// If no signals specified, this is an error
     if (arg_index >= argc) {
         source_location_t loc = builtin_get_source_location();
         shell_error_t *err =
@@ -125,7 +125,7 @@ int bin_trap(int argc, char **argv) {
         return 1;
     }
 
-    // Process each signal
+    /// Process each signal
     for (int i = arg_index; i < argc; i++) {
         int signal = get_signal_number(argv[i]);
 
@@ -169,20 +169,20 @@ int bin_trap(int argc, char **argv) {
             return 1;
         }
 
-        // Handle special cases
+        /// Handle special cases
         if (strcmp(action, "-") == 0) {
-            // Reset to default
+            /// Reset to default
             remove_trap(signal);
         } else if (strcmp(action, "") == 0 || strcmp(action, "\"\"") == 0) {
-            // Ignore signal
+            /// Ignore signal
             if (signal == 0) {
-                // EXIT trap - remove it
+                /// EXIT trap - remove it
                 remove_trap(signal);
             } else {
                 set_trap(signal, "");
             }
         } else {
-            // Set trap command
+            /// Set trap command
             if (set_trap(signal, action) != 0) {
                 executor_error_report(current_executor, SHELL_ERR_TRAP_ERROR,
                                       builtin_get_source_location(),
