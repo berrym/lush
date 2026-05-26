@@ -833,10 +833,11 @@ static lle_result_t dequote_range_to_nfc(const char *buf, size_t start,
                 continue;
             }
             if (cp == '\\') {
-                /// Look ahead one codepoint; if it's $, `, \, ", consume the
-                /// \ and emit the next char unescaped. Otherwise, emit \
-                /// literally and let the next iteration handle the next
-                /// char. POSIX double-quote behavior.
+                /// Look ahead one codepoint; if it is $, `, backslash, or
+                /// dquote, consume the backslash and emit the next char
+                /// unescaped. Otherwise, emit the backslash literally and
+                /// let the next iteration handle the following char.
+                /// POSIX double-quote behavior.
                 size_t peek_i = i + (size_t)n;
                 uint32_t peek_cp;
                 int peek_n =

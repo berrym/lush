@@ -205,7 +205,7 @@ TEST(pipeline_structure) {
 TEST(if_statement_structure) {
     /// Create an if statement structure:
     ///     IF
-    ///    / | \
+    ///    /-|-+
     /// cond then else
     node_t *if_node = new_node(NODE_IF);
     node_t *condition = new_node(NODE_COMMAND);
@@ -227,7 +227,7 @@ TEST(if_statement_structure) {
 TEST(for_loop_structure) {
     /// Create a for loop structure:
     ///     FOR
-    ///    / | \
+    ///    /-|-+
     /// var list body
     node_t *for_node = new_node(NODE_FOR);
     node_t *var = new_node(NODE_VAR);
@@ -249,7 +249,7 @@ TEST(for_loop_structure) {
 TEST(command_with_redirections) {
     /// Command with redirections:
     ///     COMMAND
-    ///    /   |   \
+    ///    /---|---+
     /// arg1 arg2 redir
     node_t *cmd = new_node(NODE_COMMAND);
     node_t *arg1 = new_node(NODE_VAR);

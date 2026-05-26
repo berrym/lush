@@ -29,6 +29,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/// Forward declare POSIX strcasecmp: the project's own include/strings.h
+/// header (legacy lush utilities) shadows the system <strings.h>, so a
+/// straight #include cannot pull in the BSD declaration.
+extern int strcasecmp(const char *s1, const char *s2);
+
 /** @brief Global shell options instance */
 shell_options_t shell_opts = {0};
 
