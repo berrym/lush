@@ -40,20 +40,20 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-// ============================================================================
-// FORWARD DECLARATIONS (Multiline Support)
-// ============================================================================
+/// ============================================================================
+/// FORWARD DECLARATIONS (Multiline Support)
+/// ============================================================================
 
 /**
  * Represents a single line in a multiline command
  */
 typedef struct {
-    const char *content; // Pointer to start of line content
-    size_t length;       // Length in bytes (not including \n)
-    size_t byte_offset;  // Byte offset from start of command
+    const char *content; /// Pointer to start of line content
+    size_t length;       /// Length in bytes (not including \n)
+    size_t byte_offset;  /// Byte offset from start of command
 } command_line_info_t;
 
-// Forward declarations for multiline composition helpers
+/// Forward declarations for multiline composition helpers
 static size_t split_command_lines(const char *command_text,
                                   command_line_info_t *lines, size_t max_lines);
 
@@ -72,9 +72,9 @@ static composition_engine_error_t translate_cursor_to_screen_position(
     const command_line_info_t *lines, size_t line_count, char (*prompts)[256],
     int terminal_width, size_t *out_line, size_t *out_column);
 
-// ============================================================================
-// INTERNAL HELPER FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// INTERNAL HELPER FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Get current timestamp in nanoseconds
@@ -102,7 +102,7 @@ static void calculate_content_hash(const char *content, char *hash_output,
         return;
     }
 
-    uint32_t hash = 5381; // djb2 hash algorithm
+    uint32_t hash = 5381; /// djb2 hash algorithm
     const char *str = content;
     int c;
 
@@ -132,7 +132,7 @@ static size_t count_lines(const char *text) {
         ptr++;
     }
 
-    // If text ends with newline, don't count the empty line after it
+    /// If text ends with newline, don't count the empty line after it
     if (ptr > text && *(ptr - 1) == '\n') {
         lines--;
     }
@@ -155,7 +155,7 @@ static size_t get_last_line_width(const char *text) {
     size_t width = 0;
     while (*last_line) {
         if (*last_line == '\033') {
-            // Skip ANSI escape sequences
+            /// Skip ANSI escape sequences
             while (*last_line && *last_line != 'm') {
                 last_line++;
             }
@@ -194,7 +194,7 @@ static bool is_ascii_art_prompt(const char *text) {
     if (line_count < 2)
         return false;
 
-    // Look for common ASCII art characters
+    /// Look for common ASCII art characters
     const char *art_chars = "┌┐└┘├┤┬┴┼─│╭╮╰╯╠╣╦╩╬═║/\\()[]{}";
 
     size_t art_char_count = 0;
@@ -209,8 +209,8 @@ static bool is_ascii_art_prompt(const char *text) {
         }
     }
 
-    // If more than 30% of non-whitespace chars are ASCII art chars, likely
-    // ASCII art
+    /// If more than 30% of non-whitespace chars are ASCII art chars, likely
+    /// ASCII art
     return total_chars > 0 && (art_char_count * 100 / total_chars) > 30;
 }
 
@@ -275,7 +275,7 @@ get_lru_cache_entry(composition_engine_t *engine) {
     for (size_t i = 1; i < COMPOSITION_ENGINE_CACHE_SIZE; i++) {
         composition_cache_entry_t *entry = &engine->cache[i];
         if (!entry->valid) {
-            return entry; // Use invalid entry first
+            return entry; /// Use invalid entry first
         }
 
         if (entry->timestamp.tv_sec < oldest_time.tv_sec ||
@@ -310,9 +310,9 @@ static bool is_cache_entry_expired(const composition_engine_t *engine,
     return entry_age_ms > engine->max_cache_age_ms;
 }
 
-// ============================================================================
-// PROMPT ANALYSIS FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// PROMPT ANALYSIS FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Analyze prompt structure non-invasively
@@ -331,14 +331,14 @@ analyze_prompt_structure(composition_engine_t *engine,
 
     memset(analysis, 0, sizeof(composition_analysis_t));
 
-    // Basic line and width analysis
+    /// Basic line and width analysis
     analysis->line_count = count_lines(prompt_content);
     analysis->last_line_length = get_last_line_width(prompt_content);
     analysis->has_ansi_sequences = contains_ansi_sequences(prompt_content);
     analysis->is_multiline = analysis->line_count > 1;
     analysis->is_ascii_art = is_ascii_art_prompt(prompt_content);
 
-    // Find maximum line width
+    /// Find maximum line width
     analysis->max_line_width = 0;
     const char *line_start = prompt_content;
     const char *ptr = prompt_content;
@@ -354,20 +354,20 @@ analyze_prompt_structure(composition_engine_t *engine,
         ptr++;
     }
 
-    // Determine cursor position (end of last line)
+    /// Determine cursor position (end of last line)
     analysis->cursor_line = analysis->line_count - 1;
     analysis->cursor_column = analysis->last_line_length;
 
-    // Check if prompt ends with space
+    /// Check if prompt ends with space
     size_t content_len = strlen(prompt_content);
     analysis->has_trailing_space =
         content_len > 0 && (prompt_content[content_len - 1] == ' ' ||
                             prompt_content[content_len - 1] == '\t');
 
-    // Store last line content for analysis
+    /// Store last line content for analysis
     const char *last_line_start = strrchr(prompt_content, '\n');
     if (last_line_start) {
-        last_line_start++; // Skip the newline
+        last_line_start++; /// Skip the newline
     } else {
         last_line_start = prompt_content;
     }
@@ -376,7 +376,7 @@ analyze_prompt_structure(composition_engine_t *engine,
             sizeof(analysis->last_line_content) - 1);
     analysis->last_line_content[sizeof(analysis->last_line_content) - 1] = '\0';
 
-    // Recommend composition strategy
+    /// Recommend composition strategy
     if (analysis->is_ascii_art) {
         analysis->recommended_strategy = COMPOSITION_STRATEGY_ASCII_ART;
     } else if (analysis->is_multiline) {
@@ -391,9 +391,9 @@ analyze_prompt_structure(composition_engine_t *engine,
     return COMPOSITION_ENGINE_SUCCESS;
 }
 
-// ============================================================================
-// POSITIONING CALCULATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// POSITIONING CALCULATION FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Calculate optimal positioning for command layer
@@ -412,29 +412,29 @@ calculate_optimal_positioning(composition_engine_t *engine,
 
     memset(positioning, 0, sizeof(composition_positioning_t));
 
-    // Basic positioning setup
+    /// Basic positioning setup
     positioning->prompt_start_line = 0;
     positioning->prompt_end_line = analysis->line_count - 1;
 
-    // Determine command positioning based on prompt structure
+    /// Determine command positioning based on prompt structure
     if (analysis->is_multiline || analysis->is_ascii_art) {
-        // For multi-line or ASCII art prompts, place command on next line
+        /// For multi-line or ASCII art prompts, place command on next line
         positioning->command_on_same_line = false;
         positioning->command_start_line = analysis->line_count;
         positioning->command_start_column = 0;
     } else {
-        // For single-line prompts, place command on same line
+        /// For single-line prompts, place command on same line
         positioning->command_on_same_line = true;
         positioning->command_start_line = analysis->line_count - 1;
         positioning->command_start_column = analysis->last_line_length;
 
-        // Add space if prompt doesn't end with one
+        /// Add space if prompt doesn't end with one
         if (!analysis->has_trailing_space) {
-            positioning->command_start_column++; // Account for space we'll add
+            positioning->command_start_column++; /// Account for space we'll add
         }
     }
 
-    // Calculate total dimensions
+    /// Calculate total dimensions
     if (positioning->command_on_same_line) {
         positioning->total_lines = analysis->line_count;
         positioning->total_width = positioning->command_start_column;
@@ -443,7 +443,7 @@ calculate_optimal_positioning(composition_engine_t *engine,
         positioning->total_width = analysis->max_line_width;
     }
 
-    // Determine if cursor positioning is needed
+    /// Determine if cursor positioning is needed
     positioning->needs_cursor_positioning = analysis->is_multiline ||
                                             analysis->is_ascii_art ||
                                             analysis->has_ansi_sequences;
@@ -451,9 +451,9 @@ calculate_optimal_positioning(composition_engine_t *engine,
     return COMPOSITION_ENGINE_SUCCESS;
 }
 
-// ============================================================================
-// COMPOSITION ALGORITHMS
-// ============================================================================
+/// ============================================================================
+/// COMPOSITION ALGORITHMS
+/// ============================================================================
 
 /**
  * @brief Compose layers using simple strategy for single-line prompts
@@ -477,7 +477,7 @@ compose_simple_strategy(composition_engine_t *engine,
 
     size_t written = 0;
 
-    // Add prompt content
+    /// Add prompt content
     size_t prompt_len = strlen(prompt_content);
     if (written + prompt_len >= output_size) {
         return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
@@ -486,14 +486,14 @@ compose_simple_strategy(composition_engine_t *engine,
     strcpy(output + written, prompt_content);
     written += prompt_len;
 
-    // Add space if needed
+    /// Add space if needed
     if (!positioning->command_on_same_line) {
         if (written + 1 >= output_size) {
             return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
         }
         output[written++] = '\n';
     } else {
-        // Check if we need to add a space
+        /// Check if we need to add a space
         if (prompt_len > 0 && prompt_content[prompt_len - 1] != ' ') {
             if (written + 1 >= output_size) {
                 return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
@@ -502,7 +502,7 @@ compose_simple_strategy(composition_engine_t *engine,
         }
     }
 
-    // Add command content
+    /// Add command content
     size_t command_len = strlen(command_content);
     if (written + command_len >= output_size) {
         return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
@@ -511,7 +511,7 @@ compose_simple_strategy(composition_engine_t *engine,
     strcpy(output + written, command_content);
     written += command_len;
 
-    // Null terminate
+    /// Null terminate
     if (written >= output_size) {
         return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
     }
@@ -541,7 +541,7 @@ static composition_engine_error_t compose_multiline_strategy(
 
     size_t written = 0;
 
-    // Add prompt content exactly as-is
+    /// Add prompt content exactly as-is
     size_t prompt_len = strlen(prompt_content);
     if (written + prompt_len >= output_size) {
         return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
@@ -550,9 +550,9 @@ static composition_engine_error_t compose_multiline_strategy(
     strcpy(output + written, prompt_content);
     written += prompt_len;
 
-    // For multiline prompts, command goes on the line after prompt
+    /// For multiline prompts, command goes on the line after prompt
     if (positioning->command_on_same_line) {
-        // Add space if prompt doesn't end with one
+        /// Add space if prompt doesn't end with one
         if (prompt_len > 0 && prompt_content[prompt_len - 1] != ' ') {
             if (written + 1 >= output_size) {
                 return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
@@ -560,7 +560,7 @@ static composition_engine_error_t compose_multiline_strategy(
             output[written++] = ' ';
         }
     } else {
-        // Add newline if prompt doesn't end with one
+        /// Add newline if prompt doesn't end with one
         if (prompt_len == 0 || prompt_content[prompt_len - 1] != '\n') {
             if (written + 1 >= output_size) {
                 return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
@@ -569,7 +569,7 @@ static composition_engine_error_t compose_multiline_strategy(
         }
     }
 
-    // Add command content
+    /// Add command content
     size_t command_len = strlen(command_content);
     if (written + command_len >= output_size) {
         return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
@@ -578,7 +578,7 @@ static composition_engine_error_t compose_multiline_strategy(
     strcpy(output + written, command_content);
     written += command_len;
 
-    // Null terminate
+    /// Null terminate
     if (written >= output_size) {
         return COMPOSITION_ENGINE_ERROR_BUFFER_TOO_SMALL;
     }
@@ -608,13 +608,13 @@ compose_layers(composition_engine_t *engine, const char *prompt_content,
 
     composition_engine_error_t result;
 
-    // Determine strategy to use
+    /// Determine strategy to use
     composition_strategy_t strategy = engine->current_strategy;
     if (strategy == COMPOSITION_STRATEGY_ADAPTIVE) {
         strategy = analysis->recommended_strategy;
     }
 
-    // Allocate output buffer if needed
+    /// Allocate output buffer if needed
     if (!engine->composed_output) {
         engine->composed_output = malloc(COMPOSITION_ENGINE_MAX_OUTPUT_SIZE);
         if (!engine->composed_output) {
@@ -623,7 +623,7 @@ compose_layers(composition_engine_t *engine, const char *prompt_content,
         engine->composed_output_size = COMPOSITION_ENGINE_MAX_OUTPUT_SIZE;
     }
 
-    // Apply composition strategy
+    /// Apply composition strategy
     switch (strategy) {
     case COMPOSITION_STRATEGY_SIMPLE:
         result = compose_simple_strategy(
@@ -647,9 +647,9 @@ compose_layers(composition_engine_t *engine, const char *prompt_content,
     return result;
 }
 
-// ============================================================================
-// CACHE MANAGEMENT FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CACHE MANAGEMENT FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Store composition result in cache for future reuse
@@ -673,17 +673,17 @@ store_in_cache(composition_engine_t *engine, const char *prompt_hash,
         return COMPOSITION_ENGINE_ERROR_CACHE_INVALID;
     }
 
-    // Clear existing entry
+    /// Clear existing entry
     clear_cache_entry(entry);
 
-    // Store new entry
+    /// Store new entry
     snprintf(entry->prompt_hash, sizeof(entry->prompt_hash), "%s", prompt_hash);
     snprintf(entry->command_hash, sizeof(entry->command_hash), "%s",
              command_hash);
     entry->cached_analysis = *analysis;
     entry->cached_positioning = *positioning;
 
-    // Store composed output
+    /// Store composed output
     if (engine->composed_output) {
         size_t output_len = strlen(engine->composed_output);
         entry->cached_output = malloc(output_len + 1);
@@ -698,9 +698,9 @@ store_in_cache(composition_engine_t *engine, const char *prompt_hash,
     return COMPOSITION_ENGINE_SUCCESS;
 }
 
-// ============================================================================
-// EVENT HANDLING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// EVENT HANDLING FUNCTIONS
+/// ============================================================================
 
 /**
  * Handle layer content changed event
@@ -712,15 +712,15 @@ composition_engine_handle_content_changed(const layer_event_t *event,
     if (!engine || !event)
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
 
-    // Invalidate cache when content changes
+    /// Invalidate cache when content changes
     engine->composition_cache_valid = false;
 
-    // Update performance metrics
+    /// Update performance metrics
     if (engine->performance_monitoring) {
         engine->performance.cache_misses++;
     }
 
-    // Enhanced Performance Monitoring: Record cache miss
+    /// Enhanced Performance Monitoring: Record cache miss
     display_integration_record_layer_cache_operation("composition_engine",
                                                      false);
 
@@ -737,7 +737,7 @@ composition_engine_handle_theme_changed(const layer_event_t *event,
     if (!engine || !event)
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
 
-    // Clear cache on theme changes
+    /// Clear cache on theme changes
     composition_engine_clear_cache(engine);
     engine->composition_cache_valid = false;
 
@@ -754,16 +754,16 @@ composition_engine_handle_terminal_resize(const layer_event_t *event,
     if (!engine || !event)
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
 
-    // Clear cache on terminal resize
+    /// Clear cache on terminal resize
     composition_engine_clear_cache(engine);
     engine->composition_cache_valid = false;
 
     return LAYER_EVENTS_SUCCESS;
 }
 
-// ============================================================================
-// CORE API IMPLEMENTATION
-// ============================================================================
+/// ============================================================================
+/// CORE API IMPLEMENTATION
+/// ============================================================================
 
 composition_engine_t *composition_engine_create(void) {
     composition_engine_t *engine = calloc(1, sizeof(composition_engine_t));
@@ -771,14 +771,14 @@ composition_engine_t *composition_engine_create(void) {
         return NULL;
     }
 
-    // Initialize default configuration
+    /// Initialize default configuration
     engine->intelligent_positioning = true;
     engine->adaptive_strategy = true;
     engine->performance_monitoring = true;
     engine->max_cache_age_ms = COMPOSITION_ENGINE_CACHE_EXPIRY_MS;
     engine->current_strategy = COMPOSITION_STRATEGY_ADAPTIVE;
 
-    // Initialize version string
+    /// Initialize version string
     snprintf(engine->version_string, sizeof(engine->version_string), "%d.%d.%d",
              COMPOSITION_ENGINE_VERSION_MAJOR, COMPOSITION_ENGINE_VERSION_MINOR,
              COMPOSITION_ENGINE_VERSION_PATCH);
@@ -793,16 +793,16 @@ composition_engine_error_t composition_engine_init(
         return COMPOSITION_ENGINE_ERROR_INVALID_PARAM;
     }
 
-    // Store layer references
+    /// Store layer references
     engine->prompt_layer = prompt_layer;
     engine->command_layer = command_layer;
     engine->event_system = event_system;
 
-    // Continuation prompts are handled via screen_buffer line prefixes
-    // in display_controller.c using screen_buffer_render_with_continuation()
+    /// Continuation prompts are handled via screen_buffer line prefixes
+    /// in display_controller.c using screen_buffer_render_with_continuation()
     engine->continuation_prompts_enabled = false;
 
-    // Subscribe to relevant events
+    /// Subscribe to relevant events
     if (engine->event_system) {
         layer_events_subscribe(
             engine->event_system, LAYER_EVENT_CONTENT_CHANGED,
@@ -827,7 +827,7 @@ composition_engine_error_t composition_engine_init(
         engine->event_subscription_active = true;
     }
 
-    // Initialize performance metrics
+    /// Initialize performance metrics
     memset(&engine->performance, 0, sizeof(engine->performance));
     engine->performance.min_composition_time_ns = UINT64_MAX;
 
@@ -844,7 +844,7 @@ composition_engine_compose(composition_engine_t *engine) {
     uint64_t start_time = get_timestamp_ns();
     composition_engine_error_t result = COMPOSITION_ENGINE_SUCCESS;
 
-    // Get current prompt content
+    /// Get current prompt content
     char prompt_content[PROMPT_LAYER_MAX_CONTENT_SIZE];
     prompt_layer_error_t prompt_error = prompt_layer_get_rendered_content(
         engine->prompt_layer, prompt_content, sizeof(prompt_content));
@@ -852,7 +852,7 @@ composition_engine_compose(composition_engine_t *engine) {
         return COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY;
     }
 
-    // Get current command content
+    /// Get current command content
     char command_content[COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE];
     command_layer_error_t command_error = command_layer_get_highlighted_text(
         engine->command_layer, command_content, sizeof(command_content));
@@ -860,18 +860,18 @@ composition_engine_compose(composition_engine_t *engine) {
         return COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY;
     }
 
-    // Calculate content hashes for caching
+    /// Calculate content hashes for caching
     char prompt_hash[32], command_hash[32];
     calculate_content_hash(prompt_content, prompt_hash, sizeof(prompt_hash));
     calculate_content_hash(command_content, command_hash, sizeof(command_hash));
 
-    // Check cache first
+    /// Check cache first
     composition_cache_entry_t *cached =
         find_cache_entry(engine, prompt_hash, command_hash);
     if (cached && !is_cache_entry_expired(engine, cached)) {
-        // Use cached result
+        /// Use cached result
         if (cached->cached_output) {
-            // Ensure we have a buffer (allocate if needed)
+            /// Ensure we have a buffer (allocate if needed)
             if (!engine->composed_output) {
                 engine->composed_output =
                     malloc(COMPOSITION_ENGINE_MAX_OUTPUT_SIZE);
@@ -882,7 +882,7 @@ composition_engine_compose(composition_engine_t *engine) {
                     COMPOSITION_ENGINE_MAX_OUTPUT_SIZE;
             }
 
-            // Copy cached output into existing buffer (don't shrink buffer!)
+            /// Copy cached output into existing buffer (don't shrink buffer!)
             size_t output_len = strlen(cached->cached_output);
             if (output_len < engine->composed_output_size) {
                 strcpy(engine->composed_output, cached->cached_output);
@@ -899,42 +899,42 @@ composition_engine_compose(composition_engine_t *engine) {
             engine->performance.composition_count++;
         }
 
-        // Enhanced Performance Monitoring: Record cache hit
+        /// Enhanced Performance Monitoring: Record cache hit
         display_integration_record_layer_cache_operation("composition_engine",
                                                          true);
 
         return COMPOSITION_ENGINE_SUCCESS;
     }
 
-    // Cache miss - perform composition
+    /// Cache miss - perform composition
     if (engine->performance_monitoring) {
         engine->performance.cache_misses++;
     }
 
-    // Enhanced Performance Monitoring: Record cache miss
+    /// Enhanced Performance Monitoring: Record cache miss
     display_integration_record_layer_cache_operation("composition_engine",
                                                      false);
 
-    // ========================================================================
-    // PHASE 4: MULTILINE DETECTION AND PATH SELECTION
-    // ========================================================================
+    /// ========================================================================
+    /// PHASE 4: MULTILINE DETECTION AND PATH SELECTION
+    /// ========================================================================
 
-    // Detect if command contains newlines (multiline command)
+    /// Detect if command contains newlines (multiline command)
     bool is_multiline = strchr(command_content, '\n') != NULL;
 
-    // Check if we should use the multiline path
+    /// Check if we should use the multiline path
     bool use_multiline_path = is_multiline &&
                               engine->continuation_prompts_enabled &&
                               engine->screen_buffer != NULL;
 
     if (use_multiline_path) {
-        // ====================================================================
-        // MULTILINE PATH: Use continuation prompts with screen_buffer
-        // ====================================================================
+        /// ====================================================================
+        /// MULTILINE PATH: Use continuation prompts with screen_buffer
+        /// ====================================================================
 
         uint64_t composition_start = get_timestamp_ns();
 
-        // Allocate output buffer if needed
+        /// Allocate output buffer if needed
         if (!engine->composed_output) {
             engine->composed_output =
                 malloc(COMPOSITION_ENGINE_MAX_OUTPUT_SIZE);
@@ -944,19 +944,19 @@ composition_engine_compose(composition_engine_t *engine) {
             engine->composed_output_size = COMPOSITION_ENGINE_MAX_OUTPUT_SIZE;
         }
 
-// Split command into lines
+/// Split command into lines
 #define MAX_COMMAND_LINES 100
         command_line_info_t lines[MAX_COMMAND_LINES];
         size_t line_count =
             split_command_lines(command_content, lines, MAX_COMMAND_LINES);
 
         if (line_count == 0) {
-            // Empty command - use regular path
+            /// Empty command - use regular path
             use_multiline_path = false;
             goto regular_composition_path;
         }
 
-        // Build continuation prompts for all lines
+        /// Build continuation prompts for all lines
         char prompts[MAX_COMMAND_LINES][256];
         result =
             build_continuation_prompts(engine, prompt_content, command_content,
@@ -966,7 +966,7 @@ composition_engine_compose(composition_engine_t *engine) {
             return result;
         }
 
-        // Coordinate with screen_buffer to render
+        /// Coordinate with screen_buffer to render
         result = coordinate_screen_buffer_rendering(
             engine, lines, line_count, prompts, engine->composed_output,
             engine->composed_output_size);
@@ -981,25 +981,25 @@ composition_engine_compose(composition_engine_t *engine) {
                 composition_end - composition_start;
         }
 
-        // Update analysis to reflect multiline composition
+        /// Update analysis to reflect multiline composition
         memset(&engine->current_analysis, 0, sizeof(engine->current_analysis));
         engine->current_analysis.is_multiline = true;
         engine->current_analysis.line_count = line_count;
 
-        // Update positioning to reflect multiline layout
+        /// Update positioning to reflect multiline layout
         memset(&engine->current_positioning, 0,
                sizeof(engine->current_positioning));
         engine->current_positioning.total_lines = line_count;
         engine->current_positioning.command_on_same_line = false;
 
     } else {
-        // ====================================================================
-        // REGULAR PATH: Single-line or continuation prompts disabled
-        // ====================================================================
+        /// ====================================================================
+        /// REGULAR PATH: Single-line or continuation prompts disabled
+        /// ====================================================================
 
     regular_composition_path:;
 
-        // Analyze prompt structure
+        /// Analyze prompt structure
         uint64_t analysis_start = get_timestamp_ns();
         result = analyze_prompt_structure(engine, prompt_content,
                                           &engine->current_analysis);
@@ -1013,14 +1013,14 @@ composition_engine_compose(composition_engine_t *engine) {
                 analysis_end - analysis_start;
         }
 
-        // Calculate optimal positioning
+        /// Calculate optimal positioning
         result = calculate_optimal_positioning(
             engine, &engine->current_analysis, &engine->current_positioning);
         if (result != COMPOSITION_ENGINE_SUCCESS) {
             return result;
         }
 
-        // Perform layer composition
+        /// Perform layer composition
         uint64_t composition_start = get_timestamp_ns();
         result = compose_layers(engine, prompt_content, command_content,
                                 &engine->current_analysis,
@@ -1036,11 +1036,11 @@ composition_engine_compose(composition_engine_t *engine) {
         }
     }
 
-    // Store in cache
+    /// Store in cache
     store_in_cache(engine, prompt_hash, command_hash, &engine->current_analysis,
                    &engine->current_positioning);
 
-    // Update performance metrics
+    /// Update performance metrics
     if (engine->performance_monitoring) {
         uint64_t total_time = get_timestamp_ns() - start_time;
 
@@ -1051,14 +1051,14 @@ composition_engine_compose(composition_engine_t *engine) {
             engine->performance.min_composition_time_ns = total_time;
             engine->performance.max_composition_time_ns = total_time;
         } else {
-            // Update average
+            /// Update average
             engine->performance.avg_composition_time_ns =
                 (engine->performance.avg_composition_time_ns *
                      (engine->performance.composition_count - 1) +
                  total_time) /
                 engine->performance.composition_count;
 
-            // Update min/max
+            /// Update min/max
             if (total_time < engine->performance.min_composition_time_ns) {
                 engine->performance.min_composition_time_ns = total_time;
             }
@@ -1067,7 +1067,7 @@ composition_engine_compose(composition_engine_t *engine) {
             }
         }
 
-        // Update cache hit rate
+        /// Update cache hit rate
         if (engine->performance.composition_count > 0) {
             engine->performance.cache_hit_rate =
                 (double)engine->performance.cache_hits * 100.0 /
@@ -1157,25 +1157,25 @@ composition_engine_cleanup(composition_engine_t *engine) {
         return COMPOSITION_ENGINE_ERROR_INVALID_PARAM;
     }
 
-    // Unsubscribe from events
+    /// Unsubscribe from events
     if (engine->event_subscription_active && engine->event_system) {
-        // Unsubscribe from all events - need to implement proper cleanup
-        // layer_events_unsubscribe_all(engine->event_system,
-        // LAYER_ID_COMPOSITION_ENGINE);
+        /// Unsubscribe from all events - need to implement proper cleanup
+        /// layer_events_unsubscribe_all(engine->event_system,
+        /// LAYER_ID_COMPOSITION_ENGINE);
         engine->event_subscription_active = false;
     }
 
-    // Clear cache
+    /// Clear cache
     composition_engine_clear_cache(engine);
 
-    // Free composed output
+    /// Free composed output
     if (engine->composed_output) {
         free(engine->composed_output);
         engine->composed_output = NULL;
         engine->composed_output_size = 0;
     }
 
-    // Free owned layers - composition engine takes ownership after init
+    /// Free owned layers - composition engine takes ownership after init
     if (engine->command_layer) {
         command_layer_cleanup(engine->command_layer);
         command_layer_destroy(engine->command_layer);
@@ -1188,7 +1188,7 @@ composition_engine_cleanup(composition_engine_t *engine) {
         engine->prompt_layer = NULL;
     }
 
-    // Reset state
+    /// Reset state
     memset(&engine->current_analysis, 0, sizeof(engine->current_analysis));
     memset(&engine->current_positioning, 0,
            sizeof(engine->current_positioning));
@@ -1209,9 +1209,9 @@ void composition_engine_destroy(composition_engine_t *engine) {
     free(engine);
 }
 
-// ============================================================================
-// CONFIGURATION AND CONTROL FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION AND CONTROL FUNCTIONS
+/// ============================================================================
 
 composition_engine_error_t
 composition_engine_set_strategy(composition_engine_t *engine,
@@ -1225,7 +1225,7 @@ composition_engine_set_strategy(composition_engine_t *engine,
     }
 
     engine->current_strategy = strategy;
-    engine->composition_cache_valid = false; // Invalidate cache
+    engine->composition_cache_valid = false; /// Invalidate cache
 
     return COMPOSITION_ENGINE_SUCCESS;
 }
@@ -1238,7 +1238,7 @@ composition_engine_set_intelligent_positioning(composition_engine_t *engine,
     }
 
     engine->intelligent_positioning = enable;
-    engine->composition_cache_valid = false; // Invalidate cache
+    engine->composition_cache_valid = false; /// Invalidate cache
 
     return COMPOSITION_ENGINE_SUCCESS;
 }
@@ -1252,7 +1252,7 @@ composition_engine_set_performance_monitoring(composition_engine_t *engine,
 
     engine->performance_monitoring = enable;
 
-    // Reset performance metrics if disabling
+    /// Reset performance metrics if disabling
     if (!enable) {
         memset(&engine->performance, 0, sizeof(engine->performance));
         engine->performance.min_composition_time_ns = UINT64_MAX;
@@ -1288,9 +1288,9 @@ composition_engine_clear_cache(composition_engine_t *engine) {
     return COMPOSITION_ENGINE_SUCCESS;
 }
 
-// ============================================================================
-// ANALYSIS AND DEBUGGING FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// ANALYSIS AND DEBUGGING FUNCTIONS
+/// ============================================================================
 
 composition_engine_error_t
 composition_engine_analyze_prompt(composition_engine_t *engine,
@@ -1303,7 +1303,7 @@ composition_engine_analyze_prompt(composition_engine_t *engine,
         return COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED;
     }
 
-    // Get current prompt content
+    /// Get current prompt content
     char prompt_content[PROMPT_LAYER_MAX_CONTENT_SIZE];
     prompt_layer_error_t prompt_error = prompt_layer_get_rendered_content(
         engine->prompt_layer, prompt_content, sizeof(prompt_content));
@@ -1384,9 +1384,9 @@ bool composition_engine_is_initialized(const composition_engine_t *engine) {
     return engine && engine->initialized;
 }
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 const char *composition_engine_error_string(composition_engine_error_t error) {
     switch (error) {
@@ -1448,7 +1448,7 @@ composition_engine_calculate_hash(const composition_engine_t *engine,
         return COMPOSITION_ENGINE_ERROR_NOT_INITIALIZED;
     }
 
-    // Get current content
+    /// Get current content
     char prompt_content[PROMPT_LAYER_MAX_CONTENT_SIZE];
     char command_content[COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE];
 
@@ -1464,7 +1464,7 @@ composition_engine_calculate_hash(const composition_engine_t *engine,
         return COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY;
     }
 
-    // Combine content and calculate hash
+    /// Combine content and calculate hash
     char combined_content[PROMPT_LAYER_MAX_CONTENT_SIZE +
                           COMMAND_LAYER_MAX_HIGHLIGHTED_SIZE + 16];
     snprintf(combined_content, sizeof(combined_content), "%s|%s",
@@ -1475,9 +1475,9 @@ composition_engine_calculate_hash(const composition_engine_t *engine,
     return COMPOSITION_ENGINE_SUCCESS;
 }
 
-// ============================================================================
-// CURSOR TRACKING IMPLEMENTATION (For LLE Terminal Control Wrapping)
-// ============================================================================
+/// ============================================================================
+/// CURSOR TRACKING IMPLEMENTATION (For LLE Terminal Control Wrapping)
+/// ============================================================================
 
 /**
  * @brief Calculate visual width of a text string, stripping ANSI escape
@@ -1497,7 +1497,7 @@ static size_t calculate_visual_width(const char *text) {
     bool in_escape = false;
 
     for (const char *p = text; *p; p++) {
-        // Skip GNU Readline prompt markers (irrelevant for LLE)
+        /// Skip GNU Readline prompt markers (irrelevant for LLE)
         if (*p == '\001' || *p == '\002') {
             continue;
         }
@@ -1508,7 +1508,7 @@ static size_t calculate_visual_width(const char *text) {
         }
 
         if (in_escape) {
-            // Skip until we find the end of the escape sequence
+            /// Skip until we find the end of the escape sequence
             if (*p == 'm' || *p == 'K' || *p == 'J' || *p == 'H' || *p == 'A' ||
                 *p == 'B' || *p == 'C' || *p == 'D' || *p == 'G' || *p == 'f' ||
                 *p == 's' || *p == 'u') {
@@ -1517,9 +1517,9 @@ static size_t calculate_visual_width(const char *text) {
             continue;
         }
 
-        // Count visible characters
-        // TODO: Proper UTF-8 width calculation (for now assume 1 column per
-        // char)
+        /// Count visible characters
+        /// TODO: Proper UTF-8 width calculation (for now assume 1 column per
+        /// char)
         visual_len++;
     }
 
@@ -1545,23 +1545,23 @@ composition_engine_error_t composition_engine_compose_with_cursor(
     }
 
     if (terminal_width <= 0) {
-        terminal_width = 80; // Fallback to standard width
+        terminal_width = 80; /// Fallback to standard width
     }
 
-    // First, perform normal composition to get the composed output
+    /// First, perform normal composition to get the composed output
     composition_engine_error_t comp_result = composition_engine_compose(engine);
     if (comp_result != COMPOSITION_ENGINE_SUCCESS) {
         return comp_result;
     }
 
-    // Get the composed output
+    /// Get the composed output
     comp_result = composition_engine_get_output(
         engine, result->composed_output, sizeof(result->composed_output));
     if (comp_result != COMPOSITION_ENGINE_SUCCESS) {
         return comp_result;
     }
 
-    // Get prompt content to calculate its visual width
+    /// Get prompt content to calculate its visual width
     char prompt_content[PROMPT_LAYER_MAX_CONTENT_SIZE];
     prompt_layer_error_t prompt_error = prompt_layer_get_rendered_content(
         engine->prompt_layer, prompt_content, sizeof(prompt_content));
@@ -1569,75 +1569,75 @@ composition_engine_error_t composition_engine_compose_with_cursor(
         return COMPOSITION_ENGINE_ERROR_LAYER_NOT_READY;
     }
 
-    // Calculate prompt visual width (strip ANSI codes)
+    /// Calculate prompt visual width (strip ANSI codes)
     size_t prompt_width = calculate_visual_width(prompt_content);
 
-    // Get command text for cursor tracking
+    /// Get command text for cursor tracking
     const char *cmd = engine->command_layer->command_text;
     if (!cmd) {
         cmd = "";
     }
     size_t cmd_len = strlen(cmd);
 
-    // Initialize cursor tracking
-    int x = prompt_width; // Start after prompt
+    /// Initialize cursor tracking
+    int x = prompt_width; /// Start after prompt
     int y = 0;
     size_t bytes_processed = 0;
     result->cursor_found = false;
     result->terminal_width = terminal_width;
 
-    // Walk through command buffer character by character
+    /// Walk through command buffer character by character
     for (size_t i = 0; i < cmd_len;) {
-        // Check if cursor is at this position BEFORE processing the character
-        // cursor_byte_offset represents the position before the character at
-        // that offset
+        /// Check if cursor is at this position BEFORE processing the character
+        /// cursor_byte_offset represents the position before the character at
+        /// that offset
         if (bytes_processed == cursor_byte_offset && !result->cursor_found) {
             result->cursor_screen_row = y;
             result->cursor_screen_column = x;
             result->cursor_found = true;
         }
 
-        // Determine character type and visual width
+        /// Determine character type and visual width
         int char_width = 0;
         int bytes_consumed = 1;
 
         if (cmd[i] == '\t') {
-            // Tab character - expand to next multiple of 8
+            /// Tab character - expand to next multiple of 8
             char_width = 8 - (x % 8);
         } else if ((cmd[i] & 0x80) == 0) {
-            // ASCII character (single byte, width 1)
+            /// ASCII character (single byte, width 1)
             char_width = 1;
         } else {
-            // Multi-byte UTF-8 character
-            // Detect byte count
+            /// Multi-byte UTF-8 character
+            /// Detect byte count
             if ((cmd[i] & 0xE0) == 0xC0) {
-                bytes_consumed = 2; // 2-byte UTF-8
+                bytes_consumed = 2; /// 2-byte UTF-8
             } else if ((cmd[i] & 0xF0) == 0xE0) {
-                bytes_consumed = 3; // 3-byte UTF-8
+                bytes_consumed = 3; /// 3-byte UTF-8
             } else if ((cmd[i] & 0xF8) == 0xF0) {
-                bytes_consumed = 4; // 4-byte UTF-8
+                bytes_consumed = 4; /// 4-byte UTF-8
             }
 
-            // For now, assume width 1 (proper wide char detection would check
-            // Unicode range)
-            // TODO: Implement proper wcwidth() for CJK characters (width 2)
+            /// For now, assume width 1 (proper wide char detection would check
+            /// Unicode range)
+            /// TODO: Implement proper wcwidth() for CJK characters (width 2)
             char_width = 1;
         }
 
-        // Advance cursor position
+        /// Advance cursor position
         x += char_width;
 
-        // Handle line wrapping
+        /// Handle line wrapping
         if (x >= terminal_width) {
             x = 0;
             y++;
         }
 
-        // Advance through buffer
+        /// Advance through buffer
         i += bytes_consumed;
         bytes_processed += bytes_consumed;
 
-        // Check AGAIN after advancing - cursor might be after this character
+        /// Check AGAIN after advancing - cursor might be after this character
         if (bytes_processed == cursor_byte_offset && !result->cursor_found) {
             result->cursor_screen_row = y;
             result->cursor_screen_column = x;
@@ -1645,15 +1645,15 @@ composition_engine_error_t composition_engine_compose_with_cursor(
         }
     }
 
-    // If cursor is at end of buffer and not found yet (redundant with check
-    // above, but kept for safety)
+    /// If cursor is at end of buffer and not found yet (redundant with check
+    /// above, but kept for safety)
     if (bytes_processed == cursor_byte_offset && !result->cursor_found) {
         result->cursor_screen_row = y;
         result->cursor_screen_column = x;
         result->cursor_found = true;
     }
 
-    // If cursor position exceeds buffer, place at end
+    /// If cursor position exceeds buffer, place at end
     if (!result->cursor_found) {
         result->cursor_screen_row = y;
         result->cursor_screen_column = x;
@@ -1675,9 +1675,9 @@ composition_engine_set_screen_buffer(composition_engine_t *engine,
     return COMPOSITION_ENGINE_SUCCESS;
 }
 
-// ============================================================================
-// MULTILINE COMPOSITION HELPERS
-// ============================================================================
+/// ============================================================================
+/// MULTILINE COMPOSITION HELPERS
+/// ============================================================================
 
 /**
  * @brief Split command content by newlines into line info structures
@@ -1707,13 +1707,13 @@ static size_t split_command_lines(const char *command_text,
 
     while (*ptr && line_count < max_lines) {
         if (*ptr == '\n') {
-            // Found end of line
+            /// Found end of line
             lines[line_count].content = line_start;
             lines[line_count].length = ptr - line_start;
             lines[line_count].byte_offset = byte_offset;
             line_count++;
 
-            // Move to next line
+            /// Move to next line
             ptr++;
             line_start = ptr;
             byte_offset = ptr - command_text;
@@ -1722,7 +1722,7 @@ static size_t split_command_lines(const char *command_text,
         }
     }
 
-    // Handle last line (without trailing \n)
+    /// Handle last line (without trailing \n)
     if (line_count < max_lines && (line_start < ptr || *line_start != '\0')) {
         lines[line_count].content = line_start;
         lines[line_count].length = ptr - line_start;
@@ -1755,14 +1755,14 @@ build_continuation_prompts(composition_engine_t *engine,
                            const char *primary_prompt, const char *command_text,
                            const command_line_info_t *lines, size_t line_count,
                            char (*prompts)[256], size_t prompt_size) {
-    (void)command_text; // Used by display_controller callback instead
-    (void)lines;        // Used by display_controller callback instead
+    (void)command_text; /// Used by display_controller callback instead
+    (void)lines;        /// Used by display_controller callback instead
 
     if (!engine || !primary_prompt || !prompts || line_count == 0) {
         return COMPOSITION_ENGINE_ERROR_INVALID_PARAM;
     }
 
-    // Line 0: Use primary prompt
+    /// Line 0: Use primary prompt
     strncpy(prompts[0], primary_prompt, prompt_size - 1);
     prompts[0][prompt_size - 1] = '\0';
 
@@ -1804,7 +1804,7 @@ static composition_engine_error_t coordinate_screen_buffer_rendering(
 
     screen_buffer_t *sb = engine->screen_buffer;
 
-    // Set prefix for each line
+    /// Set prefix for each line
     for (size_t i = 0; i < line_count; i++) {
         bool result = screen_buffer_set_line_prefix(sb, (int)i, prompts[i]);
         if (!result) {
@@ -1812,11 +1812,11 @@ static composition_engine_error_t coordinate_screen_buffer_rendering(
         }
     }
 
-    // Render all lines with prefixes
+    /// Render all lines with prefixes
     bool render_result = screen_buffer_render_multiline_with_prefixes(
         sb,
-        0,               // start_line
-        (int)line_count, // num_lines
+        0,               /// start_line
+        (int)line_count, /// num_lines
         output, output_size);
 
     if (!render_result) {
@@ -1861,17 +1861,17 @@ static composition_engine_error_t translate_cursor_to_screen_position(
     }
 
     if (terminal_width <= 0) {
-        terminal_width = 80; // Fallback
+        terminal_width = 80; /// Fallback
     }
 
-    // Find which line the cursor is on
+    /// Find which line the cursor is on
     size_t cursor_line = 0;
     size_t cursor_offset_in_line = cursor_byte_offset;
 
     for (size_t i = 0; i < line_count; i++) {
         size_t line_end_offset = lines[i].byte_offset + lines[i].length;
 
-        // Check if cursor is on this line
+        /// Check if cursor is on this line
         if (cursor_byte_offset >= lines[i].byte_offset &&
             cursor_byte_offset <= line_end_offset) {
             cursor_line = i;
@@ -1879,27 +1879,27 @@ static composition_engine_error_t translate_cursor_to_screen_position(
             break;
         }
 
-        // If cursor is at the newline after this line
+        /// If cursor is at the newline after this line
         if (i + 1 < line_count &&
             cursor_byte_offset == lines[i + 1].byte_offset - 1) {
             cursor_line = i;
-            cursor_offset_in_line = lines[i].length; // At end of line
+            cursor_offset_in_line = lines[i].length; /// At end of line
             break;
         }
     }
 
-    // If cursor is beyond all lines, place at end
+    /// If cursor is beyond all lines, place at end
     if (cursor_line >= line_count) {
         cursor_line = line_count - 1;
         cursor_offset_in_line = lines[cursor_line].length;
     }
 
-    // Calculate visual width of prompt for this line (strip ANSI codes)
+    /// Calculate visual width of prompt for this line (strip ANSI codes)
     size_t prompt_width =
         screen_buffer_calculate_visual_width(prompts[cursor_line], 0);
 
-    // Walk through the line content character by character
-    size_t column = prompt_width; // Start after prompt
+    /// Walk through the line content character by character
+    size_t column = prompt_width; /// Start after prompt
     size_t bytes_processed = 0;
     const char *line_text = lines[cursor_line].content;
 
@@ -1907,15 +1907,15 @@ static composition_engine_error_t translate_cursor_to_screen_position(
            bytes_processed < lines[cursor_line].length) {
         unsigned char ch = line_text[bytes_processed];
 
-        // Determine character width
+        /// Determine character width
         int char_width = 0;
         int bytes_consumed = 1;
 
         if (ch == '\t') {
-            // Tab character - expand to next multiple of 8
+            /// Tab character - expand to next multiple of 8
             char_width = 8 - (column % 8);
         } else if (ch == '\033') {
-            // ANSI escape sequence - skip without adding width
+            /// ANSI escape sequence - skip without adding width
             bytes_consumed = 1;
             while (bytes_processed + bytes_consumed <
                    lines[cursor_line].length) {
@@ -1929,23 +1929,24 @@ static composition_engine_error_t translate_cursor_to_screen_position(
                     break;
                 }
             }
-            char_width = 0; // ANSI codes have no visual width
+            char_width = 0; /// ANSI codes have no visual width
         } else if ((ch & 0x80) == 0) {
-            // ASCII character (single byte, width 1)
+            /// ASCII character (single byte, width 1)
             char_width = 1;
         } else {
-            // Multi-byte UTF-8 character
+            /// Multi-byte UTF-8 character
             if ((ch & 0xE0) == 0xC0) {
-                bytes_consumed = 2; // 2-byte UTF-8
+                bytes_consumed = 2; /// 2-byte UTF-8
             } else if ((ch & 0xF0) == 0xE0) {
-                bytes_consumed = 3; // 3-byte UTF-8
+                bytes_consumed = 3; /// 3-byte UTF-8
             } else if ((ch & 0xF8) == 0xF0) {
-                bytes_consumed = 4; // 4-byte UTF-8
+                bytes_consumed = 4; /// 4-byte UTF-8
             }
 
-            // For now, assume width 1 (proper wcwidth() would check Unicode
-            // range)
-            // TODO: Implement proper wide character detection for CJK (width 2)
+            /// For now, assume width 1 (proper wcwidth() would check Unicode
+            /// range)
+            /// TODO: Implement proper wide character detection for CJK (width
+            /// 2)
             char_width = 1;
         }
 

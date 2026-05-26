@@ -27,9 +27,9 @@
 #include <string.h>
 #include <unistd.h>
 
-// ============================================================================
-// INITIALIZATION AND CLEANUP
-// ============================================================================
+/// ============================================================================
+/// INITIALIZATION AND CLEANUP
+/// ============================================================================
 
 void screen_buffer_init(screen_buffer_t *buffer, int terminal_width) {
     if (!buffer)
@@ -43,20 +43,20 @@ void screen_buffer_init(screen_buffer_t *buffer, int terminal_width) {
     buffer->command_start_row = 0;
     buffer->command_start_col = 0;
 
-    // Initialize menu/overlay tracking fields
+    /// Initialize menu/overlay tracking fields
     buffer->menu_lines = 0;
     buffer->ghost_text_lines = 0;
     buffer->total_display_rows = 0;
     buffer->command_end_row = 0;
     buffer->command_end_col = 0;
 
-    // Initialize RPROMPT fields
+    /// Initialize RPROMPT fields
     buffer->rprompt_text[0] = '\0';
     buffer->rprompt_visual_width = 0;
     buffer->rprompt_fits = false;
     buffer->rprompt_col = 0;
 
-    // Initialize all prefix pointers to NULL
+    /// Initialize all prefix pointers to NULL
     for (int i = 0; i < SCREEN_BUFFER_MAX_ROWS; i++) {
         buffer->lines[i].prefix = NULL;
         buffer->lines[i].prefix_dirty = false;
@@ -71,24 +71,24 @@ void screen_buffer_clear(screen_buffer_t *buffer) {
         buffer->lines[i].length = 0;
         buffer->lines[i].dirty = false;
 
-        // Zero all cells (important for UTF-8 structure with padding)
+        /// Zero all cells (important for UTF-8 structure with padding)
         memset(buffer->lines[i].cells, 0, sizeof(buffer->lines[i].cells));
 
-        // Note: We do NOT free prefixes here - they persist across clears
-        // Use screen_buffer_clear_line_prefix() to explicitly remove prefixes
+        /// Note: We do NOT free prefixes here - they persist across clears
+        /// Use screen_buffer_clear_line_prefix() to explicitly remove prefixes
     }
     buffer->num_rows = 0;
     buffer->cursor_row = 0;
     buffer->cursor_col = 0;
 
-    // Reset menu/overlay tracking fields
+    /// Reset menu/overlay tracking fields
     buffer->menu_lines = 0;
     buffer->ghost_text_lines = 0;
     buffer->total_display_rows = 0;
     buffer->command_end_row = 0;
     buffer->command_end_col = 0;
 
-    // Reset RPROMPT fields
+    /// Reset RPROMPT fields
     buffer->rprompt_text[0] = '\0';
     buffer->rprompt_visual_width = 0;
     buffer->rprompt_fits = false;
@@ -99,12 +99,12 @@ void screen_buffer_cleanup(screen_buffer_t *buffer) {
     if (!buffer)
         return;
 
-    // Free all line prefixes
+    /// Free all line prefixes
     for (int i = 0; i < SCREEN_BUFFER_MAX_ROWS; i++) {
         screen_buffer_clear_line_prefix(buffer, i);
     }
 
-    // Clear the buffer
+    /// Clear the buffer
     screen_buffer_clear(buffer);
 }
 
@@ -114,9 +114,9 @@ void screen_buffer_copy(screen_buffer_t *dest, const screen_buffer_t *src) {
     memcpy(dest, src, sizeof(screen_buffer_t));
 }
 
-// ============================================================================
-// TEXT WIDTH CALCULATION
-// ============================================================================
+/// ============================================================================
+/// TEXT WIDTH CALCULATION
+/// ============================================================================
 
 void screen_buffer_set_rprompt(screen_buffer_t *buffer,
                                const char *rprompt_text) {
@@ -124,7 +124,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
         return;
     }
 
-    // Clear RPROMPT state
+    /// Clear RPROMPT state
     buffer->rprompt_text[0] = '\0';
     buffer->rprompt_visual_width = 0;
     buffer->rprompt_fits = false;
@@ -134,7 +134,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
         return;
     }
 
-    // Copy RPROMPT text (truncate if necessary)
+    /// Copy RPROMPT text (truncate if necessary)
     size_t len = strlen(rprompt_text);
     if (len >= sizeof(buffer->rprompt_text)) {
         len = sizeof(buffer->rprompt_text) - 1;
@@ -142,7 +142,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
     memcpy(buffer->rprompt_text, rprompt_text, len);
     buffer->rprompt_text[len] = '\0';
 
-    // Calculate visual width (excludes ANSI escape codes)
+    /// Calculate visual width (excludes ANSI escape codes)
     buffer->rprompt_visual_width =
         (int)screen_buffer_visual_width(rprompt_text, strlen(rprompt_text));
 
@@ -162,7 +162,7 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
      */
     int rightmost_col = buffer->command_start_col;
     if (buffer->command_end_row == buffer->command_start_row) {
-        // Command hasn't wrapped — use the actual end of typed text
+        /// Command hasn't wrapped — use the actual end of typed text
         rightmost_col = buffer->command_end_col;
     }
 
@@ -185,7 +185,7 @@ size_t screen_buffer_visual_width(const char *text, size_t byte_length) {
     while (i < byte_length && text[i]) {
         unsigned char ch = (unsigned char)text[i];
 
-        // Handle ANSI escape sequences (they take 0 columns)
+        /// Handle ANSI escape sequences (they take 0 columns)
         if (ch == '\033' || ch == '\x1b') {
             in_escape = true;
             i++;
@@ -194,7 +194,7 @@ size_t screen_buffer_visual_width(const char *text, size_t byte_length) {
 
         if (in_escape) {
             i++;
-            // Check for escape sequence terminator
+            /// Check for escape sequence terminator
             if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
                 ch == 'm' || ch == 'H' || ch == 'J' || ch == 'K' || ch == 'G') {
                 in_escape = false;
@@ -202,31 +202,31 @@ size_t screen_buffer_visual_width(const char *text, size_t byte_length) {
             continue;
         }
 
-        // Skip readline markers \001 and \002
+        /// Skip readline markers \001 and \002
         if (ch == '\001' || ch == '\002') {
             i++;
             continue;
         }
 
-        // Handle UTF-8 multi-byte sequences
+        /// Handle UTF-8 multi-byte sequences
         if ((ch & 0x80) == 0) {
-            // ASCII: 1 byte, 1 column
+            /// ASCII: 1 byte, 1 column
             visual_width++;
             i++;
         } else if ((ch & 0xE0) == 0xC0) {
-            // 2-byte UTF-8
+            /// 2-byte UTF-8
             visual_width++;
             i += 2;
         } else if ((ch & 0xF0) == 0xE0) {
-            // 3-byte UTF-8
+            /// 3-byte UTF-8
             visual_width++;
             i += 3;
         } else if ((ch & 0xF8) == 0xF0) {
-            // 4-byte UTF-8
+            /// 4-byte UTF-8
             visual_width++;
             i += 4;
         } else {
-            // Invalid UTF-8, skip
+            /// Invalid UTF-8, skip
             i++;
         }
     }
@@ -234,9 +234,9 @@ size_t screen_buffer_visual_width(const char *text, size_t byte_length) {
     return visual_width;
 }
 
-// ============================================================================
-// RENDERING
-// ============================================================================
+/// ============================================================================
+/// RENDERING
+/// ============================================================================
 
 /**
  * @brief Write a UTF-8 character to screen buffer at current position
@@ -261,14 +261,14 @@ static void write_char_to_buffer(screen_buffer_t *buffer,
     if (byte_len < 1 || byte_len > 4)
         return;
 
-    // Check if we need to wrap to next line
+    /// Check if we need to wrap to next line
     if (*col >= buffer->terminal_width) {
         (*row)++;
         *col = 0;
 
-        // Ensure we have enough rows
+        /// Ensure we have enough rows
         if (*row >= SCREEN_BUFFER_MAX_ROWS) {
-            return; // Can't write beyond buffer
+            return; /// Can't write beyond buffer
         }
 
         if (*row >= buffer->num_rows) {
@@ -276,14 +276,14 @@ static void write_char_to_buffer(screen_buffer_t *buffer,
         }
     }
 
-    // Write UTF-8 sequence to buffer
+    /// Write UTF-8 sequence to buffer
     screen_cell_t *cell = &buffer->lines[*row].cells[*col];
     memcpy(cell->utf8_bytes, utf8_bytes, byte_len);
     cell->byte_len = (uint8_t)byte_len;
     cell->visual_width = (uint8_t)visual_width;
     cell->is_prompt = is_prompt;
 
-    // Zero out unused bytes for cleanliness and deterministic comparison
+    /// Zero out unused bytes for cleanliness and deterministic comparison
     for (int i = byte_len; i < 4; i++) {
         cell->utf8_bytes[i] = '\0';
     }
@@ -300,14 +300,14 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
     if (!buffer)
         return;
 
-    // Clear buffer
+    /// Clear buffer
     screen_buffer_clear(buffer);
 
     int row = 0;
     int col = 0;
     bool cursor_set = false;
 
-    // Render prompt - calculate visual width (excluding ANSI codes)
+    /// Render prompt - calculate visual width (excluding ANSI codes)
     if (prompt_text) {
         size_t i = 0;
         size_t text_len = strlen(prompt_text);
@@ -316,7 +316,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
         while (i < text_len) {
             unsigned char ch = (unsigned char)prompt_text[i];
 
-            // Handle readline markers \001 and \002
+            /// Handle readline markers \001 and \002
             if (ch == '\001') {
                 in_readline_marker = true;
                 i++;
@@ -332,7 +332,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 continue;
             }
 
-            // Handle ANSI escape sequences (skip without advancing position)
+            /// Handle ANSI escape sequences (skip without advancing position)
             if (ch == '\033' || ch == '\x1b') {
                 i++;
                 if (i < text_len && prompt_text[i] == '[') {
@@ -349,7 +349,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 continue;
             }
 
-            // Handle newlines in multi-line prompts
+            /// Handle newlines in multi-line prompts
             if (ch == '\n') {
                 row++;
                 col = 0;
@@ -360,14 +360,14 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 continue;
             }
 
-            // Handle carriage returns (move to start of line without newline)
+            /// Handle carriage returns (move to start of line without newline)
             if (ch == '\r') {
                 col = 0;
                 i++;
                 continue;
             }
 
-            // Handle tabs
+            /// Handle tabs
             if (ch == '\t') {
                 int tw = config.tab_width > 0 ? config.tab_width : 4;
                 size_t tab_width = tw - (col % tw);
@@ -383,7 +383,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 continue;
             }
 
-            // Decode UTF-8 codepoint for proper width calculation
+            /// Decode UTF-8 codepoint for proper width calculation
             uint32_t codepoint;
             int bytes = lle_utf8_decode_codepoint(prompt_text + i, text_len - i,
                                                   &codepoint);
@@ -391,16 +391,16 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
             if (bytes > 0 && codepoint >= 32) {
                 int visual_width = lle_utf8_codepoint_width(codepoint);
                 if (visual_width > 0) {
-                    // Store full UTF-8 sequence
+                    /// Store full UTF-8 sequence
                     write_char_to_buffer(buffer, prompt_text + i, bytes,
                                          visual_width, true, &row, &col);
 
-                    // For wide characters (width=2), we store the character in
-                    // one cell but it occupies 2 columns visually, so advance
-                    // col by 1 more
+                    /// For wide characters (width=2), we store the character in
+                    /// one cell but it occupies 2 columns visually, so advance
+                    /// col by 1 more
                     if (visual_width == 2) {
                         col++;
-                        // Handle wrapping for wide characters at boundary
+                        /// Handle wrapping for wide characters at boundary
                         if (col >= buffer->terminal_width) {
                             row++;
                             col = 0;
@@ -417,19 +417,19 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
         }
     }
 
-    // Save position where command starts (this is where cursor save happens)
+    /// Save position where command starts (this is where cursor save happens)
     buffer->command_start_row = row;
     buffer->command_start_col = col;
 
-    // Render command text using same approach as display_bridge.c
+    /// Render command text using same approach as display_bridge.c
     if (command_text) {
         size_t i = 0;
         size_t text_len = strlen(command_text);
         size_t bytes_processed =
-            0; // Actual bytes in raw text (excludes ANSI codes)
+            0; /// Actual bytes in raw text (excludes ANSI codes)
 
         while (i < text_len) {
-            // Check cursor position BEFORE processing next character
+            /// Check cursor position BEFORE processing next character
             if (!cursor_set && bytes_processed == cursor_byte_offset) {
                 buffer->cursor_row = row;
                 buffer->cursor_col = col;
@@ -438,8 +438,8 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
 
             unsigned char ch = (unsigned char)command_text[i];
 
-            // Handle ANSI escape sequences (skip without advancing
-            // bytes_processed or position)
+            /// Handle ANSI escape sequences (skip without advancing
+            /// bytes_processed or position)
             if (ch == '\033' || ch == '\x1b') {
                 i++;
                 if (i < text_len && command_text[i] == '[') {
@@ -453,22 +453,22 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                         }
                     }
                 }
-                // Don't increment bytes_processed - ANSI codes don't count
+                /// Don't increment bytes_processed - ANSI codes don't count
                 continue;
             }
 
-            // Handle newlines
+            /// Handle newlines
             if (ch == '\n') {
                 row++;
                 if (row >= buffer->num_rows) {
                     buffer->num_rows = row + 1;
                 }
 
-                // CONTINUATION PROMPT SUPPORT:
-                // After a newline, check if the next row has a continuation
-                // prompt prefix. If it does, start column position after the
-                // prefix (not at column 0). This ensures cursor tracking
-                // accounts for continuation prompts like "loop> "
+                /// CONTINUATION PROMPT SUPPORT:
+                /// After a newline, check if the next row has a continuation
+                /// prompt prefix. If it does, start column position after the
+                /// prefix (not at column 0). This ensures cursor tracking
+                /// accounts for continuation prompts like "loop> "
                 size_t prefix_width =
                     screen_buffer_get_line_prefix_visual_width(buffer, row);
                 col = (int)prefix_width;
@@ -478,7 +478,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 continue;
             }
 
-            // Handle tabs
+            /// Handle tabs
             if (ch == '\t') {
                 int tw = config.tab_width > 0 ? config.tab_width : 4;
                 size_t tab_width = tw - (col % tw);
@@ -495,7 +495,7 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 continue;
             }
 
-            // Decode UTF-8 codepoint for proper width calculation
+            /// Decode UTF-8 codepoint for proper width calculation
             uint32_t codepoint;
             int char_bytes = lle_utf8_decode_codepoint(
                 command_text + i, text_len - i, &codepoint);
@@ -504,16 +504,16 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
                 int visual_width = lle_utf8_codepoint_width(codepoint);
 
                 if (visual_width > 0) {
-                    // Store full UTF-8 sequence
+                    /// Store full UTF-8 sequence
                     write_char_to_buffer(buffer, command_text + i, char_bytes,
                                          visual_width, false, &row, &col);
 
-                    // For wide characters (width=2), we store the character in
-                    // one cell but it occupies 2 columns visually, so advance
-                    // col by 1 more
+                    /// For wide characters (width=2), we store the character in
+                    /// one cell but it occupies 2 columns visually, so advance
+                    /// col by 1 more
                     if (visual_width == 2) {
                         col++;
-                        // Handle wrapping for wide characters at boundary
+                        /// Handle wrapping for wide characters at boundary
                         if (col >= buffer->terminal_width) {
                             row++;
                             col = 0;
@@ -532,25 +532,25 @@ void screen_buffer_render(screen_buffer_t *buffer, const char *prompt_text,
             }
         }
 
-        // If cursor is at end of text
+        /// If cursor is at end of text
         if (!cursor_set && bytes_processed == cursor_byte_offset) {
             buffer->cursor_row = row;
             buffer->cursor_col = col;
             cursor_set = true;
         }
 
-        // Track where command text ends (for menu/ghost text positioning)
+        /// Track where command text ends (for menu/ghost text positioning)
         buffer->command_end_row = row;
         buffer->command_end_col = col;
     }
 
-    // Ensure at least one row
+    /// Ensure at least one row
     if (buffer->num_rows == 0) {
         buffer->num_rows = 1;
     }
 
-    // Initialize total display rows (will be updated by caller if menu/ghost
-    // text added)
+    /// Initialize total display rows (will be updated by caller if menu/ghost
+    /// text added)
     buffer->total_display_rows = buffer->num_rows;
 }
 
@@ -561,10 +561,10 @@ void screen_buffer_render_with_continuation(
     if (!buffer)
         return;
 
-    // Clear buffer (prefixes persist across clears per design)
+    /// Clear buffer (prefixes persist across clears per design)
     screen_buffer_clear(buffer);
 
-    // Also clear any old prefixes from previous render
+    /// Also clear any old prefixes from previous render
     for (int r = 0; r < SCREEN_BUFFER_MAX_ROWS; r++) {
         screen_buffer_clear_line_prefix(buffer, r);
     }
@@ -573,7 +573,7 @@ void screen_buffer_render_with_continuation(
     int col = 0;
     bool cursor_set = false;
 
-    // Render prompt - same as screen_buffer_render
+    /// Render prompt - same as screen_buffer_render
     if (prompt_text) {
         size_t i = 0;
         size_t text_len = strlen(prompt_text);
@@ -674,19 +674,19 @@ void screen_buffer_render_with_continuation(
     buffer->command_start_row = row;
     buffer->command_start_col = col;
 
-    // Render command text with continuation prompt support
+    /// Render command text with continuation prompt support
     if (command_text) {
         size_t i = 0;
         size_t text_len = strlen(command_text);
         size_t bytes_processed = 0;
 
-        // Track current line for continuation callback
+        /// Track current line for continuation callback
         int logical_line = 0;
-        (void)logical_line;         // Reserved for multi-line tracking
-        size_t line_start_byte = 0; // Start of current line in command_text
-        (void)line_start_byte;      // Reserved for line position tracking
+        (void)logical_line;         /// Reserved for multi-line tracking
+        size_t line_start_byte = 0; /// Start of current line in command_text
+        (void)line_start_byte;      /// Reserved for line position tracking
 
-        // Buffer for plain text of current line (ANSI stripped)
+        /// Buffer for plain text of current line (ANSI stripped)
         char plain_line[4096];
         size_t plain_pos = 0;
         bool in_ansi = false;
@@ -700,7 +700,7 @@ void screen_buffer_render_with_continuation(
 
             unsigned char ch = (unsigned char)command_text[i];
 
-            // Handle ANSI escape sequences
+            /// Handle ANSI escape sequences
             if (ch == '\033' || ch == '\x1b') {
                 in_ansi = true;
                 i++;
@@ -719,35 +719,36 @@ void screen_buffer_render_with_continuation(
                 continue;
             }
 
-            // Handle newlines - this is where we call the continuation callback
+            /// Handle newlines - this is where we call the continuation
+            /// callback
             if (ch == '\n') {
-                // Null-terminate the plain text buffer for this line
+                /// Null-terminate the plain text buffer for this line
                 plain_line[plain_pos] = '\0';
 
-                // Move to next row
+                /// Move to next row
                 row++;
                 if (row >= buffer->num_rows) {
                     buffer->num_rows = row + 1;
                 }
 
-                // Call continuation callback to get prompt for the next line
+                /// Call continuation callback to get prompt for the next line
                 if (continuation_cb) {
                     const char *cont_prompt = continuation_cb(
                         plain_line, plain_pos, logical_line, user_data);
 
                     if (cont_prompt) {
-                        // Set the prefix on the CURRENT row (which is the new
-                        // row after newline)
+                        /// Set the prefix on the CURRENT row (which is the new
+                        /// row after newline)
                         screen_buffer_set_line_prefix(buffer, row, cont_prompt);
                     }
                 }
 
-                // Get prefix width for cursor positioning
+                /// Get prefix width for cursor positioning
                 size_t prefix_width =
                     screen_buffer_get_line_prefix_visual_width(buffer, row);
                 col = (int)prefix_width;
 
-                // Reset for next line
+                /// Reset for next line
                 logical_line++;
                 line_start_byte = i + 1;
                 plain_pos = 0;
@@ -757,9 +758,9 @@ void screen_buffer_render_with_continuation(
                 continue;
             }
 
-            // Accumulate plain text (skip if still in ANSI sequence)
+            /// Accumulate plain text (skip if still in ANSI sequence)
             if (!in_ansi && plain_pos < sizeof(plain_line) - 1) {
-                // For non-ANSI characters, add to plain buffer
+                /// For non-ANSI characters, add to plain buffer
                 int seq_len = lle_utf8_sequence_length(ch);
                 if (seq_len > 0 && i + seq_len <= text_len) {
                     for (int j = 0;
@@ -770,7 +771,7 @@ void screen_buffer_render_with_continuation(
                 }
             }
 
-            // Handle tabs
+            /// Handle tabs
             if (ch == '\t') {
                 int tw = config.tab_width > 0 ? config.tab_width : 4;
                 size_t tab_width = tw - (col % tw);
@@ -787,7 +788,7 @@ void screen_buffer_render_with_continuation(
                 continue;
             }
 
-            // Decode UTF-8 and render
+            /// Decode UTF-8 and render
             uint32_t codepoint;
             int char_bytes = lle_utf8_decode_codepoint(
                 command_text + i, text_len - i, &codepoint);
@@ -825,7 +826,7 @@ void screen_buffer_render_with_continuation(
             cursor_set = true;
         }
 
-        // Track where command text ends (for menu/ghost text positioning)
+        /// Track where command text ends (for menu/ghost text positioning)
         buffer->command_end_row = row;
         buffer->command_end_col = col;
     }
@@ -834,14 +835,14 @@ void screen_buffer_render_with_continuation(
         buffer->num_rows = 1;
     }
 
-    // Initialize total display rows (will be updated by caller if menu/ghost
-    // text added)
+    /// Initialize total display rows (will be updated by caller if menu/ghost
+    /// text added)
     buffer->total_display_rows = buffer->num_rows;
 }
 
-// ============================================================================
-// PREFIX SUPPORT FUNCTIONS (Continuation Prompts)
-// ============================================================================
+/// ============================================================================
+/// PREFIX SUPPORT FUNCTIONS (Continuation Prompts)
+/// ============================================================================
 
 bool screen_buffer_set_line_prefix(screen_buffer_t *buffer, int line_num,
                                    const char *prefix_text) {
@@ -850,36 +851,36 @@ bool screen_buffer_set_line_prefix(screen_buffer_t *buffer, int line_num,
     }
 
     if (!prefix_text) {
-        // NULL text means clear prefix
+        /// NULL text means clear prefix
         return screen_buffer_clear_line_prefix(buffer, line_num);
     }
 
     screen_line_t *line = &buffer->lines[line_num];
 
-    // Allocate or reuse prefix structure
+    /// Allocate or reuse prefix structure
     if (!line->prefix) {
         line->prefix =
             (screen_line_prefix_t *)malloc(sizeof(screen_line_prefix_t));
         if (!line->prefix) {
-            return false; // Allocation failed
+            return false; /// Allocation failed
         }
         line->prefix->text = NULL;
     }
 
-    // Free old text if present
+    /// Free old text if present
     if (line->prefix->text) {
         free(line->prefix->text);
     }
 
-    // Copy prefix text
+    /// Copy prefix text
     line->prefix->text = strdup(prefix_text);
     if (!line->prefix->text) {
         free(line->prefix);
         line->prefix = NULL;
-        return false; // Allocation failed
+        return false; /// Allocation failed
     }
 
-    // Calculate properties
+    /// Calculate properties
     line->prefix->length = strlen(prefix_text);
     line->prefix->visual_width =
         screen_buffer_calculate_visual_width(prefix_text, 0);
@@ -905,7 +906,7 @@ bool screen_buffer_clear_line_prefix(screen_buffer_t *buffer, int line_num) {
         line->prefix = NULL;
     }
 
-    line->prefix_dirty = true; // Mark as changed (prefix removed)
+    line->prefix_dirty = true; /// Mark as changed (prefix removed)
 
     return true;
 }
@@ -983,7 +984,7 @@ int screen_buffer_translate_display_to_buffer_col(const screen_buffer_t *buffer,
     size_t prefix_width =
         screen_buffer_get_line_prefix_visual_width(buffer, line_num);
 
-    // If display column is within prefix area, return 0 (start of content)
+    /// If display column is within prefix area, return 0 (start of content)
     if ((size_t)display_col < prefix_width) {
         return 0;
     }
@@ -1002,21 +1003,21 @@ bool screen_buffer_render_line_with_prefix(const screen_buffer_t *buffer,
     const screen_line_t *line = &buffer->lines[line_num];
     size_t pos = 0;
 
-    // Add prefix if present
+    /// Add prefix if present
     if (line->prefix && line->prefix->text) {
         size_t prefix_len = line->prefix->length;
         if (pos + prefix_len >= output_size) {
-            return false; // Buffer too small
+            return false; /// Buffer too small
         }
         memcpy(output + pos, line->prefix->text, prefix_len);
         pos += prefix_len;
     }
 
-    // Add line content (full UTF-8 sequences)
+    /// Add line content (full UTF-8 sequences)
     for (int i = 0; i < line->length && pos < output_size - 1; i++) {
         const screen_cell_t *cell = &line->cells[i];
 
-        // Copy full UTF-8 sequence
+        /// Copy full UTF-8 sequence
         for (int b = 0; b < cell->byte_len && pos < output_size - 1; b++) {
             output[pos++] = cell->utf8_bytes[b];
         }
@@ -1035,7 +1036,7 @@ bool screen_buffer_render_multiline_with_prefixes(const screen_buffer_t *buffer,
     }
 
     if (start_line + num_lines > SCREEN_BUFFER_MAX_ROWS) {
-        return false; // Invalid range
+        return false; /// Invalid range
     }
 
     size_t pos = 0;
@@ -1043,23 +1044,23 @@ bool screen_buffer_render_multiline_with_prefixes(const screen_buffer_t *buffer,
     for (int i = 0; i < num_lines; i++) {
         int line_num = start_line + i;
 
-        // Render line with prefix
+        /// Render line with prefix
         char line_buffer[SCREEN_BUFFER_MAX_COLS * 2];
         if (!screen_buffer_render_line_with_prefix(
                 buffer, line_num, line_buffer, sizeof(line_buffer))) {
             return false;
         }
 
-        // Add to output
+        /// Add to output
         size_t line_len = strlen(line_buffer);
         if (pos + line_len + 1 >= output_size) {
-            return false; // Buffer too small
+            return false; /// Buffer too small
         }
 
         memcpy(output + pos, line_buffer, line_len);
         pos += line_len;
 
-        // Add newline between lines (except after last line)
+        /// Add newline between lines (except after last line)
         if (i < num_lines - 1) {
             output[pos++] = '\n';
         }
@@ -1083,7 +1084,7 @@ size_t screen_buffer_calculate_visual_width(const char *text,
     while (i < text_len) {
         unsigned char ch = (unsigned char)text[i];
 
-        // Handle ANSI escape sequences (they take 0 columns)
+        /// Handle ANSI escape sequences (they take 0 columns)
         if (ch == '\033' || ch == '\x1b') {
             in_escape = true;
             i++;
@@ -1092,7 +1093,7 @@ size_t screen_buffer_calculate_visual_width(const char *text,
 
         if (in_escape) {
             i++;
-            // Check for escape sequence terminator
+            /// Check for escape sequence terminator
             if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
                 ch == 'm' || ch == 'H' || ch == 'J' || ch == 'K' || ch == 'G') {
                 in_escape = false;
@@ -1100,13 +1101,13 @@ size_t screen_buffer_calculate_visual_width(const char *text,
             continue;
         }
 
-        // Skip readline markers \001 and \002
+        /// Skip readline markers \001 and \002
         if (ch == '\001' || ch == '\002') {
             i++;
             continue;
         }
 
-        // Handle tab expansion
+        /// Handle tab expansion
         if (ch == '\t') {
             int tw = config.tab_width > 0 ? config.tab_width : 4;
             size_t tab_width = tw - (col % tw);
@@ -1131,23 +1132,23 @@ size_t screen_buffer_calculate_visual_width(const char *text,
          *   CONTINUATION_PROMPTS=([loop]="🔄 " [if]="❓ " [quote]="💬 ")
          */
 
-        // Find the end of this grapheme cluster
+        /// Find the end of this grapheme cluster
         const char *grapheme_start = text + i;
         const char *grapheme_end = grapheme_start;
 
-        // Scan forward by UTF-8 characters until we hit a grapheme boundary
+        /// Scan forward by UTF-8 characters until we hit a grapheme boundary
         do {
-            // Advance to next UTF-8 character
+            /// Advance to next UTF-8 character
             int char_len =
                 lle_utf8_sequence_length((unsigned char)*grapheme_end);
             if (char_len <= 0 || grapheme_end + char_len > text + text_len) {
-                // Invalid UTF-8 or end of string - treat as single byte
+                /// Invalid UTF-8 or end of string - treat as single byte
                 grapheme_end++;
                 break;
             }
             grapheme_end += char_len;
 
-            // Check if this is a grapheme boundary
+            /// Check if this is a grapheme boundary
             if (grapheme_end >= text + text_len ||
                 lle_is_grapheme_boundary(grapheme_end, text, text + text_len)) {
                 break;
@@ -1156,26 +1157,26 @@ size_t screen_buffer_calculate_visual_width(const char *text,
 
         size_t grapheme_bytes = grapheme_end - grapheme_start;
 
-        // Calculate visual width of this grapheme cluster
-        // Decode base codepoint (determines width of entire cluster)
+        /// Calculate visual width of this grapheme cluster
+        /// Decode base codepoint (determines width of entire cluster)
         uint32_t base_codepoint = 0;
         int decode_result = lle_utf8_decode_codepoint(
             grapheme_start, grapheme_bytes, &base_codepoint);
 
-        int char_width = 1; // Default to 1 column
+        int char_width = 1; /// Default to 1 column
         if (decode_result > 0 && base_codepoint >= 32) {
-            // Use LLE's wcwidth implementation for proper width
+            /// Use LLE's wcwidth implementation for proper width
             char_width = lle_utf8_codepoint_width(base_codepoint);
             if (char_width < 0) {
-                char_width = 1; // Control characters default to 1
+                char_width = 1; /// Control characters default to 1
             }
         }
 
-        // Add width of this grapheme cluster
+        /// Add width of this grapheme cluster
         visual_width += char_width;
         col += char_width;
 
-        // Move to next grapheme cluster
+        /// Move to next grapheme cluster
         i += grapheme_bytes;
     }
 

@@ -35,15 +35,15 @@
 #include <time.h>
 #include <unistd.h>
 
-// ============================================================================
-// INTERNAL CONSTANTS AND MACROS
-// ============================================================================
+/// ============================================================================
+/// INTERNAL CONSTANTS AND MACROS
+/// ============================================================================
 
 #define AUTOSUGGESTIONS_LAYER_CACHE_CLEANUP_THRESHOLD 50
 #define AUTOSUGGESTIONS_LAYER_MIN_SUGGESTION_LENGTH 1
 #define AUTOSUGGESTIONS_LAYER_MAX_CONTEXT_LENGTH 512
 
-// Performance timing macros
+/// Performance timing macros
 #define START_TIMING()                                                         \
     struct timespec start_time;                                                \
     clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -54,9 +54,9 @@
     duration_ns = (end_time.tv_sec - start_time.tv_sec) * 1000000000L +        \
                   (end_time.tv_nsec - start_time.tv_nsec);
 
-// ============================================================================
-// INTERNAL FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// INTERNAL FUNCTIONS
+/// ============================================================================
 
 /**
  * @brief Get current timestamp in nanoseconds
@@ -92,8 +92,8 @@ static void set_layer_error(autosuggestions_layer_t *layer,
  * @return true if valid for initialization, false otherwise
  */
 static bool validate_layer_for_init(const autosuggestions_layer_t *layer) {
-    // During initialization, don't check initialized flag to avoid circular
-    // dependency
+    /// During initialization, don't check initialized flag to avoid circular
+    /// dependency
     return layer && layer->event_system && layer->terminal_control;
 }
 
@@ -129,18 +129,18 @@ find_cache_entry(autosuggestions_layer_t *layer, const char *input) {
     if (!validate_layer(layer) || !input)
         return NULL;
 
-    // uint32_t hash = calculate_cache_hash(input); // Unused for now
+    /// uint32_t hash = calculate_cache_hash(input); /// Unused for now
 
     for (int i = 0; i < layer->cache_size; i++) {
         if (layer->cache[i].valid && layer->cache[i].input_text &&
             strcmp(layer->cache[i].input_text, input) == 0) {
 
-            // Update access time and count
+            /// Update access time and count
             layer->cache[i].last_used_timestamp = get_timestamp_ns();
             layer->cache[i].use_count++;
             layer->metrics.cache_hits++;
 
-            // Enhanced Performance Monitoring: Record cache hit
+            /// Enhanced Performance Monitoring: Record cache hit
             display_integration_record_layer_cache_operation("autosuggestions",
                                                              true);
 
@@ -150,7 +150,7 @@ find_cache_entry(autosuggestions_layer_t *layer, const char *input) {
 
     layer->metrics.cache_misses++;
 
-    // Enhanced Performance Monitoring: Record cache miss
+    /// Enhanced Performance Monitoring: Record cache miss
     display_integration_record_layer_cache_operation("autosuggestions", false);
 
     return NULL;
@@ -172,13 +172,13 @@ add_cache_entry(autosuggestions_layer_t *layer, const char *input,
         return AUTOSUGGESTIONS_LAYER_ERROR_INVALID_PARAM;
     }
 
-    // Find slot to use (LRU replacement if full)
+    /// Find slot to use (LRU replacement if full)
     int slot = layer->cache_next_index;
     if (layer->cache_size < AUTOSUGGESTIONS_LAYER_MAX_CACHE_ENTRIES) {
         slot = layer->cache_size;
         layer->cache_size++;
     } else {
-        // Find LRU entry
+        /// Find LRU entry
         uint64_t oldest_time = UINT64_MAX;
         for (int i = 0; i < layer->cache_size; i++) {
             if (layer->cache[i].last_used_timestamp < oldest_time) {
@@ -188,7 +188,7 @@ add_cache_entry(autosuggestions_layer_t *layer, const char *input,
         }
     }
 
-    // Free existing data
+    /// Free existing data
     if (layer->cache[slot].input_text) {
         free(layer->cache[slot].input_text);
     }
@@ -196,7 +196,7 @@ add_cache_entry(autosuggestions_layer_t *layer, const char *input,
         free(layer->cache[slot].suggestion_text);
     }
 
-    // Set new data
+    /// Set new data
     layer->cache[slot].input_text = strdup(input);
     layer->cache[slot].suggestion_text = strdup(suggestion);
     layer->cache[slot].suggestion_score = score;
@@ -233,11 +233,11 @@ static char *generate_suggestion(autosuggestions_layer_t *layer,
 
     START_TIMING();
 
-    // In v1.3.0, suggestion generation is handled externally by LLE.
-    // LLE's readline implementation calls
-    // autosuggestions_layer_set_suggestion() with suggestions from LLE's
-    // history system. This function returns NULL; external callers should use
-    // set_suggestion().
+    /// In v1.3.0, suggestion generation is handled externally by LLE.
+    /// LLE's readline implementation calls
+    /// autosuggestions_layer_set_suggestion() with suggestions from LLE's
+    /// history system. This function returns NULL; external callers should use
+    /// set_suggestion().
 
     END_TIMING(*generation_time_ns);
 
@@ -256,7 +256,7 @@ static void update_performance_metrics(autosuggestions_layer_t *layer,
     if (!validate_layer(layer))
         return;
 
-    // Update generation time average
+    /// Update generation time average
     double generation_ms = generation_time_ns / 1000000.0;
     layer->metrics.avg_generation_time_ms =
         (layer->metrics.avg_generation_time_ms *
@@ -264,7 +264,7 @@ static void update_performance_metrics(autosuggestions_layer_t *layer,
          generation_ms) /
         (layer->metrics.suggestions_generated + 1);
 
-    // Update display time average
+    /// Update display time average
     if (display_time_ns > 0) {
         double display_ms = display_time_ns / 1000000.0;
         layer->metrics.avg_display_time_ms =
@@ -274,7 +274,7 @@ static void update_performance_metrics(autosuggestions_layer_t *layer,
             (layer->metrics.suggestions_displayed + 1);
     }
 
-    // Update cache hit rate
+    /// Update cache hit rate
     uint64_t total_requests =
         layer->metrics.cache_hits + layer->metrics.cache_misses;
     if (total_requests > 0) {
@@ -304,11 +304,11 @@ compose_suggestion_display(autosuggestions_layer_t *layer,
 
     *bytes_written = 0;
 
-    // Check terminal capabilities
+    /// Check terminal capabilities
     if (!layer->display_config.enable_color ||
         !terminal_control_has_capability(layer->terminal_control,
                                          TERMINAL_CAP_COLOR_8)) {
-        // Plain text display
+        /// Plain text display
         int written = snprintf(buffer, buffer_size, "%s", suggestion);
         if (written < 0 || (size_t)written >= buffer_size) {
             return AUTOSUGGESTIONS_LAYER_ERROR_DISPLAY_FAILED;
@@ -317,13 +317,13 @@ compose_suggestion_display(autosuggestions_layer_t *layer,
         return AUTOSUGGESTIONS_LAYER_SUCCESS;
     }
 
-    // Generate color sequence
+    /// Generate color sequence
     char color_sequence[64] = {0};
     if (terminal_control_generate_color_sequence(
             layer->terminal_control, layer->display_config.suggestion_color,
-            true, // foreground
+            true, /// foreground
             color_sequence, sizeof(color_sequence)) <= 0) {
-        // Fallback to plain text
+        /// Fallback to plain text
         int written = snprintf(buffer, buffer_size, "%s", suggestion);
         if (written < 0 || (size_t)written >= buffer_size) {
             return AUTOSUGGESTIONS_LAYER_ERROR_DISPLAY_FAILED;
@@ -332,15 +332,15 @@ compose_suggestion_display(autosuggestions_layer_t *layer,
         return AUTOSUGGESTIONS_LAYER_SUCCESS;
     }
 
-    // Generate reset sequence
+    /// Generate reset sequence
     char reset_sequence[32] = {0};
     if (terminal_control_generate_style_sequence(
             layer->terminal_control, TERMINAL_STYLE_NONE, reset_sequence,
             sizeof(reset_sequence)) <= 0) {
-        strcpy(reset_sequence, "\033[0m"); // Fallback
+        strcpy(reset_sequence, "\033[0m"); /// Fallback
     }
 
-    // Compose full display
+    /// Compose full display
     int written = snprintf(buffer, buffer_size, "%s%s%s", color_sequence,
                            suggestion, reset_sequence);
 
@@ -352,9 +352,9 @@ compose_suggestion_display(autosuggestions_layer_t *layer,
     return AUTOSUGGESTIONS_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// CORE LAYER MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// CORE LAYER MANAGEMENT
+/// ============================================================================
 
 autosuggestions_layer_t *
 autosuggestions_layer_create(layer_event_system_t *event_system,
@@ -368,33 +368,33 @@ autosuggestions_layer_create(layer_event_system_t *event_system,
         return NULL;
     }
 
-    // Initialize basic fields
+    /// Initialize basic fields
     layer->layer_id = LAYER_ID_AUTOSUGGESTIONS;
     layer->initialized = false;
     layer->enabled = true;
     layer->last_error = AUTOSUGGESTIONS_LAYER_SUCCESS;
 
-    // Store references
+    /// Store references
     layer->event_system = event_system;
     layer->terminal_control = terminal_control;
 
-    // Initialize state
+    /// Initialize state
     layer->current_input = NULL;
     layer->current_suggestion = NULL;
     layer->cursor_position = 0;
     layer->suggestion_displayed = false;
     layer->suggestion_timestamp = 0;
 
-    // Initialize cache
+    /// Initialize cache
     layer->cache_size = 0;
     layer->cache_next_index = 0;
     memset(layer->cache, 0, sizeof(layer->cache));
 
-    // Initialize performance metrics
+    /// Initialize performance metrics
     memset(&layer->metrics, 0, sizeof(layer->metrics));
     layer->metrics.last_performance_update = get_timestamp_ns();
 
-    // Initialize coordination flags
+    /// Initialize coordination flags
     layer->in_display_operation = false;
     layer->needs_refresh = false;
 
@@ -409,46 +409,46 @@ autosuggestions_layer_init(autosuggestions_layer_t *layer,
     }
 
     if (layer->initialized) {
-        return AUTOSUGGESTIONS_LAYER_SUCCESS; // Already initialized
+        return AUTOSUGGESTIONS_LAYER_SUCCESS; /// Already initialized
     }
 
-    // Set configuration
+    /// Set configuration
     if (config) {
         layer->display_config = *config;
     } else {
         autosuggestions_layer_create_default_config(&layer->display_config);
     }
 
-    // Get terminal capabilities
+    /// Get terminal capabilities
     layer->terminal_caps =
         terminal_control_get_capabilities(layer->terminal_control);
 
-    // Use LLE for comprehensive terminal capability detection
+    /// Use LLE for comprehensive terminal capability detection
     lle_terminal_detection_result_t *detection = NULL;
     lle_detect_terminal_capabilities_optimized(&detection);
 
-    // For autosuggestions, we need stdout to be a TTY for display, not
-    // necessarily stdin
+    /// For autosuggestions, we need stdout to be a TTY for display, not
+    /// necessarily stdin
     if (!detection || !detection->stdout_is_tty) {
         set_layer_error(layer,
                         AUTOSUGGESTIONS_LAYER_ERROR_UNSUPPORTED_TERMINAL);
         return AUTOSUGGESTIONS_LAYER_ERROR_UNSUPPORTED_TERMINAL;
     }
 
-    // Check if terminal has basic capabilities needed for autosuggestions
-    // We need colors and unicode support for professional display
+    /// Check if terminal has basic capabilities needed for autosuggestions
+    /// We need colors and unicode support for professional display
     if (!detection->supports_colors || !detection->supports_unicode) {
         set_layer_error(layer,
                         AUTOSUGGESTIONS_LAYER_ERROR_UNSUPPORTED_TERMINAL);
         return AUTOSUGGESTIONS_LAYER_ERROR_UNSUPPORTED_TERMINAL;
     }
 
-    // NOTE: In v1.3.0, suggestion generation is handled externally by LLE's
-    // history system. LLE's readline calls
-    // autosuggestions_layer_set_suggestion() directly with history-based
-    // suggestions. No legacy init needed.
+    /// NOTE: In v1.3.0, suggestion generation is handled externally by LLE's
+    /// history system. LLE's readline calls
+    /// autosuggestions_layer_set_suggestion() directly with history-based
+    /// suggestions. No legacy init needed.
 
-    // Subscribe to layer events
+    /// Subscribe to layer events
     autosuggestions_layer_error_t error =
         autosuggestions_layer_subscribe_events(layer);
     if (error != AUTOSUGGESTIONS_LAYER_SUCCESS) {
@@ -470,15 +470,15 @@ autosuggestions_layer_destroy(autosuggestions_layer_t **layer) {
 
     autosuggestions_layer_t *l = *layer;
 
-    // Unsubscribe from events
+    /// Unsubscribe from events
     if (l->initialized) {
         autosuggestions_layer_unsubscribe_events(l);
     }
 
-    // Clear display
+    /// Clear display
     autosuggestions_layer_clear(l);
 
-    // Free current state
+    /// Free current state
     if (l->current_input) {
         free(l->current_input);
     }
@@ -486,7 +486,7 @@ autosuggestions_layer_destroy(autosuggestions_layer_t **layer) {
         free(l->current_suggestion);
     }
 
-    // Free cache entries
+    /// Free cache entries
     for (int i = 0; i < l->cache_size; i++) {
         if (l->cache[i].input_text) {
             free(l->cache[i].input_text);
@@ -496,7 +496,7 @@ autosuggestions_layer_destroy(autosuggestions_layer_t **layer) {
         }
     }
 
-    // Free layer structure
+    /// Free layer structure
     free(l);
     *layer = NULL;
 
@@ -514,7 +514,7 @@ autosuggestions_layer_set_enabled(autosuggestions_layer_t *layer,
         layer->enabled = enabled;
 
         if (!enabled) {
-            // Clear current display when disabled
+            /// Clear current display when disabled
             autosuggestions_layer_clear(layer);
         }
     }
@@ -527,9 +527,9 @@ bool autosuggestions_layer_is_enabled(const autosuggestions_layer_t *layer) {
     return validate_layer(layer) && layer->enabled;
 }
 
-// ============================================================================
-// SUGGESTION GENERATION AND DISPLAY
-// ============================================================================
+/// ============================================================================
+/// SUGGESTION GENERATION AND DISPLAY
+/// ============================================================================
 
 autosuggestions_layer_error_t
 autosuggestions_layer_update(autosuggestions_layer_t *layer,
@@ -549,13 +549,13 @@ autosuggestions_layer_update(autosuggestions_layer_t *layer,
 
     autosuggestions_layer_error_t result = AUTOSUGGESTIONS_LAYER_SUCCESS;
 
-    // Check if we should suggest
+    /// Check if we should suggest
     if (!autosuggestions_layer_should_suggest(layer, context)) {
         autosuggestions_layer_clear(layer);
         goto cleanup;
     }
 
-    // Check cache first
+    /// Check cache first
     autosuggestions_cache_entry_t *cached =
         find_cache_entry(layer, context->input_line);
     char *suggestion_text = NULL;
@@ -565,18 +565,18 @@ autosuggestions_layer_update(autosuggestions_layer_t *layer,
         suggestion_text = strdup(cached->suggestion_text);
         generation_time_ns = cached->generation_time_ns;
     } else {
-        // Generate new suggestion
+        /// Generate new suggestion
         suggestion_text =
             generate_suggestion(layer, context, &generation_time_ns);
 
         if (suggestion_text) {
-            // Add to cache
+            /// Add to cache
             add_cache_entry(layer, context->input_line, suggestion_text, 100,
                             generation_time_ns);
         }
     }
 
-    // Update current state
+    /// Update current state
     if (layer->current_input) {
         free(layer->current_input);
     }
@@ -592,7 +592,7 @@ autosuggestions_layer_update(autosuggestions_layer_t *layer,
         layer->suggestion_displayed = true;
         layer->metrics.suggestions_displayed++;
 
-        // Publish change event
+        /// Publish change event
         autosuggestions_layer_publish_change(layer, NULL, suggestion_text);
     } else {
         autosuggestions_layer_clear(layer);
@@ -616,7 +616,7 @@ autosuggestions_layer_clear(autosuggestions_layer_t *layer) {
     if (layer->suggestion_displayed) {
         const char *old_suggestion = layer->current_suggestion;
 
-        // Clear state
+        /// Clear state
         if (layer->current_suggestion) {
             free(layer->current_suggestion);
             layer->current_suggestion = NULL;
@@ -625,7 +625,7 @@ autosuggestions_layer_clear(autosuggestions_layer_t *layer) {
         layer->suggestion_displayed = false;
         layer->suggestion_timestamp = 0;
 
-        // Publish change event
+        /// Publish change event
         autosuggestions_layer_publish_change(layer, old_suggestion, NULL);
     }
 
@@ -654,7 +654,7 @@ autosuggestions_layer_accept(autosuggestions_layer_t *layer,
     strcpy(accepted_text, layer->current_suggestion);
     layer->metrics.suggestions_accepted++;
 
-    // Clear after acceptance
+    /// Clear after acceptance
     autosuggestions_layer_clear(layer);
 
     set_layer_error(layer, AUTOSUGGESTIONS_LAYER_SUCCESS);
@@ -678,25 +678,25 @@ autosuggestions_layer_set_suggestion(autosuggestions_layer_t *layer,
         return AUTOSUGGESTIONS_LAYER_ERROR_NULL_POINTER;
     }
 
-    // Handle NULL or empty suggestion as clear
+    /// Handle NULL or empty suggestion as clear
     if (!suggestion || !*suggestion) {
         return autosuggestions_layer_clear(layer);
     }
 
-    // Validate suggestion length
+    /// Validate suggestion length
     size_t len = strlen(suggestion);
     if (len > AUTOSUGGESTIONS_LAYER_MAX_SUGGESTION_LENGTH) {
         set_layer_error(layer, AUTOSUGGESTIONS_LAYER_ERROR_INVALID_PARAM);
         return AUTOSUGGESTIONS_LAYER_ERROR_INVALID_PARAM;
     }
 
-    // Free existing suggestion if any
+    /// Free existing suggestion if any
     if (layer->current_suggestion) {
         free(layer->current_suggestion);
         layer->current_suggestion = NULL;
     }
 
-    // Set new suggestion
+    /// Set new suggestion
     layer->current_suggestion = strdup(suggestion);
     if (!layer->current_suggestion) {
         set_layer_error(layer, AUTOSUGGESTIONS_LAYER_ERROR_MEMORY_ALLOCATION);
@@ -717,9 +717,9 @@ bool autosuggestions_layer_has_suggestion(
            layer->current_suggestion;
 }
 
-// ============================================================================
-// CONFIGURATION AND STYLING
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION AND STYLING
+/// ============================================================================
 
 autosuggestions_layer_error_t autosuggestions_layer_create_default_config(
     autosuggestions_display_config_t *config) {
@@ -740,9 +740,9 @@ autosuggestions_layer_error_t autosuggestions_layer_create_default_config(
     return AUTOSUGGESTIONS_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// LAYER EVENT INTEGRATION
-// ============================================================================
+/// ============================================================================
+/// LAYER EVENT INTEGRATION
+/// ============================================================================
 
 layer_events_error_t
 autosuggestions_layer_handle_event(const layer_event_t *event,
@@ -755,14 +755,14 @@ autosuggestions_layer_handle_event(const layer_event_t *event,
 
     switch (event->type) {
     case LAYER_EVENT_CONTENT_CHANGED:
-        // Command layer content changed - may need to update suggestions
+        /// Command layer content changed - may need to update suggestions
         if (event->source_layer == LAYER_ID_COMMAND_LAYER) {
             layer->needs_refresh = true;
         }
         break;
 
     case LAYER_EVENT_SIZE_CHANGED:
-        // Terminal size changed - update capabilities
+        /// Terminal size changed - update capabilities
         layer->terminal_caps =
             terminal_control_get_capabilities(layer->terminal_control);
         break;
@@ -783,7 +783,7 @@ autosuggestions_layer_publish_change(autosuggestions_layer_t *layer,
         return AUTOSUGGESTIONS_LAYER_ERROR_NOT_INITIALIZED;
     }
 
-    // Publish content changed event
+    /// Publish content changed event
     if (layer->event_system) {
         const char *content = new_suggestion ? new_suggestion : "";
         size_t content_len = strlen(content);
@@ -799,7 +799,7 @@ autosuggestions_layer_publish_change(autosuggestions_layer_t *layer,
          * this, clearing autosuggestion doesn't trigger a visual update. */
         layer_events_publish_simple(
             layer->event_system, LAYER_EVENT_REDRAW_NEEDED,
-            LAYER_ID_AUTOSUGGESTIONS, 0, // broadcast to all
+            LAYER_ID_AUTOSUGGESTIONS, 0, /// broadcast to all
             LAYER_EVENT_PRIORITY_HIGH);
     }
 
@@ -812,7 +812,7 @@ autosuggestions_layer_subscribe_events(autosuggestions_layer_t *layer) {
         return AUTOSUGGESTIONS_LAYER_ERROR_NOT_INITIALIZED;
     }
 
-    // Subscribe to content changes from command layer
+    /// Subscribe to content changes from command layer
     layer_events_error_t error = layer_events_subscribe(
         layer->event_system, LAYER_EVENT_CONTENT_CHANGED,
         LAYER_ID_AUTOSUGGESTIONS, autosuggestions_layer_handle_event, layer,
@@ -822,7 +822,7 @@ autosuggestions_layer_subscribe_events(autosuggestions_layer_t *layer) {
         return AUTOSUGGESTIONS_LAYER_ERROR_EVENT_FAILED;
     }
 
-    // Subscribe to size changes
+    /// Subscribe to size changes
     error = layer_events_subscribe(
         layer->event_system, LAYER_EVENT_SIZE_CHANGED, LAYER_ID_AUTOSUGGESTIONS,
         autosuggestions_layer_handle_event, layer, LAYER_EVENT_PRIORITY_LOW);
@@ -845,9 +845,9 @@ autosuggestions_layer_unsubscribe_events(autosuggestions_layer_t *layer) {
     return AUTOSUGGESTIONS_LAYER_SUCCESS;
 }
 
-// ============================================================================
-// ERROR HANDLING AND UTILITIES
-// ============================================================================
+/// ============================================================================
+/// ERROR HANDLING AND UTILITIES
+/// ============================================================================
 
 autosuggestions_layer_error_t
 autosuggestions_layer_get_last_error(const autosuggestions_layer_t *layer) {
@@ -909,9 +909,9 @@ void autosuggestions_layer_get_version(int *major, int *minor, int *patch) {
         *patch = AUTOSUGGESTIONS_LAYER_VERSION_PATCH;
 }
 
-// ============================================================================
-// INTEGRATION HELPERS
-// ============================================================================
+/// ============================================================================
+/// INTEGRATION HELPERS
+/// ============================================================================
 
 autosuggestions_layer_error_t
 autosuggestions_layer_create_context_from_readline(
@@ -927,8 +927,8 @@ autosuggestions_layer_create_context_from_readline(
     context->input_line = line_buffer;
     context->cursor_position = cursor_pos;
     context->line_length = line_end;
-    context->is_multiline_context = false;        // Could be enhanced later
-    context->current_directory = getcwd(NULL, 0); // Will need to be freed
+    context->is_multiline_context = false;        /// Could be enhanced later
+    context->current_directory = getcwd(NULL, 0); /// Will need to be freed
     context->shell_context = NULL;
 
     return AUTOSUGGESTIONS_LAYER_SUCCESS;
@@ -941,34 +941,34 @@ bool autosuggestions_layer_should_suggest(
         return false;
     }
 
-    // Don't suggest if disabled
+    /// Don't suggest if disabled
     if (!layer->enabled) {
         return false;
     }
 
-    // Don't suggest if no input
+    /// Don't suggest if no input
     if (!context->input_line || !*context->input_line) {
         return false;
     }
 
-    // Don't suggest if cursor not at end
+    /// Don't suggest if cursor not at end
     if (context->cursor_position != context->line_length) {
         return false;
     }
 
-    // Don't suggest for very short commands unless configured
+    /// Don't suggest for very short commands unless configured
     if (!layer->display_config.show_for_short_commands &&
         context->line_length < 3) {
         return false;
     }
 
-    // Don't suggest in multiline context unless configured
+    /// Don't suggest in multiline context unless configured
     if (context->is_multiline_context &&
         !layer->display_config.show_in_multiline) {
         return false;
     }
 
-    // Check terminal size
+    /// Check terminal size
     if (layer->terminal_caps.terminal_width <
         AUTOSUGGESTIONS_LAYER_MIN_TERMINAL_WIDTH) {
         return false;
