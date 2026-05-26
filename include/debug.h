@@ -20,7 +20,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-// Forward declarations
+/// Forward declarations
 struct executor;
 typedef struct executor executor_t;
 
@@ -28,21 +28,21 @@ typedef struct executor executor_t;
  * @brief Debug levels for different types of debugging information
  */
 typedef enum {
-    DEBUG_NONE = 0,    /**< No debugging output */
-    DEBUG_BASIC = 1,   /**< Basic debugging output */
-    DEBUG_VERBOSE = 2, /**< Verbose debugging output */
-    DEBUG_TRACE = 3,   /**< Trace-level debugging output */
-    DEBUG_PROFILE = 4  /**< Profiling information */
+    DEBUG_NONE = 0,    ///< No debugging output
+    DEBUG_BASIC = 1,   ///< Basic debugging output
+    DEBUG_VERBOSE = 2, ///< Verbose debugging output
+    DEBUG_TRACE = 3,   ///< Trace-level debugging output
+    DEBUG_PROFILE = 4  ///< Profiling information
 } debug_level_t;
 
 /**
  * @brief Debug execution modes
  */
 typedef enum {
-    DEBUG_MODE_NORMAL,    /**< Normal execution */
-    DEBUG_MODE_STEP,      /**< Step-by-step execution */
-    DEBUG_MODE_STEP_OVER, /**< Step over function calls */
-    DEBUG_MODE_CONTINUE   /**< Continue to next breakpoint */
+    DEBUG_MODE_NORMAL,    ///< Normal execution
+    DEBUG_MODE_STEP,      ///< Step-by-step execution
+    DEBUG_MODE_STEP_OVER, ///< Step over function calls
+    DEBUG_MODE_CONTINUE   ///< Continue to next breakpoint
 } debug_mode_t;
 
 /**
@@ -51,26 +51,26 @@ typedef enum {
  * Represents a debugger breakpoint with optional condition.
  */
 typedef struct breakpoint {
-    int id;                  /**< Unique breakpoint ID */
-    char *file;              /**< Source file name */
-    int line;                /**< Line number */
-    char *condition;         /**< Optional condition expression */
-    int hit_count;           /**< Number of times hit */
-    bool enabled;            /**< Whether breakpoint is enabled */
-    struct breakpoint *next; /**< Next breakpoint in list */
+    int id;                  ///< Unique breakpoint ID
+    char *file;              ///< Source file name
+    int line;                ///< Line number
+    char *condition;         ///< Optional condition expression
+    int hit_count;           ///< Number of times hit
+    bool enabled;            ///< Whether breakpoint is enabled
+    struct breakpoint *next; ///< Next breakpoint in list
 } breakpoint_t;
 
 /**
  * @brief Debug stack frame for tracking execution context
  */
 typedef struct debug_frame {
-    char *function_name;        /**< Name of current function */
-    char *file_path;            /**< Path to source file */
-    int line_number;            /**< Current line number */
-    node_t *current_node;       /**< Current AST node */
-    struct debug_frame *parent; /**< Parent frame */
-    struct timespec start_time; /**< Frame start time */
-    struct timespec end_time;   /**< Frame end time */
+    char *function_name;        ///< Name of current function
+    char *file_path;            ///< Path to source file
+    int line_number;            ///< Current line number
+    node_t *current_node;       ///< Current AST node
+    struct debug_frame *parent; ///< Parent frame
+    struct timespec start_time; ///< Frame start time
+    struct timespec end_time;   ///< Frame end time
     /**
      * Scoping discipline of this frame. True for typed-function (`fn`)
      * frames whose body resolves free names through a captured
@@ -86,26 +86,26 @@ typedef struct debug_frame {
  * @brief Performance profiling data
  */
 typedef struct profile_data {
-    char *function_name;       /**< Function name */
-    char *file_path;           /**< Source file path */
-    long total_time_ns;        /**< Total time in nanoseconds */
-    int call_count;            /**< Number of calls */
-    long min_time_ns;          /**< Minimum call time */
-    long max_time_ns;          /**< Maximum call time */
-    struct profile_data *next; /**< Next profile entry */
+    char *function_name;       ///< Function name
+    char *file_path;           ///< Source file path
+    long total_time_ns;        ///< Total time in nanoseconds
+    int call_count;            ///< Number of calls
+    long min_time_ns;          ///< Minimum call time
+    long max_time_ns;          ///< Maximum call time
+    struct profile_data *next; ///< Next profile entry
 } profile_data_t;
 
 /**
  * @brief Script analysis issue
  */
 typedef struct analysis_issue {
-    char *file_path;  /**< File with issue */
-    int line_number;  /**< Line number of issue */
-    char *severity;   /**< "error", "warning", "info" */
-    char *category;   /**< "syntax", "performance", "security", "style" */
-    char *message;    /**< Issue description */
-    char *suggestion; /**< Suggested fix */
-    struct analysis_issue *next; /**< Next issue */
+    char *file_path;  ///< File with issue
+    int line_number;  ///< Line number of issue
+    char *severity;   ///< "error", "warning", "info"
+    char *category;   ///< "syntax", "performance", "security", "style"
+    char *message;    ///< Issue description
+    char *suggestion; ///< Suggested fix
+    struct analysis_issue *next; ///< Next issue
 } analysis_issue_t;
 
 /**
@@ -114,61 +114,60 @@ typedef struct analysis_issue {
  * Contains all debugging state and configuration.
  */
 typedef struct debug_context {
-    debug_level_t level;   /**< Current debug level */
-    debug_mode_t mode;     /**< Current execution mode */
-    bool enabled;          /**< Debug mode enabled */
-    bool step_mode;        /**< Single-step mode active */
-    bool trace_execution;  /**< Trace execution enabled */
-    bool profile_enabled;  /**< Profiling enabled */
-    bool analysis_enabled; /**< Script analysis enabled */
+    debug_level_t level;   ///< Current debug level
+    debug_mode_t mode;     ///< Current execution mode
+    bool enabled;          ///< Debug mode enabled
+    bool step_mode;        ///< Single-step mode active
+    bool trace_execution;  ///< Trace execution enabled
+    bool profile_enabled;  ///< Profiling enabled
+    bool analysis_enabled; ///< Script analysis enabled
 
-    // Execution state
-    debug_frame_t *current_frame; /**< Current stack frame */
-    int stack_depth;              /**< Current stack depth */
-    int step_target_depth;        /**< Single-stepping stops only when
-                                       stack_depth <= this. INT_MAX for
-                                       step-into (stop everywhere), the
-                                       current depth for step-over, and
-                                       depth-1 for step-out. */
+    /// Execution state
+    debug_frame_t *current_frame; ///< Current stack frame
+    int stack_depth;              ///< Current stack depth
+    int step_target_depth; ///< Single-stepping stops only when stack_depth <=
+                           ///< this. INT_MAX for step-into (stop everywhere),
+                           ///< the current depth for step-over, and depth-1 for
+                           ///< step-out.
 
-    // Execution context preservation (for loop debugging fix)
+    /// Execution context preservation (for loop debugging fix)
     struct {
-        bool in_loop;              /**< Currently inside a loop */
-        char *loop_variable;       /**< Current loop variable name */
-        char *loop_variable_value; /**< Current iteration value */
-        int loop_iteration;        /**< Current iteration number */
-        node_t *loop_node;         /**< AST node of current loop */
-        int loop_body_start_line;  /**< Line number where loop body starts */
-    } execution_context;           /**< Execution context for loop debugging */
+        bool in_loop;              ///< Currently inside a loop
+        char *loop_variable;       ///< Current loop variable name
+        char *loop_variable_value; ///< Current iteration value
+        int loop_iteration;        ///< Current iteration number
+        node_t *loop_node;         ///< AST node of current loop
+        int loop_body_start_line;  ///< Line number where loop body starts
+    } execution_context;           ///< Execution context for loop debugging
 
-    // Breakpoints
-    breakpoint_t *breakpoints; /**< List of breakpoints */
-    int next_breakpoint_id;    /**< Next breakpoint ID to assign */
+    /// Breakpoints
+    breakpoint_t *breakpoints; ///< List of breakpoints
+    int next_breakpoint_id;    ///< Next breakpoint ID to assign
 
-    // Profiling
-    profile_data_t *profile_data; /**< Profiling data */
-    bool timing_enabled;          /**< Timing collection enabled */
+    /// Profiling
+    profile_data_t *profile_data; ///< Profiling data
+    bool timing_enabled;          ///< Timing collection enabled
 
-    // Analysis
-    analysis_issue_t *analysis_issues; /**< List of analysis issues */
-    int issue_count;                   /**< Number of issues found */
+    /// Analysis
+    analysis_issue_t *analysis_issues; ///< List of analysis issues
+    int issue_count;                   ///< Number of issues found
 
-    // Output control
-    FILE *debug_output;    /**< Debug output stream */
-    FILE *profile_output;  /**< Profile output stream */
-    FILE *analysis_output; /**< Analysis output stream */
+    /// Output control
+    FILE *debug_output;    ///< Debug output stream
+    FILE *profile_output;  ///< Profile output stream
+    FILE *analysis_output; ///< Analysis output stream
 
-    // Configuration
-    bool show_variables;   /**< Show variable values */
-    bool show_stack_trace; /**< Show stack traces */
-    bool show_timing;      /**< Show timing information */
-    bool highlight_syntax; /**< Syntax highlighting in output */
-    int max_stack_depth;   /**< Maximum stack depth to display */
+    /// Configuration
+    bool show_variables;   ///< Show variable values
+    bool show_stack_trace; ///< Show stack traces
+    bool show_timing;      ///< Show timing information
+    bool highlight_syntax; ///< Syntax highlighting in output
+    int max_stack_depth;   ///< Maximum stack depth to display
 
-    // Statistics
-    long total_commands;           /**< Total commands executed */
-    long total_time_ns;            /**< Total execution time */
-    struct timespec session_start; /**< Session start time */
+    /// Statistics
+    long total_commands;           ///< Total commands executed
+    long total_time_ns;            ///< Total execution time
+    struct timespec session_start; ///< Session start time
 } debug_context_t;
 
 /** @brief Global debug context */
@@ -525,9 +524,8 @@ void debug_profile_reset(debug_context_t *ctx);
  * Determines what level of output and functionality is available.
  */
 typedef enum {
-    ANALYSIS_MODE_FULL, /**< Full analysis: info + warnings + errors */
-    ANALYSIS_MODE_LINT, /**< Lint mode: warnings + errors only, supports fixes
-                         */
+    ANALYSIS_MODE_FULL, ///< Full analysis: info + warnings + errors
+    ANALYSIS_MODE_LINT, ///< Lint mode: warnings + errors only, supports fixes
 } analysis_mode_t;
 
 /**
@@ -974,4 +972,4 @@ bool debug_check_breakpoint_with_context(debug_context_t *ctx, const char *file,
                                          int line, executor_t *executor,
                                          node_t *node);
 
-#endif // DEBUG_H
+#endif /// DEBUG_H

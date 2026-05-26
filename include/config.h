@@ -43,9 +43,9 @@
  * @brief Configuration file format types
  */
 typedef enum {
-    CONFIG_FORMAT_UNKNOWN, /**< Unknown or invalid format */
-    CONFIG_FORMAT_LEGACY,  /**< Legacy INI-like format (.lushrc) */
-    CONFIG_FORMAT_TOML     /**< TOML format (lushrc.toml) */
+    CONFIG_FORMAT_UNKNOWN, ///< Unknown or invalid format
+    CONFIG_FORMAT_LEGACY,  ///< Legacy INI-like format (.lushrc)
+    CONFIG_FORMAT_TOML     ///< TOML format (lushrc.toml)
 } config_format_t;
 
 /**
@@ -54,17 +54,17 @@ typedef enum {
  * Enumerates the different sections in configuration files.
  */
 typedef enum {
-    CONFIG_SECTION_NONE,       /**< No section (default) */
-    CONFIG_SECTION_HISTORY,    /**< History settings */
-    CONFIG_SECTION_COMPLETION, /**< Completion settings */
-    CONFIG_SECTION_PROMPT,     /**< Prompt settings */
-    CONFIG_SECTION_BEHAVIOR,   /**< Behavior settings */
-    CONFIG_SECTION_ALIASES,    /**< Alias definitions */
-    CONFIG_SECTION_KEYS,       /**< Key binding settings */
-    CONFIG_SECTION_NETWORK,    /**< Network settings */
-    CONFIG_SECTION_SCRIPTS,    /**< Script settings */
-    CONFIG_SECTION_SHELL,      /**< Shell options */
-    CONFIG_SECTION_DISPLAY     /**< Display settings */
+    CONFIG_SECTION_NONE,       ///< No section (default)
+    CONFIG_SECTION_HISTORY,    ///< History settings
+    CONFIG_SECTION_COMPLETION, ///< Completion settings
+    CONFIG_SECTION_PROMPT,     ///< Prompt settings
+    CONFIG_SECTION_BEHAVIOR,   ///< Behavior settings
+    CONFIG_SECTION_ALIASES,    ///< Alias definitions
+    CONFIG_SECTION_KEYS,       ///< Key binding settings
+    CONFIG_SECTION_NETWORK,    ///< Network settings
+    CONFIG_SECTION_SCRIPTS,    ///< Script settings
+    CONFIG_SECTION_SHELL,      ///< Shell options
+    CONFIG_SECTION_DISPLAY     ///< Display settings
 } config_section_t;
 
 /**
@@ -73,11 +73,11 @@ typedef enum {
  * Controls how arrow keys behave in multiline editing contexts.
  */
 typedef enum {
-    LLE_ARROW_MODE_CONTEXT_AWARE, /**< Smart: multiline navigation when in
-                                     multiline */
-    LLE_ARROW_MODE_CLASSIC, /**< GNU Readline: always history navigation */
-    LLE_ARROW_MODE_ALWAYS_HISTORY, /**< Always history, use Ctrl-P/N only */
-    LLE_ARROW_MODE_MULTILINE_FIRST /**< Prioritize multiline navigation */
+    LLE_ARROW_MODE_CONTEXT_AWARE,  ///< Smart: multiline navigation when in
+                                   ///< multiline
+    LLE_ARROW_MODE_CLASSIC,        ///< GNU Readline: always history navigation
+    LLE_ARROW_MODE_ALWAYS_HISTORY, ///< Always history, use Ctrl-P/N only
+    LLE_ARROW_MODE_MULTILINE_FIRST ///< Prioritize multiline navigation
 } lle_arrow_key_mode_t;
 
 /**
@@ -86,10 +86,10 @@ typedef enum {
  * Controls how history is stored on disk.
  */
 typedef enum {
-    LLE_STORAGE_MODE_LLE_ONLY,       /**< Store only in LLE format */
-    LLE_STORAGE_MODE_BASH_ONLY,      /**< Store only in bash format */
-    LLE_STORAGE_MODE_DUAL,           /**< Store in both formats (recommended) */
-    LLE_STORAGE_MODE_READLINE_COMPAT /**< Use GNU Readline's storage */
+    LLE_STORAGE_MODE_LLE_ONLY,       ///< Store only in LLE format
+    LLE_STORAGE_MODE_BASH_ONLY,      ///< Store only in bash format
+    LLE_STORAGE_MODE_DUAL,           ///< Store in both formats (recommended)
+    LLE_STORAGE_MODE_READLINE_COMPAT ///< Use GNU Readline's storage
 } lle_history_storage_mode_t;
 
 /**
@@ -98,10 +98,10 @@ typedef enum {
  * Controls the scope of duplicate detection.
  */
 typedef enum {
-    LLE_DEDUP_SCOPE_NONE,    /**< No deduplication */
-    LLE_DEDUP_SCOPE_SESSION, /**< Within current session */
-    LLE_DEDUP_SCOPE_RECENT,  /**< Last N entries */
-    LLE_DEDUP_SCOPE_GLOBAL   /**< Entire history */
+    LLE_DEDUP_SCOPE_NONE,    ///< No deduplication
+    LLE_DEDUP_SCOPE_SESSION, ///< Within current session
+    LLE_DEDUP_SCOPE_RECENT,  ///< Last N entries
+    LLE_DEDUP_SCOPE_GLOBAL   ///< Entire history
 } lle_dedup_scope_t;
 
 /**
@@ -110,13 +110,12 @@ typedef enum {
  * Controls how duplicates are handled when detected.
  */
 typedef enum {
-    LLE_DEDUP_STRATEGY_IGNORE,        /**< Reject new duplicates, keep old */
-    LLE_DEDUP_STRATEGY_KEEP_RECENT,   /**< Keep newest, mark old as deleted
-                                         (default) */
-    LLE_DEDUP_STRATEGY_KEEP_FREQUENT, /**< Keep entry with highest usage count
-                                       */
-    LLE_DEDUP_STRATEGY_MERGE,   /**< Merge forensic metadata, keep existing */
-    LLE_DEDUP_STRATEGY_KEEP_ALL /**< No dedup (track frequency only) */
+    LLE_DEDUP_STRATEGY_IGNORE,        ///< Reject new duplicates, keep old
+    LLE_DEDUP_STRATEGY_KEEP_RECENT,   ///< Keep newest, mark old as deleted
+                                      ///< (default)
+    LLE_DEDUP_STRATEGY_KEEP_FREQUENT, ///< Keep entry with highest usage count
+    LLE_DEDUP_STRATEGY_MERGE,   ///< Merge forensic metadata, keep existing
+    LLE_DEDUP_STRATEGY_KEEP_ALL ///< No dedup (track frequency only)
 } lle_dedup_strategy_t;
 
 /**
@@ -125,16 +124,16 @@ typedef enum {
  * Tracks the current parsing context during configuration file processing.
  */
 typedef struct {
-    char *user_config_path;    /**< Path to user configuration file */
-    char *system_config_path;  /**< Path to system configuration file */
-    char *xdg_config_dir;      /**< XDG config directory path */
-    char *legacy_config_path;  /**< Path to legacy config if it exists */
-    bool user_config_exists;   /**< Whether user config file exists */
-    bool system_config_exists; /**< Whether system config file exists */
-    config_format_t format;    /**< Format of loaded config file */
-    bool needs_migration;      /**< True if legacy config needs migration */
-    int line_number;           /**< Current line number being parsed */
-    const char *current_file;  /**< Current file being parsed */
+    char *user_config_path;    ///< Path to user configuration file
+    char *system_config_path;  ///< Path to system configuration file
+    char *xdg_config_dir;      ///< XDG config directory path
+    char *legacy_config_path;  ///< Path to legacy config if it exists
+    bool user_config_exists;   ///< Whether user config file exists
+    bool system_config_exists; ///< Whether system config file exists
+    config_format_t format;    ///< Format of loaded config file
+    bool needs_migration;      ///< True if legacy config needs migration
+    int line_number;           ///< Current line number being parsed
+    const char *current_file;  ///< Current file being parsed
 } config_context_t;
 
 /**
@@ -143,133 +142,132 @@ typedef struct {
  * Contains all configuration settings for the shell.
  */
 typedef struct {
-    // History settings
-    bool history_enabled;    /**< Enable command history */
-    int history_size;        /**< Maximum history entries */
-    bool history_no_dups;    /**< Ignore duplicate entries */
-    bool history_timestamps; /**< Record timestamps */
-    char *history_file;      /**< History file path */
+    /// History settings
+    bool history_enabled;    ///< Enable command history
+    int history_size;        ///< Maximum history entries
+    bool history_no_dups;    ///< Ignore duplicate entries
+    bool history_timestamps; ///< Record timestamps
+    char *history_file;      ///< History file path
 
-    // LLE History Configuration
-    lle_arrow_key_mode_t lle_arrow_key_mode; /**< Arrow key behavior mode */
-    bool lle_enable_multiline_navigation;    /**< Enable multiline navigation */
-    bool lle_wrap_history_navigation;        /**< Wrap at history ends */
-    bool lle_save_line_on_history_nav;       /**< Save line when navigating */
-    bool lle_preserve_multiline_structure; /**< Preserve multiline structure */
-    bool lle_enable_multiline_editing;     /**< Enable multiline editing */
-    bool lle_show_multiline_indicators;    /**< Show multiline indicators */
-    bool lle_enable_interactive_search;    /**< Enable interactive search */
-    bool lle_search_fuzzy_matching;        /**< Enable fuzzy search matching */
-    bool lle_search_case_sensitive;        /**< Case-sensitive search */
-    lle_history_storage_mode_t lle_storage_mode; /**< History storage mode */
-    char *lle_history_file;                      /**< LLE history file path */
-    bool lle_sync_with_readline;             /**< Sync with readline history */
-    bool lle_export_to_bash_history;         /**< Export to bash history */
-    bool lle_enable_forensic_tracking;       /**< Enable forensic tracking */
-    bool lle_enable_deduplication;           /**< Enable deduplication */
-    lle_dedup_scope_t lle_dedup_scope;       /**< Deduplication scope */
-    lle_dedup_strategy_t lle_dedup_strategy; /**< Deduplication strategy */
-    bool lle_dedup_navigation;         /**< Skip duplicates during navigation */
-    bool lle_dedup_navigation_unique;  /**< Show only unique entries */
-    bool lle_dedup_unicode_normalize;  /**< Use Unicode NFC normalization */
-    bool lle_enable_history_cache;     /**< Enable history cache */
-    int lle_cache_size;                /**< Cache size */
-    bool lle_readline_compatible_mode; /**< Readline compatibility mode */
+    /// LLE History Configuration
+    lle_arrow_key_mode_t lle_arrow_key_mode; ///< Arrow key behavior mode
+    bool lle_enable_multiline_navigation;    ///< Enable multiline navigation
+    bool lle_wrap_history_navigation;        ///< Wrap at history ends
+    bool lle_save_line_on_history_nav;       ///< Save line when navigating
+    bool lle_preserve_multiline_structure;   ///< Preserve multiline structure
+    bool lle_enable_multiline_editing;       ///< Enable multiline editing
+    bool lle_show_multiline_indicators;      ///< Show multiline indicators
+    bool lle_enable_interactive_search;      ///< Enable interactive search
+    bool lle_search_fuzzy_matching;          ///< Enable fuzzy search matching
+    bool lle_search_case_sensitive;          ///< Case-sensitive search
+    lle_history_storage_mode_t lle_storage_mode; ///< History storage mode
+    char *lle_history_file;                      ///< LLE history file path
+    bool lle_sync_with_readline;                 ///< Sync with readline history
+    bool lle_export_to_bash_history;             ///< Export to bash history
+    bool lle_enable_forensic_tracking;           ///< Enable forensic tracking
+    bool lle_enable_deduplication;               ///< Enable deduplication
+    lle_dedup_scope_t lle_dedup_scope;           ///< Deduplication scope
+    lle_dedup_strategy_t lle_dedup_strategy;     ///< Deduplication strategy
+    bool lle_dedup_navigation;         ///< Skip duplicates during navigation
+    bool lle_dedup_navigation_unique;  ///< Show only unique entries
+    bool lle_dedup_unicode_normalize;  ///< Use Unicode NFC normalization
+    bool lle_enable_history_cache;     ///< Enable history cache
+    int lle_cache_size;                ///< Cache size
+    bool lle_readline_compatible_mode; ///< Readline compatibility mode
 
-    // Completion settings
-    bool completion_enabled;        /**< Enable tab completion */
-    bool fuzzy_completion;          /**< Enable fuzzy matching */
-    int completion_threshold;       /**< Minimum match score */
-    bool completion_case_sensitive; /**< Case-sensitive completion */
-    bool completion_show_all;       /**< Show all completions */
-    bool hints_enabled;             /**< Enable inline hints */
+    /// Completion settings
+    bool completion_enabled;        ///< Enable tab completion
+    bool fuzzy_completion;          ///< Enable fuzzy matching
+    int completion_threshold;       ///< Minimum match score
+    bool completion_case_sensitive; ///< Case-sensitive completion
+    bool completion_show_all;       ///< Show all completions
+    bool hints_enabled;             ///< Enable inline hints
 
-    // Prompt settings
-    bool use_theme_prompt;   /**< Use theme system for prompts */
-    char *prompt_theme;      /**< Theme name */
-    bool git_prompt_enabled; /**< Enable git info in prompt */
-    int git_cache_timeout;   /**< Git info cache timeout (seconds) */
-    char *prompt_format;     /**< Custom prompt format string */
+    /// Prompt settings
+    bool use_theme_prompt;   ///< Use theme system for prompts
+    char *prompt_theme;      ///< Theme name
+    bool git_prompt_enabled; ///< Enable git info in prompt
+    int git_cache_timeout;   ///< Git info cache timeout (seconds)
+    char *prompt_format;     ///< Custom prompt format string
 
-    // Theme settings
-    char *theme_name;                  /**< Active theme name */
-    bool theme_auto_detect_colors;     /**< Auto-detect color support */
-    bool theme_fallback_basic;         /**< Fall back to basic theme */
-    char *theme_corporate_company;     /**< Company name for corporate theme */
-    char *theme_corporate_department;  /**< Department for corporate theme */
-    char *theme_corporate_project;     /**< Project for corporate theme */
-    char *theme_corporate_environment; /**< Environment for corporate theme */
-    bool theme_show_company;           /**< Show company in prompt */
-    bool theme_show_department;        /**< Show department in prompt */
-    bool theme_show_right_prompt;      /**< Enable right-side prompt */
-    bool theme_enable_animations;      /**< Enable prompt animations */
-    bool theme_enable_icons;           /**< Enable Unicode icons */
-    int theme_color_support_override;  /**< Override detected color support */
+    /// Theme settings
+    char *theme_name;                  ///< Active theme name
+    bool theme_auto_detect_colors;     ///< Auto-detect color support
+    bool theme_fallback_basic;         ///< Fall back to basic theme
+    char *theme_corporate_company;     ///< Company name for corporate theme
+    char *theme_corporate_department;  ///< Department for corporate theme
+    char *theme_corporate_project;     ///< Project for corporate theme
+    char *theme_corporate_environment; ///< Environment for corporate theme
+    bool theme_show_company;           ///< Show company in prompt
+    bool theme_show_department;        ///< Show department in prompt
+    bool theme_show_right_prompt;      ///< Enable right-side prompt
+    bool theme_enable_animations;      ///< Enable prompt animations
+    bool theme_enable_icons;           ///< Enable Unicode icons
+    int theme_color_support_override;  ///< Override detected color support
 
-    // Behavior settings
-    bool auto_cd;            /**< Auto-cd to directories */
-    bool spell_correction;   /**< Enable spell correction */
-    bool confirm_exit;       /**< Confirm before exit */
-    int tab_width;           /**< Tab display width */
-    bool no_word_expand;     /**< Disable word expansion */
-    bool multiline_mode;     /**< Enable multiline editing */
-    int brace_expansion_max; /**< Max brace expansion result count (0 =
-                                unbounded) */
-    int regex_pattern_max;   /**< Max regex pattern length before rejection
-                                (0 = unbounded; covers `[[ =~ ]]` and
-                                extglob translation paths) */
-    int path_negative_cache_ttl_ms; /**< TTL (ms) for negative PATH-search
-                                       cache; bounds repeated lookups of a
-                                       missing command in tight loops to
-                                       O(1) instead of O(PATH_dirs)
-                                       (0 = disabled) */
-    int loop_failure_streak;  /**< Consecutive non-zero body iterations before
-                                 runaway-loop trip (0 = disable) */
-    int loop_failure_seconds; /**< Min wall-clock seconds streak must last
-                                 before tripping */
+    /// Behavior settings
+    bool auto_cd;            ///< Auto-cd to directories
+    bool spell_correction;   ///< Enable spell correction
+    bool confirm_exit;       ///< Confirm before exit
+    int tab_width;           ///< Tab display width
+    bool no_word_expand;     ///< Disable word expansion
+    bool multiline_mode;     ///< Enable multiline editing
+    int brace_expansion_max; ///< Max brace expansion result count (0 =
+                             ///< unbounded)
+    int regex_pattern_max;   ///< Max regex pattern length before rejection (0 =
+                             ///< unbounded; covers `[[ =~ ]]` and extglob
+                             ///< translation paths)
+    int path_negative_cache_ttl_ms; ///< TTL (ms) for negative PATH-search
+                                    ///< cache; bounds repeated lookups of a
+                                    ///< missing command in tight loops to O(1)
+                                    ///< instead of O(PATH_dirs) (0 = disabled)
+    int loop_failure_streak;  ///< Consecutive non-zero body iterations before
+                              ///< runaway-loop trip (0 = disable)
+    int loop_failure_seconds; ///< Min wall-clock seconds streak must last
+                              ///< before tripping
 
-    // Auto-correction settings
-    int autocorrect_max_suggestions; /**< Maximum suggestions */
-    int autocorrect_threshold;       /**< Minimum similarity threshold */
-    bool autocorrect_interactive;    /**< Interactive prompts */
-    bool autocorrect_learn_history;  /**< Learn from history */
-    bool autocorrect_builtins;       /**< Correct builtin names */
-    bool autocorrect_external;       /**< Correct external commands */
-    bool autocorrect_case_sensitive; /**< Case-sensitive matching */
+    /// Auto-correction settings
+    int autocorrect_max_suggestions; ///< Maximum suggestions
+    int autocorrect_threshold;       ///< Minimum similarity threshold
+    bool autocorrect_interactive;    ///< Interactive prompts
+    bool autocorrect_learn_history;  ///< Learn from history
+    bool autocorrect_builtins;       ///< Correct builtin names
+    bool autocorrect_external;       ///< Correct external commands
+    bool autocorrect_case_sensitive; ///< Case-sensitive matching
 
-    // Color settings
-    char *color_scheme;  /**< Active color scheme name */
-    bool colors_enabled; /**< Enable colored output */
+    /// Color settings
+    char *color_scheme;  ///< Active color scheme name
+    bool colors_enabled; ///< Enable colored output
 
-    // Advanced settings
-    bool verbose_errors; /**< Verbose error messages */
-    bool debug_mode;     /**< Enable debug mode */
+    /// Advanced settings
+    bool verbose_errors; ///< Verbose error messages
+    bool debug_mode;     ///< Enable debug mode
 
-    // Display system settings
-    bool display_syntax_highlighting;   /**< Enable syntax highlighting */
-    bool display_autosuggestions;       /**< Enable autosuggestions */
-    bool display_transient_prompt;      /**< Enable transient prompts */
-    bool display_theme_hot_reload;      /**< Auto-reload theme on file change */
-    bool display_newline_before_prompt; /**< Print newline before prompt */
-    bool display_performance_monitoring; /**< Enable performance monitoring */
-    int display_optimization_level;      /**< Optimization level (0-4) */
-    bool enhanced_display_mode; /**< Legacy display setting (deprecated) */
+    /// Display system settings
+    bool display_syntax_highlighting;    ///< Enable syntax highlighting
+    bool display_autosuggestions;        ///< Enable autosuggestions
+    bool display_transient_prompt;       ///< Enable transient prompts
+    bool display_theme_hot_reload;       ///< Auto-reload theme on file change
+    bool display_newline_before_prompt;  ///< Print newline before prompt
+    bool display_performance_monitoring; ///< Enable performance monitoring
+    int display_optimization_level;      ///< Optimization level (0-4)
+    bool enhanced_display_mode; ///< Legacy display setting (deprecated)
 
-    // Network settings
-    bool ssh_completion_enabled;  /**< Enable SSH host completion */
-    bool cloud_discovery_enabled; /**< Enable cloud host discovery */
-    bool cache_ssh_hosts;         /**< Cache SSH hosts */
-    int cache_timeout_minutes;    /**< Cache timeout in minutes */
-    bool show_remote_context;     /**< Show remote context */
-    bool auto_detect_cloud;       /**< Auto-detect cloud environment */
-    int max_completion_hosts;     /**< Maximum hosts for completion */
+    /// Network settings
+    bool ssh_completion_enabled;  ///< Enable SSH host completion
+    bool cloud_discovery_enabled; ///< Enable cloud host discovery
+    bool cache_ssh_hosts;         ///< Cache SSH hosts
+    int cache_timeout_minutes;    ///< Cache timeout in minutes
+    bool show_remote_context;     ///< Show remote context
+    bool auto_detect_cloud;       ///< Auto-detect cloud environment
+    int max_completion_hosts;     ///< Maximum hosts for completion
 
-    // Script execution control
-    bool script_execution; /**< Enable script execution */
+    /// Script execution control
+    bool script_execution; ///< Enable script execution
 
-    // Shell mode settings (Phase 0: Extended Language Support)
-    int shell_mode;         /**< Shell mode: 0=posix, 1=bash, 2=zsh, 3=lush */
-    bool shell_mode_strict; /**< Disallow runtime mode changes */
+    /// Shell mode settings (Phase 0: Extended Language Support)
+    int shell_mode;         ///< Shell mode: 0=posix, 1=bash, 2=zsh, 3=lush
+    bool shell_mode_strict; ///< Disallow runtime mode changes
 } config_values_t;
 
 /** @brief Global configuration instance */
@@ -874,4 +872,4 @@ void builtin_config(int argc, char **argv);
 /** @brief Configuration file template for new installations */
 extern const char *CONFIG_FILE_TEMPLATE;
 
-#endif // CONFIG_H
+#endif /// CONFIG_H

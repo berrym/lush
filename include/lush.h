@@ -86,23 +86,23 @@ extern bool shell_argv_is_dynamic;
  * and expansion mode flags.
  */
 typedef struct expansion_context {
-    bool in_double_quotes;   /**< Inside double quotes */
-    bool in_single_quotes;   /**< Inside single quotes */
-    bool in_var_assign;      /**< Processing variable assignment */
-    int var_assign_eq_count; /**< Number of = signs seen */
-    bool no_field_split;     /**< Disable field splitting */
-    bool no_pathname_expand; /**< Disable pathname expansion */
-    bool no_tilde_expand;    /**< Disable tilde expansion */
+    bool in_double_quotes;   ///< Inside double quotes
+    bool in_single_quotes;   ///< Inside single quotes
+    bool in_var_assign;      ///< Processing variable assignment
+    int var_assign_eq_count; ///< Number of = signs seen
+    bool no_field_split;     ///< Disable field splitting
+    bool no_pathname_expand; ///< Disable pathname expansion
+    bool no_tilde_expand;    ///< Disable tilde expansion
 } exp_ctx_t;
 
 /**
  * @brief Expansion result codes
  */
 typedef enum {
-    EXP_OK,           /**< Expansion succeeded */
-    EXP_ERROR,        /**< Expansion failed */
-    EXP_NO_EXPANSION, /**< No expansion needed */
-    EXP_INVALID_VAR   /**< Invalid variable reference */
+    EXP_OK,           ///< Expansion succeeded
+    EXP_ERROR,        ///< Expansion failed
+    EXP_NO_EXPANSION, ///< No expansion needed
+    EXP_INVALID_VAR   ///< Invalid variable reference
 } exp_result_t;
 
 /**
@@ -111,18 +111,18 @@ typedef enum {
  * Contains the result of an individual expansion operation.
  */
 typedef struct {
-    exp_result_t result; /**< Result code */
-    char *expanded;      /**< Expanded string (caller must free) */
-    size_t len;          /**< Length of expanded string */
+    exp_result_t result; ///< Result code
+    char *expanded;      ///< Expanded string (caller must free)
+    size_t len;          ///< Length of expanded string
 } expansion_t;
 
 /**
  * @brief String builder for efficient string manipulation
  */
 typedef struct string_builder {
-    char *data;      /**< String data buffer */
-    size_t len;      /**< Current string length */
-    size_t capacity; /**< Buffer capacity */
+    char *data;      ///< String data buffer
+    size_t len;      ///< Current string length
+    size_t capacity; ///< Buffer capacity
 } str_builder_t;
 
 /* ============================================================================
@@ -220,49 +220,48 @@ void set_shell_vari(char *name, int val);
  * Contains all shell option flags for behavior control.
  */
 typedef struct shell_options {
-    // Command-line invocation modes
-    bool command_mode;    /**< -c flag: execute command string */
-    char *command_string; /**< -c argument: command to execute */
-    bool stdin_mode;      /**< -s flag: read from stdin */
-    bool interactive;     /**< -i flag: force interactive mode */
-    bool login_shell;     /**< -l flag: login shell behavior */
-    bool analyze_mode;    /**< --analyze: full script analysis */
-    bool lint_mode;       /**< --lint: actionable linting with fix support */
-    bool fix_mode;        /**< --fix: apply safe automatic fixes */
-    bool unsafe_fixes;    /**< --unsafe-fixes: also apply unsafe fixes */
-    bool dry_run;         /**< --dry-run: preview fixes without applying */
-    char *analyze_file;   /**< --analyze/--lint argument: file to analyze */
-    char *output_format;  /**< --format: output format (text, json, gcc) */
+    /// Command-line invocation modes
+    bool command_mode;    ///< -c flag: execute command string
+    char *command_string; ///< -c argument: command to execute
+    bool stdin_mode;      ///< -s flag: read from stdin
+    bool interactive;     ///< -i flag: force interactive mode
+    bool login_shell;     ///< -l flag: login shell behavior
+    bool analyze_mode;    ///< --analyze: full script analysis
+    bool lint_mode;       ///< --lint: actionable linting with fix support
+    bool fix_mode;        ///< --fix: apply safe automatic fixes
+    bool unsafe_fixes;    ///< --unsafe-fixes: also apply unsafe fixes
+    bool dry_run;         ///< --dry-run: preview fixes without applying
+    char *analyze_file;   ///< --analyze/--lint argument: file to analyze
+    char *output_format;  ///< --format: output format (text, json, gcc)
 
-    // Shell behavior flags
-    bool exit_on_error;   /**< -e flag: exit on command failure */
-    bool trace_execution; /**< -x flag: trace command execution */
-    bool syntax_check;    /**< -n flag: syntax check only */
-    bool unset_error;     /**< -u flag: error on unset variables */
-    bool verbose;         /**< -v flag: print input lines */
-    bool no_globbing;     /**< -f flag: disable pathname expansion */
-    bool hash_commands;   /**< -h flag: command hashing */
-    bool job_control;     /**< -m flag: enable job control */
-    bool allexport;       /**< -a flag: automatically export all variables */
-    bool noclobber;       /**< -C flag: prevent overwriting with > */
-    bool onecmd;          /**< -t flag: exit after one command */
-    bool notify;          /**< -b flag: asynchronous job notification */
-    bool ignoreeof;       /**< ignoreeof: prevent exit on EOF (Ctrl+D) */
-    bool nolog;           /**< nolog: prevent function defs in history */
-    bool errtrace;        /**< -E flag: ERR trap inherits into functions */
-    bool functrace;       /**< -T flag: DEBUG/RETURN inherit into functions */
-    bool emacs_mode;      /**< emacs: emacs-style line editing (default) */
-    bool vi_mode;         /**< vi: vi-style line editing */
-    bool posix_mode;      /**< posix: strict POSIX compliance mode */
-    bool pipefail_mode;   /**< pipefail: pipeline fails if any command fails */
+    /// Shell behavior flags
+    bool exit_on_error;   ///< -e flag: exit on command failure
+    bool trace_execution; ///< -x flag: trace command execution
+    bool syntax_check;    ///< -n flag: syntax check only
+    bool unset_error;     ///< -u flag: error on unset variables
+    bool verbose;         ///< -v flag: print input lines
+    bool no_globbing;     ///< -f flag: disable pathname expansion
+    bool hash_commands;   ///< -h flag: command hashing
+    bool job_control;     ///< -m flag: enable job control
+    bool allexport;       ///< -a flag: automatically export all variables
+    bool noclobber;       ///< -C flag: prevent overwriting with >
+    bool onecmd;          ///< -t flag: exit after one command
+    bool notify;          ///< -b flag: asynchronous job notification
+    bool ignoreeof;       ///< ignoreeof: prevent exit on EOF (Ctrl+D)
+    bool nolog;           ///< nolog: prevent function defs in history
+    bool errtrace;        ///< -E flag: ERR trap inherits into functions
+    bool functrace;       ///< -T flag: DEBUG/RETURN inherit into functions
+    bool emacs_mode;      ///< emacs: emacs-style line editing (default)
+    bool vi_mode;         ///< vi: vi-style line editing
+    bool posix_mode;      ///< posix: strict POSIX compliance mode
+    bool pipefail_mode;   ///< pipefail: pipeline fails if any command fails
     bool pipeline_diagnostic_mode; ///< pipeline-diagnostic: emit a structured
                                    ///< error per non-zero pipeline stage
-    bool histexpand_mode;          /**< histexpand: enable history expansion */
-    bool history_mode; /**< history: enable command history recording */
-    bool interactive_comments_mode; /**< interactive-comments: enable # comments
-                                     */
-    bool physical_mode;             /**< physical: resolve symlinks in paths */
-    bool privileged_mode; /**< privileged: restricted shell security mode */
+    bool histexpand_mode;          ///< histexpand: enable history expansion
+    bool history_mode; ///< history: enable command history recording
+    bool interactive_comments_mode; ///< interactive-comments: enable # comments
+    bool physical_mode;             ///< physical: resolve symlinks in paths
+    bool privileged_mode; ///< privileged: restricted shell security mode
 
     /* Early-init CLI mode override. Populated by --posix/--bash/--zsh/--lush
      * during parse_opts; consumed by detect_initial_mode() before
@@ -408,9 +407,9 @@ int builtin_set(char **args);
  * forming a linked list of words.
  */
 typedef struct word {
-    char *data;        /**< Word text */
-    size_t len;        /**< Word length */
-    struct word *next; /**< Next word in list */
+    char *data;        ///< Word text
+    size_t len;        ///< Word length
+    struct word *next; ///< Next word in list
 } word_t;
 
 /**
@@ -760,4 +759,4 @@ int execute_new_parser_while(node_t *while_node);
  */
 int execute_new_parser_for(node_t *for_node);
 
-#endif // LUSH_H
+#endif /// LUSH_H

@@ -22,9 +22,9 @@
  * executed when the signal is received.
  */
 typedef struct trap_entry {
-    int signal;              /**< Signal number */
-    char *command;           /**< Command to execute on signal */
-    struct trap_entry *next; /**< Next trap in linked list */
+    int signal;              ///< Signal number
+    char *command;           ///< Command to execute on signal
+    struct trap_entry *next; ///< Next trap in linked list
 } trap_entry_t;
 
 /**

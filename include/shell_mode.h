@@ -33,11 +33,11 @@
  * and behavioral semantics.
  */
 typedef enum {
-    SHELL_MODE_POSIX, /**< Strict POSIX sh compliance - minimal features */
-    SHELL_MODE_BASH,  /**< Bash 5.x compatibility mode */
-    SHELL_MODE_ZSH,   /**< Zsh compatibility mode */
-    SHELL_MODE_LUSH,  /**< Lush-native: curated best of both (default) */
-    SHELL_MODE_COUNT  /**< Number of shell modes (for array sizing) */
+    SHELL_MODE_POSIX, ///< Strict POSIX sh compliance - minimal features
+    SHELL_MODE_BASH,  ///< Bash 5.x compatibility mode
+    SHELL_MODE_ZSH,   ///< Zsh compatibility mode
+    SHELL_MODE_LUSH,  ///< Lush-native: curated best of both (default)
+    SHELL_MODE_COUNT  ///< Number of shell modes (for array sizing)
 } shell_mode_t;
 
 /* ============================================================================
@@ -53,91 +53,90 @@ typedef enum {
  * via shell_mode_allows() to determine if it should be active.
  */
 typedef enum {
-    // Arrays (Phase 1)
-    FEATURE_INDEXED_ARRAYS,     /**< arr=(a b c), ${arr[0]} */
-    FEATURE_ASSOCIATIVE_ARRAYS, /**< declare -A, ${arr[key]} */
-    FEATURE_ARRAY_ZERO_INDEXED, /**< Bash: 0-indexed, Zsh: 1-indexed */
-    FEATURE_ARRAY_APPEND,       /**< arr+=(value) syntax */
+    /// Arrays (Phase 1)
+    FEATURE_INDEXED_ARRAYS,     ///< arr=(a b c), ${arr[0]}
+    FEATURE_ASSOCIATIVE_ARRAYS, ///< declare -A, ${arr[key]}
+    FEATURE_ARRAY_ZERO_INDEXED, ///< Bash: 0-indexed, Zsh: 1-indexed
+    FEATURE_ARRAY_APPEND,       ///< arr+=(value) syntax
 
-    // Arithmetic (Phase 1)
-    FEATURE_ARITH_COMMAND, /**< (( expr )) as command */
-    FEATURE_LET_BUILTIN,   /**< let builtin command */
+    /// Arithmetic (Phase 1)
+    FEATURE_ARITH_COMMAND, ///< (( expr )) as command
+    FEATURE_LET_BUILTIN,   ///< let builtin command
 
-    // Extended Tests (Phase 2)
-    FEATURE_EXTENDED_TEST, /**< [[ ]] extended test */
-    FEATURE_REGEX_MATCH,   /**< =~ regex matching */
-    FEATURE_PATTERN_MATCH, /**< == pattern matching in [[ ]] */
+    /// Extended Tests (Phase 2)
+    FEATURE_EXTENDED_TEST, ///< [[ ]] extended test
+    FEATURE_REGEX_MATCH,   ///< =~ regex matching
+    FEATURE_PATTERN_MATCH, ///< == pattern matching in [[ ]]
 
-    // Process Substitution (Phase 3)
-    FEATURE_PROCESS_SUBSTITUTION, /**< <(cmd) and >(cmd) */
-    FEATURE_PIPE_STDERR,          /**< |& pipe stderr too */
-    FEATURE_APPEND_BOTH,          /**< &>> append both streams */
-    FEATURE_COPROC,               /**< coproc command */
+    /// Process Substitution (Phase 3)
+    FEATURE_PROCESS_SUBSTITUTION, ///< <(cmd) and >(cmd)
+    FEATURE_PIPE_STDERR,          ///< |& pipe stderr too
+    FEATURE_APPEND_BOTH,          ///< &>> append both streams
+    FEATURE_COPROC,               ///< coproc command
 
-    // Extended Parameter Expansion (Phase 4)
-    FEATURE_CASE_MODIFICATION,    /**< ${var^^}, ${var,,} */
-    FEATURE_SUBSTRING_EXPANSION,  /**< ${var:offset:length} */
-    FEATURE_PATTERN_SUBSTITUTION, /**< ${var/pattern/replacement} */
-    FEATURE_INDIRECT_EXPANSION,   /**< ${!var}, ${!prefix*} */
-    FEATURE_PARAM_TRANSFORMATION, /**< ${var@Q}, ${var@E}, etc. */
+    /// Extended Parameter Expansion (Phase 4)
+    FEATURE_CASE_MODIFICATION,    ///< ${var^^}, ${var,,}
+    FEATURE_SUBSTRING_EXPANSION,  ///< ${var:offset:length}
+    FEATURE_PATTERN_SUBSTITUTION, ///< ${var/pattern/replacement}
+    FEATURE_INDIRECT_EXPANSION,   ///< ${!var}, ${!prefix*}
+    FEATURE_PARAM_TRANSFORMATION, ///< ${var@Q}, ${var@E}, etc.
 
-    // Extended Globbing
-    FEATURE_EXTENDED_GLOB, /**< extglob: ?(pat), *(pat), etc. */
-    FEATURE_NULL_GLOB, /**< Null glob: unmatched patterns expand to nothing */
-    FEATURE_DOT_GLOB,  /**< Include dotfiles in glob matches */
-    FEATURE_GLOBSTAR,  /**< ** matches recursively through directories */
+    /// Extended Globbing
+    FEATURE_EXTENDED_GLOB, ///< extglob: ?(pat), *(pat), etc.
+    FEATURE_NULL_GLOB,     ///< Null glob: unmatched patterns expand to nothing
+    FEATURE_DOT_GLOB,      ///< Include dotfiles in glob matches
+    FEATURE_GLOBSTAR,      ///< ** matches recursively through directories
 
-    // Brace Expansion
-    FEATURE_BRACE_EXPANSION, /**< {a,b,c} and {1..10} brace expansion */
+    /// Brace Expansion
+    FEATURE_BRACE_EXPANSION, ///< {a,b,c} and {1..10} brace expansion
 
-    // Quoting Extensions
-    FEATURE_ANSI_QUOTING,   /**< $'...' ANSI-C quoting with escape sequences */
-    FEATURE_LOCALE_QUOTING, /**< $"..." locale-aware quoting (gettext) */
+    /// Quoting Extensions
+    FEATURE_ANSI_QUOTING,   ///< $'...' ANSI-C quoting with escape sequences
+    FEATURE_LOCALE_QUOTING, ///< $"..." locale-aware quoting (gettext)
 
-    // Control Flow Extensions (Phase 5)
-    FEATURE_CASE_FALLTHROUGH, /**< ;& and ;;& in case statements */
-    FEATURE_SELECT_LOOP,      /**< select var in list; do ... done */
-    FEATURE_TIME_KEYWORD,     /**< time command with TIMEFORMAT */
+    /// Control Flow Extensions (Phase 5)
+    FEATURE_CASE_FALLTHROUGH, ///< ;& and ;;& in case statements
+    FEATURE_SELECT_LOOP,      ///< select var in list; do ... done
+    FEATURE_TIME_KEYWORD,     ///< time command with TIMEFORMAT
 
-    // Behavior Defaults
-    FEATURE_WORD_SPLIT_DEFAULT, /**< Word splitting on by default (Bash) */
-    FEATURE_AUTO_CD,          /**< Auto-cd to directories without cd command */
-    FEATURE_AUTO_PUSHD,       /**< Auto-push directories to stack on cd */
-    FEATURE_CDABLE_VARS,      /**< Treat unset vars as directory names for cd */
-    FEATURE_ERREXIT_IN_LOOPS, /**< Loop body's first non-zero exit aborts the
-                                 loop. Curated lush-mode default; off in
-                                 POSIX/bash/zsh modes for polyglot parity.
-                                 Toggleable per-script via setopt/unsetopt. */
-    FEATURE_XPG_ECHO, /**< echo interprets \n, \t, etc. by default (XSI/zsh
-                         behavior); when false, echo prints args literally
-                         unless `-e` is given (bash default). Bridged via
-                         `xpg_echo` (bash shopt name) and inverted alias
-                         `bsd_echo` (zsh setopt name). */
+    /// Behavior Defaults
+    FEATURE_WORD_SPLIT_DEFAULT, ///< Word splitting on by default (Bash)
+    FEATURE_AUTO_CD,            ///< Auto-cd to directories without cd command
+    FEATURE_AUTO_PUSHD,         ///< Auto-push directories to stack on cd
+    FEATURE_CDABLE_VARS,        ///< Treat unset vars as directory names for cd
+    FEATURE_ERREXIT_IN_LOOPS,   ///< Loop body's first non-zero exit aborts the
+                                ///< loop. Curated lush-mode default; off in
+                                ///< POSIX/bash/zsh modes for polyglot parity.
+                                ///< Toggleable per-script via setopt/unsetopt.
+    FEATURE_XPG_ECHO, ///< echo interprets \n, \t, etc. by default (XSI/zsh
+                      ///< behavior); when false, echo prints args literally
+                      ///< unless `-e` is given (bash default). Bridged via
+                      ///< `xpg_echo` (bash shopt name) and inverted alias
+                      ///< `bsd_echo` (zsh setopt name).
 
-    // History Behavior
-    FEATURE_HISTAPPEND, /**< Append to history file instead of overwrite */
-    FEATURE_INC_APPEND_HISTORY, /**< Append each command immediately (better
-                                   crash recovery) */
-    FEATURE_SHARE_HISTORY, /**< Share history between concurrent sessions */
-    FEATURE_HIST_VERIFY,   /**< Verify history expansion before execution */
-    FEATURE_CHECKJOBS,     /**< Warn about running jobs on exit */
+    /// History Behavior
+    FEATURE_HISTAPPEND,         ///< Append to history file instead of overwrite
+    FEATURE_INC_APPEND_HISTORY, ///< Append each command immediately (better
+                                ///< crash recovery)
+    FEATURE_SHARE_HISTORY,      ///< Share history between concurrent sessions
+    FEATURE_HIST_VERIFY,        ///< Verify history expansion before execution
+    FEATURE_CHECKJOBS,          ///< Warn about running jobs on exit
 
-    // Function Enhancements (Phase 6)
-    FEATURE_NAMEREF,             /**< local -n nameref variables */
-    FEATURE_ANONYMOUS_FUNCTIONS, /**< Zsh () { } anonymous functions */
-    FEATURE_RETURN_ANYWHERE,     /**< return from sourced scripts */
+    /// Function Enhancements (Phase 6)
+    FEATURE_NAMEREF,             ///< local -n nameref variables
+    FEATURE_ANONYMOUS_FUNCTIONS, ///< Zsh () { } anonymous functions
+    FEATURE_RETURN_ANYWHERE,     ///< return from sourced scripts
 
-    // Zsh-Specific (Phase 7)
-    FEATURE_GLOB_QUALIFIERS,    /**< Zsh glob qualifiers: *(.) *(/) */
-    FEATURE_HOOK_FUNCTIONS,     /**< precmd, preexec, chpwd hooks */
-    FEATURE_SIMPLE_HOOK_ARRAYS, /**< precmd+=(fn) in addition to
-                                   precmd_functions+=(fn) */
-    FEATURE_PROMPT_COMMAND,     /**< Bash PROMPT_COMMAND (string and array) */
-    FEATURE_ZSH_PARAM_FLAGS,    /**< Zsh-style parameter flags */
-    FEATURE_ZSH_BARE_SUBSCRIPT, /**< Zsh bare-$var[N] subscript (vs ${var[N]})
-                                 */
-    FEATURE_ZSH_PRINT_BUILTIN,  /**< Zsh `print` builtin (-l/-n/-r/-u/-f) */
-    FEATURE_PLUGIN_SYSTEM,      /**< Dynamic plugin loading system */
+    /// Zsh-Specific (Phase 7)
+    FEATURE_GLOB_QUALIFIERS,    ///< Zsh glob qualifiers: *(.) *(/)
+    FEATURE_HOOK_FUNCTIONS,     ///< precmd, preexec, chpwd hooks
+    FEATURE_SIMPLE_HOOK_ARRAYS, ///< precmd+=(fn) in addition to
+                                ///< precmd_functions+=(fn)
+    FEATURE_PROMPT_COMMAND,     ///< Bash PROMPT_COMMAND (string and array)
+    FEATURE_ZSH_PARAM_FLAGS,    ///< Zsh-style parameter flags
+    FEATURE_ZSH_BARE_SUBSCRIPT, ///< Zsh bare-$var[N] subscript (vs ${var[N]})
+    FEATURE_ZSH_PRINT_BUILTIN,  ///< Zsh `print` builtin (-l/-n/-r/-u/-f)
+    FEATURE_PLUGIN_SYSTEM,      ///< Dynamic plugin loading system
     FEATURE_KIND_SIGILS,        ///< Top-level @name / %name sigils for vector
                                 ///< and pair presentation contexts.  Stealing
                                 ///< @ and % from word characters at word-start
@@ -146,8 +145,8 @@ typedef enum {
                                 ///< `@reboot`, `user@host`, and `make %.o:%.c`
                                 ///< keep their bare-word reading.
 
-    // Sentinel - must be last
-    FEATURE_COUNT /**< Number of features (for array sizing) */
+    /// Sentinel - must be last
+    FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;
 
 /* ============================================================================
@@ -163,11 +162,10 @@ typedef enum {
  * regardless of the current mode.
  */
 typedef struct {
-    shell_mode_t current_mode;             /**< Active shell mode */
-    bool feature_overrides[FEATURE_COUNT]; /**< Override values per feature */
-    bool feature_override_set[FEATURE_COUNT]; /**< Which features are overridden
-                                               */
-    bool strict_mode; /**< Disallow runtime mode changes */
+    shell_mode_t current_mode;                ///< Active shell mode
+    bool feature_overrides[FEATURE_COUNT];    ///< Override values per feature
+    bool feature_override_set[FEATURE_COUNT]; ///< Which features are overridden
+    bool strict_mode;                         ///< Disallow runtime mode changes
 } shell_mode_state_t;
 
 /** @brief Global shell mode state */
@@ -469,4 +467,4 @@ void shell_mode_debug_print(void);
  */
 int shell_feature_describe(shell_feature_t feature, char *buffer, size_t size);
 
-#endif // SHELL_MODE_H
+#endif /// SHELL_MODE_H

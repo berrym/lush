@@ -13,7 +13,7 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include "shell_error.h" // For source_location_t
+#include "shell_error.h" /// For source_location_t
 
 #include <stddef.h>
 #include <stdint.h>
@@ -21,72 +21,72 @@
 
 typedef enum {
     NODE_COMMAND,           ///< Simple command (argv-style)
-    NODE_ASSIGN,            /**< cmd_prefix assignment: val.str = "var=value" /
-                               "var+=value" */
+    NODE_ASSIGN,            ///< cmd_prefix assignment: val.str = "var=value" /
+                            ///< "var+=value"
     NODE_VAR,               ///< Variable reference
-    NODE_STRING_LITERAL,    /**< Single-quoted string - no expansion */
-    NODE_STRING_EXPANDABLE, /**< Double-quoted string - variable expansion */
-    NODE_ARITH_EXP,         /**< Arithmetic expansion $((expr)) */
-    NODE_COMMAND_SUB,       /**< Command substitution $(cmd) */
+    NODE_STRING_LITERAL,    ///< Single-quoted string - no expansion
+    NODE_STRING_EXPANDABLE, ///< Double-quoted string - variable expansion
+    NODE_ARITH_EXP,         ///< Arithmetic expansion $((expr))
+    NODE_COMMAND_SUB,       ///< Command substitution $(cmd)
     NODE_PIPE,              ///< Pipe operator '|'
-    NODE_REDIR_IN,          /**< '<' */
-    NODE_REDIR_OUT,         /**< '>' */
-    NODE_REDIR_APPEND,      /**< '>>' */
-    NODE_REDIR_ERR,         /**< 'N>' (any fd output, e.g., 2>, 3>) */
-    NODE_REDIR_IN_FD,       /**< 'N<' (any fd input, e.g., 3<, 4<) */
-    NODE_REDIR_ERR_APPEND,  /**< 'N>>' (any fd append, e.g., 2>>, 3>>) */
-    NODE_REDIR_HEREDOC,     /**< '<<' */
-    NODE_REDIR_HEREDOC_STRIP, /**< '<<-' */
-    NODE_REDIR_HERESTRING,    /**< '<<<' */
-    NODE_REDIR_BOTH,          /**< '&>' */
-    NODE_REDIR_BOTH_APPEND,   /**< '&>>' - append both stdout and stderr */
-    NODE_REDIR_FD,            /**< '&1', '&2', etc. */
-    NODE_REDIR_FD_ALLOC, /**< '{varname}>' - fd allocation (bash 4.1+/zsh) */
-    NODE_REDIR_CLOBBER,  /**< '>|' */
-    // List types for semantic clarity
-    NODE_COMMAND_LIST, /**< Sequence of commands separated by semicolons */
-    NODE_PIPELINE,     /**< Sequence of commands connected by pipes */
-    // Control structures
-    NODE_IF,        /**< if statement */
-    NODE_FOR,       /**< for loop (POSIX: for var in words) */
-    NODE_FOR_ARITH, /**< C-style for loop: for ((init; test; update)) */
-    NODE_WHILE,     /**< while loop */
-    NODE_UNTIL,     /**< until loop */
-    NODE_REPEAT,   /**< zsh repeat N loop: repeat N do/done OR repeat N {...} */
-    NODE_CASE,     /**< case statement */
-    NODE_FUNCTION, /**< function definition */
-    NODE_BRACE_GROUP, /**< brace group { commands; } */
-    NODE_SUBSHELL,    /**< subshell ( commands ) */
-    // Logical operators
-    NODE_LOGICAL_AND, /**< && operator */
-    NODE_LOGICAL_OR,  /**< || operator */
-    // Job control
-    NODE_BACKGROUND, /**< & operator (background execution) */
+    NODE_REDIR_IN,          ///< '<'
+    NODE_REDIR_OUT,         ///< '>'
+    NODE_REDIR_APPEND,      ///< '>>'
+    NODE_REDIR_ERR,         ///< 'N>' (any fd output, e.g., 2>, 3>)
+    NODE_REDIR_IN_FD,       ///< 'N<' (any fd input, e.g., 3<, 4<)
+    NODE_REDIR_ERR_APPEND,  ///< 'N>>' (any fd append, e.g., 2>>, 3>>)
+    NODE_REDIR_HEREDOC,     ///< '<<'
+    NODE_REDIR_HEREDOC_STRIP, ///< '<<-'
+    NODE_REDIR_HERESTRING,    ///< '<<<'
+    NODE_REDIR_BOTH,          ///< '&>'
+    NODE_REDIR_BOTH_APPEND,   ///< '&>>' - append both stdout and stderr
+    NODE_REDIR_FD,            ///< '&1', '&2', etc.
+    NODE_REDIR_FD_ALLOC,      ///< '{varname}>' - fd allocation (bash 4.1+/zsh)
+    NODE_REDIR_CLOBBER,       ///< '>|'
+    /// List types for semantic clarity
+    NODE_COMMAND_LIST, ///< Sequence of commands separated by semicolons
+    NODE_PIPELINE,     ///< Sequence of commands connected by pipes
+    /// Control structures
+    NODE_IF,          ///< if statement
+    NODE_FOR,         ///< for loop (POSIX: for var in words)
+    NODE_FOR_ARITH,   ///< C-style for loop: for ((init; test; update))
+    NODE_WHILE,       ///< while loop
+    NODE_UNTIL,       ///< until loop
+    NODE_REPEAT,      ///< zsh repeat N loop: repeat N do/done OR repeat N {...}
+    NODE_CASE,        ///< case statement
+    NODE_FUNCTION,    ///< function definition
+    NODE_BRACE_GROUP, ///< brace group { commands; }
+    NODE_SUBSHELL,    ///< subshell ( commands )
+    /// Logical operators
+    NODE_LOGICAL_AND, ///< && operator
+    NODE_LOGICAL_OR,  ///< || operator
+    /// Job control
+    NODE_BACKGROUND, ///< & operator (background execution)
 
-    // Extended language features (Phase 1: Arrays and Arithmetic)
-    NODE_ARITH_CMD,     /**< (( expr )) - arithmetic command evaluation */
-    NODE_ARRAY_LITERAL, /**< (a b c) - array literal */
-    NODE_ARRAY_ACCESS,  /**< ${arr[index]} - array element access */
-    NODE_ARRAY_ASSIGN,  /**< arr[n]=value or arr=(...) - array assignment */
-    NODE_ARRAY_APPEND,  /**< arr+=(a b c) - append elements to array */
+    /// Extended language features (Phase 1: Arrays and Arithmetic)
+    NODE_ARITH_CMD,     ///< (( expr )) - arithmetic command evaluation
+    NODE_ARRAY_LITERAL, ///< (a b c) - array literal
+    NODE_ARRAY_ACCESS,  ///< ${arr[index]} - array element access
+    NODE_ARRAY_ASSIGN,  ///< arr[n]=value or arr=(...) - array assignment
+    NODE_ARRAY_APPEND,  ///< arr+=(a b c) - append elements to array
 
-    // Extended language features (Phase 2: Extended Tests)
-    NODE_EXTENDED_TEST, /**< [[ expr ]] - extended test command */
+    /// Extended language features (Phase 2: Extended Tests)
+    NODE_EXTENDED_TEST, ///< [[ expr ]] - extended test command
 
-    // Extended language features (Phase 3: Process Substitution)
-    NODE_PROC_SUB_IN,  /**< <(cmd) - process substitution input */
-    NODE_PROC_SUB_OUT, /**< >(cmd) - process substitution output */
-    NODE_COPROC,       /**< coproc name cmd - coprocess */
+    /// Extended language features (Phase 3: Process Substitution)
+    NODE_PROC_SUB_IN,  ///< <(cmd) - process substitution input
+    NODE_PROC_SUB_OUT, ///< >(cmd) - process substitution output
+    NODE_COPROC,       ///< coproc name cmd - coprocess
 
-    // Extended language features (Phase 5: Control Flow)
-    NODE_CASE_ITEM, /**< Case item with terminator type */
-    NODE_SELECT,    /**< select var in list; do body; done */
-    NODE_TIME,      /**< time [-p] pipeline */
-    NODE_NEGATE,    /**< ! pipeline - negate exit status */
+    /// Extended language features (Phase 5: Control Flow)
+    NODE_CASE_ITEM, ///< Case item with terminator type
+    NODE_SELECT,    ///< select var in list; do body; done
+    NODE_TIME,      ///< time [-p] pipeline
+    NODE_NEGATE,    ///< ! pipeline - negate exit status
 
-    // Extended language features (Phase 7: Zsh-Specific)
-    NODE_ANON_FUNCTION, /**< () { body } - anonymous function (immediately
-                           executed) */
+    /// Extended language features (Phase 7: Zsh-Specific)
+    NODE_ANON_FUNCTION, ///< () { body } - anonymous function (immediately
+                        ///< executed)
 
     /**
      * @brief Typed-function form AST nodes.
@@ -113,11 +113,11 @@ typedef enum {
     NODE_LET_FN,
 } node_type_t;
 
-// Case item terminator types for fall-through behavior
+/// Case item terminator types for fall-through behavior
 typedef enum {
-    CASE_TERM_BREAK,       /**< ;; - stop processing (default) */
-    CASE_TERM_FALLTHROUGH, /**< ;& - execute next item without pattern test */
-    CASE_TERM_CONTINUE,    /**< ;;& - continue testing next patterns */
+    CASE_TERM_BREAK,       ///< ;; - stop processing (default)
+    CASE_TERM_FALLTHROUGH, ///< ;& - execute next item without pattern test
+    CASE_TERM_CONTINUE,    ///< ;;& - continue testing next patterns
 } case_terminator_t;
 
 typedef enum {
@@ -150,7 +150,7 @@ typedef struct node {
     struct node *first_child;                 ///< First child in linked list
     struct node *next_sibling, *prev_sibling; ///< Sibling linked-list pointers
 
-    // Source location tracking for error reporting
+    /// Source location tracking for error reporting
     source_location_t loc;
 } node_t;
 

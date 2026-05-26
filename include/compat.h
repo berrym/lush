@@ -34,11 +34,11 @@
  * construct they describe.
  */
 typedef enum {
-    COMPAT_CATEGORY_BUILTIN,   /**< Built-in command differences (echo, test) */
-    COMPAT_CATEGORY_EXPANSION, /**< Variable/parameter expansion differences */
-    COMPAT_CATEGORY_QUOTING,   /**< Quoting and escaping differences */
-    COMPAT_CATEGORY_SYNTAX,    /**< Syntax differences (arrays, functions) */
-    COMPAT_CATEGORY_COUNT      /**< Number of categories (for array sizing) */
+    COMPAT_CATEGORY_BUILTIN,   ///< Built-in command differences (echo, test)
+    COMPAT_CATEGORY_EXPANSION, ///< Variable/parameter expansion differences
+    COMPAT_CATEGORY_QUOTING,   ///< Quoting and escaping differences
+    COMPAT_CATEGORY_SYNTAX,    ///< Syntax differences (arrays, functions)
+    COMPAT_CATEGORY_COUNT      ///< Number of categories (for array sizing)
 } compat_category_t;
 
 /**
@@ -48,10 +48,10 @@ typedef enum {
  * determine how to report issues.
  */
 typedef enum {
-    COMPAT_SEVERITY_INFO,    /**< Informational - no action needed */
-    COMPAT_SEVERITY_WARNING, /**< May cause portability issues */
-    COMPAT_SEVERITY_ERROR,   /**< Will definitely fail in target shell */
-    COMPAT_SEVERITY_COUNT    /**< Number of severity levels */
+    COMPAT_SEVERITY_INFO,    ///< Informational - no action needed
+    COMPAT_SEVERITY_WARNING, ///< May cause portability issues
+    COMPAT_SEVERITY_ERROR,   ///< Will definitely fail in target shell
+    COMPAT_SEVERITY_COUNT    ///< Number of severity levels
 } compat_severity_t;
 
 /**
@@ -61,10 +61,10 @@ typedef enum {
  * applied automatically by the linter.
  */
 typedef enum {
-    FIX_TYPE_NONE,   /**< No automatic fix available */
-    FIX_TYPE_SAFE,   /**< Safe to apply automatically (--fix) */
-    FIX_TYPE_UNSAFE, /**< Risky fix, requires --unsafe-fixes */
-    FIX_TYPE_MANUAL, /**< Cannot be auto-fixed, requires manual rewrite */
+    FIX_TYPE_NONE,   ///< No automatic fix available
+    FIX_TYPE_SAFE,   ///< Safe to apply automatically (--fix)
+    FIX_TYPE_UNSAFE, ///< Risky fix, requires --unsafe-fixes
+    FIX_TYPE_MANUAL, ///< Cannot be auto-fixed, requires manual rewrite
 } fix_type_t;
 
 /**
@@ -73,10 +73,10 @@ typedef enum {
  * Describes how a specific shell handles a particular construct.
  */
 typedef struct {
-    const char *posix; /**< POSIX sh behavior */
-    const char *bash;  /**< Bash behavior */
-    const char *zsh;   /**< Zsh behavior */
-    const char *lush;  /**< Lush behavior */
+    const char *posix; ///< POSIX sh behavior
+    const char *bash;  ///< Bash behavior
+    const char *zsh;   ///< Zsh behavior
+    const char *lush;  ///< Lush behavior
 } compat_behavior_t;
 
 /**
@@ -88,10 +88,10 @@ typedef struct {
  * (since the behavior differs slightly).
  */
 typedef struct {
-    fix_type_t posix; /**< Fix safety when targeting POSIX */
-    fix_type_t bash;  /**< Fix safety when targeting Bash */
-    fix_type_t zsh;   /**< Fix safety when targeting Zsh */
-    fix_type_t lush;  /**< Fix safety when targeting Lush */
+    fix_type_t posix; ///< Fix safety when targeting POSIX
+    fix_type_t bash;  ///< Fix safety when targeting Bash
+    fix_type_t zsh;   ///< Fix safety when targeting Zsh
+    fix_type_t lush;  ///< Fix safety when targeting Lush
 } compat_fix_class_t;
 
 /**
@@ -101,12 +101,12 @@ typedef struct {
  * issue, including optional auto-fix configuration.
  */
 typedef struct {
-    compat_severity_t severity; /**< Severity level */
-    const char *message;        /**< Message shown to user */
-    const char *suggestion;     /**< Suggested fix (optional) */
-    const char *pattern;        /**< Regex pattern to detect (optional) */
-    compat_fix_class_t fix;     /**< Per-shell fix classification */
-    const char *replacement;    /**< Replacement pattern for auto-fix */
+    compat_severity_t severity; ///< Severity level
+    const char *message;        ///< Message shown to user
+    const char *suggestion;     ///< Suggested fix (optional)
+    const char *pattern;        ///< Regex pattern to detect (optional)
+    compat_fix_class_t fix;     ///< Per-shell fix classification
+    const char *replacement;    ///< Replacement pattern for auto-fix
 } compat_lint_t;
 
 /**
@@ -116,12 +116,12 @@ typedef struct {
  * difference between shells.
  */
 typedef struct {
-    const char *id;             /**< Unique identifier */
-    compat_category_t category; /**< Category of this entry */
-    const char *feature;        /**< Feature name (e.g., "echo", "arrays") */
-    const char *description;    /**< Human-readable description */
-    compat_behavior_t behavior; /**< Per-shell behavior descriptions */
-    compat_lint_t lint;         /**< Lint configuration */
+    const char *id;             ///< Unique identifier
+    compat_category_t category; ///< Category of this entry
+    const char *feature;        ///< Feature name (e.g., "echo", "arrays")
+    const char *description;    ///< Human-readable description
+    compat_behavior_t behavior; ///< Per-shell behavior descriptions
+    compat_lint_t lint;         ///< Lint configuration
 } compat_entry_t;
 
 /**
@@ -130,11 +130,11 @@ typedef struct {
  * Result of checking a construct for compatibility with a target shell.
  */
 typedef struct {
-    bool is_portable;            /**< True if construct is portable to target */
-    const compat_entry_t *entry; /**< Entry that matched (if not portable) */
-    shell_mode_t target;         /**< Target shell that was checked against */
-    int line;                    /**< Line number where issue was found */
-    int column;                  /**< Column number where issue was found */
+    bool is_portable;            ///< True if construct is portable to target
+    const compat_entry_t *entry; ///< Entry that matched (if not portable)
+    shell_mode_t target;         ///< Target shell that was checked against
+    int line;                    ///< Line number where issue was found
+    int column;                  ///< Column number where issue was found
 } compat_result_t;
 
 /* ============================================================================
@@ -286,7 +286,7 @@ size_t compat_check_line(const char *line, shell_mode_t target,
 size_t compat_check_script(const char *script, shell_mode_t target,
                            compat_result_t *results, size_t max_results);
 
-// Forward declaration for AST node
+/// Forward declaration for AST node
 struct node;
 
 /**
@@ -298,10 +298,10 @@ struct node;
 typedef struct {
     int line;
     int column;
-    const char *severity;   /**< Static string, not owned */
-    const char *message;    /**< Static string from TOML, not owned */
-    const char *suggestion; /**< Static string from TOML, not owned */
-    const char *feature;    /**< Static string, not owned */
+    const char *severity;   ///< Static string, not owned
+    const char *message;    ///< Static string from TOML, not owned
+    const char *suggestion; ///< Static string from TOML, not owned
+    const char *feature;    ///< Static string, not owned
 } compat_ast_issue_t;
 
 /**
@@ -500,4 +500,4 @@ void compat_debug_print_stats(void);
  */
 void compat_debug_print_entry(const compat_entry_t *entry);
 
-#endif // COMPAT_H
+#endif /// COMPAT_H

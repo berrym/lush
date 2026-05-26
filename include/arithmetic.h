@@ -123,4 +123,4 @@ const char *arithm_error_while(void);
 /** @brief Returns the `help:` suggestion for the current error. May be NULL. */
 const char *arithm_error_help(void);
 
-#endif // ARITHMETIC_H
+#endif /// ARITHMETIC_H

@@ -33,50 +33,50 @@
  * Fixes are applied from end to start to preserve line/column positions.
  */
 typedef struct {
-    int line;                    /**< Line number (1-based) */
-    int column;                  /**< Column number (1-based) */
-    size_t match_start;          /**< Byte offset of match start */
-    size_t match_length;         /**< Length of matched text */
-    const char *original;        /**< Original matched text (not owned) */
-    const char *replacement;     /**< Replacement text (not owned) */
-    fix_type_t type;             /**< Fix type (safe/unsafe/manual) */
-    const char *message;         /**< Description of the fix (not owned) */
-    const compat_entry_t *entry; /**< Source compat entry (not owned) */
+    int line;                    ///< Line number (1-based)
+    int column;                  ///< Column number (1-based)
+    size_t match_start;          ///< Byte offset of match start
+    size_t match_length;         ///< Length of matched text
+    const char *original;        ///< Original matched text (not owned)
+    const char *replacement;     ///< Replacement text (not owned)
+    fix_type_t type;             ///< Fix type (safe/unsafe/manual)
+    const char *message;         ///< Description of the fix (not owned)
+    const compat_entry_t *entry; ///< Source compat entry (not owned)
 } fixer_fix_t;
 
 /**
  * @brief Collection of fixes for a script
  */
 typedef struct {
-    fixer_fix_t *fixes; /**< Array of fixes */
-    size_t count;       /**< Number of fixes */
-    size_t capacity;    /**< Allocated capacity */
-    char *script_path;  /**< Path to script being fixed */
-    char *content;      /**< Original content (owned) */
-    size_t content_len; /**< Content length */
+    fixer_fix_t *fixes; ///< Array of fixes
+    size_t count;       ///< Number of fixes
+    size_t capacity;    ///< Allocated capacity
+    char *script_path;  ///< Path to script being fixed
+    char *content;      ///< Original content (owned)
+    size_t content_len; ///< Content length
 } fixer_context_t;
 
 /**
  * @brief Result of a fix operation
  */
 typedef enum {
-    FIXER_OK,         /**< Success */
-    FIXER_ERR_IO,     /**< I/O error reading/writing file */
-    FIXER_ERR_PARSE,  /**< Failed to parse fixed script */
-    FIXER_ERR_NOMEM,  /**< Memory allocation failed */
-    FIXER_ERR_NOFIX,  /**< No fixes to apply */
-    FIXER_ERR_VERIFY, /**< Fixed script failed verification */
+    FIXER_OK,         ///< Success
+    FIXER_ERR_IO,     ///< I/O error reading/writing file
+    FIXER_ERR_PARSE,  ///< Failed to parse fixed script
+    FIXER_ERR_NOMEM,  ///< Memory allocation failed
+    FIXER_ERR_NOFIX,  ///< No fixes to apply
+    FIXER_ERR_VERIFY, ///< Fixed script failed verification
 } fixer_result_t;
 
 /**
  * @brief Options for fix application
  */
 typedef struct {
-    bool include_unsafe; /**< Include unsafe fixes */
-    bool dry_run;        /**< Preview only, don't modify files */
-    bool create_backup;  /**< Create .bak backup before modifying */
-    bool verify_syntax;  /**< Parse fixed script to verify correctness */
-    shell_mode_t target; /**< Target shell mode for verification */
+    bool include_unsafe; ///< Include unsafe fixes
+    bool dry_run;        ///< Preview only, don't modify files
+    bool create_backup;  ///< Create .bak backup before modifying
+    bool verify_syntax;  ///< Parse fixed script to verify correctness
+    shell_mode_t target; ///< Target shell mode for verification
 } fixer_options_t;
 
 /* ============================================================================
@@ -302,24 +302,24 @@ const char *fixer_result_string(fixer_result_t result);
  * @brief User response for interactive fix mode
  */
 typedef enum {
-    FIXER_RESPONSE_YES,  /**< Apply this fix */
-    FIXER_RESPONSE_NO,   /**< Skip this fix */
-    FIXER_RESPONSE_ALL,  /**< Apply all remaining fixes */
-    FIXER_RESPONSE_QUIT, /**< Stop and apply accepted fixes */
-    FIXER_RESPONSE_DIFF, /**< Show diff for this fix */
-    FIXER_RESPONSE_HELP, /**< Show help */
+    FIXER_RESPONSE_YES,  ///< Apply this fix
+    FIXER_RESPONSE_NO,   ///< Skip this fix
+    FIXER_RESPONSE_ALL,  ///< Apply all remaining fixes
+    FIXER_RESPONSE_QUIT, ///< Stop and apply accepted fixes
+    FIXER_RESPONSE_DIFF, ///< Show diff for this fix
+    FIXER_RESPONSE_HELP, ///< Show help
 } fixer_response_t;
 
 /**
  * @brief Interactive fix session state
  */
 typedef struct {
-    fixer_context_t *ctx;    /**< Fixer context */
-    fixer_options_t options; /**< Fix options */
-    bool *accepted;          /**< Array of accepted fix flags */
-    size_t current;          /**< Current fix index */
-    bool apply_all;          /**< Apply all remaining without prompting */
-    bool aborted;            /**< Session was aborted */
+    fixer_context_t *ctx;    ///< Fixer context
+    fixer_options_t options; ///< Fix options
+    bool *accepted;          ///< Array of accepted fix flags
+    size_t current;          ///< Current fix index
+    bool apply_all;          ///< Apply all remaining without prompting
+    bool aborted;            ///< Session was aborted
 } fixer_interactive_t;
 
 /**
@@ -414,4 +414,4 @@ fixer_response_t fixer_read_response(void);
 int fixer_run_interactive(fixer_context_t *ctx, const fixer_options_t *options,
                           const char *script_path);
 
-#endif // FIXER_H
+#endif /// FIXER_H

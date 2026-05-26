@@ -71,9 +71,9 @@ source_location_t builtin_get_source_location(void);
 
 /** Builtin command entry */
 typedef struct builtin_s {
-    const char *name;                   /**< Command name */
-    const char *doc;                    /**< Help documentation */
-    int (*func)(int argc, char **argv); /**< Handler function */
+    const char *name;                   ///< Command name
+    const char *doc;                    ///< Help documentation
+    int (*func)(int argc, char **argv); ///< Handler function
 } builtin;
 
 /** Array of all builtin commands */
@@ -493,10 +493,10 @@ int bin_lint(int argc, char **argv);
 int bin_disown(int argc, char **argv);
 int bin_let(int argc, char **argv);
 
-// zsh compatibility stubs (silent no-ops). See bin_zsh_stubs.c for the
-// rationale: scripts that call these at top level don't break, the
-// zsh-specific bookkeeping these would perform is invisible from a
-// non-interactive script's signal surface.
+/// zsh compatibility stubs (silent no-ops). See bin_zsh_stubs.c for the
+/// rationale: scripts that call these at top level don't break, the
+/// zsh-specific bookkeeping these would perform is invisible from a
+/// non-interactive script's signal surface.
 int bin_bindkey(int argc, char **argv);
 int bin_autoload(int argc, char **argv);
 int bin_zmodload(int argc, char **argv);
@@ -504,9 +504,9 @@ int bin_emulate(int argc, char **argv);
 int bin_colors(int argc, char **argv);
 int bin_zle(int argc, char **argv);
 
-// bash-completion compatibility stubs. See bin_zsh_stubs.c for the
-// silent-no-op rationale; full record-and-query parity is a future
-// implementation parallel to bindkey/zle.
+/// bash-completion compatibility stubs. See bin_zsh_stubs.c for the
+/// silent-no-op rationale; full record-and-query parity is a future
+/// implementation parallel to bindkey/zle.
 int bin_complete(int argc, char **argv);
 int bin_compgen(int argc, char **argv);
 int bin_compopt(int argc, char **argv);

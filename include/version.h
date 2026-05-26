@@ -25,4 +25,4 @@
     "highlighting and context-aware completions without relying on GNU "       \
     "Readline or any external library."
 
-#endif // VERSION_H
+#endif /// VERSION_H

@@ -56,4 +56,4 @@ static inline pid_t lush_fork(void) {
 #endif
 }
 
-#endif // LUSH_FORK_H
+#endif /// LUSH_FORK_H

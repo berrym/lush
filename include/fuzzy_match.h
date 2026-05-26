@@ -35,10 +35,10 @@
  * Fuzzy matching options
  */
 typedef struct fuzzy_match_options {
-    bool case_sensitive;    /**< Case-sensitive comparison (default: false) */
-    bool unicode_normalize; /**< Use NFC normalization (default: true) */
-    bool use_damerau; /**< Use Damerau-Levenshtein instead of Levenshtein */
-    int max_distance; /**< Maximum edit distance to consider (0 = unlimited) */
+    bool case_sensitive;    ///< Case-sensitive comparison (default: false)
+    bool unicode_normalize; ///< Use NFC normalization (default: true)
+    bool use_damerau;       ///< Use Damerau-Levenshtein instead of Levenshtein
+    int max_distance; ///< Maximum edit distance to consider (0 = unlimited)
 } fuzzy_match_options_t;
 
 /**
@@ -209,9 +209,9 @@ bool fuzzy_is_subsequence(const char *pattern, const char *text,
  * Match result for batch operations
  */
 typedef struct fuzzy_match_result {
-    const char *text; /**< Matched text (not owned) */
-    int score;        /**< Similarity score 0-100 */
-    int index;        /**< Original index in input array */
+    const char *text; ///< Matched text (not owned)
+    int score;        ///< Similarity score 0-100
+    int index;        ///< Original index in input array
 } fuzzy_match_result_t;
 
 /**
@@ -275,4 +275,4 @@ int fuzzy_distance_to_score(int distance, int max_len);
  */
 int fuzzy_string_length(const char *s, const fuzzy_match_options_t *options);
 
-#endif // FUZZY_MATCH_H
+#endif /// FUZZY_MATCH_H

@@ -20,7 +20,7 @@
  *
  * Example Plugin:
  *
- *     // my_plugin.c
+ *     /// my_plugin.c
  *     #include <lush_plugin.h>
  *
  *     static int my_builtin(int argc, char **argv) {
@@ -73,7 +73,7 @@ typedef struct lush_plugin lush_plugin_t;
 typedef struct lush_plugin_manager lush_plugin_manager_t;
 typedef struct lush_plugin_context lush_plugin_context_t;
 
-// Forward declarations from other lush components
+/// Forward declarations from other lush components
 struct executor;
 struct symtable;
 
@@ -91,36 +91,36 @@ struct symtable;
 typedef enum {
     LUSH_PLUGIN_PERM_NONE = 0, ///< No permissions granted
 
-    // Builtin registration
+    /// Builtin registration
     LUSH_PLUGIN_PERM_REGISTER_BUILTIN = 1 << 0,
 
-    // Hook registration
+    /// Hook registration
     LUSH_PLUGIN_PERM_REGISTER_HOOK = 1 << 1,
 
-    // Variable access
+    /// Variable access
     LUSH_PLUGIN_PERM_READ_VARS = 1 << 2,
     LUSH_PLUGIN_PERM_WRITE_VARS = 1 << 3,
 
-    // File system access
+    /// File system access
     LUSH_PLUGIN_PERM_FILE_READ = 1 << 4,
     LUSH_PLUGIN_PERM_FILE_WRITE = 1 << 5,
 
-    // Network access
+    /// Network access
     LUSH_PLUGIN_PERM_NETWORK = 1 << 6,
 
-    // Event subscription
+    /// Event subscription
     LUSH_PLUGIN_PERM_EVENTS = 1 << 7,
 
-    // Completion provider
+    /// Completion provider
     LUSH_PLUGIN_PERM_COMPLETIONS = 1 << 8,
 
-    // Widget registration (LLE)
+    /// Widget registration (LLE)
     LUSH_PLUGIN_PERM_WIDGETS = 1 << 9,
 
-    // Execute external commands
+    /// Execute external commands
     LUSH_PLUGIN_PERM_EXEC = 1 << 10,
 
-    // All permissions (for trusted plugins)
+    /// All permissions (for trusted plugins)
     LUSH_PLUGIN_PERM_ALL = 0x7FF,
 } lush_plugin_permission_t;
 
@@ -133,14 +133,14 @@ typedef enum {
  * @brief Plugin lifecycle states
  */
 typedef enum {
-    LUSH_PLUGIN_STATE_UNLOADED,     /**< Not loaded */
-    LUSH_PLUGIN_STATE_LOADING,      /**< Being loaded */
-    LUSH_PLUGIN_STATE_LOADED,       /**< Loaded but not initialized */
-    LUSH_PLUGIN_STATE_INITIALIZING, /**< Being initialized */
-    LUSH_PLUGIN_STATE_ACTIVE,       /**< Fully active */
-    LUSH_PLUGIN_STATE_SUSPENDED,    /**< Temporarily suspended */
-    LUSH_PLUGIN_STATE_ERROR,        /**< Error state */
-    LUSH_PLUGIN_STATE_UNLOADING,    /**< Being unloaded */
+    LUSH_PLUGIN_STATE_UNLOADED,     ///< Not loaded
+    LUSH_PLUGIN_STATE_LOADING,      ///< Being loaded
+    LUSH_PLUGIN_STATE_LOADED,       ///< Loaded but not initialized
+    LUSH_PLUGIN_STATE_INITIALIZING, ///< Being initialized
+    LUSH_PLUGIN_STATE_ACTIVE,       ///< Fully active
+    LUSH_PLUGIN_STATE_SUSPENDED,    ///< Temporarily suspended
+    LUSH_PLUGIN_STATE_ERROR,        ///< Error state
+    LUSH_PLUGIN_STATE_UNLOADING,    ///< Being unloaded
 } lush_plugin_state_t;
 
 /* ============================================================================
@@ -152,17 +152,17 @@ typedef enum {
  * @brief Plugin operation result codes
  */
 typedef enum {
-    LUSH_PLUGIN_OK = 0,                       /**< Success */
-    LUSH_PLUGIN_ERROR = -1,                   /**< Generic error */
-    LUSH_PLUGIN_ERROR_NOT_FOUND = -2,         /**< Plugin not found */
-    LUSH_PLUGIN_ERROR_LOAD_FAILED = -3,       /**< dlopen failed */
-    LUSH_PLUGIN_ERROR_SYMBOL_NOT_FOUND = -4,  /**< Missing required symbol */
-    LUSH_PLUGIN_ERROR_VERSION_MISMATCH = -5,  /**< API version incompatible */
-    LUSH_PLUGIN_ERROR_INIT_FAILED = -6,       /**< Plugin init() failed */
-    LUSH_PLUGIN_ERROR_PERMISSION_DENIED = -7, /**< Permission not granted */
-    LUSH_PLUGIN_ERROR_ALREADY_LOADED = -8,    /**< Plugin already loaded */
-    LUSH_PLUGIN_ERROR_INVALID_PLUGIN = -9,    /**< Invalid plugin definition */
-    LUSH_PLUGIN_ERROR_OUT_OF_MEMORY = -10,    /**< Memory allocation failed */
+    LUSH_PLUGIN_OK = 0,                       ///< Success
+    LUSH_PLUGIN_ERROR = -1,                   ///< Generic error
+    LUSH_PLUGIN_ERROR_NOT_FOUND = -2,         ///< Plugin not found
+    LUSH_PLUGIN_ERROR_LOAD_FAILED = -3,       ///< dlopen failed
+    LUSH_PLUGIN_ERROR_SYMBOL_NOT_FOUND = -4,  ///< Missing required symbol
+    LUSH_PLUGIN_ERROR_VERSION_MISMATCH = -5,  ///< API version incompatible
+    LUSH_PLUGIN_ERROR_INIT_FAILED = -6,       ///< Plugin init() failed
+    LUSH_PLUGIN_ERROR_PERMISSION_DENIED = -7, ///< Permission not granted
+    LUSH_PLUGIN_ERROR_ALREADY_LOADED = -8,    ///< Plugin already loaded
+    LUSH_PLUGIN_ERROR_INVALID_PLUGIN = -9,    ///< Invalid plugin definition
+    LUSH_PLUGIN_ERROR_OUT_OF_MEMORY = -10,    ///< Memory allocation failed
 } lush_plugin_result_t;
 
 /* ============================================================================
@@ -670,4 +670,4 @@ void lush_plugin_log(lush_plugin_context_t *ctx, int level, const char *fmt,
 }
 #endif
 
-#endif // LUSH_PLUGIN_H
+#endif /// LUSH_PLUGIN_H

@@ -15,43 +15,43 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-// Simple, clean token classification for parser
+/// Simple, clean token classification for parser
 typedef enum {
-    // Basic token types
-    TOK_EOF,    /**< End of input */
-    TOK_WORD,   /**< Regular word (command, argument, variable name) */
-    TOK_STRING, /**< Quoted string ('...' - literal) */
+    /// Basic token types
+    TOK_EOF,    ///< End of input
+    TOK_WORD,   ///< Regular word (command, argument, variable name)
+    TOK_STRING, ///< Quoted string ('...' - literal)
     /**
      * Double-quoted string ("...") - needs variable expansion
      */
     TOK_EXPANDABLE_STRING,
-    TOK_NUMBER,   /**< Numeric literal */
-    TOK_VARIABLE, /**< Variable reference ($var, ${var}, etc.) */
+    TOK_NUMBER,   ///< Numeric literal
+    TOK_VARIABLE, ///< Variable reference ($var, ${var}, etc.)
 
-    // Operators and separators
-    TOK_SEMICOLON,         /**< ; */
-    TOK_PIPE,              /**< | */
-    TOK_AND,               /**< & */
+    /// Operators and separators
+    TOK_SEMICOLON,         ///< ;
+    TOK_PIPE,              ///< |
+    TOK_AND,               ///< &
     TOK_BACKGROUND_DISOWN, ///< `&|` and `&!` -- zsh background-and-disown.
                            ///< Lush treats the disown bookkeeping as an
                            ///< optimization; observable script semantics
                            ///< match plain `&`.
-    TOK_LOGICAL_AND,       /**< && */
-    TOK_LOGICAL_OR,        /**< || */
-    TOK_REDIRECT_IN,       /**< < */
-    TOK_REDIRECT_OUT,      /**< > */
-    TOK_APPEND,            /**< >> */
-    TOK_HEREDOC,           /**< << */
-    TOK_HEREDOC_STRIP,     /**< <<- */
-    TOK_HERESTRING,        /**< <<< */
-    TOK_REDIRECT_ERR,      /**< N> (any fd output, e.g., 2>, 3>) */
-    TOK_REDIRECT_IN_FD,    /**< N< (any fd input, e.g., 3<, 4<) */
-    TOK_REDIRECT_BOTH,     /**< &> */
-    TOK_APPEND_ERR,        /**< 2>> */
-    TOK_REDIRECT_FD,       /**< &1, &2, etc. */
-    TOK_REDIRECT_FD_ALLOC, /**< {varname}> - fd allocation (bash 4.1+/zsh) */
-    TOK_REDIRECT_CLOBBER,  /**< >| */
-    TOK_ASSIGN,            /**< = */
+    TOK_LOGICAL_AND,       ///< &&
+    TOK_LOGICAL_OR,        ///< ||
+    TOK_REDIRECT_IN,       ///< <
+    TOK_REDIRECT_OUT,      ///< >
+    TOK_APPEND,            ///< >>
+    TOK_HEREDOC,           ///< <<
+    TOK_HEREDOC_STRIP,     ///< <<-
+    TOK_HERESTRING,        ///< <<<
+    TOK_REDIRECT_ERR,      ///< N> (any fd output, e.g., 2>, 3>)
+    TOK_REDIRECT_IN_FD,    ///< N< (any fd input, e.g., 3<, 4<)
+    TOK_REDIRECT_BOTH,     ///< &>
+    TOK_APPEND_ERR,        ///< 2>>
+    TOK_REDIRECT_FD,       ///< &1, &2, etc.
+    TOK_REDIRECT_FD_ALLOC, ///< {varname}> - fd allocation (bash 4.1+/zsh)
+    TOK_REDIRECT_CLOBBER,  ///< >|
+    TOK_ASSIGN,            ///< =
     /**
      * , (parameter separator for lush function parameter lists; an
      * adjacency token elsewhere -- collect_word_argument and the
@@ -59,47 +59,47 @@ typedef enum {
      * still concatenates into a single shell word)
      */
     TOK_COMMA,
-    TOK_NOT_EQUAL,   /**< != */
-    TOK_ARROW,       /**< -> (typed-function return-kind annotation) */
-    TOK_PLUS,        /**< + */
-    TOK_MINUS,       /**< - */
-    TOK_MULTIPLY,    /**< * */
-    TOK_DIVIDE,      /**< / */
-    TOK_MODULO,      /**< % */
-    TOK_GLOB,        /**< * (when used for globbing) */
-    TOK_QUESTION,    /**< ? */
-    TOK_COMMAND_SUB, /**< $(...) */
-    TOK_ARITH_EXP,   /**< $((...)) */
-    TOK_BACKQUOTE,   /**< ` */
+    TOK_NOT_EQUAL,   ///< !=
+    TOK_ARROW,       ///< -> (typed-function return-kind annotation)
+    TOK_PLUS,        ///< +
+    TOK_MINUS,       ///< -
+    TOK_MULTIPLY,    ///< *
+    TOK_DIVIDE,      ///< /
+    TOK_MODULO,      ///< %
+    TOK_GLOB,        ///< * (when used for globbing)
+    TOK_QUESTION,    ///< ?
+    TOK_COMMAND_SUB, ///< $(...)
+    TOK_ARITH_EXP,   ///< $((...))
+    TOK_BACKQUOTE,   ///< `
 
-    // Delimiters
-    TOK_LPAREN,          /**< ( */
-    TOK_RPAREN,          /**< ) */
-    TOK_DOUBLE_LPAREN,   /**< (( - arithmetic command start */
-    TOK_DOUBLE_RPAREN,   /**< )) - arithmetic command end */
-    TOK_LBRACE,          /**< { */
-    TOK_RBRACE,          /**< } */
-    TOK_LBRACKET,        /**< [ */
-    TOK_RBRACKET,        /**< ] */
-    TOK_DOUBLE_LBRACKET, /**< [[ - extended test start */
-    TOK_DOUBLE_RBRACKET, /**< ]] - extended test end */
+    /// Delimiters
+    TOK_LPAREN,          ///< (
+    TOK_RPAREN,          ///< )
+    TOK_DOUBLE_LPAREN,   ///< (( - arithmetic command start
+    TOK_DOUBLE_RPAREN,   ///< )) - arithmetic command end
+    TOK_LBRACE,          ///< {
+    TOK_RBRACE,          ///< }
+    TOK_LBRACKET,        ///< [
+    TOK_RBRACKET,        ///< ]
+    TOK_DOUBLE_LBRACKET, ///< [[ - extended test start
+    TOK_DOUBLE_RBRACKET, ///< ]] - extended test end
 
-    // Extended operators (Phase 1-2)
-    TOK_PLUS_ASSIGN, /**< += - append to array or add to integer */
-    TOK_REGEX_MATCH, /**< =~ - regex match operator in [[ ]] */
+    /// Extended operators (Phase 1-2)
+    TOK_PLUS_ASSIGN, ///< += - append to array or add to integer
+    TOK_REGEX_MATCH, ///< =~ - regex match operator in [[ ]]
 
-    // Process substitution and extended pipes (Phase 3)
-    TOK_PROC_SUB_IN,  /**< <( - process substitution input */
-    TOK_PROC_SUB_OUT, /**< >( - process substitution output */
-    TOK_PIPE_STDERR,  /**< |& - pipe both stdout and stderr */
-    TOK_APPEND_BOTH,  /**< &>> - append both stdout and stderr */
+    /// Process substitution and extended pipes (Phase 3)
+    TOK_PROC_SUB_IN,  ///< <( - process substitution input
+    TOK_PROC_SUB_OUT, ///< >( - process substitution output
+    TOK_PIPE_STDERR,  ///< |& - pipe both stdout and stderr
+    TOK_APPEND_BOTH,  ///< &>> - append both stdout and stderr
 
-    // Control flow extensions (Phase 5)
-    TOK_CASE_FALLTHROUGH, /**< ;& - case fall-through (execute next without
-                             test) */
-    TOK_CASE_CONTINUE,    /**< ;;& - case continue (test next pattern) */
+    /// Control flow extensions (Phase 5)
+    TOK_CASE_FALLTHROUGH, ///< ;& - case fall-through (execute next without
+                          ///< test)
+    TOK_CASE_CONTINUE,    ///< ;;& - case continue (test next pattern)
 
-    // Keywords (recognized contextually)
+    /// Keywords (recognized contextually)
     TOK_IF,
     TOK_THEN,
     TOK_ELSE,
@@ -114,20 +114,20 @@ typedef enum {
     TOK_ESAC,
     TOK_UNTIL,
     TOK_FUNCTION,
-    TOK_SELECT, /**< select keyword for select loop */
-    TOK_TIME,   /**< time keyword for timing pipelines */
-    TOK_COPROC, /**< coproc keyword for coprocesses */
-    TOK_REPEAT, /**< zsh repeat keyword (#103) */
+    TOK_SELECT, ///< select keyword for select loop
+    TOK_TIME,   ///< time keyword for timing pipelines
+    TOK_COPROC, ///< coproc keyword for coprocesses
+    TOK_REPEAT, ///< zsh repeat keyword (#103)
     TOK_FN,     ///< Typed-function declaration keyword (`fn ...`)
 
-    // Special
-    TOK_NEWLINE,    /**< \n (significant in shell) */
-    TOK_WHITESPACE, /**< Spaces, tabs (usually ignored) */
-    TOK_COMMENT,    /**< # comment */
-    TOK_ERROR       /**< Invalid token */
+    /// Special
+    TOK_NEWLINE,    ///< \n (significant in shell)
+    TOK_WHITESPACE, ///< Spaces, tabs (usually ignored)
+    TOK_COMMENT,    ///< # comment
+    TOK_ERROR       ///< Invalid token
 } token_type_t;
 
-// Token structure for parser
+/// Token structure for parser
 typedef struct token {
     token_type_t type;
     /**
@@ -141,9 +141,9 @@ typedef struct token {
      * the consumed input span; use end_position for that).
      */
     size_t length;
-    size_t line;     /**< Line number (1-based) */
-    size_t column;   /**< Column number (1-based) */
-    size_t position; /**< Byte offset where this token starts in input. */
+    size_t line;     ///< Line number (1-based)
+    size_t column;   ///< Column number (1-based)
+    size_t position; ///< Byte offset where this token starts in input.
     /**
      * Byte offset immediately AFTER the token's consumed input span.
      * For unquoted tokens this equals position + length; for quoted
@@ -154,21 +154,20 @@ typedef struct token {
      * token2.position == token1.end_position.
      */
     size_t end_position;
-    struct token *next; /**< For token stream */
+    struct token *next; ///< For token stream
 } token_t;
 
-// Tokenizer state for parser
+/// Tokenizer state for parser
 typedef struct tokenizer {
-    const char *input;    /**< Input string */
-    size_t input_length;  /**< Input length */
-    size_t position;      /**< Current position */
-    size_t line;          /**< Current line (1-based) */
-    size_t column;        /**< Current column (1-based) */
-    token_t *current;     /**< Current token */
-    token_t *lookahead;   /**< Next token (for lookahead) */
-    bool enable_keywords; /**< Whether to recognize keywords (context-sensitive)
-                           */
-    int arith_cmd_depth;  /**< Nesting depth of (( )) arithmetic commands */
+    const char *input;    ///< Input string
+    size_t input_length;  ///< Input length
+    size_t position;      ///< Current position
+    size_t line;          ///< Current line (1-based)
+    size_t column;        ///< Current column (1-based)
+    token_t *current;     ///< Current token
+    token_t *lookahead;   ///< Next token (for lookahead)
+    bool enable_keywords; ///< Whether to recognize keywords (context-sensitive)
+    int arith_cmd_depth;  ///< Nesting depth of (( )) arithmetic commands
 } tokenizer_t;
 
 /* ============================================================================
@@ -337,4 +336,4 @@ void tokenizer_refresh_current_and_lookahead(tokenizer_t *tokenizer);
  */
 void tokenizer_refresh_from_position(tokenizer_t *tokenizer);
 
-#endif // TOKENIZER_H
+#endif /// TOKENIZER_H
