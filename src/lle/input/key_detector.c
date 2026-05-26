@@ -31,12 +31,12 @@ static uint64_t get_current_time_us(void) {
  * @brief Key sequence mapping table entry
  */
 typedef struct {
-    const char *sequence;          /**< Escape sequence bytes */
-    size_t sequence_len;           /**< Length of sequence */
-    lle_key_type_t type;           /**< Key type classification */
-    uint32_t keycode;              /**< Key code value */
-    lle_key_modifiers_t modifiers; /**< Modifier flags */
-    const char *key_name;          /**< Human-readable key name */
+    const char *sequence;          ///< Escape sequence bytes
+    size_t sequence_len;           ///< Length of sequence
+    lle_key_type_t type;           ///< Key type classification
+    uint32_t keycode;              ///< Key code value
+    lle_key_modifiers_t modifiers; ///< Modifier flags
+    const char *key_name;          ///< Human-readable key name
 } key_mapping_entry_t;
 
 /**
@@ -44,7 +44,7 @@ typedef struct {
  * Based on xterm, VT100, and modern terminal emulators.
  */
 static const key_mapping_entry_t key_mappings[] = {
-    // Function keys (xterm)
+    /// Function keys (xterm)
     {   "\x1BOP", 3, LLE_KEY_TYPE_FUNCTION,    1,  LLE_KEY_MOD_NONE,"F1"                                                                    },
     {   "\x1BOQ", 3, LLE_KEY_TYPE_FUNCTION,    2,  LLE_KEY_MOD_NONE,         "F2"},
     {   "\x1BOR", 3, LLE_KEY_TYPE_FUNCTION,    3,  LLE_KEY_MOD_NONE,         "F3"},
@@ -58,19 +58,19 @@ static const key_mapping_entry_t key_mappings[] = {
     { "\x1B[23~", 5, LLE_KEY_TYPE_FUNCTION,   11,  LLE_KEY_MOD_NONE,        "F11"},
     { "\x1B[24~", 5, LLE_KEY_TYPE_FUNCTION,   12,  LLE_KEY_MOD_NONE,        "F12"},
 
-    // Cursor keys (normal mode)
+    /// Cursor keys (normal mode)
     {   "\x1B[A", 3,   LLE_KEY_TYPE_CURSOR,  'A',  LLE_KEY_MOD_NONE,         "Up"},
     {   "\x1B[B", 3,   LLE_KEY_TYPE_CURSOR,  'B',  LLE_KEY_MOD_NONE,       "Down"},
     {   "\x1B[C", 3,   LLE_KEY_TYPE_CURSOR,  'C',  LLE_KEY_MOD_NONE,      "Right"},
     {   "\x1B[D", 3,   LLE_KEY_TYPE_CURSOR,  'D',  LLE_KEY_MOD_NONE,       "Left"},
 
-    // Cursor keys (application mode)
+    /// Cursor keys (application mode)
     {   "\x1BOA", 3,   LLE_KEY_TYPE_CURSOR,  'A',  LLE_KEY_MOD_NONE,         "Up"},
     {   "\x1BOB", 3,   LLE_KEY_TYPE_CURSOR,  'B',  LLE_KEY_MOD_NONE,       "Down"},
     {   "\x1BOC", 3,   LLE_KEY_TYPE_CURSOR,  'C',  LLE_KEY_MOD_NONE,      "Right"},
     {   "\x1BOD", 3,   LLE_KEY_TYPE_CURSOR,  'D',  LLE_KEY_MOD_NONE,       "Left"},
 
-    // Navigation keys
+    /// Navigation keys
     {   "\x1B[H", 3,   LLE_KEY_TYPE_CURSOR,  'H',  LLE_KEY_MOD_NONE,       "Home"},
     {   "\x1B[F", 3,   LLE_KEY_TYPE_CURSOR,  'F',  LLE_KEY_MOD_NONE,        "End"},
     {  "\x1B[1~", 4,   LLE_KEY_TYPE_CURSOR,  '1',  LLE_KEY_MOD_NONE,       "Home"},
@@ -78,38 +78,38 @@ static const key_mapping_entry_t key_mappings[] = {
     {  "\x1B[5~", 4,   LLE_KEY_TYPE_CURSOR,  '5',  LLE_KEY_MOD_NONE,     "PageUp"},
     {  "\x1B[6~", 4,   LLE_KEY_TYPE_CURSOR,  '6',  LLE_KEY_MOD_NONE,   "PageDown"},
 
-    // Editing keys
+    /// Editing keys
     {  "\x1B[2~", 4,  LLE_KEY_TYPE_EDITING,  '2',  LLE_KEY_MOD_NONE,     "Insert"},
     {  "\x1B[3~", 4,  LLE_KEY_TYPE_EDITING,  '3',  LLE_KEY_MOD_NONE,     "Delete"},
     {     "\x7F", 1,  LLE_KEY_TYPE_EDITING, 0x7F,  LLE_KEY_MOD_NONE,  "Backspace"},
     {     "\x08", 1,  LLE_KEY_TYPE_EDITING, 0x08,  LLE_KEY_MOD_NONE,  "Backspace"},
 
-    // Special keys
+    /// Special keys
     {     "\x09", 1,  LLE_KEY_TYPE_SPECIAL, 0x09,  LLE_KEY_MOD_NONE,        "Tab"},
     {     "\x0D", 1,  LLE_KEY_TYPE_SPECIAL, 0x0D,  LLE_KEY_MOD_NONE,      "Enter"},
     { "\x1B\x0D", 2,  LLE_KEY_TYPE_SPECIAL, 0x0D,   LLE_KEY_MOD_ALT,  "Alt+Enter"},
     {     "\x1B", 1,  LLE_KEY_TYPE_SPECIAL, 0x1B,  LLE_KEY_MOD_NONE,     "Escape"},
 
-    // Modified cursor keys (Shift)
+    /// Modified cursor keys (Shift)
     {"\x1B[1;2A", 6,   LLE_KEY_TYPE_CURSOR,  'A', LLE_KEY_MOD_SHIFT,   "Shift+Up"},
     {"\x1B[1;2B", 6,   LLE_KEY_TYPE_CURSOR,  'B', LLE_KEY_MOD_SHIFT, "Shift+Down"},
     {"\x1B[1;2C", 6,   LLE_KEY_TYPE_CURSOR,  'C', LLE_KEY_MOD_SHIFT,
      "Shift+Right"                                                               },
     {"\x1B[1;2D", 6,   LLE_KEY_TYPE_CURSOR,  'D', LLE_KEY_MOD_SHIFT, "Shift+Left"},
 
-    // Modified cursor keys (Alt)
+    /// Modified cursor keys (Alt)
     {"\x1B[1;3A", 6,   LLE_KEY_TYPE_CURSOR,  'A',   LLE_KEY_MOD_ALT,     "Alt+Up"},
     {"\x1B[1;3B", 6,   LLE_KEY_TYPE_CURSOR,  'B',   LLE_KEY_MOD_ALT,   "Alt+Down"},
     {"\x1B[1;3C", 6,   LLE_KEY_TYPE_CURSOR,  'C',   LLE_KEY_MOD_ALT,  "Alt+Right"},
     {"\x1B[1;3D", 6,   LLE_KEY_TYPE_CURSOR,  'D',   LLE_KEY_MOD_ALT,   "Alt+Left"},
 
-    // Modified cursor keys (Ctrl)
+    /// Modified cursor keys (Ctrl)
     {"\x1B[1;5A", 6,   LLE_KEY_TYPE_CURSOR,  'A',  LLE_KEY_MOD_CTRL,    "Ctrl+Up"},
     {"\x1B[1;5B", 6,   LLE_KEY_TYPE_CURSOR,  'B',  LLE_KEY_MOD_CTRL,  "Ctrl+Down"},
     {"\x1B[1;5C", 6,   LLE_KEY_TYPE_CURSOR,  'C',  LLE_KEY_MOD_CTRL, "Ctrl+Right"},
     {"\x1B[1;5D", 6,   LLE_KEY_TYPE_CURSOR,  'D',  LLE_KEY_MOD_CTRL,  "Ctrl+Left"},
 
-    // Control characters
+    /// Control characters
     {     "\x01", 1,  LLE_KEY_TYPE_CONTROL,  'A',  LLE_KEY_MOD_CTRL,     "Ctrl+A"},
     {     "\x02", 1,  LLE_KEY_TYPE_CONTROL,  'B',  LLE_KEY_MOD_CTRL,     "Ctrl+B"},
     {     "\x03", 1,  LLE_KEY_TYPE_CONTROL,  'C',  LLE_KEY_MOD_CTRL,     "Ctrl+C"},
@@ -133,7 +133,7 @@ static const key_mapping_entry_t key_mappings[] = {
     {     "\x19", 1,  LLE_KEY_TYPE_CONTROL,  'Y',  LLE_KEY_MOD_CTRL,     "Ctrl+Y"},
     {     "\x1A", 1,  LLE_KEY_TYPE_CONTROL,  'Z',  LLE_KEY_MOD_CTRL,     "Ctrl+Z"},
 
-    // Meta/Alt + letter keys (lowercase)
+    /// Meta/Alt + letter keys (lowercase)
     {   "\x1B"
    "f", 2,  LLE_KEY_TYPE_REGULAR,  'f',   LLE_KEY_MOD_ALT,      "Alt+F"     },
     {   "\x1B"
@@ -147,7 +147,7 @@ static const key_mapping_entry_t key_mappings[] = {
     {   "\x1B"
    "u", 2,  LLE_KEY_TYPE_REGULAR,  'u',   LLE_KEY_MOD_ALT,      "Alt+U"     },
 
-    // Meta/Alt + special characters
+    /// Meta/Alt + special characters
     {   "\x1B"
    "<", 2,  LLE_KEY_TYPE_REGULAR,  '<',   LLE_KEY_MOD_ALT,      "Alt+<"     },
     {   "\x1B"
@@ -175,7 +175,7 @@ static lle_result_t init_key_sequence_map(lle_key_sequence_map_t **map,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Allocate entries array
+    /// Allocate entries array
     new_map->capacity = KEY_MAPPING_COUNT;
     new_map->entry_count = 0;
     new_map->memory_pool = memory_pool;
@@ -187,20 +187,20 @@ static lle_result_t init_key_sequence_map(lle_key_sequence_map_t **map,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Populate map from static table
+    /// Populate map from static table
     for (size_t i = 0; i < KEY_MAPPING_COUNT; i++) {
         const key_mapping_entry_t *src = &key_mappings[i];
         lle_key_sequence_map_entry_t *dst = &new_map->entries[i];
 
-        // Copy sequence
+        /// Copy sequence
         if (src->sequence_len > LLE_MAX_KEY_SEQUENCE_LENGTH) {
-            continue; // Skip if too long
+            continue; /// Skip if too long
         }
 
         memcpy(dst->sequence, src->sequence, src->sequence_len);
         dst->sequence_length = src->sequence_len;
 
-        // Fill key info
+        /// Fill key info
         dst->key_info.type = src->type;
         dst->key_info.keycode = src->keycode;
         dst->key_info.modifiers = src->modifiers;
@@ -237,20 +237,20 @@ match_sequence(const lle_key_sequence_map_t *map, const char *sequence,
     bool has_prefix_match = false;
     lle_key_sequence_map_entry_t *exact_entry = NULL;
 
-    // Scan for matches
+    /// Scan for matches
     for (size_t i = 0; i < map->entry_count; i++) {
         lle_key_sequence_map_entry_t *entry = &map->entries[i];
 
         if (entry->sequence_length == sequence_len) {
-            // Check for exact match
+            /// Check for exact match
             if (memcmp(entry->sequence, sequence, sequence_len) == 0) {
                 has_exact_match = true;
                 exact_entry = entry;
-                // Don't break - check if there are longer sequences with this
-                // as prefix
+                /// Don't break - check if there are longer sequences with this
+                /// as prefix
             }
         } else if (entry->sequence_length > sequence_len) {
-            // Check if current sequence is a prefix
+            /// Check if current sequence is a prefix
             if (memcmp(entry->sequence, sequence, sequence_len) == 0) {
                 has_prefix_match = true;
             }
@@ -259,14 +259,14 @@ match_sequence(const lle_key_sequence_map_t *map, const char *sequence,
 
     if (has_exact_match) {
         if (has_prefix_match) {
-            // Ambiguous - exact match but also prefix of longer sequences
+            /// Ambiguous - exact match but also prefix of longer sequences
             if (key_info && exact_entry) {
                 memcpy(key_info, &exact_entry->key_info,
                        sizeof(lle_key_info_t));
             }
             return LLE_MATCH_AMBIGUOUS;
         } else {
-            // Exact match, no ambiguity
+            /// Exact match, no ambiguity
             if (key_info && exact_entry) {
                 memcpy(key_info, &exact_entry->key_info,
                        sizeof(lle_key_info_t));
@@ -274,7 +274,7 @@ match_sequence(const lle_key_sequence_map_t *map, const char *sequence,
             return LLE_MATCH_EXACT;
         }
     } else if (has_prefix_match) {
-        // Prefix match - need more data
+        /// Prefix match - need more data
         return LLE_MATCH_PREFIX;
     }
 
@@ -310,7 +310,7 @@ lle_result_t lle_key_detector_init(lle_key_detector_t **detector,
     new_detector->sequence_start_time = 0;
     new_detector->ambiguous_sequence = false;
 
-    // Initialize sequence map
+    /// Initialize sequence map
     lle_result_t result =
         init_key_sequence_map(&new_detector->sequence_map, memory_pool);
     if (result != LLE_SUCCESS) {
@@ -383,9 +383,9 @@ lle_result_t lle_key_detector_process_sequence(lle_key_detector_t *detector,
     lle_key_sequence_match_result_t result;
     memset(&result, 0, sizeof(lle_key_sequence_match_result_t));
 
-    // Add sequence to buffer
+    /// Add sequence to buffer
     if (detector->sequence_pos + sequence_len > LLE_MAX_KEY_SEQUENCE_LENGTH) {
-        // Buffer overflow - reset
+        /// Buffer overflow - reset
         detector->sequence_pos = 0;
         detector->sequence_start_time = 0;
         detector->ambiguous_sequence = false;
@@ -396,12 +396,12 @@ lle_result_t lle_key_detector_process_sequence(lle_key_detector_t *detector,
            sequence_len);
     detector->sequence_pos += sequence_len;
 
-    // Start timing if first byte
+    /// Start timing if first byte
     if (detector->sequence_pos == sequence_len) {
         detector->sequence_start_time = get_current_time_us();
     }
 
-    // Try to match
+    /// Try to match
     lle_key_info_t matched_key;
     lle_key_sequence_match_type_t match_type =
         match_sequence(detector->sequence_map, detector->sequence_buffer,
@@ -409,7 +409,7 @@ lle_result_t lle_key_detector_process_sequence(lle_key_detector_t *detector,
 
     switch (match_type) {
     case LLE_MATCH_EXACT:
-        // Exact match found - allocate and return key info
+        /// Exact match found - allocate and return key info
         *key_info = lle_pool_alloc(sizeof(lle_key_info_t));
         if (*key_info) {
             memcpy(*key_info, &matched_key, sizeof(lle_key_info_t));
@@ -422,20 +422,20 @@ lle_result_t lle_key_detector_process_sequence(lle_key_detector_t *detector,
         detector->sequences_detected++;
         detector->sequences_resolved++;
 
-        // Reset buffer
+        /// Reset buffer
         detector->sequence_pos = 0;
         detector->sequence_start_time = 0;
         detector->ambiguous_sequence = false;
         break;
 
     case LLE_MATCH_AMBIGUOUS:
-        // Ambiguous - could match or could be prefix
+        /// Ambiguous - could match or could be prefix
         detector->ambiguous_sequence = true;
         detector->sequences_detected++;
 
-        // Check for timeout
+        /// Check for timeout
         if (has_timed_out(detector)) {
-            // Timeout - accept the match
+            /// Timeout - accept the match
             *key_info = lle_pool_alloc(sizeof(lle_key_info_t));
             if (*key_info) {
                 memcpy(*key_info, &matched_key, sizeof(lle_key_info_t));
@@ -448,20 +448,20 @@ lle_result_t lle_key_detector_process_sequence(lle_key_detector_t *detector,
             detector->ambiguous_timeouts++;
             detector->sequences_resolved++;
 
-            // Reset buffer
+            /// Reset buffer
             detector->sequence_pos = 0;
             detector->sequence_start_time = 0;
             detector->ambiguous_sequence = false;
         }
-        // Otherwise keep waiting for more data or timeout
+        /// Otherwise keep waiting for more data or timeout
         break;
 
     case LLE_MATCH_PREFIX:
-        // Prefix match - need more data, keep buffering
+        /// Prefix match - need more data, keep buffering
         break;
 
     case LLE_MATCH_NONE:
-        // No match - reset
+        /// No match - reset
         detector->sequence_pos = 0;
         detector->sequence_start_time = 0;
         detector->ambiguous_sequence = false;

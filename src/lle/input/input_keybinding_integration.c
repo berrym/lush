@@ -35,7 +35,7 @@
 #include <time.h>
 
 /* ========================================================================== */
-// KEYBINDING INTEGRATION LIFECYCLE
+/// KEYBINDING INTEGRATION LIFECYCLE
 /* ========================================================================== */
 
 /**
@@ -57,7 +57,7 @@ lle_keybinding_integration_init(lle_keybinding_integration_t **integration,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate integration structure
+    /// Allocate integration structure
     lle_keybinding_integration_t *kb =
         lle_pool_alloc(sizeof(lle_keybinding_integration_t));
     if (!kb) {
@@ -66,17 +66,17 @@ lle_keybinding_integration_init(lle_keybinding_integration_t **integration,
 
     memset(kb, 0, sizeof(lle_keybinding_integration_t));
 
-    // Store references
-    kb->keybinding_engine = keybinding_engine; // May be NULL
+    /// Store references
+    kb->keybinding_engine = keybinding_engine; /// May be NULL
     kb->memory_pool = memory_pool;
 
-    // Initialize sequence buffer
+    /// Initialize sequence buffer
     kb->sequence_length = 0;
     kb->sequence_start_time = 0;
     kb->sequence_timeout_us = LLE_KEY_SEQUENCE_TIMEOUT_US;
     kb->sequence_in_progress = false;
 
-    // Initialize performance metrics
+    /// Initialize performance metrics
     kb->lookups_performed = 0;
     kb->lookup_hits = 0;
     kb->lookup_misses = 0;
@@ -105,19 +105,19 @@ lle_keybinding_integration_destroy(lle_keybinding_integration_t *integration) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Clean up lookup cache if allocated
+    /// Clean up lookup cache if allocated
     if (integration->lookup_cache) {
         lle_pool_free(integration->lookup_cache);
     }
 
-    // Free integration structure
+    /// Free integration structure
     lle_pool_free(integration);
 
     return LLE_SUCCESS;
 }
 
 /* ========================================================================== */
-// KEYBINDING LOOKUP FUNCTIONS
+/// KEYBINDING LOOKUP FUNCTIONS
 /* ========================================================================== */
 
 /**
@@ -138,24 +138,24 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
     }
 
     if (!parser->keybinding_integration) {
-        // No keybinding integration configured
+        /// No keybinding integration configured
         return LLE_SUCCESS;
     }
 
     lle_keybinding_integration_t *kb = parser->keybinding_integration;
 
-    // Record start time for performance tracking
+    /// Record start time for performance tracking
     uint64_t start_time = lle_event_get_timestamp_us();
 
-    // Update lookup counter
+    /// Update lookup counter
     __atomic_fetch_add(&kb->lookups_performed, 1, __ATOMIC_SEQ_CST);
 
-    // Check if we're building a multi-key sequence
+    /// Check if we're building a multi-key sequence
     if (kb->sequence_in_progress) {
-        // Check for timeout
+        /// Check for timeout
         uint64_t elapsed = start_time - kb->sequence_start_time;
         if (elapsed > kb->sequence_timeout_us) {
-            // Timeout - clear sequence and process normally
+            /// Timeout - clear sequence and process normally
             kb->sequence_length = 0;
             kb->sequence_in_progress = false;
         }
@@ -163,7 +163,7 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
 
     /* Keybinding lookup would happen here when keybinding engine is available
      */
-    // For now, mark as not found and let normal processing continue
+    /// For now, mark as not found and let normal processing continue
     bool keybinding_found = false;
 
     if (!keybinding_found) {
@@ -172,7 +172,7 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
         __atomic_fetch_add(&kb->lookup_hits, 1, __ATOMIC_SEQ_CST);
     }
 
-    // Track lookup time
+    /// Track lookup time
     uint64_t lookup_time = lle_event_get_timestamp_us() - start_time;
     __atomic_fetch_add(&kb->total_lookup_time_us, lookup_time,
                        __ATOMIC_SEQ_CST);
@@ -181,9 +181,9 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
         kb->max_lookup_time_us = lookup_time;
     }
 
-    // Check if we exceeded performance target
+    /// Check if we exceeded performance target
     if (lookup_time > LLE_KEYBINDING_LOOKUP_TARGET_US) {
-        // Log performance warning but don't fail
+        /// Log performance warning but don't fail
     }
 
     return LLE_SUCCESS;
@@ -206,21 +206,21 @@ lle_keybinding_add_to_sequence(lle_keybinding_integration_t *integration,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Check if adding would overflow buffer
+    /// Check if adding would overflow buffer
     if (integration->sequence_length + key_length >
         LLE_MAX_KEY_SEQUENCE_LENGTH) {
-        // Buffer full - reset and reject
+        /// Buffer full - reset and reject
         integration->sequence_length = 0;
         integration->sequence_in_progress = false;
         return LLE_ERROR_BUFFER_OVERFLOW;
     }
 
-    // Copy key data to sequence buffer
+    /// Copy key data to sequence buffer
     memcpy(integration->sequence_buffer + integration->sequence_length,
            key_data, key_length);
     integration->sequence_length += key_length;
 
-    // Mark sequence as in progress
+    /// Mark sequence as in progress
     if (!integration->sequence_in_progress) {
         integration->sequence_in_progress = true;
         integration->sequence_start_time = lle_event_get_timestamp_us();
