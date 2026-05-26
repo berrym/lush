@@ -293,6 +293,8 @@ Sorted by likelihood-of-impact (how often a real user hits this):
 
 5. **`src/autocorrect.c:608-619`** — fuzzy "did you mean…" edit-distance iterates bytes with ASCII-only case fold via `c += 32`. Non-ASCII command names won't fuzzy-match. Combined with **autocorrect.c:587-588** byte-length cap of 32, non-ASCII names of moderate visual length get rejected before edit-distance even runs.
 
+6. **`src/pattern_match.c:match()`** — the `[[ str == pat ]]` extended-test matcher (separate from executor.c's case-pattern matcher) walks bytes for every operator. Concrete sub-verdicts: (a) `?` matches one byte rather than one codepoint (`c?é` fails to match `café`); (b) `[...]` bracket class calls `match_char_class` which uses byte ranges + single-byte `s++` -- same shape as the executor.c verdict #3 fix; (c) literal `*p != *s` compares first byte of multi-byte codepoints. The `*` branch iterates `s++` byte-by-byte; functionally tolerable (eventually lands on a codepoint boundary) but redundant work on each mid-codepoint position. **Audit-enumeration gap:** the file-level entry at line 140 forward-referenced these but the cross-cutting list did not include them; the work is real, the discovery is mine.
+
 ## High-priority B verdicts (NFC equivalence)
 
 - **`src/executor.c:8953,8958`** and **`src/builtins/bin_test.c:189,192`** — `[ a = b ]` / `[[ a == b ]]` compare user values bytewise. NFC `é` vs NFD `é` currently unequal. Pure POSIX defends this; lush-superset shouldn't.
