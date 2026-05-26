@@ -152,6 +152,7 @@ src = ['src/arithmetic.c',
        'src/display/composition_engine.c',
        'src/display/display_controller.c',
        'src/display/layer_events.c',
+       'src/display/pager_input.c',
        'src/display/pager_layer.c',
        'src/display/prompt_layer.c',
        'src/display/screen_buffer_menu.c',
@@ -284,6 +285,7 @@ display_sources = [
   'src/display/screen_buffer_menu.c',
   'src/display/autosuggestions_layer.c',
   'src/display/pager_layer.c',
+  'src/display/pager_input.c',
   'src/display_integration.c',
   'src/globals.c',
   'src/strings.c',
@@ -1845,6 +1847,26 @@ if fs.exists('tests/unit/test_pager_layer.c')
                                 include_directories: [inc, include_directories('tests')],
                                 dependencies: [lle_dep, libm])
   test('Pager Layer', test_pager_layer,
+       suite: 'unit',
+       timeout: 30)
+endif
+
+# Pager Input Tests
+# ============================================================================
+if fs.exists('tests/unit/test_pager_input.c')
+  test_pager_input_sources = []
+  foreach s : src
+    if not s.endswith('lush.c')
+      test_pager_input_sources += s
+    endif
+  endforeach
+  test_pager_input = executable('test_pager_input',
+                                'tests/unit/test_pager_input.c',
+                                'tests/unit/test_executor_stubs.c',
+                                test_pager_input_sources + lle_shell_sources,
+                                include_directories: [inc, include_directories('tests')],
+                                dependencies: [lle_dep, libm])
+  test('Pager Input', test_pager_input,
        suite: 'unit',
        timeout: 30)
 endif

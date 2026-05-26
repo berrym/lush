@@ -273,6 +273,7 @@ lle_shell_sources = files(
 lle_sources += files(
   'lle_debug_prompt_state.c',
   'lle_editor.c',
+  'lle_pager_state.c',
   'lle_readline.c',
   'lle_readline_state.c',
   'lle_watchdog.c',
