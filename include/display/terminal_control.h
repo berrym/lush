@@ -38,9 +38,9 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define TERMINAL_CONTROL_VERSION_MAJOR 1
 #define TERMINAL_CONTROL_VERSION_MINOR 0
@@ -50,7 +50,7 @@ extern "C" {
 #define TERMINAL_CONTROL_MAX_TERMINAL_NAME_LENGTH 64
 #define TERMINAL_CONTROL_CAPABILITY_CACHE_SIZE 32
 
-// Common ANSI color codes
+/// Common ANSI color codes
 #define TERMINAL_COLOR_BLACK 0
 #define TERMINAL_COLOR_RED 1
 #define TERMINAL_COLOR_GREEN 2
@@ -60,7 +60,7 @@ extern "C" {
 #define TERMINAL_COLOR_CYAN 6
 #define TERMINAL_COLOR_WHITE 7
 
-// Bright color variants (8-15)
+/// Bright color variants (8-15)
 #define TERMINAL_COLOR_BRIGHT_BLACK 8
 #define TERMINAL_COLOR_BRIGHT_RED 9
 #define TERMINAL_COLOR_BRIGHT_GREEN 10
@@ -70,49 +70,50 @@ extern "C" {
 #define TERMINAL_COLOR_BRIGHT_CYAN 14
 #define TERMINAL_COLOR_BRIGHT_WHITE 15
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Error codes for terminal control operations
  */
 typedef enum {
-    TERMINAL_CONTROL_SUCCESS = 0,         // Operation completed successfully
-    TERMINAL_CONTROL_ERROR_INVALID_PARAM, // Invalid parameter provided
-    TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION,     // Memory allocation failed
-    TERMINAL_CONTROL_ERROR_CAPABILITY_DETECTION,  // Capability detection failed
-    TERMINAL_CONTROL_ERROR_SEQUENCE_TOO_LONG,     // Generated sequence too long
-    TERMINAL_CONTROL_ERROR_UNSUPPORTED_OPERATION, // Operation not supported by
-                                                  // terminal
-    TERMINAL_CONTROL_ERROR_COLOR_OUT_OF_RANGE, // Color value out of valid range
-    TERMINAL_CONTROL_ERROR_POSITION_OUT_OF_RANGE, // Cursor position out of
-                                                  // range
-    TERMINAL_CONTROL_ERROR_TERMINAL_NOT_READY     // Terminal not properly
-                                                  // initialized
+    TERMINAL_CONTROL_SUCCESS = 0,         /// Operation completed successfully
+    TERMINAL_CONTROL_ERROR_INVALID_PARAM, /// Invalid parameter provided
+    TERMINAL_CONTROL_ERROR_MEMORY_ALLOCATION,    /// Memory allocation failed
+    TERMINAL_CONTROL_ERROR_CAPABILITY_DETECTION, /// Capability detection failed
+    TERMINAL_CONTROL_ERROR_SEQUENCE_TOO_LONG,    /// Generated sequence too long
+    TERMINAL_CONTROL_ERROR_UNSUPPORTED_OPERATION, /// Operation not supported by
+                                                  /// terminal
+    TERMINAL_CONTROL_ERROR_COLOR_OUT_OF_RANGE,    /// Color value out of valid
+                                                  /// range
+    TERMINAL_CONTROL_ERROR_POSITION_OUT_OF_RANGE, /// Cursor position out of
+                                                  /// range
+    TERMINAL_CONTROL_ERROR_TERMINAL_NOT_READY     /// Terminal not properly
+                                                  /// initialized
 } terminal_control_error_t;
 
 /**
  * Terminal capability flags
  */
 typedef enum {
-    TERMINAL_CAP_NONE = 0,                      // No special capabilities
-    TERMINAL_CAP_COLOR_8 = (1 << 0),            // 8-color support
-    TERMINAL_CAP_COLOR_16 = (1 << 1),           // 16-color support
-    TERMINAL_CAP_COLOR_256 = (1 << 2),          // 256-color support
-    TERMINAL_CAP_COLOR_TRUECOLOR = (1 << 3),    // 24-bit RGB color support
-    TERMINAL_CAP_CURSOR_POSITIONING = (1 << 4), // Cursor positioning support
-    TERMINAL_CAP_CURSOR_VISIBILITY = (1 << 5),  // Cursor visibility control
-    TERMINAL_CAP_UNICODE = (1 << 6),            // Unicode character support
-    TERMINAL_CAP_BOLD = (1 << 7),               // Bold text support
-    TERMINAL_CAP_ITALIC = (1 << 8),             // Italic text support
-    TERMINAL_CAP_UNDERLINE = (1 << 9),          // Underline text support
-    TERMINAL_CAP_REVERSE = (1 << 10),           // Reverse video support
-    TERMINAL_CAP_STRIKETHROUGH = (1 << 11),     // Strikethrough text support
-    TERMINAL_CAP_ALTERNATE_SCREEN = (1 << 12),  // Alternate screen buffer
-    TERMINAL_CAP_MOUSE_REPORTING = (1 << 13),   // Mouse event reporting
-    TERMINAL_CAP_BRACKETED_PASTE = (1 << 14),   // Bracketed paste mode
-    TERMINAL_CAP_WINDOW_TITLE = (1 << 15)       // Window title setting
+    TERMINAL_CAP_NONE = 0,                      /// No special capabilities
+    TERMINAL_CAP_COLOR_8 = (1 << 0),            /// 8-color support
+    TERMINAL_CAP_COLOR_16 = (1 << 1),           /// 16-color support
+    TERMINAL_CAP_COLOR_256 = (1 << 2),          /// 256-color support
+    TERMINAL_CAP_COLOR_TRUECOLOR = (1 << 3),    /// 24-bit RGB color support
+    TERMINAL_CAP_CURSOR_POSITIONING = (1 << 4), /// Cursor positioning support
+    TERMINAL_CAP_CURSOR_VISIBILITY = (1 << 5),  /// Cursor visibility control
+    TERMINAL_CAP_UNICODE = (1 << 6),            /// Unicode character support
+    TERMINAL_CAP_BOLD = (1 << 7),               /// Bold text support
+    TERMINAL_CAP_ITALIC = (1 << 8),             /// Italic text support
+    TERMINAL_CAP_UNDERLINE = (1 << 9),          /// Underline text support
+    TERMINAL_CAP_REVERSE = (1 << 10),           /// Reverse video support
+    TERMINAL_CAP_STRIKETHROUGH = (1 << 11),     /// Strikethrough text support
+    TERMINAL_CAP_ALTERNATE_SCREEN = (1 << 12),  /// Alternate screen buffer
+    TERMINAL_CAP_MOUSE_REPORTING = (1 << 13),   /// Mouse event reporting
+    TERMINAL_CAP_BRACKETED_PASTE = (1 << 14),   /// Bracketed paste mode
+    TERMINAL_CAP_WINDOW_TITLE = (1 << 15)       /// Window title setting
 } terminal_capability_flags_t;
 
 /**
@@ -132,17 +133,17 @@ typedef enum {
  */
 typedef struct {
     enum {
-        TERMINAL_COLOR_TYPE_DEFAULT, // Use terminal default
-        TERMINAL_COLOR_TYPE_BASIC,   // Basic 8/16 colors (0-15)
-        TERMINAL_COLOR_TYPE_256,     // 256-color palette (0-255)
-        TERMINAL_COLOR_TYPE_RGB      // 24-bit RGB color
+        TERMINAL_COLOR_TYPE_DEFAULT, /// Use terminal default
+        TERMINAL_COLOR_TYPE_BASIC,   /// Basic 8/16 colors (0-15)
+        TERMINAL_COLOR_TYPE_256,     /// 256-color palette (0-255)
+        TERMINAL_COLOR_TYPE_RGB      /// 24-bit RGB color
     } type;
 
     union {
-        uint8_t basic;   // Basic color index (0-15)
-        uint8_t palette; // 256-color palette index
+        uint8_t basic;   /// Basic color index (0-15)
+        uint8_t palette; /// 256-color palette index
         struct {
-            uint8_t r, g, b; // RGB values (0-255)
+            uint8_t r, g, b; /// RGB values (0-255)
         } rgb;
     } value;
 } terminal_color_t;
@@ -151,71 +152,72 @@ typedef struct {
  * Terminal capabilities structure
  */
 typedef struct {
-    int terminal_width;                // Current terminal width in columns
-    int terminal_height;               // Current terminal height in rows
-    terminal_capability_flags_t flags; // Supported capability flags
-    char terminal_name
-        [TERMINAL_CONTROL_MAX_TERMINAL_NAME_LENGTH]; // Terminal name from $TERM
+    int terminal_width;                /// Current terminal width in columns
+    int terminal_height;               /// Current terminal height in rows
+    terminal_capability_flags_t flags; /// Supported capability flags
+    char terminal_name[TERMINAL_CONTROL_MAX_TERMINAL_NAME_LENGTH]; /// Terminal
+                                                                   /// name from
+                                                                   /// $TERM
 
-    // Detailed capability information
-    int max_colors;                  // Maximum number of colors supported
-    bool cursor_positioning_support; // Can position cursor arbitrarily
-    bool unicode_support;            // Supports Unicode characters
-    bool mouse_support;              // Supports mouse reporting
+    /// Detailed capability information
+    int max_colors;                  /// Maximum number of colors supported
+    bool cursor_positioning_support; /// Can position cursor arbitrarily
+    bool unicode_support;            /// Supports Unicode characters
+    bool mouse_support;              /// Supports mouse reporting
 
-    // Performance optimization data
-    bool sequence_caching_enabled; // Whether to cache generated sequences
-    uint32_t cache_hit_count;      // Number of cache hits
-    uint32_t cache_miss_count;     // Number of cache misses
+    /// Performance optimization data
+    bool sequence_caching_enabled; /// Whether to cache generated sequences
+    uint32_t cache_hit_count;      /// Number of cache hits
+    uint32_t cache_miss_count;     /// Number of cache misses
 } terminal_capabilities_t;
 
 /**
  * Cursor position structure
  */
 typedef struct {
-    int row;    // Row position (1-based)
-    int column; // Column position (1-based)
+    int row;    /// Row position (1-based)
+    int column; /// Column position (1-based)
 } terminal_position_t;
 
 /**
  * ANSI sequence cache entry
  */
 typedef struct {
-    char sequence[TERMINAL_CONTROL_MAX_SEQUENCE_LENGTH]; // Cached sequence
-    uint32_t hash;      // Hash of the parameters
-    uint64_t last_used; // Timestamp of last use
-    bool valid;         // Whether this entry is valid
+    char sequence[TERMINAL_CONTROL_MAX_SEQUENCE_LENGTH]; /// Cached sequence
+    uint32_t hash;      /// Hash of the parameters
+    uint64_t last_used; /// Timestamp of last use
+    bool valid;         /// Whether this entry is valid
 } sequence_cache_entry_t;
 
 /**
  * Terminal control instance structure
  */
 typedef struct {
-    base_terminal_t *base_terminal;       // Reference to base terminal
-    terminal_capabilities_t capabilities; // Terminal capabilities
-    bool initialized;                    // Whether control layer is initialized
-    terminal_control_error_t last_error; // Last error that occurred
+    base_terminal_t *base_terminal;       /// Reference to base terminal
+    terminal_capabilities_t capabilities; /// Terminal capabilities
+    bool initialized; /// Whether control layer is initialized
+    terminal_control_error_t last_error; /// Last error that occurred
 
-    // Sequence caching for performance
+    /// Sequence caching for performance
     sequence_cache_entry_t
         sequence_cache[TERMINAL_CONTROL_CAPABILITY_CACHE_SIZE];
-    uint32_t cache_next_index; // Next cache slot to use
+    uint32_t cache_next_index; /// Next cache slot to use
 
-    // Current state
-    terminal_position_t cursor_position;  // Last known cursor position
-    terminal_color_t current_fg_color;    // Current foreground color
-    terminal_color_t current_bg_color;    // Current background color
-    terminal_style_flags_t current_style; // Current text style
+    /// Current state
+    terminal_position_t cursor_position;  /// Last known cursor position
+    terminal_color_t current_fg_color;    /// Current foreground color
+    terminal_color_t current_bg_color;    /// Current background color
+    terminal_style_flags_t current_style; /// Current text style
 
-    // Performance metrics
-    uint64_t sequences_generated;      // Total sequences generated
-    uint64_t sequences_cached;         // Sequences served from cache
-    uint64_t total_generation_time_ns; // Time spent generating sequences
+    /// Performance metrics
+    uint64_t sequences_generated;      /// Total sequences generated
+    uint64_t sequences_cached;         /// Sequences served from cache
+    uint64_t total_generation_time_ns; /// Time spent generating sequences
 } terminal_control_t;
 
-// ============================================================================
-// LIFECYCLE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// LIFECYCLE FUNCTIONS
+/// ============================================================================
 
 /**
  * Create a new terminal control instance
@@ -275,9 +277,9 @@ terminal_control_error_t terminal_control_cleanup(terminal_control_t *control);
  */
 void terminal_control_destroy(terminal_control_t *control);
 
-// ============================================================================
-// CAPABILITY DETECTION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CAPABILITY DETECTION FUNCTIONS
+/// ============================================================================
 
 /**
  * Detect terminal capabilities
@@ -331,9 +333,9 @@ bool terminal_control_has_capability(terminal_control_t *control,
 terminal_control_error_t
 terminal_control_update_size(terminal_control_t *control);
 
-// ============================================================================
-// CURSOR CONTROL FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// CURSOR CONTROL FUNCTIONS
+/// ============================================================================
 
 /**
  * Move cursor to specified position
@@ -412,9 +414,9 @@ terminal_control_save_cursor(terminal_control_t *control);
 terminal_control_error_t
 terminal_control_restore_cursor(terminal_control_t *control);
 
-// ============================================================================
-// SCREEN CONTROL FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// SCREEN CONTROL FUNCTIONS
+/// ============================================================================
 
 /**
  * Clear entire screen
@@ -471,9 +473,9 @@ terminal_control_clear_line(terminal_control_t *control);
 terminal_control_error_t
 terminal_control_clear_to_end_of_screen(terminal_control_t *control);
 
-// ============================================================================
-// COLOR AND STYLE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// COLOR AND STYLE FUNCTIONS
+/// ============================================================================
 
 /**
  * Set foreground color
@@ -529,9 +531,9 @@ terminal_control_set_style(terminal_control_t *control,
 terminal_control_error_t
 terminal_control_reset_formatting(terminal_control_t *control);
 
-// ============================================================================
-// SEQUENCE GENERATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// SEQUENCE GENERATION FUNCTIONS
+/// ============================================================================
 
 /**
  * Generate ANSI sequence for cursor movement
@@ -584,9 +586,9 @@ ssize_t terminal_control_generate_style_sequence(terminal_control_t *control,
                                                  char *buffer,
                                                  size_t buffer_size);
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * Create color specification from RGB values
@@ -635,9 +637,9 @@ terminal_color_t terminal_control_color_default(void);
 bool terminal_control_validate_color(terminal_control_t *control,
                                      terminal_color_t color);
 
-// ============================================================================
-// PERFORMANCE AND DIAGNOSTICS
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE AND DIAGNOSTICS
+/// ============================================================================
 
 /**
  * Get performance metrics
@@ -677,9 +679,9 @@ terminal_control_clear_metrics(terminal_control_t *control);
 terminal_control_error_t
 terminal_control_set_caching_enabled(terminal_control_t *control, bool enabled);
 
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
+/// ============================================================================
+/// ERROR HANDLING
+/// ============================================================================
 
 /**
  * Get last error code
@@ -706,9 +708,9 @@ terminal_control_get_last_error(terminal_control_t *control);
  */
 const char *terminal_control_error_string(terminal_control_error_t error);
 
-// ============================================================================
-// VERSION INFORMATION
-// ============================================================================
+/// ============================================================================
+/// VERSION INFORMATION
+/// ============================================================================
 
 /**
  * Get terminal control layer version
@@ -736,11 +738,11 @@ static inline void terminal_control_get_version(int *major, int *minor,
 }
 #endif
 
-#endif // TERMINAL_CONTROL_H
+#endif /// TERMINAL_CONTROL_H
 
-// ============================================================================
-// USAGE EXAMPLES
-// ============================================================================
+/// ============================================================================
+/// USAGE EXAMPLES
+/// ============================================================================
 
 /*
  * Basic usage example:
@@ -749,11 +751,11 @@ static inline void terminal_control_get_version(int *major, int *minor,
  * #include "terminal_control.h"
  *
  * int main() {
- *     // Create base terminal
+ *     /// Create base terminal
  *     base_terminal_t *base = base_terminal_create();
  *     base_terminal_init(base);
  *
- *     // Create terminal control layer
+ *     /// Create terminal control layer
  *     terminal_control_t *control = terminal_control_create(base);
  *     if (!control) return 1;
  *
@@ -762,22 +764,22 @@ static inline void terminal_control_get_version(int *major, int *minor,
  *         return 1;
  *     }
  *
- *     // Use terminal control features
+ *     /// Use terminal control features
  *     terminal_control_clear_screen(control);
  *     terminal_control_move_cursor(control, 1, 1);
  *
- *     // Set colors
+ *     /// Set colors
  *     terminal_color_t red =
  * terminal_control_color_from_basic(TERMINAL_COLOR_RED);
  *     terminal_control_set_foreground_color(control, red);
  *
- *     // Write colored text (through base terminal)
+ *     /// Write colored text (through base terminal)
  *     base_terminal_write(base, "Hello, colorful world!\n", 23);
  *
- *     // Reset formatting
+ *     /// Reset formatting
  *     terminal_control_reset_formatting(control);
  *
- *     // Cleanup
+ *     /// Cleanup
  *     terminal_control_destroy(control);
  *     base_terminal_destroy(base);
  *     return 0;
@@ -787,13 +789,13 @@ static inline void terminal_control_get_version(int *major, int *minor,
  * Advanced color example:
  *
  * ```c
- * // RGB color (if supported)
+ * /// RGB color (if supported)
  * terminal_color_t purple = terminal_control_color_from_rgb(control, 128, 0,
  * 128); if (terminal_control_validate_color(control, purple)) {
  *     terminal_control_set_background_color(control, purple);
  * }
  *
- * // Style combination
+ * /// Style combination
  * terminal_style_flags_t style = TERMINAL_STYLE_BOLD |
  * TERMINAL_STYLE_UNDERLINE; terminal_control_set_style(control, style);
  * ```

@@ -49,156 +49,156 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define AUTOSUGGESTIONS_LAYER_VERSION_MAJOR 1
 #define AUTOSUGGESTIONS_LAYER_VERSION_MINOR 3
 #define AUTOSUGGESTIONS_LAYER_VERSION_PATCH 0
 
-// Layer identification
+/// Layer identification
 #define LAYER_ID_AUTOSUGGESTIONS 7
 
-// Performance and caching limits
+/// Performance and caching limits
 #define AUTOSUGGESTIONS_LAYER_MAX_SUGGESTION_LENGTH 256
 #define AUTOSUGGESTIONS_LAYER_MAX_CACHE_ENTRIES 64
 #define AUTOSUGGESTIONS_LAYER_CACHE_TTL_MS 30000
 #define AUTOSUGGESTIONS_LAYER_MAX_GENERATION_TIME_MS 50
 
-// Display configuration
+/// Display configuration
 #define AUTOSUGGESTIONS_LAYER_DEFAULT_COLOR_TYPE TERMINAL_COLOR_BRIGHT_BLACK
 #define AUTOSUGGESTIONS_LAYER_MIN_TERMINAL_WIDTH 40
 #define AUTOSUGGESTIONS_LAYER_MAX_DISPLAY_WIDTH 120
 
-// Performance monitoring
+/// Performance monitoring
 #define AUTOSUGGESTIONS_LAYER_METRICS_HISTORY_SIZE 100
 #define AUTOSUGGESTIONS_LAYER_PERFORMANCE_THRESHOLD_MS 10
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Error codes for autosuggestions layer operations
  */
 typedef enum {
-    AUTOSUGGESTIONS_LAYER_SUCCESS = 0, // Operation completed successfully
-    AUTOSUGGESTIONS_LAYER_ERROR_INVALID_PARAM,     // Invalid parameter provided
-    AUTOSUGGESTIONS_LAYER_ERROR_NULL_POINTER,      // NULL pointer passed
-    AUTOSUGGESTIONS_LAYER_ERROR_MEMORY_ALLOCATION, // Memory allocation failed
-    AUTOSUGGESTIONS_LAYER_ERROR_NOT_INITIALIZED,   // Layer not initialized
-    AUTOSUGGESTIONS_LAYER_ERROR_TERMINAL_TOO_SMALL, // Terminal too small
-    AUTOSUGGESTIONS_LAYER_ERROR_GENERATION_FAILED,  // Suggestion generation
-                                                    // failed
-    AUTOSUGGESTIONS_LAYER_ERROR_DISPLAY_FAILED,     // Display operation failed
-    AUTOSUGGESTIONS_LAYER_ERROR_CACHE_FULL,         // Cache is full
-    AUTOSUGGESTIONS_LAYER_ERROR_UNSUPPORTED_TERMINAL, // Terminal doesn't
-                                                      // support required
-                                                      // features
-    AUTOSUGGESTIONS_LAYER_ERROR_LAYER_CONFLICT, // Conflict with other layers
-    AUTOSUGGESTIONS_LAYER_ERROR_EVENT_FAILED    // Event handling failed
+    AUTOSUGGESTIONS_LAYER_SUCCESS = 0, /// Operation completed successfully
+    AUTOSUGGESTIONS_LAYER_ERROR_INVALID_PARAM, /// Invalid parameter provided
+    AUTOSUGGESTIONS_LAYER_ERROR_NULL_POINTER,  /// NULL pointer passed
+    AUTOSUGGESTIONS_LAYER_ERROR_MEMORY_ALLOCATION,  /// Memory allocation failed
+    AUTOSUGGESTIONS_LAYER_ERROR_NOT_INITIALIZED,    /// Layer not initialized
+    AUTOSUGGESTIONS_LAYER_ERROR_TERMINAL_TOO_SMALL, /// Terminal too small
+    AUTOSUGGESTIONS_LAYER_ERROR_GENERATION_FAILED,  /// Suggestion generation
+                                                    /// failed
+    AUTOSUGGESTIONS_LAYER_ERROR_DISPLAY_FAILED,     /// Display operation failed
+    AUTOSUGGESTIONS_LAYER_ERROR_CACHE_FULL,         /// Cache is full
+    AUTOSUGGESTIONS_LAYER_ERROR_UNSUPPORTED_TERMINAL, /// Terminal doesn't
+                                                      /// support required
+                                                      /// features
+    AUTOSUGGESTIONS_LAYER_ERROR_LAYER_CONFLICT, /// Conflict with other layers
+    AUTOSUGGESTIONS_LAYER_ERROR_EVENT_FAILED    /// Event handling failed
 } autosuggestions_layer_error_t;
 
 /**
  * Autosuggestion display style configuration
  */
 typedef struct {
-    terminal_color_t suggestion_color;       // Color for suggestion text
-    terminal_style_flags_t suggestion_style; // Style flags (dim, italic, etc.)
-    bool enable_color;                       // Whether to use color
-    bool enable_styling;                     // Whether to apply styling
-    int display_delay_ms;                    // Delay before showing suggestion
-    int fade_timeout_ms;                     // Timeout before fading suggestion
-    bool show_in_multiline;       // Show suggestions in multiline input
-    bool show_for_short_commands; // Show for commands < 3 chars
+    terminal_color_t suggestion_color;       /// Color for suggestion text
+    terminal_style_flags_t suggestion_style; /// Style flags (dim, italic, etc.)
+    bool enable_color;                       /// Whether to use color
+    bool enable_styling;                     /// Whether to apply styling
+    int display_delay_ms;                    /// Delay before showing suggestion
+    int fade_timeout_ms;          /// Timeout before fading suggestion
+    bool show_in_multiline;       /// Show suggestions in multiline input
+    bool show_for_short_commands; /// Show for commands < 3 chars
 } autosuggestions_display_config_t;
 
 /**
  * Autosuggestion cache entry
  */
 typedef struct {
-    char *input_text;             // Input that generated suggestion
-    char *suggestion_text;        // Generated suggestion
-    int suggestion_score;         // Quality score of suggestion
-    uint64_t generation_time_ns;  // Time to generate suggestion
-    uint64_t last_used_timestamp; // Last time this entry was used
-    uint32_t use_count;           // Number of times used
-    bool valid;                   // Whether entry is valid
+    char *input_text;             /// Input that generated suggestion
+    char *suggestion_text;        /// Generated suggestion
+    int suggestion_score;         /// Quality score of suggestion
+    uint64_t generation_time_ns;  /// Time to generate suggestion
+    uint64_t last_used_timestamp; /// Last time this entry was used
+    uint32_t use_count;           /// Number of times used
+    bool valid;                   /// Whether entry is valid
 } autosuggestions_cache_entry_t;
 
 /**
  * Performance metrics for autosuggestions layer
  */
 typedef struct {
-    uint64_t total_suggestions_requested; // Total suggestions requested
-    uint64_t suggestions_generated;       // Suggestions successfully generated
-    uint64_t suggestions_displayed;       // Suggestions actually displayed
-    uint64_t suggestions_accepted;        // Suggestions accepted by user
-    uint64_t cache_hits;                  // Cache hits
-    uint64_t cache_misses;                // Cache misses
-    double avg_generation_time_ms;        // Average generation time
-    double avg_display_time_ms;           // Average display time
-    double cache_hit_rate;                // Cache hit rate percentage
-    uint64_t display_errors;              // Display errors encountered
-    uint64_t layer_conflicts;             // Conflicts with other layers
-    uint64_t last_performance_update;     // Last performance update timestamp
+    uint64_t total_suggestions_requested; /// Total suggestions requested
+    uint64_t suggestions_generated;       /// Suggestions successfully generated
+    uint64_t suggestions_displayed;       /// Suggestions actually displayed
+    uint64_t suggestions_accepted;        /// Suggestions accepted by user
+    uint64_t cache_hits;                  /// Cache hits
+    uint64_t cache_misses;                /// Cache misses
+    double avg_generation_time_ms;        /// Average generation time
+    double avg_display_time_ms;           /// Average display time
+    double cache_hit_rate;                /// Cache hit rate percentage
+    uint64_t display_errors;              /// Display errors encountered
+    uint64_t layer_conflicts;             /// Conflicts with other layers
+    uint64_t last_performance_update;     /// Last performance update timestamp
 } autosuggestions_performance_metrics_t;
 
 /**
  * Autosuggestions layer state
  */
 typedef struct {
-    // Layer identification and initialization
-    layer_id_t layer_id; // Layer ID in the system
-    bool initialized;    // Whether layer is initialized
-    bool enabled;        // Whether autosuggestions are enabled
-    autosuggestions_layer_error_t last_error; // Last error encountered
+    /// Layer identification and initialization
+    layer_id_t layer_id; /// Layer ID in the system
+    bool initialized;    /// Whether layer is initialized
+    bool enabled;        /// Whether autosuggestions are enabled
+    autosuggestions_layer_error_t last_error; /// Last error encountered
 
-    // Display configuration
-    autosuggestions_display_config_t display_config; // Display configuration
-    terminal_capabilities_t terminal_caps;           // Terminal capabilities
+    /// Display configuration
+    autosuggestions_display_config_t display_config; /// Display configuration
+    terminal_capabilities_t terminal_caps;           /// Terminal capabilities
 
-    // Current state
-    char *current_input;           // Current input line
-    char *current_suggestion;      // Current suggestion
-    int cursor_position;           // Current cursor position
-    bool suggestion_displayed;     // Whether suggestion is displayed
-    uint64_t suggestion_timestamp; // When suggestion was generated
+    /// Current state
+    char *current_input;           /// Current input line
+    char *current_suggestion;      /// Current suggestion
+    int cursor_position;           /// Current cursor position
+    bool suggestion_displayed;     /// Whether suggestion is displayed
+    uint64_t suggestion_timestamp; /// When suggestion was generated
 
-    // Caching system
+    /// Caching system
     autosuggestions_cache_entry_t
         cache[AUTOSUGGESTIONS_LAYER_MAX_CACHE_ENTRIES];
-    int cache_size;       // Number of cache entries
-    int cache_next_index; // Next cache index to use
+    int cache_size;       /// Number of cache entries
+    int cache_next_index; /// Next cache index to use
 
-    // Performance monitoring
-    autosuggestions_performance_metrics_t metrics; // Performance metrics
+    /// Performance monitoring
+    autosuggestions_performance_metrics_t metrics; /// Performance metrics
 
-    // Layer integration
-    layer_event_system_t *event_system;   // Event system reference
-    terminal_control_t *terminal_control; // Terminal control reference
+    /// Layer integration
+    layer_event_system_t *event_system;   /// Event system reference
+    terminal_control_t *terminal_control; /// Terminal control reference
 
-    // Thread safety and coordination
-    bool in_display_operation; // Prevent recursive display calls
-    bool needs_refresh;        // Whether display needs refresh
+    /// Thread safety and coordination
+    bool in_display_operation; /// Prevent recursive display calls
+    bool needs_refresh;        /// Whether display needs refresh
 } autosuggestions_layer_t;
 
 /**
  * Autosuggestion context for generation
  */
 typedef struct {
-    const char *input_line;        // Current input line
-    int cursor_position;           // Cursor position in line
-    int line_length;               // Length of input line
-    bool is_multiline_context;     // Whether in multiline input
-    const char *current_directory; // Current working directory
-    const char *shell_context;     // Additional shell context
+    const char *input_line;        /// Current input line
+    int cursor_position;           /// Cursor position in line
+    int line_length;               /// Length of input line
+    bool is_multiline_context;     /// Whether in multiline input
+    const char *current_directory; /// Current working directory
+    const char *shell_context;     /// Additional shell context
 } autosuggestions_context_t;
 
-// ============================================================================
-// CORE LAYER MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// CORE LAYER MANAGEMENT
+/// ============================================================================
 
 /**
  * Create and initialize autosuggestions layer
@@ -249,9 +249,9 @@ autosuggestions_layer_set_enabled(autosuggestions_layer_t *layer, bool enabled);
  */
 bool autosuggestions_layer_is_enabled(const autosuggestions_layer_t *layer);
 
-// ============================================================================
-// SUGGESTION GENERATION AND DISPLAY
-// ============================================================================
+/// ============================================================================
+/// SUGGESTION GENERATION AND DISPLAY
+/// ============================================================================
 
 /**
  * Update autosuggestions for current input
@@ -322,9 +322,9 @@ autosuggestions_layer_set_suggestion(autosuggestions_layer_t *layer,
  */
 bool autosuggestions_layer_has_suggestion(const autosuggestions_layer_t *layer);
 
-// ============================================================================
-// CONFIGURATION AND STYLING
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION AND STYLING
+/// ============================================================================
 
 /**
  * Set display configuration
@@ -379,9 +379,9 @@ autosuggestions_layer_error_t
 autosuggestions_layer_set_style(autosuggestions_layer_t *layer,
                                 terminal_style_flags_t style);
 
-// ============================================================================
-// CACHE MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// CACHE MANAGEMENT
+/// ============================================================================
 
 /**
  * Clear suggestion cache
@@ -416,9 +416,9 @@ autosuggestions_layer_error_t
 autosuggestions_layer_preload_cache(autosuggestions_layer_t *layer,
                                     const char **patterns, int pattern_count);
 
-// ============================================================================
-// PERFORMANCE MONITORING
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE MONITORING
+/// ============================================================================
 
 /**
  * Get performance metrics
@@ -459,9 +459,9 @@ autosuggestions_layer_print_diagnostics(const autosuggestions_layer_t *layer,
  */
 bool autosuggestions_layer_performance_ok(const autosuggestions_layer_t *layer);
 
-// ============================================================================
-// LAYER EVENT INTEGRATION
-// ============================================================================
+/// ============================================================================
+/// LAYER EVENT INTEGRATION
+/// ============================================================================
 
 /**
  * Handle layer events
@@ -506,9 +506,9 @@ autosuggestions_layer_subscribe_events(autosuggestions_layer_t *layer);
 autosuggestions_layer_error_t
 autosuggestions_layer_unsubscribe_events(autosuggestions_layer_t *layer);
 
-// ============================================================================
-// ERROR HANDLING AND UTILITIES
-// ============================================================================
+/// ============================================================================
+/// ERROR HANDLING AND UTILITIES
+/// ============================================================================
 
 /**
  * Get last error from layer
@@ -546,9 +546,9 @@ bool autosuggestions_layer_terminal_supported(
  */
 void autosuggestions_layer_get_version(int *major, int *minor, int *patch);
 
-// ============================================================================
-// INTEGRATION HELPERS
-// ============================================================================
+/// ============================================================================
+/// INTEGRATION HELPERS
+/// ============================================================================
 
 /**
  * Create autosuggestion context from readline state
@@ -593,4 +593,4 @@ autosuggestions_layer_compose_display(autosuggestions_layer_t *layer,
 }
 #endif
 
-#endif // AUTOSUGGESTIONS_LAYER_H
+#endif /// AUTOSUGGESTIONS_LAYER_H

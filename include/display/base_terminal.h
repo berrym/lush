@@ -38,9 +38,9 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// PORTABILITY MACROS
-// ============================================================================
+/// ============================================================================
+/// PORTABILITY MACROS
+/// ============================================================================
 
 /* Macro to suppress unused warnings for spec-compliant but not-yet-wired code
  */
@@ -52,14 +52,14 @@ extern "C" {
 #endif
 #endif
 
-// Macro to explicitly mark a parameter/variable as intentionally unused
+/// Macro to explicitly mark a parameter/variable as intentionally unused
 #ifndef UNUSED
 #define UNUSED(x) (void)(x)
 #endif
 
-// ============================================================================
-// CONSTANTS AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS AND CONFIGURATION
+/// ============================================================================
 
 #define BASE_TERMINAL_VERSION_MAJOR 1
 #define BASE_TERMINAL_VERSION_MINOR 0
@@ -68,40 +68,40 @@ extern "C" {
 #define BASE_TERMINAL_MAX_TERMINAL_NAME_LENGTH 64
 #define BASE_TERMINAL_DEFAULT_TIMEOUT_MS 100
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Error codes for base terminal operations
  */
 typedef enum {
-    BASE_TERMINAL_SUCCESS = 0,             // Operation completed successfully
-    BASE_TERMINAL_ERROR_INVALID_PARAM,     // Invalid parameter provided
-    BASE_TERMINAL_ERROR_MEMORY_ALLOCATION, // Memory allocation failed
-    BASE_TERMINAL_ERROR_TERMIOS_FAILED, // Terminal attributes operation failed
-    BASE_TERMINAL_ERROR_TERMINAL_DETECTION, // Terminal type detection failed
-    BASE_TERMINAL_ERROR_SIGNAL_HANDLER,     // Signal handler setup failed
-    BASE_TERMINAL_ERROR_READ_FAILED,        // Terminal read operation failed
-    BASE_TERMINAL_ERROR_WRITE_FAILED,       // Terminal write operation failed
-    BASE_TERMINAL_ERROR_FLUSH_FAILED,       // Terminal flush operation failed
-    BASE_TERMINAL_ERROR_IOCTL_FAILED,       // Terminal ioctl operation failed
-    BASE_TERMINAL_ERROR_SELECT_FAILED,      // Select operation failed
-    BASE_TERMINAL_ERROR_NOT_INITIALIZED     // Terminal not initialized
+    BASE_TERMINAL_SUCCESS = 0,             /// Operation completed successfully
+    BASE_TERMINAL_ERROR_INVALID_PARAM,     /// Invalid parameter provided
+    BASE_TERMINAL_ERROR_MEMORY_ALLOCATION, /// Memory allocation failed
+    BASE_TERMINAL_ERROR_TERMIOS_FAILED, /// Terminal attributes operation failed
+    BASE_TERMINAL_ERROR_TERMINAL_DETECTION, /// Terminal type detection failed
+    BASE_TERMINAL_ERROR_SIGNAL_HANDLER,     /// Signal handler setup failed
+    BASE_TERMINAL_ERROR_READ_FAILED,        /// Terminal read operation failed
+    BASE_TERMINAL_ERROR_WRITE_FAILED,       /// Terminal write operation failed
+    BASE_TERMINAL_ERROR_FLUSH_FAILED,       /// Terminal flush operation failed
+    BASE_TERMINAL_ERROR_IOCTL_FAILED,       /// Terminal ioctl operation failed
+    BASE_TERMINAL_ERROR_SELECT_FAILED,      /// Select operation failed
+    BASE_TERMINAL_ERROR_NOT_INITIALIZED     /// Terminal not initialized
 } base_terminal_error_t;
 
 /**
  * Performance metrics for terminal operations
  */
 typedef struct {
-    uint64_t total_reads;         // Total number of read operations
-    uint64_t total_writes;        // Total number of write operations
-    uint64_t total_bytes_read;    // Total bytes read from terminal
-    uint64_t total_bytes_written; // Total bytes written to terminal
+    uint64_t total_reads;         /// Total number of read operations
+    uint64_t total_writes;        /// Total number of write operations
+    uint64_t total_bytes_read;    /// Total bytes read from terminal
+    uint64_t total_bytes_written; /// Total bytes written to terminal
     uint64_t
-        initialization_time_ns;  // Time taken for initialization (nanoseconds)
-    uint64_t last_read_time_ns;  // Timestamp of last read operation
-    uint64_t last_write_time_ns; // Timestamp of last write operation
+        initialization_time_ns;  /// Time taken for initialization (nanoseconds)
+    uint64_t last_read_time_ns;  /// Timestamp of last read operation
+    uint64_t last_write_time_ns; /// Timestamp of last write operation
 } base_terminal_metrics_t;
 
 /**
@@ -111,35 +111,35 @@ typedef struct {
  * This structure should be treated as opaque by higher layers.
  */
 typedef struct {
-    // File descriptors
-    int input_fd;  // Input file descriptor (usually STDIN)
-    int output_fd; // Output file descriptor (usually STDOUT)
-    int error_fd;  // Error file descriptor (usually STDERR)
+    /// File descriptors
+    int input_fd;  /// Input file descriptor (usually STDIN)
+    int output_fd; /// Output file descriptor (usually STDOUT)
+    int error_fd;  /// Error file descriptor (usually STDERR)
 
-    // Terminal state
-    struct termios original_termios; // Original terminal attributes
-    struct termios current_termios;  // Current terminal attributes
-    bool raw_mode_enabled;           // True if raw mode is active
-    bool initialized;                // True if terminal is initialized
+    /// Terminal state
+    struct termios original_termios; /// Original terminal attributes
+    struct termios current_termios;  /// Current terminal attributes
+    bool raw_mode_enabled;           /// True if raw mode is active
+    bool initialized;                /// True if terminal is initialized
 
-    // Terminal information
-    char *terminal_type; // Terminal type string (from $TERM)
-    int terminal_width;  // Current terminal width
-    int terminal_height; // Current terminal height
+    /// Terminal information
+    char *terminal_type; /// Terminal type string (from $TERM)
+    int terminal_width;  /// Current terminal width
+    int terminal_height; /// Current terminal height
 
-    // Error handling
-    base_terminal_error_t last_error; // Last error that occurred
+    /// Error handling
+    base_terminal_error_t last_error; /// Last error that occurred
 
-    // Performance metrics
-    base_terminal_metrics_t metrics; // Performance tracking data
+    /// Performance metrics
+    base_terminal_metrics_t metrics; /// Performance tracking data
 
-    // Internal state (implementation specific)
-    void *private_data; // Private implementation data
+    /// Internal state (implementation specific)
+    void *private_data; /// Private implementation data
 } base_terminal_t;
 
-// ============================================================================
-// LIFECYCLE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// LIFECYCLE FUNCTIONS
+/// ============================================================================
 
 /**
  * Create a new base terminal instance
@@ -204,9 +204,9 @@ base_terminal_error_t base_terminal_cleanup(base_terminal_t *terminal);
  */
 void base_terminal_destroy(base_terminal_t *terminal);
 
-// ============================================================================
-// TERMINAL MODE FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// TERMINAL MODE FUNCTIONS
+/// ============================================================================
 
 /**
  * Enable or disable raw terminal mode
@@ -233,9 +233,9 @@ void base_terminal_destroy(base_terminal_t *terminal);
 base_terminal_error_t base_terminal_set_raw_mode(base_terminal_t *terminal,
                                                  bool enable);
 
-// ============================================================================
-// INPUT/OUTPUT FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// INPUT/OUTPUT FUNCTIONS
+/// ============================================================================
 
 /**
  * Read data from terminal input
@@ -289,9 +289,9 @@ ssize_t base_terminal_write(base_terminal_t *terminal, const char *data,
  */
 base_terminal_error_t base_terminal_flush(base_terminal_t *terminal);
 
-// ============================================================================
-// TERMINAL INFORMATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// TERMINAL INFORMATION FUNCTIONS
+/// ============================================================================
 
 /**
  * Get current terminal size
@@ -325,9 +325,9 @@ base_terminal_error_t base_terminal_get_size(base_terminal_t *terminal,
  */
 int base_terminal_data_available(base_terminal_t *terminal, int timeout_ms);
 
-// ============================================================================
-// PERFORMANCE AND DIAGNOSTICS
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE AND DIAGNOSTICS
+/// ============================================================================
 
 /**
  * Get current performance metrics
@@ -356,9 +356,9 @@ base_terminal_metrics_t base_terminal_get_metrics(base_terminal_t *terminal);
  */
 uint64_t base_terminal_get_timestamp_ns(void);
 
-// ============================================================================
-// ERROR HANDLING
-// ============================================================================
+/// ============================================================================
+/// ERROR HANDLING
+/// ============================================================================
 
 /**
  * Get last error code
@@ -389,9 +389,9 @@ base_terminal_error_t base_terminal_get_last_error(base_terminal_t *terminal);
  */
 const char *base_terminal_error_string(base_terminal_error_t error);
 
-// ============================================================================
-// VERSION INFORMATION
-// ============================================================================
+/// ============================================================================
+/// VERSION INFORMATION
+/// ============================================================================
 
 /**
  * Get base terminal layer version
@@ -419,11 +419,11 @@ static inline void base_terminal_get_version(int *major, int *minor,
 }
 #endif
 
-#endif // BASE_TERMINAL_H
+#endif /// BASE_TERMINAL_H
 
-// ============================================================================
-// USAGE EXAMPLES
-// ============================================================================
+/// ============================================================================
+/// USAGE EXAMPLES
+/// ============================================================================
 
 /*
  * Basic usage example:
@@ -432,7 +432,7 @@ static inline void base_terminal_get_version(int *major, int *minor,
  * #include "base_terminal.h"
  *
  * int main() {
- *     // Create and initialize terminal
+ *     /// Create and initialize terminal
  *     base_terminal_t *terminal = base_terminal_create();
  *     if (!terminal) return 1;
  *
@@ -441,32 +441,32 @@ static inline void base_terminal_get_version(int *major, int *minor,
  *         return 1;
  *     }
  *
- *     // Enable raw mode for character-by-character input
+ *     /// Enable raw mode for character-by-character input
  *     base_terminal_set_raw_mode(terminal, true);
  *
- *     // Read a single character
+ *     /// Read a single character
  *     char ch;
  *     if (base_terminal_read(terminal, &ch, 1) == 1) {
  *         printf("You pressed: %c\n", ch);
  *     }
  *
- *     // Write some output
+ *     /// Write some output
  *     const char *message = "Hello, terminal!\n";
  *     base_terminal_write(terminal, message, strlen(message));
  *     base_terminal_flush(terminal);
  *
- *     // Get terminal size
+ *     /// Get terminal size
  *     int width, height;
  *     if (base_terminal_get_size(terminal, &width, &height) ==
  * BASE_TERMINAL_SUCCESS) { printf("Terminal size: %dx%d\n", width, height);
  *     }
  *
- *     // Check performance metrics
+ *     /// Check performance metrics
  *     base_terminal_metrics_t metrics = base_terminal_get_metrics(terminal);
  *     printf("Total reads: %lu, Total writes: %lu\n",
  *            metrics.total_reads, metrics.total_writes);
  *
- *     // Cleanup
+ *     /// Cleanup
  *     base_terminal_destroy(terminal);
  *     return 0;
  * }
@@ -475,18 +475,18 @@ static inline void base_terminal_get_version(int *major, int *minor,
  * Non-blocking input example:
  *
  * ```c
- * // Check for input without blocking
+ * /// Check for input without blocking
  * while (running) {
  *     if (base_terminal_data_available(terminal, 0) > 0) {
  *         char buffer[256];
  *         ssize_t bytes = base_terminal_read(terminal, buffer, sizeof(buffer));
  *         if (bytes > 0) {
- *             // Process input
+ *             /// Process input
  *             process_input(buffer, bytes);
  *         }
  *     }
  *
- *     // Do other work
+ *     /// Do other work
  *     perform_background_tasks();
  * }
  * ```

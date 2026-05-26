@@ -22,16 +22,16 @@
 extern "C" {
 #endif
 
-// ============================================================================
-// CONSTANTS
-// ============================================================================
+/// ============================================================================
+/// CONSTANTS
+/// ============================================================================
 
 #define SCREEN_BUFFER_MAX_ROWS 100
 #define SCREEN_BUFFER_MAX_COLS 512
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+/// ============================================================================
+/// TYPE DEFINITIONS
+/// ============================================================================
 
 /**
  * Represents a single character cell in the virtual screen
@@ -48,10 +48,10 @@ extern "C" {
  * - 2 for wide characters (CJK, emoji)
  */
 typedef struct {
-    char utf8_bytes[4];   // Full UTF-8 sequence (1-4 bytes)
-    uint8_t byte_len;     // Actual bytes used (1-4)
-    uint8_t visual_width; // Display width in columns (0, 1, or 2)
-    bool is_prompt;       // True if this cell is part of the prompt
+    char utf8_bytes[4];   /// Full UTF-8 sequence (1-4 bytes)
+    uint8_t byte_len;     /// Actual bytes used (1-4)
+    uint8_t visual_width; /// Display width in columns (0, 1, or 2)
+    bool is_prompt;       /// True if this cell is part of the prompt
 } screen_cell_t;
 
 /**
@@ -62,11 +62,11 @@ typedef struct {
  * like autosuggestions.
  */
 typedef struct {
-    char *text;          // Prefix text (e.g., "> ", "loop> ")
-    size_t length;       // Length in bytes
-    size_t visual_width; // Visual width in columns (excluding ANSI codes)
-    bool contains_ansi;  // True if prefix contains ANSI escape codes
-    bool dirty;          // True if prefix changed since last render
+    char *text;          /// Prefix text (e.g., "> ", "loop> ")
+    size_t length;       /// Length in bytes
+    size_t visual_width; /// Visual width in columns (excluding ANSI codes)
+    bool contains_ansi;  /// True if prefix contains ANSI escape codes
+    bool dirty;          /// True if prefix changed since last render
 } screen_line_prefix_t;
 
 /**
@@ -74,11 +74,11 @@ typedef struct {
  */
 typedef struct {
     screen_cell_t cells[SCREEN_BUFFER_MAX_COLS];
-    int length; // Number of characters in this line
-    bool dirty; // True if line content changed since last render
+    int length; /// Number of characters in this line
+    bool dirty; /// True if line content changed since last render
 
-    screen_line_prefix_t *prefix; // Optional prefix (NULL if none)
-    bool prefix_dirty;            // True if prefix changed since last render
+    screen_line_prefix_t *prefix; /// Optional prefix (NULL if none)
+    bool prefix_dirty;            /// True if prefix changed since last render
 } screen_line_t;
 
 /**
@@ -90,33 +90,33 @@ typedef struct {
  */
 typedef struct {
     screen_line_t lines[SCREEN_BUFFER_MAX_ROWS];
-    int num_rows;          // Number of rows currently used (command only)
-    int terminal_width;    // Terminal width in columns
-    int cursor_row;        // Cursor row position (0-based, within command)
-    int cursor_col;        // Cursor column position (0-based)
-    int command_start_row; // Row where command text starts (after prompt)
-    int command_start_col; // Column where command text starts (after prompt)
+    int num_rows;          /// Number of rows currently used (command only)
+    int terminal_width;    /// Terminal width in columns
+    int cursor_row;        /// Cursor row position (0-based, within command)
+    int cursor_col;        /// Cursor column position (0-based)
+    int command_start_row; /// Row where command text starts (after prompt)
+    int command_start_col; /// Column where command text starts (after prompt)
 
-    // Menu/overlay tracking - tracks content displayed after command text
-    // This allows cursor positioning to account for all displayed content
-    int menu_lines;         // Number of lines the menu occupies (0 if none)
-    int ghost_text_lines;   // Extra lines from autosuggestion wrapping (0 if
-                            // none)
-    int total_display_rows; // Total rows: num_rows + ghost_text_lines +
-                            // menu_lines
-    int command_end_row;    // Row where command text ends (before ghost/menu)
-    int command_end_col;    // Column where command text ends
+    /// Menu/overlay tracking - tracks content displayed after command text
+    /// This allows cursor positioning to account for all displayed content
+    int menu_lines;         /// Number of lines the menu occupies (0 if none)
+    int ghost_text_lines;   /// Extra lines from autosuggestion wrapping (0 if
+                            /// none)
+    int total_display_rows; /// Total rows: num_rows + ghost_text_lines +
+                            /// menu_lines
+    int command_end_row;    /// Row where command text ends (before ghost/menu)
+    int command_end_col;    /// Column where command text ends
 
-    // RPROMPT tracking - right-aligned prompt on command_start_row
-    char rprompt_text[512];   // Rendered RPROMPT string (may contain ANSI)
-    int rprompt_visual_width; // Visual width excluding ANSI escapes
-    bool rprompt_fits;        // True if rprompt fits on prompt row
-    int rprompt_col;          // Starting column (0-based) for rprompt display
+    /// RPROMPT tracking - right-aligned prompt on command_start_row
+    char rprompt_text[512];   /// Rendered RPROMPT string (may contain ANSI)
+    int rprompt_visual_width; /// Visual width excluding ANSI escapes
+    bool rprompt_fits;        /// True if rprompt fits on prompt row
+    int rprompt_col;          /// Starting column (0-based) for rprompt display
 } screen_buffer_t;
 
-// ============================================================================
-// FUNCTION DECLARATIONS
-// ============================================================================
+/// ============================================================================
+/// FUNCTION DECLARATIONS
+/// ============================================================================
 
 /**
  * Initialize a screen buffer
@@ -238,9 +238,9 @@ size_t screen_buffer_visual_width(const char *text, size_t byte_length);
  */
 void screen_buffer_copy(screen_buffer_t *dest, const screen_buffer_t *src);
 
-// ============================================================================
-// PREFIX SUPPORT FUNCTIONS (Phase 2: Continuation Prompts)
-// ============================================================================
+/// ============================================================================
+/// PREFIX SUPPORT FUNCTIONS (Phase 2: Continuation Prompts)
+/// ============================================================================
 
 /**
  * Set prefix for a line (e.g., continuation prompt)
@@ -466,4 +466,4 @@ int screen_buffer_get_rows_below_cursor(const screen_buffer_t *buffer);
 }
 #endif
 
-#endif // SCREEN_BUFFER_H
+#endif /// SCREEN_BUFFER_H
