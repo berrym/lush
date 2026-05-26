@@ -530,6 +530,8 @@ int bin_display(int argc, char **argv) {
             return display_lle_hook(argc - 2, argv + 2);
         } else if (strcmp(lle_cmd, "segment") == 0) {
             return display_lle_segment(argc - 2, argv + 2);
+        } else if (strcmp(lle_cmd, "pager") == 0) {
+            return display_lle_pager(argc - 2, argv + 2);
         } else {
             source_location_t loc = builtin_get_source_location();
             shell_error_t *err = shell_error_create(
