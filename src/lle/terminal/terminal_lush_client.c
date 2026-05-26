@@ -50,14 +50,14 @@ lle_lush_display_client_init(lle_lush_display_client_t **client,
     c->display_context = display_context;
     c->capabilities = capabilities;
 
-    // Configure LLE layer for Lush
+    /// Configure LLE layer for Lush
     c->layer_config.layer_name = "lle_editing";
     c->layer_config.layer_priority = LUSH_LAYER_PRIORITY_EDITING;
     c->layer_config.supports_transparency = false;
     c->layer_config.requires_full_refresh = true;
     c->layer_config.color_capabilities = capabilities->detected_color_depth;
 
-    // Initialize submission tracking
+    /// Initialize submission tracking
     c->last_submission_time = 0;
     c->submission_count = 0;
 
@@ -158,7 +158,7 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
      * This matches what GNU readline does (rl_redisplay writes to stdout).
      */
 
-    // DEBUG: Log what we're about to render
+    /// DEBUG: Log what we're about to render
     fprintf(stderr, "[DISPLAY] Rendering %zu lines, cursor at (%zu, %zu)\n",
             content->line_count, content->cursor_line, content->cursor_column);
     for (size_t i = 0; i < content->line_count; i++) {
@@ -175,13 +175,13 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
      * path inside the render function. The fflush(stdout) at the end
      * of this function provides the cross-platform commit point. */
 
-    // Clear line and move to start: \r\033[K
+    /// Clear line and move to start: \r\033[K
     (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
-    // Write each line of content
+    /// Write each line of content
     for (size_t i = 0; i < content->line_count; i++) {
         if (i > 0) {
-            (void)!write(STDOUT_FILENO, "\r\n", 2); // CR+LF for new line
+            (void)!write(STDOUT_FILENO, "\r\n", 2); /// CR+LF for new line
         }
         if (content->lines[i].content && content->lines[i].length > 0) {
             (void)!write(STDOUT_FILENO, content->lines[i].content,
@@ -193,7 +193,7 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
      * This follows the same pattern as readline's rl_redisplay()
      */
     if (content->line_count > 0) {
-        // If we're not on the last line, move cursor up
+        /// If we're not on the last line, move cursor up
         size_t current_line = content->line_count - 1;
         if (content->cursor_line < current_line) {
             size_t lines_up = current_line - content->cursor_line;
@@ -204,7 +204,7 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
             }
         }
 
-        // Move to correct column
+        /// Move to correct column
         (void)!write(STDOUT_FILENO, "\r", 1);
         if (content->cursor_column > 0) {
             char move_right[32];
@@ -216,17 +216,17 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
         }
     }
 
-    // Flush to ensure immediate display
+    /// Flush to ensure immediate display
     fflush(stdout);
 
-    // Update submission tracking
+    /// Update submission tracking
     client->submission_count++;
     client->last_submission_time = lle_get_current_time_microseconds();
 
-    // Calculate submission latency for performance monitoring
+    /// Calculate submission latency for performance monitoring
     uint64_t submission_latency =
         client->last_submission_time - submission_start;
-    (void)submission_latency; // Will be used for perf monitoring
+    (void)submission_latency; /// Will be used for perf monitoring
 
     return LLE_SUCCESS;
 }
@@ -246,6 +246,6 @@ lle_result_t lle_convert_lush_error(lush_result_t lush_error) {
         return LLE_SUCCESS;
     }
 
-    // Default: treat as generic error
+    /// Default: treat as generic error
     return LLE_ERROR_DISPLAY_SUBMISSION;
 }

@@ -43,15 +43,15 @@ lle_terminal_recover_from_error(lle_unix_interface_t *unix_interface,
         return error_code;
     }
 
-    // Attempt to exit raw mode if active
+    /// Attempt to exit raw mode if active
     if (unix_interface->raw_mode_active) {
         lle_result_t result = lle_unix_interface_exit_raw_mode(unix_interface);
         if (result != LLE_SUCCESS) {
-            // Recovery failed - critical
+            /// Recovery failed - critical
             return LLE_ERROR_RECOVERY_FAILED;
         }
     }
 
-    // Terminal state restored successfully
+    /// Terminal state restored successfully
     return LLE_SUCCESS;
 }

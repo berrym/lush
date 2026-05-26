@@ -28,7 +28,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      * ========================================================================
      */
 
-    // Zed Editor
+    /// Zed Editor
     {           .name = "zed",
      .term_program_pattern = "zed",
      .term_pattern = "xterm-256color",
@@ -38,7 +38,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = true,
      .requires_special_handling = false},
 
-    // Visual Studio Code
+    /// Visual Studio Code
     {        .name = "vscode",
      .term_program_pattern = "vscode",
      .term_pattern = "xterm-256color",
@@ -48,7 +48,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = true,
      .requires_special_handling = false},
 
-    // Cursor (VS Code fork)
+    /// Cursor (VS Code fork)
     {        .name = "cursor",
      .term_program_pattern = "cursor",
      .term_pattern = "xterm-256color",
@@ -63,7 +63,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      * ========================================================================
      */
 
-    // AI Assistant interfaces
+    /// AI Assistant interfaces
     {  .name = "ai_assistant",
      .term_program_pattern = "*assistant*",
      .term_pattern = "*",
@@ -78,7 +78,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      * ========================================================================
      */
 
-    // iTerm2 (macOS)
+    /// iTerm2 (macOS)
     {        .name = "iterm2",
      .term_program_pattern = "iTerm",
      .term_pattern = "*",
@@ -88,7 +88,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // GNOME Terminal
+    /// GNOME Terminal
     {.name = "gnome-terminal",
      .term_program_pattern = "gnome-terminal",
      .term_pattern = "gnome*",
@@ -98,7 +98,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // Konsole (KDE)
+    /// Konsole (KDE)
     {       .name = "konsole",
      .term_program_pattern = "konsole",
      .term_pattern = "konsole*",
@@ -108,7 +108,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // Kitty
+    /// Kitty
     {         .name = "kitty",
      .term_program_pattern = NULL,
      .term_pattern = "*kitty*",
@@ -118,7 +118,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // Alacritty
+    /// Alacritty
     {     .name = "alacritty",
      .term_program_pattern = NULL,
      .term_pattern = "alacritty",
@@ -128,7 +128,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // WezTerm
+    /// WezTerm
     {       .name = "wezterm",
      .term_program_pattern = "WezTerm",
      .term_pattern = "wezterm",
@@ -138,7 +138,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // Ghostty
+    /// Ghostty
     {       .name = "ghostty",
      .term_program_pattern = "ghostty",
      .term_pattern = "xterm-ghostty",
@@ -148,7 +148,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // Terminal.app (macOS)
+    /// Terminal.app (macOS)
     {  .name = "terminal_app",
      .term_program_pattern = "Apple_Terminal",
      .term_pattern = "xterm-256color",
@@ -158,7 +158,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // xterm
+    /// xterm
     {         .name = "xterm",
      .term_program_pattern = NULL,
      .term_pattern = "xterm*",
@@ -168,7 +168,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // rxvt/urxvt
+    /// rxvt/urxvt
     {          .name = "rxvt",
      .term_program_pattern = NULL,
      .term_pattern = "rxvt*",
@@ -178,7 +178,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = false},
 
-    // Linux console
+    /// Linux console
     { .name = "linux_console",
      .term_program_pattern = NULL,
      .term_pattern = "linux",
@@ -193,7 +193,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      * ========================================================================
      */
 
-    // tmux
+    /// tmux
     {          .name = "tmux",
      .term_program_pattern = NULL,
      .term_pattern = "tmux*",
@@ -203,7 +203,7 @@ static const lle_terminal_signature_t lle_known_terminals[] = {
      .force_interactive = false,
      .requires_special_handling = true },
 
-    // GNU Screen
+    /// GNU Screen
     {        .name = "screen",
      .term_program_pattern = NULL,
      .term_pattern = "screen*",
