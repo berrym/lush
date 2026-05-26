@@ -26,39 +26,39 @@ extern "C" {
 #endif
 
 /* ========================================================================== */
-// TOKEN TYPES
+/// TOKEN TYPES
 /* ========================================================================== */
 
 /**
  * @brief Shell-specific syntax token types
  */
 typedef enum lle_syntax_token_type {
-    LLE_TOKEN_UNKNOWN = 0, /**< Unknown/unclassified */
-    LLE_TOKEN_WHITESPACE,  /**< Whitespace */
+    LLE_TOKEN_UNKNOWN = 0, ///< Unknown/unclassified
+    LLE_TOKEN_WHITESPACE,  ///< Whitespace
 
-    // Commands
-    LLE_TOKEN_COMMAND_VALID,    /**< Valid external command */
-    LLE_TOKEN_COMMAND_INVALID,  /**< Non-existent command */
-    LLE_TOKEN_COMMAND_BUILTIN,  /**< Shell builtin (cd, echo, etc.) */
-    LLE_TOKEN_COMMAND_ALIAS,    /**< Defined alias */
-    LLE_TOKEN_COMMAND_FUNCTION, /**< Shell function */
+    /// Commands
+    LLE_TOKEN_COMMAND_VALID,    ///< Valid external command
+    LLE_TOKEN_COMMAND_INVALID,  ///< Non-existent command
+    LLE_TOKEN_COMMAND_BUILTIN,  ///< Shell builtin (cd, echo, etc.)
+    LLE_TOKEN_COMMAND_ALIAS,    ///< Defined alias
+    LLE_TOKEN_COMMAND_FUNCTION, ///< Shell function
 
-    // Keywords
+    /// Keywords
     LLE_TOKEN_KEYWORD, /**< Shell keyword (if, then, else, fi, for, while, do,
                           done, case, esac) */
 
-    // Assignment
+    /// Assignment
     LLE_TOKEN_ASSIGNMENT, /**< Variable assignment (VAR=value, export VAR=val)
                            */
 
-    // Literals
-    LLE_TOKEN_STRING_SINGLE,   /**< Single-quoted string */
-    LLE_TOKEN_STRING_DOUBLE,   /**< Double-quoted string */
-    LLE_TOKEN_STRING_BACKTICK, /**< Backtick command substitution */
-    LLE_TOKEN_NUMBER,          /**< Numeric literal */
+    /// Literals
+    LLE_TOKEN_STRING_SINGLE,   ///< Single-quoted string
+    LLE_TOKEN_STRING_DOUBLE,   ///< Double-quoted string
+    LLE_TOKEN_STRING_BACKTICK, ///< Backtick command substitution
+    LLE_TOKEN_NUMBER,          ///< Numeric literal
 
-    // Variables
-    LLE_TOKEN_VARIABLE,         /**< Variable reference ($var, ${var}) */
+    /// Variables
+    LLE_TOKEN_VARIABLE,         ///< Variable reference ($var, ${var})
     LLE_TOKEN_VARIABLE_SPECIAL, /**< Special variable ($?, $#, $@, $$, $!,
                                    $0-$9) */
 
@@ -80,56 +80,56 @@ typedef enum lle_syntax_token_type {
     LLE_TOKEN_PATH_DIR_ABSOLUTE,
     LLE_TOKEN_PATH_DIR_RELATIVE,
     LLE_TOKEN_PATH_DIR_HOME,
-    LLE_TOKEN_PATH_INVALID, /**< Non-existent path */
+    LLE_TOKEN_PATH_INVALID, ///< Non-existent path
 
-    // Operators
-    LLE_TOKEN_PIPE,           /**< Pipe (|) */
-    LLE_TOKEN_REDIRECT,       /**< Redirection (>, <, >>, 2>, &>, etc.) */
-    LLE_TOKEN_BACKGROUND,     /**< Background (&) */
-    LLE_TOKEN_SEMICOLON,      /**< Command separator (;) */
-    LLE_TOKEN_AND,            /**< Logical AND (&&) */
-    LLE_TOKEN_OR,             /**< Logical OR (||) */
-    LLE_TOKEN_SUBSHELL_START, /**< Subshell start ( */
-    LLE_TOKEN_SUBSHELL_END,   /**< Subshell end ) */
-    LLE_TOKEN_BRACE_START,    /**< Brace group start { */
-    LLE_TOKEN_BRACE_END,      /**< Brace group end } */
+    /// Operators
+    LLE_TOKEN_PIPE,           ///< Pipe (|)
+    LLE_TOKEN_REDIRECT,       ///< Redirection (>, <, >>, 2>, &>, etc.)
+    LLE_TOKEN_BACKGROUND,     ///< Background (&)
+    LLE_TOKEN_SEMICOLON,      ///< Command separator (;)
+    LLE_TOKEN_AND,            ///< Logical AND (&&)
+    LLE_TOKEN_OR,             ///< Logical OR (||)
+    LLE_TOKEN_SUBSHELL_START, ///< Subshell start (
+    LLE_TOKEN_SUBSHELL_END,   ///< Subshell end )
+    LLE_TOKEN_BRACE_START,    ///< Brace group start {
+    LLE_TOKEN_BRACE_END,      ///< Brace group end }
 
-    // Other
-    LLE_TOKEN_COMMENT,  /**< Comment (# ...) */
-    LLE_TOKEN_OPTION,   /**< Command option (-v, --verbose) */
-    LLE_TOKEN_ARGUMENT, /**< Generic argument */
-    LLE_TOKEN_GLOB,     /**< Glob pattern (*, ?, [...]) */
+    /// Other
+    LLE_TOKEN_COMMENT,  ///< Comment (# ...)
+    LLE_TOKEN_OPTION,   ///< Command option (-v, --verbose)
+    LLE_TOKEN_ARGUMENT, ///< Generic argument
+    LLE_TOKEN_GLOB,     ///< Glob pattern (*, ?, [...])
     LLE_TOKEN_EXTGLOB, /**< Extended glob ?(pat), *(pat), +(pat), @(pat), !(pat)
                         */
-    LLE_TOKEN_GLOB_QUAL, /**< Glob qualifier *(.), *(/) */
-    LLE_TOKEN_ESCAPE,    /**< Escape sequence (\x) */
+    LLE_TOKEN_GLOB_QUAL, ///< Glob qualifier *(.), *(/)
+    LLE_TOKEN_ESCAPE,    ///< Escape sequence (\x)
 
-    // Here-documents and here-strings
-    LLE_TOKEN_HEREDOC_OP,      /**< Heredoc operator (<<, <<-, <<') */
-    LLE_TOKEN_HEREDOC_DELIM,   /**< Heredoc delimiter word */
-    LLE_TOKEN_HEREDOC_CONTENT, /**< Heredoc content (body) */
-    LLE_TOKEN_HERESTRING,      /**< Here-string (<<<) */
+    /// Here-documents and here-strings
+    LLE_TOKEN_HEREDOC_OP,      ///< Heredoc operator (<<, <<-, <<')
+    LLE_TOKEN_HEREDOC_DELIM,   ///< Heredoc delimiter word
+    LLE_TOKEN_HEREDOC_CONTENT, ///< Heredoc content (body)
+    LLE_TOKEN_HERESTRING,      ///< Here-string (<<<)
 
-    // Process substitution
-    LLE_TOKEN_PROCSUB_IN,  /**< Process substitution input <(...) */
-    LLE_TOKEN_PROCSUB_OUT, /**< Process substitution output >(...) */
+    /// Process substitution
+    LLE_TOKEN_PROCSUB_IN,  ///< Process substitution input <(...)
+    LLE_TOKEN_PROCSUB_OUT, ///< Process substitution output >(...)
 
-    // ANSI-C quoting
-    LLE_TOKEN_STRING_ANSIC, /**< ANSI-C quoted string $'...' */
+    /// ANSI-C quoting
+    LLE_TOKEN_STRING_ANSIC, ///< ANSI-C quoted string $'...'
 
-    // Arithmetic expansion
-    LLE_TOKEN_ARITHMETIC, /**< Arithmetic expansion $((...)) */
+    /// Arithmetic expansion
+    LLE_TOKEN_ARITHMETIC, ///< Arithmetic expansion $((...))
 
-    // Errors
-    LLE_TOKEN_ERROR,             /**< Syntax error */
-    LLE_TOKEN_UNCLOSED_STRING,   /**< Unclosed quote */
-    LLE_TOKEN_UNCLOSED_SUBSHELL, /**< Unclosed subshell/brace */
+    /// Errors
+    LLE_TOKEN_ERROR,             ///< Syntax error
+    LLE_TOKEN_UNCLOSED_STRING,   ///< Unclosed quote
+    LLE_TOKEN_UNCLOSED_SUBSHELL, ///< Unclosed subshell/brace
 
-    LLE_TOKEN_TYPE_COUNT /**< Number of token types */
+    LLE_TOKEN_TYPE_COUNT ///< Number of token types
 } lle_syntax_token_type_t;
 
 /* ========================================================================== */
-// COLOR SCHEME
+/// COLOR SCHEME
 /* ========================================================================== */
 
 /**
@@ -139,23 +139,23 @@ typedef enum lle_syntax_token_type {
  * A value of 0 means "use default/inherited color".
  */
 typedef struct lle_syntax_colors {
-    // Commands
-    uint32_t command_valid;    /**< Valid external command (typically green) */
-    uint32_t command_invalid;  /**< Invalid command (typically red) */
-    uint32_t command_builtin;  /**< Shell builtin (typically cyan) */
-    uint32_t command_alias;    /**< Alias (typically cyan) */
-    uint32_t command_function; /**< Function (typically blue) */
+    /// Commands
+    uint32_t command_valid;    ///< Valid external command (typically green)
+    uint32_t command_invalid;  ///< Invalid command (typically red)
+    uint32_t command_builtin;  ///< Shell builtin (typically cyan)
+    uint32_t command_alias;    ///< Alias (typically cyan)
+    uint32_t command_function; ///< Function (typically blue)
 
-    // Keywords
-    uint32_t keyword; /**< Shell keywords (typically blue/magenta) */
+    /// Keywords
+    uint32_t keyword; ///< Shell keywords (typically blue/magenta)
 
-    // Strings
-    uint32_t string;        /**< Quoted strings (typically yellow) */
-    uint32_t string_escape; /**< Escape sequences in strings */
+    /// Strings
+    uint32_t string;        ///< Quoted strings (typically yellow)
+    uint32_t string_escape; ///< Escape sequences in strings
 
-    // Variables
-    uint32_t variable;         /**< Variables (typically magenta/purple) */
-    uint32_t variable_special; /**< Special variables */
+    /// Variables
+    uint32_t variable;         ///< Variables (typically magenta/purple)
+    uint32_t variable_special; ///< Special variables
 
     /* Paths -- shape × kind grid with kind-only fallbacks.
      *
@@ -181,70 +181,70 @@ typedef struct lle_syntax_colors {
     uint32_t path_dir_absolute;
     uint32_t path_dir_relative;
     uint32_t path_dir_home;
-    uint32_t path_file;    /**< Kind-only fallback for any file path */
-    uint32_t path_dir;     /**< Kind-only fallback for any directory path */
-    uint32_t path_invalid; /**< Non-existent paths (no fallback) */
+    uint32_t path_file;    ///< Kind-only fallback for any file path
+    uint32_t path_dir;     ///< Kind-only fallback for any directory path
+    uint32_t path_invalid; ///< Non-existent paths (no fallback)
 
-    // Operators
-    uint32_t pipe;           /**< Pipe operator */
-    uint32_t redirect;       /**< Redirection operators */
-    uint32_t operator_other; /**< Other operators (&, ;, &&, ||) */
+    /// Operators
+    uint32_t pipe;           ///< Pipe operator
+    uint32_t redirect;       ///< Redirection operators
+    uint32_t operator_other; ///< Other operators (&, ;, &&, ||)
 
-    // Assignment
-    uint32_t assignment; /**< Variable assignment (VAR=value) */
+    /// Assignment
+    uint32_t assignment; ///< Variable assignment (VAR=value)
 
-    // Other
-    uint32_t comment;   /**< Comments (typically dim/gray) */
-    uint32_t number;    /**< Numbers (typically cyan) */
-    uint32_t option;    /**< Options (typically white/default) */
-    uint32_t glob;      /**< Glob patterns */
-    uint32_t extglob;   /**< Extended glob patterns ?(pat), *(pat), etc. */
-    uint32_t glob_qual; /**< Glob qualifiers *(.), *(/) */
-    uint32_t argument;  /**< Generic arguments (default) */
+    /// Other
+    uint32_t comment;   ///< Comments (typically dim/gray)
+    uint32_t number;    ///< Numbers (typically cyan)
+    uint32_t option;    ///< Options (typically white/default)
+    uint32_t glob;      ///< Glob patterns
+    uint32_t extglob;   ///< Extended glob patterns ?(pat), *(pat), etc.
+    uint32_t glob_qual; ///< Glob qualifiers *(.), *(/)
+    uint32_t argument;  ///< Generic arguments (default)
 
-    // Here-documents and here-strings
-    uint32_t heredoc_op;      /**< Heredoc operator (<<) */
-    uint32_t heredoc_delim;   /**< Heredoc delimiter */
-    uint32_t heredoc_content; /**< Heredoc body content */
-    uint32_t herestring;      /**< Here-string (<<<word) */
+    /// Here-documents and here-strings
+    uint32_t heredoc_op;      ///< Heredoc operator (<<)
+    uint32_t heredoc_delim;   ///< Heredoc delimiter
+    uint32_t heredoc_content; ///< Heredoc body content
+    uint32_t herestring;      ///< Here-string (<<<word)
 
-    // Process substitution
-    uint32_t procsub; /**< Process substitution <() and >() */
+    /// Process substitution
+    uint32_t procsub; ///< Process substitution <() and >()
 
-    // ANSI-C quoting
-    uint32_t string_ansic; /**< ANSI-C string $'...' */
+    /// ANSI-C quoting
+    uint32_t string_ansic; ///< ANSI-C string $'...'
 
-    // Arithmetic expansion
-    uint32_t arithmetic; /**< Arithmetic $((...)) */
+    /// Arithmetic expansion
+    uint32_t arithmetic; ///< Arithmetic $((...))
 
-    // Errors
-    uint32_t error;    /**< Syntax errors (typically red bg) */
-    uint32_t error_fg; /**< Error foreground (typically white) */
+    /// Errors
+    uint32_t error;    ///< Syntax errors (typically red bg)
+    uint32_t error_fg; ///< Error foreground (typically white)
 
-    // Text attributes (bitmask)
-    uint8_t keyword_bold;    /**< Bold keywords */
-    uint8_t command_bold;    /**< Bold valid commands */
-    uint8_t error_underline; /**< Underline errors */
-    uint8_t path_underline;  /**< Underline paths */
-    uint8_t comment_dim;     /**< Dim comments */
+    /// Text attributes (bitmask)
+    uint8_t keyword_bold;    ///< Bold keywords
+    uint8_t command_bold;    ///< Bold valid commands
+    uint8_t error_underline; ///< Underline errors
+    uint8_t path_underline;  ///< Underline paths
+    uint8_t comment_dim;     ///< Dim comments
 } lle_syntax_colors_t;
 
 /* ========================================================================== */
-// TOKEN
+/// TOKEN
 /* ========================================================================== */
 
 /**
  * @brief A single syntax token
  */
 typedef struct lle_syntax_token {
-    lle_syntax_token_type_t type; /**< Token type */
-    size_t start;                 /**< Start position in input */
-    size_t end;                   /**< End position (exclusive) */
-    uint32_t color;               /**< Resolved color for this token */
-    uint8_t attributes;           /**< Text attributes (bold, underline, dim) */
+    lle_syntax_token_type_t type; ///< Token type
+    size_t start;                 ///< Start position in input
+    size_t end;                   ///< End position (exclusive)
+    uint32_t color;               ///< Resolved color for this token
+    uint8_t attributes;           ///< Text attributes (bold, underline, dim)
 } lle_syntax_token_t;
 
-// Text attribute flags
+/// Text attribute flags
 #define LLE_ATTR_NONE 0x00
 #define LLE_ATTR_BOLD 0x01
 #define LLE_ATTR_DIM 0x02
@@ -254,29 +254,29 @@ typedef struct lle_syntax_token {
 #define LLE_ATTR_REVERSE 0x20
 
 /* ========================================================================== */
-// HIGHLIGHTER CONTEXT
+/// HIGHLIGHTER CONTEXT
 /* ========================================================================== */
 
 /**
  * @brief Syntax highlighter context
  */
 typedef struct lle_syntax_highlighter {
-    // Color scheme
+    /// Color scheme
     lle_syntax_colors_t colors;
 
-    // Token buffer
+    /// Token buffer
     lle_syntax_token_t *tokens;
     size_t token_count;
     size_t token_capacity;
 
-    // Configuration
+    /// Configuration
     bool enabled;
-    bool validate_commands; /**< Check if commands exist */
-    bool validate_paths;    /**< Check if paths exist */
-    bool highlight_errors;  /**< Highlight syntax errors */
+    bool validate_commands; ///< Check if commands exist
+    bool validate_paths;    ///< Check if paths exist
+    bool highlight_errors;  ///< Highlight syntax errors
 
-    // Terminal capabilities
-    int color_depth; /**< 0=none, 1=8, 2=256, 3=truecolor */
+    /// Terminal capabilities
+    int color_depth; ///< 0=none, 1=8, 2=256, 3=truecolor
 
     /* Caches for filesystem lookups -- opaque to keep the public ABI
      * insulated from the cache layout. The path cache is a separate
@@ -284,12 +284,12 @@ typedef struct lle_syntax_highlighter {
      * (PATH changes invalidate one, cwd changes invalidate the other)
      * and because keying them in the same table would conflate the
      * two namespaces (`bash` the command vs. `bash` the file). */
-    void *command_cache; /**< Opaque pointer to cmd_cache_t */
-    void *path_cache;    /**< Opaque pointer to path_cache_t */
+    void *command_cache; ///< Opaque pointer to cmd_cache_t
+    void *path_cache;    ///< Opaque pointer to path_cache_t
 } lle_syntax_highlighter_t;
 
 /* ========================================================================== */
-// API
+/// API
 /* ========================================================================== */
 
 /**
@@ -382,4 +382,4 @@ void lle_syntax_clear_cache(lle_syntax_highlighter_t *highlighter);
 }
 #endif
 
-#endif // LLE_SYNTAX_HIGHLIGHTING_H
+#endif /// LLE_SYNTAX_HIGHLIGHTING_H

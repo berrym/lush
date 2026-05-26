@@ -298,6 +298,6 @@ lle_result_t lle_kill_ring_get_entry_at_index(lle_kill_ring_t *ring,
  */
 lle_result_t lle_kill_ring_dump(lle_kill_ring_t *ring);
 
-#endif // LLE_DEBUG
+#endif /// LLE_DEBUG
 
-#endif // LLE_KILL_RING_H
+#endif /// LLE_KILL_RING_H

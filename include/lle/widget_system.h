@@ -19,18 +19,18 @@
  *
  * Example Usage:
  *
- *     // Initialize registry
+ *     /// Initialize registry
  *     lle_widget_registry_t *registry;
  *     lle_widget_registry_init(&registry, memory_pool);
  *
- *     // Register a widget
+ *     /// Register a widget
  *     lle_widget_register(registry, "my-widget", my_callback,
  *                        LLE_WIDGET_USER, NULL);
  *
- *     // Execute widget
+ *     /// Execute widget
  *     lle_widget_execute(registry, "my-widget", editor);
  *
- *     // Cleanup
+ *     /// Cleanup
  *     lle_widget_registry_destroy(registry);
  */
 
@@ -38,7 +38,7 @@
 #define LLE_WIDGET_SYSTEM_H
 
 #include "lle/error_handling.h"
-#include "lle/hashtable.h" // IWYU pragma: keep (provides lle_hashtable_t)
+#include "lle/hashtable.h" /// IWYU pragma: keep (provides lle_hashtable_t)
 #include "lle/memory_management.h"
 
 #include <stdbool.h>
@@ -48,7 +48,7 @@
 extern "C" {
 #endif
 
-// Forward declaration to avoid circular dependency
+/// Forward declaration to avoid circular dependency
 typedef struct lle_editor lle_editor_t;
 
 /* ============================================================================
@@ -60,9 +60,9 @@ typedef struct lle_editor lle_editor_t;
  * Widget types
  */
 typedef enum {
-    LLE_WIDGET_BUILTIN, /**< Built-in LLE widgets */
-    LLE_WIDGET_USER,    /**< User-defined widgets */
-    LLE_WIDGET_PLUGIN,  /**< Plugin-provided widgets */
+    LLE_WIDGET_BUILTIN, ///< Built-in LLE widgets
+    LLE_WIDGET_USER,    ///< User-defined widgets
+    LLE_WIDGET_PLUGIN,  ///< Plugin-provided widgets
 } lle_widget_type_t;
 
 /**
@@ -85,21 +85,20 @@ typedef lle_result_t (*lle_widget_callback_t)(lle_editor_t *editor,
  * keybindings, hooks, or programmatically.
  */
 typedef struct lle_widget {
-    char *name;                     /**< Widget name (unique identifier) */
-    lle_widget_callback_t callback; /**< Execution function */
-    lle_widget_type_t type;         /**< Widget type */
-    void *user_data;                /**< Optional user data */
+    char *name;                     ///< Widget name (unique identifier)
+    lle_widget_callback_t callback; ///< Execution function
+    lle_widget_type_t type;         ///< Widget type
+    void *user_data;                ///< Optional user data
 
-    // Performance tracking
-    uint64_t execution_count; /**< Times executed */
-    uint64_t
-        total_execution_time_us; /**< Total execution time in microseconds */
+    /// Performance tracking
+    uint64_t execution_count;         ///< Times executed
+    uint64_t total_execution_time_us; ///< Total execution time in microseconds
 
-    // State
-    bool enabled; /**< Widget enabled state */
+    /// State
+    bool enabled; ///< Widget enabled state
 
-    // Linked list for iteration
-    struct lle_widget *next; /**< Next widget in list */
+    /// Linked list for iteration
+    struct lle_widget *next; ///< Next widget in list
 } lle_widget_t;
 
 /**
@@ -109,11 +108,11 @@ typedef struct lle_widget {
  * and maintains linked list for iteration.
  */
 typedef struct lle_widget_registry {
-    lle_hashtable_t *widgets;       /**< name -> widget lookup */
-    lle_widget_t *widget_list;      /**< Linked list of all widgets */
-    size_t widget_count;            /**< Total widgets registered */
-    lle_memory_pool_t *memory_pool; /**< Memory pool for allocations */
-    bool registry_active;           /**< Registry operational state */
+    lle_hashtable_t *widgets;       ///< name -> widget lookup
+    lle_widget_t *widget_list;      ///< Linked list of all widgets
+    size_t widget_count;            ///< Total widgets registered
+    lle_memory_pool_t *memory_pool; ///< Memory pool for allocations
+    bool registry_active;           ///< Registry operational state
 } lle_widget_registry_t;
 
 /* ============================================================================
@@ -299,4 +298,4 @@ lle_result_t lle_widget_disable(lle_widget_registry_t *registry,
 }
 #endif
 
-#endif // LLE_WIDGET_SYSTEM_H
+#endif /// LLE_WIDGET_SYSTEM_H

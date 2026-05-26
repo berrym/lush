@@ -54,7 +54,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Forward declarations
+/// Forward declarations
 typedef struct lle_event lle_event_t;
 typedef struct lle_event_queue lle_event_queue_t;
 typedef struct lle_event_handler lle_event_handler_t;
@@ -65,85 +65,85 @@ typedef struct lle_event_system lle_event_system_t;
  * Note: Using 'kind' terminology to avoid conflict with memory pool event_type
  */
 typedef enum {
-    // Terminal Input Events (0x1000 - 0x1FFF) - Priority: HIGH
-    LLE_EVENT_KEY_PRESS = 0x1000, /**< Single key press */
-    LLE_EVENT_KEY_RELEASE,        /**< Key release (if supported) */
-    LLE_EVENT_KEY_SEQUENCE,       /**< Multi-key sequence (escape sequences) */
-    LLE_EVENT_KEY_CHORD,          /**< Simultaneous key combination */
+    /// Terminal Input Events (0x1000 - 0x1FFF) - Priority: HIGH
+    LLE_EVENT_KEY_PRESS = 0x1000, ///< Single key press
+    LLE_EVENT_KEY_RELEASE,        ///< Key release (if supported)
+    LLE_EVENT_KEY_SEQUENCE,       ///< Multi-key sequence (escape sequences)
+    LLE_EVENT_KEY_CHORD,          ///< Simultaneous key combination
 
-    // Mouse Events (0x2000 - 0x2FFF) - Priority: MEDIUM
-    LLE_EVENT_MOUSE_PRESS = 0x2000, /**< Mouse button press */
-    LLE_EVENT_MOUSE_RELEASE,        /**< Mouse button release */
-    LLE_EVENT_MOUSE_MOVE,           /**< Mouse movement */
-    LLE_EVENT_MOUSE_WHEEL,          /**< Mouse wheel scroll */
-    LLE_EVENT_MOUSE_DRAG,           /**< Mouse drag operation */
+    /// Mouse Events (0x2000 - 0x2FFF) - Priority: MEDIUM
+    LLE_EVENT_MOUSE_PRESS = 0x2000, ///< Mouse button press
+    LLE_EVENT_MOUSE_RELEASE,        ///< Mouse button release
+    LLE_EVENT_MOUSE_MOVE,           ///< Mouse movement
+    LLE_EVENT_MOUSE_WHEEL,          ///< Mouse wheel scroll
+    LLE_EVENT_MOUSE_DRAG,           ///< Mouse drag operation
 
-    // Terminal State Events (0x3000 - 0x3FFF) - Priority: CRITICAL
-    LLE_EVENT_TERMINAL_RESIZE = 0x3000, /**< Terminal size change */
-    LLE_EVENT_FOCUS_IN,                 /**< Terminal gained focus */
-    LLE_EVENT_FOCUS_OUT,                /**< Terminal lost focus */
-    LLE_EVENT_TERMINAL_DISCONNECT,      /**< Terminal disconnected */
+    /// Terminal State Events (0x3000 - 0x3FFF) - Priority: CRITICAL
+    LLE_EVENT_TERMINAL_RESIZE = 0x3000, ///< Terminal size change
+    LLE_EVENT_FOCUS_IN,                 ///< Terminal gained focus
+    LLE_EVENT_FOCUS_OUT,                ///< Terminal lost focus
+    LLE_EVENT_TERMINAL_DISCONNECT,      ///< Terminal disconnected
 
-    // Paste Events (0x4000 - 0x4FFF) - Priority: HIGH
-    LLE_EVENT_PASTE_START = 0x4000, /**< Bracketed paste start */
-    LLE_EVENT_PASTE_DATA,           /**< Paste data chunk */
-    LLE_EVENT_PASTE_END,            /**< Bracketed paste end */
-    LLE_EVENT_PASTE_TIMEOUT,        /**< Paste operation timeout */
+    /// Paste Events (0x4000 - 0x4FFF) - Priority: HIGH
+    LLE_EVENT_PASTE_START = 0x4000, ///< Bracketed paste start
+    LLE_EVENT_PASTE_DATA,           ///< Paste data chunk
+    LLE_EVENT_PASTE_END,            ///< Bracketed paste end
+    LLE_EVENT_PASTE_TIMEOUT,        ///< Paste operation timeout
 
-    // Buffer Events (0x5000 - 0x5FFF) - Priority: MEDIUM
-    LLE_EVENT_BUFFER_CHANGED = 0x5000, /**< Buffer content changed */
-    LLE_EVENT_CURSOR_MOVED,            /**< Cursor position changed */
-    LLE_EVENT_SELECTION_CHANGED,       /**< Text selection changed */
-    LLE_EVENT_BUFFER_VALIDATION,       /**< Buffer validation request */
+    /// Buffer Events (0x5000 - 0x5FFF) - Priority: MEDIUM
+    LLE_EVENT_BUFFER_CHANGED = 0x5000, ///< Buffer content changed
+    LLE_EVENT_CURSOR_MOVED,            ///< Cursor position changed
+    LLE_EVENT_SELECTION_CHANGED,       ///< Text selection changed
+    LLE_EVENT_BUFFER_VALIDATION,       ///< Buffer validation request
 
-    // History Events (0x6000 - 0x6FFF) - Priority: LOW
-    LLE_EVENT_HISTORY_CHANGED = 0x6000, /**< History state changed */
-    LLE_EVENT_HISTORY_SEARCH,           /**< History search request */
-    LLE_EVENT_HISTORY_NAVIGATE,         /**< History navigation */
+    /// History Events (0x6000 - 0x6FFF) - Priority: LOW
+    LLE_EVENT_HISTORY_CHANGED = 0x6000, ///< History state changed
+    LLE_EVENT_HISTORY_SEARCH,           ///< History search request
+    LLE_EVENT_HISTORY_NAVIGATE,         ///< History navigation
 
-    // Completion Events (0x7000 - 0x7FFF) - Priority: MEDIUM
-    LLE_EVENT_COMPLETION_REQUESTED = 0x7000, /**< Tab completion requested */
-    LLE_EVENT_COMPLETION_UPDATED,            /**< Completion list updated */
-    LLE_EVENT_COMPLETION_ACCEPTED,           /**< Completion accepted */
-    LLE_EVENT_COMPLETION_CANCELLED,          /**< Completion cancelled */
+    /// Completion Events (0x7000 - 0x7FFF) - Priority: MEDIUM
+    LLE_EVENT_COMPLETION_REQUESTED = 0x7000, ///< Tab completion requested
+    LLE_EVENT_COMPLETION_UPDATED,            ///< Completion list updated
+    LLE_EVENT_COMPLETION_ACCEPTED,           ///< Completion accepted
+    LLE_EVENT_COMPLETION_CANCELLED,          ///< Completion cancelled
 
-    // Suggestion Events (0x8000 - 0x8FFF) - Priority: LOW
-    LLE_EVENT_SUGGESTION_UPDATED = 0x8000, /**< Autosuggestion updated */
-    LLE_EVENT_SUGGESTION_ACCEPTED,         /**< Suggestion accepted */
-    LLE_EVENT_SUGGESTION_DISMISSED,        /**< Suggestion dismissed */
+    /// Suggestion Events (0x8000 - 0x8FFF) - Priority: LOW
+    LLE_EVENT_SUGGESTION_UPDATED = 0x8000, ///< Autosuggestion updated
+    LLE_EVENT_SUGGESTION_ACCEPTED,         ///< Suggestion accepted
+    LLE_EVENT_SUGGESTION_DISMISSED,        ///< Suggestion dismissed
 
-    // System Events (0x9000 - 0x9FFF) - Priority: CRITICAL
-    LLE_EVENT_SYSTEM_ERROR = 0x9000, /**< System error occurred */
-    LLE_EVENT_SYSTEM_WARNING,        /**< System warning */
-    LLE_EVENT_SYSTEM_SHUTDOWN,       /**< System shutdown request */
-    LLE_EVENT_MEMORY_PRESSURE,       /**< Memory pressure warning */
+    /// System Events (0x9000 - 0x9FFF) - Priority: CRITICAL
+    LLE_EVENT_SYSTEM_ERROR = 0x9000, ///< System error occurred
+    LLE_EVENT_SYSTEM_WARNING,        ///< System warning
+    LLE_EVENT_SYSTEM_SHUTDOWN,       ///< System shutdown request
+    LLE_EVENT_MEMORY_PRESSURE,       ///< Memory pressure warning
 
-    // Timer Events (0xA000 - 0xAFFF) - Priority: LOW
-    LLE_EVENT_TIMER_EXPIRED = 0xA000, /**< Timer expired */
-    LLE_EVENT_TIMEOUT,                /**< General timeout */
-    LLE_EVENT_PERIODIC_UPDATE,        /**< Periodic update trigger */
+    /// Timer Events (0xA000 - 0xAFFF) - Priority: LOW
+    LLE_EVENT_TIMER_EXPIRED = 0xA000, ///< Timer expired
+    LLE_EVENT_TIMEOUT,                ///< General timeout
+    LLE_EVENT_PERIODIC_UPDATE,        ///< Periodic update trigger
 
-    // Plugin Events (0xB000 - 0xBFFF) - Priority: CONFIGURABLE
-    LLE_EVENT_PLUGIN_CUSTOM = 0xB000, /**< Plugin-defined event */
-    LLE_EVENT_PLUGIN_MESSAGE,         /**< Inter-plugin message */
-    LLE_EVENT_PLUGIN_ERROR,           /**< Plugin error */
+    /// Plugin Events (0xB000 - 0xBFFF) - Priority: CONFIGURABLE
+    LLE_EVENT_PLUGIN_CUSTOM = 0xB000, ///< Plugin-defined event
+    LLE_EVENT_PLUGIN_MESSAGE,         ///< Inter-plugin message
+    LLE_EVENT_PLUGIN_ERROR,           ///< Plugin error
 
-    // Display Integration Events (0xC000 - 0xCFFF) - Priority: HIGH
-    LLE_EVENT_DISPLAY_UPDATE = 0xC000, /**< Display update required */
-    LLE_EVENT_DISPLAY_REFRESH,         /**< Display refresh request */
-    LLE_EVENT_DISPLAY_INVALIDATE,      /**< Display invalidation */
+    /// Display Integration Events (0xC000 - 0xCFFF) - Priority: HIGH
+    LLE_EVENT_DISPLAY_UPDATE = 0xC000, ///< Display update required
+    LLE_EVENT_DISPLAY_REFRESH,         ///< Display refresh request
+    LLE_EVENT_DISPLAY_INVALIDATE,      ///< Display invalidation
 
-    // Shell Lifecycle Events (0xD000 - 0xDFFF) - Priority: HIGH
-    LLE_EVENT_DIRECTORY_CHANGED = 0xD000, /**< Working directory changed (cd) */
-    LLE_EVENT_PRE_COMMAND,                /**< Before command execution */
-    LLE_EVENT_POST_COMMAND,               /**< After command execution */
-    LLE_EVENT_COMMAND_NOT_FOUND,          /**< Command not found */
-    LLE_EVENT_PROMPT_DISPLAY,             /**< Prompt about to be displayed */
+    /// Shell Lifecycle Events (0xD000 - 0xDFFF) - Priority: HIGH
+    LLE_EVENT_DIRECTORY_CHANGED = 0xD000, ///< Working directory changed (cd)
+    LLE_EVENT_PRE_COMMAND,                ///< Before command execution
+    LLE_EVENT_POST_COMMAND,               ///< After command execution
+    LLE_EVENT_COMMAND_NOT_FOUND,          ///< Command not found
+    LLE_EVENT_PROMPT_DISPLAY,             ///< Prompt about to be displayed
 
-    // Testing and Debug Events (0xF000 - 0xFFFF) - Priority: LOWEST
-    LLE_EVENT_DEBUG_MARKER = 0xF000, /**< Debug marker event */
-    LLE_EVENT_TEST_TRIGGER,          /**< Test trigger event */
-    LLE_EVENT_PROFILING_SAMPLE,      /**< Profiling sample */
+    /// Testing and Debug Events (0xF000 - 0xFFFF) - Priority: LOWEST
+    LLE_EVENT_DEBUG_MARKER = 0xF000, ///< Debug marker event
+    LLE_EVENT_TEST_TRIGGER,          ///< Test trigger event
+    LLE_EVENT_PROFILING_SAMPLE,      ///< Profiling sample
 } lle_event_kind_t;
 
 /*
@@ -151,121 +151,121 @@ typedef enum {
  */
 typedef enum {
     LLE_PRIORITY_CRITICAL =
-        0, /**< System-critical events (terminal state, errors) */
-    LLE_PRIORITY_HIGH = 1, /**< High-priority user events (key input, paste) */
-    LLE_PRIORITY_MEDIUM = 2, /**< Normal priority events (buffer, completion) */
+        0,                 ///< System-critical events (terminal state, errors)
+    LLE_PRIORITY_HIGH = 1, ///< High-priority user events (key input, paste)
+    LLE_PRIORITY_MEDIUM = 2, ///< Normal priority events (buffer, completion)
     LLE_PRIORITY_LOW =
-        3, /**< Low priority events (history, suggestions, timers) */
-    LLE_PRIORITY_LOWEST = 4, /**< Lowest priority events (debug, profiling) */
-    LLE_PRIORITY_COUNT = 5   // Total priority levels
+        3, ///< Low priority events (history, suggestions, timers)
+    LLE_PRIORITY_LOWEST = 4, ///< Lowest priority events (debug, profiling)
+    LLE_PRIORITY_COUNT = 5   /// Total priority levels
 } lle_event_priority_t;
 
 /*
  * Event Source Identification (Phase 2)
  */
 typedef enum {
-    LLE_EVENT_SOURCE_TERMINAL,   /**< Terminal input */
-    LLE_EVENT_SOURCE_INTERNAL,   /**< Internal system event */
-    LLE_EVENT_SOURCE_PLUGIN,     /**< Plugin-generated event */
-    LLE_EVENT_SOURCE_TIMER,      /**< Timer-generated event */
-    LLE_EVENT_SOURCE_DISPLAY,    /**< Display system event */
-    LLE_EVENT_SOURCE_BUFFER,     /**< Buffer system event */
-    LLE_EVENT_SOURCE_HISTORY,    /**< History system event */
-    LLE_EVENT_SOURCE_COMPLETION, /**< Completion system event */
-    LLE_EVENT_SOURCE_SHELL, /**< Shell lifecycle event (cd, command exec) */
-    LLE_EVENT_SOURCE_TEST,  /**< Test system event */
+    LLE_EVENT_SOURCE_TERMINAL,   ///< Terminal input
+    LLE_EVENT_SOURCE_INTERNAL,   ///< Internal system event
+    LLE_EVENT_SOURCE_PLUGIN,     ///< Plugin-generated event
+    LLE_EVENT_SOURCE_TIMER,      ///< Timer-generated event
+    LLE_EVENT_SOURCE_DISPLAY,    ///< Display system event
+    LLE_EVENT_SOURCE_BUFFER,     ///< Buffer system event
+    LLE_EVENT_SOURCE_HISTORY,    ///< History system event
+    LLE_EVENT_SOURCE_COMPLETION, ///< Completion system event
+    LLE_EVENT_SOURCE_SHELL,      ///< Shell lifecycle event (cd, command exec)
+    LLE_EVENT_SOURCE_TEST,       ///< Test system event
 } lle_event_source_t;
 
 /*
  * Event Flags (Phase 2)
  */
 typedef enum {
-    LLE_EVENT_FLAG_NONE = 0,             /**< No flags */
-    LLE_EVENT_FLAG_HANDLED = (1 << 0),   /**< Event has been handled */
-    LLE_EVENT_FLAG_CANCELLED = (1 << 1), /**< Event processing cancelled */
-    LLE_EVENT_FLAG_SYNTHETIC = (1 << 2), /**< Synthetically generated event */
+    LLE_EVENT_FLAG_NONE = 0,             ///< No flags
+    LLE_EVENT_FLAG_HANDLED = (1 << 0),   ///< Event has been handled
+    LLE_EVENT_FLAG_CANCELLED = (1 << 1), ///< Event processing cancelled
+    LLE_EVENT_FLAG_SYNTHETIC = (1 << 2), ///< Synthetically generated event
     LLE_EVENT_FLAG_PROPAGATE =
-        (1 << 3), /**< Continue propagating to other handlers */
-    LLE_EVENT_FLAG_QUEUED = (1 << 4),     /**< Event is currently queued */
-    LLE_EVENT_FLAG_PROCESSING = (1 << 5), /**< Event is being processed */
+        (1 << 3), ///< Continue propagating to other handlers
+    LLE_EVENT_FLAG_QUEUED = (1 << 4),     ///< Event is currently queued
+    LLE_EVENT_FLAG_PROCESSING = (1 << 5), ///< Event is being processed
 } lle_event_flags_t;
 
 /*
  * Key Event Data (Phase 2)
  */
 typedef struct {
-    uint32_t key_code;  /**< Key code */
-    uint32_t modifiers; /**< Modifier keys (Ctrl, Alt, Shift) */
-    char utf8_char[8];  /**< UTF-8 character */
-    bool is_special;    /**< Special key (arrow, function key) */
+    uint32_t key_code;  ///< Key code
+    uint32_t modifiers; ///< Modifier keys (Ctrl, Alt, Shift)
+    char utf8_char[8];  ///< UTF-8 character
+    bool is_special;    ///< Special key (arrow, function key)
 } lle_key_event_data_t;
 
 /*
  * Mouse Event Data (Phase 2)
  */
 typedef struct {
-    uint32_t button;     /**< Mouse button (1=left, 2=middle, 3=right) */
-    uint32_t x;          /**< X coordinate */
-    uint32_t y;          /**< Y coordinate */
-    int32_t wheel_delta; /**< Wheel scroll delta */
-    uint32_t modifiers;  /**< Modifier keys */
+    uint32_t button;     ///< Mouse button (1=left, 2=middle, 3=right)
+    uint32_t x;          ///< X coordinate
+    uint32_t y;          ///< Y coordinate
+    int32_t wheel_delta; ///< Wheel scroll delta
+    uint32_t modifiers;  ///< Modifier keys
 } lle_mouse_event_data_t;
 
 /*
  * Terminal Resize Event Data (Phase 2)
  */
 typedef struct {
-    uint32_t old_width;  /**< Previous terminal width */
-    uint32_t old_height; /**< Previous terminal height */
-    uint32_t new_width;  /**< New terminal width */
-    uint32_t new_height; /**< New terminal height */
+    uint32_t old_width;  ///< Previous terminal width
+    uint32_t old_height; ///< Previous terminal height
+    uint32_t new_width;  ///< New terminal width
+    uint32_t new_height; ///< New terminal height
 } lle_resize_event_data_t;
 
 /*
  * Paste Event Data (Phase 2)
  */
 typedef struct {
-    const char *data;  /**< Paste data */
-    size_t length;     /**< Data length */
-    bool is_bracketed; /**< Bracketed paste mode */
+    const char *data;  ///< Paste data
+    size_t length;     ///< Data length
+    bool is_bracketed; ///< Bracketed paste mode
 } lle_paste_event_data_t;
 
 /*
  * Buffer Event Data (Phase 2)
  */
 typedef struct {
-    size_t old_cursor_pos; /**< Previous cursor position */
-    size_t new_cursor_pos; /**< New cursor position */
-    size_t old_length;     /**< Previous buffer length */
-    size_t new_length;     /**< New buffer length */
+    size_t old_cursor_pos; ///< Previous cursor position
+    size_t new_cursor_pos; ///< New cursor position
+    size_t old_length;     ///< Previous buffer length
+    size_t new_length;     ///< New buffer length
 } lle_buffer_event_data_t;
 
 /*
  * Error Event Data (Phase 2)
  */
 typedef struct {
-    lle_result_t error_code; /**< Error code */
-    char message[256];       /**< Error message */
-    const char *source_file; /**< Source file */
-    int source_line;         /**< Source line */
+    lle_result_t error_code; ///< Error code
+    char message[256];       ///< Error message
+    const char *source_file; ///< Source file
+    int source_line;         ///< Source line
 } lle_error_event_data_t;
 
 /*
  * Timer Event Data (Phase 2)
  */
 typedef struct {
-    uint64_t timer_id;    /**< Timer identifier */
-    uint64_t interval_us; /**< Timer interval (microseconds) */
-    bool is_periodic;     /**< Periodic timer */
+    uint64_t timer_id;    ///< Timer identifier
+    uint64_t interval_us; ///< Timer interval (microseconds)
+    bool is_periodic;     ///< Periodic timer
 } lle_timer_event_data_t;
 
 /*
  * Custom Event Data (Phase 2)
  */
 typedef struct {
-    char event_name[64];     /**< Custom event name */
-    void *custom_data;       /**< Custom data pointer */
-    size_t custom_data_size; /**< Custom data size */
+    char event_name[64];     ///< Custom event name
+    void *custom_data;       ///< Custom data pointer
+    size_t custom_data_size; ///< Custom data size
 } lle_custom_event_data_t;
 
 /*
@@ -273,60 +273,60 @@ typedef struct {
  * Used for directory changes, command execution events, etc.
  */
 typedef struct {
-    char old_directory[4096]; /**< Previous working directory */
+    char old_directory[4096]; ///< Previous working directory
     char new_directory[4096]; /**< New working directory (for DIRECTORY_CHANGED)
                                */
-    char command[4096];   /**< Command being executed (for PRE/POST_COMMAND) */
-    int exit_code;        /**< Command exit code (for POST_COMMAND) */
-    uint64_t duration_us; /**< Command duration in microseconds */
+    char command[4096];       ///< Command being executed (for PRE/POST_COMMAND)
+    int exit_code;            ///< Command exit code (for POST_COMMAND)
+    uint64_t duration_us;     ///< Command duration in microseconds
 } lle_shell_event_data_t;
 
 /*
  * Event Data Union (Phase 2)
  */
 typedef union {
-    lle_key_event_data_t key;       /**< Key event data */
-    lle_mouse_event_data_t mouse;   /**< Mouse event data */
-    lle_resize_event_data_t resize; /**< Resize event data */
-    lle_paste_event_data_t paste;   /**< Paste event data */
-    lle_buffer_event_data_t buffer; /**< Buffer event data */
-    lle_error_event_data_t error;   /**< Error event data */
-    lle_timer_event_data_t timer;   /**< Timer event data */
-    lle_custom_event_data_t custom; /**< Custom event data */
-    lle_shell_event_data_t shell;   /**< Shell lifecycle event data */
+    lle_key_event_data_t key;       ///< Key event data
+    lle_mouse_event_data_t mouse;   ///< Mouse event data
+    lle_resize_event_data_t resize; ///< Resize event data
+    lle_paste_event_data_t paste;   ///< Paste event data
+    lle_buffer_event_data_t buffer; ///< Buffer event data
+    lle_error_event_data_t error;   ///< Error event data
+    lle_timer_event_data_t timer;   ///< Timer event data
+    lle_custom_event_data_t custom; ///< Custom event data
+    lle_shell_event_data_t shell;   ///< Shell lifecycle event data
 } lle_event_data_union_t;
 
 /*
  * Event Structure (Phase 1 + Phase 2)
  */
 struct lle_event {
-    // Core event identification (Phase 1)
-    lle_event_kind_t type;    /**< Event kind/type */
-    uint64_t sequence_number; /**< Global sequence number */
-    uint64_t timestamp;       /**< Event timestamp (microseconds) */
+    /// Core event identification (Phase 1)
+    lle_event_kind_t type;    ///< Event kind/type
+    uint64_t sequence_number; ///< Global sequence number
+    uint64_t timestamp;       ///< Event timestamp (microseconds)
 
-    // Phase 2: Event metadata
-    lle_event_source_t source;     /**< Event source */
-    lle_event_priority_t priority; /**< Event priority */
-    lle_event_flags_t flags;       /**< Event flags */
+    /// Phase 2: Event metadata
+    lle_event_source_t source;     ///< Event source
+    lle_event_priority_t priority; ///< Event priority
+    lle_event_flags_t flags;       ///< Event flags
 
-    // Phase 2: Event processing state
-    uint32_t handler_count;         /**< Number of handlers invoked */
-    uint64_t processing_start_time; /**< Processing start timestamp */
-    uint64_t processing_end_time;   /**< Processing end timestamp */
+    /// Phase 2: Event processing state
+    uint32_t handler_count;         ///< Number of handlers invoked
+    uint64_t processing_start_time; ///< Processing start timestamp
+    uint64_t processing_end_time;   ///< Processing end timestamp
 
-    // Event data (Phase 1 - preserved for backward compatibility)
-    void *data;       /**< Generic event-specific data */
-    size_t data_size; /**< Size of data */
+    /// Event data (Phase 1 - preserved for backward compatibility)
+    void *data;       ///< Generic event-specific data
+    size_t data_size; ///< Size of data
 
-    // Phase 2: Typed event data union
-    lle_event_data_union_t event_data; /**< Typed event data */
+    /// Phase 2: Typed event data union
+    lle_event_data_union_t event_data; ///< Typed event data
 
-    // Queue linkage (Phase 1)
-    struct lle_event *next; /**< Next event in queue */
+    /// Queue linkage (Phase 1)
+    struct lle_event *next; ///< Next event in queue
 
-    // Phase 2: Doubly-linked list support
-    struct lle_event *prev; /**< Previous event in queue */
+    /// Phase 2: Doubly-linked list support
+    struct lle_event *prev; ///< Previous event in queue
 };
 
 /*
@@ -339,60 +339,60 @@ typedef lle_result_t (*lle_event_handler_fn)(lle_event_t *event,
  * Event Handler Structure
  */
 struct lle_event_handler {
-    lle_event_kind_t event_type;  /**< Event kind this handler handles */
-    lle_event_handler_fn handler; /**< Handler function */
-    void *user_data;              /**< User data passed to handler */
-    char name[64];                /**< Handler name (for debugging) */
+    lle_event_kind_t event_type;  ///< Event kind this handler handles
+    lle_event_handler_fn handler; ///< Handler function
+    void *user_data;              ///< User data passed to handler
+    char name[64];                ///< Handler name (for debugging)
 };
 
 /*
  * Event Queue Structure (Phase 1 - circular buffer)
  */
 struct lle_event_queue {
-    lle_event_t **events;  /**< Array of event pointers */
-    size_t capacity;       /**< Queue capacity */
-    size_t head;           /**< Read position */
-    size_t tail;           /**< Write position */
-    size_t count;          /**< Current event count */
-    pthread_mutex_t mutex; /**< Thread safety */
+    lle_event_t **events;  ///< Array of event pointers
+    size_t capacity;       ///< Queue capacity
+    size_t head;           ///< Read position
+    size_t tail;           ///< Write position
+    size_t count;          ///< Current event count
+    pthread_mutex_t mutex; ///< Thread safety
 };
 
 /*
  * Per-Event-Type Statistics (Phase 2B)
  */
 typedef struct {
-    lle_event_kind_t event_type;    /**< Event type */
-    uint64_t count;                 /**< Total events of this type */
-    uint64_t total_processing_time; /**< Total microseconds spent */
-    uint64_t min_processing_time;   /**< Minimum processing time */
-    uint64_t max_processing_time;   /**< Maximum processing time */
-    uint64_t last_processed_time;   /**< Last processing timestamp */
+    lle_event_kind_t event_type;    ///< Event type
+    uint64_t count;                 ///< Total events of this type
+    uint64_t total_processing_time; ///< Total microseconds spent
+    uint64_t min_processing_time;   ///< Minimum processing time
+    uint64_t max_processing_time;   ///< Maximum processing time
+    uint64_t last_processed_time;   ///< Last processing timestamp
 } lle_event_type_stats_t;
 
 /*
  * Enhanced Statistics Structure (Phase 2B)
  */
 typedef struct {
-    // Cycle statistics
+    /// Cycle statistics
     uint64_t cycles_completed;
     uint64_t total_cycle_time;
     uint64_t min_cycle_time;
     uint64_t max_cycle_time;
 
-    // Per-type statistics
+    /// Per-type statistics
     lle_event_type_stats_t *type_stats;
     size_t type_stats_count;
     size_t type_stats_capacity;
 
-    // Queue depth tracking
+    /// Queue depth tracking
     uint64_t max_queue_depth_seen;
     uint64_t max_priority_queue_depth_seen;
 
-    // Processing limits tracking
+    /// Processing limits tracking
     uint64_t cycles_hit_time_limit;
     uint64_t cycles_hit_event_limit;
 
-    // Thread safety
+    /// Thread safety
     pthread_mutex_t stats_mutex;
 } lle_event_enhanced_stats_t;
 
@@ -400,29 +400,29 @@ typedef struct {
  * Processing State (Phase 2B)
  */
 typedef enum {
-    LLE_PROCESSING_STOPPED, /**< Processing stopped */
-    LLE_PROCESSING_RUNNING, /**< Processing running */
-    LLE_PROCESSING_PAUSED   // Processing paused
+    LLE_PROCESSING_STOPPED, ///< Processing stopped
+    LLE_PROCESSING_RUNNING, ///< Processing running
+    LLE_PROCESSING_PAUSED   /// Processing paused
 } lle_processing_state_t;
 
 /*
  * Processing Configuration (Phase 2B)
  */
 typedef struct {
-    uint32_t max_events_per_cycle; /**< Maximum events per processing cycle */
-    uint64_t cycle_time_limit_us;  /**< Time limit per cycle (microseconds) */
-    bool auto_process;          /**< Automatically process when events queued */
-    bool record_detailed_stats; /**< Enable detailed statistics */
+    uint32_t max_events_per_cycle; ///< Maximum events per processing cycle
+    uint64_t cycle_time_limit_us;  ///< Time limit per cycle (microseconds)
+    bool auto_process;             ///< Automatically process when events queued
+    bool record_detailed_stats;    ///< Enable detailed statistics
 } lle_event_processing_config_t;
 
 /*
  * Filter Result (Phase 2C)
  */
 typedef enum {
-    LLE_FILTER_PASS,      /**< Pass event through */
-    LLE_FILTER_BLOCK,     /**< Block event (don't dispatch) */
-    LLE_FILTER_TRANSFORM, /**< Event was transformed */
-    LLE_FILTER_ERROR      // Error in filter
+    LLE_FILTER_PASS,      ///< Pass event through
+    LLE_FILTER_BLOCK,     ///< Block event (don't dispatch)
+    LLE_FILTER_TRANSFORM, ///< Event was transformed
+    LLE_FILTER_ERROR      /// Error in filter
 } lle_filter_result_t;
 
 /*
@@ -435,29 +435,29 @@ typedef lle_filter_result_t (*lle_event_filter_fn)(lle_event_t *event,
  * Event Filter (Phase 2C)
  */
 typedef struct {
-    lle_event_filter_fn filter; /**< Filter function */
-    void *user_data;            /**< User data for filter */
-    char name[64];              /**< Filter name (for debugging) */
-    bool enabled;               /**< Filter enabled/disabled */
+    lle_event_filter_fn filter; ///< Filter function
+    void *user_data;            ///< User data for filter
+    char name[64];              ///< Filter name (for debugging)
+    bool enabled;               ///< Filter enabled/disabled
 
-    // Filter statistics
-    uint64_t events_filtered;    /**< Total events checked */
-    uint64_t events_passed;      /**< Events passed */
-    uint64_t events_blocked;     /**< Events blocked */
-    uint64_t events_transformed; /**< Events transformed */
-    uint64_t events_errored;     /**< Filter errors */
+    /// Filter statistics
+    uint64_t events_filtered;    ///< Total events checked
+    uint64_t events_passed;      ///< Events passed
+    uint64_t events_blocked;     ///< Events blocked
+    uint64_t events_transformed; ///< Events transformed
+    uint64_t events_errored;     ///< Filter errors
 } lle_event_filter_t;
 
 /*
  * Event Filter System (Phase 2C)
  */
 typedef struct {
-    lle_event_filter_t **filters; /**< Array of filters */
-    size_t filter_count;          /**< Number of filters */
-    size_t filter_capacity;       /**< Array capacity */
-    pthread_mutex_t filter_mutex; /**< Thread safety */
+    lle_event_filter_t **filters; ///< Array of filters
+    size_t filter_count;          ///< Number of filters
+    size_t filter_capacity;       ///< Array capacity
+    pthread_mutex_t filter_mutex; ///< Thread safety
 
-    // Global filter statistics
+    /// Global filter statistics
     uint64_t total_events_filtered;
     uint64_t total_events_blocked;
 } lle_event_filter_system_t;
@@ -480,38 +480,38 @@ typedef void (*lle_event_post_dispatch_fn)(lle_event_t *event,
  * System State (Phase 2C)
  */
 typedef enum {
-    LLE_STATE_INITIALIZING,  /**< System initializing */
-    LLE_STATE_IDLE,          /**< No events processing */
-    LLE_STATE_PROCESSING,    /**< Processing events */
-    LLE_STATE_PAUSED,        /**< Processing paused */
-    LLE_STATE_SHUTTING_DOWN, /**< System shutting down */
-    LLE_STATE_ERROR          // Error state
+    LLE_STATE_INITIALIZING,  ///< System initializing
+    LLE_STATE_IDLE,          ///< No events processing
+    LLE_STATE_PROCESSING,    ///< Processing events
+    LLE_STATE_PAUSED,        ///< Processing paused
+    LLE_STATE_SHUTTING_DOWN, ///< System shutting down
+    LLE_STATE_ERROR          /// Error state
 } lle_system_state_t;
 
 /*
  * Timer Event (Phase 2D)
  */
 typedef struct lle_timer_event {
-    uint64_t timer_id;        /**< Unique timer identifier */
-    lle_event_t *event;       /**< Event to dispatch when timer fires */
-    uint64_t trigger_time_us; /**< When to fire (absolute timestamp) */
-    uint64_t interval_us;     /**< Repeat interval (0 = one-shot) */
-    bool repeating;           /**< Is this a repeating timer? */
-    bool enabled;             /**< Is timer currently enabled? */
-    uint64_t fire_count;      /**< How many times has it fired? */
+    uint64_t timer_id;        ///< Unique timer identifier
+    lle_event_t *event;       ///< Event to dispatch when timer fires
+    uint64_t trigger_time_us; ///< When to fire (absolute timestamp)
+    uint64_t interval_us;     ///< Repeat interval (0 = one-shot)
+    bool repeating;           ///< Is this a repeating timer?
+    bool enabled;             ///< Is timer currently enabled?
+    uint64_t fire_count;      ///< How many times has it fired?
 } lle_timer_event_t;
 
 /*
  * Timer System (Phase 2D)
  */
 typedef struct {
-    lle_timer_event_t **timers;  /**< Array of timer pointers */
-    size_t timer_count;          /**< Current number of timers */
-    size_t timer_capacity;       /**< Capacity of array */
-    uint64_t next_timer_id;      /**< Next ID to assign */
-    pthread_mutex_t timer_mutex; /**< Thread safety */
+    lle_timer_event_t **timers;  ///< Array of timer pointers
+    size_t timer_count;          ///< Current number of timers
+    size_t timer_capacity;       ///< Capacity of array
+    uint64_t next_timer_id;      ///< Next ID to assign
+    pthread_mutex_t timer_mutex; ///< Thread safety
 
-    // Timer statistics
+    /// Timer statistics
     uint64_t total_timers_created;
     uint64_t total_timers_fired;
     uint64_t total_timers_cancelled;
@@ -521,60 +521,59 @@ typedef struct {
  * Event System Structure (Phase 1 + Phase 2A + Phase 2B + Phase 2C + Phase 2D)
  */
 struct lle_event_system {
-    // Phase 1: Single queue
-    lle_event_queue_t *queue; /**< Main event queue (FIFO for Phase 1) */
+    /// Phase 1: Single queue
+    lle_event_queue_t *queue; ///< Main event queue (FIFO for Phase 1)
 
-    // Phase 2A: Priority queue support
-    lle_event_queue_t *priority_queue; /**< Priority queue (CRITICAL events) */
-    bool use_priority_queue;           /**< Enable priority queue processing */
+    /// Phase 2A: Priority queue support
+    lle_event_queue_t *priority_queue; ///< Priority queue (CRITICAL events)
+    bool use_priority_queue;           ///< Enable priority queue processing
 
-    // Handler management
-    lle_event_handler_t **handlers; /**< Handler array */
-    size_t handler_count;           /**< Number of handlers */
-    size_t handler_capacity;        /**< Handler array capacity */
+    /// Handler management
+    lle_event_handler_t **handlers; ///< Handler array
+    size_t handler_count;           ///< Number of handlers
+    size_t handler_capacity;        ///< Handler array capacity
 
-    // Memory management
-    lle_memory_pool_t *event_pool; /**< Memory pool for events */
-    pthread_mutex_t system_mutex;  /**< System-wide mutex */
+    /// Memory management
+    lle_memory_pool_t *event_pool; ///< Memory pool for events
+    pthread_mutex_t system_mutex;  ///< System-wide mutex
 
-    // Event tracking
-    uint64_t sequence_counter; /**< Event sequence counter */
-    bool active;               /**< System active flag */
+    /// Event tracking
+    uint64_t sequence_counter; ///< Event sequence counter
+    bool active;               ///< System active flag
 
-    // Phase 1 Statistics
-    uint64_t events_created;    /**< Total events created */
-    uint64_t events_dispatched; /**< Total events dispatched */
-    uint64_t events_dropped;    /**< Events dropped (queue full) */
+    /// Phase 1 Statistics
+    uint64_t events_created;    ///< Total events created
+    uint64_t events_dispatched; ///< Total events dispatched
+    uint64_t events_dropped;    ///< Events dropped (queue full)
 
-    // Phase 2A Statistics
-    uint64_t priority_events_queued;    /**< Priority events queued */
-    uint64_t priority_events_processed; /**< Priority events processed */
+    /// Phase 2A Statistics
+    uint64_t priority_events_queued;    ///< Priority events queued
+    uint64_t priority_events_processed; ///< Priority events processed
     uint64_t events_by_priority[LLE_PRIORITY_COUNT]; /**< Events per priority
                                                         level */
 
-    // Phase 2B: Enhanced statistics and processing control
+    /// Phase 2B: Enhanced statistics and processing control
     lle_event_enhanced_stats_t
-        *enhanced_stats; /**< Enhanced statistics (optional) */
+        *enhanced_stats; ///< Enhanced statistics (optional)
     lle_event_processing_config_t
-        processing_config;                   /**< Processing configuration */
-    lle_processing_state_t processing_state; /**< Current processing state */
+        processing_config;                   ///< Processing configuration
+    lle_processing_state_t processing_state; ///< Current processing state
 
-    // Phase 2C: Event filtering and hooks
+    /// Phase 2C: Event filtering and hooks
     lle_event_filter_system_t
-        *filter_system; /**< Event filter system (optional) */
-    lle_event_pre_dispatch_fn pre_dispatch_hook; /**< Pre-dispatch callback */
-    void *pre_dispatch_data;                     /**< Pre-dispatch user data */
-    lle_event_post_dispatch_fn
-        post_dispatch_hook;   /**< Post-dispatch callback */
-    void *post_dispatch_data; /**< Post-dispatch user data */
+        *filter_system; ///< Event filter system (optional)
+    lle_event_pre_dispatch_fn pre_dispatch_hook;   ///< Pre-dispatch callback
+    void *pre_dispatch_data;                       ///< Pre-dispatch user data
+    lle_event_post_dispatch_fn post_dispatch_hook; ///< Post-dispatch callback
+    void *post_dispatch_data;                      ///< Post-dispatch user data
 
-    // Phase 2C: System state tracking
-    lle_system_state_t current_state;  /**< Current system state */
-    lle_system_state_t previous_state; /**< Previous state (for recovery) */
-    uint64_t state_changed_time;       /**< When state last changed */
+    /// Phase 2C: System state tracking
+    lle_system_state_t current_state;  ///< Current system state
+    lle_system_state_t previous_state; ///< Previous state (for recovery)
+    uint64_t state_changed_time;       ///< When state last changed
 
-    // Phase 2D: Timer events
-    lle_timer_system_t *timer_system; /**< Timer system (optional) */
+    /// Phase 2D: Timer events
+    lle_timer_system_t *timer_system; ///< Timer system (optional)
 };
 
 /* ============================================================================
@@ -1450,4 +1449,4 @@ lle_result_t lle_event_fire_post_command(lle_event_system_t *system,
  */
 lle_result_t lle_event_fire_prompt_display(lle_event_system_t *system);
 
-#endif // LLE_EVENT_SYSTEM_H
+#endif /// LLE_EVENT_SYSTEM_H

@@ -18,20 +18,20 @@
  * - Configurable: Timeout adjustable (default 10 seconds)
  *
  * Usage:
- *   lle_watchdog_init();           // At shell startup
+ *   lle_watchdog_init();           /// At shell startup
  *
  *   while (!done) {
- *       lle_watchdog_pet(0);       // Reset timer before blocking
- *       event = read_input();      // May block
+ *       lle_watchdog_pet(0);       /// Reset timer before blocking
+ *       event = read_input();      /// May block
  *       if (lle_watchdog_check_and_clear()) {
- *           // Watchdog fired - force recovery
+ *           /// Watchdog fired - force recovery
  *           lle_hard_reset();
  *       }
  *       process(event);
  *   }
  *
- *   lle_watchdog_stop();           // On normal exit
- *   lle_watchdog_cleanup();        // At shell shutdown
+ *   lle_watchdog_stop();           /// On normal exit
+ *   lle_watchdog_cleanup();        /// At shell shutdown
  *
  * @see src/lle/lle_watchdog.c for implementation
  * @see src/lle/lle_readline.c for integration
@@ -133,9 +133,9 @@ unsigned int lle_watchdog_get_timeout(void);
  * @brief Statistics for watchdog monitoring
  */
 typedef struct {
-    unsigned int total_pets;       /**< Total times watchdog was petted */
-    unsigned int total_fires;      /**< Total times watchdog fired */
-    unsigned int total_recoveries; /**< Total successful recoveries */
+    unsigned int total_pets;       ///< Total times watchdog was petted
+    unsigned int total_fires;      ///< Total times watchdog fired
+    unsigned int total_recoveries; ///< Total successful recoveries
 } lle_watchdog_stats_t;
 
 /**
@@ -146,4 +146,4 @@ typedef struct {
  */
 lle_result_t lle_watchdog_get_stats(lle_watchdog_stats_t *stats);
 
-#endif // LLE_WATCHDOG_H
+#endif /// LLE_WATCHDOG_H

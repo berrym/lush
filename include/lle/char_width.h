@@ -37,4 +37,4 @@ int lle_codepoint_width(uint32_t codepoint);
  */
 bool lle_is_wide_character(uint32_t codepoint);
 
-#endif // LLE_CHAR_WIDTH_H
+#endif /// LLE_CHAR_WIDTH_H

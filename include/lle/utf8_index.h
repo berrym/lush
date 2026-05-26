@@ -135,4 +135,4 @@ void lle_utf8_index_invalidate(lle_utf8_index_t *index);
  */
 bool lle_utf8_index_is_valid(const lle_utf8_index_t *index);
 
-#endif // LLE_UTF8_INDEX_H
+#endif /// LLE_UTF8_INDEX_H

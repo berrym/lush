@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-// Include LLE dependencies
+/// Include LLE dependencies
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lle/performance.h"
@@ -33,22 +33,22 @@
  * ============================================================================
  */
 
-// Performance Constants
-#define LLE_PERF_MAX_RESPONSE_TIME_NS 500000ULL    // 500μs
-#define LLE_PERF_MAX_ALLOCATION_TIME_NS 100000ULL  // 100μs
-#define LLE_PERF_MAX_RENDER_TIME_NS 1000000ULL     // 1ms
-#define LLE_PERF_MAX_EVENT_PROCESSING_NS 250000ULL // 250μs
-#define LLE_PERF_MIN_CACHE_HIT_RATE 75.0           // 75%
-#define LLE_PERF_MIN_MEMORY_UTILIZATION 85.0       // 85%
-#define LLE_PERF_MAX_REGRESSION_PERCENT 10.0       // 10%
+/// Performance Constants
+#define LLE_PERF_MAX_RESPONSE_TIME_NS 500000ULL    /// 500μs
+#define LLE_PERF_MAX_ALLOCATION_TIME_NS 100000ULL  /// 100μs
+#define LLE_PERF_MAX_RENDER_TIME_NS 1000000ULL     /// 1ms
+#define LLE_PERF_MAX_EVENT_PROCESSING_NS 250000ULL /// 250μs
+#define LLE_PERF_MIN_CACHE_HIT_RATE 75.0           /// 75%
+#define LLE_PERF_MIN_MEMORY_UTILIZATION 85.0       /// 85%
+#define LLE_PERF_MAX_REGRESSION_PERCENT 10.0       /// 10%
 
-// Size/Limit Constants
+/// Size/Limit Constants
 #define LLE_MAX_TEST_NAME_LENGTH 256
 #define LLE_MAX_TEST_DESC_LENGTH 1024
 #define LLE_MAX_TEST_DEPENDENCIES 32
 #define LLE_MAX_PATH_LENGTH 4096
 
-// Test Registration Macros
+/// Test Registration Macros
 #define LLE_REGISTER_TEST(name, type, priority, description)                   \
     static lle_test_result_t test_##name(lle_test_context_t *ctx);             \
     static lle_test_case_t                                                     \
@@ -63,7 +63,7 @@
     };                                                                         \
     static lle_test_result_t test_##name(lle_test_context_t *ctx)
 
-// Assertion Macros
+/// Assertion Macros
 #define LLE_ASSERT_EQ(expected, actual, message)                               \
     do {                                                                       \
         if ((expected) != (actual)) {                                          \
@@ -110,7 +110,7 @@
  * ============================================================================
  */
 
-// Core testing framework types
+/// Core testing framework types
 typedef struct lle_testing_framework_t lle_testing_framework_t;
 typedef struct lle_test_suite_registry_t lle_test_suite_registry_t;
 typedef struct lle_test_runner_t lle_test_runner_t;
@@ -127,7 +127,7 @@ typedef struct lle_quality_metrics_t lle_quality_metrics_t;
 typedef struct lle_test_statistics_t lle_test_statistics_t;
 typedef struct lle_benchmark_database_t lle_benchmark_database_t;
 
-// Test case and suite types
+/// Test case and suite types
 typedef struct lle_test_case_t lle_test_case_t;
 typedef struct lle_test_suite_t lle_test_suite_t;
 typedef struct lle_test_context_t lle_test_context_t;
@@ -135,30 +135,30 @@ typedef struct lle_test_assertion_list_t lle_test_assertion_list_t;
 typedef struct lle_performance_expectations_t lle_performance_expectations_t;
 typedef struct lle_error_scenarios_t lle_error_scenarios_t;
 
-// Performance testing types
+/// Performance testing types
 typedef struct lle_performance_testing_framework_t
     lle_performance_testing_framework_t;
 typedef struct lle_regression_analyzer_t lle_regression_analyzer_t;
 typedef struct lle_performance_reporter_t lle_performance_reporter_t;
 
-// Memory testing types
+/// Memory testing types
 typedef struct lle_memory_safety_framework_t lle_memory_safety_framework_t;
 typedef struct lle_leak_detector_t lle_leak_detector_t;
 typedef struct lle_corruption_detector_t lle_corruption_detector_t;
 typedef struct lle_usage_analyzer_t lle_usage_analyzer_t;
 
-// Error injection types
+/// Error injection types
 typedef struct lle_error_injection_system_t lle_error_injection_system_t;
 typedef struct lle_error_recovery_monitor_t lle_error_recovery_monitor_t;
 
-// CI/CD types
+/// CI/CD types
 typedef struct lle_ci_pipeline_t lle_ci_pipeline_t;
 typedef struct lle_ci_trigger_t lle_ci_trigger_t;
 typedef struct lle_test_stage_t lle_test_stage_t;
 typedef struct lle_artifact_manager_t lle_artifact_manager_t;
 typedef struct lle_notification_system_t lle_notification_system_t;
 
-// Reporting types
+/// Reporting types
 typedef struct lle_test_reporting_framework_t lle_test_reporting_framework_t;
 typedef struct lle_report_generator_t lle_report_generator_t;
 typedef struct lle_analytics_engine_t lle_analytics_engine_t;
@@ -166,13 +166,13 @@ typedef struct lle_trend_analyzer_t lle_trend_analyzer_t;
 typedef struct lle_dashboard_manager_t lle_dashboard_manager_t;
 typedef struct lle_trend_data_t lle_trend_data_t;
 
-// Integration types
+/// Integration types
 typedef struct lle_display_integration_t lle_display_integration_t;
 typedef struct lle_autosuggestions_t lle_autosuggestions_t;
 typedef struct lle_plugin_manager_t lle_plugin_manager_t;
 typedef struct lle_plugin_t lle_plugin_t;
 
-// External LLE system types (from other specs)
+/// External LLE system types (from other specs)
 typedef struct lle_unix_terminal_t lle_unix_terminal_t;
 typedef struct lle_buffer_t lle_buffer_t;
 typedef struct lle_event_system lle_event_system_t;
@@ -180,10 +180,10 @@ typedef struct lle_history_system_t lle_history_system_t;
 typedef struct lle_system_t lle_system_t;
 typedef struct lle_display_context_t lle_display_context_t;
 
-// External Lush types
+/// External Lush types
 typedef struct lush_display_controller_t lush_display_controller_t;
 
-// Plugin registry types
+/// Plugin registry types
 typedef struct lle_plugin_registry_t lle_plugin_registry_t;
 typedef struct lle_custom_assertion_registry_t lle_custom_assertion_registry_t;
 typedef struct lle_report_plugin_registry_t lle_report_plugin_registry_t;
@@ -375,12 +375,12 @@ struct lle_test_case_t {
     lle_test_setup_function_t setup_function;
     lle_test_teardown_function_t teardown_function;
 
-    // Test requirements and dependencies
+    /// Test requirements and dependencies
     char *required_components[LLE_MAX_TEST_DEPENDENCIES];
     double expected_max_duration_ms;
     size_t expected_max_memory_bytes;
 
-    // Test validation criteria
+    /// Test validation criteria
     lle_test_assertion_list_t *assertions;
     lle_performance_expectations_t *perf_expectations;
     lle_error_scenarios_t *error_scenarios;
@@ -399,12 +399,12 @@ struct lle_testing_framework_t {
     lle_coverage_analyzer_t *coverage_analyzer;
     lle_regression_detector_t *regression_detector;
 
-    // Test execution context
+    /// Test execution context
     lle_test_environment_t *test_environment;
     lle_mock_system_t *mock_system;
     lle_fixture_manager_t *fixture_manager;
 
-    // Quality assurance metrics
+    /// Quality assurance metrics
     lle_quality_metrics_t *quality_metrics;
     lle_test_statistics_t *test_statistics;
     lle_benchmark_database_t *benchmark_db;
@@ -421,7 +421,7 @@ typedef struct {
     uint64_t last_updated_timestamp;
     uint32_t sample_count;
 
-    // Statistical analysis
+    /// Statistical analysis
     double mean_duration_us;
     double std_deviation_us;
     double min_duration_us;
@@ -461,7 +461,7 @@ struct lle_performance_testing_framework_t {
     lle_regression_analyzer_t *analyzer;
     lle_performance_reporter_t *reporter;
 
-    // Test configuration
+    /// Test configuration
     uint32_t warmup_iterations;
     uint32_t measurement_iterations;
     uint32_t statistical_confidence_level;
@@ -512,14 +512,14 @@ struct lle_memory_safety_framework_t {
     lle_corruption_detector_t *corruption_detector;
     lle_usage_analyzer_t *usage_analyzer;
 
-    // Testing configuration
+    /// Testing configuration
     bool enable_allocation_tracking;
     bool enable_leak_detection;
     bool enable_corruption_detection;
     bool enable_double_free_detection;
     bool enable_use_after_free_detection;
 
-    // Memory testing statistics
+    /// Memory testing statistics
     uint64_t total_allocations;
     uint64_t total_deallocations;
     uint64_t peak_memory_usage_bytes;
@@ -695,7 +695,7 @@ struct lle_ci_pipeline_t {
     lle_artifact_manager_t *artifact_manager;
     lle_notification_system_t *notifications;
 
-    // Pipeline configuration
+    /// Pipeline configuration
     bool parallel_stage_execution;
     uint32_t max_concurrent_jobs;
     uint32_t timeout_minutes;
@@ -712,7 +712,7 @@ struct lle_test_reporting_framework_t {
     lle_trend_analyzer_t *trend_analyzer;
     lle_dashboard_manager_t *dashboard;
 
-    // Reporting configuration
+    /// Reporting configuration
     lle_report_format_t supported_formats;
     char output_directory[LLE_MAX_PATH_LENGTH];
     bool enable_real_time_updates;
@@ -723,38 +723,38 @@ struct lle_test_reporting_framework_t {
  * @brief Test Analytics
  */
 typedef struct {
-    // Test execution statistics
+    /// Test execution statistics
     uint64_t total_test_runs;
     uint64_t successful_runs;
     uint64_t failed_runs;
     double success_rate_percent;
 
-    // Performance analytics
+    /// Performance analytics
     double average_execution_time_ms;
     double median_execution_time_ms;
     double percentile_95_execution_time_ms;
     uint64_t fastest_test_time_us;
     uint64_t slowest_test_time_us;
 
-    // Memory usage analytics
+    /// Memory usage analytics
     uint64_t average_memory_usage_bytes;
     uint64_t peak_memory_usage_bytes;
     uint32_t memory_leak_incidents;
     uint32_t memory_corruption_incidents;
 
-    // Reliability metrics
+    /// Reliability metrics
     double test_stability_score;
     uint32_t flaky_test_count;
     double mean_time_between_failures_hours;
     double mean_time_to_recovery_minutes;
 
-    // Coverage metrics
+    /// Coverage metrics
     double code_coverage_percent;
     double branch_coverage_percent;
     uint32_t uncovered_lines;
     uint32_t uncovered_branches;
 
-    // Trend analysis
+    /// Trend analysis
     lle_trend_data_t *performance_trends;
     lle_trend_data_t *reliability_trends;
     lle_trend_data_t *coverage_trends;
@@ -860,7 +860,7 @@ typedef struct {
     uint32_t max_width;
     uint32_t max_height;
 } lle_terminal_capabilities_t;
-#endif // LLE_TERMINAL_ABSTRACTION_H
+#endif /// LLE_TERMINAL_ABSTRACTION_H
 
 /**
  * @brief Test Input Event
@@ -894,7 +894,7 @@ typedef struct {
     uint32_t line;
     uint32_t column;
 } lle_cursor_position_t;
-#endif // LLE_BUFFER_MANAGEMENT_H
+#endif /// LLE_BUFFER_MANAGEMENT_H
 
 /**
  * @brief Lush Cursor Info
@@ -954,7 +954,7 @@ typedef struct {
     lle_test_runner_interface_t *interface;
     lle_plugin_capabilities_t capabilities;
 
-    // Plugin functions
+    /// Plugin functions
     lle_result_t (*initialize)(void *config);
     lle_result_t (*execute_test)(lle_test_case_t *test,
                                  lle_test_result_t *result);
@@ -972,7 +972,7 @@ typedef struct {
     lle_metrics_plugin_registry_t *metrics_plugins;
     lle_analytics_engine_t *analytics_engine;
 
-    // Extensibility configuration
+    /// Extensibility configuration
     bool enable_plugin_system;
     bool enable_custom_metrics;
     bool enable_ml_analytics;
@@ -1205,7 +1205,7 @@ lle_result_t lle_buffer_clear(lle_buffer_t *buffer);
 char *lle_buffer_get_text(lle_buffer_t *buffer);
 size_t lle_buffer_get_grapheme_cluster_count(lle_buffer_t *buffer);
 lle_cursor_position_t lle_buffer_get_cursor_position(lle_buffer_t *buffer);
-#endif // LLE_BUFFER_MANAGEMENT_H
+#endif /// LLE_BUFFER_MANAGEMENT_H
 
 /* ============================================================================
  * FUNCTION DECLARATIONS - UTF-8 Operations
@@ -1331,4 +1331,4 @@ lle_result_t lle_hashtable_set(lle_hashtable_t *table, const char *key,
 lle_error_context_t *lle_error_context_create(void);
 void lle_error_context_destroy(lle_error_context_t *ctx);
 
-#endif // LLE_TESTING_H
+#endif /// LLE_TESTING_H

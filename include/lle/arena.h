@@ -25,14 +25,14 @@
  *
  * Usage:
  *
- *   // Create arena (child of parent, or NULL for root)
+ *   /// Create arena (child of parent, or NULL for root)
  *   lle_arena_t *arena = lle_arena_create(parent, "name", 4096);
  *
- *   // Allocate from arena - no free needed
+ *   /// Allocate from arena - no free needed
  *   void *ptr = lle_arena_alloc(arena, size);
  *   char *str = lle_arena_strdup(arena, "hello");
  *
- *   // Destroy arena - frees ALL allocations and child arenas
+ *   /// Destroy arena - frees ALL allocations and child arenas
  *   lle_arena_destroy(arena);
  *
  * See docs/development/ARENA_MEMORY_MANAGEMENT_PLAN.md for full design.
@@ -80,10 +80,10 @@ extern "C" {
  * The chunk header is followed by usable memory in the flexible array.
  */
 typedef struct lle_arena_chunk_t {
-    struct lle_arena_chunk_t *next; /**< Next chunk in chain (NULL if last) */
-    size_t size;                    /**< Usable size of this chunk (bytes) */
-    size_t used;                    /**< Bytes allocated from this chunk */
-    char data[];                    /**< Flexible array - actual memory */
+    struct lle_arena_chunk_t *next; ///< Next chunk in chain (NULL if last)
+    size_t size;                    ///< Usable size of this chunk (bytes)
+    size_t used;                    ///< Bytes allocated from this chunk
+    char data[];                    ///< Flexible array - actual memory
 } lle_arena_chunk_t;
 
 /**
@@ -93,29 +93,28 @@ typedef struct lle_arena_chunk_t {
  * destroys all children. This matches natural program scopes.
  */
 typedef struct lle_arena_t {
-    // Arena identity and hierarchy
-    const char *name;                /**< Debug name (e.g., "edit_session") */
-    struct lle_arena_t *parent;      /**< Parent arena (NULL for root) */
-    struct lle_arena_t *first_child; /**< First child arena */
-    struct lle_arena_t
-        *next_sibling; /**< Next sibling in parent's child list */
+    /// Arena identity and hierarchy
+    const char *name;                 ///< Debug name (e.g., "edit_session")
+    struct lle_arena_t *parent;       ///< Parent arena (NULL for root)
+    struct lle_arena_t *first_child;  ///< First child arena
+    struct lle_arena_t *next_sibling; ///< Next sibling in parent's child list
 
-    // Memory management
-    lle_arena_chunk_t *first_chunk;   /**< First chunk (always present) */
-    lle_arena_chunk_t *current_chunk; /**< Current allocation chunk */
-    size_t default_chunk_size;        /**< Size for new chunks */
-    size_t alignment;                 /**< Default alignment requirement */
+    /// Memory management
+    lle_arena_chunk_t *first_chunk;   ///< First chunk (always present)
+    lle_arena_chunk_t *current_chunk; ///< Current allocation chunk
+    size_t default_chunk_size;        ///< Size for new chunks
+    size_t alignment;                 ///< Default alignment requirement
 
 #if LLE_ARENA_STATS
-    // Statistics (optional, can be compiled out)
-    size_t total_allocated;  /**< Total bytes allocated from this arena */
-    size_t allocation_count; /**< Number of allocations made */
-    size_t chunk_count;      /**< Number of chunks allocated */
-    size_t peak_usage;       /**< High water mark for usage */
+    /// Statistics (optional, can be compiled out)
+    size_t total_allocated;  ///< Total bytes allocated from this arena
+    size_t allocation_count; ///< Number of allocations made
+    size_t chunk_count;      ///< Number of chunks allocated
+    size_t peak_usage;       ///< High water mark for usage
 #endif
 
-    // Flags
-    uint32_t flags; /**< Arena configuration flags */
+    /// Flags
+    uint32_t flags; ///< Arena configuration flags
 } lle_arena_t;
 
 /**
@@ -123,8 +122,8 @@ typedef struct lle_arena_t {
  */
 typedef enum lle_arena_flags_t {
     LLE_ARENA_FLAG_NONE = 0,
-    LLE_ARENA_FLAG_ZERO_ALLOC = 0x0001, /**< Zero-initialize all allocations */
-    LLE_ARENA_FLAG_NO_GROW = 0x0002, /**< Don't allocate new chunks if full */
+    LLE_ARENA_FLAG_ZERO_ALLOC = 0x0001, ///< Zero-initialize all allocations
+    LLE_ARENA_FLAG_NO_GROW = 0x0002,    ///< Don't allocate new chunks if full
 } lle_arena_flags_t;
 
 /* ============================================================================
@@ -147,8 +146,8 @@ typedef enum lle_arena_flags_t {
  *
  * Example:
  *   lle_arena_t *edit = lle_arena_create(session, "edit", 8192);
- *   // ... use edit arena ...
- *   lle_arena_destroy(edit);  // Or let parent destruction handle it
+ *   /// ... use edit arena ...
+ *   lle_arena_destroy(edit);  /// Or let parent destruction handle it
  */
 lle_arena_t *lle_arena_create(lle_arena_t *parent, const char *name,
                               size_t initial_size);
@@ -395,8 +394,8 @@ typedef struct lle_arena_scratch_t {
  * Example:
  *   lle_arena_scratch_t scratch = lle_arena_scratch_begin(arena);
  *   char *temp = lle_arena_alloc(arena, 1024);
- *   // ... use temp ...
- *   lle_arena_scratch_end(&scratch);  // temp is now invalid
+ *   /// ... use temp ...
+ *   lle_arena_scratch_end(&scratch);  /// temp is now invalid
  */
 lle_arena_scratch_t lle_arena_scratch_begin(lle_arena_t *arena);
 
@@ -417,4 +416,4 @@ void lle_arena_scratch_end(lle_arena_scratch_t *scratch);
 }
 #endif
 
-#endif // LLE_ARENA_H
+#endif /// LLE_ARENA_H

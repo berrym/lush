@@ -143,7 +143,7 @@ static inline bool lle_readline_state_is_valid(lle_readline_state_t state) {
     return state >= LLE_READLINE_STATE_IDLE && state < LLE_READLINE_STATE_COUNT;
 }
 
-// Forward declaration for readline context
+/// Forward declaration for readline context
 struct readline_context;
 
 /**
@@ -227,4 +227,4 @@ lle_readline_state_t lle_readline_state_get(const struct readline_context *ctx);
 lle_readline_state_t
 lle_readline_state_get_previous(const struct readline_context *ctx);
 
-#endif // LLE_READLINE_STATE_H
+#endif /// LLE_READLINE_STATE_H

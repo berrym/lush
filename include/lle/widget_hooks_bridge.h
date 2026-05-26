@@ -15,8 +15,8 @@
 #ifndef LLE_WIDGET_HOOKS_BRIDGE_H
 #define LLE_WIDGET_HOOKS_BRIDGE_H
 
-// Forward declarations; full types pulled in only by the .c that
-// implements the bridge.
+/// Forward declarations; full types pulled in only by the .c that
+/// implements the bridge.
 struct lle_shell_event_hub;
 struct lle_editor;
 
@@ -41,4 +41,4 @@ struct lle_editor;
 void lle_widget_hooks_bridge_install(struct lle_shell_event_hub *hub,
                                      struct lle_editor *editor);
 
-#endif // LLE_WIDGET_HOOKS_BRIDGE_H
+#endif /// LLE_WIDGET_HOOKS_BRIDGE_H

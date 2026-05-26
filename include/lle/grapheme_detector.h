@@ -19,21 +19,21 @@
  * @brief Grapheme cluster break property types (from UAX #29)
  */
 typedef enum {
-    GB_OTHER = 0,            /**< Any character not listed below */
-    GB_CR,                   /**< Carriage Return */
-    GB_LF,                   /**< Line Feed */
-    GB_CONTROL,              /**< Control characters */
-    GB_EXTEND,               /**< Extend (combining marks, etc.) */
-    GB_ZWJ,                  /**< Zero Width Joiner */
-    GB_REGIONAL_INDICATOR,   /**< Regional Indicator */
-    GB_PREPEND,              /**< Prepend */
-    GB_SPACING_MARK,         /**< SpacingMark */
-    GB_L,                    /**< Hangul L */
-    GB_V,                    /**< Hangul V */
-    GB_T,                    /**< Hangul T */
-    GB_LV,                   /**< Hangul LV */
-    GB_LVT,                  /**< Hangul LVT */
-    GB_EXTENDED_PICTOGRAPHIC /**< Emoji and pictographs */
+    GB_OTHER = 0,            ///< Any character not listed below
+    GB_CR,                   ///< Carriage Return
+    GB_LF,                   ///< Line Feed
+    GB_CONTROL,              ///< Control characters
+    GB_EXTEND,               ///< Extend (combining marks, etc.)
+    GB_ZWJ,                  ///< Zero Width Joiner
+    GB_REGIONAL_INDICATOR,   ///< Regional Indicator
+    GB_PREPEND,              ///< Prepend
+    GB_SPACING_MARK,         ///< SpacingMark
+    GB_L,                    ///< Hangul L
+    GB_V,                    ///< Hangul V
+    GB_T,                    ///< Hangul T
+    GB_LV,                   ///< Hangul LV
+    GB_LVT,                  ///< Hangul LVT
+    GB_EXTENDED_PICTOGRAPHIC ///< Emoji and pictographs
 } grapheme_break_property_t;
 
 /**
@@ -70,4 +70,4 @@ bool is_grapheme_cluster_boundary(uint32_t cp1, uint32_t cp2, bool prev_was_zwj,
 bool is_grapheme_boundary_at_position(const char *pos, const char *text_start,
                                       const char *text_end);
 
-#endif // LLE_GRAPHEME_DETECTOR_H
+#endif /// LLE_GRAPHEME_DETECTOR_H

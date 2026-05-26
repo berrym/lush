@@ -23,7 +23,7 @@
  * ============================================================================
  */
 
-// Detect mlock availability (POSIX systems)
+/// Detect mlock availability (POSIX systems)
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) ||        \
     defined(__OpenBSD__) || defined(__NetBSD__) || defined(__sun) ||           \
     defined(_AIX) || defined(__hpux)
@@ -33,7 +33,7 @@
 #define LLE_HAVE_MLOCK 0
 #endif
 
-// Detect explicit_bzero availability
+/// Detect explicit_bzero availability
 /* Note: macOS does NOT have explicit_bzero - it uses memset_s instead,
  * but memset_s requires __STDC_WANT_LIB_EXT1__ before any headers.
  * We use the volatile pointer fallback on macOS which is equally safe. */
@@ -41,11 +41,11 @@
     (defined(__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 25)
 #define LLE_HAVE_EXPLICIT_BZERO 1
 #if defined(__OpenBSD__) || defined(__FreeBSD__)
-#include <strings.h> // BSD location
+#include <strings.h> /// BSD location
 #else
-#include <string.h> // glibc location
+#include <string.h> /// glibc location
 #endif
-// Declare explicit_bzero if not already declared
+/// Declare explicit_bzero if not already declared
 #ifndef explicit_bzero
 extern void explicit_bzero(void *, size_t);
 #endif
@@ -73,10 +73,10 @@ static inline void lle_secure_wipe(void *ptr, size_t len) {
     }
 
 #if LLE_HAVE_EXPLICIT_BZERO
-    // Use explicit_bzero if available - guaranteed not to be optimized away
+    /// Use explicit_bzero if available - guaranteed not to be optimized away
     explicit_bzero(ptr, len);
 #else
-    // Portable fallback: volatile pointer prevents compiler optimization
+    /// Portable fallback: volatile pointer prevents compiler optimization
     volatile unsigned char *p = (volatile unsigned char *)ptr;
     while (len--) {
         *p++ = 0;
@@ -114,7 +114,7 @@ static inline bool lle_memory_lock(void *addr, size_t len) {
      */
     return mlock(addr, len) == 0;
 #else
-    // Platform doesn't have mlock - not an error, just unavailable
+    /// Platform doesn't have mlock - not an error, just unavailable
     (void)addr;
     (void)len;
     return false;
@@ -133,17 +133,17 @@ static inline bool lle_memory_lock(void *addr, size_t len) {
  */
 static inline bool lle_memory_unlock(void *addr, size_t len) {
     if (!addr || len == 0) {
-        return true; // Nothing to unlock
+        return true; /// Nothing to unlock
     }
 
 #if LLE_HAVE_MLOCK
     return munlock(addr, len) == 0;
 #else
-    // Platform doesn't have munlock - no-op, return success
+    /// Platform doesn't have munlock - no-op, return success
     (void)addr;
     (void)len;
     return true;
 #endif
 }
 
-#endif // LLE_SECURE_MEMORY_H
+#endif /// LLE_SECURE_MEMORY_H

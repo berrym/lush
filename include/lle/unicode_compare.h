@@ -26,9 +26,9 @@
  * @brief Unicode comparison options structure
  */
 typedef struct lle_unicode_compare_options {
-    bool normalize;        /**< Apply NFC normalization before comparison */
-    bool case_insensitive; /**< Case-insensitive comparison */
-    bool trim_whitespace;  /**< Trim leading/trailing whitespace */
+    bool normalize;        ///< Apply NFC normalization before comparison
+    bool case_insensitive; ///< Case-insensitive comparison
+    bool trim_whitespace;  ///< Trim leading/trailing whitespace
 } lle_unicode_compare_options_t;
 
 /**
@@ -178,4 +178,4 @@ bool lle_unicode_is_prefix(const char *prefix, size_t prefix_len,
 bool lle_unicode_is_prefix_z(const char *prefix, const char *str,
                              const lle_unicode_compare_options_t *options);
 
-#endif // LLE_UNICODE_COMPARE_H
+#endif /// LLE_UNICODE_COMPARE_H

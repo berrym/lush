@@ -11,8 +11,8 @@
  * Usage:
  *   char *line = lle_readline("prompt> ");
  *   if (line != NULL) {
- *       // Process line
- *       free(line);  // Caller must free
+ *       /// Process line
+ *       free(line);  /// Caller must free
  *   }
  */
 
@@ -107,4 +107,4 @@ void lle_set_debug_prompt_active(bool active);
 }
 #endif
 
-#endif // LLE_READLINE_H
+#endif /// LLE_READLINE_H

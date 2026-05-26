@@ -34,13 +34,13 @@
 #include <time.h>
 #include <unistd.h>
 
-// Include LLE dependencies
+/// Include LLE dependencies
 #include "lle/arena.h"
 #include "lle/error_handling.h"
 #include "lle/memory_management.h"
 #include "lle/performance.h"
 
-// Prevent conflicts with forward declarations in other headers
+/// Prevent conflicts with forward declarations in other headers
 #ifdef lle_input_event_t
 #undef lle_input_event_t
 #endif
@@ -53,20 +53,20 @@
  * ============================================================================
  */
 
-// Lush display system types (defined in Lush, used by LLE)
+/// Lush display system types (defined in Lush, used by LLE)
 typedef struct lush_display_context lush_display_context_t;
 typedef struct lush_display_layer lush_display_layer_t;
 typedef struct lush_layer_content lush_layer_content_t;
 typedef struct lush_display_line lush_display_line_t;
 typedef int lush_result_t;
 
-// Lush display layer priorities
+/// Lush display layer priorities
 #define LUSH_LAYER_PRIORITY_EDITING 100
 
-// Lush result codes
+/// Lush result codes
 #define LUSH_SUCCESS 0
 
-// Forward declarations for input parsing components (from input_parsing.h)
+/// Forward declarations for input parsing components (from input_parsing.h)
 typedef struct lle_sequence_parser lle_sequence_parser_t;
 typedef struct lle_key_detector lle_key_detector_t;
 
@@ -178,25 +178,25 @@ typedef enum {
  * Spec Reference: Section 3.1 - Internal State Authority Model
  */
 typedef struct lle_command_buffer {
-    char *data;            /**< Buffer content (UTF-8) */
-    size_t length;         /**< Current content length */
-    size_t capacity;       /**< Allocated buffer size */
-    size_t allocated_size; /**< Actual allocation size */
+    char *data;            ///< Buffer content (UTF-8)
+    size_t length;         ///< Current content length
+    size_t capacity;       ///< Allocated buffer size
+    size_t allocated_size; ///< Actual allocation size
 
-    // Buffer change tracking for optimization
-    size_t last_change_offset; /**< Last modification offset */
-    size_t last_change_length; /**< Last modification length */
-    bool needs_full_refresh;   /**< Requires complete display update */
+    /// Buffer change tracking for optimization
+    size_t last_change_offset; ///< Last modification offset
+    size_t last_change_length; ///< Last modification length
+    bool needs_full_refresh;   ///< Requires complete display update
 } lle_command_buffer_t;
 
 /**
  * @brief Line attributes for display styling
  */
 typedef struct lle_line_attributes {
-    uint32_t fg_color;   /**< Foreground color (RGB or palette) */
-    uint32_t bg_color;   /**< Background color (RGB or palette) */
-    uint16_t attributes; /**< Bold, italic, underline, etc. */
-    bool use_truecolor;  /**< Use 24-bit color vs palette */
+    uint32_t fg_color;   ///< Foreground color (RGB or palette)
+    uint32_t bg_color;   ///< Background color (RGB or palette)
+    uint16_t attributes; ///< Bold, italic, underline, etc.
+    bool use_truecolor;  ///< Use 24-bit color vs palette
 } lle_line_attributes_t;
 
 /**
@@ -205,16 +205,16 @@ typedef struct lle_line_attributes {
  * Spec Reference: Section 3.1 - Internal State Authority Model
  */
 typedef struct lle_display_line {
-    char *content;   /**< Line content (UTF-8) */
-    size_t length;   /**< Content length */
-    size_t capacity; /**< Allocated capacity */
+    char *content;   ///< Line content (UTF-8)
+    size_t length;   ///< Content length
+    size_t capacity; ///< Allocated capacity
 
-    // Visual attributes for this line
-    lle_line_attributes_t attributes; /**< Colors, styles, etc. */
+    /// Visual attributes for this line
+    lle_line_attributes_t attributes; ///< Colors, styles, etc.
 
-    // Cursor information if cursor is on this line
-    bool contains_cursor; /**< True if cursor on this line */
-    size_t cursor_column; /**< Visual cursor column (if present) */
+    /// Cursor information if cursor is on this line
+    bool contains_cursor; ///< True if cursor on this line
+    size_t cursor_column; ///< Visual cursor column (if present)
 } lle_display_line_t;
 
 /**
@@ -226,32 +226,32 @@ typedef struct lle_display_line {
  * Spec Reference: Section 3 - Internal State Authority Model
  */
 typedef struct lle_internal_state {
-    // Command Buffer State - AUTHORITATIVE
-    lle_command_buffer_t *command_buffer; /**< Command being edited */
-    size_t cursor_position; /**< Cursor position in buffer (logical) */
-    size_t selection_start; /**< Selection start (if any) */
-    size_t selection_end;   /**< Selection end (if any) */
-    bool has_selection;     /**< Selection active flag */
+    /// Command Buffer State - AUTHORITATIVE
+    lle_command_buffer_t *command_buffer; ///< Command being edited
+    size_t cursor_position; ///< Cursor position in buffer (logical)
+    size_t selection_start; ///< Selection start (if any)
+    size_t selection_end;   ///< Selection end (if any)
+    bool has_selection;     ///< Selection active flag
 
-    // Display State Model - What we believe terminal contains
-    lle_display_line_t *display_lines; /**< Current display content */
-    size_t display_line_count;         /**< Number of display lines */
-    size_t display_capacity;           /**< Allocated display line capacity */
+    /// Display State Model - What we believe terminal contains
+    lle_display_line_t *display_lines; ///< Current display content
+    size_t display_line_count;         ///< Number of display lines
+    size_t display_capacity;           ///< Allocated display line capacity
 
-    // Display Geometry State
-    size_t terminal_width;  /**< Terminal columns */
-    size_t terminal_height; /**< Terminal rows */
-    size_t prompt_width;    /**< Prompt width in columns */
-    size_t display_offset;  /**< Horizontal scroll offset */
-    size_t vertical_offset; /**< Vertical scroll offset */
+    /// Display Geometry State
+    size_t terminal_width;  ///< Terminal columns
+    size_t terminal_height; ///< Terminal rows
+    size_t prompt_width;    ///< Prompt width in columns
+    size_t display_offset;  ///< Horizontal scroll offset
+    size_t vertical_offset; ///< Vertical scroll offset
 
-    // Edit State Tracking
-    bool buffer_modified;        /**< Buffer changed since last display */
-    uint64_t modification_count; /**< Number of modifications */
-    uint64_t last_update_time;   /**< Last update timestamp */
+    /// Edit State Tracking
+    bool buffer_modified;        ///< Buffer changed since last display
+    uint64_t modification_count; ///< Number of modifications
+    uint64_t last_update_time;   ///< Last update timestamp
 
-    // CRITICAL: NO terminal cursor position tracking
-    // Cursor position always calculated from buffer state + display geometry
+    /// CRITICAL: NO terminal cursor position tracking
+    /// Cursor position always calculated from buffer state + display geometry
 } lle_internal_state_t;
 
 /**
@@ -262,18 +262,18 @@ typedef struct lle_internal_state {
  * Spec Reference: Section 4 - Terminal Capability Detection
  */
 typedef struct lle_terminal_capabilities {
-    // Basic terminal information
-    bool is_tty;            /**< Running in TTY */
-    char *terminal_type;    /**< TERM environment variable */
-    char *terminal_program; /**< Terminal program name */
+    /// Basic terminal information
+    bool is_tty;            ///< Running in TTY
+    char *terminal_type;    ///< TERM environment variable
+    char *terminal_program; ///< Terminal program name
 
-    // Display capabilities (from terminfo/environment)
-    bool supports_ansi_colors;    /**< Basic 8/16 color support */
-    bool supports_256_colors;     /**< 256 color support */
-    bool supports_truecolor;      /**< 24-bit color support */
-    uint8_t detected_color_depth; /**< Color depth (4, 8, or 24) */
+    /// Display capabilities (from terminfo/environment)
+    bool supports_ansi_colors;    ///< Basic 8/16 color support
+    bool supports_256_colors;     ///< 256 color support
+    bool supports_truecolor;      ///< 24-bit color support
+    uint8_t detected_color_depth; ///< Color depth (4, 8, or 24)
 
-    // Text attributes (from terminfo)
+    /// Text attributes (from terminfo)
     bool supports_bold;          ///< Bold attribute available
     bool supports_italic;        ///< Italic attribute available
     bool supports_underline;     ///< Underline attribute available
@@ -281,22 +281,22 @@ typedef struct lle_terminal_capabilities {
     bool supports_reverse;       ///< Reverse-video attribute available
     bool supports_dim;           ///< Dim attribute available
 
-    // Advanced features (from environment/terminfo)
+    /// Advanced features (from environment/terminfo)
     bool supports_mouse_reporting;     ///< Mouse reporting available
     bool supports_bracketed_paste;     ///< Bracketed paste mode available
     bool supports_focus_events;        ///< Focus in/out events available
     bool supports_synchronized_output; ///< Synchronized output (DEC 2026)
     bool supports_unicode;             ///< Terminal renders Unicode correctly
 
-    // Terminal geometry
-    size_t terminal_width;  /**< Columns */
-    size_t terminal_height; /**< Rows */
+    /// Terminal geometry
+    size_t terminal_width;  ///< Columns
+    size_t terminal_height; ///< Rows
 
-    // Performance characteristics
-    uint32_t estimated_latency_ms; /**< Estimated terminal latency */
-    bool supports_fast_updates;    /**< Can handle rapid updates */
+    /// Performance characteristics
+    uint32_t estimated_latency_ms; ///< Estimated terminal latency
+    bool supports_fast_updates;    ///< Can handle rapid updates
 
-    // Terminal-specific optimizations
+    /// Terminal-specific optimizations
     lle_terminal_type_t terminal_type_enum; ///< Identified terminal type
     lle_optimization_flags_t optimizations; ///< Available optimization flags
 } lle_terminal_capabilities_t;
@@ -307,17 +307,17 @@ typedef struct lle_terminal_capabilities {
  * Spec Reference: Section 5 - Display Content Generation
  */
 typedef struct lle_display_content {
-    // Complete display lines
+    /// Complete display lines
     lle_display_line_t *lines; ///< Array of generated display lines
     size_t line_count;         ///< Number of populated lines
-    size_t line_capacity;      /**< Total allocated lines for proper cleanup */
+    size_t line_capacity;      ///< Total allocated lines for proper cleanup
 
-    // Cursor position information
+    /// Cursor position information
     size_t cursor_line;   ///< Cursor row within content (0-based)
     size_t cursor_column; ///< Cursor column within content (0-based)
     bool cursor_visible;  ///< Cursor visibility flag
 
-    // Content metadata
+    /// Content metadata
     uint64_t generation_time; ///< Microsecond timestamp when generated
     bool is_complete_refresh; ///< True when full refresh is required
     uint32_t content_version; ///< Monotonic content version counter
@@ -342,11 +342,11 @@ typedef struct lle_display_generator {
         *capabilities;                    ///< Detected terminal capabilities
     lle_internal_state_t *internal_state; ///< Authoritative editing state
 
-    // Content generation state
+    /// Content generation state
     lle_display_content_t *current_content;  ///< Latest generated content
     lle_display_content_t *previous_content; ///< Previously generated content
 
-    // Generation parameters
+    /// Generation parameters
     lle_generation_params_t params; ///< Active generation parameters
 } lle_display_generator_t;
 
@@ -369,18 +369,18 @@ typedef struct lle_layer_config {
  * Spec Reference: Section 6 - Lush Display Layer Integration
  */
 typedef struct lle_lush_display_client {
-    // Lush display system integration
+    /// Lush display system integration
     lush_display_context_t *display_context; ///< Lush display context handle
     lush_display_layer_t *lle_display_layer; ///< LLE's display layer in Lush
 
-    // LLE-specific layer configuration
+    /// LLE-specific layer configuration
     lle_layer_config_t layer_config; ///< Layer configuration values
 
-    // Terminal capabilities for display optimization
+    /// Terminal capabilities for display optimization
     lle_terminal_capabilities_t
         *capabilities; ///< Detected terminal capabilities
 
-    // Display submission tracking
+    /// Display submission tracking
     uint64_t last_submission_time; ///< Microsecond timestamp of last submission
     uint64_t submission_count;     ///< Total submissions made to Lush
 } lle_lush_display_client_t;
@@ -398,35 +398,33 @@ typedef struct lle_input_event_t {
     uint32_t sequence_number; ///< Monotonic event sequence number
 
     union {
-        // Character input
+        /// Character input
         struct {
-            uint32_t codepoint; /**< Unicode codepoint */
-            char utf8_bytes[8]; /**< UTF-8 representation */
-            uint8_t byte_count; /**< Number of UTF-8 bytes */
+            uint32_t codepoint; ///< Unicode codepoint
+            char utf8_bytes[8]; ///< UTF-8 representation
+            uint8_t byte_count; ///< Number of UTF-8 bytes
         } character;
 
-        // Special key input
+        /// Special key input
         struct {
-            lle_special_key_t
-                key; /**< Special key enum (arrows, F-keys, etc.) */
-            lle_key_modifier_t
-                modifiers;    /**< Modifier flags (Ctrl, Alt, Shift) */
+            lle_special_key_t key; ///< Special key enum (arrows, F-keys, etc.)
+            lle_key_modifier_t modifiers; ///< Modifier flags (Ctrl, Alt, Shift)
             uint32_t keycode; /* Raw keycode for letters (e.g., 'A'=65 with Ctrl
                                  modifier) */
         } special_key;
 
-        // Window resize event
+        /// Window resize event
         struct {
             size_t new_width;  ///< New terminal width in columns
             size_t new_height; ///< New terminal height in rows
         } resize;
 
-        // Signal event
+        /// Signal event
         struct {
             int signal_number; ///< POSIX signal number delivered
         } signal;
 
-        // Error event
+        /// Error event
         struct {
             lle_result_t error_code; ///< LLE error code for this event
             char error_message[256]; ///< Human-readable error message
@@ -445,11 +443,11 @@ typedef struct lle_input_processor {
     struct lle_unix_interface
         *unix_interface; ///< Backing Unix terminal interface
 
-    // Input processing state
+    /// Input processing state
     uint64_t events_processed;     ///< Total events processed
     uint32_t next_sequence_number; ///< Next sequence number to assign
 
-    // Performance tracking
+    /// Performance tracking
     uint64_t total_processing_time_us; ///< Cumulative processing time (us)
 
     /* Event arena for per-event allocations (fixes memory leak).
@@ -463,28 +461,27 @@ typedef struct lle_input_processor {
  * Spec Reference: Section 8 - Unix Terminal Interface
  */
 typedef struct lle_unix_interface {
-    int terminal_fd;                 /**< Terminal file descriptor */
-    struct termios original_termios; /**< Original terminal settings */
-    struct termios raw_termios;      /**< Raw mode settings */
-    bool raw_mode_active;            /**< Currently in raw mode */
+    int terminal_fd;                 ///< Terminal file descriptor
+    struct termios original_termios; ///< Original terminal settings
+    struct termios raw_termios;      ///< Raw mode settings
+    bool raw_mode_active;            ///< Currently in raw mode
 
-    // Window size tracking
+    /// Window size tracking
     size_t current_width;  ///< Current terminal width in columns
     size_t current_height; ///< Current terminal height in rows
     bool size_changed;     ///< True when a SIGWINCH-triggered resize is pending
 
-    // Signal handling integration
+    /// Signal handling integration
     bool sigwinch_received; ///< Set by SIGWINCH handler, polled by loop
 
-    // Escape sequence parsing (Spec 06 integration)
-    lle_sequence_parser_t
-        *sequence_parser;             /**< Comprehensive sequence parser */
-    lle_key_detector_t *key_detector; /**< Key sequence detector */
+    /// Escape sequence parsing (Spec 06 integration)
+    lle_sequence_parser_t *sequence_parser; ///< Comprehensive sequence parser
+    lle_key_detector_t *key_detector;       ///< Key sequence detector
     lle_terminal_capabilities_t
-        *capabilities;              /**< Terminal capabilities for parser */
-    lle_memory_pool_t *memory_pool; /**< Memory pool for parser */
+        *capabilities;              ///< Terminal capabilities for parser
+    lle_memory_pool_t *memory_pool; ///< Memory pool for parser
 
-    // Error state
+    /// Error state
     lle_result_t last_error;
 } lle_unix_interface_t;
 
@@ -496,28 +493,28 @@ typedef struct lle_unix_interface {
  * Note: Struct name matches forward declaration in performance.h
  */
 typedef struct lle_terminal_abstraction_t {
-    // Internal State Authority Model - CORE COMPONENT
+    /// Internal State Authority Model - CORE COMPONENT
     lle_internal_state_t *internal_state;
 
-    // Display Content Generation System
+    /// Display Content Generation System
     lle_display_generator_t *display_generator;
 
-    // Lush Display Layer Integration
+    /// Lush Display Layer Integration
     lle_lush_display_client_t *display_client;
 
-    // Terminal Capability Model (detected once at startup)
+    /// Terminal Capability Model (detected once at startup)
     lle_terminal_capabilities_t *capabilities;
 
-    // Input Processing System
+    /// Input Processing System
     lle_input_processor_t *input_processor;
 
-    // Unix Terminal Interface (minimal, abstracted)
+    /// Unix Terminal Interface (minimal, abstracted)
     lle_unix_interface_t *unix_interface;
 
-    // Error handling context
+    /// Error handling context
     lle_error_context_t *error_ctx;
 
-    // Performance monitoring
+    /// Performance monitoring
     lle_performance_monitor_t *perf_monitor;
 } lle_terminal_abstraction_t;
 
@@ -526,7 +523,7 @@ typedef struct lle_terminal_abstraction_t {
  * ============================================================================
  */
 
-// Main Terminal Abstraction Lifecycle
+/// Main Terminal Abstraction Lifecycle
 /**
  * @brief Initialize the LLE terminal abstraction subsystem
  * @param abstraction Output pointer to the new abstraction instance
@@ -542,7 +539,7 @@ lle_terminal_abstraction_init(lle_terminal_abstraction_t **abstraction,
  */
 void lle_terminal_abstraction_destroy(lle_terminal_abstraction_t *abstraction);
 
-// Internal State Operations
+/// Internal State Operations
 /**
  * @brief Initialize a new internal authoritative state
  * @param state Output pointer to the created state
@@ -595,7 +592,7 @@ lle_result_t lle_internal_state_calculate_cursor_display_position(
 lle_result_t lle_internal_state_update_geometry(lle_internal_state_t *state,
                                                 size_t width, size_t height);
 
-// Command Buffer Operations
+/// Command Buffer Operations
 /**
  * @brief Initialize a new command buffer with given initial capacity
  * @param buffer Output pointer to the created buffer
@@ -635,7 +632,7 @@ lle_result_t lle_command_buffer_delete(lle_command_buffer_t *buffer,
  */
 void lle_command_buffer_clear(lle_command_buffer_t *buffer);
 
-// Terminal Capability Detection
+/// Terminal Capability Detection
 /**
  * @brief Detect terminal capabilities from environment and terminfo
  * @param caps Output pointer to the detected capabilities
@@ -660,7 +657,7 @@ void lle_capabilities_destroy(lle_terminal_capabilities_t *caps);
 lle_result_t lle_capabilities_update_geometry(lle_terminal_capabilities_t *caps,
                                               size_t width, size_t height);
 
-// Display Content Generation
+/// Display Content Generation
 /**
  * @brief Initialize a display content generator
  * @param generator Output pointer to the new generator
@@ -686,7 +683,7 @@ lle_result_t
 lle_display_generator_generate_content(lle_display_generator_t *generator,
                                        lle_display_content_t **content);
 
-// Display Content Operations
+/// Display Content Operations
 /**
  * @brief Create a new display content object
  * @param content Output pointer to the new content object
@@ -701,7 +698,7 @@ lle_result_t lle_display_content_create(lle_display_content_t **content,
  */
 void lle_display_content_destroy(lle_display_content_t *content);
 
-// Lush Display Client Operations
+/// Lush Display Client Operations
 /**
  * @brief Initialize the Lush display client used by LLE
  * @param client Output pointer to the new client
@@ -728,7 +725,7 @@ lle_result_t
 lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
                                        lle_display_content_t *content);
 
-// Input Event Processing
+/// Input Event Processing
 /**
  * @brief Initialize the input processor
  * @param processor Output pointer to the new input processor
@@ -764,7 +761,7 @@ lle_input_processor_read_next_event(lle_input_processor_t *processor,
                                     lle_input_event_t **event,
                                     uint32_t timeout_ms);
 
-// Unix Terminal Interface
+/// Unix Terminal Interface
 /**
  * @brief Initialize the minimal Unix terminal interface
  * @param interface Output pointer to the new Unix interface
@@ -818,7 +815,7 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
 lle_result_t lle_unix_interface_get_window_size(lle_unix_interface_t *interface,
                                                 size_t *width, size_t *height);
 
-// Utility Functions
+/// Utility Functions
 /**
  * @brief Get the current monotonic time in microseconds
  * @return Microsecond timestamp from a monotonic clock source
@@ -831,4 +828,4 @@ uint64_t lle_get_current_time_microseconds(void);
  */
 lle_result_t lle_convert_lush_error(lush_result_t lush_error);
 
-#endif // LLE_TERMINAL_ABSTRACTION_H
+#endif /// LLE_TERMINAL_ABSTRACTION_H

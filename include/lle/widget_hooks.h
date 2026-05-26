@@ -23,14 +23,14 @@
  *
  * Example Usage:
  *
- *     // Initialize hooks manager
+ *     /// Initialize hooks manager
  *     lle_widget_hooks_manager_t *manager;
  *     lle_widget_hooks_manager_init(&manager, widget_registry, memory_pool);
  *
- *     // Register widget for hook
+ *     /// Register widget for hook
  *     lle_widget_hook_register(manager, LLE_HOOK_BUFFER_MODIFIED, "my-widget");
  *
- *     // Trigger hook (called by system)
+ *     /// Trigger hook (called by system)
  *     lle_widget_hook_trigger(manager, LLE_HOOK_BUFFER_MODIFIED, editor);
  */
 
@@ -63,17 +63,17 @@ extern "C" {
  *   LINE_INIT -> [editing] -> LINE_ACCEPTED -> LINE_FINISH -> PRE_COMMAND
  */
 typedef enum {
-    LLE_HOOK_LINE_INIT,        /**< Start of line editing (zle-line-init) */
-    LLE_HOOK_LINE_ACCEPTED,    /**< Line accepted, before display finalized */
-    LLE_HOOK_LINE_FINISH,      /**< End of line editing (zle-line-finish) */
-    LLE_HOOK_BUFFER_MODIFIED,  /**< Buffer content changed */
-    LLE_HOOK_PRE_COMMAND,      /**< Before command execution (precmd) */
-    LLE_HOOK_POST_COMMAND,     /**< After command execution */
-    LLE_HOOK_COMPLETION_START, /**< Tab completion triggered */
-    LLE_HOOK_COMPLETION_END,   /**< Completion finished */
-    LLE_HOOK_HISTORY_SEARCH,   /**< History search started */
-    LLE_HOOK_TERMINAL_RESIZE,  /**< Terminal resized */
-    LLE_HOOK_COUNT             /**< Total hook types (not a valid hook) */
+    LLE_HOOK_LINE_INIT,        ///< Start of line editing (zle-line-init)
+    LLE_HOOK_LINE_ACCEPTED,    ///< Line accepted, before display finalized
+    LLE_HOOK_LINE_FINISH,      ///< End of line editing (zle-line-finish)
+    LLE_HOOK_BUFFER_MODIFIED,  ///< Buffer content changed
+    LLE_HOOK_PRE_COMMAND,      ///< Before command execution (precmd)
+    LLE_HOOK_POST_COMMAND,     ///< After command execution
+    LLE_HOOK_COMPLETION_START, ///< Tab completion triggered
+    LLE_HOOK_COMPLETION_END,   ///< Completion finished
+    LLE_HOOK_HISTORY_SEARCH,   ///< History search started
+    LLE_HOOK_TERMINAL_RESIZE,  ///< Terminal resized
+    LLE_HOOK_COUNT             ///< Total hook types (not a valid hook)
 } lle_widget_hook_type_t;
 
 /**
@@ -83,11 +83,11 @@ typedef enum {
  * Multiple widgets can be registered for the same hook.
  */
 typedef struct lle_hook_registration {
-    lle_widget_t *widget;               /**< Widget to execute */
-    lle_widget_hook_type_t hook_type;   /**< Hook type */
-    uint64_t trigger_count;             /**< Times triggered */
-    bool enabled;                       /**< Registration enabled */
-    struct lle_hook_registration *next; /**< Next registration in list */
+    lle_widget_t *widget;               ///< Widget to execute
+    lle_widget_hook_type_t hook_type;   ///< Hook type
+    uint64_t trigger_count;             ///< Times triggered
+    bool enabled;                       ///< Registration enabled
+    struct lle_hook_registration *next; ///< Next registration in list
 } lle_hook_registration_t;
 
 /**
@@ -97,12 +97,12 @@ typedef struct lle_hook_registration {
  * for each hook type for efficient triggering.
  */
 typedef struct lle_widget_hooks_manager {
-    lle_widget_registry_t *registry; /**< Widget registry reference */
-    lle_hook_registration_t *hooks[LLE_HOOK_COUNT]; /**< Hooks per type */
-    lle_memory_pool_t *memory_pool;                 /**< Memory pool */
-    uint64_t total_hooks_triggered; /**< Total triggers across all hooks */
-    uint64_t hook_trigger_counts[LLE_HOOK_COUNT]; /**< Triggers per hook type */
-    bool hooks_enabled;                           /**< Global enable/disable */
+    lle_widget_registry_t *registry; ///< Widget registry reference
+    lle_hook_registration_t *hooks[LLE_HOOK_COUNT]; ///< Hooks per type
+    lle_memory_pool_t *memory_pool;                 ///< Memory pool
+    uint64_t total_hooks_triggered; ///< Total triggers across all hooks
+    uint64_t hook_trigger_counts[LLE_HOOK_COUNT]; ///< Triggers per hook type
+    bool hooks_enabled;                           ///< Global enable/disable
 } lle_widget_hooks_manager_t;
 
 /* ============================================================================
@@ -281,4 +281,4 @@ lle_result_t lle_widget_hooks_disable(lle_widget_hooks_manager_t *manager);
 }
 #endif
 
-#endif // LLE_WIDGET_HOOKS_H
+#endif /// LLE_WIDGET_HOOKS_H
