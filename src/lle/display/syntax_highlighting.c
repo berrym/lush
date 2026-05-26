@@ -24,41 +24,41 @@
 #include <time.h>
 #include <unistd.h>
 
-// Include lush headers for command/alias/builtin checks
+/// Include lush headers for command/alias/builtin checks
 #include "alias.h"
 #include "builtins.h"
 #include "lle/adaptive_terminal_integration.h"
 
-// Weak symbol for function lookup - overridden in full shell build
+/// Weak symbol for function lookup - overridden in full shell build
 __attribute__((weak)) bool lle_shell_function_exists(const char *name) {
     (void)name;
-    return false; // Default: no functions in standalone LLE
+    return false; /// Default: no functions in standalone LLE
 }
 
 /* ========================================================================== */
-// DEFAULT COLOR SCHEME
+/// DEFAULT COLOR SCHEME
 /* ========================================================================== */
 
 /** @brief Default colors (vivid dark theme, derived from proven 256-color
  * palette) */
 static const lle_syntax_colors_t default_colors = {
-    // Commands
-    .command_valid = 0x005FFF00,    // Bright lime green (256: 82)
-    .command_invalid = 0x00FF0000,  // Bright red (256: 196)
-    .command_builtin = 0x0000FFFF,  // Bright cyan (256: 51)
-    .command_alias = 0x0000FFFF,    // Bright cyan (256: 51)
-    .command_function = 0x005F87FF, // Steel blue (256: 69)
+    /// Commands
+    .command_valid = 0x005FFF00,    /// Bright lime green (256: 82)
+    .command_invalid = 0x00FF0000,  /// Bright red (256: 196)
+    .command_builtin = 0x0000FFFF,  /// Bright cyan (256: 51)
+    .command_alias = 0x0000FFFF,    /// Bright cyan (256: 51)
+    .command_function = 0x005F87FF, /// Steel blue (256: 69)
 
-    // Keywords
-    .keyword = 0x005FAFFF, // Sky blue (256: 75)
+    /// Keywords
+    .keyword = 0x005FAFFF, /// Sky blue (256: 75)
 
-    // Strings
-    .string = 0x00FFAF00,        // Amber (256: 214)
-    .string_escape = 0x00FF5F5F, // Salmon (256: 203)
+    /// Strings
+    .string = 0x00FFAF00,        /// Amber (256: 214)
+    .string_escape = 0x00FF5F5F, /// Salmon (256: 203)
 
-    // Variables
-    .variable = 0x00D787FF,         // Light purple (256: 177)
-    .variable_special = 0x00FF87FF, // Bright orchid
+    /// Variables
+    .variable = 0x00D787FF,         /// Light purple (256: 177)
+    .variable_special = 0x00FF87FF, /// Bright orchid
 
     /* Paths -- ship the three base knobs; leave the six shape-specific
      * slots at 0 (unset → fall through to the kind-only knob).
@@ -74,47 +74,47 @@ static const lle_syntax_colors_t default_colors = {
     .path_dir_absolute = 0,
     .path_dir_relative = 0,
     .path_dir_home = 0,
-    .path_file = 0,             // unset → file paths render as ARGUMENT
-    .path_dir = 0x0087D787,     // Pale green (256: 114)
-    .path_invalid = 0x00FF0000, // Bright red (256: 196)
+    .path_file = 0,             /// unset → file paths render as ARGUMENT
+    .path_dir = 0x0087D787,     /// Pale green (256: 114)
+    .path_invalid = 0x00FF0000, /// Bright red (256: 196)
 
-    // Operators
-    .pipe = 0x005F87FF,           // Steel blue (256: 69)
-    .redirect = 0x00FF5F5F,       // Salmon (256: 203)
-    .operator_other = 0x00D0D0D0, // Light gray (256: 252)
+    /// Operators
+    .pipe = 0x005F87FF,           /// Steel blue (256: 69)
+    .redirect = 0x00FF5F5F,       /// Salmon (256: 203)
+    .operator_other = 0x00D0D0D0, /// Light gray (256: 252)
 
-    // Assignment
-    .assignment = 0x00D787FF, // Light purple (same as variable)
+    /// Assignment
+    .assignment = 0x00D787FF, /// Light purple (same as variable)
 
-    // Other
-    .comment = 0x00808080,   // Gray (256: 244)
-    .number = 0x00FFFFAF,    // Light yellow (256: 229)
-    .option = 0x0087D7D7,    // Muted cyan (256: 116)
-    .glob = 0x00FFAF00,      // Amber (same as string)
-    .extglob = 0x00FFAF00,   // Amber (same as string)
-    .glob_qual = 0x00D787FF, // Light purple
-    .argument = 0x00D0D0D0,  // Light gray (256: 252)
+    /// Other
+    .comment = 0x00808080,   /// Gray (256: 244)
+    .number = 0x00FFFFAF,    /// Light yellow (256: 229)
+    .option = 0x0087D7D7,    /// Muted cyan (256: 116)
+    .glob = 0x00FFAF00,      /// Amber (same as string)
+    .extglob = 0x00FFAF00,   /// Amber (same as string)
+    .glob_qual = 0x00D787FF, /// Light purple
+    .argument = 0x00D0D0D0,  /// Light gray (256: 252)
 
-    // Here-documents and here-strings
-    .heredoc_op = 0x00FF5F5F,      // Salmon (same as redirect)
-    .heredoc_delim = 0x00FFAF00,   // Amber (same as string)
-    .heredoc_content = 0x00FFAF00, // Amber (same as string)
-    .herestring = 0x00FFAF00,      // Amber (same as string)
+    /// Here-documents and here-strings
+    .heredoc_op = 0x00FF5F5F,      /// Salmon (same as redirect)
+    .heredoc_delim = 0x00FFAF00,   /// Amber (same as string)
+    .heredoc_content = 0x00FFAF00, /// Amber (same as string)
+    .herestring = 0x00FFAF00,      /// Amber (same as string)
 
-    // Process substitution
-    .procsub = 0x00FF5F5F, // Salmon
+    /// Process substitution
+    .procsub = 0x00FF5F5F, /// Salmon
 
-    // ANSI-C quoting
-    .string_ansic = 0x00FFAF00, // Amber (same as string)
+    /// ANSI-C quoting
+    .string_ansic = 0x00FFAF00, /// Amber (same as string)
 
-    // Arithmetic expansion
-    .arithmetic = 0x0000FFFF, // Bright cyan (256: 51)
+    /// Arithmetic expansion
+    .arithmetic = 0x0000FFFF, /// Bright cyan (256: 51)
 
-    // Errors
-    .error = 0x00FF0000,    // Bright red (256: 196)
-    .error_fg = 0x00FFFFFF, // White
+    /// Errors
+    .error = 0x00FF0000,    /// Bright red (256: 196)
+    .error_fg = 0x00FFFFFF, /// White
 
-    // Attributes
+    /// Attributes
     .keyword_bold = 1,
     .command_bold = 1,
     .error_underline = 1,
@@ -123,11 +123,11 @@ static const lle_syntax_colors_t default_colors = {
 };
 
 /* ========================================================================== */
-// COMMAND CACHE
+/// COMMAND CACHE
 /* ========================================================================== */
 
 #define CMD_CACHE_SIZE 128
-#define CMD_CACHE_TTL 30 // seconds
+#define CMD_CACHE_TTL 30 /// seconds
 
 /**
  * @brief Command cache entry structure
@@ -136,9 +136,9 @@ static const lle_syntax_colors_t default_colors = {
  * for cache expiration checking.
  */
 typedef struct cmd_cache_entry {
-    char *command;                /**< @brief Command string (heap-allocated) */
-    lle_syntax_token_type_t type; /**< @brief Cached token type result */
-    time_t timestamp;             /**< @brief Cache entry creation timestamp */
+    char *command;                ///< @brief Command string (heap-allocated)
+    lle_syntax_token_type_t type; ///< @brief Cached token type result
+    time_t timestamp;             ///< @brief Cache entry creation timestamp
 } cmd_cache_entry_t;
 
 /**
@@ -148,8 +148,7 @@ typedef struct cmd_cache_entry {
  * repeated PATH searches for frequently used commands.
  */
 typedef struct cmd_cache {
-    cmd_cache_entry_t
-        entries[CMD_CACHE_SIZE]; /**< @brief Cache entries array */
+    cmd_cache_entry_t entries[CMD_CACHE_SIZE]; ///< @brief Cache entries array
 } cmd_cache_t;
 
 /**
@@ -167,7 +166,7 @@ static unsigned int hash_string(const char *str) {
 }
 
 /* ========================================================================== */
-// PATH CACHE
+/// PATH CACHE
 /* ========================================================================== */
 
 /* Path-classification cache. Mirrors the command cache structurally but
@@ -178,11 +177,11 @@ static unsigned int hash_string(const char *str) {
  * promptly, long enough that progressive typing of a path doesn't
  * stat() each prefix on every keystroke. */
 #define PATH_CACHE_SIZE 128
-#define PATH_CACHE_TTL 30 // seconds
+#define PATH_CACHE_TTL 30 /// seconds
 
 typedef struct path_cache_entry {
-    char *path;                   /**< Dequoted path string (owned) */
-    lle_syntax_token_type_t type; /**< Cached classification */
+    char *path;                   ///< Dequoted path string (owned)
+    lle_syntax_token_type_t type; ///< Cached classification
     time_t timestamp;
 } path_cache_entry_t;
 
@@ -203,7 +202,7 @@ static unsigned int path_hash(const char *str) {
 }
 
 /* ========================================================================== */
-// SHELL KEYWORDS
+/// SHELL KEYWORDS
 /* ========================================================================== */
 
 /** @brief Shell keywords for syntax highlighting */
@@ -249,19 +248,19 @@ static bool is_block_ending_keyword(const char *word, size_t len) {
 }
 
 /* ========================================================================== */
-// SPECIAL VARIABLES
+/// SPECIAL VARIABLES
 /* ========================================================================== */
 
 /** @brief Hook array variable names that get special highlighting */
 static const char *hook_array_variables[] = {
-    "precmd_functions",   // Zsh: functions called before prompt
-    "preexec_functions",  // Zsh: functions called before command exec
-    "chpwd_functions",    // Zsh: functions called after directory change
-    "periodic_functions", // Zsh: functions called periodically
-    "precmd",             // Simple hook array (FEATURE_SIMPLE_HOOK_ARRAYS)
-    "preexec",            // Simple hook array
-    "chpwd",              // Simple hook array
-    "PROMPT_COMMAND",     // Bash: command/array run before prompt
+    "precmd_functions",   /// Zsh: functions called before prompt
+    "preexec_functions",  /// Zsh: functions called before command exec
+    "chpwd_functions",    /// Zsh: functions called after directory change
+    "periodic_functions", /// Zsh: functions called periodically
+    "precmd",             /// Simple hook array (FEATURE_SIMPLE_HOOK_ARRAYS)
+    "preexec",            /// Simple hook array
+    "chpwd",              /// Simple hook array
+    "PROMPT_COMMAND",     /// Bash: command/array run before prompt
     NULL};
 
 /**
@@ -281,7 +280,7 @@ static bool is_hook_array_variable(const char *name, size_t len) {
 }
 
 /* ========================================================================== */
-// LEXER HELPERS
+/// LEXER HELPERS
 /* ========================================================================== */
 
 /**
@@ -296,7 +295,7 @@ static bool is_word_char(char c) {
      * words. This ensures multi-byte UTF-8 characters like 'é' (0xC3 0xA9) are
      * not split. */
     if (uc >= 0x80) {
-        return true; // Any non-ASCII byte is part of a word
+        return true; /// Any non-ASCII byte is part of a word
     }
 
     return isalnum(uc) || c == '_' || c == '-' || c == '.' || c == '/' ||
@@ -314,7 +313,7 @@ static bool is_option_start(const char *s, size_t remaining) {
            (isalnum((unsigned char)s[1]) || s[1] == '-');
 }
 
-// is_variable_start - currently inlined in tokenizer, kept for future use
+/// is_variable_start - currently inlined in tokenizer, kept for future use
 #if 0
 static bool is_variable_start(char c) {
     return c == '$';
@@ -362,12 +361,12 @@ static bool is_extglob_start(const char *input, size_t pos, size_t len) {
  * Zsh-style glob qualifiers: *(.) for files, *(/) for dirs, *(@) for symlinks
  */
 static bool is_glob_qualifier(const char *input, size_t pos, size_t len) {
-    // Must have *( followed by single char and )
+    /// Must have *( followed by single char and )
     if (pos + 3 >= len)
         return false;
     if (input[pos] != '*' || input[pos + 1] != '(')
         return false;
-    // Check for single-char qualifier: ., /, @, *, etc.
+    /// Check for single-char qualifier: ., /, @, *, etc.
     char qual = input[pos + 2];
     if (input[pos + 3] == ')' &&
         (qual == '.' || qual == '/' || qual == '@' || qual == '*' ||
@@ -389,24 +388,24 @@ static bool is_glob_qualifier(const char *input, size_t pos, size_t len) {
  */
 static bool is_assignment(const char *word, size_t len) {
     if (len < 2)
-        return false; // Minimum: "x="
+        return false; /// Minimum: "x="
 
-    // Find the '='
+    /// Find the '='
     const char *eq = memchr(word, '=', len);
     if (!eq)
         return false;
 
-    // Variable name must be before the '='
+    /// Variable name must be before the '='
     size_t name_len = eq - word;
     if (name_len == 0)
         return false;
 
-    // First char must be letter or underscore
+    /// First char must be letter or underscore
     if (!isalpha((unsigned char)word[0]) && word[0] != '_') {
         return false;
     }
 
-    // Rest must be alphanumeric or underscore
+    /// Rest must be alphanumeric or underscore
     for (size_t i = 1; i < name_len; i++) {
         if (!isalnum((unsigned char)word[i]) && word[i] != '_') {
             return false;
@@ -431,11 +430,11 @@ static size_t skip_whitespace(const char *input, size_t pos, size_t len) {
 }
 
 /* ========================================================================== */
-// COMMAND CHECKING
+/// COMMAND CHECKING
 /* ========================================================================== */
 
-// Use is_builtin() from builtins.h (already included above)
-// Use is_alias() from alias.h (already included above)
+/// Use is_builtin() from builtins.h (already included above)
+/// Use is_alias() from alias.h (already included above)
 
 /**
  * @brief Forward declarations for path helpers implemented below.
@@ -467,7 +466,7 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
  * @return true if command is found and executable
  */
 static bool command_exists_in_path(const char *command) {
-    // Check if command contains a path separator
+    /// Check if command contains a path separator
     if (strchr(command, '/')) {
         return access(command, X_OK) == 0;
     }
@@ -503,7 +502,7 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
         return LLE_TOKEN_UNKNOWN;
     }
 
-    // Check cache first
+    /// Check cache first
     if (highlighter && highlighter->command_cache) {
         cmd_cache_t *cache = (cmd_cache_t *)highlighter->command_cache;
         unsigned int idx = hash_string(command);
@@ -517,7 +516,7 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
         }
     }
 
-    // Check command type
+    /// Check command type
     lle_syntax_token_type_t type;
 
     if (is_builtin(command)) {
@@ -527,11 +526,11 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
     } else if (lle_shell_function_exists(command)) {
         type = LLE_TOKEN_COMMAND_FUNCTION;
     } else if (command[0] == '/' || command[0] == '.') {
-        // Absolute or relative path - check if file exists
+        /// Absolute or relative path - check if file exists
         type = path_exists(command) ? LLE_TOKEN_COMMAND_VALID
                                     : LLE_TOKEN_COMMAND_INVALID;
     } else if (command[0] == '~') {
-        // Home directory path - expand and check
+        /// Home directory path - expand and check
         const char *home = getenv("HOME");
         if (home) {
             char expanded[4096];
@@ -542,21 +541,21 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
             type = LLE_TOKEN_COMMAND_INVALID;
         }
     } else if (command[0] == '$' && strchr(command, '/')) {
-        // Variable path (e.g., $HOME/bin/script) - expand and check
+        /// Variable path (e.g., $HOME/bin/script) - expand and check
         char expanded[4096];
         const char *var_start = command + 1;
         const char *var_end = var_start;
         const char *rest = NULL;
 
         if (var_start[0] == '{') {
-            // ${VAR} format
+            /// ${VAR} format
             var_start++;
             var_end = strchr(var_start, '}');
             if (var_end) {
                 rest = var_end + 1;
             }
         } else {
-            // $VAR format
+            /// $VAR format
             while (*var_end &&
                    (isalnum((unsigned char)*var_end) || *var_end == '_')) {
                 var_end++;
@@ -590,7 +589,7 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
         type = LLE_TOKEN_COMMAND_INVALID;
     }
 
-    // Update cache
+    /// Update cache
     if (highlighter && highlighter->command_cache) {
         cmd_cache_t *cache = (cmd_cache_t *)highlighter->command_cache;
         unsigned int idx = hash_string(command);
@@ -676,11 +675,11 @@ static bool is_implicit_path_word(const char *word, size_t len) {
         return true;
     }
     if (len >= 2 && word[0] == '~') {
-        // ~+ or ~-
+        /// ~+ or ~-
         if (word[1] == '+' || word[1] == '-') {
             return true;
         }
-        // ~name -- POSIX NAME is [A-Za-z_][A-Za-z0-9_]*, all ASCII
+        /// ~name -- POSIX NAME is [A-Za-z_][A-Za-z0-9_]*, all ASCII
         if (isalpha((unsigned char)word[1]) || word[1] == '_') {
             return true;
         }
@@ -717,7 +716,7 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
     memcpy(raw, raw_word, copy_len);
     raw[copy_len] = '\0';
 
-    // Cache lookup keyed on the raw (pre-dequote) bytes.
+    /// Cache lookup keyed on the raw (pre-dequote) bytes.
     if (highlighter && highlighter->path_cache) {
         path_cache_t *cache = (path_cache_t *)highlighter->path_cache;
         unsigned int idx = path_hash(raw);
@@ -734,9 +733,9 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
      * shape bucket is anchored to what the user typed, not what it
      * resolves to. */
     enum {
-        SHAPE_ABSOLUTE, /**< leading '/' */
-        SHAPE_HOME,     /**< leading '~' */
-        SHAPE_RELATIVE  // anything else (./, ../, bare-with-slash)
+        SHAPE_ABSOLUTE, ///< leading '/'
+        SHAPE_HOME,     ///< leading '~'
+        SHAPE_RELATIVE  /// anything else (./, ../, bare-with-slash)
     } shape;
     if (raw[0] == '/') {
         shape = SHAPE_ABSOLUTE;
@@ -846,7 +845,7 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
         }
     }
 
-    // Update cache. Slot collisions are LRU-by-overwrite.
+    /// Update cache. Slot collisions are LRU-by-overwrite.
     if (highlighter && highlighter->path_cache) {
         path_cache_t *cache = (path_cache_t *)highlighter->path_cache;
         unsigned int idx = path_hash(raw);
@@ -861,7 +860,7 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
 }
 
 /* ========================================================================== */
-// TOKENIZER
+/// TOKENIZER
 /* ========================================================================== */
 
 /**
@@ -930,12 +929,12 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
     highlighter->token_count = 0;
 
     size_t pos = 0;
-    bool expect_command = true; // Next word is a command
+    bool expect_command = true; /// Next word is a command
     bool after_function_keyword =
-        false; // Previous token was 'function' keyword
+        false; /// Previous token was 'function' keyword
 
     while (pos < input_len) {
-        // Skip whitespace
+        /// Skip whitespace
         size_t ws_start = pos;
         pos = skip_whitespace(input, pos, input_len);
         if (pos > ws_start) {
@@ -955,7 +954,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         char c = input[pos];
         size_t token_start = pos;
 
-        // Comment
+        /// Comment
         if (c == '#') {
             while (pos < input_len && input[pos] != '\n')
                 pos++;
@@ -963,13 +962,13 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Single-quoted string
+        /// Single-quoted string
         if (c == '\'') {
             pos++;
             while (pos < input_len && input[pos] != '\'')
                 pos++;
             if (pos < input_len)
-                pos++; // Skip closing quote
+                pos++; /// Skip closing quote
             add_token(highlighter,
                       pos <= input_len && input[pos - 1] == '\''
                           ? LLE_TOKEN_STRING_SINGLE
@@ -979,7 +978,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Double-quoted string
+        /// Double-quoted string
         if (c == '"') {
             pos++;
             while (pos < input_len && input[pos] != '"') {
@@ -988,7 +987,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 pos++;
             }
             if (pos < input_len)
-                pos++; // Skip closing quote
+                pos++; /// Skip closing quote
             add_token(highlighter,
                       pos <= input_len && input[pos - 1] == '"'
                           ? LLE_TOKEN_STRING_DOUBLE
@@ -998,7 +997,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Backtick command substitution
+        /// Backtick command substitution
         if (c == '`') {
             pos++;
             while (pos < input_len && input[pos] != '`') {
@@ -1013,10 +1012,10 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Kind sigils `@NAME` / `%NAME`: highlight the whole token like a
-        // variable when the post-sigil span is a valid identifier.  Other
-        // uses of `@` and `%` (mid-word, extglob `@(...)`, git refs `@{-1}`,
-        // job specs `%1`) fail the identifier check and fall through.
+        /// Kind sigils `@NAME` / `%NAME`: highlight the whole token like a
+        /// variable when the post-sigil span is a valid identifier.  Other
+        /// uses of `@` and `%` (mid-word, extglob `@(...)`, git refs `@{-1}`,
+        /// job specs `%1`) fail the identifier check and fall through.
         if ((c == '@' || c == '%') && pos + 1 < input_len &&
             (isalpha((unsigned char)input[pos + 1]) || input[pos + 1] == '_')) {
             pos++;
@@ -1029,25 +1028,25 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Variable and $-prefixed constructs
+        /// Variable and $-prefixed constructs
         if (c == '$') {
             pos++;
             if (pos < input_len) {
                 char next = input[pos];
                 lle_syntax_token_type_t vtype = LLE_TOKEN_VARIABLE;
 
-                // ANSI-C quoting: $'...'
+                /// ANSI-C quoting: $'...'
                 if (next == '\'') {
-                    pos++; // Skip opening quote
+                    pos++; /// Skip opening quote
                     while (pos < input_len && input[pos] != '\'') {
-                        // Handle escape sequences in ANSI-C strings
+                        /// Handle escape sequences in ANSI-C strings
                         if (input[pos] == '\\' && pos + 1 < input_len) {
                             pos++;
                         }
                         pos++;
                     }
                     if (pos < input_len)
-                        pos++; // Skip closing quote
+                        pos++; /// Skip closing quote
                     add_token(highlighter,
                               pos <= input_len && input[pos - 1] == '\''
                                   ? LLE_TOKEN_STRING_ANSIC
@@ -1056,10 +1055,10 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     expect_command = false;
                     continue;
                 }
-                // Arithmetic expansion: $((...))
+                /// Arithmetic expansion: $((...))
                 else if (next == '(' && pos + 1 < input_len &&
                          input[pos + 1] == '(') {
-                    pos += 2; // Skip ((
+                    pos += 2; /// Skip ((
                     int depth = 1;
                     while (pos < input_len && depth > 0) {
                         if (pos + 1 < input_len && input[pos] == '(' &&
@@ -1078,7 +1077,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     expect_command = false;
                     continue;
                 }
-                // Special variables
+                /// Special variables
                 else if (next == '?' || next == '#' || next == '@' ||
                          next == '*' || next == '$' || next == '!' ||
                          next == '-' || next == '_' ||
@@ -1089,7 +1088,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 /* ${...} brace expansion - extract variable name for hook check
                  */
                 else if (next == '{') {
-                    pos++; // Skip {
+                    pos++; /// Skip {
                     size_t var_name_start = pos;
                     /* Scan to find end of variable name (before : or } or other
                      * modifier) */
@@ -1100,13 +1099,13 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         pos++;
                     }
                     size_t var_name_len = pos - var_name_start;
-                    // Check if it's a hook array variable
+                    /// Check if it's a hook array variable
                     if (var_name_len > 0 &&
                         is_hook_array_variable(input + var_name_start,
                                                var_name_len)) {
                         vtype = LLE_TOKEN_VARIABLE_SPECIAL;
                     }
-                    // Continue to closing brace
+                    /// Continue to closing brace
                     int depth = 1;
                     while (pos < input_len && depth > 0) {
                         if (input[pos] == '{')
@@ -1116,7 +1115,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         pos++;
                     }
                 }
-                // $(...) command substitution
+                /// $(...) command substitution
                 else if (next == '(') {
                     int depth = 1;
                     pos++;
@@ -1128,7 +1127,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         pos++;
                     }
                 }
-                // Simple $VAR
+                /// Simple $VAR
                 else if (isalpha((unsigned char)next) || next == '_') {
                     size_t var_name_start = pos;
                     pos++;
@@ -1137,7 +1136,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                             input[pos] == '_')) {
                         pos++;
                     }
-                    // Check if it's a hook array variable
+                    /// Check if it's a hook array variable
                     size_t var_name_len = pos - var_name_start;
                     if (is_hook_array_variable(input + var_name_start,
                                                var_name_len)) {
@@ -1151,7 +1150,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             }
         }
 
-        // Operators
+        /// Operators
         if (c == '|') {
             pos++;
             if (pos < input_len && input[pos] == '|') {
@@ -1193,37 +1192,37 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             if (pos + 1 < input_len && input[pos + 1] == '(') {
                 lle_syntax_token_type_t pstype =
                     (c == '<') ? LLE_TOKEN_PROCSUB_IN : LLE_TOKEN_PROCSUB_OUT;
-                pos += 2; // Skip <( or >(
+                pos += 2; /// Skip <( or >(
                 add_token(highlighter, pstype, token_start, pos);
-                // Next token is a command inside the process substitution
+                /// Next token is a command inside the process substitution
                 expect_command = true;
                 continue;
             }
 
-            // Here-string: <<<
+            /// Here-string: <<<
             if (c == '<' && pos + 2 < input_len && input[pos + 1] == '<' &&
                 input[pos + 2] == '<') {
-                pos += 3; // Skip <<<
+                pos += 3; /// Skip <<<
                 add_token(highlighter, LLE_TOKEN_HERESTRING, token_start, pos);
                 expect_command = false;
                 continue;
             }
 
-            // Here-document: << or <<- (with optional quoting of delimiter)
+            /// Here-document: << or <<- (with optional quoting of delimiter)
             if (c == '<' && pos + 1 < input_len && input[pos + 1] == '<' &&
                 (pos + 2 >= input_len || input[pos + 2] != '<')) {
-                pos += 2; // Skip <<
-                // Check for <<- (strip leading tabs)
+                pos += 2; /// Skip <<
+                /// Check for <<- (strip leading tabs)
                 if (pos < input_len && input[pos] == '-') {
                     pos++;
                 }
                 add_token(highlighter, LLE_TOKEN_HEREDOC_OP, token_start, pos);
-                // Next token will be the delimiter (handled by word parsing)
+                /// Next token will be the delimiter (handled by word parsing)
                 expect_command = false;
                 continue;
             }
 
-            // Regular redirect: >, >>, <, >&, <&, etc.
+            /// Regular redirect: >, >>, <, >&, <&, etc.
             pos++;
             while (pos < input_len && (input[pos] == '>' || input[pos] == '&' ||
                                        isdigit((unsigned char)input[pos]))) {
@@ -1235,9 +1234,9 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         }
 
         if (c == '(') {
-            // Arithmetic command: (( expr ))
+            /// Arithmetic command: (( expr ))
             if (pos + 1 < input_len && input[pos + 1] == '(') {
-                pos += 2; // Skip ((
+                pos += 2; /// Skip ((
                 int depth = 1;
                 while (pos < input_len && depth > 0) {
                     if (pos + 1 < input_len && input[pos] == '(' &&
@@ -1255,7 +1254,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 expect_command = false;
                 continue;
             }
-            // Regular subshell
+            /// Regular subshell
             pos++;
             add_token(highlighter, LLE_TOKEN_SUBSHELL_START, token_start, pos);
             expect_command = true;
@@ -1283,17 +1282,17 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Glob qualifier: *(.) *(/) *(@) - must check before extglob
+        /// Glob qualifier: *(.) *(/) *(@) - must check before extglob
         if (is_glob_qualifier(input, pos, input_len)) {
-            pos += 4; // Skip *(X)
+            pos += 4; /// Skip *(X)
             add_token(highlighter, LLE_TOKEN_GLOB_QUAL, token_start, pos);
             expect_command = false;
             continue;
         }
 
-        // Extended glob: ?(pat), *(pat), +(pat), @(pat), !(pat)
+        /// Extended glob: ?(pat), *(pat), +(pat), @(pat), !(pat)
         if (is_extglob_start(input, pos, input_len)) {
-            pos += 2; // Skip ?( or *( etc.
+            pos += 2; /// Skip ?( or *( etc.
             int depth = 1;
             while (pos < input_len && depth > 0) {
                 if (input[pos] == '(')
@@ -1307,9 +1306,9 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Word (command, argument, path, option, etc.)
+        /// Word (command, argument, path, option, etc.)
         if (is_word_char(c) || c == '\\') {
-            // Scan the word
+            /// Scan the word
             bool has_glob = false;
             bool has_slash = false;
 
@@ -1336,11 +1335,11 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
 
             size_t word_len = pos - token_start;
 
-            // Determine token type
+            /// Determine token type
             lle_syntax_token_type_t type;
 
             if (expect_command) {
-                // Extract word for checking
+                /// Extract word for checking
                 char word[256];
                 size_t copy_len =
                     word_len < sizeof(word) - 1 ? word_len : sizeof(word) - 1;
@@ -1358,12 +1357,12 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                  * Look ahead for () after the word */
                 else {
                     size_t lookahead = pos;
-                    // Skip optional whitespace between name and ()
+                    /// Skip optional whitespace between name and ()
                     while (lookahead < input_len &&
                            isspace((unsigned char)input[lookahead])) {
                         lookahead++;
                     }
-                    // Check for ()
+                    /// Check for ()
                     bool is_posix_func_def = false;
                     if (lookahead + 1 < input_len && input[lookahead] == '(' &&
                         input[lookahead + 1] == ')') {
@@ -1374,9 +1373,9 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         type = LLE_TOKEN_COMMAND_FUNCTION;
                         expect_command = false;
                     }
-                    // Check for VAR=value assignment prefix
+                    /// Check for VAR=value assignment prefix
                     else if (is_assignment(input + token_start, word_len)) {
-                        // Find the '=' to get the variable name length
+                        /// Find the '=' to get the variable name length
                         const char *eq =
                             memchr(input + token_start, '=', word_len);
                         if (eq) {
@@ -1393,12 +1392,12 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         } else {
                             type = LLE_TOKEN_ASSIGNMENT;
                         }
-                        // Keep expect_command = true because command follows
-                        // e.g., "VAR=value command arg1 arg2"
+                        /// Keep expect_command = true because command follows
+                        /// e.g., "VAR=value command arg1 arg2"
                     } else if (is_shell_keyword(input + token_start,
                                                 word_len)) {
                         type = LLE_TOKEN_KEYWORD;
-                        // Check if this is the 'function' keyword
+                        /// Check if this is the 'function' keyword
                         if (word_len == 8 &&
                             strncmp(input + token_start, "function", 8) == 0) {
                             after_function_keyword = true;
@@ -1422,7 +1421,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     }
                 }
             } else {
-                // Not expecting command - it's an argument
+                /// Not expecting command - it's an argument
                 if (is_option_start(input + token_start, word_len)) {
                     type = LLE_TOKEN_OPTION;
                 } else if (has_glob) {
@@ -1441,9 +1440,9 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                                                word_len);
                 } else if (has_slash || is_implicit_path_word(
                                             input + token_start, word_len)) {
-                    type = LLE_TOKEN_ARGUMENT; // Path-like but not validating
+                    type = LLE_TOKEN_ARGUMENT; /// Path-like but not validating
                 } else {
-                    // Check if it's a number
+                    /// Check if it's a number
                     bool is_num = true;
                     for (size_t i = token_start; i < pos && is_num; i++) {
                         if (!isdigit((unsigned char)input[i]) &&
@@ -1460,12 +1459,12 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Unknown character - skip it
+        /// Unknown character - skip it
         pos++;
         add_token(highlighter, LLE_TOKEN_UNKNOWN, token_start, pos);
     }
 
-    // Apply colors to tokens
+    /// Apply colors to tokens
     for (size_t i = 0; i < highlighter->token_count; i++) {
         lle_syntax_token_t *tok = &highlighter->tokens[i];
         const lle_syntax_colors_t *c = &highlighter->colors;
@@ -1604,7 +1603,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         case LLE_TOKEN_ARGUMENT:
             tok->color = c->argument;
             break;
-        // Here-documents and here-strings
+        /// Here-documents and here-strings
         case LLE_TOKEN_HEREDOC_OP:
             tok->color = c->heredoc_op;
             break;
@@ -1617,16 +1616,16 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         case LLE_TOKEN_HERESTRING:
             tok->color = c->herestring;
             break;
-        // Process substitution
+        /// Process substitution
         case LLE_TOKEN_PROCSUB_IN:
         case LLE_TOKEN_PROCSUB_OUT:
             tok->color = c->procsub;
             break;
-        // ANSI-C quoting
+        /// ANSI-C quoting
         case LLE_TOKEN_STRING_ANSIC:
             tok->color = c->string_ansic;
             break;
-        // Arithmetic expansion
+        /// Arithmetic expansion
         case LLE_TOKEN_ARITHMETIC:
             tok->color = c->arithmetic;
             break;
@@ -1647,7 +1646,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
 }
 
 /* ========================================================================== */
-// ANSI RENDERING
+/// ANSI RENDERING
 /* ========================================================================== */
 
 /**
@@ -1672,10 +1671,10 @@ int lle_syntax_color_to_ansi(uint32_t color, uint8_t attributes,
     char *p = output;
     char *end = output + output_size - 1;
 
-    // Start escape sequence
+    /// Start escape sequence
     p += snprintf(p, end - p, "\x1b[");
 
-    // Attributes
+    /// Attributes
     bool need_sep = false;
     if (attributes & LLE_ATTR_BOLD) {
         p += snprintf(p, end - p, "1");
@@ -1694,21 +1693,21 @@ int lle_syntax_color_to_ansi(uint32_t color, uint8_t attributes,
         need_sep = true;
     }
 
-    // Color
+    /// Color
     if (color != 0 && color_depth > 0) {
         uint8_t r = (color >> 16) & 0xFF;
         uint8_t g = (color >> 8) & 0xFF;
         uint8_t b = color & 0xFF;
 
         if (color_depth >= 3) {
-            // Truecolor
+            /// Truecolor
             p += snprintf(p, end - p, "%s38;2;%d;%d;%d", need_sep ? ";" : "", r,
                           g, b);
         } else if (color_depth == 2) {
-            // 256 color - convert RGB to 256 color index
+            /// 256 color - convert RGB to 256 color index
             int idx;
             if (r == g && g == b) {
-                // Grayscale
+                /// Grayscale
                 if (r < 8)
                     idx = 16;
                 else if (r > 248)
@@ -1716,12 +1715,12 @@ int lle_syntax_color_to_ansi(uint32_t color, uint8_t attributes,
                 else
                     idx = 232 + (r - 8) / 10;
             } else {
-                // Color cube
+                /// Color cube
                 idx = 16 + (r / 51) * 36 + (g / 51) * 6 + (b / 51);
             }
             p += snprintf(p, end - p, "%s38;5;%d", need_sep ? ";" : "", idx);
         } else {
-            // 8 color - pick closest basic color
+            /// 8 color - pick closest basic color
             int basic = 0;
             if (r > 127)
                 basic |= 1;
@@ -1729,7 +1728,7 @@ int lle_syntax_color_to_ansi(uint32_t color, uint8_t attributes,
                 basic |= 2;
             if (b > 127)
                 basic |= 4;
-            // Use bright if any component is very bright
+            /// Use bright if any component is very bright
             if (r > 200 || g > 200 || b > 200) {
                 p += snprintf(p, end - p, "%s9%d", need_sep ? ";" : "", basic);
             } else {
@@ -1767,7 +1766,7 @@ int lle_syntax_render_ansi(lle_syntax_highlighter_t *highlighter,
     for (size_t i = 0; i < highlighter->token_count && p < end; i++) {
         lle_syntax_token_t *tok = &highlighter->tokens[i];
 
-        // Skip whitespace and unknown tokens - just copy them
+        /// Skip whitespace and unknown tokens - just copy them
         if (tok->type == LLE_TOKEN_WHITESPACE ||
             tok->type == LLE_TOKEN_UNKNOWN) {
             size_t len = tok->end - tok->start;
@@ -1778,7 +1777,7 @@ int lle_syntax_render_ansi(lle_syntax_highlighter_t *highlighter,
             continue;
         }
 
-        // Apply color
+        /// Apply color
         if (tok->color != 0 || tok->attributes != 0) {
             char color_seq[64];
             int seq_len = lle_syntax_color_to_ansi(
@@ -1790,14 +1789,14 @@ int lle_syntax_render_ansi(lle_syntax_highlighter_t *highlighter,
             }
         }
 
-        // Copy token text
+        /// Copy token text
         size_t len = tok->end - tok->start;
         if (p + len >= end)
             len = end - p;
         memcpy(p, input + tok->start, len);
         p += len;
 
-        // Reset after token
+        /// Reset after token
         if (tok->color != 0 || tok->attributes != 0) {
             const char *reset = "\x1b[0m";
             size_t reset_len = 4;
@@ -1813,7 +1812,7 @@ int lle_syntax_render_ansi(lle_syntax_highlighter_t *highlighter,
 }
 
 /* ========================================================================== */
-// PUBLIC API
+/// PUBLIC API
 /* ========================================================================== */
 
 /**
@@ -1829,13 +1828,13 @@ int lle_syntax_highlighter_create(lle_syntax_highlighter_t **highlighter) {
     if (!h)
         return -1;
 
-    // Set defaults
+    /// Set defaults
     h->colors = default_colors;
     h->enabled = true;
     h->validate_commands = true;
     h->validate_paths = true;
     h->highlight_errors = true;
-    // Detect terminal color capabilities via cached detection
+    /// Detect terminal color capabilities via cached detection
     lle_terminal_detection_result_t *detection = NULL;
     if (lle_detect_terminal_capabilities_optimized(&detection) == LLE_SUCCESS &&
         detection) {
@@ -1848,7 +1847,7 @@ int lle_syntax_highlighter_create(lle_syntax_highlighter_t **highlighter) {
         else
             h->color_depth = 0;
     } else {
-        h->color_depth = 3; // Fallback: assume truecolor
+        h->color_depth = 3; /// Fallback: assume truecolor
     }
 
     /* Create caches. Both are best-effort allocations: a NULL cache
@@ -1868,7 +1867,7 @@ void lle_syntax_highlighter_destroy(lle_syntax_highlighter_t *highlighter) {
     if (!highlighter)
         return;
 
-    // Free command cache
+    /// Free command cache
     if (highlighter->command_cache) {
         cmd_cache_t *cache = (cmd_cache_t *)highlighter->command_cache;
         for (int i = 0; i < CMD_CACHE_SIZE; i++) {
@@ -1877,7 +1876,7 @@ void lle_syntax_highlighter_destroy(lle_syntax_highlighter_t *highlighter) {
         free(cache);
     }
 
-    // Free path cache
+    /// Free path cache
     if (highlighter->path_cache) {
         path_cache_t *cache = (path_cache_t *)highlighter->path_cache;
         for (int i = 0; i < PATH_CACHE_SIZE; i++) {
@@ -1949,7 +1948,7 @@ void lle_syntax_highlighter_set_colors(lle_syntax_highlighter_t *highlighter,
 
 #undef MERGE_COLOR
 
-    // Boolean attributes are always copied (they default to false)
+    /// Boolean attributes are always copied (they default to false)
     highlighter->colors.keyword_bold = colors->keyword_bold;
     highlighter->colors.command_bold = colors->command_bold;
     highlighter->colors.error_underline = colors->error_underline;

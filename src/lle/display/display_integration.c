@@ -18,7 +18,7 @@
 #include <stdlib.h>
 
 /* ========================================================================== */
-// GLOBAL STATE
+/// GLOBAL STATE
 /* ========================================================================== */
 
 /**
@@ -30,7 +30,7 @@
 static lle_display_integration_t *global_display_integration = NULL;
 
 /* ========================================================================== */
-// CORE INTEGRATION FUNCTIONS
+/// CORE INTEGRATION FUNCTIONS
 /* ========================================================================== */
 
 /**
@@ -62,27 +62,27 @@ lle_display_integration_init(lle_display_integration_t **integration,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Allocate main integration structure
+    /// Allocate main integration structure
     lle_display_integration_t *integ =
         calloc(1, sizeof(lle_display_integration_t));
     if (!integ) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Store Lush display controller reference
+    /// Store Lush display controller reference
     integ->lush_display = lush_display;
     integ->memory_pool = memory_pool;
     integ->integration_active = true;
     integ->api_version = 1;
     integ->frame_counter = 0;
 
-    // Initialize integration lock
+    /// Initialize integration lock
     if (pthread_rwlock_init(&integ->integration_lock, NULL) != 0) {
         free(integ);
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    // Initialize display bridge
+    /// Initialize display bridge
     lle_result_t result = lle_display_bridge_init(
         &integ->display_bridge, editor, lush_display, memory_pool);
 
@@ -92,7 +92,7 @@ lle_display_integration_init(lle_display_integration_t **integration,
         return result;
     }
 
-    // Initialize render controller
+    /// Initialize render controller
     result = lle_render_controller_init(&integ->render_controller,
                                         integ->display_bridge, memory_pool);
 
@@ -103,7 +103,7 @@ lle_display_integration_init(lle_display_integration_t **integration,
         return result;
     }
 
-    // Allocate display metrics
+    /// Allocate display metrics
     integ->perf_metrics = calloc(1, sizeof(lle_display_metrics_t));
     if (!integ->perf_metrics) {
         lle_render_controller_cleanup(integ->render_controller);
@@ -113,7 +113,7 @@ lle_display_integration_init(lle_display_integration_t **integration,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Allocate display config
+    /// Allocate display config
     integ->config = calloc(1, sizeof(lle_display_config_t));
     if (!integ->config) {
         free(integ->perf_metrics);
@@ -124,12 +124,12 @@ lle_display_integration_init(lle_display_integration_t **integration,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Set default config
+    /// Set default config
     integ->config->enable_syntax_highlighting = true;
-    integ->config->enable_caching = false; // Disabled for now
+    integ->config->enable_caching = false; /// Disabled for now
     integ->config->enable_performance_monitoring = false;
 
-    // Allocate display state
+    /// Allocate display state
     integ->current_state = calloc(1, sizeof(lle_display_state_t));
     if (!integ->current_state) {
         free(integ->config);
@@ -141,7 +141,7 @@ lle_display_integration_init(lle_display_integration_t **integration,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Set as global singleton
+    /// Set as global singleton
     global_display_integration = integ;
     *integration = integ;
 
@@ -160,37 +160,37 @@ lle_display_integration_cleanup(lle_display_integration_t *integration) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Clear global singleton if this is it
+    /// Clear global singleton if this is it
     if (global_display_integration == integration) {
         global_display_integration = NULL;
     }
 
-    // Cleanup render controller
+    /// Cleanup render controller
     if (integration->render_controller) {
         lle_render_controller_cleanup(integration->render_controller);
     }
 
-    // Cleanup display bridge
+    /// Cleanup display bridge
     if (integration->display_bridge) {
         lle_display_bridge_cleanup(integration->display_bridge);
     }
 
-    // Free allocated structures
+    /// Free allocated structures
     free(integration->current_state);
     free(integration->config);
     free(integration->perf_metrics);
 
-    // Destroy lock
+    /// Destroy lock
     pthread_rwlock_destroy(&integration->integration_lock);
 
-    // Free main structure
+    /// Free main structure
     free(integration);
 
     return LLE_SUCCESS;
 }
 
 /* ========================================================================== */
-// DISPLAY BRIDGE FUNCTIONS
+/// DISPLAY BRIDGE FUNCTIONS
 /* ========================================================================== */
 
 /* NOTE: Display bridge init, cleanup, and send_output are implemented in
