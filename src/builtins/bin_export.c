@@ -7,7 +7,11 @@
  */
 
 #include "builtins.h"
+#include "lle/lle_pager.h"
 #include "symtable.h"
+
+#include <stdio.h>
+#include <stdlib.h>
 
 /**
  * @brief Export shell variables to the environment
@@ -22,10 +26,26 @@
  */
 int bin_export(int argc, char **argv) {
     if (argc == 1) {
-        /// Print all exported variables
+        /// Print all exported variables. The full environment is
+        /// commonly several hundred entries deep on containerised
+        /// or development setups, so the listing is built into an
+        /// open_memstream heap buffer and handed to
+        /// lle_pager_present; non-tty, disabled master switch, and
+        /// fits-in-one-screen cases stream directly. memstream
+        /// allocation failure falls back to the prior streaming
+        /// path so output still surfaces.
         extern char **environ;
+        char *buf = NULL;
+        size_t buf_len = 0;
+        FILE *out = open_memstream(&buf, &buf_len);
+        FILE *sink = out ? out : stdout;
         for (char **env = environ; *env; env++) {
-            printf("export %s\n", *env);
+            fprintf(sink, "export %s\n", *env);
+        }
+        if (out) {
+            fclose(out);
+            lle_pager_present(NULL, buf);
+            free(buf);
         }
         return 0;
     }
