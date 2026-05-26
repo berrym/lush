@@ -46,21 +46,21 @@ static inline bool is_power_of_two(size_t n) {
  * @return New chunk, or NULL on failure
  */
 static lle_arena_chunk_t *arena_alloc_chunk(size_t min_data_size) {
-    // Calculate total size including header
+    /// Calculate total size including header
     size_t total_size = sizeof(lle_arena_chunk_t) + min_data_size;
 
-    // Round up to at least minimum chunk size
+    /// Round up to at least minimum chunk size
     if (total_size < LLE_ARENA_MIN_CHUNK_SIZE) {
         total_size = LLE_ARENA_MIN_CHUNK_SIZE;
     }
 
-    // Allocate from lush pool
+    /// Allocate from lush pool
     lle_arena_chunk_t *chunk = lush_pool_alloc(total_size);
     if (!chunk) {
         return NULL;
     }
 
-    // Initialize chunk
+    /// Initialize chunk
     chunk->next = NULL;
     chunk->size = total_size - sizeof(lle_arena_chunk_t);
     chunk->used = 0;
@@ -99,11 +99,11 @@ static void arena_unlink_from_parent(lle_arena_t *arena) {
 
     lle_arena_t *parent = arena->parent;
 
-    // Is this the first child?
+    /// Is this the first child?
     if (parent->first_child == arena) {
         parent->first_child = arena->next_sibling;
     } else {
-        // Find previous sibling
+        /// Find previous sibling
         lle_arena_t *prev = parent->first_child;
         while (prev && prev->next_sibling != arena) {
             prev = prev->next_sibling;
@@ -143,7 +143,7 @@ lle_arena_t *lle_arena_create(lle_arena_t *parent, const char *name,
 
 lle_arena_t *lle_arena_create_with_flags(lle_arena_t *parent, const char *name,
                                          size_t initial_size, uint32_t flags) {
-    // Determine chunk size
+    /// Determine chunk size
     if (initial_size == 0) {
         initial_size = LLE_ARENA_DEFAULT_CHUNK_SIZE;
     }
@@ -155,18 +155,18 @@ lle_arena_t *lle_arena_create_with_flags(lle_arena_t *parent, const char *name,
         return NULL;
     }
 
-    // Allocate arena structure from the chunk itself for locality
+    /// Allocate arena structure from the chunk itself for locality
     if (chunk->size < sizeof(lle_arena_t)) {
-        // Chunk too small for arena struct, allocate separately
+        /// Chunk too small for arena struct, allocate separately
         arena_free_chunk(chunk);
         return NULL;
     }
 
-    // Place arena struct at start of chunk data
+    /// Place arena struct at start of chunk data
     lle_arena_t *arena = (lle_arena_t *)chunk->data;
     chunk->used = align_up(sizeof(lle_arena_t), LLE_ARENA_DEFAULT_ALIGNMENT);
 
-    // Initialize arena
+    /// Initialize arena
     arena->name = name;
     arena->parent = NULL;
     arena->first_child = NULL;
@@ -179,12 +179,12 @@ lle_arena_t *lle_arena_create_with_flags(lle_arena_t *parent, const char *name,
 
 #if LLE_ARENA_STATS
     arena->total_allocated = sizeof(lle_arena_t);
-    arena->allocation_count = 1; // Count arena struct itself
+    arena->allocation_count = 1; /// Count arena struct itself
     arena->chunk_count = 1;
     arena->peak_usage = chunk->used;
 #endif
 
-    // Link to parent
+    /// Link to parent
     if (parent) {
         arena_link_to_parent(arena, parent);
     }
@@ -197,25 +197,25 @@ void lle_arena_destroy(lle_arena_t *arena) {
         return;
     }
 
-    // Recursively destroy all children first (depth-first)
+    /// Recursively destroy all children first (depth-first)
     while (arena->first_child) {
         lle_arena_destroy(arena->first_child);
     }
 
-    // Unlink from parent
+    /// Unlink from parent
     arena_unlink_from_parent(arena);
 
-    // Save first_chunk before freeing (arena struct is in first chunk)
+    /// Save first_chunk before freeing (arena struct is in first chunk)
     lle_arena_chunk_t *first_chunk = arena->first_chunk;
 
-    // Clear arena to help catch use-after-free in debug builds
+    /// Clear arena to help catch use-after-free in debug builds
 #ifndef NDEBUG
     arena->name = NULL;
     arena->first_chunk = NULL;
     arena->current_chunk = NULL;
 #endif
 
-    // Free all chunks (including the one containing the arena struct)
+    /// Free all chunks (including the one containing the arena struct)
     arena_free_all_chunks(first_chunk);
 }
 
@@ -224,12 +224,12 @@ void lle_arena_reset(lle_arena_t *arena) {
         return;
     }
 
-    // Reset all chunks to empty
+    /// Reset all chunks to empty
     lle_arena_chunk_t *chunk = arena->first_chunk;
     bool first = true;
     while (chunk) {
         if (first) {
-            // First chunk contains arena struct, keep that
+            /// First chunk contains arena struct, keep that
             chunk->used =
                 align_up(sizeof(lle_arena_t), LLE_ARENA_DEFAULT_ALIGNMENT);
             first = false;
@@ -239,13 +239,13 @@ void lle_arena_reset(lle_arena_t *arena) {
         chunk = chunk->next;
     }
 
-    // Reset to first chunk
+    /// Reset to first chunk
     arena->current_chunk = arena->first_chunk;
 
 #if LLE_ARENA_STATS
     arena->total_allocated = sizeof(lle_arena_t);
     arena->allocation_count = 1;
-    // Keep chunk_count - chunks are still allocated
+    /// Keep chunk_count - chunks are still allocated
 #endif
 }
 
@@ -269,10 +269,10 @@ void *lle_arena_alloc(lle_arena_t *arena, size_t size) {
         return NULL;
     }
 
-    // Align size
+    /// Align size
     size_t aligned_size = align_up(size, arena->alignment);
 
-    // Try to allocate from current chunk
+    /// Try to allocate from current chunk
     lle_arena_chunk_t *chunk = arena->current_chunk;
     if (chunk->used + aligned_size <= chunk->size) {
         void *ptr = chunk->data + chunk->used;
@@ -289,12 +289,12 @@ void *lle_arena_alloc(lle_arena_t *arena, size_t size) {
         return ptr;
     }
 
-    // Need a new chunk
+    /// Need a new chunk
     if (arena->flags & LLE_ARENA_FLAG_NO_GROW) {
-        return NULL; // Not allowed to grow
+        return NULL; /// Not allowed to grow
     }
 
-    // Allocate new chunk - at least default size or requested size
+    /// Allocate new chunk - at least default size or requested size
     size_t new_chunk_size = aligned_size > arena->default_chunk_size
                                 ? aligned_size
                                 : arena->default_chunk_size;
@@ -304,7 +304,7 @@ void *lle_arena_alloc(lle_arena_t *arena, size_t size) {
         return NULL;
     }
 
-    // Link new chunk at the front (so current_chunk is always newest)
+    /// Link new chunk at the front (so current_chunk is always newest)
     new_chunk->next = arena->first_chunk;
     arena->first_chunk = new_chunk;
     arena->current_chunk = new_chunk;
@@ -313,7 +313,7 @@ void *lle_arena_alloc(lle_arena_t *arena, size_t size) {
     arena->chunk_count++;
 #endif
 
-    // Allocate from new chunk
+    /// Allocate from new chunk
     void *ptr = new_chunk->data;
     new_chunk->used = aligned_size;
 
@@ -330,10 +330,10 @@ void *lle_arena_calloc(lle_arena_t *arena, size_t count, size_t size) {
         return NULL;
     }
 
-    // Check for overflow
+    /// Check for overflow
     size_t total = count * size;
     if (total / count != size) {
-        return NULL; // Overflow
+        return NULL; /// Overflow
     }
 
     void *ptr = lle_arena_alloc(arena, total);
@@ -356,17 +356,17 @@ void *lle_arena_alloc_aligned(lle_arena_t *arena, size_t size,
         return lle_arena_alloc(arena, size);
     }
 
-    // Need extra space for alignment padding
+    /// Need extra space for alignment padding
     size_t padding = alignment - 1;
     size_t total_size = size + padding;
 
-    // Allocate with extra space
+    /// Allocate with extra space
     void *raw_ptr = lle_arena_alloc(arena, total_size);
     if (!raw_ptr) {
         return NULL;
     }
 
-    // Align the pointer
+    /// Align the pointer
     uintptr_t addr = (uintptr_t)raw_ptr;
     uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
 
@@ -392,7 +392,7 @@ char *lle_arena_strndup(lle_arena_t *arena, const char *str, size_t max_len) {
         return NULL;
     }
 
-    // Find actual length (up to max_len)
+    /// Find actual length (up to max_len)
     size_t len = 0;
     while (len < max_len && str[len] != '\0') {
         len++;
@@ -429,7 +429,7 @@ char *lle_arena_sprintf(lle_arena_t *arena, const char *format, ...) {
     va_start(args1, format);
     va_copy(args2, args1);
 
-    // Determine required size
+    /// Determine required size
     int len = vsnprintf(NULL, 0, format, args1);
     va_end(args1);
 
@@ -438,7 +438,7 @@ char *lle_arena_sprintf(lle_arena_t *arena, const char *format, ...) {
         return NULL;
     }
 
-    // Allocate and format
+    /// Allocate and format
     char *str = lle_arena_alloc(arena, (size_t)len + 1);
     if (str) {
         vsnprintf(str, (size_t)len + 1, format, args2);
@@ -472,7 +472,7 @@ size_t lle_arena_get_allocated(lle_arena_t *arena, bool include_children) {
     return total;
 #else
     (void)include_children;
-    return 0; // Stats disabled
+    return 0; /// Stats disabled
 #endif
 }
 
@@ -483,7 +483,7 @@ size_t lle_arena_get_total_size(lle_arena_t *arena, bool include_children) {
 
     size_t total = 0;
 
-    // Sum up chunk sizes
+    /// Sum up chunk sizes
     lle_arena_chunk_t *chunk = arena->first_chunk;
     while (chunk) {
         total += sizeof(lle_arena_chunk_t) + chunk->size;
@@ -552,7 +552,7 @@ void lle_arena_print_stats(lle_arena_t *arena, int indent) {
         return;
     }
 
-    // Print indentation
+    /// Print indentation
     for (int i = 0; i < indent; i++) {
         fprintf(stderr, "  ");
     }
@@ -566,7 +566,7 @@ void lle_arena_print_stats(lle_arena_t *arena, int indent) {
             arena->name ? arena->name : "(unnamed)");
 #endif
 
-    // Print children
+    /// Print children
     lle_arena_t *child = arena->first_child;
     while (child) {
         lle_arena_print_stats(child, indent + 1);
@@ -617,7 +617,7 @@ void lle_arena_scratch_end(lle_arena_scratch_t *scratch) {
 
     lle_arena_t *arena = scratch->arena;
 
-    // Free any chunks allocated after scratch began
+    /// Free any chunks allocated after scratch began
     while (arena->first_chunk != scratch->chunk) {
         lle_arena_chunk_t *chunk = arena->first_chunk;
         arena->first_chunk = chunk->next;
@@ -627,13 +627,13 @@ void lle_arena_scratch_end(lle_arena_scratch_t *scratch) {
 #endif
     }
 
-    // Reset current chunk to scratch state
+    /// Reset current chunk to scratch state
     arena->current_chunk = scratch->chunk;
     if (scratch->chunk) {
         scratch->chunk->used = scratch->chunk_used;
     }
 
-    // Clear scratch marker
+    /// Clear scratch marker
     scratch->arena = NULL;
     scratch->chunk = NULL;
     scratch->chunk_used = 0;

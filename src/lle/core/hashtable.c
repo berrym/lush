@@ -24,7 +24,7 @@
  * ============================================================================
  */
 
-// Thread-local storage for memory context (Phase 1)
+/// Thread-local storage for memory context (Phase 1)
 static __thread lle_hashtable_memory_context_t *current_memory_context = NULL;
 
 /**
@@ -58,7 +58,7 @@ void *lle_hashtable_key_copy_pooled(const void *key) {
     lle_hashtable_memory_context_t *ctx = lle_get_current_memory_context();
 
     if (!key || !ctx || !ctx->pool) {
-        // Fallback to regular malloc
+        /// Fallback to regular malloc
         const char *key_str = (const char *)key;
         size_t len = strlen(key_str) + 1;
         char *new_key = malloc(len);
@@ -77,7 +77,7 @@ void *lle_hashtable_key_copy_pooled(const void *key) {
 
     memcpy(new_key, key_str, key_len);
 
-    // Update statistics
+    /// Update statistics
     ctx->allocations++;
     ctx->bytes_allocated += key_len;
 
@@ -96,7 +96,7 @@ void lle_hashtable_key_free_pooled(const void *key) {
     }
 
     if (!ctx || !ctx->pool) {
-        // Fallback to regular free
+        /// Fallback to regular free
         free((void *)key);
         return;
     }
@@ -105,7 +105,7 @@ void lle_hashtable_key_free_pooled(const void *key) {
     size_t key_len = strlen(key_str) + 1;
     lush_pool_free((void *)key);
 
-    // Update statistics
+    /// Update statistics
     ctx->deallocations++;
     ctx->bytes_freed += key_len;
 }
@@ -119,7 +119,7 @@ void *lle_hashtable_value_copy_pooled(const void *value) {
     lle_hashtable_memory_context_t *ctx = lle_get_current_memory_context();
 
     if (!value || !ctx || !ctx->pool) {
-        // Fallback to regular malloc
+        /// Fallback to regular malloc
         const char *value_str = (const char *)value;
         size_t len = strlen(value_str) + 1;
         char *new_value = malloc(len);
@@ -138,7 +138,7 @@ void *lle_hashtable_value_copy_pooled(const void *value) {
 
     memcpy(new_value, value_str, value_len);
 
-    // Update statistics
+    /// Update statistics
     ctx->allocations++;
     ctx->bytes_allocated += value_len;
 
@@ -157,7 +157,7 @@ void lle_hashtable_value_free_pooled(const void *value) {
     }
 
     if (!ctx || !ctx->pool) {
-        // Fallback to regular free
+        /// Fallback to regular free
         free((void *)value);
         return;
     }
@@ -166,7 +166,7 @@ void lle_hashtable_value_free_pooled(const void *value) {
     size_t value_len = strlen(value_str) + 1;
     lush_pool_free((void *)value);
 
-    // Update statistics
+    /// Update statistics
     ctx->deallocations++;
     ctx->bytes_freed += value_len;
 }
@@ -187,28 +187,28 @@ void lle_hashtable_config_init_default(lle_hashtable_config_t *config) {
 
     memset(config, 0, sizeof(lle_hashtable_config_t));
 
-    // Memory management defaults
+    /// Memory management defaults
     config->use_memory_pool = false;
     config->memory_pool = NULL;
 
-    // Hash configuration defaults
-    config->hash_function = NULL; // Use libhashtable default (FNV1A)
-    config->key_equality = NULL;  // Use libhashtable default
+    /// Hash configuration defaults
+    config->hash_function = NULL; /// Use libhashtable default (FNV1A)
+    config->key_equality = NULL;  /// Use libhashtable default
     config->hash_seed = 0;
     config->random_seed = true;
 
-    // Performance tuning defaults
+    /// Performance tuning defaults
     config->initial_capacity = 16;
     config->max_load_factor = 0.75;
     config->growth_factor = 2;
-    config->max_capacity = 0; // No limit
+    config->max_capacity = 0; /// No limit
 
-    // Thread safety defaults
+    /// Thread safety defaults
     config->thread_safe = false;
     config->lock_type = LLE_LOCK_NONE;
     config->allow_concurrent_reads = false;
 
-    // Monitoring defaults
+    /// Monitoring defaults
     config->performance_monitoring = false;
     config->debug_mode = false;
     config->hashtable_name = NULL;
@@ -228,7 +228,7 @@ lle_result_t lle_hashtable_config_create_pooled(lle_hashtable_config_t **config,
 
     lle_hashtable_config_init_default(cfg);
 
-    // Enable memory pool integration
+    /// Enable memory pool integration
     cfg->use_memory_pool = true;
     cfg->memory_pool = memory_pool;
     cfg->hashtable_name = name ? strdup(name) : NULL;
@@ -293,7 +293,7 @@ lle_result_t lle_hashtable_registry_add(lle_hashtable_registry_t *registry,
 
     pthread_mutex_lock(&registry->lock);
 
-    // Check if we need to grow the registry
+    /// Check if we need to grow the registry
     if (registry->count >= registry->capacity) {
         size_t new_capacity = registry->capacity * 2;
         lle_strstr_hashtable_t **new_hashtables =
@@ -323,10 +323,10 @@ lle_result_t lle_hashtable_registry_remove(lle_hashtable_registry_t *registry,
 
     pthread_mutex_lock(&registry->lock);
 
-    // Find and remove hashtable
+    /// Find and remove hashtable
     for (size_t i = 0; i < registry->count; i++) {
         if (registry->hashtables[i] == hashtable) {
-            // Shift remaining entries
+            /// Shift remaining entries
             for (size_t j = i; j < registry->count - 1; j++) {
                 registry->hashtables[j] = registry->hashtables[j + 1];
             }
@@ -356,7 +356,7 @@ lle_result_t lle_hashtable_factory_init(lle_hashtable_factory_t **factory,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize default configuration
+    /// Initialize default configuration
     f->default_config = calloc(1, sizeof(lle_hashtable_config_t));
     if (!f->default_config) {
         free(f);
@@ -365,7 +365,7 @@ lle_result_t lle_hashtable_factory_init(lle_hashtable_factory_t **factory,
 
     lle_hashtable_config_init_default(f->default_config);
 
-    // Initialize registry
+    /// Initialize registry
     lle_result_t result = lle_hashtable_registry_init(&f->registry);
     if (result != LLE_SUCCESS) {
         free(f->default_config);
@@ -376,7 +376,7 @@ lle_result_t lle_hashtable_factory_init(lle_hashtable_factory_t **factory,
     f->memory_pool = memory_pool;
     f->memory_pool_integrated = false;
 
-    // Set up default callbacks (standard malloc/free)
+    /// Set up default callbacks (standard malloc/free)
     memset(&f->default_callbacks, 0, sizeof(ht_callbacks_t));
 
     *factory = f;
@@ -409,7 +409,7 @@ lle_hashtable_integrate_memory_pool(lle_hashtable_factory_t *factory,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Set up memory pool callbacks
+    /// Set up memory pool callbacks
     factory->default_callbacks.key_copy = lle_hashtable_key_copy_pooled;
     factory->default_callbacks.key_free = lle_hashtable_key_free_pooled;
     factory->default_callbacks.val_copy = lle_hashtable_value_copy_pooled;
@@ -418,7 +418,7 @@ lle_hashtable_integrate_memory_pool(lle_hashtable_factory_t *factory,
     factory->memory_pool = memory_pool;
     factory->memory_pool_integrated = true;
 
-    // Update default config
+    /// Update default config
     factory->default_config->use_memory_pool = true;
     factory->default_config->memory_pool = memory_pool;
 
@@ -433,18 +433,18 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Use provided config or factory default
+    /// Use provided config or factory default
     const lle_hashtable_config_t *cfg =
         config ? config : factory->default_config;
 
-    // Allocate wrapper structure
+    /// Allocate wrapper structure
     lle_strstr_hashtable_t *ht_wrapper =
         calloc(1, sizeof(lle_strstr_hashtable_t));
     if (!ht_wrapper) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Store configuration
+    /// Store configuration
     ht_wrapper->config = calloc(1, sizeof(lle_hashtable_config_t));
     if (!ht_wrapper->config) {
         free(ht_wrapper);
@@ -452,7 +452,7 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
     }
     memcpy(ht_wrapper->config, cfg, sizeof(lle_hashtable_config_t));
 
-    // Create memory context if using memory pool
+    /// Create memory context if using memory pool
     if (cfg->use_memory_pool && cfg->memory_pool) {
         ht_wrapper->mem_ctx = calloc(1, sizeof(lle_hashtable_memory_context_t));
         if (!ht_wrapper->mem_ctx) {
@@ -464,11 +464,11 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
         ht_wrapper->mem_ctx->pool = cfg->memory_pool;
         ht_wrapper->mem_ctx->hashtable_name = cfg->hashtable_name;
 
-        // Set as current context for memory callbacks
+        /// Set as current context for memory callbacks
         lle_set_current_memory_context(ht_wrapper->mem_ctx);
     }
 
-    // Create underlying libhashtable
+    /// Create underlying libhashtable
     uint32_t flags = 0;
     if (cfg->random_seed) {
         flags |= HT_SEED_RANDOM;
@@ -487,7 +487,7 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
     /* Note: libhashtable callbacks are set during creation, not after.
      * For now, memory pool integration will be added in a future phase. */
 
-    // Initialize performance metrics if enabled
+    /// Initialize performance metrics if enabled
     if (cfg->performance_monitoring) {
         ht_wrapper->metrics =
             calloc(1, sizeof(lle_hashtable_performance_metrics_t));
@@ -502,7 +502,7 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
         }
     }
 
-    // Initialize thread safety if enabled (Phase 2)
+    /// Initialize thread safety if enabled (Phase 2)
     if (cfg->thread_safe) {
         ht_wrapper->lock = calloc(1, sizeof(pthread_rwlock_t));
         if (!ht_wrapper->lock) {
@@ -536,12 +536,12 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
     }
 
     ht_wrapper->name = cfg->hashtable_name;
-    ht_wrapper->entry_count = 0; // Initialize entry count
+    ht_wrapper->entry_count = 0; /// Initialize entry count
 
-    // Register with factory registry
+    /// Register with factory registry
     lle_hashtable_registry_add(factory->registry, ht_wrapper);
 
-    // Clear memory context
+    /// Clear memory context
     if (cfg->use_memory_pool) {
         lle_set_current_memory_context(NULL);
     }
@@ -558,18 +558,18 @@ lle_result_t lle_hashtable_factory_create_generic(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    // Use provided config or factory default
+    /// Use provided config or factory default
     const lle_hashtable_config_t *cfg =
         config ? config : factory->default_config;
 
-    // Allocate wrapper structure
+    /// Allocate wrapper structure
     lle_generic_hashtable_t *ht_wrapper =
         calloc(1, sizeof(lle_generic_hashtable_t));
     if (!ht_wrapper) {
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Store configuration
+    /// Store configuration
     ht_wrapper->config = calloc(1, sizeof(lle_hashtable_config_t));
     if (!ht_wrapper->config) {
         free(ht_wrapper);
@@ -577,7 +577,7 @@ lle_result_t lle_hashtable_factory_create_generic(
     }
     memcpy(ht_wrapper->config, cfg, sizeof(lle_hashtable_config_t));
 
-    // Create memory context if using memory pool
+    /// Create memory context if using memory pool
     if (cfg->use_memory_pool && cfg->memory_pool) {
         ht_wrapper->mem_ctx = calloc(1, sizeof(lle_hashtable_memory_context_t));
         if (!ht_wrapper->mem_ctx) {
@@ -589,11 +589,11 @@ lle_result_t lle_hashtable_factory_create_generic(
         ht_wrapper->mem_ctx->pool = cfg->memory_pool;
         ht_wrapper->mem_ctx->hashtable_name = cfg->hashtable_name;
 
-        // Set as current context for memory callbacks
+        /// Set as current context for memory callbacks
         lle_set_current_memory_context(ht_wrapper->mem_ctx);
     }
 
-    // Create underlying libhashtable (requires flags parameter)
+    /// Create underlying libhashtable (requires flags parameter)
     uint32_t flags = cfg->random_seed ? HT_SEED_RANDOM : 0;
     ht_wrapper->ht = ht_create(hash_func, key_eq, callbacks, flags);
     if (!ht_wrapper->ht) {
@@ -606,9 +606,9 @@ lle_result_t lle_hashtable_factory_create_generic(
     }
 
     ht_wrapper->name = cfg->hashtable_name;
-    ht_wrapper->entry_count = 0; // Initialize entry count
+    ht_wrapper->entry_count = 0; /// Initialize entry count
 
-    // Clear memory context
+    /// Clear memory context
     if (cfg->use_memory_pool) {
         lle_set_current_memory_context(NULL);
     }
@@ -646,28 +646,28 @@ lle_result_t lle_strstr_hashtable_insert(lle_strstr_hashtable_t *ht,
         start_time = lle_get_current_time_microseconds();
     }
 
-    // Set memory context if using memory pool
+    /// Set memory context if using memory pool
     if (ht->mem_ctx) {
         lle_set_current_memory_context(ht->mem_ctx);
     }
 
-    // Acquire write lock if thread-safe (Phase 2)
+    /// Acquire write lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_wrlock(ht->lock);
     }
 
-    // Check if key exists (to track new inserts vs updates)
+    /// Check if key exists (to track new inserts vs updates)
     bool key_exists = (ht_strstr_get(ht->ht, key) != NULL);
 
-    // Perform insertion
+    /// Perform insertion
     ht_strstr_insert(ht->ht, key, value);
 
-    // Update entry count if this was a new insertion
+    /// Update entry count if this was a new insertion
     if (!key_exists) {
         ht->entry_count++;
     }
 
-    // Update metrics - MUST happen inside lock to prevent race conditions
+    /// Update metrics - MUST happen inside lock to prevent race conditions
     if (ht->metrics) {
         uint64_t end_time = lle_get_current_time_microseconds();
         uint64_t duration = end_time - start_time;
@@ -683,12 +683,12 @@ lle_result_t lle_strstr_hashtable_insert(lle_strstr_hashtable_t *ht,
             ht->metrics->total_insert_time_us / ht->metrics->insert_operations;
     }
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
 
-    // Clear memory context
+    /// Clear memory context
     if (ht->mem_ctx) {
         lle_set_current_memory_context(NULL);
     }
@@ -707,15 +707,15 @@ const char *lle_strstr_hashtable_lookup(lle_strstr_hashtable_t *ht,
         start_time = lle_get_current_time_microseconds();
     }
 
-    // Acquire read lock if thread-safe (Phase 2)
+    /// Acquire read lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_rdlock(ht->lock);
     }
 
-    // Perform lookup
+    /// Perform lookup
     const char *result = ht_strstr_get(ht->ht, key);
 
-    // Update metrics - MUST happen inside lock to prevent race conditions
+    /// Update metrics - MUST happen inside lock to prevent race conditions
     if (ht->metrics) {
         uint64_t end_time = lle_get_current_time_microseconds();
         uint64_t duration = end_time - start_time;
@@ -731,7 +731,7 @@ const char *lle_strstr_hashtable_lookup(lle_strstr_hashtable_t *ht,
             ht->metrics->total_lookup_time_us / ht->metrics->lookup_operations;
     }
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
@@ -750,29 +750,29 @@ lle_result_t lle_strstr_hashtable_delete(lle_strstr_hashtable_t *ht,
         start_time = lle_get_current_time_microseconds();
     }
 
-    // Set memory context if using memory pool
+    /// Set memory context if using memory pool
     if (ht->mem_ctx) {
         lle_set_current_memory_context(ht->mem_ctx);
     }
 
-    // Acquire write lock if thread-safe (Phase 2)
+    /// Acquire write lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_wrlock(ht->lock);
     }
 
-    // Check if key exists before deletion
+    /// Check if key exists before deletion
     bool key_exists = (ht_strstr_get(ht->ht, key) != NULL);
 
-    // Perform deletion - libhashtable uses remove, not delete
+    /// Perform deletion - libhashtable uses remove, not delete
     ht_strstr_remove(ht->ht, key);
     bool deleted = key_exists;
 
-    // Update entry count if something was actually deleted
+    /// Update entry count if something was actually deleted
     if (deleted) {
         ht->entry_count--;
     }
 
-    // Update metrics - MUST happen inside lock to prevent race conditions
+    /// Update metrics - MUST happen inside lock to prevent race conditions
     if (ht->metrics) {
         uint64_t end_time = lle_get_current_time_microseconds();
         uint64_t duration = end_time - start_time;
@@ -781,12 +781,12 @@ lle_result_t lle_strstr_hashtable_delete(lle_strstr_hashtable_t *ht,
         ht->metrics->total_delete_time_us += duration;
     }
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
 
-    // Clear memory context
+    /// Clear memory context
     if (ht->mem_ctx) {
         lle_set_current_memory_context(NULL);
     }
@@ -800,15 +800,15 @@ bool lle_strstr_hashtable_contains(lle_strstr_hashtable_t *ht,
         return false;
     }
 
-    // Acquire read lock if thread-safe (Phase 2)
+    /// Acquire read lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_rdlock(ht->lock);
     }
 
-    // libhashtable doesn't have contains, use get instead
+    /// libhashtable doesn't have contains, use get instead
     const char *result = ht_strstr_get(ht->ht, key);
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
@@ -821,7 +821,7 @@ size_t lle_strstr_hashtable_size(lle_strstr_hashtable_t *ht) {
         return 0;
     }
 
-    // Acquire read lock if thread-safe (Phase 2)
+    /// Acquire read lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_rdlock(ht->lock);
     }
@@ -832,7 +832,7 @@ size_t lle_strstr_hashtable_size(lle_strstr_hashtable_t *ht) {
      * chains */
     size_t count = ht->entry_count;
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
@@ -849,21 +849,21 @@ void lle_strstr_hashtable_clear(lle_strstr_hashtable_t *ht) {
         return;
     }
 
-    // Set memory context if using memory pool
+    /// Set memory context if using memory pool
     if (ht->mem_ctx) {
         lle_set_current_memory_context(ht->mem_ctx);
     }
 
-    // Acquire write lock if thread-safe (Phase 2)
+    /// Acquire write lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_wrlock(ht->lock);
     }
 
-    // libhashtable doesn't have clear, enumerate and remove all entries
+    /// libhashtable doesn't have clear, enumerate and remove all entries
     ht_enum_t *enumerator = ht_strstr_enum_create(ht->ht);
     if (enumerator) {
         const char *key, *value;
-        // Collect keys first to avoid modifying during enumeration
+        /// Collect keys first to avoid modifying during enumeration
         char **keys = NULL;
         size_t key_count = 0;
         size_t key_capacity = 16;
@@ -882,7 +882,7 @@ void lle_strstr_hashtable_clear(lle_strstr_hashtable_t *ht) {
                 keys[key_count++] = strdup(key);
             }
 
-            // Now remove all keys
+            /// Now remove all keys
             for (size_t i = 0; i < key_count; i++) {
                 ht_strstr_remove(ht->ht, keys[i]);
                 free(keys[i]);
@@ -892,15 +892,15 @@ void lle_strstr_hashtable_clear(lle_strstr_hashtable_t *ht) {
         ht_strstr_enum_destroy(enumerator);
     }
 
-    // Reset entry count
+    /// Reset entry count
     ht->entry_count = 0;
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
 
-    // Clear memory context
+    /// Clear memory context
     if (ht->mem_ctx) {
         lle_set_current_memory_context(NULL);
     }
@@ -915,34 +915,34 @@ void lle_strstr_hashtable_destroy(lle_strstr_hashtable_t *ht) {
         return;
     }
 
-    // Set memory context if using memory pool
+    /// Set memory context if using memory pool
     if (ht->mem_ctx) {
         lle_set_current_memory_context(ht->mem_ctx);
     }
 
-    // Destroy underlying hashtable
+    /// Destroy underlying hashtable
     if (ht->ht) {
         ht_strstr_destroy(ht->ht);
     }
 
-    // Clear memory context
+    /// Clear memory context
     if (ht->mem_ctx) {
         lle_set_current_memory_context(NULL);
         free(ht->mem_ctx);
     }
 
-    // Destroy thread safety lock (Phase 2)
+    /// Destroy thread safety lock (Phase 2)
     if (ht->lock) {
         pthread_rwlock_destroy(ht->lock);
         free(ht->lock);
     }
 
-    // Free metrics (Phase 1)
+    /// Free metrics (Phase 1)
     if (ht->metrics) {
         free(ht->metrics);
     }
 
-    // Free configuration
+    /// Free configuration
     if (ht->config) {
         free(ht->config);
     }
@@ -966,14 +966,14 @@ lle_hashtable_get_metrics(lle_strstr_hashtable_t *ht,
         return LLE_ERROR_FEATURE_DISABLED;
     }
 
-    // Acquire read lock if thread-safe (Phase 2)
+    /// Acquire read lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_rdlock(ht->lock);
     }
 
     memcpy(metrics, ht->metrics, sizeof(lle_hashtable_performance_metrics_t));
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
@@ -990,14 +990,14 @@ void lle_hashtable_reset_metrics(lle_strstr_hashtable_t *ht) {
         return;
     }
 
-    // Acquire write lock if thread-safe (Phase 2)
+    /// Acquire write lock if thread-safe (Phase 2)
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_wrlock(ht->lock);
     }
 
     memset(ht->metrics, 0, sizeof(lle_hashtable_performance_metrics_t));
 
-    // Release lock if thread-safe
+    /// Release lock if thread-safe
     if (ht->is_concurrent && ht->lock) {
         pthread_rwlock_unlock(ht->lock);
     }
@@ -1019,7 +1019,7 @@ lle_result_t lle_hashtable_system_init(lle_hashtable_system_t **system,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Initialize factory
+    /// Initialize factory
     lle_result_t result =
         lle_hashtable_factory_init(&sys->factory, memory_pool);
     if (result != LLE_SUCCESS) {
@@ -1027,7 +1027,7 @@ lle_result_t lle_hashtable_system_init(lle_hashtable_system_t **system,
         return result;
     }
 
-    // Integrate memory pool if provided
+    /// Integrate memory pool if provided
     if (memory_pool) {
         result = lle_hashtable_integrate_memory_pool(sys->factory, memory_pool);
         if (result != LLE_SUCCESS) {
@@ -1040,14 +1040,14 @@ lle_result_t lle_hashtable_system_init(lle_hashtable_system_t **system,
     sys->memory_pool = memory_pool;
     sys->registry = sys->factory->registry;
 
-    // Initialize default configuration
+    /// Initialize default configuration
     lle_hashtable_config_init_default(&sys->default_config);
     if (memory_pool) {
         sys->default_config.use_memory_pool = true;
         sys->default_config.memory_pool = memory_pool;
     }
 
-    sys->monitor = NULL; // Phase 3: Advanced monitoring
+    sys->monitor = NULL; /// Phase 3: Advanced monitoring
     sys->initialized = true;
 
     *system = sys;
@@ -1067,7 +1067,7 @@ void lle_hashtable_system_destroy(lle_hashtable_system_t *system) {
         lle_hashtable_factory_destroy(system->factory);
     }
 
-    // Note: registry is owned by factory, don't destroy separately
+    /// Note: registry is owned by factory, don't destroy separately
 
     free(system);
 }

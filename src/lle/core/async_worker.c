@@ -149,7 +149,7 @@ lle_result_t lle_async_worker_destroy(lle_async_worker_t *worker) {
         return LLE_SUCCESS;
     }
 
-    // Free any pending requests
+    /// Free any pending requests
     pthread_mutex_lock(&worker->queue_mutex);
     lle_async_request_t *req = worker->queue_head;
     while (req) {
@@ -182,7 +182,7 @@ lle_async_request_t *lle_async_request_create(lle_async_request_type_t type) {
 
     req->type = type;
     req->timeout_ms = LLE_ASYNC_DEFAULT_TIMEOUT_MS;
-    req->id = 0; // Assigned by worker on submit
+    req->id = 0; /// Assigned by worker on submit
     req->next = NULL;
     req->user_data = NULL;
     req->cwd[0] = '\0';
@@ -210,11 +210,11 @@ lle_result_t lle_async_worker_submit(lle_async_worker_t *worker,
         return LLE_ERROR_RESOURCE_EXHAUSTED;
     }
 
-    // Assign request ID
+    /// Assign request ID
     request->id = worker->next_request_id++;
     request->next = NULL;
 
-    // Enqueue
+    /// Enqueue
     if (worker->queue_tail) {
         worker->queue_tail->next = request;
     } else {
@@ -296,7 +296,7 @@ static void *lle_async_worker_thread(void *arg) {
     while (1) {
         lle_async_request_t *request = NULL;
 
-        // Wait for work
+        /// Wait for work
         pthread_mutex_lock(&worker->queue_mutex);
         while (worker->queue_head == NULL && !worker->shutdown_requested) {
             pthread_cond_wait(&worker->queue_cond, &worker->queue_mutex);
@@ -307,7 +307,7 @@ static void *lle_async_worker_thread(void *arg) {
             break;
         }
 
-        // Dequeue request
+        /// Dequeue request
         request = worker->queue_head;
         if (request) {
             worker->queue_head = request->next;
@@ -322,7 +322,7 @@ static void *lle_async_worker_thread(void *arg) {
             continue;
         }
 
-        // Process request
+        /// Process request
         lle_async_response_t response;
         memset(&response, 0, sizeof(response));
         response.id = request->id;
@@ -334,7 +334,7 @@ static void *lle_async_worker_thread(void *arg) {
             break;
 
         case LLE_ASYNC_CUSTOM:
-            // Custom requests not yet implemented
+            /// Custom requests not yet implemented
             response.result = LLE_ERROR_FEATURE_NOT_AVAILABLE;
             break;
 
@@ -349,7 +349,7 @@ static void *lle_async_worker_thread(void *arg) {
         worker->total_completed++;
         pthread_mutex_unlock(&worker->queue_mutex);
 
-        // Notify completion
+        /// Notify completion
         if (worker->on_complete) {
             worker->on_complete(&response, worker->callback_user_data);
         }
@@ -411,25 +411,25 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
 
     memset(status, 0, sizeof(*status));
 
-    // Check if in git repo
+    /// Check if in git repo
     if (!run_git_in_dir(cwd, "rev-parse --git-dir", NULL, 0, timeout_ms)) {
         status->is_git_repo = false;
         return LLE_SUCCESS;
     }
     status->is_git_repo = true;
 
-    // Get branch name
+    /// Get branch name
     if (run_git_in_dir(cwd, "branch --show-current", status->branch,
                        sizeof(status->branch), timeout_ms)) {
-        // branch is set
+        /// branch is set
     } else {
-        // Might be detached HEAD
+        /// Might be detached HEAD
         status->is_detached = true;
         run_git_in_dir(cwd, "rev-parse --short HEAD", status->commit,
                        sizeof(status->commit), timeout_ms);
     }
 
-    // Check for detached HEAD explicitly
+    /// Check for detached HEAD explicitly
     char head_ref[256] = {0};
     if (run_git_in_dir(cwd, "symbolic-ref HEAD", head_ref, sizeof(head_ref),
                        timeout_ms)) {
@@ -438,13 +438,13 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
         status->is_detached = true;
     }
 
-    // Get short commit hash
+    /// Get short commit hash
     if (status->commit[0] == '\0') {
         run_git_in_dir(cwd, "rev-parse --short HEAD", status->commit,
                        sizeof(status->commit), timeout_ms);
     }
 
-    // Get status counts using git status --porcelain
+    /// Get status counts using git status --porcelain
     status->staged_count = 0;
     status->unstaged_count = 0;
     status->untracked_count = 0;
@@ -452,7 +452,7 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
     char porcelain[8192] = {0};
     if (run_git_in_dir(cwd, "status --porcelain", porcelain, sizeof(porcelain),
                        timeout_ms)) {
-        // Parse porcelain output line by line
+        /// Parse porcelain output line by line
         char *line = porcelain;
         while (*line) {
             if (line[0] == '?') {
@@ -465,7 +465,7 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
                     status->unstaged_count++;
                 }
             }
-            // Advance to next line
+            /// Advance to next line
             char *nl = strchr(line, '\n');
             if (nl) {
                 line = nl + 1;
@@ -475,18 +475,18 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
         }
     }
 
-    // Check ahead/behind counts
+    /// Check ahead/behind counts
     char ahead_behind[64] = {0};
     if (run_git_in_dir(cwd, "rev-list --left-right --count HEAD...@{upstream}",
                        ahead_behind, sizeof(ahead_behind), timeout_ms)) {
         sscanf(ahead_behind, "%d %d", &status->ahead, &status->behind);
     }
 
-    // Check for merge in progress using git rev-parse
+    /// Check for merge in progress using git rev-parse
     char git_dir[512] = {0};
     if (run_git_in_dir(cwd, "rev-parse --git-dir", git_dir, sizeof(git_dir),
                        timeout_ms)) {
-        // Build absolute path if git_dir is relative
+        /// Build absolute path if git_dir is relative
         char merge_path[1024];
         char rebase_merge_path[1024];
         char rebase_apply_path[1024];
@@ -506,7 +506,7 @@ static lle_result_t lle_async_get_git_status(const char *cwd,
                      "%s/%s/rebase-apply", cwd, git_dir);
         }
 
-        // Use access() for non-blocking file existence check
+        /// Use access() for non-blocking file existence check
         if (access(merge_path, F_OK) == 0) {
             status->is_merging = true;
         }
