@@ -575,84 +575,51 @@ int autocorrect_suggest_functions(executor_t *executor, const char *command,
 /**
  * @brief Fast pre-filter using Damerau-Levenshtein distance
  *
- * Quickly eliminates candidates that are too different before
- * doing expensive Unicode-aware fuzzy matching. Uses Damerau-Levenshtein
- * which counts transpositions (like gti->git) as 1 edit, not 2.
+ * Quickly eliminates candidates that are too different before doing
+ * expensive Unicode-aware fuzzy matching. Delegates to libfuzzy's
+ * Damerau-Levenshtein, which iterates codepoints (not bytes) and
+ * case-folds via the project's Unicode case table -- so names like
+ * "Café" / "café" or "naïve" / "Naïve" are correctly identified
+ * as near-matches in the PATH scan.
  *
- * @param s1 First string
- * @param s2 Second string
+ * The codepoint-length cap of FAST_EDIT_DISTANCE_CP_CAP keeps the
+ * pre-filter bounded for absurd dirents (the libfuzzy matrix is
+ * O(len1*len2) heap allocations); 32 codepoints comfortably covers
+ * any reasonable command name in any script (POSIX shell variable
+ * names are also capped at this magnitude in practice).
+ *
+ * @param s1 First string (UTF-8)
+ * @param s2 Second string (UTF-8)
  * @param max_dist Maximum distance to consider (returns max_dist+1 if exceeded)
  * @return Edit distance, or max_dist+1 if too different
  */
+#define FAST_EDIT_DISTANCE_CP_CAP 32
+
 static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
-    size_t len1 = strlen(s1);
-    size_t len2 = strlen(s2);
+    fuzzy_match_options_t opts = FUZZY_MATCH_DEFAULT;
+    opts.case_sensitive = false;
+    opts.use_damerau = true;
+    opts.max_distance = max_dist;
 
-    /// Quick length check
-    if (len1 > 32 || len2 > 32)
+    /// Bound the matrix allocation against pathological dirents.
+    /// fuzzy_string_length counts codepoints (after optional NFC
+    /// normalisation per opts), so a 33-codepoint Cyrillic name and
+    /// a 33-character ASCII name are treated identically -- unlike
+    /// the prior byte cap which would reject the Cyrillic name at
+    /// roughly half the visible length.
+    int cp1 = fuzzy_string_length(s1, &opts);
+    int cp2 = fuzzy_string_length(s2, &opts);
+    if (cp1 > FAST_EDIT_DISTANCE_CP_CAP || cp2 > FAST_EDIT_DISTANCE_CP_CAP) {
         return max_dist + 1;
-    int len_diff = (int)len1 - (int)len2;
-    if (len_diff < 0)
-        len_diff = -len_diff;
-    if (len_diff > max_dist)
-        return max_dist + 1;
-
-    /// Full matrix for Damerau-Levenshtein (need prev-prev row for
-    /// transpositions)
-    int matrix[34][34];
-
-    for (size_t i = 0; i <= len1; i++)
-        matrix[i][0] = (int)i;
-    for (size_t j = 0; j <= len2; j++)
-        matrix[0][j] = (int)j;
-
-    for (size_t i = 1; i <= len1; i++) {
-        int row_min = (int)i;
-
-        for (size_t j = 1; j <= len2; j++) {
-            /// Case-insensitive comparison
-            char c1 = s1[i - 1];
-            char c2 = s2[j - 1];
-            if (c1 >= 'A' && c1 <= 'Z')
-                c1 += 32;
-            if (c2 >= 'A' && c2 <= 'Z')
-                c2 += 32;
-
-            int cost = (c1 == c2) ? 0 : 1;
-            int del = matrix[i - 1][j] + 1;
-            int ins = matrix[i][j - 1] + 1;
-            int sub = matrix[i - 1][j - 1] + cost;
-
-            int min_val =
-                del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
-
-            /// Check for transposition (Damerau extension)
-            if (i > 1 && j > 1) {
-                char prev_c1 = s1[i - 2];
-                char prev_c2 = s2[j - 2];
-                if (prev_c1 >= 'A' && prev_c1 <= 'Z')
-                    prev_c1 += 32;
-                if (prev_c2 >= 'A' && prev_c2 <= 'Z')
-                    prev_c2 += 32;
-
-                if (c1 == prev_c2 && c2 == prev_c1) {
-                    int trans = matrix[i - 2][j - 2] + 1;
-                    if (trans < min_val)
-                        min_val = trans;
-                }
-            }
-
-            matrix[i][j] = min_val;
-            if (min_val < row_min)
-                row_min = min_val;
-        }
-
-        /// Early termination if entire row exceeds threshold
-        if (row_min > max_dist)
-            return max_dist + 1;
     }
-
-    return matrix[len1][len2];
+    int len_diff = cp1 - cp2;
+    if (len_diff < 0) {
+        len_diff = -len_diff;
+    }
+    if (len_diff > max_dist) {
+        return max_dist + 1;
+    }
+    return fuzzy_damerau_levenshtein_distance(s1, s2, &opts);
 }
 
 int autocorrect_suggest_path_commands(const char *command,

@@ -248,6 +248,51 @@ TEST(similarity_score_case_insensitive) {
     ASSERT(score >= 90, "Case insensitive identical should match");
 }
 
+TEST(levenshtein_unicode_case_insensitive_latin1) {
+    /// Latin-1 Supplement: É (U+00C9) folds to é (U+00E9). The byte
+    /// length differs from codepoint length, so a byte-by-byte fold
+    /// would mismatch even between identical inputs of opposite case.
+    int dist = autocorrect_levenshtein_distance("café", "CAFÉ");
+    ASSERT_EQ(dist, 0, "Case-insensitive Café/CAFÉ should fold to distance 0");
+}
+
+TEST(levenshtein_unicode_one_codepoint_typo) {
+    /// One-codepoint substitution at a non-ASCII position.
+    /// "café" -> "cafe": é (multi-byte) replaced by ASCII e. A bytewise
+    /// Levenshtein would count the multi-byte difference as two edits
+    /// (one per replaced byte) plus a deletion; codepoint-wise this
+    /// is one substitution.
+    int dist = autocorrect_levenshtein_distance("café", "cafe");
+    ASSERT_EQ(dist, 1, "café -> cafe should be one codepoint substitution");
+}
+
+TEST(levenshtein_unicode_extended_a) {
+    /// Latin Extended-A: Č (U+010C) folds to č (U+010D). Without the
+    /// lle_unicode_tolower_codepoint path, libfuzzy's prior fold only
+    /// covered ASCII + Latin-1 Supplement and would mishandle this.
+    int dist = autocorrect_levenshtein_distance("ČAJ", "čaj");
+    ASSERT_EQ(dist, 0, "Latin Extended-A case-fold should match identically");
+}
+
+TEST(levenshtein_unicode_greek) {
+    /// Greek: Α (U+0391) folds to α (U+03B1). Same reasoning -- prior
+    /// code wouldn't have touched Greek codepoints.
+    int dist = autocorrect_levenshtein_distance("ΑΒΓ", "αβγ");
+    ASSERT_EQ(dist, 0, "Greek case-fold should match identically");
+}
+
+TEST(levenshtein_unicode_codepoint_distance_not_byte) {
+    /// "café" is 4 codepoints / 5 bytes. "naïve" is 5 codepoints / 6
+    /// bytes. The edit distance should reflect codepoint differences,
+    /// not byte differences: substitutions on c/n, a/n... vs a, f/i,
+    /// é/v, plus an insertion of e -- net 4 edits over codepoints.
+    /// A bytewise count would inflate this past the codepoint figure
+    /// because the multi-byte é and ï each look like multiple byte
+    /// edits.
+    int dist = autocorrect_levenshtein_distance("café", "naïve");
+    ASSERT(dist <= 5, "Codepoint-level distance should be bounded by max len");
+}
+
 /* ============================================================================
  * SUGGESTION TESTS
  * ============================================================================
@@ -504,6 +549,11 @@ int main(void) {
     RUN_TEST(similarity_score_identical);
     RUN_TEST(similarity_score_typo);
     RUN_TEST(similarity_score_case_insensitive);
+    RUN_TEST(levenshtein_unicode_case_insensitive_latin1);
+    RUN_TEST(levenshtein_unicode_one_codepoint_typo);
+    RUN_TEST(levenshtein_unicode_extended_a);
+    RUN_TEST(levenshtein_unicode_greek);
+    RUN_TEST(levenshtein_unicode_codepoint_distance_not_byte);
 
     /// Suggestion tests
     printf("\nSuggestion Tests:\n");
