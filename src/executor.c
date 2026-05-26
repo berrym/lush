@@ -10364,22 +10364,28 @@ static char *convert_case_first_lower(const char *str) {
 /**
  * @brief Pattern-restricted case modification
  *
- * Bash `${var^^[pat]}` / `${var,,[pat]}` / `${var^[pat]}` / `${var,[pat]}`
+ * `${var^^[pat]}` / `${var,,[pat]}` / `${var^[pat]}` / `${var,[pat]}`
  * apply case conversion only to characters that match `pattern`.
- * `pattern` is fnmatch-style and matched single-character against each
- * byte. If `first_only` is true, only the first matching character is
- * converted (the `^` / `,` operators); otherwise all matches convert
- * (`^^` / `,,`).
+ * `pattern` is fnmatch-style and matched against each codepoint's
+ * UTF-8 byte sequence. If `first_only` is true, only the first matching
+ * codepoint is converted (the `^` / `,` operators); otherwise all
+ * matches convert (`^^` / `,,`).
  *
- * Pattern restriction operates byte-by-byte; bash itself documents the
- * feature as glob-pattern based and does not support Unicode-aware
- * pattern matching here. Issue #96.
+ * Iteration is by codepoint via lle_utf8_decode_codepoint; case
+ * mapping goes through lle_unicode_toupper_codepoint /
+ * lle_unicode_tolower_codepoint so non-ASCII letters convert correctly.
+ * Pattern matching is fnmatch against the codepoint's UTF-8 bytes:
+ * ASCII patterns like `[aeiou]` and Unicode patterns like `[äöü]`
+ * both work; full Unicode general-category char-classes
+ * (`[[:alpha:]]`) are still byte-class-bound in the matcher — that
+ * is a separate audit item (see UNICODE_AUDIT_WORKLIST.md C-verdict
+ * #2).
  *
  * @param str Input string
  * @param pattern Glob pattern (may be NULL/empty -- treated as "any char")
  * @param to_upper true for uppercase conversion, false for lowercase
  * @param first_only true for `^` / `,`, false for `^^` / `,,`
- * @return Newly malloc'd converted string
+ * @return Newly malloc'd converted string (caller frees with free())
  */
 static char *convert_case_pattern(const char *str, const char *pattern,
                                   bool to_upper, bool first_only) {
@@ -10387,34 +10393,77 @@ static char *convert_case_pattern(const char *str, const char *pattern,
         return strdup("");
     }
     size_t len = strlen(str);
-    char *result = malloc(len + 1);
+    if (len == 0) {
+        return strdup("");
+    }
+    /// Unicode case mapping can produce more bytes than the input
+    /// (a single codepoint can map to a longer sequence), so over-
+    /// allocate to UTF-8 worst-case 4x input + NUL.
+    size_t out_cap = len * 4 + 1;
+    char *result = malloc(out_cap);
     if (!result) {
         return strdup("");
     }
     bool any_pattern = (pattern && pattern[0]);
-    for (size_t i = 0; i < len; i++) {
-        char c = str[i];
+
+    size_t in_pos = 0;
+    size_t out_pos = 0;
+    size_t cp_index = 0;
+    while (in_pos < len) {
+        uint32_t cp;
+        int consumed =
+            lle_utf8_decode_codepoint(str + in_pos, len - in_pos, &cp);
+        if (consumed <= 0) {
+            /// Malformed UTF-8: copy the byte through unchanged and advance
+            /// one. Defensive — most input is well-formed.
+            if (out_pos < out_cap - 1) {
+                result[out_pos++] = str[in_pos];
+            }
+            in_pos++;
+            continue;
+        }
+
         bool should_convert;
-        if (first_only && i > 0) {
-            /// Per bash spec: `^pat` / `,pat` only inspect the first
-            /// character of the expanded value; subsequent characters
-            /// are copied unchanged regardless of whether they would
-            /// match the pattern.
+        if (first_only && cp_index > 0) {
+            /// `^pat` / `,pat` only inspect the first codepoint of the
+            /// expanded value; subsequent codepoints copy through.
             should_convert = false;
         } else if (!any_pattern) {
             should_convert = true;
         } else {
-            char buf[2] = {c, '\0'};
-            should_convert = (fnmatch(pattern, buf, 0) == 0);
+            char utf8_buf[5] = {0};
+            int enc = lle_utf8_encode_codepoint(cp, utf8_buf);
+            if (enc <= 0) {
+                should_convert = false;
+            } else {
+                utf8_buf[enc] = '\0';
+                should_convert = (fnmatch(pattern, utf8_buf, 0) == 0);
+            }
         }
+
+        uint32_t out_cp = cp;
         if (should_convert) {
-            result[i] = to_upper ? (char)toupper((unsigned char)c)
-                                 : (char)tolower((unsigned char)c);
-        } else {
-            result[i] = c;
+            out_cp = to_upper ? lle_unicode_toupper_codepoint(cp)
+                              : lle_unicode_tolower_codepoint(cp);
         }
+
+        char enc_buf[4];
+        int enc_len = lle_utf8_encode_codepoint(out_cp, enc_buf);
+        if (enc_len <= 0) {
+            /// Encoder failure: emit the original bytes verbatim.
+            for (int k = 0; k < consumed && out_pos < out_cap - 1; k++) {
+                result[out_pos++] = str[in_pos + k];
+            }
+        } else {
+            for (int k = 0; k < enc_len && out_pos < out_cap - 1; k++) {
+                result[out_pos++] = enc_buf[k];
+            }
+        }
+
+        in_pos += (size_t)consumed;
+        cp_index++;
     }
-    result[len] = '\0';
+    result[out_pos] = '\0';
     return result;
 }
 
