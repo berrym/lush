@@ -18,6 +18,7 @@
 #include "errors.h"
 #include "executor.h"
 #include "init.h"
+#include "lle/lle_pager.h"
 #include "lle/lle_shell_integration.h"
 #include "lush.h"
 #include "shell_error.h"
@@ -384,14 +385,20 @@ static option_mapping_t *find_option_by_short(char opt) {
 }
 
 /**
- * @brief Print a shell variable value with proper POSIX quoting
+ * @brief Write a shell variable value to `out` with POSIX quoting
  *
- * @param key Variable name
+ * Writes into an arbitrary FILE* so the same formatter can target
+ * an open_memstream buffer (paginated path) or stdout directly
+ * (fallback path), without two copies of the quoting logic.
+ *
+ * @param out   Destination stream
+ * @param key   Variable name
  * @param value Variable value (already extracted, not raw encoded)
  */
-static void print_variable_quoted(const char *key, const char *value) {
+static void print_variable_quoted(FILE *out, const char *key,
+                                  const char *value) {
     if (!value) {
-        printf("%s=''\n", key);
+        fprintf(out, "%s=''\n", key);
         return;
     }
 
@@ -410,35 +417,34 @@ static void print_variable_quoted(const char *key, const char *value) {
 
     if (needs_quote) {
         /// Use single quotes, escaping any single quotes in value
-        printf("%s='", key);
+        fprintf(out, "%s='", key);
         for (const char *p = value; *p; p++) {
             if (*p == '\'') {
-                printf("'\\''"); /// End quote, escaped quote, start quote
+                fputs("'\\''", out); /// End quote, escaped quote, start quote
             } else {
-                putchar(*p);
+                fputc(*p, out);
             }
         }
-        printf("'\n");
+        fputs("'\n", out);
     } else {
-        printf("%s=%s\n", key, value);
+        fprintf(out, "%s=%s\n", key, value);
     }
 }
 
 /**
  * @brief Callback for printing a single shell variable
  *
- * Used by symtable_enumerate_global_vars to print each variable
- * in POSIX format: NAME=VALUE (with proper quoting for special chars).
+ * Used by symtable_enumerate_global_vars to write each variable in
+ * POSIX `NAME=VALUE` format to the FILE* threaded through `userdata`.
  *
- * @param key Variable name
- * @param value Variable value (already clean, no metadata)
- * @param userdata Unused
+ * @param key      Variable name
+ * @param value    Variable value (already clean, no metadata)
+ * @param userdata Destination FILE* (must not be NULL)
  */
 static void print_variable_callback(const char *key, const char *value,
                                     void *userdata) {
-    (void)userdata;
-
-    if (!key) {
+    FILE *out = (FILE *)userdata;
+    if (!out || !key) {
         return;
     }
 
@@ -447,17 +453,32 @@ static void print_variable_callback(const char *key, const char *value,
         return;
     }
 
-    print_variable_quoted(key, value);
+    print_variable_quoted(out, key, value);
 }
 
 /**
  * @brief Print all shell variables (POSIX 'set' with no arguments)
  *
- * Enumerates and prints all shell variables in NAME=VALUE format.
- * This is the POSIX-required behavior for 'set' with no arguments.
+ * Builds the full `NAME=VALUE` listing into an open_memstream heap
+ * buffer and hands the buffer to lle_pager_present, so long
+ * environments paginate in interactive shells. The pager's decision
+ * tree picks between paginating and streaming directly (non-tty,
+ * disabled master switch, or content that fits in one screen).
+ * On open_memstream allocation failure the function falls back to
+ * the prior stdout-streaming path so the listing still surfaces.
  */
 static void print_all_shell_variables(void) {
-    symtable_enumerate_global_vars(print_variable_callback, NULL);
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    if (!out) {
+        symtable_enumerate_global_vars(print_variable_callback, stdout);
+        return;
+    }
+    symtable_enumerate_global_vars(print_variable_callback, out);
+    fclose(out);
+    lle_pager_present(NULL, buf);
+    free(buf);
 }
 
 /**
@@ -553,16 +574,31 @@ int builtin_set(char **args) {
                     }
                 }
             } else {
-                /// No argument - show all options including shell mode
-                printf("Current shell options:\n");
+                /// No argument - show all options including shell mode.
+                /// Buffered through open_memstream + lle_pager_present so
+                /// the ~30-option listing paginates when it overflows a
+                /// small terminal; fits-in-one-screen and non-tty cases
+                /// stream through unchanged.
+                char *opts_buf = NULL;
+                size_t opts_len = 0;
+                FILE *opts_out = open_memstream(&opts_buf, &opts_len);
+                FILE *sink = opts_out ? opts_out : stdout;
+                fprintf(sink, "Current shell options:\n");
                 for (int j = 0; option_map[j].name; j++) {
-                    printf("set %co %s\n", *(option_map[j].flag) ? '-' : '+',
-                           option_map[j].name);
+                    fprintf(sink, "set %co %s\n",
+                            *(option_map[j].flag) ? '-' : '+',
+                            option_map[j].name);
                 }
                 /// Also show current shell mode (use the `mode` builtin to
                 /// change it; `set -o posix` is the bash-bridge alias).
-                printf("(shell mode: %s -- use `mode` builtin to change)\n",
-                       shell_mode_name(shell_mode_get()));
+                fprintf(sink,
+                        "(shell mode: %s -- use `mode` builtin to change)\n",
+                        shell_mode_name(shell_mode_get()));
+                if (opts_out) {
+                    fclose(opts_out);
+                    lle_pager_present(NULL, opts_buf);
+                    free(opts_buf);
+                }
                 return 0;
             }
         } else if (strcmp(arg, "+o") == 0) {
