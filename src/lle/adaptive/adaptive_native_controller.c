@@ -738,8 +738,8 @@ lle_result_t lle_native_read_line(lle_native_controller_t *native,
     }
     lle_native_buffer_flush(native);
 
-    /* Read line using simple fgets for now (full implementation would use raw
-     * input) */
+    /// Read line using simple fgets for now (full implementation would use raw
+    /// input)
     lle_native_exit_raw_mode(native);
 
     char buffer[4096];

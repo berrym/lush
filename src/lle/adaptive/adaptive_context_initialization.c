@@ -371,9 +371,9 @@ lle_result_t lle_create_adaptive_interface(lle_adaptive_interface_t **interface,
     result = lle_initialize_adaptive_context(&context, detection, NULL);
 
     if (result != LLE_SUCCESS) {
-        /* Do NOT destroy detection - the optimized version returns a cached
-         * result that is managed internally. Destroying it could cause
-         * double-free if the cache was refreshed. */
+        /// Do NOT destroy detection - the optimized version returns a cached
+        /// result that is managed internally. Destroying it could cause
+        /// double-free if the cache was refreshed.
         return result;
     }
 
@@ -440,18 +440,16 @@ bool lle_adaptive_should_shell_be_interactive(bool forced_interactive,
         return false;
     }
 
-    /*
-     * CRITICAL: Check if stdin is a pipe or regular file BEFORE calling
-     * comprehensive detection. Piped input (echo "cmd" | lush) must
-     * NEVER be treated as interactive, even if stdout is a TTY.
-     *
-     * The comprehensive detection is designed for editor terminals
-     * (VS Code, Zed, Cursor) which have non-TTY stdin but should still
-     * be interactive. However, those cases are detected via terminal
-     * signature matching and environment variables, not just TTY status.
-     *
-     * A simple pipe has no such signatures, so we check for pipes first.
-     */
+    /// CRITICAL: Check if stdin is a pipe or regular file BEFORE calling
+    /// comprehensive detection. Piped input (echo "cmd" | lush) must
+    /// NEVER be treated as interactive, even if stdout is a TTY.
+    ///
+    /// The comprehensive detection is designed for editor terminals
+    /// (VS Code, Zed, Cursor) which have non-TTY stdin but should still
+    /// be interactive. However, those cases are detected via terminal
+    /// signature matching and environment variables, not just TTY status.
+    ///
+    /// A simple pipe has no such signatures, so we check for pipes first.
     struct stat stdin_stat;
     if (fstat(STDIN_FILENO, &stdin_stat) == 0) {
         // Pipes and FIFOs are never interactive

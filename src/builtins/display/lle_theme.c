@@ -81,8 +81,7 @@ int display_lle_theme(int argc, char **argv) {
         }
 
         const char *theme_name = argv[2];
-        /* Use lle_composer_set_theme to properly clear cached templates
-         */
+        /// Use lle_composer_set_theme to properly clear cached templates
         lle_result_t result = lle_composer_set_theme(
             g_lle_integration->prompt_composer, theme_name);
 

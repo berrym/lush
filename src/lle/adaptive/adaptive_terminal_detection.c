@@ -75,7 +75,7 @@ static bool pattern_match(const char *pattern, const char *string) {
             p++;
             s++;
         } else if (star) {
-            /* Backtrack to * */
+            /// Backtrack to *
             p = star + 1;
             s = ++ss;
         } else {
@@ -275,12 +275,10 @@ static bool probe_capability_with_timeout(const char *query, int timeout_ms) {
 lle_result_t lle_probe_terminal_capabilities_safe(
     lle_terminal_detection_result_t *detection) {
 
-    /* Cannot probe without stdout TTY - mark as unsuccessful but not an error
-     */
+    /// Cannot probe without stdout TTY - mark as unsuccessful but not an error
     if (!detection->stdout_is_tty) {
         detection->probing_successful = false;
-        /* Set all probe flags to false - this is complete behavior for non-TTY
-         */
+        /// Set all probe flags to false - this is complete behavior for non-TTY
         detection->supports_cursor_positioning = false;
         detection->supports_cursor_queries = false;
         detection->supports_bracketed_paste = false;
@@ -429,11 +427,11 @@ lle_result_t lle_detect_terminal_capabilities_comprehensive(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Allocate detection result using standard malloc, not the pool.
-     * This is intentional: the detection result is cached as a singleton
-     * and may outlive pool shutdown. Using the pool would cause double-free
-     * or use-after-free when the pool is cleaned up while cached_result
-     * still holds a reference. */
+    /// Allocate detection result using standard malloc, not the pool.
+    /// This is intentional: the detection result is cached as a singleton
+    /// and may outlive pool shutdown. Using the pool would cause double-free
+    /// or use-after-free when the pool is cleaned up while cached_result
+    /// still holds a reference.
     lle_terminal_detection_result_t *detection =
         calloc(1, sizeof(lle_terminal_detection_result_t));
     if (!detection) {
@@ -774,8 +772,8 @@ void lle_terminal_reset(void) {
         return;
     }
 
-    /* Reset all attributes, show cursor, move to new line.
-     * Best-effort terminal cleanup; nothing useful to do on failure. */
+    /// Reset all attributes, show cursor, move to new line.
+    /// Best-effort terminal cleanup; nothing useful to do on failure.
     static const char reset_seq[] = "\x1b[0m\x1b[?25h\n";
     (void)!write(STDOUT_FILENO, reset_seq, sizeof(reset_seq) - 1);
 }

@@ -96,8 +96,8 @@ void lle_display_content_destroy(lle_display_content_t *content) {
         return;
     }
 
-    /* Free all lines - use line_capacity, not line_count, since all lines
-     * up to capacity have content buffers allocated during creation */
+    /// Free all lines - use line_capacity, not line_count, since all lines
+    /// up to capacity have content buffers allocated during creation
     if (content->lines) {
         for (size_t i = 0; i < content->line_capacity; i++) {
             if (content->lines[i].content) {

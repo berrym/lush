@@ -244,8 +244,8 @@ static int test_color_from_basic_max_value(void) {
 
 static int test_create_null_base_terminal(void) {
     terminal_control_t *tc = terminal_control_create(NULL);
-    /* Should handle NULL gracefully - either return NULL or create with NULL
-     * base */
+    /// Should handle NULL gracefully - either return NULL or create with NULL
+    /// base
     /// Implementation may vary
     if (tc) {
         terminal_control_destroy(tc);
@@ -437,8 +437,7 @@ static int test_generate_cursor_sequence_null_control(void) {
 }
 
 static int test_generate_cursor_sequence_null_buffer(void) {
-    /* Can't test without a valid control, but test that NULL buffer is handled
-     */
+    /// Can't test without a valid control, but test that NULL buffer is handled
     ssize_t result =
         terminal_control_generate_cursor_sequence(NULL, 1, 1, NULL, 64);
     ASSERT(result < 0);

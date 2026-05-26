@@ -1026,10 +1026,10 @@ lle_theme_t *lle_theme_create_powerline(void) {
     snprintf(theme->enabled_segments[3], 32, "status");
     theme->enabled_segment_count = 4;
 
-    /* Per-segment powerline colors: bold white text on colored backgrounds.
-     * Use true color #ffffff for fg (palette index 255 gets remapped by
-     * dark terminal colorschemes and becomes unreadable). Bold ensures
-     * legibility on saturated backgrounds. */
+    /// Per-segment powerline colors: bold white text on colored backgrounds.
+    /// Use true color #ffffff for fg (palette index 255 gets remapped by
+    /// dark terminal colorschemes and becomes unreadable). Bold ensures
+    /// legibility on saturated backgrounds.
     lle_segment_config_t *cfg;
     lle_color_t white_bold = lle_color_rgb(255, 255, 255);
     white_bold.bold = true;
@@ -1242,22 +1242,22 @@ lle_theme_t *lle_theme_create_corporate(void) {
     theme->capabilities =
         LLE_THEME_CAP_ASCII_FALLBACK | LLE_THEME_CAP_INHERITABLE;
 
-    /* Professional blues and grays using 256-color palette.
-     *
-     * Targets dark terminal backgrounds (text = light gray 250). Every
-     * color was audited (tools/theme_contrast_audit.py) for WCAG AA
-     * contrast against pure-black bg; previously index 24 (primary),
-     * 124 (error/path_root), and the borderline 28 (success/git_clean)
-     * dropped below 4.5:1 and rendered invisible / unreadable on
-     * terminals with very dark defaults (Ghostty, kitty, Alacritty).
-     *
-     * Primary (32 = #0087d7) is the brand color used by ${user} and
-     * ${symbol} (see composer.c:108,121). Error / path_root (196 =
-     * #ff0000) are bumped from 124 (#af0000, 2.82:1) for guaranteed
-     * AA contrast on dark backgrounds -- an "error" signal that's
-     * barely visible defeats the point. Success / git_clean (34 =
-     * #00af00) was bumped from 28 (#008700) to clear the AA bar for
-     * body-sized prompt text. */
+    /// Professional blues and grays using 256-color palette.
+    ///
+    /// Targets dark terminal backgrounds (text = light gray 250). Every
+    /// color was audited (tools/theme_contrast_audit.py) for WCAG AA
+    /// contrast against pure-black bg; previously index 24 (primary),
+    /// 124 (error/path_root), and the borderline 28 (success/git_clean)
+    /// dropped below 4.5:1 and rendered invisible / unreadable on
+    /// terminals with very dark defaults (Ghostty, kitty, Alacritty).
+    ///
+    /// Primary (32 = #0087d7) is the brand color used by ${user} and
+    /// ${symbol} (see composer.c:108,121). Error / path_root (196 =
+    /// #ff0000) are bumped from 124 (#af0000, 2.82:1) for guaranteed
+    /// AA contrast on dark backgrounds -- an "error" signal that's
+    /// barely visible defeats the point. Success / git_clean (34 =
+    /// #00af00) was bumped from 28 (#008700) to clear the AA bar for
+    /// body-sized prompt text.
     theme->colors.primary = lle_color_256(32);      /// Medium blue
     theme->colors.secondary = lle_color_256(67);    /// Steel blue
     theme->colors.success = lle_color_256(34);      /// Bright dark green

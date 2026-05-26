@@ -290,8 +290,8 @@ static int damerau_levenshtein_codepoints(const codepoint_array_t *s1,
         return max_dist + 1;
     }
 
-    /* Need full matrix for Damerau-Levenshtein (transpositions need
-     * d[i-2][j-2]) */
+    /// Need full matrix for Damerau-Levenshtein (transpositions need
+    /// d[i-2][j-2])
     int **d = malloc((len1 + 1) * sizeof(int *));
     if (!d)
         return len1 + len2;
@@ -312,11 +312,11 @@ static int damerau_levenshtein_codepoints(const codepoint_array_t *s1,
     for (int j = 0; j <= len2; j++)
         d[0][j] = j;
 
-    /* Fill matrix. The result lives in d[len1][len2]; track it directly
-     * in a local so gcc -Wmaybe-uninitialized can see the write
-     * dominates the read. The early returns above already guarantee
-     * len1 >= 1 && len2 >= 1, but gcc's data-flow only watches scalars,
-     * not memory cells. */
+    /// Fill matrix. The result lives in d[len1][len2]; track it directly
+    /// in a local so gcc -Wmaybe-uninitialized can see the write
+    /// dominates the read. The early returns above already guarantee
+    /// len1 >= 1 && len2 >= 1, but gcc's data-flow only watches scalars,
+    /// not memory cells.
     int result = 0;
     for (int i = 1; i <= len1; i++) {
         for (int j = 1; j <= len2; j++) {
@@ -725,12 +725,11 @@ int fuzzy_match_score(const char *s1, const char *s2,
 
     int subseq_score = fuzzy_subsequence_score(s1, s2, opts);
 
-    /* Weighted combination:
-     * - Edit distance: 40% (most reliable for typos)
-     * - Jaro-Winkler: 30% (good for short strings, prefix aware)
-     * - Prefix: 20% (important for command matching)
-     * - Subsequence: 10% (good for abbreviations)
-     */
+    /// Weighted combination:
+    /// - Edit distance: 40% (most reliable for typos)
+    /// - Jaro-Winkler: 30% (good for short strings, prefix aware)
+    /// - Prefix: 20% (important for command matching)
+    /// - Subsequence: 10% (good for abbreviations)
     int final_score = (levenshtein_score * 4 + jaro_score * 3 +
                        prefix_score * 2 + subseq_score * 1) /
                       10;

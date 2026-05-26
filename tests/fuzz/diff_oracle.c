@@ -320,10 +320,10 @@ static const char *resolve_oracle(mode_t_ mode) {
     }
     const oracle_config_t *cfg = &ORACLES[mode];
 
-    /* 1. Env override. The user-set override is honored even if it
-     * fails the modernity filter -- they asked for it explicitly --
-     * but we still warn so the false-positive divergences are
-     * attributable. */
+    /// 1. Env override. The user-set override is honored even if it
+    /// fails the modernity filter -- they asked for it explicitly --
+    /// but we still warn so the false-positive divergences are
+    /// attributable.
     if (cfg->env_var) {
         const char *env_val = getenv(cfg->env_var);
         if (path_executable(env_val)) {
@@ -332,10 +332,10 @@ static const char *resolve_oracle(mode_t_ mode) {
         }
     }
 
-    /* 2. PATH lookup. resolve_via_path returns the FIRST PATH-resolved
-     * binary; for MODE_BASH the modernity filter rejects an old binary
-     * here so the harness falls through to the candidate list if PATH
-     * points at /bin/bash 3.2.57 (macOS without Homebrew in PATH). */
+    /// 2. PATH lookup. resolve_via_path returns the FIRST PATH-resolved
+    /// binary; for MODE_BASH the modernity filter rejects an old binary
+    /// here so the harness falls through to the candidate list if PATH
+    /// points at /bin/bash 3.2.57 (macOS without Homebrew in PATH).
     static char path_buf[MODE_LUSH + 1][4096];
     if (resolve_via_path(cfg->binary_name, path_buf[mode],
                          sizeof(path_buf[mode]))) {
@@ -476,8 +476,8 @@ static run_result_t run_with_input(const char *binary, const char *const *argv,
     }
     close(in_pipe[1]);
 
-    /* Wait for child with timeout via SIGCHLD/poll loop.
-     * Simple approach: alarm + waitpid. */
+    /// Wait for child with timeout via SIGCHLD/poll loop.
+    /// Simple approach: alarm + waitpid.
     struct timespec start;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
@@ -499,8 +499,8 @@ static run_result_t run_with_input(const char *binary, const char *const *argv,
             r.timed_out = true;
             break;
         }
-        /* Drain pipes opportunistically each cycle so kernel buffers
-         * stay below their limits and the child doesn't block. */
+        /// Drain pipes opportunistically each cycle so kernel buffers
+        /// stay below their limits and the child doesn't block.
         if (first_pass) {
             first_pass = false;
         }
@@ -647,11 +647,11 @@ static int process_input(const char *path, const char *lush_path) {
 
     const char *lush_mode = ORACLES[mode].lush_mode;
 
-    /* Run lush in matching mode. Inject `mode X` before the input by
-     * passing the combined script via stdin. `mode` is the canonical
-     * mode-preset selector (May-06 configuration cleanup removed the
-     * `set -o {bash,zsh,lush}` toggles; `set -o posix` survives only
-     * as a bash-bridge alias, so we use `mode` uniformly). */
+    /// Run lush in matching mode. Inject `mode X` before the input by
+    /// passing the combined script via stdin. `mode` is the canonical
+    /// mode-preset selector (May-06 configuration cleanup removed the
+    /// `set -o {bash,zsh,lush}` toggles; `set -o posix` survives only
+    /// as a bash-bridge alias, so we use `mode` uniformly).
     char lush_input[DIFF_BUF_SIZE];
     if (lush_mode) {
         snprintf(lush_input, sizeof(lush_input), "mode %s\n%s", lush_mode,
@@ -663,9 +663,9 @@ static int process_input(const char *path, const char *lush_path) {
     run_result_t lush_r =
         run_with_input(lush_path, lush_argv, lush_input, DIFF_TIMEOUT_SEC);
 
-    /* Resolve oracle binary via env override → PATH → candidate list.
-     * Missing oracle is not fatal: the JSONL record marks it as
-     * absent and the input is skipped from comparison. */
+    /// Resolve oracle binary via env override → PATH → candidate list.
+    /// Missing oracle is not fatal: the JSONL record marks it as
+    /// absent and the input is skipped from comparison.
     const char *oracle_bin = (mode != MODE_LUSH) ? resolve_oracle(mode) : NULL;
 
     bool oracle_present = (oracle_bin != NULL);

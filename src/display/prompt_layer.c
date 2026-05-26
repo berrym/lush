@@ -172,8 +172,8 @@ static void calculate_prompt_metrics(const char *content,
     bool in_ansi_sequence = false;
 
     while (*current) {
-        /* Skip readline's prompt markers: \001 (RL_PROMPT_START_IGNORE) and
-         * \002 (RL_PROMPT_END_IGNORE) */
+        /// Skip readline's prompt markers: \001 (RL_PROMPT_START_IGNORE) and
+        /// \002 (RL_PROMPT_END_IGNORE)
         if (*current == '\001' || *current == '\002') {
             /// Don't count these control characters
             current++;
@@ -190,8 +190,8 @@ static void calculate_prompt_metrics(const char *content,
                 /// ANSI sequences end with a letter (A-Z or a-z)
                 in_ansi_sequence = false;
             }
-            /* Don't count ANY characters while in_ansi_sequence (including
-             * terminators) */
+            /// Don't count ANY characters while in_ansi_sequence (including
+            /// terminators)
         } else {
             /// Not in ANSI sequence - count this character
             if (*current == '\n') {
@@ -202,14 +202,13 @@ static void calculate_prompt_metrics(const char *content,
                 current_line_width = 0;
                 line_start = current + 1;
             } else {
-                /* Only count UTF-8 character start bytes, not continuation
-                 * bytes */
-                /* UTF-8 continuation bytes have the form 10xxxxxx (0x80-0xBF)
-                 */
+                /// Only count UTF-8 character start bytes, not continuation
+                /// bytes
+                /// UTF-8 continuation bytes have the form 10xxxxxx (0x80-0xBF)
                 unsigned char byte = (unsigned char)*current;
                 if ((byte & 0xC0) != 0x80) {
-                    /* This is a character start byte (ASCII or UTF-8 lead byte)
-                     */
+                    /// This is a character start byte (ASCII or UTF-8 lead
+                    /// byte)
                     current_line_width++;
 
                     /// Check for Unicode characters

@@ -619,8 +619,8 @@ int main(void) {
     RUN_TEST(pool_is_pool_pointer);
 
     printf("\nValidation Tests:\n");
-    /* pool_validate_integrity and pool_maintenance tests removed - functions
-     * not implemented */
+    /// pool_validate_integrity and pool_maintenance tests removed - functions
+    /// not implemented
 
     printf("\nError Handling Tests:\n");
     RUN_TEST(pool_error_string);

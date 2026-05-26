@@ -1006,10 +1006,10 @@ char *get_input_complete_counted(FILE *in, size_t *lines_consumed) {
     char *accumulated = NULL;
     size_t accumulated_len = 0;
     input_state_t state = {0};
-    /* Count of source lines this batch consumed. Includes lines joined
-     * via backslash continuation since they still advance the file's
-     * cumulative line counter even though they don't appear as
-     * newlines in the returned string. */
+    /// Count of source lines this batch consumed. Includes lines joined
+    /// via backslash continuation since they still advance the file's
+    /// cumulative line counter even though they don't appear as
+    /// newlines in the returned string.
     size_t source_lines = 0;
 
     char *line = NULL;
@@ -1123,12 +1123,12 @@ char *get_unified_input(FILE *in) { return get_unified_input_at(in, NULL); }
 
 char *get_unified_input_at(FILE *in, size_t *lines_consumed) {
     if (is_interactive_shell()) {
-        /* Each readline batch is one logical input; for source-location
-         * tracking purposes treat it as a single line of an implicit
-         * <stdin> source. The cumulative file-line counter in the main
-         * loop stays at 1 for interactive mode regardless of this
-         * value, so even multi-line constructs entered interactively
-         * always display as line-1 relative — matching bash. */
+        /// Each readline batch is one logical input; for source-location
+        /// tracking purposes treat it as a single line of an implicit
+        /// <stdin> source. The cumulative file-line counter in the main
+        /// loop stays at 1 for interactive mode regardless of this
+        /// value, so even multi-line constructs entered interactively
+        /// always display as line-1 relative — matching bash.
         if (lines_consumed) {
             *lines_consumed = 1;
         }

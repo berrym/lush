@@ -234,8 +234,7 @@ TEST(powerline_render_has_bg_colors) {
     lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
                          output, sizeof(output));
 
-    /* Background colors use ESC[48;5;Nm (256-color) or ESC[48;2;R;G;Bm (true)
-     */
+    /// Background colors use ESC[48;5;Nm (256-color) or ESC[48;2;R;G;Bm (true)
     ASSERT_TRUE(contains(output, "\033[48;5;") ||
                 contains(output, "\033[48;2;"));
 
@@ -252,8 +251,8 @@ TEST(powerline_render_separator_count) {
     lle_theme_t *theme = lle_theme_registry_find(&g_themes, "powerline");
     ASSERT_NOT_NULL(theme);
 
-    /* With user + directory visible (git/status may not be), expect at least
-     * 1 separator between segments plus the trailing separator */
+    /// With user + directory visible (git/status may not be), expect at least
+    /// 1 separator between segments plus the trailing separator
     lle_prompt_context_t ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.has_256_color = true;
@@ -268,8 +267,8 @@ TEST(powerline_render_separator_count) {
     /// Count left-arrow separators (U+E0B0 = 0xEE 0x82 0xB0)
     int sep_count = count_occurrences(output, "\xee\x82\xb0");
 
-    /* With N visible segments, there should be exactly N separators
-     * (N-1 between segments + 1 trailing) */
+    /// With N visible segments, there should be exactly N separators
+    /// (N-1 between segments + 1 trailing)
     ASSERT(sep_count >= 2); /// At least user + directory = 2 separators
 
     teardown();
@@ -317,28 +316,28 @@ TEST(powerline_strips_segment_ansi) {
     lle_powerline_render(theme, &g_segments, &ctx, LLE_POWERLINE_LEFT_TO_RIGHT,
                          output, sizeof(output));
 
-    /* Segment renderers embed colors like ESC[38;5;33m (path_normal) and
-     * ESC[0m (reset) in their content. The powerline renderer must strip
-     * these to prevent them from clobbering the powerline bg/fg colors.
-     *
-     * After stripping, the only resets should be from the powerline renderer
-     * itself (at segment boundaries), not mid-segment. Count resets and
-     * verify there aren't too many. With N visible segments, the renderer
-     * produces at most N+1 resets (final separator uses 2). */
+    /// Segment renderers embed colors like ESC[38;5;33m (path_normal) and
+    /// ESC[0m (reset) in their content. The powerline renderer must strip
+    /// these to prevent them from clobbering the powerline bg/fg colors.
+    ///
+    /// After stripping, the only resets should be from the powerline renderer
+    /// itself (at segment boundaries), not mid-segment. Count resets and
+    /// verify there aren't too many. With N visible segments, the renderer
+    /// produces at most N+1 resets (final separator uses 2).
     int reset_count = count_occurrences(output, "\033[0m");
     ASSERT(reset_count <= 6); /// Reasonable upper bound for 2-3 segments
 
-    /* The directory segment normally embeds ESC[38;5;33m for path_normal
-     * color. In powerline mode this must NOT appear inside the content
-     * area — only the powerline renderer's own 48;5;33 (bg) should use
-     * color 33. Check that 38;5;33m appears only in separator contexts
-     * (where fg is set to directory's bg), not before path text. */
+    /// The directory segment normally embeds ESC[38;5;33m for path_normal
+    /// color. In powerline mode this must NOT appear inside the content
+    /// area — only the powerline renderer's own 48;5;33 (bg) should use
+    /// color 33. Check that 38;5;33m appears only in separator contexts
+    /// (where fg is set to directory's bg), not before path text.
     const char *path_text = strstr(output, "~/project");
     ASSERT_NOT_NULL(path_text);
 
-    /* The 50 bytes preceding the path text should contain the powerline
-     * fg color (white), NOT the segment-internal path_normal color.
-     * Check that the white fg appears near the path text. */
+    /// The 50 bytes preceding the path text should contain the powerline
+    /// fg color (white), NOT the segment-internal path_normal color.
+    /// Check that the white fg appears near the path text.
     size_t prefix_start = (size_t)(path_text - output);
     if (prefix_start > 50)
         prefix_start -= 50;
@@ -613,15 +612,15 @@ TEST(powerline_color_downgrade) {
 /* ========================================================================== */
 
 int main(void) {
-    /* Force a color-capable terminal environment for the duration of this
-     * test process. The composer caches color capabilities on first use via
-     * setupterm(); CI environments where TERM is unset or "dumb" cause
-     * setupterm to fail and the renderer to correctly downgrade to
-     * no-color, which would mask the very behavior these tests verify.
-     * Setting TERM=xterm-256color + COLORTERM=truecolor before any
-     * composer call makes the detection deterministic across local
-     * developer terminals, GitHub Actions runners, and any other harness
-     * that does not present a color-capable tty. */
+    /// Force a color-capable terminal environment for the duration of this
+    /// test process. The composer caches color capabilities on first use via
+    /// setupterm(); CI environments where TERM is unset or "dumb" cause
+    /// setupterm to fail and the renderer to correctly downgrade to
+    /// no-color, which would mask the very behavior these tests verify.
+    /// Setting TERM=xterm-256color + COLORTERM=truecolor before any
+    /// composer call makes the detection deterministic across local
+    /// developer terminals, GitHub Actions runners, and any other harness
+    /// that does not present a color-capable tty.
     setenv("TERM", "xterm-256color", 1);
     setenv("COLORTERM", "truecolor", 1);
 

@@ -389,8 +389,8 @@ void parser_exit_recursion(parser_t *parser) {
 
     /// Assert that we're not underflowing - indicates mismatched enter/exit
     if (parser->recursion_depth == 0) {
-        /* In debug builds this would be an assertion failure.
-         * In release, we just prevent underflow. */
+        /// In debug builds this would be an assertion failure.
+        /// In release, we just prevent underflow.
 #ifndef NDEBUG
         shell_error_t *err = shell_error_create(
             SHELL_ERR_ASSERTION, SHELL_SEVERITY_ERROR, SOURCE_LOC_UNKNOWN,
@@ -549,18 +549,18 @@ void parser_error_add_with_help(parser_t *parser, shell_error_code_t code,
         return;
     }
 
-    /* Default location: current token's position. Delegate the rest
-     * to the _at variant so the two paths share one implementation. */
+    /// Default location: current token's position. Delegate the rest
+    /// to the _at variant so the two paths share one implementation.
     token_t *current = tokenizer_current(parser->tokenizer);
     source_location_t loc =
         token_to_source_location(current, parser->source_name);
 
     va_list args;
     va_start(args, fmt);
-    /* Convert variadic args into a fixed string then forward — the
-     * _at variant takes its own variadic. shell_error already handles
-     * vsnprintf internally; here we just need to hand off the formatted
-     * message. Simplest: format here, pass as a literal "%s" + buffer. */
+    /// Convert variadic args into a fixed string then forward — the
+    /// _at variant takes its own variadic. shell_error already handles
+    /// vsnprintf internally; here we just need to hand off the formatted
+    /// message. Simplest: format here, pass as a literal "%s" + buffer.
     char message_buf[1024];
     vsnprintf(message_buf, sizeof(message_buf), fmt, args);
     va_end(args);
@@ -640,10 +640,10 @@ node_t *parser_parse(parser_t *parser) {
 
     node_t *ast = parse_command_list(parser);
 
-    /* A heredoc operator on the last line with no body and no
-     * line-terminating newline never reaches the skip_separators
-     * collection trigger. Flush here so the unterminated-heredoc
-     * error is still reported rather than silently dropped. */
+    /// A heredoc operator on the last line with no body and no
+    /// line-terminating newline never reaches the skip_separators
+    /// collection trigger. Flush here so the unterminated-heredoc
+    /// error is still reported rather than silently dropped.
     if (parser->pending_heredoc_count > 0) {
         collect_pending_heredocs(parser);
     }
@@ -679,11 +679,11 @@ static void skip_separators(parser_t *parser) {
            tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
            tokenizer_match(parser->tokenizer, TOK_WHITESPACE) ||
            tokenizer_match(parser->tokenizer, TOK_COMMENT)) {
-        /* A newline that follows a `<<delim` operator is the trigger to
-         * collect the deferred heredoc body/bodies. collect_pending_
-         * heredocs repositions the tokenizer past the last terminator,
-         * so do NOT also advance -- re-evaluate the loop condition
-         * against the freshly tokenized post-heredoc token. */
+        /// A newline that follows a `<<delim` operator is the trigger to
+        /// collect the deferred heredoc body/bodies. collect_pending_
+        /// heredocs repositions the tokenizer past the last terminator,
+        /// so do NOT also advance -- re-evaluate the loop condition
+        /// against the freshly tokenized post-heredoc token.
         if (tokenizer_match(parser->tokenizer, TOK_NEWLINE) &&
             parser->pending_heredoc_count > 0) {
             collect_pending_heredocs(parser);
@@ -960,8 +960,8 @@ static node_t *parse_pipeline(parser_t *parser) {
         /// Skip newlines after pipe - allows multiline pipelines
         while (tokenizer_match(parser->tokenizer, TOK_NEWLINE) ||
                tokenizer_match(parser->tokenizer, TOK_WHITESPACE)) {
-            /* `cmd <<EOF |` then newline: the heredoc body follows that
-             * newline. Collect it before consuming the newline. */
+            /// `cmd <<EOF |` then newline: the heredoc body follows that
+            /// newline. Collect it before consuming the newline.
             if (tokenizer_match(parser->tokenizer, TOK_NEWLINE) &&
                 parser->pending_heredoc_count > 0) {
                 collect_pending_heredocs(parser);
@@ -1058,9 +1058,9 @@ static char *posix_unquoted_dequote(const char *text) {
     size_t w = 0;
     for (size_t i = 0; i < len; i++) {
         if (text[i] == '\\' && i + 1 < len) {
-            /* `\<newline>` was already removed by the tokenizer's word
-             * scanner; no special case needed here. Any other `\X`
-             * collapses to a literal X. */
+            /// `\<newline>` was already removed by the tokenizer's word
+            /// scanner; no special case needed here. Any other `\X`
+            /// collapses to a literal X.
             out[w++] = text[i + 1];
             i++;
             continue;
@@ -1108,8 +1108,8 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         return false;
     }
 
-    /* Acceptance test — same set parse_simple_command has used since the
-     * unified-concatenation logic was introduced. */
+    /// Acceptance test — same set parse_simple_command has used since the
+    /// unified-concatenation logic was introduced.
     bool accepted =
         (arg_token->type == TOK_STRING ||
          arg_token->type == TOK_EXPANDABLE_STRING ||
@@ -1125,9 +1125,9 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
         return false;
     }
 
-    /* Adjacency-collection: gather consecutive arg-like tokens that have
-     * no whitespace between them. `pre$VAR` becomes one logical arg
-     * instead of two. */
+    /// Adjacency-collection: gather consecutive arg-like tokens that have
+    /// no whitespace between them. `pre$VAR` becomes one logical arg
+    /// instead of two.
     typedef struct {
         token_type_t type;
         char *text;
@@ -1135,10 +1135,10 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
 
     token_info_t *collected_tokens = NULL;
     int token_count = 0;
-    /* Shell-word adjacency uses the consumed input span (end_position),
-     * not strlen(text): quoted strings strip their delimiters from text
-     * but their end_position covers the entire `"..."` span. POSIX 2.10.2
-     * word concatenation depends on this being correct. */
+    /// Shell-word adjacency uses the consumed input span (end_position),
+    /// not strlen(text): quoted strings strip their delimiters from text
+    /// but their end_position covers the entire `"..."` span. POSIX 2.10.2
+    /// word concatenation depends on this being correct.
     size_t last_end_pos = arg_token->end_position;
 
     while (
@@ -1208,31 +1208,30 @@ static bool collect_word_argument(parser_t *parser, node_t *parent) {
             add_child_node(parent, arg_node);
         }
     } else if (token_count > 1) {
-        /* Multi-token concatenation: build a single NODE_STRING_EXPANDABLE
-         * with the concatenated text (matches the existing semantics in
-         * parse_simple_command).
-         *
-         * Word-context tokens (TOK_WORD, keywords-as-words, etc.) carry
-         * raw `\X` pairs because the tokenizer defers escape resolution.
-         * For unquoted shell input, POSIX-unquoted quote-removal collapses
-         * any such `\X` to literal X. Doing that here, before
-         * concatenation, has two effects: (1) the `$DIR/a\ b` family of
-         * inputs no longer ships backslashes through to argv, fixing #90
-         * for the multi-token case; (2) any backslashes that survive into
-         * the concatenated string came from a quoted segment
-         * (TOK_EXPANDABLE_STRING kept its `\X` for the four DQ-meaningful
-         * escapes), so the executor can apply double-quote rules safely
-         * in `expand_quoted_string` without a quote-context flag.
-         *
-         * Tokens that already had escape semantics applied (or that are
-         * sub-expressions evaluated later) pass through untouched:
-         *   TOK_STRING               — single-quoted, no escapes ever
-         *   TOK_EXPANDABLE_STRING    — double-quoted, DQ rules later
-         *   TOK_ARITH_EXP            — `$((...))`, evaluated as arith
-         *   TOK_COMMAND_SUB          — `$(...)`, evaluated as cmd
-         *   TOK_BACKQUOTE            — `` `...` ``, evaluated as cmd
-         *   TOK_VARIABLE             — `$VAR`, no escapes by construction
-         */
+        /// Multi-token concatenation: build a single NODE_STRING_EXPANDABLE
+        /// with the concatenated text (matches the existing semantics in
+        /// parse_simple_command).
+        ///
+        /// Word-context tokens (TOK_WORD, keywords-as-words, etc.) carry
+        /// raw `\X` pairs because the tokenizer defers escape resolution.
+        /// For unquoted shell input, POSIX-unquoted quote-removal collapses
+        /// any such `\X` to literal X. Doing that here, before
+        /// concatenation, has two effects: (1) the `$DIR/a\ b` family of
+        /// inputs no longer ships backslashes through to argv, fixing #90
+        /// for the multi-token case; (2) any backslashes that survive into
+        /// the concatenated string came from a quoted segment
+        /// (TOK_EXPANDABLE_STRING kept its `\X` for the four DQ-meaningful
+        /// escapes), so the executor can apply double-quote rules safely
+        /// in `expand_quoted_string` without a quote-context flag.
+        ///
+        /// Tokens that already had escape semantics applied (or that are
+        /// sub-expressions evaluated later) pass through untouched:
+        ///   TOK_STRING               — single-quoted, no escapes ever
+        ///   TOK_EXPANDABLE_STRING    — double-quoted, DQ rules later
+        ///   TOK_ARITH_EXP            — `$((...))`, evaluated as arith
+        ///   TOK_COMMAND_SUB          — `$(...)`, evaluated as cmd
+        ///   TOK_BACKQUOTE            — `` `...` ``, evaluated as cmd
+        ///   TOK_VARIABLE             — `$VAR`, no escapes by construction
         char **dequoted = malloc((size_t)token_count * sizeof(char *));
         if (!dequoted) {
             for (int i = 0; i < token_count; i++) {
@@ -1571,12 +1570,12 @@ static node_t *parse_simple_command(parser_t *parser) {
 
         if (next &&
             (next->type == TOK_ASSIGN || next->type == TOK_PLUS_ASSIGN)) {
-            /* Capture the variable-name token's loc before
-             * parse_scalar_assignment_string advances past it; needed so
-             * the resulting NODE_COMMAND carries a real source location
-             * (otherwise expansion-subsystem errors inside the
-             * assignment's value -- e.g. ${var:?word} -- fall back to
-             * SOURCE_LOC_UNKNOWN at runtime). */
+            /// Capture the variable-name token's loc before
+            /// parse_scalar_assignment_string advances past it; needed so
+            /// the resulting NODE_COMMAND carries a real source location
+            /// (otherwise expansion-subsystem errors inside the
+            /// assignment's value -- e.g. ${var:?word} -- fall back to
+            /// SOURCE_LOC_UNKNOWN at runtime).
             source_location_t assign_loc =
                 token_to_source_location(current, parser->source_name);
             node_t *array_node = NULL;
@@ -1964,28 +1963,27 @@ static char *parse_scalar_assignment_string(parser_t *parser,
                 value->type == TOK_PLUS_ASSIGN || value->type == TOK_COMMA)) {
 
             size_t token_len = strlen(value->text);
-            /* Quote re-wrapping policy for assignment-value
-             * tokens. expand_if_needed inspects the value
-             * string for quote markers; the parser must
-             * preserve enough of the original quoting so
-             * that:
-             *   TOK_STRING (single-quoted '...'):
-             *     re-wrap with ' so expand_if_needed's
-             *     no-expansion path fires (issue #98).
-             *   TOK_STRING (ANSI-C $'...'):
-             *     tokenizer text already includes $' and ';
-             *     do NOT re-wrap.
-             *   TOK_EXPANDABLE_STRING ("..."):
-             *     text already had outer " stripped by the
-             *     tokenizer; pass through verbatim. The
-             *     embedded-quote bug (a="hello 'world'"
-             *     losing the quote) is solved at the
-             *     expand_if_needed layer: it only enters
-             *     the single-quote-handling block when
-             *     there is a matched pair of ' in the text
-             *     (issue #102 -- see expand_if_needed
-             *     comment near the strchr check).
-             */
+            /// Quote re-wrapping policy for assignment-value
+            /// tokens. expand_if_needed inspects the value
+            /// string for quote markers; the parser must
+            /// preserve enough of the original quoting so
+            /// that:
+            ///   TOK_STRING (single-quoted '...'):
+            ///     re-wrap with ' so expand_if_needed's
+            ///     no-expansion path fires (issue #98).
+            ///   TOK_STRING (ANSI-C $'...'):
+            ///     tokenizer text already includes $' and ';
+            ///     do NOT re-wrap.
+            ///   TOK_EXPANDABLE_STRING ("..."):
+            ///     text already had outer " stripped by the
+            ///     tokenizer; pass through verbatim. The
+            ///     embedded-quote bug (a="hello 'world'"
+            ///     losing the quote) is solved at the
+            ///     expand_if_needed layer: it only enters
+            ///     the single-quote-handling block when
+            ///     there is a matched pair of ' in the text
+            ///     (issue #102 -- see expand_if_needed
+            ///     comment near the strchr check).
             bool is_ansi_c = (value->type == TOK_STRING && token_len >= 2 &&
                               value->text[0] == '$' && value->text[1] == '\'');
             bool wrap_single = (value->type == TOK_STRING && !is_ansi_c);
@@ -2016,21 +2014,21 @@ static char *parse_scalar_assignment_string(parser_t *parser,
                 strcat(full_value, "'");
                 value_len += token_len + 2;
             } else if (value->type == TOK_EXPANDABLE_STRING) {
-                /* Double-quoted content: the outer "..." was
-                 * stripped by the tokenizer. Any embedded
-                 * single quotes in this content were literal
-                 * characters in the source, but
-                 * expand_if_needed would later misinterpret
-                 * them as POSIX single-quote openers and
-                 * eat them (issue #102). Pre-escape literal
-                 * single quotes as \' so the downstream
-                 * POSIX-unquoted backslash rule preserves
-                 * them as literal characters. Other chars
-                 * pass through; double-quote-specific
-                 * escapes like \$ \" \\ \` were already
-                 * preserved by the tokenizer. Grow the
-                 * buffer to account for the worst case (every
-                 * char doubles). */
+                /// Double-quoted content: the outer "..." was
+                /// stripped by the tokenizer. Any embedded
+                /// single quotes in this content were literal
+                /// characters in the source, but
+                /// expand_if_needed would later misinterpret
+                /// them as POSIX single-quote openers and
+                /// eat them (issue #102). Pre-escape literal
+                /// single quotes as \' so the downstream
+                /// POSIX-unquoted backslash rule preserves
+                /// them as literal characters. Other chars
+                /// pass through; double-quote-specific
+                /// escapes like \$ \" \\ \` were already
+                /// preserved by the tokenizer. Grow the
+                /// buffer to account for the worst case (every
+                /// char doubles).
                 size_t worst = value_len + token_len * 2 + 1;
                 if (worst >= value_capacity) {
                     value_capacity = worst * 2;
@@ -2053,20 +2051,20 @@ static char *parse_scalar_assignment_string(parser_t *parser,
                 }
                 full_value[value_len] = '\0';
             } else {
-                /* All other types (including ANSI-C $'...'
-                 * whose tokenizer text already carries the
-                 * $' and ' markers): append the text
-                 * verbatim. */
+                /// All other types (including ANSI-C $'...'
+                /// whose tokenizer text already carries the
+                /// $' and ' markers): append the text
+                /// verbatim.
                 strcat(full_value, value->text);
                 value_len += token_len;
             }
 
-            /* Only adjacent tokens (no intervening whitespace) belong to
-             * the same assignment value: `a=foo"bar"` -> foobar, but
-             * `a=foo bar` -> value `foo` and `bar` is the command word /
-             * next prefix. Mirrors the adjacency rule in
-             * collect_word_argument. Uses end_position so quoted strings
-             * count their full `"..."` span, not just the stripped text. */
+            /// Only adjacent tokens (no intervening whitespace) belong to
+            /// the same assignment value: `a=foo"bar"` -> foobar, but
+            /// `a=foo bar` -> value `foo` and `bar` is the command word /
+            /// next prefix. Mirrors the adjacency rule in
+            /// collect_word_argument. Uses end_position so quoted strings
+            /// count their full `"..."` span, not just the stripped text.
             size_t last_end_pos = value->end_position;
             tokenizer_advance(parser->tokenizer); /// consume this token
             value = tokenizer_current(parser->tokenizer);
@@ -2496,14 +2494,14 @@ static node_t *parse_redirection(parser_t *parser) {
         return NULL;
     }
 
-    /* Capture the operator's full source_location_t before any
-     * tokenizer_advance — that call frees the current token, so
-     * dereferencing redir_token later would be use-after-free.
-     * source_location_t is the project's unified position primitive
-     * (shell_error.h:33-39); using it here keeps the heredoc body
-     * search consistent with how every other parser path tracks
-     * positions, and lets the unterminated-heredoc error point at
-     * the actual operator rather than at SOURCE_LOC_UNKNOWN. */
+    /// Capture the operator's full source_location_t before any
+    /// tokenizer_advance — that call frees the current token, so
+    /// dereferencing redir_token later would be use-after-free.
+    /// source_location_t is the project's unified position primitive
+    /// (shell_error.h:33-39); using it here keeps the heredoc body
+    /// search consistent with how every other parser path tracks
+    /// positions, and lets the unterminated-heredoc error point at
+    /// the actual operator rather than at SOURCE_LOC_UNKNOWN.
     source_location_t op_loc =
         token_to_source_location(redir_token, parser->source_name);
 
@@ -2678,14 +2676,14 @@ static node_t *parse_redirection(parser_t *parser) {
         redir_node->val.str = delimiter; /// Transfer ownership
         redir_node->val_type = VAL_STR;
 
-        /* DEFERRED COLLECTION. The heredoc body physically begins on
-         * the line AFTER the operator -- collecting it now would mean
-         * jumping the tokenizer past everything that still follows
-         * `<<delim` on this line (`| wc`, a trailing `; cmd2`, etc.),
-         * losing those tokens. Instead queue the heredoc; the body is
-         * collected by collect_pending_heredocs() when the parser
-         * reaches the line-terminating newline. The content and
-         * expand-flag child nodes are attached there. */
+        /// DEFERRED COLLECTION. The heredoc body physically begins on
+        /// the line AFTER the operator -- collecting it now would mean
+        /// jumping the tokenizer past everything that still follows
+        /// `<<delim` on this line (`| wc`, a trailing `; cmd2`, etc.),
+        /// losing those tokens. Instead queue the heredoc; the body is
+        /// collected by collect_pending_heredocs() when the parser
+        /// reaches the line-terminating newline. The content and
+        /// expand-flag child nodes are attached there.
         if (parser->pending_heredoc_count >= PARSER_MAX_PENDING_HEREDOCS) {
             parser_error_add(parser, SHELL_ERR_HEREDOC_DELIMITER,
                              "too many here-documents on one line "
@@ -2798,11 +2796,11 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
     tokenizer_t *tokenizer = parser->tokenizer;
     *body_end = body_start;
 
-    /* Strip outer quotes from the delimiter if present so body lines
-     * compare against the user-visible terminator text (`'END'` →
-     * `END`, `"EOF"` → `EOF`). Used only for the line-by-line
-     * terminator match below; the delimiter SPEC in the input is not
-     * re-parsed (see content_start computation). */
+    /// Strip outer quotes from the delimiter if present so body lines
+    /// compare against the user-visible terminator text (`'END'` →
+    /// `END`, `"EOF"` → `EOF`). Used only for the line-by-line
+    /// terminator match below; the delimiter SPEC in the input is not
+    /// re-parsed (see content_start computation).
     const char *match_delimiter = delimiter;
     char *unquoted_delimiter = NULL;
     if ((delimiter[0] == '"' || delimiter[0] == '\'') &&
@@ -2817,13 +2815,13 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
         }
     }
 
-    /* The body begins exactly at body_start -- the caller
-     * (collect_pending_heredocs) computed it as the byte just past the
-     * line-terminating newline that followed the `<<delim` operator,
-     * or, for the second and later heredocs declared on the same line,
-     * the byte just past the previous heredoc's terminator. No
-     * scanning for the operator or the delimiter spec is needed here:
-     * deferral guarantees we are always positioned at a body start. */
+    /// The body begins exactly at body_start -- the caller
+    /// (collect_pending_heredocs) computed it as the byte just past the
+    /// line-terminating newline that followed the `<<delim` operator,
+    /// or, for the second and later heredocs declared on the same line,
+    /// the byte just past the previous heredoc's terminator. No
+    /// scanning for the operator or the delimiter spec is needed here:
+    /// deferral guarantees we are always positioned at a body start.
     (void)op_loc; /// retained only for the unterminated-heredoc error
 
     /// Collect lines until we find the delimiter
@@ -2871,15 +2869,15 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
 
         /// Check if this line matches the delimiter
         if (strcmp(line_content, match_delimiter) == 0) {
-            /* Found the terminator. body_end is the byte just past the
-             * terminator line's newline -- the resume point for the
-             * tokenizer (or the start of the next heredoc's body, when
-             * several heredocs share a line). When the terminator line
-             * is the final line with no trailing newline, line_end is
-             * already input_length. Deferral collects the body during
-             * separator-skipping, so landing past the newline is
-             * correct: the parser is between statements and re-enters
-             * keyword-aware tokenization for whatever follows. */
+            /// Found the terminator. body_end is the byte just past the
+            /// terminator line's newline -- the resume point for the
+            /// tokenizer (or the start of the next heredoc's body, when
+            /// several heredocs share a line). When the terminator line
+            /// is the final line with no trailing newline, line_end is
+            /// already input_length. Deferral collects the body during
+            /// separator-skipping, so landing past the newline is
+            /// correct: the parser is between statements and re-enters
+            /// keyword-aware tokenization for whatever follows.
             found_delimiter_line = true;
             free(line);
             *body_end =
@@ -2924,13 +2922,13 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
     /// partial body. Bash warns at parse time; lush -n needs an error
     /// because exit code is the only signal available to tooling.
     if (!found_delimiter_line) {
-        /* Use the OPERATOR's source location (op_loc), not the parser's
-         * current position (which by now is at end-of-input). Pointing
-         * the diagnostic at the `<<` operator is far more useful than
-         * pointing at EOF. parser_error_add_with_help_at() routes the
-         * error through the same context-stack / source-line / legacy-
-         * compatibility plumbing as parser_error_add_with_help, just
-         * with an explicit location. */
+        /// Use the OPERATOR's source location (op_loc), not the parser's
+        /// current position (which by now is at end-of-input). Pointing
+        /// the diagnostic at the `<<` operator is far more useful than
+        /// pointing at EOF. parser_error_add_with_help_at() routes the
+        /// error through the same context-stack / source-line / legacy-
+        /// compatibility plumbing as parser_error_add_with_help, just
+        /// with an explicit location.
         parser_error_add_with_help_at(
             parser, SHELL_ERR_UNEXPECTED_EOF, op_loc,
             "the delimiter must appear alone on a line; for <<- it may "
@@ -2981,11 +2979,11 @@ static bool collect_pending_heredocs(parser_t *parser) {
     tokenizer_t *tk = parser->tokenizer;
     token_t *cur = tokenizer_current(tk);
 
-    /* The first body begins immediately after the line-terminating
-     * newline. If the line was not newline-terminated (heredoc op on
-     * the final line, no trailing '\n'), there is no body -- scanning
-     * from end-of-input makes collect_one_heredoc_body report the
-     * unterminated-heredoc error. */
+    /// The first body begins immediately after the line-terminating
+    /// newline. If the line was not newline-terminated (heredoc op on
+    /// the final line, no trailing '\n'), there is no body -- scanning
+    /// from end-of-input makes collect_one_heredoc_body report the
+    /// unterminated-heredoc error.
     size_t scan;
     size_t base_offset;
     size_t base_line;
@@ -3013,8 +3011,8 @@ static bool collect_pending_heredocs(parser_t *parser) {
             break;
         }
 
-        /* Body content child, then the expand-variables flag child --
-         * the layout the executor's heredoc handling expects. */
+        /// Body content child, then the expand-variables flag child --
+        /// the layout the executor's heredoc handling expects.
         node_t *content_node = new_node(NODE_VAR);
         if (!content_node) {
             free(content);
@@ -3037,9 +3035,9 @@ static bool collect_pending_heredocs(parser_t *parser) {
 
     parser->pending_heredoc_count = 0;
 
-    /* Reposition the tokenizer past the last terminator and rebuild
-     * its line/column counters by counting newlines across the span
-     * just consumed as heredoc bodies. */
+    /// Reposition the tokenizer past the last terminator and rebuild
+    /// its line/column counters by counting newlines across the span
+    /// just consumed as heredoc bodies.
     tk->position = scan;
     size_t line = base_line;
     size_t column = 1;
@@ -3329,8 +3327,8 @@ static node_t *parse_repeat_statement(parser_t *parser) {
         return NULL;
     }
 
-    /* Parse count as a single word using the shared argument
-     * collector so $var / $((..)) / `(cmd)` all work. */
+    /// Parse count as a single word using the shared argument
+    /// collector so $var / $((..)) / `(cmd)` all work.
     if (!collect_word_argument(parser, repeat_node)) {
         free_node_tree(repeat_node);
         parser_error_add_with_help(parser, SHELL_ERR_UNEXPECTED_TOKEN,
@@ -4415,14 +4413,14 @@ static node_t *parse_anonymous_function(parser_t *parser) {
 
     add_child_node(anon_node, body);
 
-    /* Collect trailing positional arguments after the closing '}'.
-     * Zsh's anonymous-function form is `() { body } ARG1 ARG2 ...`,
-     * where the args become $1, $2, ... within the body. Uses the
-     * shared collect_word_argument helper so anon-function args have
-     * the same acceptance, adjacency-concatenation, and node-type
-     * classification semantics as regular command arguments. The
-     * helper stops naturally at non-arg tokens (NEWLINE, SEMI, EOF,
-     * AMP, PIPE, redirection tokens, etc.). */
+    /// Collect trailing positional arguments after the closing '}'.
+    /// Zsh's anonymous-function form is `() { body } ARG1 ARG2 ...`,
+    /// where the args become $1, $2, ... within the body. Uses the
+    /// shared collect_word_argument helper so anon-function args have
+    /// the same acceptance, adjacency-concatenation, and node-type
+    /// classification semantics as regular command arguments. The
+    /// helper stops naturally at non-arg tokens (NEWLINE, SEMI, EOF,
+    /// AMP, PIPE, redirection tokens, etc.).
     while (collect_word_argument(parser, anon_node)) {
         /// Loop until helper returns false (non-arg token or alloc failure).
     }
@@ -4527,14 +4525,14 @@ static node_t *parse_case_statement(parser_t *parser) {
     /// Parse case items until 'esac'
     parser_loop_guard_t items_guard = PARSER_LOOP_GUARD_INIT;
     while (1) {
-        /* Skip separators (newlines, comments, optional whitespace) between
-         * case items. Without this, a `;;` followed by a `# trailing
-         * comment` newline `esac` pattern (extremely common in real shell
-         * scripts -- see real_world/posix/100) errors with "expected
-         * pattern" when the loop body tries to parse the comment as a
-         * pattern. POSIX 2.10.2: case_item is `pattern_list ')' compound_list
-         * 'DSEMI'` followed by either another case_item or 'esac', with
-         * linebreaks / comments allowed in between. */
+        /// Skip separators (newlines, comments, optional whitespace) between
+        /// case items. Without this, a `;;` followed by a `# trailing
+        /// comment` newline `esac` pattern (extremely common in real shell
+        /// scripts -- see real_world/posix/100) errors with "expected
+        /// pattern" when the loop body tries to parse the comment as a
+        /// pattern. POSIX 2.10.2: case_item is `pattern_list ')' compound_list
+        /// 'DSEMI'` followed by either another case_item or 'esac', with
+        /// linebreaks / comments allowed in between.
         skip_separators(parser);
 
         if (tokenizer_match(parser->tokenizer, TOK_ESAC) ||
@@ -4745,16 +4743,16 @@ static node_t *parse_case_statement(parser_t *parser) {
             if (tokenizer_match(parser->tokenizer, TOK_SEMICOLON)) {
                 token_t *current_semi = tokenizer_current(parser->tokenizer);
                 token_t *next = tokenizer_peek(parser->tokenizer);
-                /* `;;` is the case_terminator only when the two
-                 * semicolons are positionally adjacent. `echo b; ;;
-                 * esac` is valid POSIX: a single `;` separator followed
-                 * by the `;;` terminator. Without the adjacency check
-                 * the parser would consume the first standalone `;`
-                 * together with the first `;` of `;;`, leaving the
-                 * trailing `;` to look like the start of a new
-                 * case_item -- which then fails pattern parsing. bash
-                 * and dash both require `;;` to be a single
-                 * unspaced token. */
+                /// `;;` is the case_terminator only when the two
+                /// semicolons are positionally adjacent. `echo b; ;;
+                /// esac` is valid POSIX: a single `;` separator followed
+                /// by the `;;` terminator. Without the adjacency check
+                /// the parser would consume the first standalone `;`
+                /// together with the first `;` of `;;`, leaving the
+                /// trailing `;` to look like the start of a new
+                /// case_item -- which then fails pattern parsing. bash
+                /// and dash both require `;;` to be a single
+                /// unspaced token.
                 if (next && next->type == TOK_SEMICOLON && current_semi &&
                     next->position == current_semi->end_position) {
                     /// ;; - break (default)
@@ -6087,16 +6085,16 @@ static node_t *parse_fn_declaration(parser_t *parser) {
 
     current = tokenizer_current(parser->tokenizer);
     while (current && current->type != TOK_RPAREN && current->type != TOK_EOF) {
-        /* Parameter forms accepted (the tokenizer treats ':' as a word
-         * char, so the surface form `name: kind` may arrive in a few
-         * shapes depending on whitespace):
-         *   1. one TOK_WORD `name:kind`           (no whitespace anywhere)
-         *   2. TOK_WORD `name:` then TOK_WORD `kind`  (space after ':')
-         *   3. TOK_WORD `name` then TOK_WORD `:kind`  (space before ':')
-         *   4. TOK_WORD `name` then TOK_WORD `:` then TOK_WORD `kind`
-         *
-         * In every case we extract the colon-delimited (name, kind)
-         * pair by string-splitting around the first ':'. */
+        /// Parameter forms accepted (the tokenizer treats ':' as a word
+        /// char, so the surface form `name: kind` may arrive in a few
+        /// shapes depending on whitespace):
+        ///   1. one TOK_WORD `name:kind`           (no whitespace anywhere)
+        ///   2. TOK_WORD `name:` then TOK_WORD `kind`  (space after ':')
+        ///   3. TOK_WORD `name` then TOK_WORD `:kind`  (space before ':')
+        ///   4. TOK_WORD `name` then TOK_WORD `:` then TOK_WORD `kind`
+        ///
+        /// In every case we extract the colon-delimited (name, kind)
+        /// pair by string-splitting around the first ':'.
         if (!token_is_word_like(current->type)) {
             parser_error_add_with_help(
                 parser, SHELL_ERR_INVALID_FUNCTION,

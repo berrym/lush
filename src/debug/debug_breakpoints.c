@@ -619,22 +619,22 @@ void debug_enter_interactive_mode(debug_context_t *ctx) {
         ctx,
         "Common commands: c/continue, s/step, n/next, vars, help, q/quit\n");
 
-    /* Read commands through LLE -- the single owner of terminal and
-     * user interaction. This is a sequential lle_readline() call: the
-     * primary prompt's readline returned long ago (the break fires
-     * during executor execution), so it is a normal supported use,
-     * not a re-entrant one. LLE owns the terminal lifecycle, so there
-     * is no fgets/termios contention with the line editor -- the bug
-     * that froze sessions. lle_readline() returns NULL on EOF,
-     * interrupt, or when LLE is unavailable (e.g. a non-interactive
-     * run with no controlling terminal); in every such case the right
-     * move is to stop prompting and let execution continue. */
+    /// Read commands through LLE -- the single owner of terminal and
+    /// user interaction. This is a sequential lle_readline() call: the
+    /// primary prompt's readline returned long ago (the break fires
+    /// during executor execution), so it is a normal supported use,
+    /// not a re-entrant one. LLE owns the terminal lifecycle, so there
+    /// is no fgets/termios contention with the line editor -- the bug
+    /// that froze sessions. lle_readline() returns NULL on EOF,
+    /// interrupt, or when LLE is unavailable (e.g. a non-interactive
+    /// run with no controlling terminal); in every such case the right
+    /// move is to stop prompting and let execution continue.
     fflush(ctx->debug_output);
-    /* Read commands until one resumes execution. Inspection commands
-     * (vars, print, backtrace, ...) loop back for another prompt;
-     * continue / step / next / finish / quit exit so the executor
-     * proceeds. EOF -- no controlling terminal, or Ctrl-D -- is
-     * treated as continue. */
+    /// Read commands until one resumes execution. Inspection commands
+    /// (vars, print, backtrace, ...) loop back for another prompt;
+    /// continue / step / next / finish / quit exit so the executor
+    /// proceeds. EOF -- no controlling terminal, or Ctrl-D -- is
+    /// treated as continue.
     for (;;) {
         char *line = lle_readline_no_history("(lush-debug) ");
         if (!line) {

@@ -838,8 +838,8 @@ bool lle_builtin_completions_applicable(const lle_word_context_t *context) {
         return false;
     }
 
-    /* Sit out the debugger's break-prompt: its `print x` / `type x`
-     * are debug-command arguments, not shell-builtin arguments. */
+    /// Sit out the debugger's break-prompt: its `print x` / `type x`
+    /// are debug-command arguments, not shell-builtin arguments.
     if (lle_in_debug_prompt()) {
         return false;
     }

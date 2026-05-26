@@ -45,8 +45,8 @@ int bin_let(int argc, char **argv) {
                     free(src_line);
                 }
             }
-            /* Walk executor's context stack — already includes
-             * "in builtin 'let'" pushed by the dispatcher. */
+            /// Walk executor's context stack — already includes
+            /// "in builtin 'let'" pushed by the dispatcher.
             if (current_executor) {
                 for (size_t i = 0; i < current_executor->context_depth; i++) {
                     if (current_executor->context_stack[i]) {
@@ -96,8 +96,8 @@ int bin_let(int argc, char **argv) {
                         free(src_line);
                     }
                 }
-                /* Walk executor's context stack — already includes
-                 * "in builtin 'let'" pushed by the dispatcher. */
+                /// Walk executor's context stack — already includes
+                /// "in builtin 'let'" pushed by the dispatcher.
                 if (current_executor) {
                     for (size_t i = 0; i < current_executor->context_depth;
                          i++) {
@@ -116,8 +116,8 @@ int bin_let(int argc, char **argv) {
                 if (err_msg) {
                     shell_error_set_detail(error, err_msg);
                 }
-                /* Prefer the per-site help from arithmetic.c when present;
-                 * fall back to the generic let-builtin operator cheat sheet. */
+                /// Prefer the per-site help from arithmetic.c when present;
+                /// fall back to the generic let-builtin operator cheat sheet.
                 if (err_help) {
                     shell_error_set_suggestion(error, err_help);
                 } else {

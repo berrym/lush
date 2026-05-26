@@ -243,8 +243,8 @@ TEST(readonly_variable) {
 
     /// Attempting to overwrite readonly should fail
     int result = symtable_set_var(mgr, "CONST", "new_value", SYMVAR_NONE);
-    /* Note: exact behavior depends on implementation - may return error or
-     * silently fail */
+    /// Note: exact behavior depends on implementation - may return error or
+    /// silently fail
     (void)result;
 
     symtable_manager_free(mgr);
@@ -410,8 +410,8 @@ TEST(array_associative) {
  */
 
 TEST(value_view_scalar_lookup) {
-    /* symtable_lookup queries the global manager. Ensure it is up;
-     * init_symtable() is a no-op if already initialized. */
+    /// symtable_lookup queries the global manager. Ensure it is up;
+    /// init_symtable() is a no-op if already initialized.
     init_symtable();
     symtable_manager_t *mgr = symtable_get_global_manager();
     if (!mgr) {
@@ -454,8 +454,8 @@ TEST(value_view_list_lookup) {
     ASSERT_EQ(symtable_array_length(view.array), 2, "length matches");
 
     lush_value_view_clear(&view);
-    /* The borrowed array is untouched by clear: still live in the
-     * symtable until we explicitly unset. */
+    /// The borrowed array is untouched by clear: still live in the
+    /// symtable until we explicitly unset.
     symtable_unset_var(symtable_manager(), "lush_view_list");
 }
 
@@ -491,8 +491,8 @@ TEST(value_view_none_on_miss) {
 
 TEST(value_view_clear_idempotent) {
     lush_value_view_t view = {0};
-    /* Repeated clears on a zero view are no-ops; safe to call after
-     * lookup whether or not a binding was found. */
+    /// Repeated clears on a zero view are no-ops; safe to call after
+    /// lookup whether or not a binding was found.
     lush_value_view_clear(&view);
     lush_value_view_clear(&view);
     lush_value_view_clear(NULL); /// NULL-safe
@@ -505,14 +505,14 @@ TEST(value_view_clear_idempotent) {
  */
 
 TEST(global_convenience_api) {
-    /* Note: These use the global manager, which may not be initialized in test
-     * context. The global convenience API is primarily for use within the shell
-     * runtime. */
+    /// Note: These use the global manager, which may not be initialized in test
+    /// context. The global convenience API is primarily for use within the
+    /// shell runtime.
 
     symtable_manager_t *mgr = symtable_get_global_manager();
     if (mgr == NULL) {
-        /* Global manager not initialized - this is expected in unit test
-         * context */
+        /// Global manager not initialized - this is expected in unit test
+        /// context
         printf(
             "    (Skipped - global manager not initialized in test context)\n");
         return;

@@ -113,13 +113,11 @@ int main(int argc, char **argv) {
             fprintf(stderr, "%s\n", shell_opts.command_string);
         }
 
-        /**
-         * @brief Fire pre-command event for command mode (Spec 26)
-         *
-         * Command mode (-c) must also fire shell events for consistency
-         * with the event system. This enables proper tracking even for
-         * single-command invocations.
-         */
+        /// @brief Fire pre-command event for command mode (Spec 26)
+        ///
+        /// Command mode (-c) must also fire shell events for consistency
+        /// with the event system. This enables proper tracking even for
+        /// single-command invocations.
         uint64_t cmd_start_us = 0;
         if (g_lle_integration) {
             struct timespec ts;
@@ -134,9 +132,7 @@ int main(int argc, char **argv) {
         /// input with no surrounding source file, so line 1.
         int exit_status = parse_and_execute(shell_opts.command_string, 1);
 
-        /**
-         * @brief Fire post-command event for command mode (Spec 26)
-         */
+        /// @brief Fire post-command event for command mode (Spec 26)
         if (g_lle_integration) {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -285,15 +281,14 @@ int main(int argc, char **argv) {
         exit(exit_status);
     }
 
-    /* Cumulative line counter for non-interactive (file) mode. Tracks
-     * the file-line of the FIRST character of the next batch the read
-     * loop hands to parse_and_execute. After each batch we advance by
-     * the number of source lines that batch consumed (counted by
-     * get_unified_input via its lines_consumed out-pointer) so multi-
-     * statement scripts produce file-relative source locations in
-     * structured-error output. Interactive REPL leaves this at 1
-     * always: each prompt batch is its own logical context.
-     */
+    /// Cumulative line counter for non-interactive (file) mode. Tracks
+    /// the file-line of the FIRST character of the next batch the read
+    /// loop hands to parse_and_execute. After each batch we advance by
+    /// the number of source lines that batch consumed (counted by
+    /// get_unified_input via its lines_consumed out-pointer) so multi-
+    /// statement scripts produce file-relative source locations in
+    /// structured-error output. Interactive REPL leaves this at 1
+    /// always: each prompt batch is its own logical context.
     size_t current_file_line = 1;
 
     /// Read input (buffering complete syntactic units) until user exits
@@ -330,13 +325,11 @@ int main(int argc, char **argv) {
         /// Add command to history if in interactive mode (handled by readline)
         /// History is automatically managed by the readline integration
 
-        /**
-         * @brief Fire pre-command event for LLE shell integration (Spec 26)
-         *
-         * Records command start time and notifies handlers before execution.
-         * Detects background commands (ending with &) to set is_background
-         * flag.
-         */
+        /// @brief Fire pre-command event for LLE shell integration (Spec 26)
+        ///
+        /// Records command start time and notifies handlers before execution.
+        /// Detects background commands (ending with &) to set is_background
+        /// flag.
         uint64_t cmd_start_us = 0;
         if (g_lle_integration) {
             struct timespec ts;
@@ -357,27 +350,26 @@ int main(int argc, char **argv) {
         last_exit_status = exit_status;
         set_exit_status(exit_status);
 
-        /* POSIX-required shell abort (e.g. ${var:?word} on a null-or-
-         * unset parameter in a non-interactive shell). The trigger
-         * sites raise this flag via executor_request_posix_exit() and
-         * every loop body / command list short-circuits up to here.
-         * Honor it before consuming any more script input. */
+        /// POSIX-required shell abort (e.g. ${var:?word} on a null-or-
+        /// unset parameter in a non-interactive shell). The trigger
+        /// sites raise this flag via executor_request_posix_exit() and
+        /// every loop body / command list short-circuits up to here.
+        /// Honor it before consuming any more script input.
         if (global_executor && global_executor->shell_exit_requested) {
             last_exit_status = global_executor->shell_exit_status;
             set_exit_status(last_exit_status);
             exit_flag = true;
         }
 
-        /* Advance cumulative line counter by the number of source
-         * lines consumed by this batch. Interactive mode skips this
-         * since the counter stays at 1. */
+        /// Advance cumulative line counter by the number of source
+        /// lines consumed by this batch. Interactive mode skips this
+        /// since the counter stays at 1.
         if (!is_interactive_shell()) {
             current_file_line += batch_lines;
         }
 
-        /* Fire post-command event for LLE shell integration (Spec 26)
-         * Provides exit code and execution duration for prompt and history.
-         */
+        /// Fire post-command event for LLE shell integration (Spec 26)
+        /// Provides exit code and execution duration for prompt and history.
         if (g_lle_integration) {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -426,11 +418,11 @@ int main(int argc, char **argv) {
     /// Cleanup is handled by atexit() handlers registered in init.c
     /// This prevents double cleanup when exit() command is used
 
-    /* Run EXIT traps BEFORE tearing down the executor: the trap body
-     * is parsed and executed by the executor itself, so it must still
-     * exist (otherwise execute_exit_traps falls back to /bin/sh, and
-     * any reference to a user-defined function or shell variable in
-     * the trap body fails). */
+    /// Run EXIT traps BEFORE tearing down the executor: the trap body
+    /// is parsed and executed by the executor itself, so it must still
+    /// exist (otherwise execute_exit_traps falls back to /bin/sh, and
+    /// any reference to a user-defined function or shell variable in
+    /// the trap body fails).
     execute_exit_traps();
 
     if (global_executor) {

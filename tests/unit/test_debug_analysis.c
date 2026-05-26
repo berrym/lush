@@ -478,9 +478,9 @@ TEST(analyze_script_type_at_subscript_in_scalar_assignment) {
 
     debug_analyze_script(ctx, path);
 
-    /* Count "type" category issues -- expect exactly two: lines 3 and
-     * 4. The for-in usage on line 5 is vector-accepting and must NOT
-     * be flagged. */
+    /// Count "type" category issues -- expect exactly two: lines 3 and
+    /// 4. The for-in usage on line 5 is vector-accepting and must NOT
+    /// be flagged.
     int type_issue_count = 0;
     bool flagged_line_3 = false;
     bool flagged_line_4 = false;

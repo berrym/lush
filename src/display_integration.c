@@ -1317,9 +1317,9 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
                     output.ps1);
         }
         if (result == LLE_SUCCESS && output.ps1_len > 0) {
-            /* Spec 25 prompt is ready - return directly, bypass display
-             * controller The display controller would transform/cache this
-             * incorrectly */
+            /// Spec 25 prompt is ready - return directly, bypass display
+            /// controller The display controller would transform/cache this
+            /// incorrectly
             *enhanced_prompt = lush_pool_strdup(output.ps1);
             lush_pool_free(base_prompt);
             lle_composer_clear_regeneration_flag(composer);

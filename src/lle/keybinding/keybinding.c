@@ -287,8 +287,8 @@ lle_result_t lle_keybinding_manager_destroy(lle_keybinding_manager_t *manager) {
 
             /// Iterate through all key-value pairs
             while (ht_strstr_enum_next(enumerator, &key, &value_str)) {
-                /* Value is a pointer stored as string - convert back to pointer
-                 */
+                /// Value is a pointer stored as string - convert back to
+                /// pointer
                 lle_keybinding_entry_t *entry;
                 sscanf(value_str, "%p", (void **)&entry);
 
@@ -536,8 +536,8 @@ lle_result_t lle_keybinding_manager_bind(lle_keybinding_manager_t *manager,
     entry->function_name =
         function_name ? keybinding_strdup(manager->pool, function_name) : NULL;
 
-    /* Convert entry to string for storage (hackish but works with strstr
-     * hashtable) */
+    /// Convert entry to string for storage (hackish but works with strstr
+    /// hashtable)
     char entry_str[32];
     snprintf(entry_str, sizeof(entry_str), "%p", (void *)entry);
 
@@ -590,8 +590,8 @@ lle_result_t lle_keybinding_manager_bind_context(
     entry->function_name =
         function_name ? keybinding_strdup(manager->pool, function_name) : NULL;
 
-    /* Convert entry to string for storage (hackish but works with strstr
-     * hashtable) */
+    /// Convert entry to string for storage (hackish but works with strstr
+    /// hashtable)
     char entry_str[32];
     snprintf(entry_str, sizeof(entry_str), "%p", (void *)entry);
 
@@ -642,10 +642,9 @@ lle_result_t lle_keybinding_manager_clear(lle_keybinding_manager_t *manager) {
         return LLE_ERROR_NULL_POINTER;
     }
 
-    /* Note: This leaks entries, but since we're clearing everything,
-     * it's acceptable if the hashtable and manager are about to be destroyed.
-     * For a proper implementation, we'd need to enumerate and free each entry.
-     */
+    /// Note: This leaks entries, but since we're clearing everything,
+    /// it's acceptable if the hashtable and manager are about to be destroyed.
+    /// For a proper implementation, we'd need to enumerate and free each entry.
     lle_strstr_hashtable_clear(manager->bindings);
 
     return LLE_SUCCESS;
@@ -708,8 +707,8 @@ lle_keybinding_manager_process_key(lle_keybinding_manager_t *manager,
         manager->max_lookup_time_us = elapsed;
     }
 
-    /* Execute action - only simple actions supported here (no readline context)
-     */
+    /// Execute action - only simple actions supported here (no readline
+    /// context)
     if (entry->action.type == LLE_ACTION_TYPE_SIMPLE) {
         return entry->action.func.simple(editor);
     } else {
@@ -793,26 +792,24 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     /// Set mode to emacs
     manager->current_mode = LLE_KEYMAP_EMACS;
 
-    /* ========================================================================
-     * GNU Readline Emacs-style Keybindings
-     *
-     * This loads all SIMPLE actions that operate on lle_editor_t only.
-     * Context-aware actions (requiring readline_context_t) must be registered
-     * separately in lle_readline.c after this preset loads.
-     *
-     * Context-aware bindings registered in lle_readline.c will OVERRIDE
-     * simple bindings registered here for: RIGHT, END, C-e, C-f, C-g,
-     * C-RIGHT, ESC, ENTER (these need autosuggestion/completion/readline
-     * access)
-     * ========================================================================
-     */
+    /// ========================================================================
+    /// GNU Readline Emacs-style Keybindings
+    ///
+    /// This loads all SIMPLE actions that operate on lle_editor_t only.
+    /// Context-aware actions (requiring readline_context_t) must be registered
+    /// separately in lle_readline.c after this preset loads.
+    ///
+    /// Context-aware bindings registered in lle_readline.c will OVERRIDE
+    /// simple bindings registered here for: RIGHT, END, C-e, C-f, C-g,
+    /// C-RIGHT, ESC, ENTER (these need autosuggestion/completion/readline
+    /// access)
+    /// ========================================================================
 
     lle_result_t result;
 
-    /* ------------------------------------------------------------------------
-     * MOVEMENT - Character Level
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// MOVEMENT - Character Level
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-f", lle_forward_char,
                                          "forward-char");
     if (result != LLE_SUCCESS)
@@ -833,10 +830,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * MOVEMENT - Word Level
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// MOVEMENT - Word Level
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "M-f", lle_forward_word,
                                          "forward-word");
     if (result != LLE_SUCCESS)
@@ -847,10 +843,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * MOVEMENT - Line Level
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// MOVEMENT - Line Level
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-a", lle_beginning_of_line,
                                          "beginning-of-line");
     if (result != LLE_SUCCESS)
@@ -871,10 +866,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * MOVEMENT - Buffer Level (Multiline)
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// MOVEMENT - Buffer Level (Multiline)
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(
         manager, "M-<", lle_beginning_of_buffer, "beginning-of-buffer");
     if (result != LLE_SUCCESS)
@@ -885,10 +879,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * DELETION - Character Level
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// DELETION - Character Level
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-d", lle_delete_char,
                                          "delete-char");
     if (result != LLE_SUCCESS)
@@ -904,10 +897,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * KILL/YANK - Line Operations
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// KILL/YANK - Line Operations
+    /// ------------------------------------------------------------------------
     result =
         lle_keybinding_manager_bind(manager, "C-k", lle_kill_line, "kill-line");
     if (result != LLE_SUCCESS)
@@ -918,10 +910,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * KILL/YANK - Word Operations
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// KILL/YANK - Word Operations
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-w", lle_unix_word_rubout,
                                          "unix-word-rubout");
     if (result != LLE_SUCCESS)
@@ -937,10 +928,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * YANK (Paste)
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// YANK (Paste)
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-y", lle_yank, "yank");
     if (result != LLE_SUCCESS)
         return result;
@@ -950,10 +940,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * CASE CHANGES
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// CASE CHANGES
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "M-u", lle_upcase_word,
                                          "upcase-word");
     if (result != LLE_SUCCESS)
@@ -969,10 +958,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * TRANSPOSE
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// TRANSPOSE
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-t", lle_transpose_chars,
                                          "transpose-chars");
     if (result != LLE_SUCCESS)
@@ -983,10 +971,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * HISTORY NAVIGATION
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// HISTORY NAVIGATION
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-p", lle_history_previous,
                                          "history-previous");
     if (result != LLE_SUCCESS)
@@ -1018,10 +1005,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * COMPLETION
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// COMPLETION
+    /// ------------------------------------------------------------------------
     result =
         lle_keybinding_manager_bind(manager, "TAB", lle_complete, "complete");
     if (result != LLE_SUCCESS)
@@ -1037,10 +1023,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * SPECIAL FUNCTIONS
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// SPECIAL FUNCTIONS
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "C-l", lle_clear_screen,
                                          "clear-screen");
     if (result != LLE_SUCCESS)
@@ -1061,10 +1046,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * LITERAL INSERTION
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// LITERAL INSERTION
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "S-ENTER",
                                          lle_insert_newline_literal,
                                          "insert-newline-literal");
@@ -1092,10 +1076,9 @@ lle_keybinding_manager_load_emacs_preset(lle_keybinding_manager_t *manager) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* ------------------------------------------------------------------------
-     * MISCELLANEOUS
-     * ------------------------------------------------------------------------
-     */
+    /// ------------------------------------------------------------------------
+    /// MISCELLANEOUS
+    /// ------------------------------------------------------------------------
     result = lle_keybinding_manager_bind(manager, "M-\\",
                                          lle_delete_horizontal_space,
                                          "delete-horizontal-space");
@@ -1166,9 +1149,9 @@ lle_keybinding_manager_list_bindings(lle_keybinding_manager_t *manager,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Note: We would need to enumerate the hashtable here, but libhashtable's
-     * enumeration is buggy according to the LLE wrapper. For now, return empty.
-     */
+    /// Note: We would need to enumerate the hashtable here, but libhashtable's
+    /// enumeration is buggy according to the LLE wrapper. For now, return
+    /// empty.
     *bindings_out = bindings;
     *count_out = 0;
 

@@ -211,20 +211,18 @@ command_layer_error_t command_layer_init(command_layer_t *layer,
 
     /// Subscribe to relevant events
     /// Temporarily disable theme subscription to isolate issue
-    /*
-    layer_events_error_t event_result = layer_events_subscribe(
-        events,
-        LAYER_EVENT_THEME_CHANGED,
-        LAYER_ID_COMMAND_LAYER,
-        handle_layer_event,
-        layer,
-        LAYER_EVENT_PRIORITY_HIGH
-    );
-
-    if (event_result != LAYER_EVENTS_SUCCESS) {
-        return COMMAND_LAYER_ERROR_EVENT_SYSTEM;
-    }
-    */
+    ///     layer_events_error_t event_result = layer_events_subscribe(
+    ///         events,
+    ///         LAYER_EVENT_THEME_CHANGED,
+    ///         LAYER_ID_COMMAND_LAYER,
+    ///         handle_layer_event,
+    ///         layer,
+    ///         LAYER_EVENT_PRIORITY_HIGH
+    ///     );
+    ///
+    ///     if (event_result != LAYER_EVENTS_SUCCESS) {
+    ///         return COMMAND_LAYER_ERROR_EVENT_SYSTEM;
+    ///     }
 
     /// Subscribe to prompt layer events if available
     layer_events_error_t event_result = layer_events_subscribe(
@@ -272,10 +270,9 @@ command_layer_error_t command_layer_set_command(command_layer_t *layer,
     /// Always need initial render even if buffer is empty
     bool is_first_render = (layer->update_sequence_number == 0);
 
-    /* Check if completion menu or notification state changed (even if
-     * command/cursor didn't). When menu/notification is shown/hidden, we need
-     * redraw even if command text unchanged.
-     */
+    /// Check if completion menu or notification state changed (even if
+    /// command/cursor didn't). When menu/notification is shown/hidden, we need
+    /// redraw even if command text unchanged.
     bool menu_changed = false;
     bool notification_changed = false;
     display_controller_t *dc = display_integration_get_controller();
@@ -886,8 +883,8 @@ publish_command_event(command_layer_t *layer, layer_event_type_t event_type) {
         return COMMAND_LAYER_SUCCESS; /// Not an error if no event system
     }
 
-    /* Use HIGH priority for REDRAW_NEEDED events to match display_controller
-     * subscription */
+    /// Use HIGH priority for REDRAW_NEEDED events to match display_controller
+    /// subscription
     layer_event_priority_t priority = (event_type == LAYER_EVENT_REDRAW_NEEDED)
                                           ? LAYER_EVENT_PRIORITY_HIGH
                                           : LAYER_EVENT_PRIORITY_NORMAL;

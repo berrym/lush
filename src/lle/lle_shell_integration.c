@@ -236,9 +236,9 @@ lle_result_t lle_shell_integration_init(void) {
         return LLE_ERROR_NOT_INITIALIZED;
     }
 
-    /* Step 2: Create session arena - root of arena hierarchy
-     * The session arena owns all LLE memory for the shell session.
-     * 64KB initial size, grows as needed. */
+    /// Step 2: Create session arena - root of arena hierarchy
+    /// The session arena owns all LLE memory for the shell session.
+    /// 64KB initial size, grows as needed.
     lle_arena_t *session_arena = lle_arena_create(NULL, "session", 64 * 1024);
     if (!session_arena) {
         return LLE_ERROR_OUT_OF_MEMORY;
@@ -256,9 +256,9 @@ lle_result_t lle_shell_integration_init(void) {
     integ->init_time_us = get_timestamp_us();
     integ->init_state.memory_pool_verified = true;
 
-    /* Step 3: Verify terminal detection is complete
-     * Terminal detection is handled by Lush's display system,
-     * so we just verify it has been initialized */
+    /// Step 3: Verify terminal detection is complete
+    /// Terminal detection is handled by Lush's display system,
+    /// so we just verify it has been initialized
     integ->init_state.terminal_detected = true;
 
     /// Step 4: Create shell event hub
@@ -269,9 +269,9 @@ lle_result_t lle_shell_integration_init(void) {
     }
     integ->init_state.event_hub_initialized = true;
 
-    /* Step 4.5: Initialize shell hook function bridge (Phase 7)
-     * This registers handlers that call user-defined hook functions
-     * (precmd, preexec, chpwd) when shell events fire. */
+    /// Step 4.5: Initialize shell hook function bridge (Phase 7)
+    /// This registers handlers that call user-defined hook functions
+    /// (precmd, preexec, chpwd) when shell events fire.
     /// Note: We set g_lle_integration temporarily so hooks can register
     g_lle_integration = integ;
     lle_shell_hooks_init();
@@ -297,8 +297,7 @@ lle_result_t lle_shell_integration_init(void) {
         lle_widget_hooks_bridge_install(integ->event_hub, integ->editor);
     }
 
-    /* Step 6: Initialize history (already done in create_and_configure_editor)
-     */
+    /// Step 6: Initialize history (already done in create_and_configure_editor)
     integ->init_state.history_initialized = true;
 
     /// Step 7: Create and configure prompt composer (Spec 25)
@@ -385,8 +384,8 @@ void lle_shell_integration_shutdown(void) {
     /// Cleanup watchdog subsystem
     lle_watchdog_cleanup();
 
-    /* Clear global pointer before destroying arena
-     * (integ is allocated from session_arena) */
+    /// Clear global pointer before destroying arena
+    /// (integ is allocated from session_arena)
     g_lle_integration = NULL;
 
     /// Destroy session arena - frees ALL LLE memory including integ itself
@@ -469,8 +468,8 @@ create_and_configure_editor(lle_shell_integration_t *integ) {
                                        history_path);
         }
 
-        /* Initialize the history bridge for builtin commands
-         * This connects the LLE history core to the shell's history builtin */
+        /// Initialize the history bridge for builtin commands
+        /// This connects the LLE history core to the shell's history builtin
         lle_result_t bridge_result =
             lle_history_bridge_init(integ->editor->history_system,
                                     NULL, /// No POSIX manager - LLE-only now
@@ -534,8 +533,8 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Initialize registries only if not already initialized
-     * This prevents double-init issues during hard reset */
+    /// Initialize registries only if not already initialized
+    /// This prevents double-init issues during hard reset
     if (!g_registries_initialized) {
         /// Initialize segment registry and register built-in segments
         lle_result_t result = lle_segment_registry_init(&g_segment_registry);
@@ -552,11 +551,10 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         }
         lle_theme_register_builtins(&g_theme_registry);
 
-        /* Load user themes from standard locations (Issue #21)
-         * This loads themes from:
-         * - $XDG_CONFIG_HOME/lush/themes/ (~/.config/lush/themes/)
-         * - /etc/lush/themes/ (system-wide)
-         */
+        /// Load user themes from standard locations (Issue #21)
+        /// This loads themes from:
+        /// - $XDG_CONFIG_HOME/lush/themes/ (~/.config/lush/themes/)
+        /// - /etc/lush/themes/ (system-wide)
         lle_theme_load_user_themes(&g_theme_registry);
 
         g_registries_initialized = true;
@@ -588,8 +586,8 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
     integ->prompt_composer->config.newline_before_prompt =
         config.display_newline_before_prompt;
 
-    /* Register with shell event hub for automatic updates
-     * This is the key Spec 25 <-> Spec 26 integration point */
+    /// Register with shell event hub for automatic updates
+    /// This is the key Spec 25 <-> Spec 26 integration point
     result = lle_composer_register_shell_events(integ->prompt_composer,
                                                 integ->event_hub);
     if (result != LLE_SUCCESS) {
@@ -599,9 +597,9 @@ create_and_configure_prompt_composer(lle_shell_integration_t *integ) {
         return result;
     }
 
-    /* Spec 28 Phase 2: Write theme's format strings to PS1/PS2.
-     * PS1 now holds the format string (with ${segment}, \u, %n escapes),
-     * not the rendered output. The prompt render loop will expand it. */
+    /// Spec 28 Phase 2: Write theme's format strings to PS1/PS2.
+    /// PS1 now holds the format string (with ${segment}, \u, %n escapes),
+    /// not the rendered output. The prompt render loop will expand it.
     const lle_theme_t *theme = lle_composer_get_theme(integ->prompt_composer);
     if (theme && strlen(theme->layout.ps1_format) > 0) {
         symtable_set_global("PS1", theme->layout.ps1_format);
@@ -749,8 +747,8 @@ void lle_nuclear_reset(void) {
     lle_hard_reset();
 
     /// Send terminal reset sequence
-    /* ESC c = RIS (Reset to Initial State); best-effort -- if the write
-     * is short or fails we have no recovery in nuclear-reset path. */
+    /// ESC c = RIS (Reset to Initial State); best-effort -- if the write
+    /// is short or fails we have no recovery in nuclear-reset path.
     (void)!write(STDOUT_FILENO, "\033c", 2);
 
     /// Give terminal time to process reset
@@ -836,9 +834,9 @@ void lle_shell_update_prompt(void) {
         lle_prompt_context_set_job_count(&composer->context, job_count);
     }
 
-    /* Powerline rendering path: bypass PS1 symtable entirely.
-     * The powerline renderer iterates the theme's enabled_segments[]
-     * and generates colored blocks with arrow separators. */
+    /// Powerline rendering path: bypass PS1 symtable entirely.
+    /// The powerline renderer iterates the theme's enabled_segments[]
+    /// and generates colored blocks with arrow separators.
     const lle_theme_t *active_theme =
         composer->themes ? lle_theme_registry_get_active(composer->themes)
                          : NULL;
@@ -902,8 +900,8 @@ void lle_shell_update_prompt(void) {
         }
     }
 
-    /* Validate UTF-8 encoding — malformed PS1 would produce corrupted
-     * terminal output.  Replace with safe fallback. */
+    /// Validate UTF-8 encoding — malformed PS1 would produce corrupted
+    /// terminal output.  Replace with safe fallback.
     if (!lle_utf8_is_valid(ps1_fmt, strlen(ps1_fmt))) {
         free(ps1_fmt);
         ps1_fmt = strdup((getuid() > 0) ? "$ " : "# ");
@@ -956,8 +954,8 @@ void lle_shell_update_prompt(void) {
     lle_composer_clear_regeneration_flag(composer);
     free(ps1_fmt);
 
-    /* Expand RPROMPT (right prompt) using the same expansion context.
-     * Read from RPROMPT or RPS1 in the symtable. */
+    /// Expand RPROMPT (right prompt) using the same expansion context.
+    /// Read from RPROMPT or RPS1 in the symtable.
     s_rendered_rprompt[0] = '\0';
     char *rprompt_fmt = symtable_get_global("RPROMPT");
     if (!rprompt_fmt) {
@@ -1124,9 +1122,9 @@ char *lush_readline_with_prompt(const char *prompt) {
 
     g_lle_integration->total_readline_calls++;
 
-    /* If prompt is NULL, expand PS1 format string (Spec 28 Phase 2).
-     * PS1 now holds the format string with escapes (\u, %n, ${segment}).
-     * lle_shell_update_prompt() expands it into a rendered prompt. */
+    /// If prompt is NULL, expand PS1 format string (Spec 28 Phase 2).
+    /// PS1 now holds the format string with escapes (\u, %n, ${segment}).
+    /// lle_shell_update_prompt() expands it into a rendered prompt.
     const char *effective_prompt = prompt;
     if (!effective_prompt) {
         lle_shell_update_prompt();

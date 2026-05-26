@@ -187,16 +187,16 @@ int bin_mapfile(int argc, char **argv) {
         symtable_unset_global(array_name);
     }
 
-    /* Read lines via a freshly-duped FILE*. We deliberately do NOT
-     * reuse the global `stdin` even when fd == STDIN_FILENO: stdio's
-     * stdin FILE* carries a stale `feof` flag from the shell's own
-     * script reading, which makes getdelim() return -1 immediately
-     * without ever touching the redirected fd. bash and zsh hit the
-     * same issue and solve it by bypassing stdio entirely for read /
-     * mapfile (see bin_read.c comment for the same fix on the read
-     * builtin). dup+fdopen gives a fresh FILE* whose state reflects
-     * the actual fd, including any `<<<` here-string redirection
-     * setup_redirections placed at fd 0. Issue #101. */
+    /// Read lines via a freshly-duped FILE*. We deliberately do NOT
+    /// reuse the global `stdin` even when fd == STDIN_FILENO: stdio's
+    /// stdin FILE* carries a stale `feof` flag from the shell's own
+    /// script reading, which makes getdelim() return -1 immediately
+    /// without ever touching the redirected fd. bash and zsh hit the
+    /// same issue and solve it by bypassing stdio entirely for read /
+    /// mapfile (see bin_read.c comment for the same fix on the read
+    /// builtin). dup+fdopen gives a fresh FILE* whose state reflects
+    /// the actual fd, including any `<<<` here-string redirection
+    /// setup_redirections placed at fd 0. Issue #101.
     int dup_fd = dup(fd);
     if (dup_fd < 0) {
         int saved_errno = errno;
@@ -264,9 +264,9 @@ int bin_mapfile(int argc, char **argv) {
 
     free(line);
 
-    /* Close the fdopen'd FILE*. fclose() closes the underlying dup_fd
-     * as well. The original fd remains intact for the rest of the
-     * shell to use. */
+    /// Close the fdopen'd FILE*. fclose() closes the underlying dup_fd
+    /// as well. The original fd remains intact for the rest of the
+    /// shell to use.
     fclose(input);
 
     /// Suppress unused variable warning

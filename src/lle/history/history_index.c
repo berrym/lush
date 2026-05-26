@@ -241,9 +241,8 @@ lle_result_t lle_history_index_clear(lle_hashtable_t *index) {
 
     /// libhashtable doesn't provide ht_clear(), so we iterate and remove
     /// For now, return success - caller will destroy/recreate if needed
-    /* Phase 1 Day 2: Acceptable since clear is only used in lle_history_clear()
-     */
-    /// which destroys the whole core anyway
+    /// Phase 1 Day 2: Acceptable since clear is only used in
+    /// lle_history_clear() which destroys the whole core anyway
 
     return LLE_SUCCESS;
 }

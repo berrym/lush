@@ -42,8 +42,8 @@ typedef struct {
  * Used when the theme does not provide a per-segment bg_color.
  */
 static lle_color_t default_segment_bg(const char *name) {
-    /* True color backgrounds — palette indices get remapped by terminal
-     * colorschemes and produce unpredictable results. */
+    /// True color backgrounds — palette indices get remapped by terminal
+    /// colorschemes and produce unpredictable results.
     if (strcmp(name, "user") == 0)
         return lle_color_rgb(68, 68, 68); /// #444444 dark gray
     if (strcmp(name, "host") == 0)
@@ -86,8 +86,8 @@ static void resolve_segment_colors(const lle_theme_t *theme,
                                    const char *segment_name,
                                    const lle_prompt_context_t *ctx,
                                    lle_color_t *fg_out, lle_color_t *bg_out) {
-    /* Default foreground: bold true-color white (palette 255 gets remapped
-     * by dark terminal colorschemes and becomes unreadable) */
+    /// Default foreground: bold true-color white (palette 255 gets remapped
+    /// by dark terminal colorschemes and becomes unreadable)
     lle_color_t fg = lle_color_rgb(255, 255, 255);
     fg.bold = true;
     lle_color_t bg = default_segment_bg(segment_name);
@@ -184,8 +184,8 @@ static size_t strip_ansi(const char *src, char *dst, size_t dst_size) {
                                        (unsigned char)src[i] <= 0x7E)) {
                 i++;
             }
-            /* i now points to the final byte (or NUL); loop increment
-             * will advance past it */
+            /// i now points to the final byte (or NUL); loop increment
+            /// will advance past it
             continue;
         }
 

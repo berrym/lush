@@ -188,8 +188,8 @@ lle_result_t lle_history_buffer_integration_create(
 
     /// Initialize performance monitor if not provided
     if (!integ->perf_monitor) {
-        /* Performance monitor should be created by caller, but we'll handle
-         * gracefully */
+        /// Performance monitor should be created by caller, but we'll handle
+        /// gracefully
         integ->perf_monitor = NULL;
     }
 
@@ -470,10 +470,9 @@ lle_history_edit_entry(lle_history_buffer_integration_t *integration,
     /// Load history entry to buffer (from cache or fresh)
     if (cache_hit) {
         /// Use cached reconstructed text - load directly into buffer
-        /* Note: For now we still do full reconstruction even on cache hit.
-         * Future optimization: Implement buffer population from cached text.
-         * This would require buffer API changes or direct buffer manipulation.
-         */
+        /// Note: For now we still do full reconstruction even on cache hit.
+        /// Future optimization: Implement buffer population from cached text.
+        /// This would require buffer API changes or direct buffer manipulation.
         integration->current_state->cache_hits--; /// Don't count as hit yet
         integration->current_state->cache_misses++;
         cache_hit = false; /// Treat as miss for now
@@ -492,12 +491,12 @@ lle_history_edit_entry(lle_history_buffer_integration_t *integration,
                 bridge, entry_index, buffer, NULL, /// Use default options
                 &transfer_result);
 
-            /* Phase 4: Cache insertion would happen here if we had the
-             * reconstructed text available. For now, cache is prepared but
-             * insertion requires getting the actual reconstructed text from
-             * the buffer or reconstruction engine, which isn't exposed in
-             * the current transfer_result structure. This is a known limitation
-             * that can be addressed in future iterations. */
+            /// Phase 4: Cache insertion would happen here if we had the
+            /// reconstructed text available. For now, cache is prepared but
+            /// insertion requires getting the actual reconstructed text from
+            /// the buffer or reconstruction engine, which isn't exposed in
+            /// the current transfer_result structure. This is a known
+            /// limitation that can be addressed in future iterations.
 
             lle_history_buffer_bridge_destroy(bridge);
         }

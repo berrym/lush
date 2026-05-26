@@ -190,9 +190,9 @@ typedef struct path_cache {
 } path_cache_t;
 
 static unsigned int path_hash(const char *str) {
-    /* Same djb2 used for the cmd cache, modulo the path table size --
-     * keeping the function distinct lets the two tables be sized
-     * independently in the future without a coupled change. */
+    /// Same djb2 used for the cmd cache, modulo the path table size --
+    /// keeping the function distinct lets the two tables be sized
+    /// independently in the future without a coupled change.
     unsigned int hash = 5381;
     int c;
     while ((c = *str++)) {
@@ -291,9 +291,9 @@ static bool is_hook_array_variable(const char *name, size_t len) {
 static bool is_word_char(char c) {
     unsigned char uc = (unsigned char)c;
 
-    /* UTF-8 continuation bytes (10xxxxxx) and lead bytes (11xxxxxx) are part of
-     * words. This ensures multi-byte UTF-8 characters like 'é' (0xC3 0xA9) are
-     * not split. */
+    /// UTF-8 continuation bytes (10xxxxxx) and lead bytes (11xxxxxx) are part
+    /// of words. This ensures multi-byte UTF-8 characters like 'é' (0xC3 0xA9)
+    /// are not split.
     if (uc >= 0x80) {
         return true; /// Any non-ASCII byte is part of a word
     }
@@ -729,9 +729,9 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
         }
     }
 
-    /* Determine the source-level shape before any expansion -- the
-     * shape bucket is anchored to what the user typed, not what it
-     * resolves to. */
+    /// Determine the source-level shape before any expansion -- the
+    /// shape bucket is anchored to what the user typed, not what it
+    /// resolves to.
     enum {
         SHAPE_ABSOLUTE, ///< leading '/'
         SHAPE_HOME,     ///< leading '~'
@@ -745,9 +745,9 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
         shape = SHAPE_RELATIVE;
     }
 
-    /* Dequote, then optionally expand `~`. The dequote pass acts on
-     * the source bytes, so a path like `~/a\ b` becomes `~/a b` first
-     * and then `$HOME/a b`. */
+    /// Dequote, then optionally expand `~`. The dequote pass acts on
+    /// the source bytes, so a path like `~/a\ b` becomes `~/a b` first
+    /// and then `$HOME/a b`.
     char dequoted[4096];
     if (!dequote_unquoted_path(raw, dequoted, sizeof(dequoted))) {
         memcpy(dequoted, raw, copy_len);
@@ -757,15 +757,15 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
     char resolved[4096];
     const char *to_stat = dequoted;
     if (shape == SHAPE_HOME) {
-        /* POSIX tilde-prefix expansion (2.6.1). The byte after `~`
-         * selects the form:
-         *   `~`        / `~/...`        -> $HOME
-         *   `~+`       / `~+/...`       -> $PWD
-         *   `~-`       / `~-/...`       -> $OLDPWD
-         *   `~name`    / `~name/...`    -> getpwnam(name)->pw_dir
-         * The prefix_len records how many bytes of `dequoted` form the
-         * tilde-prefix; the suffix after that point is concatenated
-         * verbatim onto the resolved base. */
+        /// POSIX tilde-prefix expansion (2.6.1). The byte after `~`
+        /// selects the form:
+        ///   `~`        / `~/...`        -> $HOME
+        ///   `~+`       / `~+/...`       -> $PWD
+        ///   `~-`       / `~-/...`       -> $OLDPWD
+        ///   `~name`    / `~name/...`    -> getpwnam(name)->pw_dir
+        /// The prefix_len records how many bytes of `dequoted` form the
+        /// tilde-prefix; the suffix after that point is concatenated
+        /// verbatim onto the resolved base.
         const char *base = NULL;
         size_t prefix_len = 0;
         if (dequoted[1] == '\0' || dequoted[1] == '/') {
@@ -780,10 +780,10 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
             base = getenv("OLDPWD");
             prefix_len = 2;
         } else {
-            /* `~name` or `~name/...` -- read the username up to the
-             * next '/' or end of word, then resolve via getpwnam.
-             * POSIX usernames are pure ASCII so byte-level scanning
-             * is sufficient. */
+            /// `~name` or `~name/...` -- read the username up to the
+            /// next '/' or end of word, then resolve via getpwnam.
+            /// POSIX usernames are pure ASCII so byte-level scanning
+            /// is sufficient.
             char name[256];
             size_t i = 1;
             while (dequoted[i] != '\0' && dequoted[i] != '/' &&
@@ -807,10 +807,10 @@ classify_path_token(lle_syntax_highlighter_t *highlighter, const char *raw_word,
                      dequoted + prefix_len);
             to_stat = resolved;
         }
-        /* If the prefix couldn't be resolved (HOME/PWD/OLDPWD unset or
-         * unknown user) we fall through with to_stat=dequoted; the
-         * stat() call will almost certainly fail and we'll cache the
-         * result as PATH_INVALID. */
+        /// If the prefix couldn't be resolved (HOME/PWD/OLDPWD unset or
+        /// unknown user) we fall through with to_stat=dequoted; the
+        /// stat() call will almost certainly fail and we'll cache the
+        /// result as PATH_INVALID.
     }
 
     struct stat st;
@@ -939,8 +939,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         pos = skip_whitespace(input, pos, input_len);
         if (pos > ws_start) {
             add_token(highlighter, LLE_TOKEN_WHITESPACE, ws_start, pos);
-            /* Check if whitespace contained a newline - new line = new command
-             */
+            /// Check if whitespace contained a newline - new line = new command
             for (size_t i = ws_start; i < pos; i++) {
                 if (input[i] == '\n') {
                     expect_command = true;
@@ -1085,13 +1084,13 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     pos++;
                     vtype = LLE_TOKEN_VARIABLE_SPECIAL;
                 }
-                /* ${...} brace expansion - extract variable name for hook check
-                 */
+                /// ${...} brace expansion - extract variable name for hook
+                /// check
                 else if (next == '{') {
                     pos++; /// Skip {
                     size_t var_name_start = pos;
-                    /* Scan to find end of variable name (before : or } or other
-                     * modifier) */
+                    /// Scan to find end of variable name (before : or } or
+                    /// other modifier)
                     while (pos < input_len && input[pos] != '}' &&
                            input[pos] != ':' && input[pos] != '#' &&
                            input[pos] != '%' && input[pos] != '/' &&
@@ -1183,12 +1182,11 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         }
 
         if (c == '>' || c == '<') {
-            /* Process substitution: >(...) or <(...)
-             * Only emit the <( or >( operator token, then let normal
-             * tokenization continue for the contents. This enables proper
-             * syntax highlighting of commands inside process substitutions
-             * like: cat <(cat <(echo nested))
-             */
+            /// Process substitution: >(...) or <(...)
+            /// Only emit the <( or >( operator token, then let normal
+            /// tokenization continue for the contents. This enables proper
+            /// syntax highlighting of commands inside process substitutions
+            /// like: cat <(cat <(echo nested))
             if (pos + 1 < input_len && input[pos + 1] == '(') {
                 lle_syntax_token_type_t pstype =
                     (c == '<') ? LLE_TOKEN_PROCSUB_IN : LLE_TOKEN_PROCSUB_OUT;
@@ -1319,8 +1317,7 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     continue;
                 }
                 if (ch == '\\') {
-                    /* Trailing backslash at end of input - include it and stop
-                     */
+                    /// Trailing backslash at end of input - include it and stop
                     pos++;
                     break;
                 }
@@ -1346,15 +1343,15 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 memcpy(word, input + token_start, copy_len);
                 word[copy_len] = '\0';
 
-                /* Check if this is a function name after 'function' keyword
-                 * e.g., "function foo" or "function foo()" */
+                /// Check if this is a function name after 'function' keyword
+                /// e.g., "function foo" or "function foo()"
                 if (after_function_keyword) {
                     type = LLE_TOKEN_COMMAND_FUNCTION;
                     after_function_keyword = false;
                     expect_command = false;
                 }
-                /* Check for POSIX function definition: name() { ... }
-                 * Look ahead for () after the word */
+                /// Check for POSIX function definition: name() { ... }
+                /// Look ahead for () after the word
                 else {
                     size_t lookahead = pos;
                     /// Skip optional whitespace between name and ()
@@ -1381,8 +1378,8 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                         if (eq) {
                             size_t var_name_len =
                                 (size_t)(eq - (input + token_start));
-                            /* Check for hook array assignment (special
-                             * highlight) */
+                            /// Check for hook array assignment (special
+                            /// highlight)
                             if (is_hook_array_variable(input + token_start,
                                                        var_name_len)) {
                                 type = LLE_TOKEN_VARIABLE_SPECIAL;
@@ -1402,9 +1399,10 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                             strncmp(input + token_start, "function", 8) == 0) {
                             after_function_keyword = true;
                         }
-                        /* Block-ending keywords (done, fi, esac, etc.) don't
-                           expect a command after them. Block-starting keywords
-                           do. */
+                        /// Block-ending keywords (done, fi, esac, etc.) don't
+                        ///                            expect a command after
+                        ///                            them. Block-starting
+                        ///                            keywords do.
                         if (is_block_ending_keyword(input + token_start,
                                                     word_len)) {
                             expect_command = false;
@@ -1429,13 +1427,13 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                 } else if ((has_slash || is_implicit_path_word(
                                              input + token_start, word_len)) &&
                            highlighter->validate_paths) {
-                    /* Path-shaped argument: shape × kind classification
-                     * via classify_path_token (dequote → tilde-expand →
-                     * stat → cache, single helper, see definition for
-                     * the full pipeline). The trigger admits both
-                     * slash-bearing forms (the classic heuristic) and
-                     * the bare `.` / `..` / `~` indicators per
-                     * is_implicit_path_word. */
+                    /// Path-shaped argument: shape × kind classification
+                    /// via classify_path_token (dequote → tilde-expand →
+                    /// stat → cache, single helper, see definition for
+                    /// the full pipeline). The trigger admits both
+                    /// slash-bearing forms (the classic heuristic) and
+                    /// the bare `.` / `..` / `~` indicators per
+                    /// is_implicit_path_word.
                     type = classify_path_token(highlighter, input + token_start,
                                                word_len);
                 } else if (has_slash || is_implicit_path_word(
@@ -1506,13 +1504,13 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         case LLE_TOKEN_VARIABLE_SPECIAL:
             tok->color = c->variable_special;
             break;
-        /* Path tokens use the shape × kind fallback chain documented
-         * on the lle_syntax_colors struct: shape-specific knob, then
-         * kind-only knob, then 0 (token demoted to ARGUMENT, default
-         * text). The chain is computed inline -- explicit per-case
-         * rather than table-driven so the code is grep-friendly and
-         * the failure mode for an unset knob is obvious from reading
-         * the case body. */
+        /// Path tokens use the shape × kind fallback chain documented
+        /// on the lle_syntax_colors struct: shape-specific knob, then
+        /// kind-only knob, then 0 (token demoted to ARGUMENT, default
+        /// text). The chain is computed inline -- explicit per-case
+        /// rather than table-driven so the code is grep-friendly and
+        /// the failure mode for an unset knob is obvious from reading
+        /// the case body.
         case LLE_TOKEN_PATH_FILE_ABSOLUTE:
             tok->color =
                 c->path_file_absolute ? c->path_file_absolute : c->path_file;
@@ -1850,8 +1848,8 @@ int lle_syntax_highlighter_create(lle_syntax_highlighter_t **highlighter) {
         h->color_depth = 3; /// Fallback: assume truecolor
     }
 
-    /* Create caches. Both are best-effort allocations: a NULL cache
-     * just disables caching, classification still works. */
+    /// Create caches. Both are best-effort allocations: a NULL cache
+    /// just disables caching, classification still works.
     h->command_cache = calloc(1, sizeof(cmd_cache_t));
     h->path_cache = calloc(1, sizeof(path_cache_t));
 
@@ -1899,9 +1897,9 @@ void lle_syntax_highlighter_set_colors(lle_syntax_highlighter_t *highlighter,
     if (!highlighter || !colors)
         return;
 
-    /* Merge colors: only apply non-zero values from the source, preserving
-     * defaults for unspecified colors. This allows themes to partially
-     * override syntax colors without clearing unspecified ones to black. */
+    /// Merge colors: only apply non-zero values from the source, preserving
+    /// defaults for unspecified colors. This allows themes to partially
+    /// override syntax colors without clearing unspecified ones to black.
 #define MERGE_COLOR(field)                                                     \
     if (colors->field != 0)                                                    \
     highlighter->colors.field = colors->field

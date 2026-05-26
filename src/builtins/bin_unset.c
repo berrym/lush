@@ -28,13 +28,13 @@ int bin_unset(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         const char *var_name = argv[i];
 
-        /* Array-element form: `unset arr[N]` or `unset assoc[key]`
-         * removes just the matching element, not the whole array.
-         * Bash semantics; without this lush ignored the subscript
-         * and either no-op'd or tried to unset a scalar named
-         * "arr[N]" (issue #101). Detect a `[` in the name; if
-         * followed by a matching `]`, route through the array
-         * element-unset API. */
+        /// Array-element form: `unset arr[N]` or `unset assoc[key]`
+        /// removes just the matching element, not the whole array.
+        /// Bash semantics; without this lush ignored the subscript
+        /// and either no-op'd or tried to unset a scalar named
+        /// "arr[N]" (issue #101). Detect a `[` in the name; if
+        /// followed by a matching `]`, route through the array
+        /// element-unset API.
         const char *bracket = strchr(var_name, '[');
         if (bracket && bracket > var_name) {
             const char *close = strrchr(bracket, ']');

@@ -549,9 +549,9 @@ TEST(thread_safe_concurrent_inserts) {
     size_t expected_size = num_threads * ops_per_thread;
     size_t actual_size = lle_strstr_hashtable_size(ht);
 
-    /* With our entry_count tracking fix, we should now get 100% success rate.
-     * The previous issue was libhashtable's enumeration bug, not a thread
-     * safety issue. */
+    /// With our entry_count tracking fix, we should now get 100% success rate.
+    /// The previous issue was libhashtable's enumeration bug, not a thread
+    /// safety issue.
     ASSERT_EQ(actual_size, expected_size,
               "Thread-safe inserts should have 100% success rate");
 

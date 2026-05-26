@@ -351,14 +351,13 @@ lle_result_t lle_buffer_enable_secure_mode(lle_buffer_t *buffer) {
     /// Attempt to lock buffer memory to prevent swapping
     bool lock_success = lle_memory_lock(buffer->data, buffer->capacity);
 
-    /* Note: mlock may fail due to:
-     * - Insufficient privileges (need CAP_IPC_LOCK on Linux)
-     * - Exceeding RLIMIT_MEMLOCK
-     * - Platform doesn't support mlock
-     *
-     * This is not a fatal error - the buffer can still be used,
-     * just without the anti-swap protection.
-     */
+    /// Note: mlock may fail due to:
+    /// - Insufficient privileges (need CAP_IPC_LOCK on Linux)
+    /// - Exceeding RLIMIT_MEMLOCK
+    /// - Platform doesn't support mlock
+    ///
+    /// This is not a fatal error - the buffer can still be used,
+    /// just without the anti-swap protection.
     buffer->memory_locked = lock_success;
     buffer->secure_mode_enabled = true;
 

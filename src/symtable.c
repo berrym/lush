@@ -489,13 +489,13 @@ int symtable_push_lexical_scope(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
-    /* Stash the dynamic caller so pop can restore it. The lexical
-     * frame's `parent` field points at the captured scope (lookup
-     * direction), but the SCOPE STACK is still LIFO -- pop must
-     * return to whoever pushed us, not to the captured site. We
-     * piggyback the link through a side field on the manager so
-     * existing pop machinery can find it without growing the public
-     * struct shape. */
+    /// Stash the dynamic caller so pop can restore it. The lexical
+    /// frame's `parent` field points at the captured scope (lookup
+    /// direction), but the SCOPE STACK is still LIFO -- pop must
+    /// return to whoever pushed us, not to the captured site. We
+    /// piggyback the link through a side field on the manager so
+    /// existing pop machinery can find it without growing the public
+    /// struct shape.
     new_scope->dynamic_caller = manager->current_scope;
 
     manager->current_scope = new_scope;
@@ -2556,9 +2556,9 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
     /// Check if key exists and update count
     if (is_new) {
         array->count++;
-        /* Append to insertion-order list. zsh semantic: a key keeps
-         * its original position when overwritten; only first-set
-         * appends. (Issue #69.) */
+        /// Append to insertion-order list. zsh semantic: a key keeps
+        /// its original position when overwritten; only first-set
+        /// appends. (Issue #69.)
         if (array->assoc_insertion_count >= array->assoc_insertion_capacity) {
             size_t new_cap = array->assoc_insertion_capacity
                                  ? array->assoc_insertion_capacity * 2
@@ -2569,9 +2569,9 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
                 array->assoc_insertion_order = grown;
                 array->assoc_insertion_capacity = new_cap;
             }
-            /* If realloc fails, we still set the value; iteration just
-             * won't include this key in insertion order. Hashtable
-             * fallback path remains correct. */
+            /// If realloc fails, we still set the value; iteration just
+            /// won't include this key in insertion order. Hashtable
+            /// fallback path remains correct.
         }
         if (array->assoc_insertion_count < array->assoc_insertion_capacity) {
             char *key_copy = strdup(key);
@@ -2685,9 +2685,9 @@ int symtable_array_unset_assoc(array_value_t *array, const char *key) {
         ht_strstr_remove(array->assoc_map, key);
         array->count--;
 
-        /* Remove from insertion-order list. Linear scan + memmove down;
-         * acceptable since assoc-array unset is uncommon and the list
-         * is typically small. (Issue #69.) */
+        /// Remove from insertion-order list. Linear scan + memmove down;
+        /// acceptable since assoc-array unset is uncommon and the list
+        /// is typically small. (Issue #69.)
         for (size_t i = 0; i < array->assoc_insertion_count; i++) {
             if (strcmp(array->assoc_insertion_order[i], key) == 0) {
                 free(array->assoc_insertion_order[i]);
@@ -2728,14 +2728,14 @@ char **symtable_array_get_keys(array_value_t *array, size_t *count) {
     }
 
     if (array->is_associative) {
-        /* Iteration order is mode-aware (Issue #69):
-         *   - zsh / lush mode: insertion order (matches zsh native;
-         *     lush curated default for predictability + determinism)
-         *   - bash / POSIX mode: hashtable bucket order (matches
-         *     bash's documented behavior for compat)
-         * If insertion-order tracking is empty (e.g. realloc failure
-         * during a previous set), fall back to hashtable order so we
-         * never return fewer keys than the caller expects. */
+        /// Iteration order is mode-aware (Issue #69):
+        ///   - zsh / lush mode: insertion order (matches zsh native;
+        ///     lush curated default for predictability + determinism)
+        ///   - bash / POSIX mode: hashtable bucket order (matches
+        ///     bash's documented behavior for compat)
+        /// If insertion-order tracking is empty (e.g. realloc failure
+        /// during a previous set), fall back to hashtable order so we
+        /// never return fewer keys than the caller expects.
         shell_mode_t mode = shell_mode_get();
         bool use_insertion_order =
             (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&
@@ -2794,10 +2794,10 @@ char **symtable_array_get_values(array_value_t *array, size_t *count) {
     }
 
     if (array->is_associative) {
-        /* Same mode-aware iteration as symtable_array_get_keys —
-         * critical that BOTH functions use the same order so that
-         * keys[i] and values[i] pair correctly when callers fetch
-         * both (e.g. ${(kv)assoc_map}). (Issue #69.) */
+        /// Same mode-aware iteration as symtable_array_get_keys —
+        /// critical that BOTH functions use the same order so that
+        /// keys[i] and values[i] pair correctly when callers fetch
+        /// both (e.g. ${(kv)assoc_map}). (Issue #69.)
         shell_mode_t mode = shell_mode_get();
         bool use_insertion_order =
             (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) &&

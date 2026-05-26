@@ -153,15 +153,15 @@ static bool commands_equal(const lle_history_dedup_engine_t *dedup,
         return lle_unicode_strings_equal(cmd1, cmd2, &opts);
     }
 
-    /* Fast path: if both config options are default (case-sensitive, no trim),
-     * we can just do direct strcmp */
+    /// Fast path: if both config options are default (case-sensitive, no trim),
+    /// we can just do direct strcmp
     if (dedup->case_sensitive && !dedup->trim_whitespace) {
         return strcmp(cmd1, cmd2) == 0;
     }
 
-/* Slow path: need whitespace/case normalization (no Unicode)
- * Use reasonable stack buffers (4KB each) - commands are typically < 1KB
- * For very large commands, we'll truncate during normalization */
+/// Slow path: need whitespace/case normalization (no Unicode)
+/// Use reasonable stack buffers (4KB each) - commands are typically < 1KB
+/// For very large commands, we'll truncate during normalization
 #define NORM_BUFFER_SIZE 4096
     char norm1[NORM_BUFFER_SIZE];
     char norm2[NORM_BUFFER_SIZE];
@@ -340,26 +340,24 @@ lle_result_t lle_history_dedup_check(lle_history_dedup_engine_t *dedup,
         return LLE_ERROR_INVALID_STATE;
     }
 
-    /* CRITICAL: Dedup is called from within add_entry which already holds a
-     * write lock. We MUST NOT call functions that acquire locks (deadlock!).
-     * Instead, directly access core->entries and core->entry_count.
-     * This is safe because the caller (add_entry) holds the write lock.
-     */
+    /// CRITICAL: Dedup is called from within add_entry which already holds a
+    /// write lock. We MUST NOT call functions that acquire locks (deadlock!).
+    /// Instead, directly access core->entries and core->entry_count.
+    /// This is safe because the caller (add_entry) holds the write lock.
     size_t entry_count = core->entry_count;
 
-    /* Determine how many entries to check based on dedup scope (issue #41)
-     *
-     * - LLE_HISTORY_DEDUP_SCOPE_NONE:    No deduplication (handled above)
-     * - LLE_HISTORY_DEDUP_SCOPE_SESSION: Check entries from current session
-     *                                    (approximated by last 1000 entries)
-     * - LLE_HISTORY_DEDUP_SCOPE_RECENT:  Check last N entries (default 100)
-     * - LLE_HISTORY_DEDUP_SCOPE_GLOBAL:  Check entire history
-     */
+    /// Determine how many entries to check based on dedup scope (issue #41)
+    ///
+    /// - LLE_HISTORY_DEDUP_SCOPE_NONE:    No deduplication (handled above)
+    /// - LLE_HISTORY_DEDUP_SCOPE_SESSION: Check entries from current session
+    ///                                    (approximated by last 1000 entries)
+    /// - LLE_HISTORY_DEDUP_SCOPE_RECENT:  Check last N entries (default 100)
+    /// - LLE_HISTORY_DEDUP_SCOPE_GLOBAL:  Check entire history
     size_t check_limit;
     switch (dedup->scope) {
     case LLE_HISTORY_DEDUP_SCOPE_SESSION:
-        /* Session scope: check a reasonable number of recent entries
-         * that would typically represent a session's worth of commands */
+        /// Session scope: check a reasonable number of recent entries
+        /// that would typically represent a session's worth of commands
         check_limit = (entry_count > 1000) ? 1000 : entry_count;
         break;
     case LLE_HISTORY_DEDUP_SCOPE_RECENT:
@@ -586,8 +584,8 @@ lle_result_t lle_history_dedup_cleanup(lle_history_dedup_engine_t *dedup,
 
     size_t removed = 0;
 
-    /* Scan all entries and physically remove deleted ones
-     * In production, this would be more efficient with a cleanup list */
+    /// Scan all entries and physically remove deleted ones
+    /// In production, this would be more efficient with a cleanup list
     for (size_t i = 0; i < entry_count; i++) {
         lle_history_entry_t *entry = NULL;
         result = lle_history_get_entry_by_index(core, i, &entry);
@@ -597,8 +595,8 @@ lle_result_t lle_history_dedup_cleanup(lle_history_dedup_engine_t *dedup,
         }
 
         if (entry->state == LLE_HISTORY_STATE_DELETED) {
-            /* This entry should be removed - for now just count it
-             * Full implementation would call lle_history_remove_entry() */
+            /// This entry should be removed - for now just count it
+            /// Full implementation would call lle_history_remove_entry()
             removed++;
         }
     }
@@ -754,10 +752,9 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
 
     size_t removed = 0;
 
-    /* Scan from oldest to newest, marking duplicates
-     * For KEEP_RECENT: when we find a duplicate, mark the older one as deleted
-     * For KEEP_FREQUENT: compare usage counts and mark the less frequent one
-     */
+    /// Scan from oldest to newest, marking duplicates
+    /// For KEEP_RECENT: when we find a duplicate, mark the older one as deleted
+    /// For KEEP_FREQUENT: compare usage counts and mark the less frequent one
     for (size_t i = 0; i < entry_count; i++) {
         lle_history_entry_t *entry_i = core->entries[i];
         if (!entry_i || entry_i->state != LLE_HISTORY_STATE_ACTIVE) {
@@ -781,8 +778,7 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
                 case LLE_DEDUP_IGNORE:
                 case LLE_DEDUP_KEEP_RECENT:
                 case LLE_DEDUP_MERGE_METADATA:
-                    /* Keep the more recent entry (higher index = more recent)
-                     */
+                    /// Keep the more recent entry (higher index = more recent)
                     keep = entry_j;
                     discard = entry_i;
                     break;
@@ -814,8 +810,8 @@ lle_result_t lle_history_dedup_full_scan(lle_history_dedup_engine_t *dedup,
                     removed++;
                     dedup->duplicates_merged++;
 
-                    /* If we discarded entry_i, break inner loop and move to
-                     * next i */
+                    /// If we discarded entry_i, break inner loop and move to
+                    /// next i
                     if (discard == entry_i) {
                         break;
                     }

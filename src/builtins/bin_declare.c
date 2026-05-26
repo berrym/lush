@@ -34,11 +34,11 @@ static void declare_print_array_callback(const char *name, array_value_t *array,
         return;
     if (array->is_associative) {
         printf("declare -A %s=(", name);
-        /* Print associative array elements. Iteration order matches
-         * the rest of the shell (issue #69): zsh / lush mode use
-         * insertion order for predictable output; bash / POSIX use
-         * hashtable bucket order. The insertion-order list lives on
-         * the array itself; we look up each value via ht_strstr_get. */
+        /// Print associative array elements. Iteration order matches
+        /// the rest of the shell (issue #69): zsh / lush mode use
+        /// insertion order for predictable output; bash / POSIX use
+        /// hashtable bucket order. The insertion-order list lives on
+        /// the array itself; we look up each value via ht_strstr_get.
         if (array->assoc_map) {
             shell_mode_t mode = shell_mode_get();
             bool use_insertion_order =
@@ -476,11 +476,11 @@ int bin_declare(int argc, char **argv) {
             } else {
                 symtable_set(manager, name, "0");
             }
-            /* Mark the variable as integer-typed so subsequent
-             * assignments arith-evaluate their RHS (issue #102).
-             * Without this, `declare -i n=5; n=n+10` would only
-             * apply arithmetic to the initial 5; the n=n+10 line
-             * would store the literal string "n+10". */
+            /// Mark the variable as integer-typed so subsequent
+            /// assignments arith-evaluate their RHS (issue #102).
+            /// Without this, `declare -i n=5; n=n+10` would only
+            /// apply arithmetic to the initial 5; the n=n+10 line
+            /// would store the literal string "n+10".
             symvar_flags_t flags = symtable_get_flags(manager, name);
             symtable_set_flags(manager, name, flags | SYMVAR_INTEGER_ATTR);
         }

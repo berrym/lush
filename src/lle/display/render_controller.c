@@ -161,21 +161,21 @@ lle_result_t lle_render_controller_init(lle_render_controller_t **controller,
         return result;
     }
 
-    /* Note: pipeline will be initialized when rendering operations are
-     * implemented */
+    /// Note: pipeline will be initialized when rendering operations are
+    /// implemented
     ctrl->pipeline = NULL;
 
-    /* Step 10: Create frame arena for per-frame allocations.
-     * Child of session arena if available. 4KB is enough for render output.
-     * This arena is reset at the start of each render operation to reclaim
-     * memory from temporary buffers. */
+    /// Step 10: Create frame arena for per-frame allocations.
+    /// Child of session arena if available. 4KB is enough for render output.
+    /// This arena is reset at the start of each render operation to reclaim
+    /// memory from temporary buffers.
     lle_arena_t *parent_arena = NULL;
     if (g_lle_integration && g_lle_integration->session_arena) {
         parent_arena = g_lle_integration->session_arena;
     }
     ctrl->frame_arena = lle_arena_create(parent_arena, "frame", 4096);
-    /* Note: frame_arena may be NULL if arena creation fails, which is handled
-     * gracefully in render functions by falling back to pool allocation */
+    /// Note: frame_arena may be NULL if arena creation fails, which is handled
+    /// gracefully in render functions by falling back to pool allocation
 
     /// Success - return initialized controller
     *controller = ctrl;
@@ -255,9 +255,9 @@ lle_render_controller_cleanup(lle_render_controller_t *controller) {
     controller->bridge = NULL;
     controller->memory_pool = NULL;
 
-    /* Note: The controller structure itself is not freed here.
-     * It should be freed by the caller using the same memory pool
-     * that was used to allocate it. */
+    /// Note: The controller structure itself is not freed here.
+    /// It should be freed by the caller using the same memory pool
+    /// that was used to allocate it.
 
     return LLE_SUCCESS;
 }
@@ -631,8 +631,8 @@ lle_result_t lle_render_buffer_content(lle_render_controller_t *controller,
     }
     memset(render_out, 0, sizeof(lle_render_output_t));
 
-    /* Step 4: Estimate required output size (buffer length + ANSI codes
-     * overhead) */
+    /// Step 4: Estimate required output size (buffer length + ANSI codes
+    /// overhead)
     size_t estimated_size = buffer->length + 256; /// Extra space for ANSI codes
 
     /// Step 5: Allocate output content buffer

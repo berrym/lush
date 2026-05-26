@@ -576,9 +576,9 @@ static bool scan_vector_expansion(const char *start, size_t avail,
             /// The [@] subscript is the canonical vector trigger.
             has_vector = true;
         } else if (c == '(' && i + 2 < avail && depth == 1) {
-            /* Parameter-flag operators (k) / (v) / (kv) yield vectors
-             * from a map. (i)/(I) yield indices (scalars) and are not
-             * vector-yielding -- exclude them. */
+            /// Parameter-flag operators (k) / (v) / (kv) yield vectors
+            /// from a map. (i)/(I) yield indices (scalars) and are not
+            /// vector-yielding -- exclude them.
             char f1 = start[i + 1];
             char f2 = start[i + 2];
             if ((f1 == 'k' || f1 == 'v') &&
@@ -634,8 +634,8 @@ static void debug_analyze_types(debug_context_t *ctx, const char *file,
                 goto next_line;
             }
 
-            /* Walk the line scanning for "=" followed (with optional
-             * double quote) by a ${...} expansion that contains [@]. */
+            /// Walk the line scanning for "=" followed (with optional
+            /// double quote) by a ${...} expansion that contains [@].
             for (size_t k = 0; k + 2 < line_len; k++) {
                 if (line_start[k] != '=') {
                     continue;
@@ -981,9 +981,9 @@ static void sigil_collect_bindings_from_line(const char *line, size_t len,
         return;
     }
 
-    /* `declare -A NAME` / `typeset -A NAME` -> map binding.
-     * Any other `declare`/`typeset` form falls through to the scalar /
-     * list / list-via-`=(` detector below. */
+    /// `declare -A NAME` / `typeset -A NAME` -> map binding.
+    /// Any other `declare`/`typeset` form falls through to the scalar /
+    /// list / list-via-`=(` detector below.
     static const char *map_prefixes[] = {"declare -A ", "typeset -A ", NULL};
     for (size_t p = 0; map_prefixes[p]; p++) {
         size_t plen = strlen(map_prefixes[p]);

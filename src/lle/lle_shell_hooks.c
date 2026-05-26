@@ -251,8 +251,8 @@ static void execute_prompt_command(void) {
         if (commands && count > 0) {
             for (size_t i = 0; i < count; i++) {
                 if (commands[i] && commands[i][0] != '\0') {
-                    /* PROMPT_COMMAND entries are independent logical
-                     * commands; line 1 of their own context. */
+                    /// PROMPT_COMMAND entries are independent logical
+                    /// commands; line 1 of their own context.
                     executor_execute_command_line(executor, commands[i], 1);
                 }
             }

@@ -144,8 +144,8 @@ lle_result_t lle_input_stream_init(lle_input_stream_t **stream,
     /// Flow control disabled by default
     new_stream->flow_control_enabled = false;
 
-    /* Note: terminal_caps would be set from terminal system in full integration
-     */
+    /// Note: terminal_caps would be set from terminal system in full
+    /// integration
     new_stream->terminal_caps = NULL;
 
     *stream = new_stream;

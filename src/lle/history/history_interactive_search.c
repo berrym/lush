@@ -266,11 +266,10 @@ lle_history_interactive_search_init(lle_history_core_t *history_core,
         lle_history_interactive_search_cancel();
     }
 
-    /* CRITICAL FIX: Clean up any leftover results from previous session
-     * If the previous search ended with accept() rather than cancel(),
-     * the results were kept alive for the caller to read. We must free
-     * them now to prevent memory leak.
-     */
+    /// CRITICAL FIX: Clean up any leftover results from previous session
+    /// If the previous search ended with accept() rather than cancel(),
+    /// the results were kept alive for the caller to read. We must free
+    /// them now to prevent memory leak.
     if (session->results) {
         lle_history_search_results_destroy(session->results);
         session->results = NULL;
@@ -470,9 +469,9 @@ const char *lle_history_interactive_search_accept(void) {
 
     /// Clean up session but don't free the command yet (caller needs it)
     if (session->results) {
-        /* Note: We return a pointer to command in results, so we can't destroy
-         * yet. Caller must copy the string before we destroy results. For now,
-         * we'll keep results alive and destroy on next init. */
+        /// Note: We return a pointer to command in results, so we can't destroy
+        /// yet. Caller must copy the string before we destroy results. For now,
+        /// we'll keep results alive and destroy on next init.
     }
 
     /// Mark session as inactive
@@ -510,8 +509,8 @@ const char *lle_history_interactive_search_cancel(void) {
     session->active = false;
     session->state = LLE_SEARCH_STATE_INACTIVE;
 
-    /* Note: We don't free original_line here because caller needs it.
-     * It will be freed on next init or when session is destroyed. */
+    /// Note: We don't free original_line here because caller needs it.
+    /// It will be freed on next init or when session is destroyed.
 
     return original;
 }

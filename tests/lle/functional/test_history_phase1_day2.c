@@ -112,8 +112,7 @@ void test_fast_id_lookup(void) {
     uint64_t elapsed_us =
         (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec);
 
-    /* O(1) hashtable lookup should be very fast - under 10ms for 1000 lookups
-     */
+    /// O(1) hashtable lookup should be very fast - under 10ms for 1000 lookups
     if (elapsed_us > 10000) {
         printf("  WARNING: Lookup took %lu us (expected < 10000 us)\n",
                (unsigned long)elapsed_us);

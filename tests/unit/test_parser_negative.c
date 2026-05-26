@@ -312,9 +312,8 @@ TEST(redirect_fd_dup_invalid) { ASSERT_PARSE_FAILS("echo hello 2>&"); }
 /// NOTE: variable_invalid_char_in_name (foo-bar=value) - same as above
 
 TEST(variable_empty_name) {
-    /* "=value" with nothing before = is structurally ambiguous but typically
-     * parsed as a word. Whether this should error at parse time is debatable.
-     */
+    /// "=value" with nothing before = is structurally ambiguous but typically
+    /// parsed as a word. Whether this should error at parse time is debatable.
     ASSERT_PARSE_FAILS("=value");
 }
 
@@ -475,8 +474,8 @@ TEST(heredoc_unclosed_quoted_delim) {
 }
 
 TEST(heredoc_unclosed_with_partial_match) {
-    /* Body contains a line that LOOKS like the delimiter but isn't (has
-     * trailing characters). Must still be flagged as unterminated. */
+    /// Body contains a line that LOOKS like the delimiter but isn't (has
+    /// trailing characters). Must still be flagged as unterminated.
     ASSERT_PARSE_FAILS("cat <<EOF\nbody\nEOFx\n");
 }
 
@@ -636,8 +635,8 @@ TEST(heredoc_repeated_delimiter_no_loop) {
  * Pre-fix wall-clock on the 37-byte trigger: ~4 seconds at 99% CPU.
  * Post-fix: under 50 ms; budget 1 second to tolerate slow CI. */
 TEST(heredoc_empty_quoted_concat_in_case_no_loop) {
-    /* 37 bytes: case + heredoc with empty-quote-concat delimiter,
-     * unterminated. */
+    /// 37 bytes: case + heredoc with empty-quote-concat delimiter,
+    /// unterminated.
     const char *input = "case \"$1\" in\n   t)\nai\no[<< ''ai\n \nwac\n";
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);

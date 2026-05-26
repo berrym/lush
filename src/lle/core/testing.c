@@ -296,9 +296,9 @@ lle_test_discovery_scan_and_register(lle_testing_framework_t *framework) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* In a real implementation, this would scan for test annotations,
-     * shared library symbols, or test registration sections.
-     * For now, we provide the infrastructure for manual registration. */
+    /// In a real implementation, this would scan for test annotations,
+    /// shared library symbols, or test registration sections.
+    /// For now, we provide the infrastructure for manual registration.
 
     return LLE_SUCCESS;
 }
@@ -729,8 +729,8 @@ lle_result_t lle_test_results_add_failure(lle_test_results_t *results,
     /// Increment failure count
     results->failure_count++;
 
-    /* In a complete implementation, we would reallocate the failures array
-     * For Phase 1, we just track the count */
+    /// In a complete implementation, we would reallocate the failures array
+    /// For Phase 1, we just track the count
 
     return LLE_SUCCESS;
 }
@@ -750,8 +750,8 @@ lle_testing_get_performance_metrics(lle_system_t *system,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* In a real implementation, this would query the actual system.
-     * For now, we provide the infrastructure. */
+    /// In a real implementation, this would query the actual system.
+    /// For now, we provide the infrastructure.
     memset(metrics, 0, sizeof(lle_performance_metrics_t));
 
     return LLE_SUCCESS;

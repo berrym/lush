@@ -672,8 +672,8 @@ TEST(command_layer_continuation) {
     command_layer_t *layer = create_initialized_layer(&events);
     ASSERT_NOT_NULL(layer, "create_initialized_layer should succeed");
 
-    /* Test simple continuation line (without trailing backslash that may
-     * trigger input) */
+    /// Test simple continuation line (without trailing backslash that may
+    /// trigger input)
     const char *multiline = "echo hello world";
     command_layer_error_t err = command_layer_set_command(layer, multiline, 0);
     ASSERT_EQ(err, COMMAND_LAYER_SUCCESS, "Simple command should succeed");

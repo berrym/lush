@@ -56,7 +56,7 @@ void test_complete_workflow(void) {
     lle_history_core_t *core2 = NULL;
     lle_result_t result;
 
-    /* === PART 1: Create and populate === */
+    /// === PART 1: Create and populate ===
     result = lle_history_core_create(&core1, NULL, NULL);
     if (result != LLE_SUCCESS) {
         FAIL("Failed to create core1");
@@ -84,7 +84,7 @@ void test_complete_workflow(void) {
         }
     }
 
-    /* === PART 2: Save to file === */
+    /// === PART 2: Save to file ===
     result = lle_history_save_to_file(core1, TEST_FILE);
     if (result != LLE_SUCCESS) {
         lle_history_core_destroy(core1);
@@ -103,7 +103,7 @@ void test_complete_workflow(void) {
 
     lle_history_core_destroy(core1);
 
-    /* === PART 3: Load in new core === */
+    /// === PART 3: Load in new core ===
     result = lle_history_core_create(&core2, NULL, NULL);
     if (result != LLE_SUCCESS) {
         unlink(TEST_FILE);
@@ -126,7 +126,7 @@ void test_complete_workflow(void) {
         FAIL("Loaded count should be 100");
     }
 
-    /* === PART 4: Verify retrieved data === */
+    /// === PART 4: Verify retrieved data ===
     for (int i = 0; i < 100; i++) {
         lle_history_entry_t *entry = NULL;
         result = lle_history_get_entry_by_index(core2, i, &entry);
@@ -151,7 +151,7 @@ void test_complete_workflow(void) {
         }
     }
 
-    /* === PART 5: Test hashtable indexing === */
+    /// === PART 5: Test hashtable indexing ===
     /// Get some entries by their new IDs (assigned during load)
     for (int i = 0; i < 100; i += 20) {
         lle_history_entry_t *entry1 = NULL;

@@ -758,9 +758,9 @@ determine_construct_type(lle_keyword_type_t first_keyword) {
  */
 static lle_result_t build_construct_tree(lle_structure_analyzer_t *analyzer,
                                          lle_command_structure_t *structure) {
-    /* This function builds the nested construct tree from the keyword list
-     * Currently returns success - tree building will be enhanced in next
-     * iteration */
+    /// This function builds the nested construct tree from the keyword list
+    /// Currently returns success - tree building will be enhanced in next
+    /// iteration
 
     if (!analyzer || !structure) {
         return LLE_ERROR_INVALID_PARAMETER;
@@ -779,8 +779,8 @@ static lle_result_t build_construct_tree(lle_structure_analyzer_t *analyzer,
     structure->max_depth = 0; // Will be calculated during tree building
 
     // Tree building implementation placeholder for future enhancement
-    /* For now, we have the flat keyword list which is sufficient for basic
-     * analysis */
+    /// For now, we have the flat keyword list which is sufficient for basic
+    /// analysis
 
     return LLE_SUCCESS;
 }

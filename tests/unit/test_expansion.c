@@ -126,15 +126,13 @@ TEST(braced_var_expansion) {
 }
 
 TEST(var_concatenation) {
-    /*
-     * KNOWN BUG: Variable concatenation with separator causes crash
-     * Issue #59: ${A}_${B} syntax causes memory corruption (double-free)
-     * The underscore between braced variables is incorrectly parsed.
-     * Command: A=hello; B=world; RESULT=${A}_${B}
-     * Expected: RESULT=hello_world
-     * Actual: malloc error - pointer being freed was not allocated
-     * TODO: Fix variable expansion parsing for adjacent expansions
-     */
+    /// KNOWN BUG: Variable concatenation with separator causes crash
+    /// Issue #59: ${A}_${B} syntax causes memory corruption (double-free)
+    /// The underscore between braced variables is incorrectly parsed.
+    /// Command: A=hello; B=world; RESULT=${A}_${B}
+    /// Expected: RESULT=hello_world
+    /// Actual: malloc error - pointer being freed was not allocated
+    /// TODO: Fix variable expansion parsing for adjacent expansions
     executor_t *exec = setup_executor();
 
     /// Skip actual test until bug is fixed - just verify basic setup works
@@ -568,8 +566,8 @@ TEST(special_var_dollar) {
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /* Verify it's a non-negative number (0 is valid in test context if not
-     * initialized) */
+    /// Verify it's a non-negative number (0 is valid in test context if not
+    /// initialized)
     ASSERT(atoi(result) >= 0, "$$ should be a non-negative number");
     free(result);
 
@@ -629,14 +627,12 @@ TEST(array_first_element) {
  */
 
 TEST(single_quotes_no_expansion) {
-    /*
-     * KNOWN BUG: Single quotes do not prevent variable expansion
-     * Issue #60: RESULT='$VAR' incorrectly expands $VAR
-     * Single quotes should prevent ALL expansion per POSIX
-     * Expected: RESULT=$VAR
-     * Actual: RESULT=value
-     * TODO: Fix tokenizer/executor to respect single quote semantics
-     */
+    /// KNOWN BUG: Single quotes do not prevent variable expansion
+    /// Issue #60: RESULT='$VAR' incorrectly expands $VAR
+    /// Single quotes should prevent ALL expansion per POSIX
+    /// Expected: RESULT=$VAR
+    /// Actual: RESULT=value
+    /// TODO: Fix tokenizer/executor to respect single quote semantics
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "VAR=value", 1);
@@ -644,8 +640,8 @@ TEST(single_quotes_no_expansion) {
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
     ASSERT_NOT_NULL(result, "RESULT should be set");
-    /* Temporarily check that variable is set - actual value check disabled
-     * until bug fixed */
+    /// Temporarily check that variable is set - actual value check disabled
+    /// until bug fixed
     ASSERT(result != NULL, "RESULT should be set to something");
     free(result);
 
@@ -667,12 +663,10 @@ TEST(double_quotes_with_expansion) {
 }
 
 TEST(escaped_dollar) {
-    /*
-     * KNOWN BUG: Escaped dollar sign not working correctly
-     * Related to Issue #60 - single quote regression
-     * RESULT=\$VAR causes "unterminated quoted string" error
-     * TODO: Fix after Issue #60 is resolved
-     */
+    /// KNOWN BUG: Escaped dollar sign not working correctly
+    /// Related to Issue #60 - single quote regression
+    /// RESULT=\$VAR causes "unterminated quoted string" error
+    /// TODO: Fix after Issue #60 is resolved
     executor_t *exec = setup_executor();
 
     /// Skip actual test until escaping is fixed
@@ -691,12 +685,10 @@ TEST(escaped_dollar) {
  */
 
 TEST(nested_var_expansion) {
-    /*
-     * KNOWN BUG: Single quotes don't preserve literal - Issue #60
-     * Expected: OUTER='hello $INNER' -> "hello $INNER" (literal)
-     * Actual: expands to "hello world"
-     * TODO: Re-enable after Issue #60 is fixed
-     */
+    /// KNOWN BUG: Single quotes don't preserve literal - Issue #60
+    /// Expected: OUTER='hello $INNER' -> "hello $INNER" (literal)
+    /// Actual: expands to "hello world"
+    /// TODO: Re-enable after Issue #60 is fixed
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "INNER=world", 1);
@@ -731,16 +723,14 @@ TEST(nested_var_double_quotes) {
  */
 
 TEST(brace_adjacent_text) {
-    /*
-     * KNOWN BUG: Braced variable followed by adjacent text causes crash
-     * Related to Issue #59: ${VAR}text syntax causes memory corruption
-     * Command: PREFIX=hello; RESULT=${PREFIX}world
-     * Expected: RESULT=helloworld
-     * Actual: malloc error - pointer being freed was not allocated
-     * This is the same root cause as ${A}_${B} - the expansion code
-     * incorrectly handles braced variables followed by text.
-     * TODO: Fix variable expansion parsing for braced vars with adjacent text
-     */
+    /// KNOWN BUG: Braced variable followed by adjacent text causes crash
+    /// Related to Issue #59: ${VAR}text syntax causes memory corruption
+    /// Command: PREFIX=hello; RESULT=${PREFIX}world
+    /// Expected: RESULT=helloworld
+    /// Actual: malloc error - pointer being freed was not allocated
+    /// This is the same root cause as ${A}_${B} - the expansion code
+    /// incorrectly handles braced variables followed by text.
+    /// TODO: Fix variable expansion parsing for braced vars with adjacent text
     executor_t *exec = setup_executor();
 
     /// Skip actual crash-inducing test until bug is fixed

@@ -352,8 +352,8 @@ static void update_autosuggestion(readline_context_t *ctx) {
         return;
     }
 
-    /* Check if autosuggestion regeneration is suppressed (e.g., during Ctrl+G
-     * clear) */
+    /// Check if autosuggestion regeneration is suppressed (e.g., during Ctrl+G
+    /// clear)
     if (ctx->suppress_autosuggestion) {
         return;
     }
@@ -415,22 +415,21 @@ static void update_autosuggestion(readline_context_t *ctx) {
             continue;
         }
 
-        /* Skip multiline history entries - don't suggest them for single-line
-         * input This prevents suggesting "echo \"\nhello\"" when user types
-         * "echo"
-         *
-         * Note: LLE history stores newlines as escaped "\n" (two chars:
-         * backslash + n) not as actual newline bytes. Check for both formats.
-         */
+        /// Skip multiline history entries - don't suggest them for single-line
+        /// input This prevents suggesting "echo \"\nhello\"" when user types
+        /// "echo"
+        ///
+        /// Note: LLE history stores newlines as escaped "\n" (two chars:
+        /// backslash + n) not as actual newline bytes. Check for both formats.
         if (strchr(entry->command, '\n') != NULL ||
             strstr(entry->command, "\\n") != NULL) {
             continue;
         }
 
-        /* Check for prefix match using Unicode-aware comparison (TR#29
-         * compliant) This handles NFC normalization to ensure equivalent
-         * Unicode sequences match regardless of encoding (e.g., precomposed vs
-         * decomposed) */
+        /// Check for prefix match using Unicode-aware comparison (TR#29
+        /// compliant) This handles NFC normalization to ensure equivalent
+        /// Unicode sequences match regardless of encoding (e.g., precomposed vs
+        /// decomposed)
         if (lle_unicode_is_prefix(input, input_len, entry->command,
                                   strlen(entry->command), NULL)) {
             /// Found a match - get the remaining text
@@ -475,8 +474,8 @@ static bool has_autosuggestion(readline_context_t *ctx) {
         return true;
     }
 
-    /* Also check display controller - it may have a suggestion we don't know
-     * about */
+    /// Also check display controller - it may have a suggestion we don't know
+    /// about
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         const char *dc_suggestion = display_controller_get_autosuggestion(dc);
@@ -538,8 +537,8 @@ lle_result_t lle_forward_char_or_accept_suggestion(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Priority 1: If completion menu is active, delegate to lle_forward_char
-     * which handles menu navigation (move right in multi-column menu) */
+    /// Priority 1: If completion menu is active, delegate to lle_forward_char
+    /// which handles menu navigation (move right in multi-column menu)
     if (ctx->editor) {
         bool menu_active = false;
 
@@ -557,8 +556,8 @@ lle_result_t lle_forward_char_or_accept_suggestion(readline_context_t *ctx) {
         }
     }
 
-    /* Priority 2: Fish-style autosuggestion - if at end of buffer with
-     * suggestion, accept it */
+    /// Priority 2: Fish-style autosuggestion - if at end of buffer with
+    /// suggestion, accept it
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -595,9 +594,9 @@ lle_result_t lle_end_of_line_or_accept_suggestion(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Fish-style: If already at end of buffer with suggestion, accept it
-     * Note: Suggestion acceptance only applies at absolute buffer end,
-     * since suggestions extend the entire command, not individual lines */
+    /// Fish-style: If already at end of buffer with suggestion, accept it
+    /// Note: Suggestion acceptance only applies at absolute buffer end,
+    /// since suggestions extend the entire command, not individual lines
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -606,9 +605,9 @@ lle_result_t lle_end_of_line_or_accept_suggestion(readline_context_t *ctx) {
         }
     }
 
-    /* Normal behavior: move cursor to end of CURRENT LINE (not buffer)
-     * This is critical for multiline mode - Ctrl+E should move to end of
-     * the current logical line, while Alt+> moves to end of buffer */
+    /// Normal behavior: move cursor to end of CURRENT LINE (not buffer)
+    /// This is critical for multiline mode - Ctrl+E should move to end of
+    /// the current logical line, while Alt+> moves to end of buffer
     if (ctx->editor) {
         lle_end_of_line(ctx->editor);
         /// Sync buffer cursor from editor after the move
@@ -856,14 +855,13 @@ static void refresh_display(readline_context_t *ctx) {
         return;
     }
 
-    /* Fish-style autosuggestions using LLE history
-     *
-     * This must happen BEFORE rendering so the ghost text is available
-     * for display_controller to render in dc_handle_redraw_needed().
-     *
-     * We generate the suggestion here using LLE history (not GNU readline
-     * history) and pass it directly to display_controller for rendering.
-     */
+    /// Fish-style autosuggestions using LLE history
+    ///
+    /// This must happen BEFORE rendering so the ghost text is available
+    /// for display_controller to render in dc_handle_redraw_needed().
+    ///
+    /// We generate the suggestion here using LLE history (not GNU readline
+    /// history) and pass it directly to display_controller for rendering.
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         /// Generate suggestion from LLE history
@@ -897,29 +895,28 @@ static void refresh_display(readline_context_t *ctx) {
         return;
     }
 
-    /* SPEC 08 COMPLIANT: Send rendered output through display_bridge to
-     * command_layer
-     *
-     * This is THE CORRECT ARCHITECTURE per Spec 08:
-     * 1. render_controller produces rendered output
-     * 2. display_bridge sends output to command_layer
-     * 3. command_layer sends to display_controller
-     * 4. display_controller handles terminal I/O
-     *
-     * NO DIRECT TERMINAL WRITES - this is a critical architectural principle!
-     *
-     * IMPORTANT: Always send to display_bridge even if buffer is empty, because
-     * we still need to display the prompt. The prompt is rendered separately by
-     * the prompt_layer and combined in the display_controller.
-     */
+    /// SPEC 08 COMPLIANT: Send rendered output through display_bridge to
+    /// command_layer
+    ///
+    /// This is THE CORRECT ARCHITECTURE per Spec 08:
+    /// 1. render_controller produces rendered output
+    /// 2. display_bridge sends output to command_layer
+    /// 3. command_layer sends to display_controller
+    /// 4. display_controller handles terminal I/O
+    ///
+    /// NO DIRECT TERMINAL WRITES - this is a critical architectural principle!
+    ///
+    /// IMPORTANT: Always send to display_bridge even if buffer is empty,
+    /// because we still need to display the prompt. The prompt is rendered
+    /// separately by the prompt_layer and combined in the display_controller.
     lle_display_bridge_t *display_bridge = display_integration->display_bridge;
     if (display_bridge) {
         result = lle_display_bridge_send_output(display_bridge, render_output,
                                                 &ctx->buffer->cursor);
 
         if (result != LLE_SUCCESS) {
-            /* Log error but continue - display bridge will track consecutive
-             * errors */
+            /// Log error but continue - display bridge will track consecutive
+            /// errors
         }
     }
 
@@ -1021,8 +1018,8 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
     }
 
     /// CRITICAL FIX: Clear completion menu on backspace
-    /* Prevents stale menu state with indices pointing to deleted buffer
-     * positions */
+    /// Prevents stale menu state with indices pointing to deleted buffer
+    /// positions
     if (ctx->editor) {
         bool menu_cleared = false;
 
@@ -1037,8 +1034,8 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
             display_controller_t *dc = display_integration_get_controller();
             if (dc) {
                 display_controller_clear_completion_menu(dc);
-                /* Also clear autosuggestion to prevent conflict with stale menu
-                 */
+                /// Also clear autosuggestion to prevent conflict with stale
+                /// menu
                 display_controller_set_autosuggestion(dc, NULL);
             }
             /// Clear current suggestion in context
@@ -1061,15 +1058,15 @@ static lle_result_t handle_backspace(lle_event_t *event, void *user_data) {
             return LLE_SUCCESS; /// Already at beginning
         }
 
-        /* Move cursor back by one grapheme to find the start of the grapheme to
-         * delete */
+        /// Move cursor back by one grapheme to find the start of the grapheme
+        /// to delete
         size_t current_byte = ctx->buffer->cursor.byte_offset;
 
         lle_result_t result = lle_cursor_manager_move_by_graphemes(
             ctx->editor->cursor_manager, -1);
         if (result == LLE_SUCCESS) {
-            /* CRITICAL: Sync buffer cursor back from cursor manager after
-             * movement */
+            /// CRITICAL: Sync buffer cursor back from cursor manager after
+            /// movement
             lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                             &ctx->buffer->cursor);
 
@@ -1111,11 +1108,10 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
         is_input_incomplete(ctx->buffer->data, ctx->continuation_state);
 
     if (incomplete) {
-        /* SAFETY CHECK: Limit maximum line count to prevent infinite loops
-         * If the parser has a bug and always reports incomplete, this prevents
-         * the shell from inserting newlines forever. 1000 lines is generous
-         * for any legitimate shell command but prevents runaway input.
-         */
+        /// SAFETY CHECK: Limit maximum line count to prevent infinite loops
+        /// If the parser has a bug and always reports incomplete, this prevents
+        /// the shell from inserting newlines forever. 1000 lines is generous
+        /// for any legitimate shell command but prevents runaway input.
         size_t line_count = 1;
         for (const char *p = ctx->buffer->data; *p; p++) {
             if (*p == '\n') {
@@ -1152,8 +1148,8 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
 
     /// Line complete - accept entire buffer regardless of cursor position
 
-    /* Clear autosuggestion ghost text before accepting line
-     * Without this, partial suggestions remain visible after Enter */
+    /// Clear autosuggestion ghost text before accepting line
+    /// Without this, partial suggestions remain visible after Enter
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         display_controller_set_autosuggestion(dc, NULL);
@@ -1162,13 +1158,13 @@ static lle_result_t handle_enter(lle_event_t *event, void *user_data) {
         ctx->current_suggestion[0] = '\0';
     }
 
-    /* Add to LLE history before completing. The editor's
-     * history_system may be the shell history or, during the
-     * debugger's break-prompt, the in-process debug history (swapped
-     * by lle_readline_no_history); the add path is identical for both.
-     * Persistence to ~/.lush_history is gated on NOT being at the
-     * debug prompt -- debug commands never reach the shell history
-     * file. */
+    /// Add to LLE history before completing. The editor's
+    /// history_system may be the shell history or, during the
+    /// debugger's break-prompt, the in-process debug history (swapped
+    /// by lle_readline_no_history); the add path is identical for both.
+    /// Persistence to ~/.lush_history is gated on NOT being at the
+    /// debug prompt -- debug commands never reach the shell history
+    /// file.
     if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
@@ -1223,16 +1219,16 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* If completion menu is active, finalize the cycled selection
-     * before accepting the line. The preview phase placed the
-     * candidate's literal text in the buffer (no close-quote, no
-     * trailing space, no slash); accept-phase appends the type-
-     * driven suffix -- "/" for directories, the matching close-
-     * quote (when a quote is open) plus a space for everything
-     * else. After the splice we clear the menu and continue with
-     * the rest of the accept-line flow so the now-finalized buffer
-     * is what gets submitted (or extended on a follow-up TAB
-     * inside a directory). */
+    /// If completion menu is active, finalize the cycled selection
+    /// before accepting the line. The preview phase placed the
+    /// candidate's literal text in the buffer (no close-quote, no
+    /// trailing space, no slash); accept-phase appends the type-
+    /// driven suffix -- "/" for directories, the matching close-
+    /// quote (when a quote is open) plus a space for everything
+    /// else. After the splice we clear the menu and continue with
+    /// the rest of the accept-line flow so the now-finalized buffer
+    /// is what gets submitted (or extended on a follow-up TAB
+    /// inside a directory).
     if (ctx->editor && ctx->editor->completion_system &&
         lle_completion_system_is_menu_visible(ctx->editor->completion_system)) {
 
@@ -1267,19 +1263,19 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
             }
         }
 
-        /* Clear the completion menu now that the selection is
-         * finalized. */
+        /// Clear the completion menu now that the selection is
+        /// finalized.
         lle_completion_system_clear(ctx->editor->completion_system);
         display_controller_t *dc = display_integration_get_controller();
         if (dc) {
             display_controller_clear_completion_menu(dc);
         }
 
-        /* Directory-chain (issue #85): if the accepted item was a
-         * directory and completion.chain_directories is on, re-trigger
-         * completion at the new cursor position so the next-level menu
-         * opens immediately. Mirrors the same gate at the TAB
-         * single-match site in keybinding_actions.c. */
+        /// Directory-chain (issue #85): if the accepted item was a
+        /// directory and completion.chain_directories is on, re-trigger
+        /// completion at the new cursor position so the next-level menu
+        /// opens immediately. Mirrors the same gate at the TAB
+        /// single-match site in keybinding_actions.c.
         bool chain = false;
         (void)config_registry_get_boolean("completion.chain_directories",
                                           &chain);
@@ -1287,15 +1283,15 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
             (void)lle_complete(ctx->editor);
         }
 
-        /* Directory selections leave the cursor inside an open
-         * quote with a trailing "/" and the user generally wants to
-         * keep typing; non-directory selections terminate the
-         * argument with a close-quote (if needed) and a trailing
-         * space. Either way, the user's first ENTER finalizes the
-         * cycle but does NOT submit the line -- a second ENTER
-         * submits the now-finalized buffer. This matches the
-         * existing readline behavior; only the buffer-finalization
-         * step is new. */
+        /// Directory selections leave the cursor inside an open
+        /// quote with a trailing "/" and the user generally wants to
+        /// keep typing; non-directory selections terminate the
+        /// argument with a close-quote (if needed) and a trailing
+        /// space. Either way, the user's first ENTER finalizes the
+        /// cycle but does NOT submit the line -- a second ENTER
+        /// submits the now-finalized buffer. This matches the
+        /// existing readline behavior; only the buffer-finalization
+        /// step is new.
         refresh_display(ctx);
         return LLE_SUCCESS;
     }
@@ -1325,17 +1321,16 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
 
     /// Line complete - accept entire buffer regardless of cursor position
 
-    /* CRITICAL: Move buffer cursor to end before accepting
-     *
-     * Issue #1 Fix: When accepting multiline input, the buffer cursor must be
-     * positioned at the end before the display system renders. This ensures
-     * the screen cursor is positioned after all lines when returning to shell.
-     *
-     * This is the architecturally correct solution: move the cursor in the
-     * buffer (LLE's responsibility) and let the display system render it
-     * naturally (display system's responsibility). No direct terminal writes
-     * from LLE.
-     */
+    /// CRITICAL: Move buffer cursor to end before accepting
+    ///
+    /// Issue #1 Fix: When accepting multiline input, the buffer cursor must be
+    /// positioned at the end before the display system renders. This ensures
+    /// the screen cursor is positioned after all lines when returning to shell.
+    ///
+    /// This is the architecturally correct solution: move the cursor in the
+    /// buffer (LLE's responsibility) and let the display system render it
+    /// naturally (display system's responsibility). No direct terminal writes
+    /// from LLE.
     if (ctx->buffer->length > 0 &&
         ctx->buffer->cursor.byte_offset != ctx->buffer->length) {
         /// Move buffer cursor to end
@@ -1353,13 +1348,13 @@ lle_result_t lle_accept_line_context(readline_context_t *ctx) {
         refresh_display(ctx);
     }
 
-    /* Add to LLE history before completing. The editor's
-     * history_system may be the shell history or, during the
-     * debugger's break-prompt, the in-process debug history (swapped
-     * by lle_readline_no_history); the add path is identical for both.
-     * Persistence to ~/.lush_history is gated on NOT being at the
-     * debug prompt -- debug commands never reach the shell history
-     * file. */
+    /// Add to LLE history before completing. The editor's
+    /// history_system may be the shell history or, during the
+    /// debugger's break-prompt, the in-process debug history (swapped
+    /// by lle_readline_no_history); the add path is identical for both.
+    /// Persistence to ~/.lush_history is gated on NOT being at the
+    /// debug prompt -- debug commands never reach the shell history
+    /// file.
     if (ctx->editor && ctx->editor->history_system && ctx->buffer->data &&
         ctx->buffer->data[0] != '\0') {
         lle_history_add_entry(ctx->editor->history_system, ctx->buffer->data, 0,
@@ -1403,23 +1398,23 @@ static lle_result_t handle_eof(lle_event_t *event, void *user_data) {
         *ctx->done = true;
         *ctx->final_line = NULL;
     } else {
-        /* Non-empty line - delete grapheme cluster at cursor (same as Delete
-         * key) */
+        /// Non-empty line - delete grapheme cluster at cursor (same as Delete
+        /// key)
         if (ctx->buffer->cursor.grapheme_index < ctx->buffer->grapheme_count &&
             ctx->editor && ctx->editor->cursor_manager) {
             /// Sync cursor manager position with buffer cursor before moving
             lle_cursor_manager_move_to_byte_offset(
                 ctx->editor->cursor_manager, ctx->buffer->cursor.byte_offset);
 
-            /* Move cursor forward by one grapheme to find the end of the
-             * grapheme to delete */
+            /// Move cursor forward by one grapheme to find the end of the
+            /// grapheme to delete
             size_t grapheme_start = ctx->buffer->cursor.byte_offset;
 
             lle_result_t result = lle_cursor_manager_move_by_graphemes(
                 ctx->editor->cursor_manager, 1);
             if (result == LLE_SUCCESS) {
-                /* CRITICAL: Sync buffer cursor back from cursor manager after
-                 * movement */
+                /// CRITICAL: Sync buffer cursor back from cursor manager after
+                /// movement
                 lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                                 &ctx->buffer->cursor);
 
@@ -1553,8 +1548,8 @@ lle_result_t lle_abort_line_context(readline_context_t *ctx) {
             ctx->current_suggestion[0] = '\0';
         }
 
-        /* Suppress autosuggestion regeneration during this refresh
-         * Otherwise refresh_display() will immediately regenerate it */
+        /// Suppress autosuggestion regeneration during this refresh
+        /// Otherwise refresh_display() will immediately regenerate it
         ctx->suppress_autosuggestion = true;
 
         /// Clear from display controller
@@ -1569,20 +1564,19 @@ lle_result_t lle_abort_line_context(readline_context_t *ctx) {
         return LLE_SUCCESS; /// Suggestion cleared, don't abort line
     }
 
-    /* No completion menu or autosuggestion active - abort the line
-     *
-     * ZSH-style behavior: Always abort, even on empty buffer.
-     * This serves as a recovery mechanism - if the display or editor gets into
-     * a weird state, Ctrl+G guarantees a fresh start with a new prompt.
-     * Unlike the no-op approach, this ensures users always have an escape
-     * hatch.
-     */
+    /// No completion menu or autosuggestion active - abort the line
+    ///
+    /// ZSH-style behavior: Always abort, even on empty buffer.
+    /// This serves as a recovery mechanism - if the display or editor gets into
+    /// a weird state, Ctrl+G guarantees a fresh start with a new prompt.
+    /// Unlike the no-op approach, this ensures users always have an escape
+    /// hatch.
 
-    /* Clear display before aborting to ensure clean state
-     * This clears any ghost text, completion menu residue, etc. */
+    /// Clear display before aborting to ensure clean state
+    /// This clears any ghost text, completion menu residue, etc.
 
-    /* Clear completion system state (CRITICAL: must clear both system AND
-     * display) */
+    /// Clear completion system state (CRITICAL: must clear both system AND
+    /// display)
     if (ctx->editor && ctx->editor->completion_system) {
         lle_completion_system_clear(ctx->editor->completion_system);
     }
@@ -1611,10 +1605,10 @@ lle_result_t lle_abort_line_context(readline_context_t *ctx) {
     /// Final refresh to clear ghost text from screen before abort
     refresh_display(ctx);
 
-    /* Reset display state for fresh prompt on next lle_readline() call.
-     * Don't call dc_finalize_input() here - it will be called in lle_readline()
-     * cleanup when final_line is returned. Calling it here would cause double
-     * newline. */
+    /// Reset display state for fresh prompt on next lle_readline() call.
+    /// Don't call dc_finalize_input() here - it will be called in
+    /// lle_readline() cleanup when final_line is returned. Calling it here
+    /// would cause double newline.
     dc_reset_prompt_display_state();
 
     /// Record Ctrl+G for panic detection (triple Ctrl+G triggers hard reset)
@@ -1674,11 +1668,11 @@ lle_result_t lle_escape_context(readline_context_t *ctx) {
         }
 
         if (menu_visible) {
-            /* NOTE: ESC dismisses menu but keeps current buffer state.
-             * Restoring original pre-completion text would require storing
-             * the buffer state before completion started, which is not yet
-             * implemented. Current behavior matches many shells where ESC
-             * just dismisses the menu without reverting the text. */
+            /// NOTE: ESC dismisses menu but keeps current buffer state.
+            /// Restoring original pre-completion text would require storing
+            /// the buffer state before completion started, which is not yet
+            /// implemented. Current behavior matches many shells where ESC
+            /// just dismisses the menu without reverting the text.
 
             if (ctx->editor->completion_system) {
                 lle_completion_system_clear(ctx->editor->completion_system);
@@ -1704,8 +1698,8 @@ lle_result_t lle_escape_context(readline_context_t *ctx) {
             ctx->current_suggestion[0] = '\0';
         }
 
-        /* Suppress autosuggestion regeneration during this refresh
-         * Otherwise refresh_display() will immediately regenerate it */
+        /// Suppress autosuggestion regeneration during this refresh
+        /// Otherwise refresh_display() will immediately regenerate it
         ctx->suppress_autosuggestion = true;
 
         /// Clear from display controller
@@ -1720,8 +1714,7 @@ lle_result_t lle_escape_context(readline_context_t *ctx) {
         return LLE_SUCCESS; /// Suggestion cleared, stop here
     }
 
-    /* Tier 3: Nothing to dismiss - ESC is a no-op (unlike Ctrl-G which aborts)
-     */
+    /// Tier 3: Nothing to dismiss - ESC is a no-op (unlike Ctrl-G which aborts)
     return LLE_SUCCESS;
 }
 
@@ -1939,10 +1932,9 @@ static lle_result_t handle_tab(lle_event_t *event, void *user_data) {
     /// Call completion function to set up menu
     lle_result_t result = lle_complete(ctx->editor);
 
-    /* Refresh display to render buffer content with menu appended
-     * The menu was set by lle_complete(), and command_layer_set_command()
-     * will re-append it after syntax highlighting thanks to our fix
-     */
+    /// Refresh display to render buffer content with menu appended
+    /// The menu was set by lle_complete(), and command_layer_set_command()
+    /// will re-append it after syntax highlighting thanks to our fix
     if (result == LLE_SUCCESS) {
         refresh_display(ctx);
     }
@@ -1969,8 +1961,7 @@ static lle_result_t handle_arrow_left(lle_event_t *event, void *user_data) {
         /// Move cursor by graphemes
         lle_cursor_manager_move_by_graphemes(ctx->editor->cursor_manager, -1);
 
-        /* CRITICAL: Sync buffer cursor back from cursor manager after movement
-         */
+        /// CRITICAL: Sync buffer cursor back from cursor manager after movement
         lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                         &ctx->buffer->cursor);
 
@@ -1989,9 +1980,9 @@ static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Fish-style autosuggestion acceptance:
-     * If cursor is at end of buffer AND an autosuggestion is available,
-     * accept the suggestion instead of normal cursor movement. */
+    /// Fish-style autosuggestion acceptance:
+    /// If cursor is at end of buffer AND an autosuggestion is available,
+    /// accept the suggestion instead of normal cursor movement.
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -2000,8 +1991,7 @@ static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
         }
     }
 
-    /* Normal behavior: Move cursor right by one grapheme cluster if not at end
-     */
+    /// Normal behavior: Move cursor right by one grapheme cluster if not at end
     if (ctx->buffer->cursor.grapheme_index < ctx->buffer->grapheme_count &&
         ctx->editor && ctx->editor->cursor_manager) {
         /// Sync cursor manager position with buffer cursor before moving
@@ -2011,8 +2001,7 @@ static lle_result_t handle_arrow_right(lle_event_t *event, void *user_data) {
         /// Move cursor by graphemes
         lle_cursor_manager_move_by_graphemes(ctx->editor->cursor_manager, 1);
 
-        /* CRITICAL: Sync buffer cursor back from cursor manager after movement
-         */
+        /// CRITICAL: Sync buffer cursor back from cursor manager after movement
         lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                         &ctx->buffer->cursor);
 
@@ -2046,9 +2035,10 @@ static lle_result_t handle_end(lle_event_t *event, void *user_data) {
     (void)event; /// Unused
     readline_context_t *ctx = (readline_context_t *)user_data;
 
-    /* Fish-style autosuggestion acceptance:
-     * If cursor is already at end of buffer AND an autosuggestion is available,
-     * accept the suggestion. Otherwise, move cursor to end normally. */
+    /// Fish-style autosuggestion acceptance:
+    /// If cursor is already at end of buffer AND an autosuggestion is
+    /// available, accept the suggestion. Otherwise, move cursor to end
+    /// normally.
     if (ctx->buffer->cursor.byte_offset == ctx->buffer->length &&
         has_autosuggestion(ctx)) {
         if (accept_autosuggestion(ctx)) {
@@ -2080,15 +2070,15 @@ static lle_result_t handle_delete(lle_event_t *event, void *user_data) {
         lle_cursor_manager_move_to_byte_offset(ctx->editor->cursor_manager,
                                                ctx->buffer->cursor.byte_offset);
 
-        /* Move cursor forward by one grapheme to find the end of the grapheme
-         * to delete */
+        /// Move cursor forward by one grapheme to find the end of the grapheme
+        /// to delete
         size_t grapheme_start = ctx->buffer->cursor.byte_offset;
 
         lle_result_t result = lle_cursor_manager_move_by_graphemes(
             ctx->editor->cursor_manager, 1);
         if (result == LLE_SUCCESS) {
-            /* CRITICAL: Sync buffer cursor back from cursor manager after
-             * movement */
+            /// CRITICAL: Sync buffer cursor back from cursor manager after
+            /// movement
             lle_cursor_manager_get_position(ctx->editor->cursor_manager,
                                             &ctx->buffer->cursor);
 
@@ -2203,8 +2193,8 @@ static lle_result_t handle_kill_line(lle_event_t *event, void *user_data) {
         end_change_sequence(ctx);
 
         if (result == LLE_SUCCESS) {
-            /* Cursor automatically moves to position 0 after deleting from
-             * start */
+            /// Cursor automatically moves to position 0 after deleting from
+            /// start
             refresh_display(ctx);
         }
 
@@ -2304,8 +2294,8 @@ lle_result_t lle_smart_up_arrow_context(readline_context_t *ctx) {
 
     lle_editor_t *editor = ctx->editor;
 
-    /* If completion menu is active, navigate within menu (delegate to smart
-     * arrow) */
+    /// If completion menu is active, navigate within menu (delegate to smart
+    /// arrow)
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
         lle_result_t result = lle_smart_up_arrow(editor);
@@ -2363,8 +2353,8 @@ lle_result_t lle_smart_down_arrow_context(readline_context_t *ctx) {
 
     lle_editor_t *editor = ctx->editor;
 
-    /* If completion menu is active, navigate within menu (delegate to smart
-     * arrow) */
+    /// If completion menu is active, navigate within menu (delegate to smart
+    /// arrow)
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
         lle_result_t result = lle_smart_down_arrow(editor);
@@ -2447,10 +2437,10 @@ static void refresh_search_display(readline_context_t *ctx) {
     const char *current_match =
         lle_history_interactive_search_get_current_command();
 
-    /* Clear line and move to beginning.
-     * \r = carriage return, \033[K = clear to end of line.
-     * (void)! suppresses -Wunused-result; terminal output failures here
-     * have no recoverable path in the search-display refresh. */
+    /// Clear line and move to beginning.
+    /// \r = carriage return, \033[K = clear to end of line.
+    /// (void)! suppresses -Wunused-result; terminal output failures here
+    /// have no recoverable path in the search-display refresh.
     (void)!write(STDOUT_FILENO, "\r\033[K", 4);
 
     /// Write the search prompt
@@ -2631,8 +2621,8 @@ static bool handle_search_mode_input(readline_context_t *ctx,
         return true;
     }
 
-    /* Arrow keys and other special keys: exit search mode, process key normally
-     */
+    /// Arrow keys and other special keys: exit search mode, process key
+    /// normally
     if (special_key == LLE_KEY_UP || special_key == LLE_KEY_DOWN ||
         special_key == LLE_KEY_LEFT || special_key == LLE_KEY_RIGHT) {
         /// Accept current match and exit search
@@ -2694,8 +2684,7 @@ static lle_result_t execute_keybinding_action(
 
             /// Dispatch based on action type
             if (action->type == LLE_ACTION_TYPE_SIMPLE) {
-                /* Simple action: operate on editor, then handle special flags
-                 */
+                /// Simple action: operate on editor, then handle special flags
                 exec_result = action->func.simple(ctx->editor);
 
                 /// Check for EOF request (legacy flag - used by Ctrl-D)
@@ -2720,8 +2709,8 @@ static lle_result_t execute_keybinding_action(
 
                 return exec_result;
             } else if (action->type == LLE_ACTION_TYPE_CONTEXT) {
-                /* Context-aware action: has full access, handles everything
-                 * including display refresh */
+                /// Context-aware action: has full access, handles everything
+                /// including display refresh
                 exec_result = action->func.context(ctx);
                 return exec_result;
             }
@@ -2731,8 +2720,8 @@ static lle_result_t execute_keybinding_action(
         }
     }
 
-    /* Fallback to hardcoded handler if keybinding manager not available or
-     * lookup failed */
+    /// Fallback to hardcoded handler if keybinding manager not available or
+    /// lookup failed
     if (fallback_handler) {
         return fallback_handler(NULL, ctx);
     }
@@ -2763,15 +2752,13 @@ static lle_result_t execute_keybinding_action(
 char *lle_readline(const char *prompt) {
     lle_result_t result;
 
-    /*
-     * CRITICAL: Check if stdin is a TTY before attempting raw mode.
-     *
-     * When the shell is forced into interactive mode with -i but stdin is
-     * a pipe or file, we cannot use raw mode terminal features. Fall back
-     * to simple getline() for input while still showing the prompt.
-     *
-     * This handles: echo "cmd" | lush -i
-     */
+    /// CRITICAL: Check if stdin is a TTY before attempting raw mode.
+    ///
+    /// When the shell is forced into interactive mode with -i but stdin is
+    /// a pipe or file, we cannot use raw mode terminal features. Fall back
+    /// to simple getline() for input while still showing the prompt.
+    ///
+    /// This handles: echo "cmd" | lush -i
     if (!isatty(STDIN_FILENO)) {
         /// Print prompt to stdout if provided
         if (prompt && *prompt) {
@@ -2803,7 +2790,7 @@ char *lle_readline(const char *prompt) {
     /// Get display controller from display_integration
     void *display_controller = display_integration_get_controller();
 
-    /* === STEP 1: Create terminal abstraction instance === */
+    /// === STEP 1: Create terminal abstraction instance ===
     lle_terminal_abstraction_t *term = NULL;
     result = lle_terminal_abstraction_init(
         &term, (lush_display_context_t *)display_controller);
@@ -2812,7 +2799,7 @@ char *lle_readline(const char *prompt) {
         return NULL;
     }
 
-    /* === STEP 2: Get unix interface for raw mode === */
+    /// === STEP 2: Get unix interface for raw mode ===
     if (term->unix_interface == NULL) {
         lle_terminal_abstraction_destroy(term);
         return NULL;
@@ -2820,7 +2807,7 @@ char *lle_readline(const char *prompt) {
 
     lle_unix_interface_t *unix_iface = term->unix_interface;
 
-    /* === STEP 3: Enter raw mode === */
+    /// === STEP 3: Enter raw mode ===
     result = lle_unix_interface_enter_raw_mode(unix_iface);
     if (result != LLE_SUCCESS) {
         /// Failed to enter raw mode
@@ -2828,13 +2815,12 @@ char *lle_readline(const char *prompt) {
         return NULL;
     }
 
-    /* Notify signal handler that LLE readline is active
-     * This allows SIGINT (Ctrl+C) to be handled properly by setting a flag
-     * that we check in the input loop, rather than using the default behavior
-     */
+    /// Notify signal handler that LLE readline is active
+    /// This allows SIGINT (Ctrl+C) to be handled properly by setting a flag
+    /// that we check in the input loop, rather than using the default behavior
     set_lle_readline_active(1);
 
-    /* === STEP 4: Create buffer for line editing === */
+    /// === STEP 4: Create buffer for line editing ===
     lle_buffer_t *buffer = NULL;
     result = lle_buffer_create(&buffer, global_memory_pool, 256);
     if (result != LLE_SUCCESS || buffer == NULL) {
@@ -2847,7 +2833,7 @@ char *lle_readline(const char *prompt) {
     /// Enable change tracking for undo/redo support
     buffer->change_tracking_enabled = true;
 
-    /* === STEP 5: Create event system === */
+    /// === STEP 5: Create event system ===
     /// Step 3: Add event system for decoupled architecture
     lle_event_system_t *event_system = NULL;
     result = lle_event_system_init(&event_system,
@@ -2860,32 +2846,32 @@ char *lle_readline(const char *prompt) {
         return NULL;
     }
 
-    /* === STEP 5.5: Create continuation state === */
+    /// === STEP 5.5: Create continuation state ===
     /// Step 6: Initialize shared multiline parser state
     continuation_state_t continuation_state;
     continuation_state_init(&continuation_state);
 
-    /* === STEP 5.55: Create edit-session arena === */
-    /* Arena for per-readline allocations (kill buffer, suggestions, etc.)
-     * Child of session arena - automatically freed when session ends,
-     * but we explicitly destroy it at end of lle_readline() for prompt cleanup.
-     * 8KB initial size is sufficient for typical editing session. */
+    /// === STEP 5.55: Create edit-session arena ===
+    /// Arena for per-readline allocations (kill buffer, suggestions, etc.)
+    /// Child of session arena - automatically freed when session ends,
+    /// but we explicitly destroy it at end of lle_readline() for prompt
+    /// cleanup. 8KB initial size is sufficient for typical editing session.
     lle_arena_t *edit_arena = NULL;
     if (g_lle_integration && g_lle_integration->session_arena) {
         edit_arena = lle_arena_create(g_lle_integration->session_arena, "edit",
                                       8 * 1024);
     }
 
-    /* === STEP 5.6: Create kill buffer === */
-    /* Step 5 enhancement: Initialize kill buffer for yank operations
-     * Allocated from edit_arena if available, otherwise falls back to malloc */
+    /// === STEP 5.6: Create kill buffer ===
+    /// Step 5 enhancement: Initialize kill buffer for yank operations
+    /// Allocated from edit_arena if available, otherwise falls back to malloc
     char *kill_buffer = NULL;
     size_t kill_buffer_size = 0;
 
-    /* === STEP 5.7: Get display controller for prompt display === */
+    /// === STEP 5.7: Get display controller for prompt display ===
     display_controller_t *display = display_integration_get_controller();
 
-    /* === STEP 5.8: Initialize LLE display integration (Spec 08) === */
+    /// === STEP 5.8: Initialize LLE display integration (Spec 08) ===
     lle_display_integration_t *lle_display_integ =
         lle_display_integration_get_global();
     if (!lle_display_integ && display) {
@@ -2893,18 +2879,17 @@ char *lle_readline(const char *prompt) {
         result = lle_display_integration_init(
             &lle_display_integ, NULL, /// editor context - not needed yet
             display, (lle_memory_pool_t *)global_memory_pool);
-        /* Non-fatal if display integration fails - LLE will still work for
-         * input */
+        /// Non-fatal if display integration fails - LLE will still work for
+        /// input
     }
 
-    /* === STEP 6: Register event handlers === */
+    /// === STEP 6: Register event handlers ===
     /// Step 4: Register handlers that will modify buffer and refresh display
     bool done = false;
     char *final_line = NULL;
-    /* === STEP 6.5: Initialize LLE editor (proper architecture) === */
-    /* Spec 26: Use shell integration's editor if available, otherwise
-     * fall back to lazy initialization for backward compatibility.
-     */
+    /// === STEP 6.5: Initialize LLE editor (proper architecture) ===
+    /// Spec 26: Use shell integration's editor if available, otherwise
+    /// fall back to lazy initialization for backward compatibility.
     lle_editor_t *editor_to_use = NULL;
 
     if (g_lle_integration && g_lle_integration->editor) {
@@ -2952,48 +2937,46 @@ char *lle_readline(const char *prompt) {
             editor_to_use->cursor_manager->buffer = buffer;
         }
 
-        /* CRITICAL: Reset history navigation position for new readline session
-         */
+        /// CRITICAL: Reset history navigation position for new readline session
         /// Each readline() call starts fresh - not in history navigation mode
         editor_to_use->history_navigation_pos = 0;
         /// Clear the seen set for unique-only navigation mode
         editor_to_use->history_nav_seen_count = 0;
     }
 
-    /* === STEP 6.6: Create keybinding manager and load Emacs preset === */
+    /// === STEP 6.6: Create keybinding manager and load Emacs preset ===
     lle_keybinding_manager_t *keybinding_manager = NULL;
     result =
         lle_keybinding_manager_create(&keybinding_manager, global_memory_pool);
     if (result != LLE_SUCCESS || keybinding_manager == NULL) {
-        /* Failed to create keybinding manager - non-fatal, will use hardcoded
-         * fallbacks */
+        /// Failed to create keybinding manager - non-fatal, will use hardcoded
+        /// fallbacks
         keybinding_manager = NULL;
     } else {
-        /* Load the full Emacs preset first - this provides all GNU Readline
-         * bindings */
+        /// Load the full Emacs preset first - this provides all GNU Readline
+        /// bindings
         result = lle_keybinding_manager_load_emacs_preset(keybinding_manager);
         if (result != LLE_SUCCESS) {
-            /* Preset load failed - continue with context-aware overrides only
-             */
+            /// Preset load failed - continue with context-aware overrides only
         }
 
-        /* Load user keybinding configuration from
-         * ~/.config/lush/keybindings.toml This allows users to override
-         * default Emacs bindings with custom ones. Errors are logged but don't
-         * prevent shell from starting. */
+        /// Load user keybinding configuration from
+        /// ~/.config/lush/keybindings.toml This allows users to override
+        /// default Emacs bindings with custom ones. Errors are logged but don't
+        /// prevent shell from starting.
         lle_keybinding_load_result_t load_result;
         lle_keybinding_load_user_config(keybinding_manager, &load_result);
-        /* Note: We don't check load_result here - user config is optional.
-         * If file doesn't exist, that's fine (LLE_ERROR_NOT_FOUND).
-         * If there are parse errors, they're logged to stderr. */
+        /// Note: We don't check load_result here - user config is optional.
+        /// If file doesn't exist, that's fine (LLE_ERROR_NOT_FOUND).
+        /// If there are parse errors, they're logged to stderr.
 
-        /* Override specific bindings with context-aware variants that need
-         * readline_context_t. These provide Fish-style autosuggestion
-         * acceptance and completion menu handling. The preset's simple actions
-         * are overridden where context awareness is needed. */
+        /// Override specific bindings with context-aware variants that need
+        /// readline_context_t. These provide Fish-style autosuggestion
+        /// acceptance and completion menu handling. The preset's simple actions
+        /// are overridden where context awareness is needed.
 
-        /* Fish-style autosuggestion acceptance: RIGHT/END/C-f/C-e accept
-         * suggestions */
+        /// Fish-style autosuggestion acceptance: RIGHT/END/C-f/C-e accept
+        /// suggestions
         lle_keybinding_manager_bind_context(
             keybinding_manager, "RIGHT", lle_forward_char_or_accept_suggestion,
             "forward-char-or-accept");
@@ -3007,31 +2990,28 @@ char *lle_readline(const char *prompt) {
             keybinding_manager, "C-f", lle_forward_char_or_accept_suggestion,
             "forward-char-or-accept");
 
-        /* Partial suggestion acceptance: Ctrl+RIGHT accepts one word at a time
-         */
+        /// Partial suggestion acceptance: Ctrl+RIGHT accepts one word at a time
         lle_keybinding_manager_bind_context(
             keybinding_manager, "C-RIGHT",
             lle_forward_word_or_accept_partial_suggestion,
             "forward-word-or-accept-partial");
 
-        /* Context-aware abort: first press dismisses completion menu, second
-         * aborts line */
+        /// Context-aware abort: first press dismisses completion menu, second
+        /// aborts line
         lle_keybinding_manager_bind_context(
             keybinding_manager, "C-g", lle_abort_line_context, "abort-line");
 
-        /* ESC: Context-aware escape - dismisses completion menu or
-         * autosuggestion */
+        /// ESC: Context-aware escape - dismisses completion menu or
+        /// autosuggestion
         lle_keybinding_manager_bind_context(keybinding_manager, "ESC",
                                             lle_escape_context, "escape");
 
-        /* ENTER: Context-aware accept line with multiline/completion awareness
-         */
+        /// ENTER: Context-aware accept line with multiline/completion awareness
         lle_keybinding_manager_bind_context(keybinding_manager, "ENTER",
                                             lle_accept_line_context,
                                             "accept-line");
 
-        /* UP/DOWN: Context-aware arrow keys with multiline notification hints
-         */
+        /// UP/DOWN: Context-aware arrow keys with multiline notification hints
         lle_keybinding_manager_bind_context(keybinding_manager, "UP",
                                             lle_smart_up_arrow_context,
                                             "smart-up-arrow");
@@ -3076,18 +3056,17 @@ char *lle_readline(const char *prompt) {
                          .trigger_action = LLE_NOTIF_ACTION_NONE}
     };
 
-    /* CRITICAL: Reset per-readline-call flags on editor
-     * The editor is persistent across readline calls, but these flags
-     * must be reset at the start of each new readline session.
-     * Without this reset, state persists across readline calls, causing
-     * all subsequent actions to behave incorrectly.
-     *
-     * State categories that MUST be reset:
-     * 1. Abort/EOF signals - prevent immediate exit on next readline
-     * 2. History navigation - start fresh each command
-     * 3. Interactive search - don't inherit previous search state
-     * 4. Special input modes - prevent stuck quoted insert mode
-     */
+    /// CRITICAL: Reset per-readline-call flags on editor
+    /// The editor is persistent across readline calls, but these flags
+    /// must be reset at the start of each new readline session.
+    /// Without this reset, state persists across readline calls, causing
+    /// all subsequent actions to behave incorrectly.
+    ///
+    /// State categories that MUST be reset:
+    /// 1. Abort/EOF signals - prevent immediate exit on next readline
+    /// 2. History navigation - start fresh each command
+    /// 3. Interactive search - don't inherit previous search state
+    /// 4. Special input modes - prevent stuck quoted insert mode
     if (editor_to_use) {
         /// Category 1: Abort/EOF signals
         editor_to_use->abort_requested = false;
@@ -3118,7 +3097,7 @@ char *lle_readline(const char *prompt) {
         return NULL;
     }
 
-    /* === STEP 7: Display prompt === */
+    /// === STEP 7: Display prompt ===
     /// Step 4: Set prompt in prompt_layer and display initial prompt
     if (lle_display_integ && lle_display_integ->lush_display) {
         display_controller_t *dc = lle_display_integ->lush_display;
@@ -3131,35 +3110,33 @@ char *lle_readline(const char *prompt) {
     /// Initial display refresh to show prompt
     refresh_display(&ctx);
 
-    /* === WIDGET HOOK: LINE_INIT === */
+    /// === WIDGET HOOK: LINE_INIT ===
     /// Trigger line-init hook at start of readline (ZSH zle-line-init)
     if (editor_to_use && editor_to_use->widget_hooks_manager) {
         lle_widget_hook_trigger(editor_to_use->widget_hooks_manager,
                                 LLE_HOOK_LINE_INIT, editor_to_use);
     }
 
-    /* === STEP 8: Main input loop === */
+    /// === STEP 8: Main input loop ===
 
-    /* CRITICAL FIX: Timeout counter to prevent infinite loops
-     * If we get too many consecutive timeouts without any user input,
-     * something is wrong (e.g., terminal state corruption, fd closed).
-     * The watchdog (SIGALRM) handles actual processing freezes.
-     * Idle waiting for user input is normal and should not be interrupted.
-     */
+    /// CRITICAL FIX: Timeout counter to prevent infinite loops
+    /// If we get too many consecutive timeouts without any user input,
+    /// something is wrong (e.g., terminal state corruption, fd closed).
+    /// The watchdog (SIGALRM) handles actual processing freezes.
+    /// Idle waiting for user input is normal and should not be interrupted.
 
     while (!done) {
 
-        /* WATCHDOG: Pet the watchdog at the top of each iteration.
-         * This resets the 10-second alarm timer so it covers the ENTIRE
-         * iteration: rendering, completion, event processing, and input
-         * read. Previously only covered the input read, meaning hangs
-         * in rendering or completion went undetected. */
+        /// WATCHDOG: Pet the watchdog at the top of each iteration.
+        /// This resets the 10-second alarm timer so it covers the ENTIRE
+        /// iteration: rendering, completion, event processing, and input
+        /// read. Previously only covered the input read, meaning hangs
+        /// in rendering or completion went undetected.
         lle_watchdog_pet(0); /// 0 = use default timeout (10 seconds)
 
-        /* WATCHDOG: Check at start of each iteration (defense in depth).
-         * This catches cases where the previous iteration got stuck but
-         * somehow returned to the loop without hitting the post-read check.
-         */
+        /// WATCHDOG: Check at start of each iteration (defense in depth).
+        /// This catches cases where the previous iteration got stuck but
+        /// somehow returned to the loop without hitting the post-read check.
         if (lle_watchdog_check_and_clear()) {
             fprintf(stderr, "\nlle: watchdog timeout at loop start\n");
             if (ctx.editor && ctx.editor->completion_system) {
@@ -3177,21 +3154,20 @@ char *lle_readline(const char *prompt) {
             continue;
         }
 
-        /* CRITICAL FIX: Reset suppress_autosuggestion at start of each
-         * iteration This flag is set during operations that temporarily
-         * suppress autosuggestion (e.g., Ctrl+G clearing, menu dismissal).
-         * Resetting here ensures the flag cannot stay stuck - it will be re-set
-         * if needed by the current operation. This prevents the bug where
-         * suppress_autosuggestion stays true forever if a handler sets it but
-         * doesn't reset it before returning.
-         */
+        /// CRITICAL FIX: Reset suppress_autosuggestion at start of each
+        /// iteration This flag is set during operations that temporarily
+        /// suppress autosuggestion (e.g., Ctrl+G clearing, menu dismissal).
+        /// Resetting here ensures the flag cannot stay stuck - it will be
+        /// re-set if needed by the current operation. This prevents the bug
+        /// where suppress_autosuggestion stays true forever if a handler sets
+        /// it but doesn't reset it before returning.
         ctx.suppress_autosuggestion = false;
 
-        /* Check if SIGINT was received (Ctrl+C)
-         * The signal handler sets a flag instead of interrupting directly,
-         * allowing us to handle it cleanly here in the input loop.
-         * This provides bash-like behavior: Ctrl+C aborts current line and
-         * displays a fresh prompt, rather than exiting the shell. */
+        /// Check if SIGINT was received (Ctrl+C)
+        /// The signal handler sets a flag instead of interrupting directly,
+        /// allowing us to handle it cleanly here in the input loop.
+        /// This provides bash-like behavior: Ctrl+C aborts current line and
+        /// displays a fresh prompt, rather than exiting the shell.
         if (check_and_clear_sigint_flag()) {
             /// Echo ^C to show user that Ctrl+C was pressed
             (void)!write(STDOUT_FILENO, "^C\n", 3);
@@ -3227,28 +3203,26 @@ char *lle_readline(const char *prompt) {
         /// Read next input event
         lle_input_event_t *event = NULL;
 
-        /* Idle-poll cadence: 1 second.
-         *
-         * The previous 100ms value (10 Hz polling) burned ~87% of one
-         * CPU core on idle prompts -- every 100ms the loop ran
-         * clock_gettime, allocated an arena event, called select() and
-         * returned, accumulating to substantial CPU overhead per #83.
-         *
-         * 1 second is the sweet spot: still well within the 10-second
-         * watchdog budget (lle_watchdog_pet at the top of the loop
-         * resets a 10s alarm), still well within the 2-second
-         * theme-hot-reload polling granularity, and reduces idle CPU
-         * by ~10x. Signals (SIGINT, SIGWINCH, SIGALRM) interrupt
-         * select() via EINTR immediately, so user responsiveness is
-         * unaffected.
-         */
+        /// Idle-poll cadence: 1 second.
+        ///
+        /// The previous 100ms value (10 Hz polling) burned ~87% of one
+        /// CPU core on idle prompts -- every 100ms the loop ran
+        /// clock_gettime, allocated an arena event, called select() and
+        /// returned, accumulating to substantial CPU overhead per #83.
+        ///
+        /// 1 second is the sweet spot: still well within the 10-second
+        /// watchdog budget (lle_watchdog_pet at the top of the loop
+        /// resets a 10s alarm), still well within the 2-second
+        /// theme-hot-reload polling granularity, and reduces idle CPU
+        /// by ~10x. Signals (SIGINT, SIGWINCH, SIGALRM) interrupt
+        /// select() via EINTR immediately, so user responsiveness is
+        /// unaffected.
         result = lle_input_processor_read_next_event(
             term->input_processor, &event, 1000 /// 1s idle-poll timeout
         );
 
-        /* WATCHDOG: Check if watchdog fired during processing.
-         * This catches scenarios where event processing hangs.
-         */
+        /// WATCHDOG: Check if watchdog fired during processing.
+        /// This catches scenarios where event processing hangs.
         if (lle_watchdog_check_and_clear()) {
             fprintf(stderr, "\nlle: watchdog timeout - forcing recovery\n");
             /// Attempt recovery: clear all subsystem state
@@ -3269,9 +3243,9 @@ char *lle_readline(const char *prompt) {
             continue;
         }
 
-        /* Handle timeout and null events - just continue waiting
-         * Idle waiting for user input is completely normal.
-         * The watchdog catches actual processing freezes. */
+        /// Handle timeout and null events - just continue waiting
+        /// Idle waiting for user input is completely normal.
+        /// The watchdog catches actual processing freezes.
         if (result == LLE_ERROR_TIMEOUT || event == NULL) {
             /// Theme hot-reload check (~every 2 seconds during idle)
             if (config.display_theme_hot_reload && g_lle_integration &&
@@ -3306,12 +3280,12 @@ char *lle_readline(const char *prompt) {
             lle_readline_state_transition(&ctx, LLE_READLINE_STATE_EDITING);
         }
 
-        /* CRITICAL FIX: Re-check Ctrl+C after input read
-         * SIGINT can arrive during the blocking read call. We check again here
-         * to catch Ctrl+C pressed during the read, ensuring responsive
-         * handling. This fixes the race window where Ctrl+C between the initial
-         * check and the read would be delayed until the next iteration.
-         */
+        /// CRITICAL FIX: Re-check Ctrl+C after input read
+        /// SIGINT can arrive during the blocking read call. We check again here
+        /// to catch Ctrl+C pressed during the read, ensuring responsive
+        /// handling. This fixes the race window where Ctrl+C between the
+        /// initial check and the read would be delayed until the next
+        /// iteration.
         if (check_and_clear_sigint_flag()) {
             (void)!write(STDOUT_FILENO, "^C\n", 3);
             if (ctx.editor && ctx.editor->completion_system) {
@@ -3343,7 +3317,7 @@ char *lle_readline(const char *prompt) {
             continue;
         }
 
-        /* === INTERACTIVE SEARCH MODE HANDLING === */
+        /// === INTERACTIVE SEARCH MODE HANDLING ===
         /// When Ctrl+R search is active, route input to search handler first
         if (lle_history_interactive_search_is_active()) {
             bool handled = false;
@@ -3366,7 +3340,7 @@ char *lle_readline(const char *prompt) {
             /// If not handled, fall through to normal processing
         }
 
-        /* === STEP 9: Convert input event to LLE event and dispatch === */
+        /// === STEP 9: Convert input event to LLE event and dispatch ===
         /// Step 3: Use event system instead of direct buffer manipulation
 
         switch (event->type) {
@@ -3376,16 +3350,16 @@ char *lle_readline(const char *prompt) {
 
             /// Check for Enter key (newline)
             if (codepoint == '\n' || codepoint == '\r') {
-                /* GROUP 5 MIGRATION: ENTER routed through keybinding manager
-                 * (context-aware action) */
+                /// GROUP 5 MIGRATION: ENTER routed through keybinding manager
+                /// (context-aware action)
                 execute_keybinding_action(&ctx, "ENTER", handle_enter);
                 break;
             }
 
-            /* NOTE: Ctrl-A through Ctrl-Z are now handled as SPECIAL_KEY events
-             * with modifiers See SPECIAL_KEY case below for Ctrl+letter
-             * handling. Ctrl-C (codepoint == 3) is still handled via SIGINT
-             * signal (src/signals.c). */
+            /// NOTE: Ctrl-A through Ctrl-Z are now handled as SPECIAL_KEY
+            /// events with modifiers See SPECIAL_KEY case below for Ctrl+letter
+            /// handling. Ctrl-C (codepoint == 3) is still handled via SIGINT
+            /// signal (src/signals.c).
 
             /// Check for backspace
             if (codepoint == 127 || codepoint == 8) { /// DEL or BS
@@ -3400,22 +3374,22 @@ char *lle_readline(const char *prompt) {
             }
 
             /// Check for ESC (0x1B = 27) - dismiss completion menu
-            /* ESC arrives as CHARACTER when timeout expires without escape
-             * sequence */
+            /// ESC arrives as CHARACTER when timeout expires without escape
+            /// sequence
             if (codepoint == 0x1B || codepoint == 27) {
                 execute_keybinding_action(&ctx, "ESC", NULL);
                 break;
             }
 
-            /* Check for Ctrl+_ or Ctrl+/ (both send 0x1F = 31) - undo
-             * Both are standard Emacs/readline undo keybindings */
+            /// Check for Ctrl+_ or Ctrl+/ (both send 0x1F = 31) - undo
+            /// Both are standard Emacs/readline undo keybindings
             if (codepoint == 0x1F) {
                 execute_keybinding_action(&ctx, "C-_", handle_undo);
                 break;
             }
 
-            /* Check for Ctrl+^ (0x1E = 30) - redo
-             * Note: Ctrl+^ is typed as Ctrl+Shift+6 on most keyboards */
+            /// Check for Ctrl+^ (0x1E = 30) - redo
+            /// Note: Ctrl+^ is typed as Ctrl+Shift+6 on most keyboards
             if (codepoint == 0x1E) {
                 execute_keybinding_action(&ctx, "C-^", handle_redo);
                 break;
@@ -3450,26 +3424,27 @@ char *lle_readline(const char *prompt) {
 
         case LLE_INPUT_TYPE_SPECIAL_KEY: {
             /// Special keys
-            /* GROUP 5 MIGRATION: ENTER routed through keybinding manager
-             * (context-aware action) */
+            /// GROUP 5 MIGRATION: ENTER routed through keybinding manager
+            /// (context-aware action)
             if (event->data.special_key.key == LLE_KEY_ENTER &&
                 !(event->data.special_key.modifiers & LLE_MOD_ALT)) {
                 /// Plain Enter - accept line
                 execute_keybinding_action(&ctx, "ENTER", handle_enter);
             }
-            /* Alt-Enter: Insert literal newline (for editing complete multiline
-               commands) */
+            /// Alt-Enter: Insert literal newline (for editing complete
+            /// multiline
+            ///                commands)
             else if (event->data.special_key.key == LLE_KEY_ENTER &&
                      (event->data.special_key.modifiers & LLE_MOD_ALT)) {
                 execute_keybinding_action(&ctx, "M-ENTER", NULL);
             }
-            /* GROUP 1 MIGRATION: Navigation keys routed through keybinding
-               manager */
+            /// GROUP 1 MIGRATION: Navigation keys routed through keybinding
+            ///                manager
             else if (event->data.special_key.key == LLE_KEY_LEFT) {
                 execute_keybinding_action(&ctx, "LEFT", handle_arrow_left);
             }
-            /* Ctrl+Right: Partial suggestion acceptance (must check before
-               plain RIGHT) */
+            /// Ctrl+Right: Partial suggestion acceptance (must check before
+            ///                plain RIGHT)
             else if (event->data.special_key.key == LLE_KEY_RIGHT &&
                      (event->data.special_key.modifiers & LLE_MOD_CTRL)) {
                 execute_keybinding_action(&ctx, "C-RIGHT", NULL);
@@ -3482,8 +3457,8 @@ char *lle_readline(const char *prompt) {
             } else if (event->data.special_key.key == LLE_KEY_DOWN) {
                 execute_keybinding_action(&ctx, "DOWN", handle_arrow_down);
             }
-            /* GROUP 1 MIGRATION: Home/End keys routed through keybinding
-               manager */
+            /// GROUP 1 MIGRATION: Home/End keys routed through keybinding
+            ///                manager
             else if (event->data.special_key.key == LLE_KEY_HOME) {
                 execute_keybinding_action(&ctx, "HOME", handle_home);
             } else if (event->data.special_key.key == LLE_KEY_END) {
@@ -3502,8 +3477,8 @@ char *lle_readline(const char *prompt) {
             else if (event->data.special_key.key == LLE_KEY_ESCAPE) {
                 execute_keybinding_action(&ctx, "ESC", NULL);
             }
-            /* Handle Ctrl+letter combinations (now SPECIAL_KEY events with
-               keycode) */
+            /// Handle Ctrl+letter combinations (now SPECIAL_KEY events with
+            ///                keycode)
             else if (event->data.special_key.key == LLE_KEY_UNKNOWN &&
                      (event->data.special_key.modifiers & LLE_MOD_CTRL)) {
                 uint32_t keycode = event->data.special_key.keycode;
@@ -3546,8 +3521,8 @@ char *lle_readline(const char *prompt) {
                     break;
                 case 'S': /* Ctrl-S: Forward search (when in search mode,
                              handled there) */
-                    /* In normal mode, Ctrl-S is often flow control (XOFF) -
-                     * ignore */
+                    /// In normal mode, Ctrl-S is often flow control (XOFF) -
+                    /// ignore
                     break;
                 case 'U': /// Ctrl-U: Kill entire line
                     execute_keybinding_action(&ctx, "C-u", handle_kill_line);
@@ -3559,8 +3534,8 @@ char *lle_readline(const char *prompt) {
                     execute_keybinding_action(&ctx, "C-y", handle_yank);
                     break;
                 default: {
-                    /* Try keybinding manager for other Ctrl+letter combinations
-                     */
+                    /// Try keybinding manager for other Ctrl+letter
+                    /// combinations
                     char keybind[8];
                     snprintf(keybind, sizeof(keybind), "C-%c",
                              (char)tolower(keycode));
@@ -3603,8 +3578,7 @@ char *lle_readline(const char *prompt) {
                     execute_keybinding_action(&ctx, "M-_", handle_redo);
                     break;
                 default: {
-                    /* Try keybinding manager for other Alt+letter combinations
-                     */
+                    /// Try keybinding manager for other Alt+letter combinations
                     char keybind[8];
                     snprintf(keybind, sizeof(keybind), "M-%c", (char)keycode);
                     execute_keybinding_action(&ctx, keybind, NULL);
@@ -3633,8 +3607,8 @@ char *lle_readline(const char *prompt) {
 
         case LLE_INPUT_TYPE_WINDOW_RESIZE: {
             /// Step 7: Window resize - refresh display with new dimensions
-            /* If completion menu is active, recalculate layout for new terminal
-             * width */
+            /// If completion menu is active, recalculate layout for new
+            /// terminal width
             if (ctx.editor && ctx.editor->completion_system) {
                 lle_completion_menu_state_t *menu =
                     lle_completion_system_get_menu(
@@ -3674,52 +3648,50 @@ char *lle_readline(const char *prompt) {
         }
         }
 
-        /* WATCHDOG: Check after event dispatch (catches hangs in handlers).
-         * This is a secondary check - handlers should already abort early
-         * if watchdog fired, but this catches any that don't.
-         */
+        /// WATCHDOG: Check after event dispatch (catches hangs in handlers).
+        /// This is a secondary check - handlers should already abort early
+        /// if watchdog fired, but this catches any that don't.
         if (lle_watchdog_check()) {
-            /* Don't clear here - let the loop start check handle it.
-             * Just note that we detected it after dispatch. */
+            /// Don't clear here - let the loop start check handle it.
+            /// Just note that we detected it after dispatch.
         }
 
-        /* Event processed - in Step 1 we don't free events (managed by input
-         * processor) */
+        /// Event processed - in Step 1 we don't free events (managed by input
+        /// processor)
     }
 
-    /* === WIDGET HOOK: LINE_FINISH === */
+    /// === WIDGET HOOK: LINE_FINISH ===
     /// Trigger line-finish hook at end of readline (ZSH zle-line-finish)
     if (editor_to_use && editor_to_use->widget_hooks_manager) {
         lle_widget_hook_trigger(editor_to_use->widget_hooks_manager,
                                 LLE_HOOK_LINE_FINISH, editor_to_use);
     }
 
-    /* === STEP 10: Exit raw mode and finalize input === */
+    /// === STEP 10: Exit raw mode and finalize input ===
 
-    /* Clear the LLE readline active flag before exiting raw mode
-     * This ensures the signal handler knows we're no longer in readline */
+    /// Clear the LLE readline active flag before exiting raw mode
+    /// This ensures the signal handler knows we're no longer in readline
     set_lle_readline_active(0);
 
     lle_unix_interface_exit_raw_mode(unix_iface);
 
-    /* If we got a line, fire LINE_ACCEPTED hook then finalize input.
-     *
-     * LINE_ACCEPTED Hook (Spec 25 Section 12):
-     * This hook fires when the user has pressed Enter and the line is
-     * complete, but BEFORE dc_finalize_input() which:
-     * 1. Writes \n to move cursor down
-     * 2. Resets screen buffer state (prompt metrics lost)
-     *
-     * At this point:
-     * - Cursor is at end of command line
-     * - Screen buffer has valid prompt metrics (command_start_row, etc.)
-     * - Handlers can use relative cursor movement to modify display
-     *
-     * Primary use case: Transient prompts - replace fancy prompt with
-     * minimal version in scrollback before cursor moves to output area.
-     */
+    /// If we got a line, fire LINE_ACCEPTED hook then finalize input.
+    ///
+    /// LINE_ACCEPTED Hook (Spec 25 Section 12):
+    /// This hook fires when the user has pressed Enter and the line is
+    /// complete, but BEFORE dc_finalize_input() which:
+    /// 1. Writes \n to move cursor down
+    /// 2. Resets screen buffer state (prompt metrics lost)
+    ///
+    /// At this point:
+    /// - Cursor is at end of command line
+    /// - Screen buffer has valid prompt metrics (command_start_row, etc.)
+    /// - Handlers can use relative cursor movement to modify display
+    ///
+    /// Primary use case: Transient prompts - replace fancy prompt with
+    /// minimal version in scrollback before cursor moves to output area.
     if (final_line) {
-        /* === WIDGET HOOK: LINE_ACCEPTED === */
+        /// === WIDGET HOOK: LINE_ACCEPTED ===
         if (editor_to_use && editor_to_use->widget_hooks_manager) {
             lle_widget_hook_trigger(editor_to_use->widget_hooks_manager,
                                     LLE_HOOK_LINE_ACCEPTED, editor_to_use);
@@ -3728,7 +3700,7 @@ char *lle_readline(const char *prompt) {
         dc_finalize_input();
     }
 
-    /* === STEP 11: Cleanup and return === */
+    /// === STEP 11: Cleanup and return ===
     /// Step 5 enhancement: Free kill buffer
     if (kill_buffer) {
         free(kill_buffer);
@@ -3744,31 +3716,31 @@ char *lle_readline(const char *prompt) {
         lle_keybinding_manager_destroy(keybinding_manager);
     }
 
-    /* Clear completion system state at end of readline to prevent memory leaks.
-     * Any active completion results from TAB presses during this edit session
-     * need to be freed before the next readline call or shell exit. */
+    /// Clear completion system state at end of readline to prevent memory
+    /// leaks. Any active completion results from TAB presses during this edit
+    /// session need to be freed before the next readline call or shell exit.
     if (editor_to_use && editor_to_use->completion_system) {
         lle_completion_system_clear(editor_to_use->completion_system);
     }
 
-    /* Step 6: Cleanup continuation state, destroy event system, buffer, and
-     * terminal */
+    /// Step 6: Cleanup continuation state, destroy event system, buffer, and
+    /// terminal
     continuation_state_cleanup(&continuation_state);
     lle_event_system_destroy(event_system);
     lle_buffer_destroy(buffer);
 
-    /* Destroy edit-session arena - frees all per-readline allocations.
-     * Currently kill_buffer and current_suggestion are still using malloc,
-     * but future allocations can use lle_arena_alloc(edit_arena, ...) and
-     * will be automatically freed here. */
+    /// Destroy edit-session arena - frees all per-readline allocations.
+    /// Currently kill_buffer and current_suggestion are still using malloc,
+    /// but future allocations can use lle_arena_alloc(edit_arena, ...) and
+    /// will be automatically freed here.
     if (edit_arena) {
         lle_arena_destroy(edit_arena);
     }
 
-    /* Clear editor's buffer pointer to prevent double-free on shell exit.
-     * The buffer was created per-readline call and assigned to the persistent
-     * editor (g_lle_integration->editor). Now that we've destroyed it, we must
-     * clear the reference so lle_editor_destroy won't try to free it again. */
+    /// Clear editor's buffer pointer to prevent double-free on shell exit.
+    /// The buffer was created per-readline call and assigned to the persistent
+    /// editor (g_lle_integration->editor). Now that we've destroyed it, we must
+    /// clear the reference so lle_editor_destroy won't try to free it again.
     if (editor_to_use) {
         editor_to_use->buffer = NULL;
         if (editor_to_use->cursor_manager) {
@@ -3793,12 +3765,12 @@ char *lle_readline(const char *prompt) {
  * the file-static suppression flag across the call is safe.
  */
 char *lle_readline_no_history(const char *prompt) {
-    /* Swap the editor's history to a separate in-process debug
-     * history for the duration of this call. Arrow-key recall and
-     * ctrl-r reverse search both read editor->history_system, so the
-     * swap covers both transparently: at the (lush-debug) prompt
-     * they walk past debug commands instead of shell history, and
-     * shell history is untouched. */
+    /// Swap the editor's history to a separate in-process debug
+    /// history for the duration of this call. Arrow-key recall and
+    /// ctrl-r reverse search both read editor->history_system, so the
+    /// swap covers both transparently: at the (lush-debug) prompt
+    /// they walk past debug commands instead of shell history, and
+    /// shell history is untouched.
     lle_editor_t *editor = lle_get_global_editor();
     lle_history_core_t *saved_history = NULL;
 

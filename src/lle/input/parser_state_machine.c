@@ -144,8 +144,8 @@ lle_parser_state_machine_process(lle_parser_state_machine_t *state_machine,
         return LLE_SUCCESS;
     }
 
-    /* The process function provides basic state routing hints based on input.
-     * The integration layer will do the actual parsing. */
+    /// The process function provides basic state routing hints based on input.
+    /// The integration layer will do the actual parsing.
 
     /// Check current state and input to determine transitions
     switch (state_machine->current_state) {
@@ -200,9 +200,9 @@ lle_parser_state_machine_process(lle_parser_state_machine_t *state_machine,
     case LLE_PARSER_STATE_KEY_SEQUENCE:
     case LLE_PARSER_STATE_MOUSE:
     case LLE_PARSER_STATE_UTF8_MULTIBYTE:
-        /* These states are handled by the integration layer.
-         * The state machine just tracks that we're in these states.
-         * Integration layer will call transition() when parsing completes. */
+        /// These states are handled by the integration layer.
+        /// The state machine just tracks that we're in these states.
+        /// Integration layer will call transition() when parsing completes.
         break;
 
     case LLE_PARSER_STATE_ERROR_RECOVERY:

@@ -116,8 +116,8 @@ static void test_cursor_manager_structure() {
 static void test_cursor_manager_init() {
     TEST("Cursor manager initialization");
 
-    /* Note: This test can't fully run without a real memory pool,
-     * but we verify the structure definitions are correct */
+    /// Note: This test can't fully run without a real memory pool,
+    /// but we verify the structure definitions are correct
 
     ASSERT_TRUE(sizeof(lle_cursor_manager_t) > 0,
                 "Cursor manager structure defined");
@@ -131,13 +131,13 @@ static void test_cursor_manager_init() {
 static void test_cursor_position_field_count() {
     TEST("Cursor position has complete field set");
 
-    /* Cursor position should have at least 11 fields per spec:
-     * 9 size_t fields + 1 bool + 1 uint32_t = minimum size */
+    /// Cursor position should have at least 11 fields per spec:
+    /// 9 size_t fields + 1 bool + 1 uint32_t = minimum size
     lle_cursor_position_t pos;
     memset(&pos, 0, sizeof(pos));
 
-    /* The structure should be large enough for all fields:
-     * 9 size_t + 1 bool + 1 uint32_t */
+    /// The structure should be large enough for all fields:
+    /// 9 size_t + 1 bool + 1 uint32_t
     size_t min_size = 9 * sizeof(size_t) + sizeof(bool) + sizeof(uint32_t);
     ASSERT_TRUE(sizeof(pos) >= min_size,
                 "Cursor position has sufficient fields");

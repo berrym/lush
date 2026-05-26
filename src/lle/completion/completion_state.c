@@ -94,8 +94,8 @@ void lle_completion_state_free(lle_completion_state_t *state) {
         state->results = NULL;
     }
 
-    /* Release the word context (pool-backed; this is largely a
-     * no-op kept for symmetry). */
+    /// Release the word context (pool-backed; this is largely a
+    /// no-op kept for symmetry).
     if (state->context) {
         lle_word_context_free(state->context);
         state->context = NULL;
@@ -104,8 +104,8 @@ void lle_completion_state_free(lle_completion_state_t *state) {
     /// Mark as inactive
     state->active = false;
 
-    /* Note: The state structure itself and string fields (buffer_snapshot,
-     * original_word) are pool-allocated and will be freed with the pool */
+    /// Note: The state structure itself and string fields (buffer_snapshot,
+    /// original_word) are pool-allocated and will be freed with the pool
 }
 
 /**

@@ -300,9 +300,8 @@ static void refresh_after_completion(display_controller_t *dc) {
         return;
     }
 
-    /* Directly publish REDRAW_NEEDED event and process immediately
-     * Event-based approach wasn't reliably triggering display update
-     */
+    /// Directly publish REDRAW_NEEDED event and process immediately
+    /// Event-based approach wasn't reliably triggering display update
     if (dc->event_system) {
         layer_event_t event = {.type = LAYER_EVENT_REDRAW_NEEDED,
                                .source_layer = LAYER_ID_DISPLAY_CONTROLLER,
@@ -342,9 +341,9 @@ static void update_inline_completion(lle_editor_t *editor,
     const lle_completion_item_t *selected =
         &state->results->items[menu->selected_index];
 
-    /* Re-analyze the buffer at its CURRENT cursor: prior cycling
-     * iterations have mutated the filename-portion bytes, so the
-     * boundaries from the initial generation are stale. */
+    /// Re-analyze the buffer at its CURRENT cursor: prior cycling
+    /// iterations have mutated the filename-portion bytes, so the
+    /// boundaries from the initial generation are stale.
     lle_word_context_t *current_context = NULL;
     lle_result_t ctx_result = lle_word_context_analyze(
         editor->buffer->data, editor->buffer->cursor.byte_offset,
@@ -352,10 +351,10 @@ static void update_inline_completion(lle_editor_t *editor,
     if (ctx_result != LLE_SUCCESS || !current_context)
         return;
 
-    /* External commands that shadow a builtin or alias carry their
-     * full PATH-resolved path in description; the engine splices that
-     * full path so the user picks the disambiguating absolute name.
-     * For all other types the candidate's text is what gets spliced. */
+    /// External commands that shadow a builtin or alias carry their
+    /// full PATH-resolved path in description; the engine splices that
+    /// full path so the user picks the disambiguating absolute name.
+    /// For all other types the candidate's text is what gets spliced.
     lle_completion_item_t synthetic_item = *selected;
     if (selected->type == LLE_COMPLETION_TYPE_COMMAND &&
         selected->description != NULL) {
@@ -391,8 +390,8 @@ static void clear_completion_menu(lle_editor_t *editor) {
     display_controller_t *dc = display_integration_get_controller();
     if (dc) {
         display_controller_clear_completion_menu(dc);
-        /* Note: menu_state_changed flag is set, will trigger redraw in
-         * refresh_display() */
+        /// Note: menu_state_changed flag is set, will trigger redraw in
+        /// refresh_display()
     }
 }
 
@@ -455,8 +454,8 @@ lle_result_t lle_beginning_of_line(lle_editor_t *editor) {
         editor->buffer->cursor.grapheme_index = 0;
     }
 
-    /* CRITICAL: Sync cursor_manager with buffer cursor after direct
-     * modification */
+    /// CRITICAL: Sync cursor_manager with buffer cursor after direct
+    /// modification
     if (editor->cursor_manager) {
         lle_cursor_manager_move_to_byte_offset(
             editor->cursor_manager, editor->buffer->cursor.byte_offset);
@@ -494,8 +493,8 @@ lle_result_t lle_end_of_line(lle_editor_t *editor) {
         editor->buffer->cursor.grapheme_index = editor->buffer->length;
     }
 
-    /* CRITICAL: Sync cursor_manager with buffer cursor after direct
-     * modification */
+    /// CRITICAL: Sync cursor_manager with buffer cursor after direct
+    /// modification
     if (editor->cursor_manager) {
         lle_cursor_manager_move_to_byte_offset(
             editor->cursor_manager, editor->buffer->cursor.byte_offset);
@@ -765,26 +764,25 @@ lle_result_t lle_previous_line(lle_editor_t *editor) {
     /// curr_line_start points to first char of current line (after the '\n')
     /// So curr_line_start - 1 is the '\n' that ends the previous line
 
-    /* The newline at curr_line_start - 1 terminates the previous line.
-     * We need to find where that previous line starts.
-     *
-     * Example: "line1\n\nline3" with cursor on line3
-     *          012345 6 789...
-     *          line1  \n \n line3
-     *                 ^  ^
-     *                 |  curr_line_start = 7
-     *                 prev line's terminating newline = 6
-     *
-     * The previous line (empty) spans from index 6 to 6 (just the newline).
-     * For an empty line, prev_line_start = prev_line_end = position after prior
-     * newline.
-     */
+    /// The newline at curr_line_start - 1 terminates the previous line.
+    /// We need to find where that previous line starts.
+    ///
+    /// Example: "line1\n\nline3" with cursor on line3
+    ///          012345 6 789...
+    ///          line1  \n \n line3
+    ///                 ^  ^
+    ///                 |  curr_line_start = 7
+    ///                 prev line's terminating newline = 6
+    ///
+    /// The previous line (empty) spans from index 6 to 6 (just the newline).
+    /// For an empty line, prev_line_start = prev_line_end = position after
+    /// prior newline.
 
     size_t prev_line_terminator =
         curr_line_start - 1; /// The '\n' that ends prev line
 
-    /* Find start of previous line by searching backwards for newline (or buffer
-     * start) */
+    /// Find start of previous line by searching backwards for newline (or
+    /// buffer start)
     size_t prev_line_start = prev_line_terminator;
     while (prev_line_start > 0 && data[prev_line_start - 1] != '\n') {
         prev_line_start--;
@@ -803,10 +801,9 @@ lle_result_t lle_previous_line(lle_editor_t *editor) {
     }
 
     /// Calculate new cursor position on previous line
-    /* prev_line_start points to first character of line content
-     * prev_line_terminator points to the '\n' that ends the line
-     * Line length = prev_line_terminator - prev_line_start (0 for empty lines)
-     */
+    /// prev_line_start points to first character of line content
+    /// prev_line_terminator points to the '\n' that ends the line
+    /// Line length = prev_line_terminator - prev_line_start (0 for empty lines)
     size_t prev_line_length = prev_line_terminator - prev_line_start;
     size_t new_cursor = prev_line_start + target_column;
 
@@ -816,8 +813,8 @@ lle_result_t lle_previous_line(lle_editor_t *editor) {
                                               (before newline) */
     }
 
-    /* Temporarily disable sticky_column to prevent move_to_byte_offset from
-     * overwriting preferred_visual_column */
+    /// Temporarily disable sticky_column to prevent move_to_byte_offset from
+    /// overwriting preferred_visual_column
     bool was_sticky = editor->cursor_manager->sticky_column;
     size_t saved_preferred = editor->cursor_manager->preferred_visual_column;
     editor->cursor_manager->sticky_column = false;
@@ -920,8 +917,8 @@ lle_result_t lle_next_line(lle_editor_t *editor) {
     /// Calculate new cursor position on next line
     /// next_line_end points to newline at end of line (or buffer end)
     /// next_line_start points to first character
-    /* Line length is distance between them, cursor at next_line_end positions
-     * after last char */
+    /// Line length is distance between them, cursor at next_line_end positions
+    /// after last char
     size_t next_line_length = next_line_end - next_line_start;
     size_t new_cursor = next_line_start + target_column;
 
@@ -930,8 +927,8 @@ lle_result_t lle_next_line(lle_editor_t *editor) {
         new_cursor = next_line_end; /// Position cursor at/after last character
     }
 
-    /* Temporarily disable sticky_column to prevent move_to_byte_offset from
-     * overwriting preferred_visual_column */
+    /// Temporarily disable sticky_column to prevent move_to_byte_offset from
+    /// overwriting preferred_visual_column
     bool was_sticky = editor->cursor_manager->sticky_column;
     size_t saved_preferred = editor->cursor_manager->preferred_visual_column;
     editor->cursor_manager->sticky_column = false;
@@ -1147,15 +1144,15 @@ lle_result_t lle_delete_char(lle_editor_t *editor) {
         lle_cursor_manager_move_to_byte_offset(
             editor->cursor_manager, editor->buffer->cursor.byte_offset);
 
-        /* Move cursor forward by one grapheme to find the end of the grapheme
-         * to delete */
+        /// Move cursor forward by one grapheme to find the end of the grapheme
+        /// to delete
         size_t grapheme_start = editor->buffer->cursor.byte_offset;
 
         lle_result_t result =
             lle_cursor_manager_move_by_graphemes(editor->cursor_manager, 1);
         if (result == LLE_SUCCESS) {
-            /* CRITICAL: Sync buffer cursor back from cursor manager after
-             * movement */
+            /// CRITICAL: Sync buffer cursor back from cursor manager after
+            /// movement
             lle_cursor_manager_get_position(editor->cursor_manager,
                                             &editor->buffer->cursor);
 
@@ -1166,8 +1163,8 @@ lle_result_t lle_delete_char(lle_editor_t *editor) {
             result = lle_buffer_delete_text(editor->buffer, grapheme_start,
                                             grapheme_len);
 
-            /* CRITICAL: After deletion, cursor should be at deletion point,
-             * sync cursor_manager */
+            /// CRITICAL: After deletion, cursor should be at deletion point,
+            /// sync cursor_manager
             if (result == LLE_SUCCESS) {
                 lle_cursor_manager_move_to_byte_offset(editor->cursor_manager,
                                                        grapheme_start);
@@ -1206,15 +1203,15 @@ lle_result_t lle_backward_delete_char(lle_editor_t *editor) {
             return LLE_SUCCESS; /// Already at beginning
         }
 
-        /* Move cursor back by one grapheme to find the start of the grapheme to
-         * delete */
+        /// Move cursor back by one grapheme to find the start of the grapheme
+        /// to delete
         size_t current_byte = editor->buffer->cursor.byte_offset;
 
         lle_result_t result =
             lle_cursor_manager_move_by_graphemes(editor->cursor_manager, -1);
         if (result == LLE_SUCCESS) {
-            /* CRITICAL: Sync buffer cursor back from cursor manager after
-             * movement */
+            /// CRITICAL: Sync buffer cursor back from cursor manager after
+            /// movement
             lle_cursor_manager_get_position(editor->cursor_manager,
                                             &editor->buffer->cursor);
 
@@ -1225,8 +1222,8 @@ lle_result_t lle_backward_delete_char(lle_editor_t *editor) {
             result = lle_buffer_delete_text(editor->buffer, grapheme_start,
                                             grapheme_len);
 
-            /* CRITICAL: After deletion, ensure cursor_manager is synced with
-             * buffer cursor */
+            /// CRITICAL: After deletion, ensure cursor_manager is synced with
+            /// buffer cursor
             if (result == LLE_SUCCESS) {
                 lle_cursor_manager_move_to_byte_offset(
                     editor->cursor_manager, editor->buffer->cursor.byte_offset);
@@ -1499,10 +1496,9 @@ lle_result_t lle_transpose_chars(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Find grapheme boundaries around cursor.
-     * Transpose swaps the grapheme before cursor with the one at/after cursor.
-     * If at end of buffer, swap the last two graphemes.
-     */
+    /// Find grapheme boundaries around cursor.
+    /// Transpose swaps the grapheme before cursor with the one at/after cursor.
+    /// If at end of buffer, swap the last two graphemes.
     size_t g1_start, g1_end, g2_start, g2_end;
 
     if (cursor >= len) {
@@ -1581,8 +1577,7 @@ lle_result_t lle_transpose_words(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Find word2: the word at or after cursor using grapheme-aware boundaries
-     */
+    /// Find word2: the word at or after cursor using grapheme-aware boundaries
     size_t word2_start = cursor;
     size_t word2_end;
 
@@ -1594,8 +1589,8 @@ lle_result_t lle_transpose_words(lle_editor_t *editor) {
         !is_shell_metachar(cp_at_cursor)) {
         /// We're inside a word - find its start
         word2_start = find_word_start(data, cursor);
-        /* find_word_start returns position at start of word, but we need to
-         * check if we need to look for next word instead */
+        /// find_word_start returns position at start of word, but we need to
+        /// check if we need to look for next word instead
     }
 
     /// Find end of word2
@@ -2144,17 +2139,16 @@ lle_result_t lle_history_previous(lle_editor_t *editor) {
     /// Check if navigation-time deduplication is enabled (default: true)
     bool dedup_enabled = config.lle_dedup_navigation;
 
-    /* Check if unique-only navigation is enabled (default: true)
-     * When enabled, each command is shown at most once per navigation session
-     */
+    /// Check if unique-only navigation is enabled (default: true)
+    /// When enabled, each command is shown at most once per navigation session
     bool unique_only = config.lle_dedup_navigation_unique;
 
     /// Get current buffer content for deduplication comparison
     const char *current_content =
         dedup_enabled ? get_current_buffer_content(editor) : NULL;
 
-    /* Move backward in history (toward older entries), skipping duplicates if
-     * enabled */
+    /// Move backward in history (toward older entries), skipping duplicates if
+    /// enabled
     while (editor->history_navigation_pos < entry_count) {
         size_t idx = entry_count - 1 - editor->history_navigation_pos;
         lle_history_entry_t *entry = NULL;
@@ -2169,8 +2163,8 @@ lle_result_t lle_history_previous(lle_editor_t *editor) {
                 continue; /// Skip non-active entry
             }
 
-            /* Skip if dedup enabled and this entry matches current buffer
-             * content */
+            /// Skip if dedup enabled and this entry matches current buffer
+            /// content
             if (dedup_enabled && current_content &&
                 history_nav_strings_equal(entry->command, current_content)) {
                 continue; /// Skip duplicate, try next older entry
@@ -2186,16 +2180,16 @@ lle_result_t lle_history_previous(lle_editor_t *editor) {
                 history_nav_mark_seen(editor, cmd_hash);
             }
 
-            /* Found entry to display - push onto display stack for symmetric
-             * down navigation (issue #40) */
+            /// Found entry to display - push onto display stack for symmetric
+            /// down navigation (issue #40)
             history_nav_push_display(editor, idx);
 
             lle_buffer_clear(editor->buffer);
             lle_buffer_insert_text(editor->buffer, 0, entry->command,
                                    strlen(entry->command));
 
-            /* CRITICAL: Sync cursor_manager after insertion moves cursor to end
-             */
+            /// CRITICAL: Sync cursor_manager after insertion moves cursor to
+            /// end
             if (editor->cursor_manager) {
                 lle_cursor_manager_move_to_byte_offset(
                     editor->cursor_manager, editor->buffer->cursor.byte_offset);
@@ -2226,8 +2220,8 @@ lle_result_t lle_history_next(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Pop the current entry from display stack (the one we're currently
-     * viewing) This removes it so the next "up" will show it again */
+    /// Pop the current entry from display stack (the one we're currently
+    /// viewing) This removes it so the next "up" will show it again
     size_t current_idx;
     if (!history_nav_pop_display(editor, &current_idx)) {
         /// Stack was empty - back to current line
@@ -2238,17 +2232,16 @@ lle_result_t lle_history_next(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Also remove from seen set so it can be shown again on next up navigation
-     */
-    /* Note: We don't have a remove-from-seen function, but that's okay because
-     * the seen set prevents showing duplicates during a single up-navigation
-     * session. When we go down and then up again, we want to see the entry.
-     * The simplest fix is to clear the seen set when we start going down,
-     * but that would break if user goes up-down-up-down randomly.
-     *
-     * Better approach: Don't clear seen set. The entry will still be in the
-     * seen set, but since we popped it from display stack, pressing up again
-     * will find the NEXT unseen entry. This is actually correct behavior. */
+    /// Also remove from seen set so it can be shown again on next up navigation
+    /// Note: We don't have a remove-from-seen function, but that's okay because
+    /// the seen set prevents showing duplicates during a single up-navigation
+    /// session. When we go down and then up again, we want to see the entry.
+    /// The simplest fix is to clear the seen set when we start going down,
+    /// but that would break if user goes up-down-up-down randomly.
+    ///
+    /// Better approach: Don't clear seen set. The entry will still be in the
+    /// seen set, but since we popped it from display stack, pressing up again
+    /// will find the NEXT unseen entry. This is actually correct behavior.
 
     /// Check if there's another entry on the stack to display
     if (history_nav_display_stack_empty(editor)) {
@@ -2266,8 +2259,7 @@ lle_result_t lle_history_next(lle_editor_t *editor) {
         return LLE_SUCCESS;
     }
 
-    /* Peek at the next entry on the stack (don't pop - we want to display it)
-     */
+    /// Peek at the next entry on the stack (don't pop - we want to display it)
     size_t next_idx =
         editor
             ->history_nav_display_stack[editor->history_nav_display_count - 1];
@@ -2388,8 +2380,7 @@ lle_result_t lle_history_search_forward(lle_editor_t *editor) {
     }
 
     /// Search forward for command starting with current buffer content
-    /* Note: This is essentially the same as backward but would track position
-     */
+    /// Note: This is essentially the same as backward but would track position
     return lle_history_search_backward(editor);
 }
 
@@ -2412,9 +2403,8 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         return LLE_SUCCESS; /// No completion system available
     }
 
-    /* If completion is already active, cycle to next item
-     * This is standard shell behavior: TAB cycles through completions
-     */
+    /// If completion is already active, cycle to next item
+    /// This is standard shell behavior: TAB cycles through completions
     bool is_active = lle_completion_system_is_active(editor->completion_system);
     bool is_menu_visible =
         lle_completion_system_is_menu_visible(editor->completion_system);
@@ -2427,8 +2417,8 @@ lle_result_t lle_complete(lle_editor_t *editor) {
             /// Move to next item sequentially (across columns, then next row)
             lle_completion_menu_move_next(menu);
 
-            /* Update command line with newly selected completion (inline
-             * update) */
+            /// Update command line with newly selected completion (inline
+            /// update)
             lle_completion_state_t *state =
                 lle_completion_system_get_state(editor->completion_system);
 
@@ -2467,34 +2457,34 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         return LLE_SUCCESS; /// No completions - not an error
     }
 
-    /* If no items, clean up and return.
-     * NOTE: result is owned by completion_system->current_state, so we call
-     * lle_completion_system_clear() to properly free it - NOT result_free. */
+    /// If no items, clean up and return.
+    /// NOTE: result is owned by completion_system->current_state, so we call
+    /// lle_completion_system_clear() to properly free it - NOT result_free.
     if (result->count == 0) {
         lle_completion_system_clear(editor->completion_system);
         return LLE_SUCCESS;
     }
 
-    /* Single match: splice the candidate into the buffer with the
-     * accept-phase suffix (close-quote + trailing space for files,
-     * "/" for directories). Multi-match: open the menu and let the
-     * preview path render the first candidate. */
+    /// Single match: splice the candidate into the buffer with the
+    /// accept-phase suffix (close-quote + trailing space for files,
+    /// "/" for directories). Multi-match: open the menu and let the
+    /// preview path render the first candidate.
     if (result->count == 1) {
         const lle_completion_item_t *item = &result->items[0];
 
-        /* External commands shadowing a builtin/alias are spliced as
-         * their full PATH-resolved path so the user disambiguates
-         * away from the builtin. */
+        /// External commands shadowing a builtin/alias are spliced as
+        /// their full PATH-resolved path so the user disambiguates
+        /// away from the builtin.
         lle_completion_item_t synthetic_item = *item;
         if (item->type == LLE_COMPLETION_TYPE_COMMAND &&
             item->description != NULL) {
             synthetic_item.text = (char *)item->description;
         }
 
-        /* Re-analyze the buffer to obtain the splice context. The
-         * completion_system already analyzed once during generate,
-         * but the analyzer is cheap and re-running keeps the apply
-         * path self-contained. */
+        /// Re-analyze the buffer to obtain the splice context. The
+        /// completion_system already analyzed once during generate,
+        /// but the analyzer is cheap and re-running keeps the apply
+        /// path self-contained.
         lle_word_context_t *splice_context = NULL;
         lle_result_t ctx_result = lle_word_context_analyze(
             buffer, cursor_pos, editor->lle_pool, &splice_context);
@@ -2508,13 +2498,13 @@ lle_result_t lle_complete(lle_editor_t *editor) {
             &synthetic_item, editor->lle_pool);
         lle_word_context_free(splice_context);
 
-        /* Directory-chain (issue #85): if the accepted item was a
-         * directory and completion.chain_directories is on, recurse
-         * into lle_complete() instead of clearing. This re-triggers
-         * completion at the new cursor position (after the inserted
-         * "/") so the next-level menu opens immediately, fish-style.
-         * The buffer + cursor are already updated by the splice, so
-         * re-entry is clean. */
+        /// Directory-chain (issue #85): if the accepted item was a
+        /// directory and completion.chain_directories is on, recurse
+        /// into lle_complete() instead of clearing. This re-triggers
+        /// completion at the new cursor position (after the inserted
+        /// "/") so the next-level menu opens immediately, fish-style.
+        /// The buffer + cursor are already updated by the splice, so
+        /// re-entry is clean.
         bool chain = false;
         (void)config_registry_get_boolean("completion.chain_directories",
                                           &chain);
@@ -2524,8 +2514,8 @@ lle_result_t lle_complete(lle_editor_t *editor) {
             return lle_complete(editor);
         }
 
-        /* Single-match path consumed the active completion state;
-         * clear it so the next TAB starts a fresh session. */
+        /// Single-match path consumed the active completion state;
+        /// clear it so the next TAB starts a fresh session.
         lle_completion_system_clear(editor->completion_system);
 
         display_controller_t *dc = display_integration_get_controller();
@@ -2535,10 +2525,10 @@ lle_result_t lle_complete(lle_editor_t *editor) {
         return replace_result;
     }
 
-    /* Multiple completions: open the menu. The completion system
-     * already stored the state during generate, so we just preview
-     * the first candidate inline and hand the menu to the display
-     * controller. */
+    /// Multiple completions: open the menu. The completion system
+    /// already stored the state during generate, so we just preview
+    /// the first candidate inline and hand the menu to the display
+    /// controller.
     lle_completion_menu_state_t *menu =
         lle_completion_system_get_menu(editor->completion_system);
     if (!menu) {
@@ -2601,18 +2591,18 @@ lle_result_t lle_accept_line(lle_editor_t *editor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* This is the simple keybinding action for line acceptance. The
-     * full menu-aware ENTER handling -- including splicer-driven
-     * finalization of a cycled completion candidate (close-quote,
-     * trailing space, "/" for directories) -- lives in
-     * lle_accept_line_context (src/lle/lle_readline.c), which
-     * overrides this action for the ENTER binding via
-     * lle_keybinding_manager_bind_context. lle_accept_line itself is
-     * a fallback for any binding path that does not have access to
-     * the readline_context_t and so cannot run the splicer. In that
-     * fallback path the most we can do for an active menu is clear
-     * it; the buffer content (possibly a preview from cycling) is
-     * left as-is. */
+    /// This is the simple keybinding action for line acceptance. The
+    /// full menu-aware ENTER handling -- including splicer-driven
+    /// finalization of a cycled completion candidate (close-quote,
+    /// trailing space, "/" for directories) -- lives in
+    /// lle_accept_line_context (src/lle/lle_readline.c), which
+    /// overrides this action for the ENTER binding via
+    /// lle_keybinding_manager_bind_context. lle_accept_line itself is
+    /// a fallback for any binding path that does not have access to
+    /// the readline_context_t and so cannot run the splicer. In that
+    /// fallback path the most we can do for an active menu is clear
+    /// it; the buffer content (possibly a preview from cycling) is
+    /// left as-is.
     if (editor->completion_system &&
         lle_completion_system_is_menu_visible(editor->completion_system)) {
         clear_completion_menu(editor);
@@ -2706,8 +2696,8 @@ lle_result_t lle_clear_screen(lle_editor_t *editor) {
     lle_display_integration_t *display_integration =
         lle_display_integration_get_global();
     if (!display_integration || !display_integration->lush_display) {
-        /* Fallback: use ANSI escape sequence if display controller not
-         * available */
+        /// Fallback: use ANSI escape sequence if display controller not
+        /// available
         printf("\033[H\033[2J");
         fflush(stdout);
         return LLE_SUCCESS;
@@ -2720,16 +2710,16 @@ lle_result_t lle_clear_screen(lle_editor_t *editor) {
         return LLE_ERROR_DISPLAY_INTEGRATION;
     }
 
-    /* CRITICAL: Reset display state so refresh_display knows to redraw
-     * everything */
-    /* After clearing the physical screen, the display system's internal state
-     * (screen buffers) is out of sync. dc_reset_prompt_display_state() clears
-     * the screen buffer state so the next refresh_display() will render
-     * everything from scratch. */
+    /// CRITICAL: Reset display state so refresh_display knows to redraw
+    /// everything
+    /// After clearing the physical screen, the display system's internal state
+    /// (screen buffers) is out of sync. dc_reset_prompt_display_state() clears
+    /// the screen buffer state so the next refresh_display() will render
+    /// everything from scratch.
     dc_reset_prompt_display_state();
 
-    /* Note: refresh_display() will be called by execute_keybinding_action after
-     * this returns */
+    /// Note: refresh_display() will be called by execute_keybinding_action
+    /// after this returns
     return LLE_SUCCESS;
 }
 
@@ -2812,8 +2802,8 @@ lle_result_t lle_unix_line_discard(lle_editor_t *editor) {
         lle_result_t result =
             lle_buffer_delete_text(editor->buffer, 0, cursor_pos);
         if (result == LLE_SUCCESS) {
-            /* CRITICAL: Sync cursor_manager after cursor is moved to position 0
-             */
+            /// CRITICAL: Sync cursor_manager after cursor is moved to position
+            /// 0
             if (editor->cursor_manager) {
                 lle_cursor_manager_move_to_byte_offset(editor->cursor_manager,
                                                        0);
@@ -3033,11 +3023,10 @@ lle_result_t lle_tab_insert(lle_editor_t *editor) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Expand tab to spaces based on visual column position.
-     * This ensures true character-by-character tracking in the display layer
-     * since each space is a single character with width 1, rather than a
-     * tab character that requires formula-based expansion during rendering.
-     */
+    /// Expand tab to spaces based on visual column position.
+    /// This ensures true character-by-character tracking in the display layer
+    /// since each space is a single character with width 1, rather than a
+    /// tab character that requires formula-based expansion during rendering.
     int tab_width = config.tab_width > 0 ? config.tab_width : 4;
     size_t visual_col = editor->buffer->cursor.visual_column;
     size_t spaces_to_insert = tab_width - (visual_col % tab_width);
@@ -3137,8 +3126,8 @@ lle_result_t lle_keybinding_load_emacs_preset(lle_editor_t *editor) {
     lle_keybinding_manager_bind(mgr, "M-n", lle_history_search_forward,
                                 "history-search-forward");
 
-    /* Navigation - Smart arrows (context-aware: buffer lines in multiline,
-     * history in single-line) */
+    /// Navigation - Smart arrows (context-aware: buffer lines in multiline,
+    /// history in single-line)
     lle_keybinding_manager_bind(mgr, "UP", lle_smart_up_arrow,
                                 "smart-up-arrow");
     lle_keybinding_manager_bind(mgr, "DOWN", lle_smart_down_arrow,

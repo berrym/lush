@@ -228,9 +228,9 @@ lle_result_t lle_event_dispatch(lle_event_system_t *system,
         }
     }
 
-    /* Copy-and-release pattern: snapshot matching handlers while holding
-     * the mutex, then release the mutex before calling handlers. This
-     * prevents deadlock if a handler touches the event system. */
+    /// Copy-and-release pattern: snapshot matching handlers while holding
+    /// the mutex, then release the mutex before calling handlers. This
+    /// prevents deadlock if a handler touches the event system.
     pthread_mutex_lock(&system->system_mutex);
 
     lle_system_state_t previous_state = system->current_state;

@@ -274,13 +274,13 @@ bool autoload_try_resolve(struct executor *executor, const char *name) {
         return false;
     }
 
-    /* Wrap the file contents as a function body. Real zsh autoload
-     * files are usually bare bodies (the function name comes from the
-     * file name) but some are already wrapped in `funcname() { ... }`.
-     * For lush we always wrap: defining `name` redefines an existing
-     * function safely, and a bare body needs the wrapper to be
-     * callable. The cost is a redundant nesting when the file already
-     * had its own definition, which is benign. */
+    /// Wrap the file contents as a function body. Real zsh autoload
+    /// files are usually bare bodies (the function name comes from the
+    /// file name) but some are already wrapped in `funcname() { ... }`.
+    /// For lush we always wrap: defining `name` redefines an existing
+    /// function safely, and a bare body needs the wrapper to be
+    /// callable. The cost is a redundant nesting when the file already
+    /// had its own definition, which is benign.
     size_t wrap_len = strlen(name) + strlen(body) + 32;
     char *wrapped = malloc(wrap_len);
     if (!wrapped) {
@@ -290,14 +290,14 @@ bool autoload_try_resolve(struct executor *executor, const char *name) {
     snprintf(wrapped, wrap_len, "function %s {\n%s\n}\n", name, body);
     free(body);
 
-    /* Capture stderr around the source step. Autoloaded files live in
-     * the system zsh function tree; they exercise zsh-only syntax (glob
-     * qualifiers, parameter flags, etc.) that lush's parser may reject.
-     * Letting those parse errors land on the script's stderr would
-     * surface lush's own gaps as if the script itself had failed. By
-     * suppressing them here we keep autoload's contract narrow:
-     * succeed silently or fail silently — diagnostics about lush's
-     * gaps belong in a debug channel, not the script's stderr. */
+    /// Capture stderr around the source step. Autoloaded files live in
+    /// the system zsh function tree; they exercise zsh-only syntax (glob
+    /// qualifiers, parameter flags, etc.) that lush's parser may reject.
+    /// Letting those parse errors land on the script's stderr would
+    /// surface lush's own gaps as if the script itself had failed. By
+    /// suppressing them here we keep autoload's contract narrow:
+    /// succeed silently or fail silently — diagnostics about lush's
+    /// gaps belong in a debug channel, not the script's stderr.
     fflush(stderr);
     int saved_stderr = dup(STDERR_FILENO);
     int devnull = open("/dev/null", O_WRONLY);

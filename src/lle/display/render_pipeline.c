@@ -403,8 +403,8 @@ lle_result_t lle_render_pipeline_execute(lle_render_pipeline_t *pipeline,
         pipeline->stages[i].total_execution_time_ns += stage_time_ns;
 
         /// For now, each stage creates its own output
-        /* In a more advanced implementation, stages would pass output between
-         * them */
+        /// In a more advanced implementation, stages would pass output between
+        /// them
         /// For this basic implementation, we'll use the last stage's output
         if (i < pipeline->stage_count - 1 && stage_output) {
             /// Free intermediate outputs (except the last one)

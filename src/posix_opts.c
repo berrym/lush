@@ -50,24 +50,24 @@ bool apply_mode_preset(shell_mode_t mode) {
         return false;
     }
 
-    /* Mode change is a clean re-seed: drop any per-feature overrides so
-     * the new mode's matrix defaults take effect. Picking a preset means
-     * asking for it. */
+    /// Mode change is a clean re-seed: drop any per-feature overrides so
+    /// the new mode's matrix defaults take effect. Picking a preset means
+    /// asking for it.
     shell_feature_reset_all();
 
-    /* Legacy POSIX bookkeeping mirror. shell_opts.posix_mode predates
-     * the mode system; keep it in sync so call sites that still consult
-     * it see the right value. */
+    /// Legacy POSIX bookkeeping mirror. shell_opts.posix_mode predates
+    /// the mode system; keep it in sync so call sites that still consult
+    /// it see the right value.
     shell_opts.posix_mode = (mode == SHELL_MODE_POSIX);
 
     /// Persist the canonical mode label in the central registry.
     config.shell_mode = (int)mode;
     if (config_registry_is_initialized()) {
         config_registry_set_string("shell.mode", shell_mode_name(mode));
-        /* Re-seed any registered per-mode default overrides. Options
-         * without per-mode defaults are unaffected. Re-seed-every-time
-         * semantic: mid-session mode changes overwrite user tweaks to
-         * mode-aware options (picking a preset means asking for it). */
+        /// Re-seed any registered per-mode default overrides. Options
+        /// without per-mode defaults are unaffected. Re-seed-every-time
+        /// semantic: mid-session mode changes overwrite user tweaks to
+        /// mode-aware options (picking a preset means asking for it).
         config_registry_apply_mode_defaults(mode);
     }
 
@@ -494,16 +494,16 @@ int builtin_set(char **args) {
                 /// Set named option
                 i++; /// consume the option name
 
-                /* `set -o posix` is preserved as a recognized
-                 * bash-bridge alias for `mode posix`: it's bash's
-                 * canonical spelling for entering POSIX mode and a
-                 * common bash-script idiom. The lush-native spelling
-                 * is `mode posix`; both route through the same
-                 * apply_mode_preset() entry point.
-                 *
-                 * `set -o {bash,zsh,lush}` are no longer recognized:
-                 * modes are a discriminated enum, not toggles. Use
-                 * the `mode` builtin instead. */
+                /// `set -o posix` is preserved as a recognized
+                /// bash-bridge alias for `mode posix`: it's bash's
+                /// canonical spelling for entering POSIX mode and a
+                /// common bash-script idiom. The lush-native spelling
+                /// is `mode posix`; both route through the same
+                /// apply_mode_preset() entry point.
+                ///
+                /// `set -o {bash,zsh,lush}` are no longer recognized:
+                /// modes are a discriminated enum, not toggles. Use
+                /// the `mode` builtin instead.
                 if (strcmp(args[i], "posix") == 0) {
                     if (!apply_mode_preset(SHELL_MODE_POSIX)) {
                         executor_error_report(
@@ -565,10 +565,10 @@ int builtin_set(char **args) {
                 /// Unset named option
                 i++; /// consume the option name
 
-                /* `set +o posix` is the bash-bridge counterpart to
-                 * `set -o posix`: it lifts the POSIX preset and
-                 * returns to lush. `set +o {bash,zsh,lush}` are
-                 * rejected -- modes aren't toggles. */
+                /// `set +o posix` is the bash-bridge counterpart to
+                /// `set -o posix`: it lifts the POSIX preset and
+                /// returns to lush. `set +o {bash,zsh,lush}` are
+                /// rejected -- modes aren't toggles.
                 if (strcmp(args[i], "posix") == 0) {
                     if (!apply_mode_preset(SHELL_MODE_LUSH)) {
                         executor_error_report(

@@ -51,16 +51,16 @@ TEST(render_none_escapes_space) {
 }
 
 TEST(render_none_escapes_all_shell_metacharacters) {
-    /* Each metacharacter must come back with a leading backslash.
-     * Construct a candidate with one of each and check the result. */
+    /// Each metacharacter must come back with a leading backslash.
+    /// Construct a candidate with one of each and check the result.
     const char *input = " \t;|&<>(){}\"'$`\\*?[!";
     char *out = NULL;
     size_t len = 0;
     lle_result_t r = lle_splicer_render_for_context(
         input, strlen(input), LLE_QUOTE_NONE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
-    /* Output should be exactly twice the length of input (every byte
-     * gets a leading backslash). */
+    /// Output should be exactly twice the length of input (every byte
+    /// gets a leading backslash).
     ASSERT(len == strlen(input) * 2);
     /// And the content is the input with backslashes prepended.
     char expected[64];
@@ -76,13 +76,13 @@ TEST(render_none_escapes_all_shell_metacharacters) {
 TEST(render_none_escapes_tilde_only_at_position_zero) {
     char *out = NULL;
     size_t len = 0;
-    /* ~/foo at position 0 — the leading ~ is escaped, the inner / is
-     * escaped (it's a path separator in shell context for an unquoted
-     * word, but actually slashes aren't special in unquoted word
-     * tokenization; see needs_escape_in_none — / is NOT in the list).
-     * Wait: my rule does NOT escape '/'. Let me reread the function.
-     * Re-checking: no, / isn't in needs_escape_in_none. Adjust the
-     * expectation. */
+    /// ~/foo at position 0 — the leading ~ is escaped, the inner / is
+    /// escaped (it's a path separator in shell context for an unquoted
+    /// word, but actually slashes aren't special in unquoted word
+    /// tokenization; see needs_escape_in_none — / is NOT in the list).
+    /// Wait: my rule does NOT escape '/'. Let me reread the function.
+    /// Re-checking: no, / isn't in needs_escape_in_none. Adjust the
+    /// expectation.
     lle_result_t r = lle_splicer_render_for_context(
         "~/foo", strlen("~/foo"), LLE_QUOTE_NONE, POOL, &out, &len);
     ASSERT(r == LLE_SUCCESS);
@@ -111,8 +111,8 @@ TEST(render_none_escapes_hash_only_at_position_zero) {
 }
 
 TEST(render_none_passes_non_ascii_bytes_through) {
-    /* Multi-byte UTF-8 bytes (high bit set) are not shell-special
-     * regardless of quote_state and must pass through untouched. */
+    /// Multi-byte UTF-8 bytes (high bit set) are not shell-special
+    /// regardless of quote_state and must pass through untouched.
     /// "café" with é = U+00E9 = 0xC3 0xA9
     const char *input = "caf\xC3\xA9";
     char *out = NULL;
@@ -140,8 +140,8 @@ TEST(render_double_passes_space_through_unescaped) {
 }
 
 TEST(render_double_escapes_only_dollar_backtick_backslash_doublequote) {
-    /* Only $ ` \ " need escaping inside double quotes; everything
-     * else (including * ? [ etc.) is literal. */
+    /// Only $ ` \ " need escaping inside double quotes; everything
+    /// else (including * ? [ etc.) is literal.
     const char *input = "a$b`c\\d\"e*f?g[h";
     char *out = NULL;
     size_t len = 0;
@@ -158,8 +158,8 @@ TEST(render_double_escapes_only_dollar_backtick_backslash_doublequote) {
  */
 
 TEST(render_single_passes_metacharacters_through) {
-    /* Inside '...' nothing escapes (POSIX). All metacharacters are
-     * literal. */
+    /// Inside '...' nothing escapes (POSIX). All metacharacters are
+    /// literal.
     const char *input = "$`\\*?[!";
     char *out = NULL;
     size_t len = 0;
@@ -170,8 +170,8 @@ TEST(render_single_passes_metacharacters_through) {
 }
 
 TEST(render_single_handles_embedded_single_quote) {
-    /* A ' in the candidate is rendered '\'' — close, escape, reopen.
-     * Candidate: it's   →  it'\''s  */
+    /// A ' in the candidate is rendered '\'' — close, escape, reopen.
+    /// Candidate: it's   →  it'\''s
     char *out = NULL;
     size_t len = 0;
     lle_result_t r = lle_splicer_render_for_context(
@@ -186,8 +186,8 @@ TEST(render_single_handles_embedded_single_quote) {
  */
 
 TEST(render_backtick_escapes_dollar_backtick_backslash) {
-    /* Inside `...` only $ ` \ are special. Double-quote is NOT
-     * special here. */
+    /// Inside `...` only $ ` \ are special. Double-quote is NOT
+    /// special here.
     const char *input = "a$b`c\\d\"e";
     char *out = NULL;
     size_t len = 0;
@@ -261,8 +261,8 @@ TEST(compute_accept_file_no_quote_appends_space) {
 
 TEST(compute_accept_file_double_quote_appends_close_and_space) {
     lle_word_context_t ctx;
-    /* simulating "cat \"my fi" — word_start at the open ", filename
-     * portion starts one byte later. */
+    /// simulating "cat \"my fi" — word_start at the open ", filename
+    /// portion starts one byte later.
     make_context(&ctx, LLE_QUOTE_DOUBLE, 5, 10);
     lle_completion_item_t item;
     make_item(&item, "my file.txt", LLE_COMPLETION_TYPE_FILE);
@@ -270,8 +270,8 @@ TEST(compute_accept_file_double_quote_appends_close_and_space) {
     lle_splicer_splice_t splice;
     lle_result_t r = lle_splicer_compute(&ctx, &item, true, POOL, &splice);
     ASSERT(r == LLE_SUCCESS);
-    /* Inside double quotes the candidate renders without space-escape;
-     * accept appends close-quote and space. */
+    /// Inside double quotes the candidate renders without space-escape;
+    /// accept appends close-quote and space.
     ASSERT(strcmp(splice.insert_text, "my file.txt\" ") == 0);
 }
 
@@ -284,8 +284,8 @@ TEST(compute_accept_file_single_quote_appends_close_and_space) {
     lle_splicer_splice_t splice;
     lle_result_t r = lle_splicer_compute(&ctx, &item, true, POOL, &splice);
     ASSERT(r == LLE_SUCCESS);
-    /* Inside single quotes the candidate renders literally; accept
-     * appends ' and space. */
+    /// Inside single quotes the candidate renders literally; accept
+    /// appends ' and space.
     ASSERT(strcmp(splice.insert_text, "my file.txt' ") == 0);
 }
 
@@ -303,8 +303,8 @@ TEST(compute_accept_directory_appends_slash_no_close) {
 }
 
 TEST(compute_accept_command_type_appends_close_and_space) {
-    /* COMMAND / BUILTIN / ALIAS / VARIABLE / HISTORY / CUSTOM all
-     * follow the file-style suffix rule. Spot-check COMMAND. */
+    /// COMMAND / BUILTIN / ALIAS / VARIABLE / HISTORY / CUSTOM all
+    /// follow the file-style suffix rule. Spot-check COMMAND.
     lle_word_context_t ctx;
     make_context(&ctx, LLE_QUOTE_NONE, 0, 2);
     lle_completion_item_t item;
@@ -317,12 +317,12 @@ TEST(compute_accept_command_type_appends_close_and_space) {
 }
 
 TEST(compute_delete_range_replaces_filename_portion_only) {
-    /* For cat ~/Doc, word_start is at ~, filename_portion_start is
-     * after the /, word_end is at cursor. compute() must delete only
-     * the filename portion ("Doc") not the path prefix ("~/"). */
+    /// For cat ~/Doc, word_start is at ~, filename_portion_start is
+    /// after the /, word_end is at cursor. compute() must delete only
+    /// the filename portion ("Doc") not the path prefix ("~/").
     lle_word_context_t ctx;
-    /* word_start=4 (~), filename_portion_start=6 (after /),
-     * word_end=9 (after Doc) — typed bytes are "cat ~/Doc". */
+    /// word_start=4 (~), filename_portion_start=6 (after /),
+    /// word_end=9 (after Doc) — typed bytes are "cat ~/Doc".
     make_context(&ctx, LLE_QUOTE_NONE, 6, 9);
     lle_completion_item_t item;
     make_item(&item, "Documents", LLE_COMPLETION_TYPE_DIRECTORY);
@@ -332,8 +332,8 @@ TEST(compute_delete_range_replaces_filename_portion_only) {
     ASSERT(r == LLE_SUCCESS);
     ASSERT(splice.delete_start == 6);
     ASSERT(splice.delete_length == 3); /// "Doc"
-    /* Insert is "Documents/" — the path prefix "~/" is NOT in the
-     * insert_text because the engine preserves it untouched. */
+    /// Insert is "Documents/" — the path prefix "~/" is NOT in the
+    /// insert_text because the engine preserves it untouched.
     ASSERT(strcmp(splice.insert_text, "Documents/") == 0);
     ASSERT(splice.cursor_after == 6 + strlen("Documents/"));
 }

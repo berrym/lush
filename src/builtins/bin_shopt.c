@@ -202,8 +202,8 @@ int bin_shopt(int argc, char **argv) {
         }
 
         bool underlying = shell_mode_allows(feature);
-        /* From the alias's perspective: an inverted alias is "on" when the
-         * underlying feature is off. */
+        /// From the alias's perspective: an inverted alias is "on" when the
+        /// underlying feature is off.
         bool effective = underlying ^ invert;
 
         if (query_mode) {
@@ -240,10 +240,10 @@ int bin_shopt(int argc, char **argv) {
                 config_registry_set_boolean(key, target);
             }
         } else {
-            /* No -s/-u: just print the option state.
-             * Print under the user-supplied alias name and its effective
-             * sense; round-tripping that through `shopt -s/-u` yields the
-             * same configuration. */
+            /// No -s/-u: just print the option state.
+            /// Print under the user-supplied alias name and its effective
+            /// sense; round-tripping that through `shopt -s/-u` yields the
+            /// same configuration.
             const char *display_name =
                 invert ? argv[i] : shell_feature_name(feature);
             if (print_mode) {

@@ -47,8 +47,8 @@ TEST(prop_cr_lf) {
 TEST(prop_control_characters) {
     ASSERT_EQ(get_grapheme_break_property(0x00), GB_CONTROL, "NUL");
     ASSERT_EQ(get_grapheme_break_property(0x1F), GB_CONTROL, "US (last C0)");
-    /* Note: TAB (0x09) and other C0 controls are GB_CONTROL by the
-     * cp < 0x20 check; CR (0x0D) and LF (0x0A) are special-cased above. */
+    /// Note: TAB (0x09) and other C0 controls are GB_CONTROL by the
+    /// cp < 0x20 check; CR (0x0D) and LF (0x0A) are special-cased above.
     ASSERT_EQ(get_grapheme_break_property(0x09), GB_CONTROL, "TAB");
     ASSERT_EQ(get_grapheme_break_property(0x7F), GB_CONTROL, "DEL");
     ASSERT_EQ(get_grapheme_break_property(0x80), GB_CONTROL, "first C1");
@@ -103,16 +103,15 @@ TEST(prop_hangul_jamo_l_v_t) {
 }
 
 TEST(prop_hangul_syllable_lv_vs_lvt) {
-    /* AC00..D7A3: 11172 syllables.
-     * s_index = cp - 0xAC00; t_index = s_index % 28.
-     * t_index == 0 is the "no trailing consonant" form -> GB_LV.
-     * t_index != 0 has a trailing consonant -> GB_LVT.
-     *
-     * 0xAC00 = 가 (s=0, t=0) -> LV
-     * 0xAC01 = 각 (s=1, t=1) -> LVT
-     * 0xAC1B = 갛 (s=27, t=27) -> LVT
-     * 0xAC1C = 개 (s=28, t=0) -> LV
-     */
+    /// AC00..D7A3: 11172 syllables.
+    /// s_index = cp - 0xAC00; t_index = s_index % 28.
+    /// t_index == 0 is the "no trailing consonant" form -> GB_LV.
+    /// t_index != 0 has a trailing consonant -> GB_LVT.
+    ///
+    /// 0xAC00 = 가 (s=0, t=0) -> LV
+    /// 0xAC01 = 각 (s=1, t=1) -> LVT
+    /// 0xAC1B = 갛 (s=27, t=27) -> LVT
+    /// 0xAC1C = 개 (s=28, t=0) -> LV
     ASSERT_EQ(get_grapheme_break_property(0xAC00), GB_LV, "가 (LV)");
     ASSERT_EQ(get_grapheme_break_property(0xAC01), GB_LVT, "각 (LVT)");
     ASSERT_EQ(get_grapheme_break_property(0xAC1B), GB_LVT,
@@ -136,14 +135,14 @@ TEST(prop_extended_pictographic) {
 }
 
 TEST(prop_spacing_mark_only_covers_devanagari_visarga) {
-    /* INCOMPLETE: the implementation classifies only U+0903 as
-     * GB_SPACING_MARK. Real Unicode SpacingMark covers many Indic
-     * codepoints. Asserted explicitly so a future expansion of the
-     * table is forced to update this test. */
+    /// INCOMPLETE: the implementation classifies only U+0903 as
+    /// GB_SPACING_MARK. Real Unicode SpacingMark covers many Indic
+    /// codepoints. Asserted explicitly so a future expansion of the
+    /// table is forced to update this test.
     ASSERT_EQ(get_grapheme_break_property(0x0903), GB_SPACING_MARK,
               "U+0903 Devanagari Sign Visarga");
-    /* Other Devanagari spacing marks the implementation does NOT cover
-     * (Unicode does): treated as GB_OTHER. */
+    /// Other Devanagari spacing marks the implementation does NOT cover
+    /// (Unicode does): treated as GB_OTHER.
     ASSERT_EQ(get_grapheme_break_property(0x093E), GB_OTHER,
               "U+093E (real SpacingMark, currently OTHER)");
     ASSERT_EQ(get_grapheme_break_property(0x094E), GB_OTHER,
@@ -178,8 +177,8 @@ TEST(rule_gb4_break_after_control_cr_lf) {
                 "Control followed by anything must break");
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x000A, 'A', false, 0),
                 "LF followed by letter must break");
-    /* CR followed by something other than LF must break (GB3 only saves
-     * the specific CR×LF pair) */
+    /// CR followed by something other than LF must break (GB3 only saves
+    /// the specific CR×LF pair)
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x000D, 'A', false, 0),
                 "CR followed by non-LF must break");
 }
@@ -246,42 +245,41 @@ TEST(rule_gb9a_no_break_before_spacing_mark) {
 }
 
 TEST(rule_gb11_emoji_zwj_sequence) {
-    /* GB11: \p{Extended_Pictographic} Extend* ZWJ × \p{Extended_Pictographic}
-     * The boundary function takes prev_was_zwj; when true and both sides are
-     * pictographic, no break. */
+    /// GB11: \p{Extended_Pictographic} Extend* ZWJ × \p{Extended_Pictographic}
+    /// The boundary function takes prev_was_zwj; when true and both sides are
+    /// pictographic, no break.
     ASSERT_FALSE(is_grapheme_cluster_boundary(0x1F468, 0x1F469, true, 0),
                  "emoji ZWJ emoji (man+woman family) — no break");
-    /* Without prev_was_zwj=true, the same pictographic+pictographic must
-     * break (GB999 default). */
+    /// Without prev_was_zwj=true, the same pictographic+pictographic must
+    /// break (GB999 default).
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x1F468, 0x1F469, false, 0),
                 "two emojis with no preceding ZWJ — break");
 }
 
 TEST(rule_gb12_gb13_regional_indicator_pairs) {
-    /* GB12/GB13: RI × RI — pair up. Even ri_sequence_count -> no break;
-     * odd -> break (we are completing a pair).
-     *
-     * The implementation: return (ri_sequence_count % 2) == 0;
-     * That returns NO BREAK when count is even, BREAK when odd.
-     *
-     * Reading: ri_sequence_count is "number of preceding REGIONAL
-     * INDICATOR codepoints in sequence". For the first RI of a pair,
-     * count is even (0). For the second RI, count is odd (1). After the
-     * pair completes, the next RI starts a new pair (count even again).
-     *
-     * Wait — that's the inverse of the comment. Let me re-read the
-     * source: "Odd position = no break, even position = break".
-     * Hmm, the comment says even -> break, but the return says
-     * "(count % 2) == 0" returns true (which the function semantics
-     * say is "boundary exists" -> break). So even count -> break,
-     * odd count -> no break. That matches the comment.
-     *
-     * Concretely:
-     *   First RI:  count=0 (even) -> BREAK (start of new flag)
-     *   Second RI: count=1 (odd)  -> NO BREAK (completing the flag)
-     *   Third RI:  count=2 (even) -> BREAK (start of next flag)
-     *   Fourth RI: count=3 (odd)  -> NO BREAK (completing it)
-     */
+    /// GB12/GB13: RI × RI — pair up. Even ri_sequence_count -> no break;
+    /// odd -> break (we are completing a pair).
+    ///
+    /// The implementation: return (ri_sequence_count % 2) == 0;
+    /// That returns NO BREAK when count is even, BREAK when odd.
+    ///
+    /// Reading: ri_sequence_count is "number of preceding REGIONAL
+    /// INDICATOR codepoints in sequence". For the first RI of a pair,
+    /// count is even (0). For the second RI, count is odd (1). After the
+    /// pair completes, the next RI starts a new pair (count even again).
+    ///
+    /// Wait — that's the inverse of the comment. Let me re-read the
+    /// source: "Odd position = no break, even position = break".
+    /// Hmm, the comment says even -> break, but the return says
+    /// "(count % 2) == 0" returns true (which the function semantics
+    /// say is "boundary exists" -> break). So even count -> break,
+    /// odd count -> no break. That matches the comment.
+    ///
+    /// Concretely:
+    ///   First RI:  count=0 (even) -> BREAK (start of new flag)
+    ///   Second RI: count=1 (odd)  -> NO BREAK (completing the flag)
+    ///   Third RI:  count=2 (even) -> BREAK (start of next flag)
+    ///   Fourth RI: count=3 (odd)  -> NO BREAK (completing it)
     /// RI followed by RI with even count (start of new pair) -> break
     ASSERT_TRUE(is_grapheme_cluster_boundary(0x1F1E6, 0x1F1E8, false, 0),
                 "RI × RI, count=0 (even) -> break (start of new pair)");
@@ -316,10 +314,10 @@ TEST(pos_start_of_text_is_boundary) {
 }
 
 TEST(pos_end_of_text_is_boundary) {
-    /* Use a real char[] so the pos > text_end probe (text + 10) lives
-     * inside the actual array -- otherwise the pointer arithmetic is
-     * UB and gcc -Warray-bounds flags it. The logical text_end stays
-     * at text + 5 (after "hello"). */
+    /// Use a real char[] so the pos > text_end probe (text + 10) lives
+    /// inside the actual array -- otherwise the pointer arithmetic is
+    /// UB and gcc -Warray-bounds flags it. The logical text_end stays
+    /// at text + 5 (after "hello").
     char text[16] = "hello";
     ASSERT_TRUE(is_grapheme_boundary_at_position(text + 5, text, text + 5),
                 "pos == text_end");
@@ -337,8 +335,8 @@ TEST(pos_before_combining_mark_is_not_boundary) {
     /// "e" + U+0301 (combining acute) -> "é" (one grapheme)
     /// U+0301 in UTF-8 is 0xCC 0x81 (2 bytes). So text is "e\xCC\x81".
     const char *text = "e\xCC\x81";
-    /* Position 1 is between 'e' and the combining mark; should NOT be a
-     * boundary because the mark attaches to the letter. */
+    /// Position 1 is between 'e' and the combining mark; should NOT be a
+    /// boundary because the mark attaches to the letter.
     ASSERT_FALSE(is_grapheme_boundary_at_position(text + 1, text, text + 3),
                  "between letter and combining mark is not a boundary");
 }
@@ -351,21 +349,21 @@ TEST(pos_after_combining_mark_is_boundary) {
 }
 
 TEST(pos_invalid_utf8_treated_as_boundary) {
-    /* 0xFF is invalid as a UTF-8 lead byte. The function should treat
-     * such positions as boundaries to avoid getting stuck. */
+    /// 0xFF is invalid as a UTF-8 lead byte. The function should treat
+    /// such positions as boundaries to avoid getting stuck.
     const char text[] = {(char)0xFF, 'A', '\0'};
     ASSERT_TRUE(is_grapheme_boundary_at_position(text + 1, text, text + 2),
                 "after invalid lead byte -> boundary");
 }
 
 TEST(pos_at_continuation_byte_scans_back) {
-    /* If the queried position is in the middle of a multi-byte UTF-8
-     * sequence (a continuation byte), the implementation scans backward
-     * to find the lead byte. Test with a CJK char (3 bytes) followed
-     * by ASCII. */
-    /* U+4E2D '中' = 0xE4 0xB8 0xAD (3 bytes). text = "中A".
-     * The string is split so the hex escape \xAD does not absorb the
-     * following 'A' into a single (out-of-range) hex literal. */
+    /// If the queried position is in the middle of a multi-byte UTF-8
+    /// sequence (a continuation byte), the implementation scans backward
+    /// to find the lead byte. Test with a CJK char (3 bytes) followed
+    /// by ASCII.
+    /// U+4E2D '中' = 0xE4 0xB8 0xAD (3 bytes). text = "中A".
+    /// The string is split so the hex escape \xAD does not absorb the
+    /// following 'A' into a single (out-of-range) hex literal.
     const char *text = "\xE4\xB8\xAD"
                        "A";
     /// Position 3 is just after the CJK char and before 'A' — boundary.

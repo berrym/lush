@@ -446,8 +446,8 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
         return;
     }
 
-    /* Scalar via the view: ownership-transfer the strdup'd value out
-     * for the surrounding length / preview / free path below. */
+    /// Scalar via the view: ownership-transfer the strdup'd value out
+    /// for the surrounding length / preview / free path below.
     char *owned_value = view.scalar_value;
     view.scalar_value = NULL;
     lush_value_view_clear(&view);
@@ -459,8 +459,8 @@ void debug_inspect_variable(debug_context_t *ctx, const char *name) {
                 ? "shell (in or above current scope)"
                 : "global";
     } else {
-        /* Environment fallback for unexported shell vars that landed
-         * in the process environment. */
+        /// Environment fallback for unexported shell vars that landed
+        /// in the process environment.
         value = getenv(clean_name);
         if (value) {
             scope = "environment";
@@ -584,9 +584,9 @@ void debug_inspect_all_variables(debug_context_t *ctx) {
         return;
     }
 
-    /* Single source of truth for the current scope: ask the symtable.
-     * The debug frame's function_name tracks the executing command,
-     * not the scope, so it would mislabel inside builtins, loops, etc. */
+    /// Single source of truth for the current scope: ask the symtable.
+    /// The debug frame's function_name tracks the executing command,
+    /// not the scope, so it would mislabel inside builtins, loops, etc.
     const char *current_scope_name =
         symtable_current_scope_name(symtable_manager());
     debug_view_begin_frame(ctx, "Variable State");

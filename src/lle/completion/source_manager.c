@@ -98,10 +98,10 @@ static bool file_source_applicable(const lle_word_context_t *context) {
 
     /// Path-shaped command-position completion (./local-script, etc.).
     if (context->context_type == LLE_CONTEXT_COMMAND_POSITION) {
-        /* The user's typed bytes between word_start and
-         * filename_portion_start carry any path markers. We use the
-         * dequoted_filename_prefix as a stand-in: a leading ~/ or
-         * /-prefix in the prefix string indicates a path. */
+        /// The user's typed bytes between word_start and
+        /// filename_portion_start carry any path markers. We use the
+        /// dequoted_filename_prefix as a stand-in: a leading ~/ or
+        /// /-prefix in the prefix string indicates a path.
         if (context->expanded_directory != NULL)
             return true;
         if (prefix_indicates_path(context->dequoted_filename_prefix))
@@ -156,12 +156,12 @@ static bool ssh_hosts_source_applicable(const lle_word_context_t *context) {
         return false;
     if (!is_ssh_host_command(context->command_name))
         return false;
-    /* For scp/sftp/rsync, `remote:path` switches the argument to a
-     * remote-path completion (not host) once a `:` appears. The bare
-     * host segment is everything before the first `:`. We let the
-     * source itself decide what to emit -- it sees the dequoted prefix
-     * and can detect `:` -- but we only fire it here, not for arguments
-     * that have no command_name match. */
+    /// For scp/sftp/rsync, `remote:path` switches the argument to a
+    /// remote-path completion (not host) once a `:` appears. The bare
+    /// host segment is everything before the first `:`. We let the
+    /// source itself decide what to emit -- it sees the dequoted prefix
+    /// and can detect `:` -- but we only fire it here, not for arguments
+    /// that have no command_name match.
     return true;
 }
 
@@ -251,10 +251,10 @@ debug_command_source_generate(lle_memory_pool_t *pool,
                               lle_completion_result_t *result) {
     (void)pool;
     (void)context;
-    /* Mirrors the dispatcher in src/debug/debug_breakpoints.c::
-     * debug_handle_user_input. Short aliases (c / s / n / f / l / p
-     * / h / q / t) are listed as their own entries so prefix matching
-     * surfaces both forms naturally. */
+    /// Mirrors the dispatcher in src/debug/debug_breakpoints.c::
+    /// debug_handle_user_input. Short aliases (c / s / n / f / l / p
+    /// / h / q / t) are listed as their own entries so prefix matching
+    /// surfaces both forms naturally.
     static const char *const debug_commands[] = {
         "backtrace", "bt",       "c",      "continue", "down",  "eval", "f",
         "feature",   "features", "finish", "h",        "help",  "l",    "list",
@@ -332,18 +332,18 @@ lle_result_t lle_source_manager_create(lle_memory_pool_t *pool,
     if (res != LLE_SUCCESS)
         return res;
 
-    /* SSH host completion for ssh/scp/sftp/etc. Fires on arguments to
-     * those commands; the source consults the ssh_hosts cache (lazy
-     * init from ~/.ssh/config + ~/.ssh/known_hosts on first call). */
+    /// SSH host completion for ssh/scp/sftp/etc. Fires on arguments to
+    /// those commands; the source consults the ssh_hosts cache (lazy
+    /// init from ~/.ssh/config + ~/.ssh/known_hosts on first call).
     res = lle_source_manager_register(manager, LLE_SOURCE_SSH_HOSTS,
                                       "ssh_hosts", ssh_hosts_source_generate,
                                       ssh_hosts_source_applicable);
     if (res != LLE_SUCCESS)
         return res;
 
-    /* Debug-prompt command completion -- only fires when
-     * lle_in_debug_prompt() is true; supplies the (lush-debug)
-     * vocabulary at the command position. */
+    /// Debug-prompt command completion -- only fires when
+    /// lle_in_debug_prompt() is true; supplies the (lush-debug)
+    /// vocabulary at the command position.
     res = lle_source_manager_register(
         manager, LLE_SOURCE_CUSTOM, "debug_commands",
         debug_command_source_generate, debug_command_source_applicable);
@@ -389,12 +389,12 @@ lle_result_t lle_source_manager_query(lle_source_manager_t *manager,
     if (!manager || !context || !result)
         return LLE_ERROR_INVALID_PARAMETER;
 
-    /* Brace-expansion fan-out: when the analyzer reports
-     * branch_count > 0, query each branch with a synthetic single-
-     * directory context and accumulate. Mode-specific intersection /
-     * union logic is the engine's concern; this loop produces every
-     * candidate from every branch and lets the engine deduplicate or
-     * filter as configured. */
+    /// Brace-expansion fan-out: when the analyzer reports
+    /// branch_count > 0, query each branch with a synthetic single-
+    /// directory context and accumulate. Mode-specific intersection /
+    /// union logic is the engine's concern; this loop produces every
+    /// candidate from every branch and lets the engine deduplicate or
+    /// filter as configured.
     if (context->branch_count > 0 && context->branches != NULL) {
         for (size_t b = 0; b < context->branch_count; b++) {
             lle_word_context_t branch_ctx = *context;

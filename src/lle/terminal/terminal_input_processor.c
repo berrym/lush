@@ -56,17 +56,17 @@ lle_result_t lle_input_processor_init(lle_input_processor_t **processor,
     proc->next_sequence_number = 1;
     proc->total_processing_time_us = 0;
 
-    /* Create event arena for per-event allocations.
-     * Child of session arena if available. 1KB is enough for input events.
-     * This arena is reset after each event is consumed, preventing the
-     * per-keystroke memory leak that previously occurred with calloc(). */
+    /// Create event arena for per-event allocations.
+    /// Child of session arena if available. 1KB is enough for input events.
+    /// This arena is reset after each event is consumed, preventing the
+    /// per-keystroke memory leak that previously occurred with calloc().
     lle_arena_t *parent_arena = NULL;
     if (g_lle_integration && g_lle_integration->session_arena) {
         parent_arena = g_lle_integration->session_arena;
     }
     proc->event_arena = lle_arena_create(parent_arena, "event", 1024);
-    /* Note: event_arena may be NULL if arena creation fails, which is handled
-     * gracefully in read_next_event by falling back to calloc */
+    /// Note: event_arena may be NULL if arena creation fails, which is handled
+    /// gracefully in read_next_event by falling back to calloc
 
     *processor = proc;
     return LLE_SUCCESS;
@@ -121,11 +121,11 @@ static bool validate_event(lle_input_event_t *event) {
         break;
 
     case LLE_INPUT_TYPE_SPECIAL_KEY:
-        /* Validate key code - allow LLE_KEY_UNKNOWN if it has a valid keycode
-         * (for Ctrl+letter) */
+        /// Validate key code - allow LLE_KEY_UNKNOWN if it has a valid keycode
+        /// (for Ctrl+letter)
         if (event->data.special_key.key == LLE_KEY_UNKNOWN) {
-            /* LLE_KEY_UNKNOWN is valid if keycode is set (e.g., Ctrl+A has
-             * keycode='A') */
+            /// LLE_KEY_UNKNOWN is valid if keycode is set (e.g., Ctrl+A has
+            /// keycode='A')
             if (event->data.special_key.keycode == 0) {
                 return false; /// Invalid: UNKNOWN key with no keycode
             }
@@ -207,10 +207,10 @@ lle_input_processor_read_next_event(lle_input_processor_t *processor,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Reset event arena to reclaim memory from previous event.
-     * This is the key to fixing the per-keystroke memory leak:
-     * instead of allocating with calloc() and never freeing,
-     * we reset the arena each iteration which is O(1). */
+    /// Reset event arena to reclaim memory from previous event.
+    /// This is the key to fixing the per-keystroke memory leak:
+    /// instead of allocating with calloc() and never freeing,
+    /// we reset the arena each iteration which is O(1).
     if (processor->event_arena) {
         lle_arena_reset(processor->event_arena);
     }
@@ -221,8 +221,8 @@ lle_input_processor_read_next_event(lle_input_processor_t *processor,
         new_event = lle_arena_calloc(processor->event_arena, 1,
                                      sizeof(lle_input_event_t));
     } else {
-        /* Fallback if arena not available - still leaks but maintains
-         * compatibility */
+        /// Fallback if arena not available - still leaks but maintains
+        /// compatibility
         new_event = calloc(1, sizeof(lle_input_event_t));
     }
     if (!new_event) {

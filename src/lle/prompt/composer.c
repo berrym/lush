@@ -48,9 +48,9 @@ static struct {
  */
 static void get_terminal_color_capabilities(bool *has_256, bool *has_true) {
     if (!g_terminal_color_caps.initialized) {
-        /* Detect terminal capabilities.
-         * Note: The optimized detection returns a cached result that is
-         * managed by the detection system - do NOT destroy it. */
+        /// Detect terminal capabilities.
+        /// Note: The optimized detection returns a cached result that is
+        /// managed by the detection system - do NOT destroy it.
         lle_terminal_detection_result_t *detection = NULL;
         lle_result_t result =
             lle_detect_terminal_capabilities_optimized(&detection);
@@ -246,8 +246,7 @@ static bool composer_is_visible(const char *segment_name, const char *property,
 
     lle_prompt_composer_t *composer = ctx->composer;
 
-    /* Check theme's enabled_segments filter (if non-empty, acts as whitelist)
-     */
+    /// Check theme's enabled_segments filter (if non-empty, acts as whitelist)
     const lle_theme_t *theme = ctx->theme;
     if (theme && theme->enabled_segment_count > 0) {
         bool in_whitelist = false;
@@ -719,8 +718,8 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
     /// Render PS1
     lle_result_t result;
 
-    /* Prepend newline for visual separation if enabled (compact_mode
-     * suppresses) */
+    /// Prepend newline for visual separation if enabled (compact_mode
+    /// suppresses)
     bool prepend_newline = composer->config.newline_before_prompt &&
                            !(theme && theme->layout.compact_mode);
     if (prepend_newline) {
@@ -739,8 +738,8 @@ lle_result_t lle_composer_render(lle_prompt_composer_t *composer,
     }
     output->ps1_len = strlen(output->ps1);
 
-    /* Append newlines after prompt if configured in theme (compact_mode
-     * suppresses) */
+    /// Append newlines after prompt if configured in theme (compact_mode
+    /// suppresses)
     if (theme && theme->layout.newline_after > 0 &&
         !theme->layout.compact_mode) {
         for (int i = 0; i < theme->layout.newline_after &&
@@ -1001,8 +1000,8 @@ static void composer_on_directory_changed(void *event_data, void *user_data) {
         return;
     }
 
-    /* Refresh the context's directory info (cwd, cwd_display, cwd_is_git_repo).
-     * This also invalidates all segment caches. */
+    /// Refresh the context's directory info (cwd, cwd_display,
+    /// cwd_is_git_repo). This also invalidates all segment caches.
     lle_composer_refresh_directory(composer);
 
     /// Invalidate all segment caches - git status, directory display, etc.
@@ -1036,17 +1035,15 @@ static void composer_on_pre_command(void *event_data, void *user_data) {
     composer->current_command = event->command;
     composer->current_command_is_bg = event->is_background;
 
-    /*
-     * Note: Transient prompt application (Spec 25 Section 12) is handled by
-     * the LINE_ACCEPTED widget hook in lle_readline.c, NOT here.
-     *
-     * The LINE_ACCEPTED hook fires earlier in the pipeline (before
-     * dc_finalize_input writes the newline), when cursor position and
-     * screen buffer state are still valid for relative cursor movement.
-     *
-     * By the time PRE_COMMAND fires here, the cursor has already moved
-     * to the output area and screen state has been reset.
-     */
+    /// Note: Transient prompt application (Spec 25 Section 12) is handled by
+    /// the LINE_ACCEPTED widget hook in lle_readline.c, NOT here.
+    ///
+    /// The LINE_ACCEPTED hook fires earlier in the pipeline (before
+    /// dc_finalize_input writes the newline), when cursor position and
+    /// screen buffer state are still valid for relative cursor movement.
+    ///
+    /// By the time PRE_COMMAND fires here, the cursor has already moved
+    /// to the output area and screen state has been reset.
 }
 
 /**
@@ -1075,8 +1072,8 @@ static void composer_on_post_command(void *event_data, void *user_data) {
     composer->current_command = NULL;
     composer->current_command_is_bg = false;
 
-    /* Invalidate all segment caches - commands like git push/pull/commit
-     * change repository state, so we must refetch git status */
+    /// Invalidate all segment caches - commands like git push/pull/commit
+    /// change repository state, so we must refetch git status
     if (composer->segments) {
         lle_segment_registry_invalidate_all(composer->segments);
     }
@@ -1105,8 +1102,8 @@ lle_composer_register_shell_events(lle_prompt_composer_t *composer,
     }
 
     if (!event_hub) {
-        /* No event hub provided - events won't be wired up.
-         * This is acceptable for unit testing or minimal configurations. */
+        /// No event hub provided - events won't be wired up.
+        /// This is acceptable for unit testing or minimal configurations.
         return LLE_SUCCESS;
     }
 

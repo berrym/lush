@@ -224,8 +224,8 @@ void debug_set_mode(debug_context_t *ctx, debug_mode_t mode) {
     case DEBUG_MODE_STEP:
     case DEBUG_MODE_STEP_OVER:
         ctx->step_mode = true;
-        /* Default to step-into depth semantics; debug_step_over()
-         * narrows step_target_depth when the user asks for it. */
+        /// Default to step-into depth semantics; debug_step_over()
+        /// narrows step_target_depth when the user asks for it.
         ctx->step_target_depth = INT_MAX;
         break;
 

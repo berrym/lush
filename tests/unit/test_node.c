@@ -123,13 +123,12 @@ TEST(add_multiple_children) {
 }
 
 TEST(nested_children) {
-    /* Create a tree structure:
-     *     parent
-     *       |
-     *     child1
-     *       |
-     *   grandchild
-     */
+    /// Create a tree structure:
+    ///     parent
+    ///       |
+    ///     child1
+    ///       |
+    ///   grandchild
     node_t *parent = new_node(NODE_IF);
     node_t *child1 = new_node(NODE_COMMAND);
     node_t *grandchild = new_node(NODE_VAR);
@@ -204,11 +203,10 @@ TEST(pipeline_structure) {
 }
 
 TEST(if_statement_structure) {
-    /* Create an if statement structure:
-     *     IF
-     *    / | \
-     * cond then else
-     */
+    /// Create an if statement structure:
+    ///     IF
+    ///    / | \
+    /// cond then else
     node_t *if_node = new_node(NODE_IF);
     node_t *condition = new_node(NODE_COMMAND);
     node_t *then_branch = new_node(NODE_COMMAND);
@@ -227,11 +225,10 @@ TEST(if_statement_structure) {
 }
 
 TEST(for_loop_structure) {
-    /* Create a for loop structure:
-     *     FOR
-     *    / | \
-     * var list body
-     */
+    /// Create a for loop structure:
+    ///     FOR
+    ///    / | \
+    /// var list body
     node_t *for_node = new_node(NODE_FOR);
     node_t *var = new_node(NODE_VAR);
     node_t *list = new_node(NODE_COMMAND); /// Word list
@@ -250,11 +247,10 @@ TEST(for_loop_structure) {
 }
 
 TEST(command_with_redirections) {
-    /* Command with redirections:
-     *     COMMAND
-     *    /   |   \
-     * arg1 arg2 redir
-     */
+    /// Command with redirections:
+    ///     COMMAND
+    ///    /   |   \
+    /// arg1 arg2 redir
     node_t *cmd = new_node(NODE_COMMAND);
     node_t *arg1 = new_node(NODE_VAR);
     node_t *arg2 = new_node(NODE_STRING_LITERAL);

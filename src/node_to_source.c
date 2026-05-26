@@ -162,9 +162,9 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
 
     switch (node->type) {
     case NODE_COMMAND: {
-        /* val.str is the command name, or NULL for a pure cmd_prefix
-         * (assignments/redirs with no command word). Children are
-         * cmd_prefix NODE_ASSIGN nodes, arguments, and redirections. */
+        /// val.str is the command name, or NULL for a pure cmd_prefix
+        /// (assignments/redirs with no command word). Children are
+        /// cmd_prefix NODE_ASSIGN nodes, arguments, and redirections.
         bool emitted = false;
         if (str && str[0]) {
             strbuf_append(buf, str); /// Command name
@@ -187,8 +187,8 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     }
 
     case NODE_ASSIGN:
-        /* cmd_prefix assignment: emit "var=value" verbatim (val.str
-         * already carries the var=, +=, and value text). */
+        /// cmd_prefix assignment: emit "var=value" verbatim (val.str
+        /// already carries the var=, +=, and value text).
         strbuf_append(buf, str);
         break;
 
@@ -339,8 +339,8 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
             node_to_source_impl(child, buf, depth + 1);
             child = child->next_sibling;
         }
-        /* Handle elif/else - remaining children come in pairs (cond, body)
-           or single (else body) */
+        /// Handle elif/else - remaining children come in pairs (cond, body)
+        ///            or single (else body)
         while (child) {
             node_t *next = child->next_sibling;
             if (next) {
@@ -441,8 +441,8 @@ static void node_to_source_impl(node_t *node, strbuf_t *buf, int depth) {
     }
 
     case NODE_CASE_ITEM: {
-        /* Pattern format: "<terminator_char><pattern>"
-           where terminator_char is '0'=;;, '1'=;&, '2'=;;& */
+        /// Pattern format: "<terminator_char><pattern>"
+        ///            where terminator_char is '0'=;;, '1'=;&, '2'=;;&
         const char *pattern = str;
         char terminator_char = '0';
         if (str[0] >= '0' && str[0] <= '2') {

@@ -163,11 +163,10 @@ static lle_result_t grapheme_index_to_byte_offset(lle_buffer_t *buffer,
     while (offset < buffer->length && current_grapheme < grapheme_index) {
         const char *ptr = data + offset;
 
-        /* Find next grapheme boundary
-         * CRITICAL: Must advance by UTF-8 character boundaries, not individual
-         * bytes! lle_is_grapheme_boundary() requires valid UTF-8 character
-         * starts.
-         */
+        /// Find next grapheme boundary
+        /// CRITICAL: Must advance by UTF-8 character boundaries, not individual
+        /// bytes! lle_is_grapheme_boundary() requires valid UTF-8 character
+        /// starts.
         const char *next = ptr;
         do {
             /// Advance to next UTF-8 character
@@ -409,8 +408,8 @@ lle_cursor_manager_move_by_codepoints(lle_cursor_manager_t *manager,
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Calculate target codepoint index from buffer's current cursor (source of
-     * truth) */
+    /// Calculate target codepoint index from buffer's current cursor (source of
+    /// truth)
     int target_codepoint =
         (int)manager->buffer->cursor.codepoint_index + codepoint_delta;
 

@@ -599,13 +599,12 @@ lush_plugin_result_t lush_plugin_register_builtin(lush_plugin_context_t *ctx,
     plugin->registered_builtins = new_builtins;
     plugin->registered_builtin_count = new_count;
 
-    /* NOTE: Actual registration with the shell's builtin system
-     * would be implemented here. For the foundation, we just track
-     * what builtins the plugin wants to register.
-     *
-     * Future integration:
-     * return register_plugin_builtin(ctx->executor, name, fn);
-     */
+    /// NOTE: Actual registration with the shell's builtin system
+    /// would be implemented here. For the foundation, we just track
+    /// what builtins the plugin wants to register.
+    ///
+    /// Future integration:
+    /// return register_plugin_builtin(ctx->executor, name, fn);
 
     return LUSH_PLUGIN_OK;
 }
@@ -651,9 +650,8 @@ lush_plugin_result_t lush_plugin_register_hook(lush_plugin_context_t *ctx,
         return LUSH_PLUGIN_ERROR_PERMISSION_DENIED;
     }
 
-    /* NOTE: Integration with lle_shell_hooks would happen here.
-     * For foundation, we validate the hook name.
-     */
+    /// NOTE: Integration with lle_shell_hooks would happen here.
+    /// For foundation, we validate the hook name.
     if (strcmp(hook_name, "precmd") != 0 && strcmp(hook_name, "preexec") != 0 &&
         strcmp(hook_name, "chpwd") != 0) {
         return LUSH_PLUGIN_ERROR;
@@ -710,9 +708,8 @@ const char *lush_plugin_get_var(lush_plugin_context_t *ctx, const char *name) {
         return NULL;
     }
 
-    /* NOTE: Integration with symtable would happen here
-     * return symtable_get_value(ctx->symtable, name);
-     */
+    /// NOTE: Integration with symtable would happen here
+    /// return symtable_get_value(ctx->symtable, name);
 
     return NULL;
 }
@@ -729,9 +726,8 @@ lush_plugin_result_t lush_plugin_set_var(lush_plugin_context_t *ctx,
         return LUSH_PLUGIN_ERROR_PERMISSION_DENIED;
     }
 
-    /* NOTE: Integration with symtable would happen here
-     * symtable_set_value(ctx->symtable, name, value);
-     */
+    /// NOTE: Integration with symtable would happen here
+    /// symtable_set_value(ctx->symtable, name, value);
 
     return LUSH_PLUGIN_OK;
 }

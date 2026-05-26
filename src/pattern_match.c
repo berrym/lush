@@ -321,14 +321,14 @@ static bool match(const char *s, const char *p) {
                 if (op == '*' && match(s, rest)) {
                     return true;
                 }
-                /* One-or-more: pick an alternative, match it against a
-                 * non-empty prefix of s, then recurse with `*(...)` + rest
-                 * on the suffix. The non-empty-prefix requirement guards
-                 * the empty-alt case (`(a|)`) from looping forever.
-                 *
-                 * Building the inner `*(...)` pattern once per iteration
-                 * keeps the alt-text identical across recursion so a
-                 * positional iterator isn't needed. */
+                /// One-or-more: pick an alternative, match it against a
+                /// non-empty prefix of s, then recurse with `*(...)` + rest
+                /// on the suffix. The non-empty-prefix requirement guards
+                /// the empty-alt case (`(a|)`) from looping forever.
+                ///
+                /// Building the inner `*(...)` pattern once per iteration
+                /// keeps the alt-text identical across recursion so a
+                /// positional iterator isn't needed.
                 size_t group_inside_len = (size_t)(close - paren_inside);
                 size_t rest_len = strlen(rest);
                 /// Reserve "*(" + content + ")" + rest + NUL
@@ -369,10 +369,10 @@ static bool match(const char *s, const char *p) {
             }
 
             if (op == '!') {
-                /* Match a prefix of s that fails ALL alternatives, with
-                 * the remainder consumed by `rest`. The empty prefix is
-                 * permitted (i.e. !(foo) at end of pattern matches the
-                 * empty string when foo isn't empty). */
+                /// Match a prefix of s that fails ALL alternatives, with
+                /// the remainder consumed by `rest`. The empty prefix is
+                /// permitted (i.e. !(foo) at end of pattern matches the
+                /// empty string when foo isn't empty).
                 size_t s_len = strlen(s);
                 for (size_t split = 0; split <= s_len; split++) {
                     bool any_alt_matches = false;

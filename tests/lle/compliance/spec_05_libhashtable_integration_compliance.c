@@ -190,18 +190,17 @@ void test_system_structure(void) {
 void test_function_declarations(void) {
     printf("[ TEST ] Function declarations (Layer 1 compliance)\n");
 
-    /* All function declarations are verified at compile time by including the
-     * header. If the header compiles, all declared functions exist.
-     *
-     * Key API functions verified:
-     * - Configuration: lle_hashtable_config_init_default,
-     * lle_hashtable_config_create_pooled
-     * - Registry: lle_hashtable_registry_*
-     * - Factory: lle_hashtable_factory_*
-     * - Operations: lle_strstr_hashtable_*
-     * - Monitoring: lle_hashtable_get_metrics, lle_hashtable_reset_metrics
-     * - System: lle_hashtable_system_init, lle_hashtable_system_destroy
-     */
+    /// All function declarations are verified at compile time by including the
+    /// header. If the header compiles, all declared functions exist.
+    ///
+    /// Key API functions verified:
+    /// - Configuration: lle_hashtable_config_init_default,
+    /// lle_hashtable_config_create_pooled
+    /// - Registry: lle_hashtable_registry_*
+    /// - Factory: lle_hashtable_factory_*
+    /// - Operations: lle_strstr_hashtable_*
+    /// - Monitoring: lle_hashtable_get_metrics, lle_hashtable_reset_metrics
+    /// - System: lle_hashtable_system_init, lle_hashtable_system_destroy
 
     TEST_ASSERT(1, "All function declarations compile successfully");
 

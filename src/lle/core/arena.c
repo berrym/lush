@@ -148,8 +148,8 @@ lle_arena_t *lle_arena_create_with_flags(lle_arena_t *parent, const char *name,
         initial_size = LLE_ARENA_DEFAULT_CHUNK_SIZE;
     }
 
-    /* Allocate initial chunk (includes space for arena struct if we
-     * want to be clever, but for simplicity we allocate separately) */
+    /// Allocate initial chunk (includes space for arena struct if we
+    /// want to be clever, but for simplicity we allocate separately)
     lle_arena_chunk_t *chunk = arena_alloc_chunk(initial_size);
     if (!chunk) {
         return NULL;
@@ -350,8 +350,8 @@ void *lle_arena_alloc_aligned(lle_arena_t *arena, size_t size,
         return NULL;
     }
 
-    /* If requested alignment is less than or equal to default, use normal
-     * alloc */
+    /// If requested alignment is less than or equal to default, use normal
+    /// alloc
     if (alignment <= arena->alignment) {
         return lle_arena_alloc(arena, size);
     }

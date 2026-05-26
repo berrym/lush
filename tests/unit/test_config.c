@@ -53,8 +53,8 @@ TEST(validate_bool_invalid) {
                  "\"invalid\" should be invalid");
     ASSERT_FALSE(config_validate_bool("maybe"), "\"maybe\" should be invalid");
     ASSERT_FALSE(config_validate_bool("2"), "\"2\" should be invalid");
-    /* Note: empty string causes strcmp with empty, which is valid but returns
-     * false */
+    /// Note: empty string causes strcmp with empty, which is valid but returns
+    /// false
 }
 
 /* ============================================================================

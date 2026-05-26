@@ -226,10 +226,10 @@ lle_result_t lle_widget_hook_trigger(lle_widget_hooks_manager_t *manager,
         // Execute widget (error-resilient: continue even if widget fails)
         lle_widget_execute_direct(reg->widget, editor);
 
-        /* Note: Widget errors are logged but do not stop hook execution.
-         * This ensures that one misbehaving widget doesn't break the entire
-         * hook chain. Individual widget failures can be diagnosed via widget
-         * execution statistics and logs. */
+        /// Note: Widget errors are logged but do not stop hook execution.
+        /// This ensures that one misbehaving widget doesn't break the entire
+        /// hook chain. Individual widget failures can be diagnosed via widget
+        /// execution statistics and logs.
 
         // Update registration statistics
         reg->trigger_count++;

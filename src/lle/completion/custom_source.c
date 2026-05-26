@@ -161,10 +161,8 @@ lle_result_t lle_custom_source_init(lle_source_manager_t *manager,
     g_custom_registry.count = 0;
     g_custom_registry.initialized = true;
 
-    /*
-     * Register a single "custom" meta-source in the manager.
-     * This source dispatches to all registered custom sources.
-     */
+    /// Register a single "custom" meta-source in the manager.
+    /// This source dispatches to all registered custom sources.
     lle_result_t res = lle_source_manager_register(
         manager, LLE_SOURCE_CUSTOM, "custom", custom_generate_wrapper,
         custom_applicable_wrapper);

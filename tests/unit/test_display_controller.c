@@ -1041,8 +1041,8 @@ int main(void) {
     printf("\n=== Performance Monitoring Null/Invalid Param Tests ===\n");
     RUN_TEST(get_performance_null_controller);
     RUN_TEST(get_performance_null_output);
-    /* NOTE: test_update_performance_monitoring_null_controller skipped -
-     * function not implemented */
+    /// NOTE: test_update_performance_monitoring_null_controller skipped -
+    /// function not implemented
     RUN_TEST(reset_performance_metrics_null_controller);
 
     printf("\n=== Optimization Null/Invalid Param Tests ===\n");

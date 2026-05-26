@@ -107,11 +107,10 @@ static inline bool lle_memory_lock(void *addr, size_t len) {
     }
 
 #if LLE_HAVE_MLOCK
-    /* Attempt to lock - may fail due to:
-     * - Insufficient privileges (need CAP_IPC_LOCK on Linux)
-     * - Exceeding RLIMIT_MEMLOCK
-     * - System doesn't support mlock
-     */
+    /// Attempt to lock - may fail due to:
+    /// - Insufficient privileges (need CAP_IPC_LOCK on Linux)
+    /// - Exceeding RLIMIT_MEMLOCK
+    /// - System doesn't support mlock
     return mlock(addr, len) == 0;
 #else
     /// Platform doesn't have mlock - not an error, just unavailable

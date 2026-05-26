@@ -70,8 +70,7 @@ lle_terminal_abstraction_init(lle_terminal_abstraction_t **abstraction,
         return result;
     }
 
-    /* Step 3.5: Initialize sequence parser now that capabilities are available
-     */
+    /// Step 3.5: Initialize sequence parser now that capabilities are available
     result = lle_unix_interface_init_sequence_parser(
         abs->unix_interface, abs->capabilities,
         (lle_memory_pool_t *)global_memory_pool);
@@ -128,13 +127,12 @@ lle_terminal_abstraction_init(lle_terminal_abstraction_t **abstraction,
     }
 
     /// Step 8: Initialize error handling and performance monitoring
-    /* NOTE: When Spec 16 Phase 2 and Spec 14 Phase 1 are implemented,
-     * we will call initialization functions here:
-     * - lle_error_context_init(&abs->error_ctx)
-     * - lle_performance_monitor_init(&abs->perf_monitor)
-     *
-     * For now, set to NULL to indicate not yet initialized.
-     */
+    /// NOTE: When Spec 16 Phase 2 and Spec 14 Phase 1 are implemented,
+    /// we will call initialization functions here:
+    /// - lle_error_context_init(&abs->error_ctx)
+    /// - lle_performance_monitor_init(&abs->perf_monitor)
+    ///
+    /// For now, set to NULL to indicate not yet initialized.
     abs->error_ctx = NULL;
     abs->perf_monitor = NULL;
 
@@ -157,9 +155,8 @@ void lle_terminal_abstraction_destroy(lle_terminal_abstraction_t *abstraction) {
     /// Destroy in reverse order of initialization
 
     /// Step 8: Destroy performance monitoring and error handling
-    /* NOTE: When Spec 16 Phase 2 and Spec 14 Phase 1 are implemented,
-     * we will call destroy functions here. For now, they are NULL.
-     */
+    /// NOTE: When Spec 16 Phase 2 and Spec 14 Phase 1 are implemented,
+    /// we will call destroy functions here. For now, they are NULL.
     abstraction->perf_monitor = NULL;
     abstraction->error_ctx = NULL;
 

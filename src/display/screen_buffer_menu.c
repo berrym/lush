@@ -49,13 +49,12 @@ int screen_buffer_render_menu(screen_buffer_t *buffer, const char *menu_text,
     buffer->cursor_row = buffer->num_rows;
     buffer->cursor_col = 0;
 
-    /* Use screen buffer's virtual layout to process menu text
-     * This handles:
-     * - ANSI escape sequences (colors, bold, etc)
-     * - UTF-8 characters
-     * - Wide characters (emoji, CJK)
-     * - Line wrapping at terminal width
-     */
+    /// Use screen buffer's virtual layout to process menu text
+    /// This handles:
+    /// - ANSI escape sequences (colors, bold, etc)
+    /// - UTF-8 characters
+    /// - Wide characters (emoji, CJK)
+    /// - Line wrapping at terminal width
     const char *p = menu_text;
     int menu_start_row = buffer->cursor_row;
 
@@ -64,8 +63,8 @@ int screen_buffer_render_menu(screen_buffer_t *buffer, const char *menu_text,
             /// ANSI escape sequence - let screen buffer handle it
             const char *seq_end = strchr(p, 'm');
             if (seq_end) {
-                /* Screen buffer would normally process this for colors
-                 * For now, skip it in position calculations */
+                /// Screen buffer would normally process this for colors
+                /// For now, skip it in position calculations
                 p = seq_end + 1;
                 continue;
             }
@@ -111,8 +110,8 @@ int screen_buffer_render_menu(screen_buffer_t *buffer, const char *menu_text,
     buffer->cursor_row = saved_row;
     buffer->cursor_col = saved_col;
 
-    /* CRITICAL: Don't permanently modify num_rows!
-     * The menu is temporary and shouldn't affect buffer state */
+    /// CRITICAL: Don't permanently modify num_rows!
+    /// The menu is temporary and shouldn't affect buffer state
     buffer->num_rows = saved_num_rows;
 
     return menu_lines;
@@ -364,13 +363,12 @@ int screen_buffer_get_rows_below_cursor(const screen_buffer_t *buffer) {
         return 0;
     }
 
-    /* Total rows minus 1 (for 0-indexing) gives last row index.
-     * Cursor is at cursor_row.
-     * Rows below cursor = (last_row) - cursor_row
-     *
-     * Example: num_rows=10 (rows 0-9), cursor at row 3
-     * Rows below = 9 - 3 = 6 (rows 4,5,6,7,8,9)
-     */
+    /// Total rows minus 1 (for 0-indexing) gives last row index.
+    /// Cursor is at cursor_row.
+    /// Rows below cursor = (last_row) - cursor_row
+    ///
+    /// Example: num_rows=10 (rows 0-9), cursor at row 3
+    /// Rows below = 9 - 3 = 6 (rows 4,5,6,7,8,9)
     int last_row = buffer->num_rows - 1;
     if (last_row < 0)
         last_row = 0;

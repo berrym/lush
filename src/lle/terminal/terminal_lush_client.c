@@ -61,8 +61,8 @@ lle_lush_display_client_init(lle_lush_display_client_t **client,
     c->last_submission_time = 0;
     c->submission_count = 0;
 
-    /* Note: Actual Lush layer registration will happen when Lush
-     * display system API is available. For now, store configuration. */
+    /// Note: Actual Lush layer registration will happen when Lush
+    /// display system API is available. For now, store configuration.
     c->lle_display_layer = NULL;
 
     *client = c;
@@ -79,8 +79,8 @@ void lle_lush_display_client_destroy(lle_lush_display_client_t *client) {
         return;
     }
 
-    /* Note: When Lush display system is implemented, we would unregister
-     * the LLE layer here. For now, just cleanup. */
+    /// Note: When Lush display system is implemented, we would unregister
+    /// the LLE layer here. For now, just cleanup.
 
     free(client);
 }
@@ -105,17 +105,16 @@ static lle_result_t LLE_MAYBE_UNUSED convert_to_lush_format(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Note: This is a placeholder implementation. When Lush display system
-     * is implemented, this function will perform the actual conversion:
-     *
-     * 1. Allocate lush_layer_content_t structure
-     * 2. Convert each LLE display line to Lush display line format
-     * 3. Include cursor position information
-     * 4. Apply color/attribute information based on capabilities
-     * 5. Return converted content
-     *
-     * For now, return success to allow compilation.
-     */
+    /// Note: This is a placeholder implementation. When Lush display system
+    /// is implemented, this function will perform the actual conversion:
+    ///
+    /// 1. Allocate lush_layer_content_t structure
+    /// 2. Convert each LLE display line to Lush display line format
+    /// 3. Include cursor position information
+    /// 4. Apply color/attribute information based on capabilities
+    /// 5. Return converted content
+    ///
+    /// For now, return success to allow compilation.
 
     *lush_content = NULL;
     return LLE_SUCCESS;
@@ -145,18 +144,17 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
 
     uint64_t submission_start = lle_get_current_time_microseconds();
 
-    /* For now, use simple direct rendering until display_controller integration
-     * is complete.
-     *
-     * The proper architecture (to be implemented):
-     * 1. Convert LLE display_content to display_controller format
-     * 2. Call display_controller_display(controller, prompt, command, output,
-     * size)
-     * 3. Write the composed output to stdout
-     *
-     * Current temporary implementation writes directly to terminal.
-     * This matches what GNU readline does (rl_redisplay writes to stdout).
-     */
+    /// For now, use simple direct rendering until display_controller
+    /// integration is complete.
+    ///
+    /// The proper architecture (to be implemented):
+    /// 1. Convert LLE display_content to display_controller format
+    /// 2. Call display_controller_display(controller, prompt, command, output,
+    /// size)
+    /// 3. Write the composed output to stdout
+    ///
+    /// Current temporary implementation writes directly to terminal.
+    /// This matches what GNU readline does (rl_redisplay writes to stdout).
 
     /// DEBUG: Log what we're about to render
     fprintf(stderr, "[DISPLAY] Rendering %zu lines, cursor at (%zu, %zu)\n",
@@ -168,12 +166,12 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
                                           : "(null)");
     }
 
-    /* All write() calls below target stdout for terminal display
-     * (mirroring what GNU readline's rl_redisplay does). Return values
-     * are intentionally discarded via the (void)! suppression idiom --
-     * short writes on a TTY are rare and there is no useful recovery
-     * path inside the render function. The fflush(stdout) at the end
-     * of this function provides the cross-platform commit point. */
+    /// All write() calls below target stdout for terminal display
+    /// (mirroring what GNU readline's rl_redisplay does). Return values
+    /// are intentionally discarded via the (void)! suppression idiom --
+    /// short writes on a TTY are rare and there is no useful recovery
+    /// path inside the render function. The fflush(stdout) at the end
+    /// of this function provides the cross-platform commit point.
 
     /// Clear line and move to start: \r\033[K
     (void)!write(STDOUT_FILENO, "\r\033[K", 4);
@@ -189,9 +187,8 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
         }
     }
 
-    /* Position cursor at correct location using escape sequences
-     * This follows the same pattern as readline's rl_redisplay()
-     */
+    /// Position cursor at correct location using escape sequences
+    /// This follows the same pattern as readline's rl_redisplay()
     if (content->line_count > 0) {
         /// If we're not on the last line, move cursor up
         size_t current_line = content->line_count - 1;
@@ -238,9 +235,8 @@ lle_lush_display_client_submit_content(lle_lush_display_client_t *client,
  * @return Corresponding LLE error code
  */
 lle_result_t lle_convert_lush_error(lush_result_t lush_error) {
-    /* Note: When Lush display system is implemented, this will map
-     * Lush error codes to LLE error codes. For now, simple mapping:
-     */
+    /// Note: When Lush display system is implemented, this will map
+    /// Lush error codes to LLE error codes. For now, simple mapping:
 
     if (lush_error == LUSH_SUCCESS) {
         return LLE_SUCCESS;

@@ -678,9 +678,9 @@ lle_result_t lle_template_render(const lle_parsed_template_t *tmpl,
                                          : token->data.conditional.false_value;
 
                 if (branch && strlen(branch) > 0) {
-                    /* Recursively evaluate the branch content to expand
-                     * nested segment references like ${git} inside
-                     * conditionals like ${?git: (${git})} */
+                    /// Recursively evaluate the branch content to expand
+                    /// nested segment references like ${git} inside
+                    /// conditionals like ${?git: (${git})}
                     size_t avail = output_size - pos - 1;
                     char *temp = malloc(avail + 1);
                     if (temp) {

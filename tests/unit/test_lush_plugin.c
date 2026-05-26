@@ -512,8 +512,7 @@ TEST(has_permission_multiple) {
     lush_plugin_context_t ctx = {.granted_permissions =
                                      LUSH_PLUGIN_PERM_READ_VARS};
 
-    /* Test that asking for multiple permissions when only one is granted fails
-     */
+    /// Test that asking for multiple permissions when only one is granted fails
     lush_plugin_permission_t multi =
         LUSH_PLUGIN_PERM_READ_VARS | LUSH_PLUGIN_PERM_WRITE_VARS;
     ASSERT_FALSE(lush_plugin_has_permission(&ctx, multi),

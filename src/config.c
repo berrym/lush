@@ -931,10 +931,10 @@ static void config_register_sections(void) {
  * them.
  */
 static void config_register_per_mode_defaults(void) {
-    /* completion.chain_directories: lush curates the fish-style
-     * auto-recurse-into-directory experience as a discoverability
-     * default; bash/zsh/posix all stop after one tab (script users
-     * expect a single insertion per keypress). */
+    /// completion.chain_directories: lush curates the fish-style
+    /// auto-recurse-into-directory experience as a discoverability
+    /// default; bash/zsh/posix all stop after one tab (script users
+    /// expect a single insertion per keypress).
     creg_value_t bool_true = creg_value_boolean(true);
     creg_value_t bool_false = creg_value_boolean(false);
 
@@ -1427,9 +1427,9 @@ int config_execute_script_file(const char *path) {
 
     char *complete_input;
     int result = 0;
-    /* 1-based file line of the first character of the next construct,
-     * threaded into parse_and_execute as the parser's starting line so
-     * node->loc.line carries the absolute source line. */
+    /// 1-based file line of the first character of the next construct,
+    /// threaded into parse_and_execute as the parser's starting line so
+    /// node->loc.line carries the absolute source line.
     size_t source_line = 1;
 
     /// Read complete multi-line constructs (same as bin_source)
@@ -2883,10 +2883,10 @@ int config_parse_line(const char *line, int line_num, const char *filename) {
         return 0;
     }
 
-    /* Helper closure-style scaffolding: each error site below needs a
-     * source_location_t pointing into the config file. Building it
-     * inline keeps the migration symmetric with the executor's error
-     * sites, per feedback-direct-api-error-system. */
+    /// Helper closure-style scaffolding: each error site below needs a
+    /// source_location_t pointing into the config file. Building it
+    /// inline keeps the migration symmetric with the executor's error
+    /// sites, per feedback-direct-api-error-system.
 
     /// Check for section header
     if (*trimmed == '[') {
@@ -3829,8 +3829,8 @@ void config_set_value(const char *key, const char *value) {
             return;
         }
 
-        /* `enable` is the user's intent in alias terms; flip onto the
-         * underlying feature when the alias is inverted. */
+        /// `enable` is the user's intent in alias terms; flip onto the
+        /// underlying feature when the alias is inverted.
         bool target = enable ^ invert;
         if (target) {
             shell_feature_enable(feature);

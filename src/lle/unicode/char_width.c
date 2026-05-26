@@ -58,8 +58,7 @@ int lle_codepoint_width(uint32_t cp) {
     if (cp == 0xFEFF)
         return 0; /// Zero Width No-Break Space
 
-    /* Hangul Jamo (medial/final are combining, initial is wide in some fonts)
-     */
+    /// Hangul Jamo (medial/final are combining, initial is wide in some fonts)
     if (cp >= 0x1100 && cp <= 0x115F)
         return 2; /// Choseong (initial)
     if (cp >= 0x1160 && cp <= 0x11FF)
@@ -121,13 +120,13 @@ int lle_codepoint_width(uint32_t cp) {
     if (cp >= 0xFE00 && cp <= 0xFE0F)
         return 0; /// Variation Selectors (zero-width)
 
-    /* NOTE: Skin tone modifiers (U+1F3FB..U+1F3FF) are not handled
-     * specially here — Unicode TR11 assigns them East Asian Width = W,
-     * so they are width 2 as standalone codepoints (and the broader
-     * emoji-block check above already returns 2 for them). Their
-     * "no extra columns when combined" behavior is a grapheme-cluster
-     * property, handled by the grapheme detector / unicode_grapheme
-     * modules, not by per-codepoint width. */
+    /// NOTE: Skin tone modifiers (U+1F3FB..U+1F3FF) are not handled
+    /// specially here — Unicode TR11 assigns them East Asian Width = W,
+    /// so they are width 2 as standalone codepoints (and the broader
+    /// emoji-block check above already returns 2 for them). Their
+    /// "no extra columns when combined" behavior is a grapheme-cluster
+    /// property, handled by the grapheme detector / unicode_grapheme
+    /// modules, not by per-codepoint width.
 
     /// Regional Indicators (flags)
     if (cp >= 0x1F1E6 && cp <= 0x1F1FF)

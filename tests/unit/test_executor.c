@@ -319,14 +319,14 @@ TEST(trap_err_fires_on_nonzero_exit) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* trap_list is global state shared across executors. Clear it
-     * at the end of the test so subsequent tests don't observe a
-     * stale ERR handler firing on their own non-zero exits. */
+    /// trap_list is global state shared across executors. Clear it
+    /// at the end of the test so subsequent tests don't observe a
+    /// stale ERR handler firing on their own non-zero exits.
     run_result_t r = run_shell_with_executor(
         exec, "trap 'echo ERR_HIT' ERR\nfalse\necho continuing\ntrap - ERR\n");
     ASSERT_EXIT_STATUS(r, 0);
-    /* The trap action runs after `false` returns 1, then execution
-     * continues with the next command. */
+    /// The trap action runs after `false` returns 1, then execution
+    /// continues with the next command.
     ASSERT_STDOUT_CONTAINS(r, "ERR_HIT");
     ASSERT_STDOUT_CONTAINS(r, "continuing");
 
@@ -347,8 +347,8 @@ TEST(trap_err_not_inherited_in_function_by_default) {
                                                    "f\n"
                                                    "trap - ERR\n");
     ASSERT_EXIT_STATUS(r, 0);
-    /* Exactly one HIT -- the top-level fire on f's non-zero return.
-     * The inside-f false was suppressed by the default-off errtrace. */
+    /// Exactly one HIT -- the top-level fire on f's non-zero return.
+    /// The inside-f false was suppressed by the default-off errtrace.
     const char *p = r.out;
     int hits = 0;
     while ((p = strstr(p, "HIT")) != NULL) {
@@ -371,8 +371,8 @@ TEST(trap_err_inherited_in_function_with_errtrace) {
                                                    "set +o errtrace\n"
                                                    "trap - ERR\n");
     ASSERT_EXIT_STATUS(r, 0);
-    /* Two HITs -- inside f at false, and at the top-level on f's
-     * non-zero return. */
+    /// Two HITs -- inside f at false, and at the top-level on f's
+    /// non-zero return.
     const char *p = r.out;
     int hits = 0;
     while ((p = strstr(p, "HIT")) != NULL) {
@@ -398,10 +398,10 @@ TEST(trap_debug_not_inherited_in_function_by_default) {
                                                    "f\n"
                                                    "trap - DEBUG\n");
     ASSERT_EXIT_STATUS(r, 0);
-    /* Between `a` and `b` (both inside f's body), no DEBUG line
-     * should appear. If DEBUG were inherited, we'd see "a\nD\nb";
-     * with the default-off behavior we should see "a\nb" with no
-     * interruption. */
+    /// Between `a` and `b` (both inside f's body), no DEBUG line
+    /// should appear. If DEBUG were inherited, we'd see "a\nD\nb";
+    /// with the default-off behavior we should see "a\nb" with no
+    /// interruption.
     ASSERT_NULL(strstr(r.out, "a\nD\nb"),
                 "DEBUG must not fire between commands inside f");
 
@@ -419,8 +419,8 @@ TEST(trap_debug_inherited_in_function_with_functrace) {
                                                    "set +o functrace\n"
                                                    "trap - DEBUG\n");
     ASSERT_EXIT_STATUS(r, 0);
-    /* With functrace, between a and b a DEBUG line should appear
-     * (`a\nD\nb`), proving the trap fired inside the body. */
+    /// With functrace, between a and b a DEBUG line should appear
+    /// (`a\nD\nb`), proving the trap fired inside the body.
     ASSERT_NOT_NULL(strstr(r.out, "a\nD\nb"),
                     "DEBUG must fire between commands inside f with functrace");
 
@@ -493,8 +493,8 @@ TEST(case_posix_character_class) {
     ASSERT_STR_EQ(r2, "up", "[[:upper:]] matched uppercase");
     free(r2);
 
-    /* Non-match falls through to the wildcard arm without misparsing
-     * the bracket class. */
+    /// Non-match falls through to the wildcard arm without misparsing
+    /// the bracket class.
     r = run_shell_with_executor(
         exec, "case \"x\" in [[:space:]]) R=ws;; *) R=other;; esac");
     ASSERT_EXIT_STATUS(r, 0);
@@ -523,8 +523,8 @@ TEST(arr_at_in_scalar_assignment_raises_type_mismatch) {
     run_result_t r = run_shell_with_executor(
         exec, "arr=(a b c)\nx=${arr[@]}\necho saw_post_assign\n");
 
-    /* The offending command aborts execution -- "saw_post_assign"
-     * must not reach stdout. */
+    /// The offending command aborts execution -- "saw_post_assign"
+    /// must not reach stdout.
     ASSERT_TRUE(strstr(r.out, "saw_post_assign") == NULL,
                 "execution aborted after type mismatch");
     /// The diagnostic must reach stderr with the canonical phrasing.
@@ -580,9 +580,9 @@ TEST(bare_arr_glued_to_text_raises_type_mismatch) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* Whole-word constraint per section 3.9: a list value glued to
-     * other text within a single word has no coherent meaning and is
-     * a runtime type error. */
+    /// Whole-word constraint per section 3.9: a list value glued to
+    /// other text within a single word has no coherent meaning and is
+    /// a runtime type error.
     run_result_t r = run_shell_with_executor(
         exec, "arr=(a b c)\necho \"x${arr}y\"\necho after\n");
 
@@ -616,10 +616,10 @@ TEST(at_paren_flag_composes_with_sort) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* (o@) -- sort ascending and yield vector. (@) is the no-op
-     * presentation alias; (o) carries the transformation per
-     * SEMANTICS section 3.5 (transformation and presentation
-     * orthogonal). */
+    /// (o@) -- sort ascending and yield vector. (@) is the no-op
+    /// presentation alias; (o) carries the transformation per
+    /// SEMANTICS section 3.5 (transformation and presentation
+    /// orthogonal).
     run_result_t r = run_shell_with_executor(
         exec, "arr=(c a b)\nfor i in ${(o@)arr}; do echo iter=$i; done\n");
 
@@ -638,9 +638,9 @@ TEST(bare_arr_argv_yields_elements_one_to_one) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* argv slot is vector-accepting. printf '<%s>\n' ${arr} must
-     * produce one <element> line per element, preserving the
-     * original boundaries even for elements containing spaces. */
+    /// argv slot is vector-accepting. printf '<%s>\n' ${arr} must
+    /// produce one <element> line per element, preserving the
+    /// original boundaries even for elements containing spaces.
     run_result_t r = run_shell_with_executor(
         exec, "arr=(a 'x y' c)\nprintf '<%s>\\n' ${arr}\n");
 
@@ -656,8 +656,8 @@ TEST(arr_at_in_for_loop_iterates) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* The for-loop word list is vector-accepting -- ${arr[@]} feeds it
-     * elements, no error. */
+    /// The for-loop word list is vector-accepting -- ${arr[@]} feeds it
+    /// elements, no error.
     run_result_t r = run_shell_with_executor(
         exec, "arr=(a b c)\nfor i in ${arr[@]}; do echo iter=$i; done\n");
 
@@ -676,8 +676,8 @@ TEST(arr_star_in_scalar_assignment_joins) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
-    /* ${arr[*]} is the explicit scalar-join operator -- legal in a
-     * scalar-requiring position; per SEMANTICS section 3.5. */
+    /// ${arr[*]} is the explicit scalar-join operator -- legal in a
+    /// scalar-requiring position; per SEMANTICS section 3.5.
     run_result_t r = run_shell_with_executor(
         exec, "arr=(a b c)\nx=${arr[*]}\necho \"x=$x\"\n");
 
@@ -1066,11 +1066,11 @@ TEST(local_plus_equals_append) {
 }
 
 TEST(local_while_loop_counter) {
-    /* The original symptomatic case from issue #47 — a while-loop counter
-     * with `local` infinite-looped before the fix. The test framework
-     * exits on first failure, so earlier simpler tests stop the run before
-     * this one ever executes in the broken state. After the fix, this
-     * confirms the loop terminates correctly. */
+    /// The original symptomatic case from issue #47 — a while-loop counter
+    /// with `local` infinite-looped before the fix. The test framework
+    /// exits on first failure, so earlier simpler tests stop the run before
+    /// this one ever executes in the broken state. After the fix, this
+    /// confirms the loop terminates correctly.
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -1182,9 +1182,9 @@ TEST(function_redir_keyword_form_applied_at_call) {
 }
 
 TEST(function_redir_input_applied_at_call) {
-    /* Verifies the function's stdin is the redirected file. The captured
-     * value is stored in a global so the test does not need command
-     * substitution to read it back. */
+    /// Verifies the function's stdin is the redirected file. The captured
+    /// value is stored in a global so the test does not need command
+    /// substitution to read it back.
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -1207,8 +1207,8 @@ TEST(function_redir_input_applied_at_call) {
 }
 
 TEST(function_redir_does_not_break_normal_call) {
-    /* Sanity: calling a function with a trailing redirect must not leak
-     * the redirection across to subsequent unrelated commands. */
+    /// Sanity: calling a function with a trailing redirect must not leak
+    /// the redirection across to subsequent unrelated commands.
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -1216,8 +1216,8 @@ TEST(function_redir_does_not_break_normal_call) {
     executor_execute_command_line(
         exec, "f() { echo from-f; } > /tmp/lush_test_48", 1);
     executor_execute_command_line(exec, "f", 1);
-    /* This echo must NOT also be captured by f's redirect — its output
-     * should be discarded as normal (we don't capture stdout here). */
+    /// This echo must NOT also be captured by f's redirect — its output
+    /// should be discarded as normal (we don't capture stdout here).
     executor_execute_command_line(exec, "echo from-second-call", 1);
     executor_execute_command_line(
         exec, "RESULT=$(cat /tmp/lush_test_48 2>/dev/null)", 1);
@@ -1868,11 +1868,9 @@ TEST(command_substitution_syntax) {
 }
 
 TEST(command_substitution_exit_status) {
-    /*
-     * KNOWN BUG: Command substitution exit status not preserved
-     * Issue #58: $? after $(false) returns 0 instead of 1
-     * The exit status of the command inside $() should be available via $?
-     */
+    /// KNOWN BUG: Command substitution exit status not preserved
+    /// Issue #58: $? after $(false) returns 0 instead of 1
+    /// The exit status of the command inside $() should be available via $?
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -1880,13 +1878,12 @@ TEST(command_substitution_exit_status) {
     run_result_t r = run_shell_with_executor(exec, "X=$(true)");
     ASSERT_EXIT_STATUS(r, 0);
 
-    /* TODO: Re-enable when bug is fixed:
-     * status = executor_execute_command_line(exec, "X=$(false); Y=$?", 1);
-     * ASSERT_EQ(status, 0, "Assignment after substitution should succeed");
-     * char *y = symtable_get_var(exec->symtable, "Y");
-     * ASSERT_STR_EQ(y, "1", "$? should capture exit status from $(false)");
-     * free(y);
-     */
+    /// TODO: Re-enable when bug is fixed:
+    /// status = executor_execute_command_line(exec, "X=$(false); Y=$?", 1);
+    /// ASSERT_EQ(status, 0, "Assignment after substitution should succeed");
+    /// char *y = symtable_get_var(exec->symtable, "Y");
+    /// ASSERT_STR_EQ(y, "1", "$? should capture exit status from $(false)");
+    /// free(y);
 
     executor_free(exec);
 }
@@ -2012,11 +2009,9 @@ TEST(elif_chain) {
  */
 
 TEST(negation_command) {
-    /*
-     * KNOWN BUG: Negation command causes memory corruption (double-free)
-     * Issue #57: "! command" syntax triggers malloc error
-     * TODO: Fix the negation handling in executor.c
-     */
+    /// KNOWN BUG: Negation command causes memory corruption (double-free)
+    /// Issue #57: "! command" syntax triggers malloc error
+    /// TODO: Fix the negation handling in executor.c
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
 
@@ -2047,8 +2042,7 @@ TEST(here_string) {
     ASSERT_EXIT_STATUS(r, 0);
 
     char *result = symtable_get_var(exec->symtable, "RESULT");
-    /* cat outputs with trailing newline, command substitution may preserve it
-     */
+    /// cat outputs with trailing newline, command substitution may preserve it
     ASSERT_NOT_NULL(result, "RESULT should be set");
     /// Check that result starts with "hello" (may have trailing newline)
     ASSERT(strncmp(result, "hello", 5) == 0,
@@ -2148,8 +2142,8 @@ static void rt_touch(const char *path) {
 /// --- Deferred here-document collection --------------------------------
 
 TEST(rt_heredoc_through_pipe) {
-    /* The body must reach `tr`; the parser once collected the heredoc
-     * inline and lost the `| tr` that followed `<<EOF` on the line. */
+    /// The body must reach `tr`; the parser once collected the heredoc
+    /// inline and lost the `| tr` that followed `<<EOF` on the line.
     run_result_t r = run_shell("cat <<EOF | tr a-z A-Z\nhello world\nEOF\n");
     ASSERT_EXIT_STATUS(r, 0);
     ASSERT_STDOUT_EQ(r, "HELLO WORLD\n");
@@ -2270,16 +2264,16 @@ TEST(rt_return_from_while_loop) {
 }
 
 TEST(rt_case_arm_runs_all) {
-    /* A case arm is a command list -- a non-zero command must not
-     * short-circuit the rest of the arm. */
+    /// A case arm is a command list -- a non-zero command must not
+    /// short-circuit the rest of the arm.
     run_result_t r =
         run_shell("case x in x) echo one; false; echo two ;; esac\n");
     ASSERT_STDOUT_EQ(r, "one\ntwo\n");
 }
 
 TEST(rt_case_arm_return_status) {
-    /* posix/101 init-script shape: a function returning non-zero in a
-     * case arm, its status captured by a following command. */
+    /// posix/101 init-script shape: a function returning non-zero in a
+    /// case arm, its status captured by a following command.
     run_result_t r =
         run_shell("do_status() { return 3; }\n"
                   "case status in status) do_status; rc=$?; esac\necho $rc\n");
@@ -2421,9 +2415,9 @@ TEST(rt_typed_fn_void_called_via_let) {
 TEST(rt_typed_fn_void_no_return) {
     run_result_t r = run_shell("fn nop() { echo hello; }\n"
                                "nop\n");
-    /* nop is a POSIX-form call site (no parens at statement position
-     * yet); for now this just confirms the fn declaration parses and
-     * does not fire a runtime error before reaching its body. */
+    /// nop is a POSIX-form call site (no parens at statement position
+    /// yet); for now this just confirms the fn declaration parses and
+    /// does not fire a runtime error before reaching its body.
     (void)r;
 }
 

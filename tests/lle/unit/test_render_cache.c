@@ -174,9 +174,9 @@ TEST(display_cache_lookup_miss_returns_cache_miss) {
 }
 
 TEST(display_cache_store_then_lookup_returns_exact_data) {
-    /* Store a known byte pattern, look it up, verify byte-for-byte equality.
-     * This is the test the original suite was missing — proving the cache
-     * actually caches the data, not just that it returns "something". */
+    /// Store a known byte pattern, look it up, verify byte-for-byte equality.
+    /// This is the test the original suite was missing — proving the cache
+    /// actually caches the data, not just that it returns "something".
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
 
@@ -198,8 +198,8 @@ TEST(display_cache_store_then_lookup_returns_exact_data) {
 }
 
 TEST(display_cache_store_then_lookup_with_binary_data) {
-    /* Store a binary blob containing embedded NUL bytes — proves the
-     * cache treats data as opaque bytes, not C strings. */
+    /// Store a binary blob containing embedded NUL bytes — proves the
+    /// cache treats data as opaque bytes, not C strings.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
 
@@ -220,8 +220,8 @@ TEST(display_cache_store_then_lookup_with_binary_data) {
 }
 
 TEST(display_cache_overwrite_same_key_returns_new_value) {
-    /* Store, then store again under the same key with different bytes.
-     * Lookup must return the NEW bytes, not the old ones. */
+    /// Store, then store again under the same key with different bytes.
+    /// Lookup must return the NEW bytes, not the old ones.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
 
@@ -290,9 +290,9 @@ TEST(display_cache_invalidate_removes_entry) {
 }
 
 TEST(display_cache_invalidate_then_restore_works) {
-    /* After invalidating a key, storing it again should make subsequent
-     * lookups hit with the new value. Verifies invalidation does not put
-     * the cache into a broken state. */
+    /// After invalidating a key, storing it again should make subsequent
+    /// lookups hit with the new value. Verifies invalidation does not put
+    /// the cache into a broken state.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
     const char *first = "old";
@@ -338,8 +338,8 @@ TEST(display_cache_invalidate_all_removes_every_entry) {
 }
 
 TEST(display_cache_invalidate_all_then_restore_works) {
-    /* invalidate_all on a populated cache, then re-store and look up,
-     * must function identically to a fresh cache. */
+    /// invalidate_all on a populated cache, then re-store and look up,
+    /// must function identically to a fresh cache.
     lle_display_cache_t *cache = NULL;
     lle_display_cache_init(&cache, mock_pool);
     lle_display_cache_store(cache, 1, "old1", 4);

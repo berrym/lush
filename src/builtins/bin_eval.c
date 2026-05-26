@@ -43,9 +43,9 @@ int bin_eval(int argc, char **argv) {
         strcat(command, argv[i]);
     }
 
-    /* Execute the command string. eval input is its own logical
-     * source slice — the joined argv has no surrounding script
-     * context, so line 1 is the right starting offset. */
+    /// Execute the command string. eval input is its own logical
+    /// source slice — the joined argv has no surrounding script
+    /// context, so line 1 is the right starting offset.
     int result = parse_and_execute(command, 1);
 
     free(command);

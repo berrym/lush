@@ -113,8 +113,7 @@ TEST(tokenize_single_quoted_string) {
 
     token_t *token = tokenizer_current(tok);
     ASSERT_EQ(token->type, TOK_STRING, "Should be STRING token");
-    /* String content may or may not include quotes depending on implementation
-     */
+    /// String content may or may not include quotes depending on implementation
     ASSERT_NOT_NULL(token->text, "Token text should not be NULL");
 
     tokenizer_free(tok);
@@ -750,13 +749,13 @@ TEST(tokenize_line_position_tracking) {
  */
 
 TEST(utf8_partial_sequence_at_eof_brace_expansion) {
-    /* 4 bytes total: '{', 'x', '}', 0xF0. The lead byte claims a 4-byte
-     * UTF-8 sequence; no continuation bytes follow. */
+    /// 4 bytes total: '{', 'x', '}', 0xF0. The lead byte claims a 4-byte
+    /// UTF-8 sequence; no continuation bytes follow.
     const char input[] = {'{', 'x', '}', (char)0xF0, '\0'};
     tokenizer_t *t = tokenizer_new(input);
     ASSERT_NOT_NULL(t, "tokenizer_new failed");
-    /* Drain all tokens. The previous defect crashed inside token_new during
-     * the first WORD emission; reaching TOK_EOF here proves the bound holds. */
+    /// Drain all tokens. The previous defect crashed inside token_new during
+    /// the first WORD emission; reaching TOK_EOF here proves the bound holds.
     token_t *tok = NULL;
     do {
         tok = tokenizer_current(t);

@@ -27,11 +27,11 @@ char *process_escape_sequences(const char *str);
  * @return Always returns 0
  */
 int bin_echo(int argc, char **argv) {
-    /* Default escape-interpretation policy is the FEATURE_XPG_ECHO flag,
-     * curated zsh-style in lush mode (escapes interpreted unless `-E` is
-     * given). Bash mode and `unsetopt xpg_echo` (or the inverted-alias
-     * `setopt bsd_echo`) flip the default to literal. `-e` / `-E` always
-     * override per-call. */
+    /// Default escape-interpretation policy is the FEATURE_XPG_ECHO flag,
+    /// curated zsh-style in lush mode (escapes interpreted unless `-E` is
+    /// given). Bash mode and `unsetopt xpg_echo` (or the inverted-alias
+    /// `setopt bsd_echo`) flip the default to literal. `-e` / `-E` always
+    /// override per-call.
     bool interpret_escapes = shell_mode_allows(FEATURE_XPG_ECHO);
     bool no_newline = false;
     int arg_start = 1;

@@ -230,9 +230,8 @@ static lle_result_t reset_all_parsers(lle_input_parser_system_t *parser_sys) {
         parser_sys->utf8_processor->current_codepoint = 0;
     }
 
-    /* Reset mouse parser - no internal buffer state to reset based on structure
-     */
-    /// Mouse parser state is managed by its own functions
+    /// Reset mouse parser - no internal buffer state to reset based on
+    /// structure Mouse parser state is managed by its own functions
 
     return LLE_SUCCESS;
 }
@@ -273,8 +272,8 @@ lle_result_t lle_input_parser_recover_from_error(
         break;
 
     case LLE_ERROR_BUFFER_OVERFLOW:
-        /* Buffer overflow: Reset sequence parser and process as individual
-         * characters */
+        /// Buffer overflow: Reset sequence parser and process as individual
+        /// characters
         result = reset_sequence_parser(parser_sys);
         if (result == LLE_SUCCESS && problematic_data && data_len > 0) {
             result = process_as_text(parser_sys, problematic_data, data_len);
@@ -319,8 +318,8 @@ lle_result_t lle_input_parser_recover_from_error(
         break;
     }
 
-    /* Note: Recovery performance statistics could be tracked in perf_monitor if
-     * needed */
+    /// Note: Recovery performance statistics could be tracked in perf_monitor
+    /// if needed
     (void)start_time; /// Suppress unused variable warning
 
     return result;

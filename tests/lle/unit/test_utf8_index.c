@@ -107,8 +107,8 @@ TEST(rebuild_multibyte_cjk) {
 }
 
 TEST(rebuild_combining_mark_collapses_graphemes) {
-    /* "e" + U+0301 (combining acute) = "é" as 2 codepoints, 1 grapheme.
-     * "e" is 1 byte, U+0301 is 2 bytes (0xCC 0x81). */
+    /// "e" + U+0301 (combining acute) = "é" as 2 codepoints, 1 grapheme.
+    /// "e" is 1 byte, U+0301 is 2 bytes (0xCC 0x81).
     const char *text = "e\xCC\x81";
     lle_utf8_index_t idx;
     lle_utf8_index_init(&idx);
@@ -122,8 +122,8 @@ TEST(rebuild_combining_mark_collapses_graphemes) {
 }
 
 TEST(rebuild_mixed_ascii_and_cjk) {
-    /* "A中B": 1 + 3 + 1 = 5 bytes, 3 codepoints, 3 graphemes,
-     * 1 + 2 + 1 = 4 columns. */
+    /// "A中B": 1 + 3 + 1 = 5 bytes, 3 codepoints, 3 graphemes,
+    /// 1 + 2 + 1 = 4 columns.
     const char *text = "A\xE4\xB8\xAD"
                        "B";
     lle_utf8_index_t idx;
@@ -231,10 +231,10 @@ TEST(roundtrip_byte_codepoint_and_back) {
 }
 
 TEST(roundtrip_codepoint_grapheme_and_back) {
-    /* "e\xCC\x81X": 'e', combining acute, 'X'.
-     *   bytes: 0='e', 1-2 = combining, 3='X'
-     *   codepoints: 0='e', 1=combining, 2='X'
-     *   graphemes:  0=é (cp 0+1), 1=X (cp 2) */
+    /// "e\xCC\x81X": 'e', combining acute, 'X'.
+    ///   bytes: 0='e', 1-2 = combining, 3='X'
+    ///   codepoints: 0='e', 1=combining, 2='X'
+    ///   graphemes:  0=é (cp 0+1), 1=X (cp 2)
     const char *text = "e\xCC\x81"
                        "X";
     lle_utf8_index_t idx;
@@ -273,9 +273,8 @@ TEST(roundtrip_codepoint_grapheme_and_back) {
 }
 
 TEST(roundtrip_grapheme_display_and_back) {
-    /* "A中B": graphemes at columns 0, 1, 3.
-     * display columns: 0 -> 'A', 1 -> '中' (start), 2 -> '中' (cont), 3 -> 'B'
-     */
+    /// "A中B": graphemes at columns 0, 1, 3.
+    /// display columns: 0 -> 'A', 1 -> '中' (start), 2 -> '中' (cont), 3 -> 'B'
     const char *text = "A\xE4\xB8\xAD"
                        "B";
     lle_utf8_index_t idx;
@@ -302,8 +301,8 @@ TEST(roundtrip_grapheme_display_and_back) {
     ASSERT_EQ(lle_utf8_index_display_to_grapheme(&idx, 1, &g), LLE_SUCCESS,
               "col 1");
     ASSERT_EQ(g, 1, "column 1 -> grapheme 1 (lead column of 中)");
-    /* Column 2 is the continuation column of 中 — implementation-defined,
-     * must be either grapheme 1 or grapheme 2 (the next cluster). */
+    /// Column 2 is the continuation column of 中 — implementation-defined,
+    /// must be either grapheme 1 or grapheme 2 (the next cluster).
     ASSERT_EQ(lle_utf8_index_display_to_grapheme(&idx, 2, &g), LLE_SUCCESS,
               "col 2");
     ASSERT_TRUE(g == 1 || g == 2,

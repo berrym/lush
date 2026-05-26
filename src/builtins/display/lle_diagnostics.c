@@ -31,9 +31,9 @@ int display_lle_diagnostics(int argc, char **argv) {
 
     if (editor) {
         printf("\nSubsystems:\n");
-        /* Buffer and keybindings are session-scoped - created during
-         * readline and cleaned up after. They're not "MISSING", just
-         * inactive between prompts. */
+        /// Buffer and keybindings are session-scoped - created during
+        /// readline and cleaned up after. They're not "MISSING", just
+        /// inactive between prompts.
         printf("  Buffer: %s\n", editor->buffer ? "OK" : "OK (session-scoped)");
         printf("  History: %s\n", editor->history_system ? "OK" : "MISSING");
         printf("  Keybindings: %s\n",
@@ -88,8 +88,8 @@ int display_lle_diagnostics(int argc, char **argv) {
     if (!editor) {
         printf("ERROR (editor not initialized)\n");
     } else if (!editor->history_system) {
-        /* Only check persistent subsystems - buffer and keybindings
-         * are session-scoped and intentionally NULL between prompts */
+        /// Only check persistent subsystems - buffer and keybindings
+        /// are session-scoped and intentionally NULL between prompts
         printf("DEGRADED (missing persistent subsystems)\n");
     } else {
         printf("OK\n");

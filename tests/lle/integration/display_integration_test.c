@@ -192,9 +192,9 @@ TEST(dirty_tracker_range_marking) {
     result = lle_dirty_tracker_clear(tracker);
     ASSERT_SUCCESS(result, "Clear should succeed");
 
-    /* Mark a range as dirty (start offset, length)
-     * Note: mark_range marks start and end boundaries, not every offset in
-     * between */
+    /// Mark a range as dirty (start offset, length)
+    /// Note: mark_range marks start and end boundaries, not every offset in
+    /// between
     result = lle_dirty_tracker_mark_range(tracker, 100, 200);
     ASSERT_SUCCESS(result, "Mark range should succeed");
 

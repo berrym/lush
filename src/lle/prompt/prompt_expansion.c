@@ -699,27 +699,25 @@ lle_result_t lle_prompt_expand(const char *format, char *output,
 
     output[0] = '\0';
 
-    /* Validate UTF-8 input — reject malformed sequences that would produce
-     * corrupted terminal output.  Fall back to the format string as-is if
-     * it happens to be mostly ASCII (lle_utf8_is_valid is strict). */
+    /// Validate UTF-8 input — reject malformed sequences that would produce
+    /// corrupted terminal output.  Fall back to the format string as-is if
+    /// it happens to be mostly ASCII (lle_utf8_is_valid is strict).
     if (!lle_utf8_is_valid(format, strlen(format))) {
         /// Best-effort: copy what we can, replacing invalid bytes
         snprintf(output, output_size, "%s", "$ ");
         return LLE_ERROR_INVALID_ENCODING;
     }
 
-    /*
-     * Pass 1: Resolve LLE template segments (${...})
-     *
-     * If template_ctx is provided, run the template engine first.
-     * The template engine handles ${segment}, ${?cond:t:f}, ${color:text}
-     * and its own \n, \$, \\ escapes. It leaves bash \X and zsh %X untouched
-     * because it only recognizes \n, \\, and \$ as escapes.
-     *
-     * NOTE: The template engine treats \n as newline and \\ as backslash.
-     * Bash prompt escapes like \u, \h etc. will pass through the template
-     * engine as literal characters since it doesn't recognize them.
-     */
+    /// Pass 1: Resolve LLE template segments (${...})
+    ///
+    /// If template_ctx is provided, run the template engine first.
+    /// The template engine handles ${segment}, ${?cond:t:f}, ${color:text}
+    /// and its own \n, \$, \\ escapes. It leaves bash \X and zsh %X untouched
+    /// because it only recognizes \n, \\, and \$ as escapes.
+    ///
+    /// NOTE: The template engine treats \n as newline and \\ as backslash.
+    /// Bash prompt escapes like \u, \h etc. will pass through the template
+    /// engine as literal characters since it doesn't recognize them.
     const char *pass2_input = format;
     char intermediate[EXPAND_BUF_SIZE];
 

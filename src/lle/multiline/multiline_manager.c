@@ -452,8 +452,8 @@ convert_to_lle_state(const continuation_state_t *state) {
     if (state->in_here_doc) {
         return LLE_MULTILINE_STATE_HEREDOC;
     }
-    /* Control structures - map to generic states since specific ones don't
-     * exist */
+    /// Control structures - map to generic states since specific ones don't
+    /// exist
     if (state->in_if_statement || state->in_case_statement ||
         state->in_while_loop || state->in_for_loop || state->in_until_loop ||
         state->in_function_definition) {
@@ -542,8 +542,8 @@ lle_multiline_manager_analyze_buffer(lle_multiline_manager_t *manager,
             manager->line_updates++;
         }
     } else if (buffer->length > 0) {
-        /* Buffer has text but no line structure - treat entire buffer as one
-         * line */
+        /// Buffer has text but no line structure - treat entire buffer as one
+        /// line
         result = lle_multiline_analyze_line(
             buffer->multiline_ctx, (const char *)buffer->data, buffer->length);
         if (result != LLE_SUCCESS) {
@@ -579,8 +579,8 @@ lle_result_t lle_multiline_manager_update_line_state(
                                                of bounds */
     }
 
-    /* For single-line update, we need to re-analyze from the beginning
-     * because multiline state is cumulative. This is acceptable for
-     * typical shell inputs (<100 lines). */
+    /// For single-line update, we need to re-analyze from the beginning
+    /// because multiline state is cumulative. This is acceptable for
+    /// typical shell inputs (<100 lines).
     return lle_multiline_manager_analyze_buffer(manager, buffer);
 }

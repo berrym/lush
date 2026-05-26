@@ -56,8 +56,8 @@ TEST(interface_double_destroy) {
     /// First destroy
     lle_unix_interface_destroy(interface);
 
-    /* Second destroy on same pointer is undefined, but we test that
-     * destroying NULL doesn't crash */
+    /// Second destroy on same pointer is undefined, but we test that
+    /// destroying NULL doesn't crash
     lle_unix_interface_destroy(NULL);
 }
 
@@ -239,9 +239,9 @@ TEST(get_window_size_basic) {
     ASSERT(width > 0);
     ASSERT(height > 0);
 
-    /* In TTY environments, expect reasonable bounds.
-     * In non-TTY, we should get at least the fallback values (80x24).
-     * Allow very small values in case COLUMNS/LINES env vars are weird. */
+    /// In TTY environments, expect reasonable bounds.
+    /// In non-TTY, we should get at least the fallback values (80x24).
+    /// Allow very small values in case COLUMNS/LINES env vars are weird.
     ASSERT(width <= 10000);
     ASSERT(height <= 10000);
 
@@ -299,8 +299,8 @@ TEST(get_window_size_caching) {
 }
 
 TEST(window_size_fallback_values) {
-    /* This test verifies that we get reasonable defaults even in
-     * non-terminal environments */
+    /// This test verifies that we get reasonable defaults even in
+    /// non-terminal environments
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);
     ASSERT(result == LLE_SUCCESS);
@@ -322,9 +322,9 @@ TEST(window_size_fallback_values) {
  */
 
 TEST(read_event_stub) {
-    /* Phase 2 only provides a stub for read_event, which will be
-     * fully implemented in Phase 3. Verify the stub exists and
-     * handles null parameters correctly. */
+    /// Phase 2 only provides a stub for read_event, which will be
+    /// fully implemented in Phase 3. Verify the stub exists and
+    /// handles null parameters correctly.
 
     lle_unix_interface_t *interface = NULL;
     lle_result_t result = lle_unix_interface_init(&interface);

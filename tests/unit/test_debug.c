@@ -192,17 +192,17 @@ TEST(breakpoint_check_hit) {
     debug_context_t *ctx = debug_init();
     ASSERT_NOT_NULL(ctx, "debug_init should succeed");
     debug_enable(ctx, true);
-    /* debug_check_breakpoint reports through debug_output and, on a
-     * hit, enters the (no-terminal, immediately-returning) debug
-     * prompt; route its chatter to /dev/null. */
+    /// debug_check_breakpoint reports through debug_output and, on a
+    /// hit, enters the (no-terminal, immediately-returning) debug
+    /// prompt; route its chatter to /dev/null.
     ctx->debug_output = fopen("/dev/null", "w");
 
     int id = debug_add_breakpoint(ctx, "test.sh", 10, NULL);
     ASSERT(id >= 0, "Add should succeed");
 
-    /* A matching, enabled breakpoint is a hit: debug_check_breakpoint
-     * returns true and increments the hit count. This exercises the
-     * real function -- not a hand-walk of the breakpoint list. */
+    /// A matching, enabled breakpoint is a hit: debug_check_breakpoint
+    /// returns true and increments the hit count. This exercises the
+    /// real function -- not a hand-walk of the breakpoint list.
     bool hit = debug_check_breakpoint(ctx, "test.sh", 10);
     ASSERT_TRUE(hit, "Matching breakpoint should report a hit");
     ASSERT_EQ(ctx->breakpoints->hit_count, 1, "Hit count should be 1");

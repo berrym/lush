@@ -150,16 +150,15 @@ void screen_buffer_set_rprompt(screen_buffer_t *buffer,
         return;
     }
 
-    /* Fit check: RPROMPT fits only on the prompt row (command_start_row).
-     *
-     * If the command text is still on the same row as the prompt, we must
-     * check against command_end_col (the rightmost extent of typed text).
-     * If the command has wrapped to subsequent rows, the prompt row has
-     * only the prompt itself, so command_start_col is the right boundary.
-     *
-     * Either way: rightmost_used_col + 1 (gap) + rprompt_width <= term_width
-     * The 1-column gap prevents prompt/command text and rprompt from touching.
-     */
+    /// Fit check: RPROMPT fits only on the prompt row (command_start_row).
+    ///
+    /// If the command text is still on the same row as the prompt, we must
+    /// check against command_end_col (the rightmost extent of typed text).
+    /// If the command has wrapped to subsequent rows, the prompt row has
+    /// only the prompt itself, so command_start_col is the right boundary.
+    ///
+    /// Either way: rightmost_used_col + 1 (gap) + rprompt_width <= term_width
+    /// The 1-column gap prevents prompt/command text and rprompt from touching.
     int rightmost_col = buffer->command_start_col;
     if (buffer->command_end_row == buffer->command_start_row) {
         /// Command hasn't wrapped — use the actual end of typed text
@@ -1117,20 +1116,20 @@ size_t screen_buffer_calculate_visual_width(const char *text,
             continue;
         }
 
-        /* GRAPHEME-AWARE WIDTH CALCULATION
-         *
-         * Use LLE's full Unicode TR#29 grapheme cluster detection to properly
-         * handle complex characters in continuation prompts:
-         * - Emoji with modifiers (👨‍👩‍👧‍👦 = family emoji)
-         * - ZWJ sequences (🏳️‍🌈 = rainbow flag)
-         * - Regional indicator pairs (🇺🇸 = US flag)
-         * - Combining marks (é = e + combining acute)
-         * - CJK characters (中文 = 2 columns each)
-         * - Emoji (🎉 = 2 columns)
-         *
-         * This allows users to configure continuation prompts with any Unicode:
-         *   CONTINUATION_PROMPTS=([loop]="🔄 " [if]="❓ " [quote]="💬 ")
-         */
+        /// GRAPHEME-AWARE WIDTH CALCULATION
+        ///
+        /// Use LLE's full Unicode TR#29 grapheme cluster detection to properly
+        /// handle complex characters in continuation prompts:
+        /// - Emoji with modifiers (👨‍👩‍👧‍👦 = family emoji)
+        /// - ZWJ sequences (🏳️‍🌈 = rainbow flag)
+        /// - Regional indicator pairs (🇺🇸 = US flag)
+        /// - Combining marks (é = e + combining acute)
+        /// - CJK characters (中文 = 2 columns each)
+        /// - Emoji (🎉 = 2 columns)
+        ///
+        /// This allows users to configure continuation prompts with any
+        /// Unicode:
+        ///   CONTINUATION_PROMPTS=([loop]="🔄 " [if]="❓ " [quote]="💬 ")
 
         /// Find the end of this grapheme cluster
         const char *grapheme_start = text + i;

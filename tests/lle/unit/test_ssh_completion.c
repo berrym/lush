@@ -53,10 +53,10 @@ static int ssh_test_setup(ssh_test_fixture_t *fx, const char *config_body) {
         return -1;
     fx->home = strdup(dir);
 
-    /* ssh_dir holds "${home}/.ssh"; config_path holds "${ssh_dir}/config".
-     * Buffers are sized so the chained snprintfs cannot truncate when
-     * home is a normal tmpdir path -- silences gcc -Wformat-truncation
-     * over the worst-case length estimate. */
+    /// ssh_dir holds "${home}/.ssh"; config_path holds "${ssh_dir}/config".
+    /// Buffers are sized so the chained snprintfs cannot truncate when
+    /// home is a normal tmpdir path -- silences gcc -Wformat-truncation
+    /// over the worst-case length estimate.
     char ssh_dir[1024];
     snprintf(ssh_dir, sizeof(ssh_dir), "%s/.ssh", fx->home);
     if (mkdir(ssh_dir, 0700) != 0) {
@@ -143,8 +143,8 @@ TEST(ssh_source_emits_configured_host) {
     bool found = false;
     for (size_t i = 0; i < result->count; i++) {
         const lle_completion_item_t *item = &result->items[i];
-        /* Default user from the stanza should be honoured when the
-         * user typed no `@` segment. */
+        /// Default user from the stanza should be honoured when the
+        /// user typed no `@` segment.
         if (item->text && strcmp(item->text, "alice@example.com") == 0) {
             found = true;
             break;
@@ -158,9 +158,9 @@ TEST(ssh_source_emits_configured_host) {
 }
 
 TEST(ssh_source_preserves_user_at_prefix) {
-    /* When the user types `bob@`, the typed user wins over the User
-     * directive in the Host stanza -- otherwise we'd silently override
-     * the user's explicit choice. */
+    /// When the user types `bob@`, the typed user wins over the User
+    /// directive in the Host stanza -- otherwise we'd silently override
+    /// the user's explicit choice.
     ssh_test_fixture_t fx = {0};
     if (ssh_test_setup(&fx, "Host example.com\n  User alice\n") != 0) {
         TEST_FAIL_MSG("could not set up SSH fixture");
@@ -200,10 +200,10 @@ TEST(ssh_source_preserves_user_at_prefix) {
 }
 
 TEST(ssh_source_skips_remote_path_syntax) {
-    /* `host:path` is scp/sftp/rsync remote-path completion territory.
-     * The source must not emit host candidates once the user has typed
-     * the colon -- doing so would conflict with a future remote-path
-     * source. */
+    /// `host:path` is scp/sftp/rsync remote-path completion territory.
+    /// The source must not emit host candidates once the user has typed
+    /// the colon -- doing so would conflict with a future remote-path
+    /// source.
     ssh_test_fixture_t fx = {0};
     if (ssh_test_setup(&fx, "Host example.com\n") != 0) {
         TEST_FAIL_MSG("could not set up SSH fixture");
@@ -248,8 +248,8 @@ static char *write_temp_file(const char *body) {
 }
 
 TEST(etc_hosts_parses_primary_and_aliases) {
-    /* Standard /etc/hosts shape: IP, primary, two aliases. All three
-     * names should land in the cache. */
+    /// Standard /etc/hosts shape: IP, primary, two aliases. All three
+    /// names should land in the cache.
     const char *body = "127.0.0.1 localhost loopback lo\n"
                        "192.168.1.5 fileserver fs\n";
     char *path = write_temp_file(body);
@@ -284,8 +284,8 @@ TEST(etc_hosts_parses_primary_and_aliases) {
 }
 
 TEST(etc_hosts_skips_comments_and_blanks) {
-    /* `#`-prefixed comment lines, blank lines, and end-of-line comments
-     * must not produce candidates. */
+    /// `#`-prefixed comment lines, blank lines, and end-of-line comments
+    /// must not produce candidates.
     const char *body = "# leading comment\n"
                        "\n"
                        "10.0.0.1 alpha   # this is the gateway\n"
@@ -321,8 +321,8 @@ TEST(etc_hosts_skips_comments_and_blanks) {
 }
 
 TEST(etc_hosts_dedupes_against_higher_priority_source) {
-    /* If a host is already in the cache (e.g., from ssh_config) the
-     * /etc/hosts entry is skipped so the higher-priority entry wins. */
+    /// If a host is already in the cache (e.g., from ssh_config) the
+    /// /etc/hosts entry is skipped so the higher-priority entry wins.
     const char *body = "1.2.3.4 production-host\n";
     char *path = write_temp_file(body);
     if (!path) {

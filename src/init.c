@@ -203,9 +203,9 @@ static void ensure_bottom_margin(void) {
     char cmd[64];
     int len = snprintf(cmd, sizeof(cmd), "\x1b[s\x1b[%d;1H\n\x1b[u", rows);
     if (len > 0 && (size_t)len < sizeof(cmd)) {
-        /* (void)! is the portable suppression idiom; plain (void)cast
-         * does not silence gcc -Wunused-result on functions decorated
-         * with warn_unused_result. */
+        /// (void)! is the portable suppression idiom; plain (void)cast
+        /// does not silence gcc -Wunused-result on functions decorated
+        /// with warn_unused_result.
         (void)!write(STDOUT_FILENO, cmd, (size_t)len);
     }
 
@@ -237,9 +237,9 @@ static shell_mode_t detect_initial_mode(int argc, char **argv, size_t optind) {
         return (shell_mode_t)shell_opts.cli_mode_override;
     }
 
-    /* Script file: peek at shebang. process_shebang() will fire later
-     * when the script is actually opened for execution; this peek is
-     * just for early mode resolution. */
+    /// Script file: peek at shebang. process_shebang() will fire later
+    /// when the script is actually opened for execution; this peek is
+    /// just for early mode resolution.
     if (optind < (size_t)argc && argv[optind] && argv[optind][0] != '\0' &&
         argv[optind][0] != '-') {
         FILE *f = fopen(argv[optind], "r");
@@ -614,14 +614,12 @@ int init(int argc, char **argv, FILE **in) {
     } else if (lle_adaptive_should_shell_be_interactive(
                    forced_interactive, has_script_file,
                    shell_opts.stdin_mode)) {
-        /*
-         * Interactive shell detection using LLE adaptive terminal system.
-         * This handles:
-         * - Traditional TTY detection (stdin/stdout are terminals)
-         * - Editor terminals (Zed, VS Code, Cursor) with non-TTY stdin
-         * - Terminal multiplexers (tmux, screen)
-         * - Force interactive flag (-i)
-         */
+        /// Interactive shell detection using LLE adaptive terminal system.
+        /// This handles:
+        /// - Traditional TTY detection (stdin/stdout are terminals)
+        /// - Editor terminals (Zed, VS Code, Cursor) with non-TTY stdin
+        /// - Terminal multiplexers (tmux, screen)
+        /// - Force interactive flag (-i)
         IS_INTERACTIVE_SHELL = true;
         SHELL_TYPE = SHELL_INTERACTIVE;
         *in = stdin;
@@ -712,11 +710,11 @@ int init(int argc, char **argv, FILE **in) {
                         "Continuing with standard malloc/free operations\n");
             }
         } else {
-            /* Register memory pool cleanup FIRST so it runs LAST in atexit.
-             * atexit handlers run in LIFO order (last registered = first run).
-             * By registering pool shutdown BEFORE LLE init, the LLE atexit
-             * handler (registered later) will run BEFORE pool shutdown,
-             * ensuring LLE can safely save history using pool memory. */
+            /// Register memory pool cleanup FIRST so it runs LAST in atexit.
+            /// atexit handlers run in LIFO order (last registered = first run).
+            /// By registering pool shutdown BEFORE LLE init, the LLE atexit
+            /// handler (registered later) will run BEFORE pool shutdown,
+            /// ensuring LLE can safely save history using pool memory.
             atexit(lush_pool_shutdown);
 
             if (display_config.debug_mode || getenv("LUSH_MEMORY_DEBUG")) {
@@ -725,10 +723,9 @@ int init(int argc, char **argv, FILE **in) {
             }
         }
 
-        /* Initialize LLE shell integration (Spec 26)
-         * LLE is the sole line editor - no GNU readline fallback.
-         * Requires: global_memory_pool (initialized above)
-         */
+        /// Initialize LLE shell integration (Spec 26)
+        /// LLE is the sole line editor - no GNU readline fallback.
+        /// Requires: global_memory_pool (initialized above)
         lle_result_t lle_result = lle_shell_integration_init();
         if (lle_result != LLE_SUCCESS) {
             shell_error_t *err = shell_error_create(
@@ -887,9 +884,9 @@ int init(int argc, char **argv, FILE **in) {
         atexit(display_integration_cleanup);
     }
 
-    /* Memory pool cleanup is now registered immediately after pool init
-     * (before LLE init) so it runs LAST in atexit order (LIFO).
-     * This ensures LLE can safely use pool memory during shutdown. */
+    /// Memory pool cleanup is now registered immediately after pool init
+    /// (before LLE init) so it runs LAST in atexit order (LIFO).
+    /// This ensures LLE can safely use pool memory during shutdown.
 
     return 0;
 }

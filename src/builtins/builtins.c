@@ -376,11 +376,11 @@ char *find_command_in_path(const char *command) {
         return NULL;
     }
 
-    /* Positive cache: command_hash holds previously-resolved paths
-     * (also populated by the POSIX `hash` builtin). On hit, revalidate
-     * with access(X_OK) so a removed binary doesn't keep a stale path
-     * pinned -- on revalidation failure, drop the stale entry and fall
-     * through to a fresh PATH walk. */
+    /// Positive cache: command_hash holds previously-resolved paths
+    /// (also populated by the POSIX `hash` builtin). On hit, revalidate
+    /// with access(X_OK) so a removed binary doesn't keep a stale path
+    /// pinned -- on revalidation failure, drop the stale entry and fall
+    /// through to a fresh PATH walk.
     if (command_hash) {
         const char *cached = ht_strstr_get(command_hash, command);
         if (cached) {
@@ -391,9 +391,9 @@ char *find_command_in_path(const char *command) {
         }
     }
 
-    /* Negative cache: short-circuit a recent miss within TTL so a tight
-     * loop calling a missing command pays O(1) instead of O(PATH_dirs)
-     * per iteration. */
+    /// Negative cache: short-circuit a recent miss within TTL so a tight
+    /// loop calling a missing command pays O(1) instead of O(PATH_dirs)
+    /// per iteration.
     if (path_neg_cache_check(command)) {
         return NULL;
     }
@@ -435,8 +435,8 @@ char *find_command_in_path(const char *command) {
     free(path_copy);
 
     if (result) {
-        /* Populate positive cache. POSIX hash table doubles as the
-         * positive cache; the `hash` builtin shows / clears it. */
+        /// Populate positive cache. POSIX hash table doubles as the
+        /// positive cache; the `hash` builtin shows / clears it.
         if (!command_hash) {
             init_command_hash();
         }

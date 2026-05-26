@@ -728,8 +728,8 @@ TEST(enumerate_current_scope_vars_in_function_scope) {
     scope_probe_t probe_global = {"global_unrelated", false, SYMVAR_STRING};
     symtable_enumerate_current_scope_vars(symtable_manager(), scope_probe_cb,
                                           &probe_global);
-    /* The global may end up in this scope if the set placed it here;
-     * the explicit local one is the load-bearing assertion. */
+    /// The global may end up in this scope if the set placed it here;
+    /// the explicit local one is the load-bearing assertion.
     (void)probe_global;
 
     symtable_pop_scope(symtable_manager());
@@ -747,10 +747,10 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
     ASSERT_EQ(rc, 0, "push function scope");
     symtable_set_local_var(symtable_manager(), "greeting", "hi");
 
-    /* current_executor must be non-NULL for inspect to render; the
-     * existing inspect_all_variables_basic test gates on it but the
-     * trace tests do not stage one. Skip the trace path entirely by
-     * pointing at a temporary executor. */
+    /// current_executor must be non-NULL for inspect to render; the
+    /// existing inspect_all_variables_basic test gates on it but the
+    /// trace tests do not stage one. Skip the trace path entirely by
+    /// pointing at a temporary executor.
     extern executor_t *current_executor;
     executor_t *saved = current_executor;
     current_executor = (executor_t *)0x1; /// sentinel non-NULL
@@ -761,9 +761,9 @@ TEST(inspect_all_variables_shows_locals_in_function_scope) {
 
     char log[8192];
     read_debug_output(ctx, log, sizeof(log));
-    /* The Local Variables section is now a framed block titled
-     * "[Local Variables]" -- match the bracketed title across both
-     * UTF-8 and ASCII glyph sets. */
+    /// The Local Variables section is now a framed block titled
+    /// "[Local Variables]" -- match the bracketed title across both
+    /// UTF-8 and ASCII glyph sets.
     ASSERT_TRUE(strstr(log, "[Local Variables]") != NULL,
                 "Local Variables section present");
     ASSERT_TRUE(strstr(log, "greeting") != NULL, "local variable name appears");
@@ -923,9 +923,9 @@ TEST(view_emit_line_ascii_uses_pipe_gutter) {
 
     char log[256];
     read_debug_output(ctx, log, sizeof(log));
-    /* The captured output also carries debug_enable's preamble; check
-     * that the gutter-prefixed line is present rather than requiring
-     * exact equality. */
+    /// The captured output also carries debug_enable's preamble; check
+    /// that the gutter-prefixed line is present rather than requiring
+    /// exact equality.
     ASSERT_TRUE(strstr(log, "| hello 42\n") != NULL,
                 "ASCII gutter prefixes emitted line");
 
@@ -961,9 +961,9 @@ TEST(view_frame_brackets_render_around_title) {
 
     char log[1024];
     read_debug_output(ctx, log, sizeof(log));
-    /* Top border with bracketed title, plus a row, plus the bottom
-     * border. The exact horizontal fill length is fixed by the
-     * module; assert presence of the load-bearing pieces. */
+    /// Top border with bracketed title, plus a row, plus the bottom
+    /// border. The exact horizontal fill length is fixed by the
+    /// module; assert presence of the load-bearing pieces.
     ASSERT_TRUE(strstr(log, "+- [Sample] ") != NULL, "frame top with title");
     ASSERT_TRUE(strstr(log, "| row one\n") != NULL,
                 "interior row carries the gutter");

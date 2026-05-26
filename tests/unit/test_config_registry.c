@@ -676,8 +676,8 @@ TEST(mode_default_type_mismatch_fails) {
 TEST(mode_default_applies_for_registered_mode) {
     config_registry_register_section(&shell_section);
 
-    /* Register a per-mode default: errexit=true under POSIX, false elsewhere
-     * (default). */
+    /// Register a per-mode default: errexit=true under POSIX, false elsewhere
+    /// (default).
     creg_value_t posix_default = creg_value_boolean(true);
     ASSERT_EQ(config_registry_set_mode_default(
                   "shell.errexit", SHELL_MODE_POSIX, &posix_default),
@@ -690,8 +690,8 @@ TEST(mode_default_applies_for_registered_mode) {
     ASSERT_EQ(config_registry_get_boolean("shell.errexit", &got), CREG_SUCCESS);
     ASSERT(got == true);
 
-    /* Apply LUSH defaults: errexit has no per-mode default for LUSH, so
-     * the value persists from the prior apply. */
+    /// Apply LUSH defaults: errexit has no per-mode default for LUSH, so
+    /// the value persists from the prior apply.
     ASSERT_EQ(config_registry_apply_mode_defaults(SHELL_MODE_LUSH),
               CREG_SUCCESS);
     got = false;

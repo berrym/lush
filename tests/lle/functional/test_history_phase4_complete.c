@@ -570,11 +570,10 @@ void test_all_phase4_features_together(void) {
     result = lle_history_preserve_multiline(entry, multiline);
     ASSERT_EQ(result, LLE_SUCCESS, "Multiline preservation should succeed");
 
-    /* Verify all features:
-     * 1. Forensics - automatically captured on add
-     * 2. Dedup - engine created and active
-     * 3. Multiline - preserved correctly
-     */
+    /// Verify all features:
+    /// 1. Forensics - automatically captured on add
+    /// 2. Dedup - engine created and active
+    /// 3. Multiline - preserved correctly
     ASSERT_TRUE(entry->process_id > 0, "Forensics captured");
     ASSERT_TRUE(entry->is_multiline, "Multiline detected");
     ASSERT_NOT_NULL(entry->original_multiline, "Original preserved");

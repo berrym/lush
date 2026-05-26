@@ -1271,9 +1271,9 @@ void arithm_cleanup(void) { arithm_clear_error(); }
 
 void arithm_set_error(shell_error_code_t code, const char *while_context,
                       const char *help, const char *fmt, ...) {
-    /* Preserve the first reported error of an evaluation: shunting-yard
-     * cleanup paths often try to set further errors after the original
-     * trip; the original is the actionable one. */
+    /// Preserve the first reported error of an evaluation: shunting-yard
+    /// cleanup paths often try to set further errors after the original
+    /// trip; the original is the actionable one.
     if (s_arithm_error.flagged) {
         return;
     }
@@ -1413,21 +1413,21 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                 }
             }
 
-            /* Decide whether the current operator is at a position
-             * where it must be unary (no left operand on the stack)
-             * versus a position where the previous token left an
-             * operand. last_op tracks the previous OPERATOR; it is
-             * NULL after an operand (number/variable) and non-NULL
-             * after an operator. The "previous token left an operand"
-             * cases:
-             *   - last_op == NULL                  (number/var)
-             *   - last_op->op == ')'               (closing paren)
-             *   - last_op == OP_POSTINC/OP_POSTDEC (postfix unary,
-             *     result stays on the stack)
-             * In any of those, a binary operator follows naturally
-             * and no unary conversion / error is required. Otherwise
-             * apply the existing unary conversion (-/+ -> umin/uplus)
-             * or report a binary-without-operand error. Issue #100. */
+            /// Decide whether the current operator is at a position
+            /// where it must be unary (no left operand on the stack)
+            /// versus a position where the previous token left an
+            /// operand. last_op tracks the previous OPERATOR; it is
+            /// NULL after an operand (number/variable) and non-NULL
+            /// after an operator. The "previous token left an operand"
+            /// cases:
+            ///   - last_op == NULL                  (number/var)
+            ///   - last_op->op == ')'               (closing paren)
+            ///   - last_op == OP_POSTINC/OP_POSTDEC (postfix unary,
+            ///     result stays on the stack)
+            /// In any of those, a binary operator follows naturally
+            /// and no unary conversion / error is required. Otherwise
+            /// apply the existing unary conversion (-/+ -> umin/uplus)
+            /// or report a binary-without-operand error. Issue #100.
             bool left_operand_present =
                 (!last_op || last_op->op == ')' || last_op == OP_POSTINC ||
                  last_op == OP_POSTDEC);

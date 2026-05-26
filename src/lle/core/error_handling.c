@@ -1740,10 +1740,9 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
     case LLE_BUFFER_ERROR_INVALID_CURSOR_POSITION:
         /// Reset cursor to safe position (start of buffer)
         if (buffer) {
-            /* Would call: lle_buffer_reset_cursor_to_safe_position(buffer, ctx)
-             */
-            /* For now, mark as successful - actual buffer integration in future
-             */
+            /// Would call: lle_buffer_reset_cursor_to_safe_position(buffer,
+            /// ctx) For now, mark as successful - actual buffer integration in
+            /// future
             recovery_result = LLE_SUCCESS;
         }
         break;
@@ -1759,8 +1758,7 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
     case LLE_BUFFER_ERROR_MULTILINE_CORRUPTION:
         /// Rebuild multiline structure from scratch
         if (buffer) {
-            /* Would call: lle_buffer_rebuild_multiline_structure(buffer, ctx)
-             */
+            /// Would call: lle_buffer_rebuild_multiline_structure(buffer, ctx)
             recovery_result = LLE_SUCCESS;
         }
         break;
@@ -1785,8 +1783,8 @@ lle_result_t lle_handle_buffer_error(void *buffer, lle_buffer_error_t error,
             recovery_result =
                 strategy->execute_strategy(ctx, strategy->strategy_data);
         } else if (strategy) {
-            /* Strategy exists but no execution function - mark as partial
-             * success */
+            /// Strategy exists but no execution function - mark as partial
+            /// success
             recovery_result = LLE_SUCCESS;
         }
         break;
@@ -1852,8 +1850,8 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
 
             /// Temporarily bypass event system
             if (event_system) {
-                /* Would call: lle_event_system_enter_bypass_mode(event_system,
-                 * ctx) */
+                /// Would call: lle_event_system_enter_bypass_mode(event_system,
+                /// ctx)
             }
 
             /// Free error context
@@ -1875,8 +1873,7 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
     case LLE_EVENT_ERROR_QUEUE_OVERFLOW:
         /// Emergency queue flush - drop non-critical events
         if (event_system) {
-            /* Would call: lle_event_system_emergency_flush(event_system, ctx)
-             */
+            /// Would call: lle_event_system_emergency_flush(event_system, ctx)
             recovery_result = LLE_SUCCESS;
         }
         break;
@@ -1884,8 +1881,8 @@ lle_handle_event_system_error(void *event_system, lle_event_error_t error,
     case LLE_EVENT_ERROR_PROCESSING_TIMEOUT:
         /// Kill hanging event handlers
         if (event_system) {
-            /* Would call: lle_event_system_kill_hanging_handlers(event_system,
-             * ctx) */
+            /// Would call: lle_event_system_kill_hanging_handlers(event_system,
+            /// ctx)
             recovery_result = LLE_SUCCESS;
         }
         break;

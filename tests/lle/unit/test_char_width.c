@@ -348,16 +348,16 @@ TEST(unmapped_codepoints_default_to_one) {
  */
 
 TEST(boundary_just_before_cjk_unified) {
-    /* 0x4DFF is just before the CJK block (0x4E00..) and is the end of
-     * Yijing Hexagram Symbols, which the implementation does not treat
-     * specially, so it falls through to the default width of 1. */
+    /// 0x4DFF is just before the CJK block (0x4E00..) and is the end of
+    /// Yijing Hexagram Symbols, which the implementation does not treat
+    /// specially, so it falls through to the default width of 1.
     ASSERT_EQ(lle_codepoint_width(0x4DFF), 1, "just before CJK");
     ASSERT_EQ(lle_codepoint_width(0x4E00), 2, "first CJK");
 }
 
 TEST(boundary_just_after_cjk_unified) {
-    /* 0xA000 is just after CJK (0x9FFF). Yi Syllables block; falls
-     * through to default. */
+    /// 0xA000 is just after CJK (0x9FFF). Yi Syllables block; falls
+    /// through to default.
     ASSERT_EQ(lle_codepoint_width(0x9FFF), 2, "last CJK");
     ASSERT_EQ(lle_codepoint_width(0xA000), 1, "just after CJK (default)");
 }

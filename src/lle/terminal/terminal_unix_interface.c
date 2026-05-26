@@ -190,8 +190,8 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
 
     struct sigaction sa;
 
-    /* SIGWINCH - window resize
-     * Block SIGTSTP and SIGCONT while handling SIGWINCH to prevent nesting */
+    /// SIGWINCH - window resize
+    /// Block SIGTSTP and SIGCONT while handling SIGWINCH to prevent nesting
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = handle_sigwinch;
     sigemptyset(&sa.sa_mask);
@@ -203,8 +203,8 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* SIGTSTP - suspend (Ctrl-Z)
-     * Block SIGWINCH while handling SIGTSTP to prevent nesting */
+    /// SIGTSTP - suspend (Ctrl-Z)
+    /// Block SIGWINCH while handling SIGTSTP to prevent nesting
     sa.sa_handler = handle_sigtstp;
     sigemptyset(&sa.sa_mask);
     sigaddset(&sa.sa_mask, SIGWINCH);
@@ -213,8 +213,8 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* SIGCONT - resume
-     * Block SIGWINCH while handling SIGCONT to prevent nesting */
+    /// SIGCONT - resume
+    /// Block SIGWINCH while handling SIGCONT to prevent nesting
     sa.sa_handler = handle_sigcont;
     sigemptyset(&sa.sa_mask);
     sigaddset(&sa.sa_mask, SIGWINCH);
@@ -224,16 +224,15 @@ static lle_result_t install_signal_handlers(lle_unix_interface_t *interface) {
         return LLE_ERROR_SYSTEM_CALL;
     }
 
-    /* NOTE: We do NOT install SIGINT/SIGTERM handlers here.
-     * Lush's signal handlers (src/signals.c) manage these properly:
-     * - SIGINT: kills child process OR clears line (but never exits shell)
-     * - SIGTERM: handles graceful shutdown
-     *
-     * LLE previously installed handlers that would exit the shell on Ctrl+C,
-     * which is incorrect shell behavior. Now that ISIG is enabled in raw mode,
-     * Ctrl+C generates SIGINT which lush's handler will catch and handle
-     * correctly.
-     */
+    /// NOTE: We do NOT install SIGINT/SIGTERM handlers here.
+    /// Lush's signal handlers (src/signals.c) manage these properly:
+    /// - SIGINT: kills child process OR clears line (but never exits shell)
+    /// - SIGTERM: handles graceful shutdown
+    ///
+    /// LLE previously installed handlers that would exit the shell on Ctrl+C,
+    /// which is incorrect shell behavior. Now that ISIG is enabled in raw mode,
+    /// Ctrl+C generates SIGINT which lush's handler will catch and handle
+    /// correctly.
 
     /// Set global pointer for handlers
     g_signal_interface = interface;
@@ -298,8 +297,7 @@ lle_result_t lle_unix_interface_init(lle_unix_interface_t **interface) {
     iface->terminal_fd = STDIN_FILENO;
 
     /// Save original terminal state (if this is a TTY)
-    /* In non-TTY environments (tests, pipes), tcgetattr will fail - that's OK
-     */
+    /// In non-TTY environments (tests, pipes), tcgetattr will fail - that's OK
     if (tcgetattr(iface->terminal_fd, &iface->original_termios) != 0) {
         /// Not a TTY - initialize with empty termios
         memset(&iface->original_termios, 0, sizeof(struct termios));
@@ -457,22 +455,21 @@ lle_unix_interface_enter_raw_mode(lle_unix_interface_t *interface) {
                       IXON);   /// Disable XON/XOFF flow control
 
     /// Output flags - KEEP output processing for proper display
-    /* NOTE: Disabling OPOST causes display corruption - \n won't return to
-     * column 0 */
+    /// NOTE: Disabling OPOST causes display corruption - \n won't return to
+    /// column 0
     /// We need raw INPUT mode, but output should remain processed for display
 
     /// Control flags - 8-bit characters
     raw->c_cflag |= (CS8); /// 8 bits per byte
 
-    /* Local flags - disable canonical mode and echo, but KEEP signals enabled
-     */
+    /// Local flags - disable canonical mode and echo, but KEEP signals enabled
     raw->c_lflag &= ~(ECHO |   /// No echo
                       ICANON | /// Non-canonical mode
                       IEXTEN); /// Disable extended input processing
-    /* KEEP ISIG ENABLED - allow Ctrl-C to generate SIGINT for proper shell
-     * behavior */
-    /* This ensures lush's signal handler (src/signals.c) can manage child
-     * processes */
+    /// KEEP ISIG ENABLED - allow Ctrl-C to generate SIGINT for proper shell
+    /// behavior
+    /// This ensures lush's signal handler (src/signals.c) can manage child
+    /// processes
 
     /// Control characters - non-blocking read
     raw->c_cc[VMIN] = 0;  /// Non-blocking: return immediately
@@ -640,8 +637,7 @@ static lle_special_key_t convert_key_code(uint32_t keycode,
     case LLE_KEY_TYPE_CONTROL:
         /// Control characters - treat as regular characters for now
         /// Ctrl+C (0x03) should be handled by the application layer
-        /* We'll return UNKNOWN here and let the character handler deal with it
-         */
+        /// We'll return UNKNOWN here and let the character handler deal with it
         break;
     case LLE_KEY_TYPE_SPECIAL:
         /// Special keys
@@ -730,16 +726,16 @@ convert_parsed_input_to_event(const lle_parsed_input_t *parsed,
         lle_special_key_t special_key = convert_key_code(
             parsed->data.key_info.keycode, parsed->data.key_info.type);
 
-        /* If it's a control character that didn't map to a special key,
-         * treat it as a regular character event (e.g., Ctrl+C) */
+        /// If it's a control character that didn't map to a special key,
+        /// treat it as a regular character event (e.g., Ctrl+C)
         if (special_key == LLE_KEY_UNKNOWN &&
             parsed->data.key_info.type == LLE_KEY_TYPE_CONTROL) {
             /// Control character - return as CHARACTER event
-            /* For control chars, keycode might be ASCII letter, so use raw
-             * value */
+            /// For control chars, keycode might be ASCII letter, so use raw
+            /// value
             uint32_t ctrl_code = parsed->data.key_info.keycode;
-            /* If keycode is uppercase letter, convert to control code (Ctrl+C =
-             * 'C'-64 = 3) */
+            /// If keycode is uppercase letter, convert to control code (Ctrl+C
+            /// = 'C'-64 = 3)
             if (ctrl_code >= 'A' && ctrl_code <= 'Z') {
                 ctrl_code = ctrl_code - 64;
             } else if (ctrl_code >= 'a' && ctrl_code <= 'z') {
@@ -995,15 +991,15 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
     /// Determine effective timeout
     uint32_t effective_timeout_ms = timeout_ms;
 
-    /* If parser is accumulating an escape sequence, use a shorter timeout
-     * to detect standalone ESC key (50ms is typical escape sequence timeout) */
+    /// If parser is accumulating an escape sequence, use a shorter timeout
+    /// to detect standalone ESC key (50ms is typical escape sequence timeout)
     if (interface->sequence_parser) {
         lle_parser_state_t parser_state =
             lle_sequence_parser_get_state(interface->sequence_parser);
         if (parser_state != LLE_PARSER_STATE_NORMAL) {
-            /* Parser is waiting for more sequence bytes - use 60ms timeout
-             * (slightly longer than the 50ms sequence timeout to ensure we
-             * detect it) */
+            /// Parser is waiting for more sequence bytes - use 60ms timeout
+            /// (slightly longer than the 50ms sequence timeout to ensure we
+            /// detect it)
             if (effective_timeout_ms == UINT32_MAX ||
                 effective_timeout_ms > 60) {
                 effective_timeout_ms = 60;
@@ -1100,10 +1096,10 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
 
     /// Use comprehensive sequence parser if available
     if (interface->sequence_parser) {
-        /* Check if parser is accumulating a sequence or if this is ESC/control
-         * char IMPORTANT: Don't send standalone control chars (Ctrl-A through
-         * Ctrl-Z, Enter, etc.) to parser unless we're already accumulating an
-         * escape sequence. Only ESC (0x1B) should initiate parsing. */
+        /// Check if parser is accumulating a sequence or if this is ESC/control
+        /// char IMPORTANT: Don't send standalone control chars (Ctrl-A through
+        /// Ctrl-Z, Enter, etc.) to parser unless we're already accumulating an
+        /// escape sequence. Only ESC (0x1B) should initiate parsing.
         lle_parser_state_t parser_state =
             lle_sequence_parser_get_state(interface->sequence_parser);
         bool parser_accumulating = (parser_state != LLE_PARSER_STATE_NORMAL);
@@ -1114,8 +1110,8 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             lle_parsed_input_t *parsed_input = NULL;
             char byte_buffer[1] = {(char)first_byte};
 
-            /* Save parser buffer BEFORE process_data (in case it needs to be
-             * retrieved) */
+            /// Save parser buffer BEFORE process_data (in case it needs to be
+            /// retrieved)
             const char *pre_buffer = NULL;
             size_t pre_buffer_len = 0;
             lle_sequence_parser_get_buffer(interface->sequence_parser,
@@ -1145,19 +1141,18 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
 
             if (parsed_input) {
                 /// Parser returned a complete sequence
-                /* Note: Parser has already reset its buffer, but we saved it
-                 * beforehand */
+                /// Note: Parser has already reset its buffer, but we saved it
+                /// beforehand
 
                 /// Add the last byte we just processed to the saved buffer
                 if (saved_len < sizeof(saved_buffer)) {
                     saved_buffer[saved_len++] = first_byte;
                 }
 
-                /* Try key_detector if:
-                 * 1. It's a generic SEQUENCE type, OR
-                 * 2. It's a KEY type but with unknown/zero keycode (parser
-                 * didn't identify it)
-                 */
+                /// Try key_detector if:
+                /// 1. It's a generic SEQUENCE type, OR
+                /// 2. It's a KEY type but with unknown/zero keycode (parser
+                /// didn't identify it)
                 bool should_try_detector = false;
                 if (parsed_input->type == LLE_PARSED_INPUT_TYPE_SEQUENCE) {
                     should_try_detector = true;
@@ -1177,8 +1172,8 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                             &key_info);
 
                     if (detect_result == LLE_SUCCESS && key_info) {
-                        /* Successfully identified the key - update parsed_input
-                         */
+                        /// Successfully identified the key - update
+                        /// parsed_input
                         parsed_input->type = LLE_PARSED_INPUT_TYPE_KEY;
                         parsed_input->data.key_info = *key_info;
                         lle_pool_free(key_info);
@@ -1193,8 +1188,8 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             }
 
             /// Parser is accumulating a sequence - check for timeout first
-            /* If ESC key was pressed and enough time has passed, return ESC as
-             * standalone key */
+            /// If ESC key was pressed and enough time has passed, return ESC as
+            /// standalone key
             lle_parsed_input_t *timeout_input = NULL;
             lle_result_t timeout_result = lle_sequence_parser_check_timeout(
                 interface->sequence_parser,
@@ -1214,8 +1209,8 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             event->timestamp = lle_get_current_time_microseconds();
             return LLE_SUCCESS;
         }
-        /* else: regular character, parser not accumulating - fall through to
-         * UTF-8 handling */
+        /// else: regular character, parser not accumulating - fall through to
+        /// UTF-8 handling
     }
 
     /// Check for escape sequences (ESC = 0x1B = 27)
@@ -1280,8 +1275,8 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                         }
                         break;
                     default:
-                        /* Unknown CSI sequence - fall through to return as
-                         * character */
+                        /// Unknown CSI sequence - fall through to return as
+                        /// character
                         break;
                     }
                 }
@@ -1309,14 +1304,15 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
                 }
             } else if (read2 == 1 && second_byte >= 0x20 &&
                        second_byte < 0x7F) {
-                /* ESC + printable ASCII character = Meta/Alt + character
-                 * This is how macOS Terminal and other terminals send Alt+key
-                 * when the Option key is configured as Meta, or when user
-                 * physically presses ESC then a letter (e.g., ESC f for Alt-f).
-                 *
-                 * Range 0x20-0x7E covers printable ASCII (space through tilde).
-                 * This enables M-f (forward-word), M-b (backward-word), etc.
-                 */
+                /// ESC + printable ASCII character = Meta/Alt + character
+                /// This is how macOS Terminal and other terminals send Alt+key
+                /// when the Option key is configured as Meta, or when user
+                /// physically presses ESC then a letter (e.g., ESC f for
+                /// Alt-f).
+                ///
+                /// Range 0x20-0x7E covers printable ASCII (space through
+                /// tilde). This enables M-f (forward-word), M-b
+                /// (backward-word), etc.
                 event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
                 event->timestamp = lle_get_current_time_microseconds();
                 event->data.special_key.key = LLE_KEY_UNKNOWN;
@@ -1326,9 +1322,9 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
             }
         }
 
-        /* If we get here, it's just a plain ESC key (no second byte within
-         * timeout) or an unrecognized sequence - return ESC as a regular
-         * character */
+        /// If we get here, it's just a plain ESC key (no second byte within
+        /// timeout) or an unrecognized sequence - return ESC as a regular
+        /// character
     }
 
     /// Decode UTF-8 character
@@ -1348,18 +1344,17 @@ lle_result_t lle_unix_interface_read_event(lle_unix_interface_t *interface,
         return decode_result;
     }
 
-    /* Check if this is a Ctrl+letter combination (0x01-0x1A = Ctrl-A through
-     * Ctrl-Z) According to spec, these should be SPECIAL_KEY events with
-     * keycode and modifiers EXCEPT for special control characters that have
-     * their own meaning:
-     * - 0x09 (Tab / Ctrl-I)
-     * - 0x0A (Newline / Ctrl-J)
-     * - 0x0D (Enter / Ctrl-M)
-     */
+    /// Check if this is a Ctrl+letter combination (0x01-0x1A = Ctrl-A through
+    /// Ctrl-Z) According to spec, these should be SPECIAL_KEY events with
+    /// keycode and modifiers EXCEPT for special control characters that have
+    /// their own meaning:
+    /// - 0x09 (Tab / Ctrl-I)
+    /// - 0x0A (Newline / Ctrl-J)
+    /// - 0x0D (Enter / Ctrl-M)
     if (codepoint >= 0x01 && codepoint <= 0x1A && codepoint != 0x09 &&
         codepoint != 0x0A && codepoint != 0x0D) {
-        /* Ctrl+letter: Convert to SPECIAL_KEY event with keycode and
-         * LLE_MOD_CTRL */
+        /// Ctrl+letter: Convert to SPECIAL_KEY event with keycode and
+        /// LLE_MOD_CTRL
         event->type = LLE_INPUT_TYPE_SPECIAL_KEY;
         event->timestamp = lle_get_current_time_microseconds();
         event->data.special_key.key =

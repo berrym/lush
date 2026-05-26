@@ -433,9 +433,9 @@ int get_signal_number(const char *signame) {
         return 0; /// Special case for EXIT trap
     }
 
-    /* Bash-style pseudo-signals: not real kernel signals, dispatched
-     * by the executor at well-known points (after a command for ERR,
-     * before a command for DEBUG, on function return for RETURN). */
+    /// Bash-style pseudo-signals: not real kernel signals, dispatched
+    /// by the executor at well-known points (after a command for ERR,
+    /// before a command for DEBUG, on function return for RETURN).
     if (strcmp(signame, "ERR") == 0) {
         return TRAP_PSEUDO_ERR;
     }
@@ -485,13 +485,13 @@ static void run_trap_command(const char *command) {
  * with no ERR trap registered -- a quick lookup and return.
  */
 void fire_err_trap(void) {
-    /* Bash's `set -o errtrace` (`-E`) gates trap inheritance into
-     * function bodies: when errtrace is OFF and execution is inside a
-     * function scope, the parent shell's ERR trap is suppressed.
-     * Without errtrace the trap is reset to default within function
-     * bodies; with it, the trap follows execution into nested
-     * contexts. The check is one-sided here -- if errtrace is on, or
-     * we're at top-level scope, the trap fires normally. */
+    /// Bash's `set -o errtrace` (`-E`) gates trap inheritance into
+    /// function bodies: when errtrace is OFF and execution is inside a
+    /// function scope, the parent shell's ERR trap is suppressed.
+    /// Without errtrace the trap is reset to default within function
+    /// bodies; with it, the trap follows execution into nested
+    /// contexts. The check is one-sided here -- if errtrace is on, or
+    /// we're at top-level scope, the trap fires normally.
     if (!shell_opts.errtrace &&
         symtable_in_function_scope(symtable_manager())) {
         return;
@@ -550,17 +550,17 @@ void execute_pending_traps(void) {
         return;
     }
 
-    /* Clear all pending bits before executing (if a new signal arrives
-     * during execution, it will set the bit again for next iteration) */
+    /// Clear all pending bits before executing (if a new signal arrives
+    /// during execution, it will set the bit again for next iteration)
     pending_trap_signals = 0;
 
     for (int signo = 1; signo < 32; signo++) {
         if (pending & (1 << signo)) {
             trap_entry_t *trap = find_trap(signo);
             if (trap && trap->command) {
-                /* Trap commands are fire-and-forget; their exit status
-                 * is propagated by the surrounding shell context, not by
-                 * this trap dispatch. */
+                /// Trap commands are fire-and-forget; their exit status
+                /// is propagated by the surrounding shell context, not by
+                /// this trap dispatch.
                 run_trap_command(trap->command);
             }
         }
@@ -576,9 +576,9 @@ void execute_pending_traps(void) {
 void execute_exit_traps(void) {
     trap_entry_t *trap = find_trap(0); /// EXIT is signal 0
     if (trap && trap->command) {
-        /* Run in the current shell via the global executor so user
-         * functions, variables, and options are in scope. Exit-trap
-         * status is not propagated. */
+        /// Run in the current shell via the global executor so user
+        /// functions, variables, and options are in scope. Exit-trap
+        /// status is not propagated.
         run_trap_command(trap->command);
     }
 

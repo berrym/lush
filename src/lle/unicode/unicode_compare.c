@@ -659,19 +659,15 @@ bool lle_unicode_is_prefix(const char *prefix, size_t prefix_len,
     lle_unicode_compare_options_t opts =
         options ? *options : LLE_UNICODE_COMPARE_DEFAULT;
 
-    /*
-     * Fast path: If no normalization needed, use simple byte comparison.
-     * This handles the common case of ASCII-only input efficiently.
-     */
+    /// Fast path: If no normalization needed, use simple byte comparison.
+    /// This handles the common case of ASCII-only input efficiently.
     if (!opts.normalize && !opts.case_insensitive) {
         return memcmp(prefix, str, prefix_len) == 0;
     }
 
-    /*
-     * Unicode-aware path: Normalize both strings and compare.
-     * We need to be careful about grapheme boundaries - the prefix
-     * should end at a grapheme boundary in the normalized form.
-     */
+    /// Unicode-aware path: Normalize both strings and compare.
+    /// We need to be careful about grapheme boundaries - the prefix
+    /// should end at a grapheme boundary in the normalized form.
 #define PREFIX_NORM_BUF_SIZE 4096
     char norm_prefix[PREFIX_NORM_BUF_SIZE];
     char norm_str[PREFIX_NORM_BUF_SIZE];
@@ -713,11 +709,9 @@ bool lle_unicode_is_prefix(const char *prefix, size_t prefix_len,
         return false;
     }
 
-    /*
-     * Compare codepoint by codepoint, optionally with case folding.
-     * Track position in both strings to ensure we match exactly
-     * norm_prefix_len worth of normalized prefix.
-     */
+    /// Compare codepoint by codepoint, optionally with case folding.
+    /// Track position in both strings to ensure we match exactly
+    /// norm_prefix_len worth of normalized prefix.
     const char *pp = norm_prefix;
     const char *pp_end = norm_prefix + norm_prefix_len;
     const char *sp = norm_str;

@@ -65,8 +65,8 @@ void lle_completion_system_destroy(lle_completion_system_t *system) {
         lle_source_manager_free(system->source_manager);
     }
 
-    /* Free menu state (must be freed before current_state since menu
-     * references result owned by current_state) */
+    /// Free menu state (must be freed before current_state since menu
+    /// references result owned by current_state)
     if (system->menu) {
         lle_completion_menu_state_free(system->menu);
         system->menu = NULL;
@@ -90,9 +90,9 @@ void lle_completion_system_clear(lle_completion_system_t *system) {
         return;
     }
 
-    /* Free menu first (must be freed before state since menu references
-     * result owned by state). The display_controller should have already
-     * cleared its reference before calling this function. */
+    /// Free menu first (must be freed before state since menu references
+    /// result owned by state). The display_controller should have already
+    /// cleared its reference before calling this function.
     if (system->menu) {
         lle_completion_menu_state_free(system->menu);
         system->menu = NULL;
@@ -279,9 +279,9 @@ lle_completion_system_generate(lle_completion_system_t *system,
         res = lle_completion_menu_state_create(system->pool, result,
                                                &menu_config, &menu);
         if (res != LLE_SUCCESS) {
-            /* state owns result and context, so freeing state frees them too.
-             * Do NOT call result_free or context_free separately - that would
-             * be a double-free. */
+            /// state owns result and context, so freeing state frees them too.
+            /// Do NOT call result_free or context_free separately - that would
+            /// be a double-free.
             lle_completion_state_free(state);
             return res;
         }

@@ -12,11 +12,10 @@
 #include "lle/lle_shell_integration.h"
 
 int display_lle_reset(int argc, char **argv) {
-    /* LLE reset commands (Spec 26: Three-tier reset hierarchy)
-     * - reset        : Hard reset (destroy/recreate editor)
-     * - reset --soft : Soft reset (abort current line)
-     * - reset --terminal : Nuclear reset (hard + terminal reset)
-     */
+    /// LLE reset commands (Spec 26: Three-tier reset hierarchy)
+    /// - reset        : Hard reset (destroy/recreate editor)
+    /// - reset --soft : Soft reset (abort current line)
+    /// - reset --terminal : Nuclear reset (hard + terminal reset)
     if (!lle_is_active()) {
         fprintf(stderr, "display lle reset: LLE shell integration not "
                         "initialized\n");

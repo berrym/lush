@@ -459,21 +459,22 @@ void ssh_hosts_refresh(void) {
 
     char path[1024];
 
-    /* Source list matches docs/COMPLETION_SYSTEM.md §SSH host
-     * completion. Order matters: ssh_host_cache_find dedupes by
-     * hostname and earlier entries win, so higher-priority sources are
-     * read first.
-     *
-     *   1. ~/.ssh/config            -- user-curated Host stanzas (pri 100)
-     *   2. ~/.ssh/known_hosts       -- hosts the user has connected to (pri 50)
-     *   3. /etc/ssh/ssh_known_hosts -- system-wide known hosts (pri 50)
-     *   4. /etc/hosts               -- NSS hostname database (pri 20)
-     *
-     * Note: /etc/ssh/ssh_config (SSH *client* config) is intentionally
-     * NOT a source -- the doc only promises the four files above and
-     * sysadmin-defined Host stanzas in the client config are unusual
-     * enough that they should be opted into by the user copying the
-     * relevant stanzas to ~/.ssh/config. */
+    /// Source list matches docs/COMPLETION_SYSTEM.md §SSH host
+    /// completion. Order matters: ssh_host_cache_find dedupes by
+    /// hostname and earlier entries win, so higher-priority sources are
+    /// read first.
+    ///
+    ///   1. ~/.ssh/config            -- user-curated Host stanzas (pri 100)
+    ///   2. ~/.ssh/known_hosts       -- hosts the user has connected to (pri
+    ///   50)
+    ///   3. /etc/ssh/ssh_known_hosts -- system-wide known hosts (pri 50)
+    ///   4. /etc/hosts               -- NSS hostname database (pri 20)
+    ///
+    /// Note: /etc/ssh/ssh_config (SSH *client* config) is intentionally
+    /// NOT a source -- the doc only promises the four files above and
+    /// sysadmin-defined Host stanzas in the client config are unusual
+    /// enough that they should be opted into by the user copying the
+    /// relevant stanzas to ~/.ssh/config.
 
     /// User SSH config
     snprintf(path, sizeof(path), "%s/.ssh/config", home);

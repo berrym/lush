@@ -774,8 +774,8 @@ static int test_step_out_sets_mode(void) {
     ctx->stack_depth = 3;
 
     debug_step_out(ctx);
-    /* Step-out keeps single-stepping, but suppressed until the stack
-     * unwinds past the current frame: target depth is stack_depth - 1. */
+    /// Step-out keeps single-stepping, but suppressed until the stack
+    /// unwinds past the current frame: target depth is stack_depth - 1.
     ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);
     ASSERT(ctx->step_mode);
     ASSERT_EQ(ctx->step_target_depth, 2);
@@ -1836,8 +1836,8 @@ static int test_step_mode_transitions(void) {
     ASSERT_EQ(ctx->mode, DEBUG_MODE_CONTINUE);
     ASSERT(!ctx->step_mode);
 
-    /* Step into again, then step out -- step-out keeps stepping, with
-     * a target depth one frame shallower than the current one. */
+    /// Step into again, then step out -- step-out keeps stepping, with
+    /// a target depth one frame shallower than the current one.
     debug_step_into(ctx);
     debug_step_out(ctx);
     ASSERT_EQ(ctx->mode, DEBUG_MODE_STEP_OVER);

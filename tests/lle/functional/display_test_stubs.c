@@ -203,8 +203,8 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
             *expanded_count = 0;
         return NULL;
     }
-    /* Pass-through: return a single-element array with the pattern.
-     * Matches the no-brace path of the real implementation. */
+    /// Pass-through: return a single-element array with the pattern.
+    /// Matches the no-brace path of the real implementation.
     char **r = malloc(sizeof(char *) * 2);
     if (!r) {
         *expanded_count = 0;

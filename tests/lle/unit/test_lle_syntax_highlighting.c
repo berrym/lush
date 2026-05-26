@@ -465,8 +465,8 @@ TEST(path_invalid_missing) {
     lle_syntax_highlighter_t *h = NULL;
     lle_syntax_highlighter_create(&h);
 
-    /* This path can never collide with a real fixture -- the random
-     * suffix is chosen at compile time. */
+    /// This path can never collide with a real fixture -- the random
+    /// suffix is chosen at compile time.
     const char *input = "cat /tmp/lush_definitely_not_present_z9q3pq/x";
     lle_syntax_highlight(h, input, strlen(input));
 
@@ -499,8 +499,8 @@ TEST(path_dequote_backslash_space) {
         return;
     }
 
-    /* Create a file whose name contains spaces, exactly the case
-     * users hit when invoking `cat /tmp/foo/a\ test\ file.txt`. */
+    /// Create a file whose name contains spaces, exactly the case
+    /// users hit when invoking `cat /tmp/foo/a\ test\ file.txt`.
     char file[512];
     snprintf(file, sizeof(file), "%s/a test file.txt", dir);
     FILE *fp = fopen(file, "w");
@@ -554,8 +554,8 @@ TEST(path_shape_relative_dir) {
         return;
     }
 
-    /* chdir into the parent of the test dir so `./<basename>` is a
-     * valid relative path to a real directory. */
+    /// chdir into the parent of the test dir so `./<basename>` is a
+    /// valid relative path to a real directory.
     char *saved_cwd = getcwd(NULL, 0);
     if (chdir("/tmp") != 0) {
         free(saved_cwd);
@@ -575,9 +575,9 @@ TEST(path_shape_relative_dir) {
 
     lle_syntax_token_type_t type = find_path_token(h);
 
-    /* Restore cwd before any assertion path that would skip cleanup.
-     * Best-effort: if chdir fails here the test still runs to its
-     * verdict; the harness will catch any cross-test cwd corruption. */
+    /// Restore cwd before any assertion path that would skip cleanup.
+    /// Best-effort: if chdir fails here the test still runs to its
+    /// verdict; the harness will catch any cross-test cwd corruption.
     if (saved_cwd) {
         (void)!chdir(saved_cwd);
         free(saved_cwd);
@@ -612,8 +612,8 @@ TEST(path_shape_home_dir) {
         return;
     }
 
-    /* Create a subdir inside the temp dir, then point HOME at the
-     * temp dir so `~/sub` resolves to it. */
+    /// Create a subdir inside the temp dir, then point HOME at the
+    /// temp dir so `~/sub` resolves to it.
     char sub[512];
     snprintf(sub, sizeof(sub), "%s/sub", dir);
     if (mkdir(sub, 0755) != 0) {
@@ -843,8 +843,8 @@ TEST(path_implicit_tilde_user) {
     }
     struct stat st;
     if (stat(pw->pw_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
-        /* User's home dir doesn't exist or isn't a directory --
-         * unusual but skip rather than fail spuriously. */
+        /// User's home dir doesn't exist or isn't a directory --
+        /// unusual but skip rather than fail spuriously.
         TEST_PASS();
         lle_syntax_highlighter_destroy(h);
         return;

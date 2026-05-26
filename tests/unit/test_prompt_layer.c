@@ -241,8 +241,8 @@ static int test_destroy_twice(void) {
     ASSERT_NOT_NULL(layer);
 
     prompt_layer_destroy(layer);
-    /* Second call with same pointer would be undefined, but we test
-       that the first destroy doesn't crash */
+    /// Second call with same pointer would be undefined, but we test
+    ///        that the first destroy doesn't crash
     return 1;
 }
 
@@ -710,8 +710,7 @@ static int test_get_rendered_content_preserves_content(void) {
         prompt_layer_get_rendered_content(layer, output, sizeof(output));
 
     ASSERT_EQ(result, PROMPT_LAYER_SUCCESS);
-    /* Output should contain the original content (possibly with theme colors)
-     */
+    /// Output should contain the original content (possibly with theme colors)
     ASSERT(strstr(output, "test") != NULL || strstr(output, "$") != NULL);
 
     prompt_layer_destroy(layer);

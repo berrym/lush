@@ -169,12 +169,12 @@ lle_result_t lle_editor_create(lle_editor_t **editor,
     ed->history_search_direction = 0;
     ed->quoted_insert_mode = false;
 
-    /* === Widget System Initialization (Spec 07) === */
+    /// === Widget System Initialization (Spec 07) ===
     /// Initialize widget registry for ZSH-style widget system
     result = lle_widget_registry_init(&ed->widget_registry, ed->lle_pool);
     if (result != LLE_SUCCESS) {
-        /* Widget system initialization failed - non-fatal, continue without
-         * widgets */
+        /// Widget system initialization failed - non-fatal, continue without
+        /// widgets
         ed->widget_registry = NULL;
         ed->widget_hooks_manager = NULL;
     } else {

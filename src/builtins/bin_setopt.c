@@ -104,14 +104,14 @@ int bin_setopt(int argc, char **argv) {
         }
 
         if (query_mode) {
-            /* For query, return status based on the *aliased* sense:
-             * `setopt -q bsd_echo` is true when xpg_echo is OFF. */
+            /// For query, return status based on the *aliased* sense:
+            /// `setopt -q bsd_echo` is true when xpg_echo is OFF.
             bool effective = shell_mode_allows(feature) ^ invert;
             return effective ? 0 : 1;
         }
 
-        /* Enable from the alias's perspective; flip on the underlying
-         * feature when the alias is inverted. */
+        /// Enable from the alias's perspective; flip on the underlying
+        /// feature when the alias is inverted.
         bool target_value = !invert;
         if (target_value) {
             shell_feature_enable(feature);

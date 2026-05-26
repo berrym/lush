@@ -202,10 +202,10 @@ void dc_reset_prompt_display_state(void) {
         screen_buffer_clear(&desired_screen);
     }
 
-    /* Reset command_layer's update_sequence_number so next render is treated
-     * as "first render" and publishes REDRAW_NEEDED even if buffer is empty.
-     * Without this, empty-to-empty transitions (like Ctrl+G on empty buffer)
-     * would skip the event and prompt wouldn't be drawn. */
+    /// Reset command_layer's update_sequence_number so next render is treated
+    /// as "first render" and publishes REDRAW_NEEDED even if buffer is empty.
+    /// Without this, empty-to-empty transitions (like Ctrl+G on empty buffer)
+    /// would skip the event and prompt wouldn't be drawn.
     display_controller_t *dc = display_integration_get_controller();
     if (dc && dc->compositor && dc->compositor->command_layer) {
         dc->compositor->command_layer->update_sequence_number = 0;
@@ -246,30 +246,27 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
         return false;
     }
 
-    /* Block SIGWINCH during terminal output to prevent mid-sequence corruption
-     */
+    /// Block SIGWINCH during terminal output to prevent mid-sequence corruption
     sigset_t block_set, old_set;
     sigemptyset(&block_set);
     sigaddset(&block_set, SIGWINCH);
     sigprocmask(SIG_BLOCK, &block_set, &old_set);
 
-    /*
-     * Transient Prompt Replacement (Spec 25 Section 12)
-     *
-     * Replace the current (fancy) prompt with a minimal transient prompt
-     * while preserving the command text. This simplifies scrollback history.
-     *
-     * Current state (from current_screen):
-     * - command_start_row: row where command starts (0 = same line as prompt)
-     * - cursor_row: current cursor row (last row of display)
-     * - We need to go back and redraw everything from row 0
-     *
-     * Algorithm:
-     * 1. Move cursor up to row 0, column 1
-     * 2. Clear from there to end of screen
-     * 3. Write transient prompt + command text
-     * 4. Update screen buffer to reflect new state
-     */
+    /// Transient Prompt Replacement (Spec 25 Section 12)
+    ///
+    /// Replace the current (fancy) prompt with a minimal transient prompt
+    /// while preserving the command text. This simplifies scrollback history.
+    ///
+    /// Current state (from current_screen):
+    /// - command_start_row: row where command starts (0 = same line as prompt)
+    /// - cursor_row: current cursor row (last row of display)
+    /// - We need to go back and redraw everything from row 0
+    ///
+    /// Algorithm:
+    /// 1. Move cursor up to row 0, column 1
+    /// 2. Clear from there to end of screen
+    /// 3. Write transient prompt + command text
+    /// 4. Update screen buffer to reflect new state
 
     int total_rows = current_screen.cursor_row + 1;
     char seq_buf[32];
@@ -330,14 +327,14 @@ bool dc_apply_transient_prompt(const char *transient_prompt,
         }
     }
 
-    /* Step 6: Update screen buffer to reflect new state
-     * Re-render with transient prompt so current_screen is accurate */
+    /// Step 6: Update screen buffer to reflect new state
+    /// Re-render with transient prompt so current_screen is accurate
     size_t cursor_offset = command_text ? strlen(command_text) : 0;
     screen_buffer_render(&current_screen, transient_prompt,
                          command_text ? command_text : "", cursor_offset);
 
-    /* Mark that we handled this - prompt_rendered stays true since we
-     * wrote a prompt, but next dc_reset_prompt_display_state will clear it */
+    /// Mark that we handled this - prompt_rendered stays true since we
+    /// wrote a prompt, but next dc_reset_prompt_display_state will clear it
 
     (void)total_rows; /// Used for documentation, may use later
 
@@ -363,25 +360,23 @@ void dc_get_prompt_metrics(int *prompt_lines, int *total_lines,
         return;
     }
 
-    /*
-     * current_screen contains the last rendered state:
-     * - command_start_row: row where command text starts (0-based)
-     * - command_start_col: column where command text starts
-     * - cursor_row: current cursor row (0-based)
-     *
-     * For a single-line prompt "$ cmd":
-     *   command_start_row = 0, command_start_col > 0
-     *   prompt occupies part of row 0
-     *
-     * For a two-line prompt:
-     *   Line 0: "[user@host] ~/path"
-     *   Line 1: "$ cmd"
-     *   command_start_row = 1, prompt occupies rows 0-1
-     *
-     * prompt_lines = command_start_row + 1 (since it's 0-indexed)
-     * But if command_start_row == 0, prompt shares line with command,
-     * so prompt_lines = 1.
-     */
+    /// current_screen contains the last rendered state:
+    /// - command_start_row: row where command text starts (0-based)
+    /// - command_start_col: column where command text starts
+    /// - cursor_row: current cursor row (0-based)
+    ///
+    /// For a single-line prompt "$ cmd":
+    ///   command_start_row = 0, command_start_col > 0
+    ///   prompt occupies part of row 0
+    ///
+    /// For a two-line prompt:
+    ///   Line 0: "[user@host] ~/path"
+    ///   Line 1: "$ cmd"
+    ///   command_start_row = 1, prompt occupies rows 0-1
+    ///
+    /// prompt_lines = command_start_row + 1 (since it's 0-indexed)
+    /// But if command_start_row == 0, prompt shares line with command,
+    /// so prompt_lines = 1.
     if (prompt_lines) {
         *prompt_lines = current_screen.command_start_row + 1;
     }
@@ -447,9 +442,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
     }
 
-    /* Block SIGWINCH during rendering to prevent a resize signal from
-     * interrupting mid-escape-sequence, which corrupts terminal state.
-     * The signal will be delivered after we restore the mask. */
+    /// Block SIGWINCH during rendering to prevent a resize signal from
+    /// interrupting mid-escape-sequence, which corrupts terminal state.
+    /// The signal will be delivered after we restore the mask.
     sigset_t block_set, old_set;
     sigemptyset(&block_set);
     sigaddset(&block_set, SIGWINCH);
@@ -490,8 +485,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         return LAYER_EVENTS_ERROR_INVALID_PARAM;
     }
 
-    /* Render completion menu if active (Proper Architecture - Spec 12)
-     * Menu is now composed at display time, not baked into command text */
+    /// Render completion menu if active (Proper Architecture - Spec 12)
+    /// Menu is now composed at display time, not baked into command text
     char menu_buffer[8192] = {0};
     char *menu_text = NULL;
 
@@ -511,17 +506,16 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* CONTINUATION PROMPT SUPPORT:
-     *
-     * Use screen_buffer_render_with_continuation() which calls back on each
-     * newline to get the context-aware continuation prompt. This is the
-     * architecturally correct approach: prompts are set at the exact visual row
-     * where each newline lands during character-by-character rendering, not
-     * pre-calculated.
-     *
-     * The callback receives the plain text of each line (ANSI stripped) and
-     * updates the continuation state to determine the appropriate prompt.
-     */
+    /// CONTINUATION PROMPT SUPPORT:
+    ///
+    /// Use screen_buffer_render_with_continuation() which calls back on each
+    /// newline to get the context-aware continuation prompt. This is the
+    /// architecturally correct approach: prompts are set at the exact visual
+    /// row where each newline lands during character-by-character rendering,
+    /// not pre-calculated.
+    ///
+    /// The callback receives the plain text of each line (ANSI stripped) and
+    /// updates the continuation state to determine the appropriate prompt.
     int newline_count = count_newlines(command_buffer);
     bool is_multiline = (newline_count > 0);
 
@@ -557,30 +551,30 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Pass RPROMPT to screen_buffer for fit calculation.
-     * Must be done after screen_buffer_render() so command_start_col is valid.
-     * The RPROMPT text comes from the shell integration layer which expands
-     * RPROMPT/RPS1 through the Spec 28 two-pass engine. */
+    /// Pass RPROMPT to screen_buffer for fit calculation.
+    /// Must be done after screen_buffer_render() so command_start_col is valid.
+    /// The RPROMPT text comes from the shell integration layer which expands
+    /// RPROMPT/RPS1 through the Spec 28 two-pass engine.
     const char *rprompt = lle_shell_get_rendered_rprompt();
     if (rprompt && rprompt[0]) {
         screen_buffer_set_rprompt(&desired_screen, rprompt);
     }
 
-    /* Add menu rows to screen_buffer per SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md
-     *
-     * This is the key fix: by adding menu rows to screen_buffer AFTER rendering
-     * command text, the buffer knows the total display height. This allows
-     * screen_buffer_get_rows_below_cursor() to return the correct value for
-     * cursor positioning, fixing the "upward row consumption" bug.
-     *
-     * Cursor position (cursor_row, cursor_col) stays in the command area -
-     * menu rows are added AFTER and don't affect cursor tracking.
-     */
+    /// Add menu rows to screen_buffer per
+    /// SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md
+    ///
+    /// This is the key fix: by adding menu rows to screen_buffer AFTER
+    /// rendering command text, the buffer knows the total display height. This
+    /// allows screen_buffer_get_rows_below_cursor() to return the correct value
+    /// for cursor positioning, fixing the "upward row consumption" bug.
+    ///
+    /// Cursor position (cursor_row, cursor_col) stays in the command area -
+    /// menu rows are added AFTER and don't affect cursor tracking.
     int menu_rows_added = 0;
     if (menu_text && *menu_text) {
-        /* Add menu starting at row after command ends.
-         * Note: We add a newline before menu, so start at num_rows (which is
-         * one past the last command row). */
+        /// Add menu starting at row after command ends.
+        /// Note: We add a newline before menu, so start at num_rows (which is
+        /// one past the last command row).
         int menu_start_row = desired_screen.num_rows;
         menu_rows_added = screen_buffer_add_text_rows(
             &desired_screen, menu_start_row, menu_text);
@@ -590,9 +584,9 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                  menu_start_row, menu_rows_added, desired_screen.num_rows);
     }
 
-    /* Get notification text if visible and add to screen_buffer for proper
-     * tracking Following the same pattern as menu to ensure correct cursor
-     * positioning */
+    /// Get notification text if visible and add to screen_buffer for proper
+    /// tracking Following the same pattern as menu to ensure correct cursor
+    /// positioning
     char notification_buffer[LLE_NOTIFICATION_MAX_STYLED];
     const char *notification_text = NULL;
     int notification_rows_added = 0;
@@ -617,16 +611,15 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* PROMPT-ONCE ARCHITECTURE per MODERN_EDITOR_WRAPPING_RESEARCH.md
-     *
-     * This implements the proven approach used by Replxx, Fish, and ZLE:
-     * 1. Prompt is drawn ONCE on first render and NEVER redrawn
-     * 2. Only the command text area is cleared and redrawn on updates
-     * 3. Absolute column positioning (\033[{n}G) is used instead of \r
-     *
-     * Key principle: Never move cursor to column 0 after first render,
-     * as this would allow \033[J to clear the prompt.
-     */
+    /// PROMPT-ONCE ARCHITECTURE per MODERN_EDITOR_WRAPPING_RESEARCH.md
+    ///
+    /// This implements the proven approach used by Replxx, Fish, and ZLE:
+    /// 1. Prompt is drawn ONCE on first render and NEVER redrawn
+    /// 2. Only the command text area is cleared and redrawn on updates
+    /// 3. Absolute column positioning (\033[{n}G) is used instead of \r
+    ///
+    /// Key principle: Never move cursor to column 0 after first render,
+    /// as this would allow \033[J to clear the prompt.
 
     /// First render only: Draw prompt once
     if (!prompt_rendered) {
@@ -636,12 +629,12 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         prompt_rendered = true;
     }
 
-    /* Every render (including first): Position to command start and redraw
-     * command */
+    /// Every render (including first): Position to command start and redraw
+    /// command
 
-    /* Step 1: Move to absolute column where command starts (after prompt)
-     * For multi-line prompts, use command_start_col from screen buffer
-     * Use \033[{n}G for absolute positioning (1-based indexing) */
+    /// Step 1: Move to absolute column where command starts (after prompt)
+    /// For multi-line prompts, use command_start_col from screen buffer
+    /// Use \033[{n}G for absolute positioning (1-based indexing)
     int command_start_col = desired_screen.command_start_col;
     char move_to_col[32];
     int col_len = snprintf(move_to_col, sizeof(move_to_col), "\033[%dG",
@@ -650,20 +643,20 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         dc_write_all(STDOUT_FILENO, move_to_col, col_len);
     }
 
-    /* Step 2: Handle ghost text/menu cleanup from previous render
-     *
-     * Problem: Ghost text (autosuggestions) may have wrapped to extra rows.
-     * After Step 5 of previous render, cursor was moved back to command cursor
-     * position. But the ghost text remains on screen below that.
-     *
-     * Solution: If previous render had extra rows (ghost text/menu), move DOWN
-     * to that row first, then clear, then move back up. This ensures we clear
-     * all the ghost text artifacts. */
+    /// Step 2: Handle ghost text/menu cleanup from previous render
+    ///
+    /// Problem: Ghost text (autosuggestions) may have wrapped to extra rows.
+    /// After Step 5 of previous render, cursor was moved back to command cursor
+    /// position. But the ghost text remains on screen below that.
+    ///
+    /// Solution: If previous render had extra rows (ghost text/menu), move DOWN
+    /// to that row first, then clear, then move back up. This ensures we clear
+    /// all the ghost text artifacts.
     int command_row = desired_screen.command_start_row;
 
     if (last_terminal_end_row > current_screen.cursor_row) {
-        /* Previous render had ghost text/menu extending below cursor position.
-         * Move DOWN to that row to clear from there. */
+        /// Previous render had ghost text/menu extending below cursor position.
+        /// Move DOWN to that row to clear from there.
         int rows_down = last_terminal_end_row - current_screen.cursor_row;
         DC_DEBUG("Step2: Moving DOWN %d rows to clear ghost text", rows_down);
         char move_down[32];
@@ -688,8 +681,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             }
         }
     } else if (current_screen.cursor_row > command_row) {
-        /* No ghost text overflow, but cursor is below command start - move up
-         */
+        /// No ghost text overflow, but cursor is below command start - move up
         int rows_up = current_screen.cursor_row - command_row;
         DC_DEBUG("Step2: Moving up %d rows", rows_up);
         char move_up[32];
@@ -699,20 +691,19 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Step 3: Clear from current position to end of screen
-     * This clears only the command area, never touches the prompt */
+    /// Step 3: Clear from current position to end of screen
+    /// This clears only the command area, never touches the prompt
     dc_write_all(STDOUT_FILENO, "\033[J", 3);
 
-    /* Step 3.5: Write RPROMPT (right-aligned on prompt row)
-     *
-     * RPROMPT occupies the right side of the prompt row. It's written after
-     * \033[J clears the command area (which also erases any previous RPROMPT),
-     * so we must redraw it every cycle.
-     *
-     * Sequence: move to rprompt_col, write RPROMPT, move back to command_start.
-     * Only on single-line prompts where command hasn't grown into RPROMPT
-     * space.
-     */
+    /// Step 3.5: Write RPROMPT (right-aligned on prompt row)
+    ///
+    /// RPROMPT occupies the right side of the prompt row. It's written after
+    /// \033[J clears the command area (which also erases any previous RPROMPT),
+    /// so we must redraw it every cycle.
+    ///
+    /// Sequence: move to rprompt_col, write RPROMPT, move back to
+    /// command_start. Only on single-line prompts where command hasn't grown
+    /// into RPROMPT space.
     if (desired_screen.rprompt_fits && desired_screen.rprompt_text[0]) {
         char rprompt_col_seq[16];
         int rprompt_col_len =
@@ -735,21 +726,20 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Step 4: Write command text with continuation prompts
-     *
-     * For multiline input, we need to insert continuation prompts after each
-     * newline. The screen_buffer has prefixes set at visual rows (accounting
-     * for wrapping), so we must track visual rows during output to find the
-     * correct prefix.
-     *
-     * This uses character-by-character tracking to match how
-     * screen_buffer_render calculated visual rows, ensuring prefixes appear on
-     * the correct lines.
-     */
+    /// Step 4: Write command text with continuation prompts
+    ///
+    /// For multiline input, we need to insert continuation prompts after each
+    /// newline. The screen_buffer has prefixes set at visual rows (accounting
+    /// for wrapping), so we must track visual rows during output to find the
+    /// correct prefix.
+    ///
+    /// This uses character-by-character tracking to match how
+    /// screen_buffer_render calculated visual rows, ensuring prefixes appear on
+    /// the correct lines.
     if (command_buffer[0]) {
         if (is_multiline) {
-            /* Write command text character by character, tracking visual rows
-             * to output continuation prompts at the correct positions */
+            /// Write command text character by character, tracking visual rows
+            /// to output continuation prompts at the correct positions
             size_t i = 0;
             size_t text_len = strlen(command_buffer);
             int visual_row = desired_screen.command_start_row;
@@ -758,8 +748,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
             while (i < text_len) {
                 unsigned char ch = (unsigned char)command_buffer[i];
 
-                /* Handle ANSI escape sequences - pass through without affecting
-                 * position */
+                /// Handle ANSI escape sequences - pass through without
+                /// affecting position
                 if (ch == '\033' || ch == '\x1b') {
                     size_t seq_start = i;
                     i++;
@@ -781,8 +771,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     continue;
                 }
 
-                /* Handle newlines - move to next visual row and output
-                 * continuation prompt */
+                /// Handle newlines - move to next visual row and output
+                /// continuation prompt
                 if (ch == '\n') {
                     dc_write_all(STDOUT_FILENO, "\n", 1);
                     visual_row++;
@@ -791,8 +781,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     const char *cont_prompt = screen_buffer_get_line_prefix(
                         &desired_screen, visual_row);
                     if (cont_prompt) {
-                        /* Reset ANSI state before writing continuation prompt
-                         */
+                        /// Reset ANSI state before writing continuation prompt
                         dc_write_all(STDOUT_FILENO, "\033[0m", 4);
                         dc_write_all(STDOUT_FILENO, cont_prompt,
                                      strlen(cont_prompt));
@@ -807,8 +796,7 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     continue;
                 }
 
-                /* Handle regular characters - track visual column for wrapping
-                 */
+                /// Handle regular characters - track visual column for wrapping
                 uint32_t codepoint;
                 int char_bytes = lle_utf8_decode_codepoint(
                     command_buffer + i, text_len - i, &codepoint);
@@ -826,8 +814,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
                     if (visual_col >= term_width) {
                         visual_row++;
                         visual_col = 0;
-                        /* Note: wrapped lines don't get continuation prompts,
-                         * only lines after explicit newlines do */
+                        /// Note: wrapped lines don't get continuation prompts,
+                        /// only lines after explicit newlines do
                     }
 
                     i += char_bytes;
@@ -848,17 +836,16 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Step 4a: Write autosuggestion ghost text (Fish-style)
-     *
-     * Conditions for showing ghost text:
-     * 1. Autosuggestions enabled and layer available
-     * 2. No completion menu visible (menu takes precedence)
-     * 3. Not multiline input (simplifies initial implementation)
-     * 4. Cursor is at end of command (checked by autosuggestions_layer)
-     *
-     * The ghost text appears in BRIGHT_BLACK (gray/dimmed) after the command.
-     * Cursor positioning (Step 5) will move cursor back to correct position.
-     */
+    /// Step 4a: Write autosuggestion ghost text (Fish-style)
+    ///
+    /// Conditions for showing ghost text:
+    /// 1. Autosuggestions enabled and layer available
+    /// 2. No completion menu visible (menu takes precedence)
+    /// 3. Not multiline input (simplifies initial implementation)
+    /// 4. Cursor is at end of command (checked by autosuggestions_layer)
+    ///
+    /// The ghost text appears in BRIGHT_BLACK (gray/dimmed) after the command.
+    /// Cursor positioning (Step 5) will move cursor back to correct position.
     if (controller->autosuggestions_enabled &&
         controller->autosuggestions_layer &&
         !controller->completion_menu_visible && !is_multiline) {
@@ -882,37 +869,36 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         dc_write_all(STDOUT_FILENO, menu_text, strlen(menu_text));
     }
 
-    /* Step 4c: Write notification below menu (if any)
-     * Notification is now tracked in screen_buffer like menu */
+    /// Step 4c: Write notification below menu (if any)
+    /// Notification is now tracked in screen_buffer like menu
     if (notification_text && *notification_text) {
         dc_write_all(STDOUT_FILENO, "\n", 1);
         dc_write_all(STDOUT_FILENO, notification_text,
                      strlen(notification_text));
     }
 
-    /* Step 5: Position cursor at the correct location
-     *
-     * After drawing command text, ghost text, and menu, terminal cursor is at
-     * the end. We need to position it where the user's cursor actually is (in
-     * the command).
-     *
-     * With the new architecture (per SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md):
-     * - Menu rows were added to desired_screen via
-     * screen_buffer_add_text_rows()
-     * - desired_screen.num_rows now includes menu rows
-     * - desired_screen.cursor_row is still in the command area (unaffected by
-     * menu)
-     * - screen_buffer_get_rows_below_cursor() gives us the exact count
-     *
-     * Ghost text is not yet tracked in screen_buffer, so we still calculate it
-     * separately.
-     */
+    /// Step 5: Position cursor at the correct location
+    ///
+    /// After drawing command text, ghost text, and menu, terminal cursor is at
+    /// the end. We need to position it where the user's cursor actually is (in
+    /// the command).
+    ///
+    /// With the new architecture (per SCREEN_BUFFER_MENU_INTEGRATION_PLAN.md):
+    /// - Menu rows were added to desired_screen via
+    /// screen_buffer_add_text_rows()
+    /// - desired_screen.num_rows now includes menu rows
+    /// - desired_screen.cursor_row is still in the command area (unaffected by
+    /// menu)
+    /// - screen_buffer_get_rows_below_cursor() gives us the exact count
+    ///
+    /// Ghost text is not yet tracked in screen_buffer, so we still calculate it
+    /// separately.
     int cursor_row = desired_screen.cursor_row;
     int cursor_col = desired_screen.cursor_col;
 
-    /* Calculate extra rows added by ghost text (autosuggestion)
-     * Ghost text may wrap to additional lines beyond the command text.
-     * TODO: Add ghost text to screen_buffer for unified tracking. */
+    /// Calculate extra rows added by ghost text (autosuggestion)
+    /// Ghost text may wrap to additional lines beyond the command text.
+    /// TODO: Add ghost text to screen_buffer for unified tracking.
     int ghost_text_extra_rows = 0;
     if (controller->autosuggestions_enabled &&
         controller->autosuggestions_layer &&
@@ -933,13 +919,12 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Calculate rows to move up using screen_buffer's tracked state.
-     *
-     * screen_buffer_get_rows_below_cursor() returns: (num_rows - 1) -
-     * cursor_row This accounts for menu rows AND notification rows that were
-     * added via screen_buffer_add_text_rows(). We still need to add
-     * ghost_text_extra_rows since those aren't in screen_buffer yet.
-     */
+    /// Calculate rows to move up using screen_buffer's tracked state.
+    ///
+    /// screen_buffer_get_rows_below_cursor() returns: (num_rows - 1) -
+    /// cursor_row This accounts for menu rows AND notification rows that were
+    /// added via screen_buffer_add_text_rows(). We still need to add
+    /// ghost_text_extra_rows since those aren't in screen_buffer yet.
     int rows_to_move_up = screen_buffer_get_rows_below_cursor(&desired_screen) +
                           ghost_text_extra_rows;
 
@@ -958,8 +943,8 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
         }
     }
 
-    /* Move to absolute column (never use \r - it goes to column 0!)
-     * Use \033[{n}G for absolute column positioning (1-based indexing) */
+    /// Move to absolute column (never use \r - it goes to column 0!)
+    /// Use \033[{n}G for absolute column positioning (1-based indexing)
     char col_seq[16];
     int col_seq_len =
         snprintf(col_seq, sizeof(col_seq), "\033[%dG", cursor_col + 1);
@@ -973,24 +958,24 @@ static layer_events_error_t dc_handle_redraw_needed(const layer_event_t *event,
     screen_buffer_copy(&current_screen, &desired_screen);
     prompt_rendered = true;
 
-    /* Track where the terminal display actually ends (including ghost
-     * text/menu/notification) This is needed by Step 2 on the next render to
-     * move up the correct amount.
-     *
-     * With menu AND notification rows now tracked in screen_buffer:
-     * - (num_rows - 1) gives the last row index in the buffer (includes menu
-     *   and notification)
-     * - ghost_text_extra_rows adds any additional wrapping from autosuggestions
-     */
+    /// Track where the terminal display actually ends (including ghost
+    /// text/menu/notification) This is needed by Step 2 on the next render to
+    /// move up the correct amount.
+    ///
+    /// With menu AND notification rows now tracked in screen_buffer:
+    /// - (num_rows - 1) gives the last row index in the buffer (includes menu
+    ///   and notification)
+    /// - ghost_text_extra_rows adds any additional wrapping from
+    /// autosuggestions
     last_terminal_end_row =
         (desired_screen.num_rows - 1) + ghost_text_extra_rows;
 
-    /* NOTE: fsync() was causing input timeouts after cursor positioning -
-     * removed stdout is line-buffered by default and terminal I/O doesn't need
-     * fsync */
+    /// NOTE: fsync() was causing input timeouts after cursor positioning -
+    /// removed stdout is line-buffered by default and terminal I/O doesn't need
+    /// fsync
 
-    /* Restore original signal mask - any pending SIGWINCH will be delivered now
-     */
+    /// Restore original signal mask - any pending SIGWINCH will be delivered
+    /// now
     sigprocmask(SIG_SETMASK, &old_set, NULL);
 
     return LAYER_EVENTS_SUCCESS;
@@ -1604,8 +1589,8 @@ display_controller_init(display_controller_t *controller,
     if (isatty(STDOUT_FILENO)) {
         base_terminal_error_t bt_result = base_terminal_init(base_terminal);
         if (bt_result != BASE_TERMINAL_SUCCESS) {
-            /* Non-fatal - will use default 80x24. Only log at debug level
-             * since this is expected when stdin is a pipe with -i flag. */
+            /// Non-fatal - will use default 80x24. Only log at debug level
+            /// since this is expected when stdin is a pipe with -i flag.
             DC_DEBUG("Base terminal init returned %d - using defaults",
                      bt_result);
         } else {
@@ -2687,10 +2672,9 @@ display_controller_error_t display_controller_set_completion_menu(
     DC_DEBUG("Completion menu set (visible: %d, columns: %zu)",
              controller->completion_menu_visible, menu_state->num_columns);
 
-    /* Menu state changed - mark that we need redraw even if command text
-     * unchanged This flag will be checked by command_layer to bypass its early
-     * return optimization
-     */
+    /// Menu state changed - mark that we need redraw even if command text
+    /// unchanged This flag will be checked by command_layer to bypass its early
+    /// return optimization
     controller->menu_state_changed = true;
 
     return DISPLAY_CONTROLLER_SUCCESS;
@@ -2712,8 +2696,8 @@ display_controller_clear_completion_menu(display_controller_t *controller) {
 
     DC_DEBUG("Completion menu cleared");
 
-    /* Menu state changed - mark that we need redraw even if command text
-     * unchanged */
+    /// Menu state changed - mark that we need redraw even if command text
+    /// unchanged
     controller->menu_state_changed = true;
 
     return DISPLAY_CONTROLLER_SUCCESS;
@@ -2761,21 +2745,20 @@ void display_controller_update_autosuggestion(display_controller_t *controller,
                                               size_t cursor_position,
                                               size_t buffer_length) {
 
-    /* DEPRECATED: This function uses the legacy autosuggestions system which
-     * relies on GNU readline history. Use
-     * display_controller_set_autosuggestion() with LLE history instead.
-     *
-     * This function is kept for backwards compatibility but is now a no-op
-     * when LLE is active. The actual suggestion generation happens in
-     * lle_readline.c using LLE history, then passed via set_autosuggestion().
-     */
+    /// DEPRECATED: This function uses the legacy autosuggestions system which
+    /// relies on GNU readline history. Use
+    /// display_controller_set_autosuggestion() with LLE history instead.
+    ///
+    /// This function is kept for backwards compatibility but is now a no-op
+    /// when LLE is active. The actual suggestion generation happens in
+    /// lle_readline.c using LLE history, then passed via set_autosuggestion().
     (void)controller;
     (void)buffer_content;
     (void)cursor_position;
     (void)buffer_length;
 
-    /* No-op: lle_readline now handles suggestion generation and calls
-     * display_controller_set_autosuggestion() directly */
+    /// No-op: lle_readline now handles suggestion generation and calls
+    /// display_controller_set_autosuggestion() directly
 }
 
 void display_controller_set_autosuggestion(display_controller_t *controller,

@@ -128,29 +128,29 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
         return 0;
     }
 
-    /* Always zero the results struct before any further early return
-     * so callers can safely call autocorrect_free_results() on it
-     * regardless of whether we found suggestions, ran at all, or
-     * bailed because autocorrect is disabled. The previous code
-     * exited on the !enabled check before the memset, leaving the
-     * caller with an uninitialised stack struct that free_results
-     * then passed to free() on the next "command not found" event
-     * (issue #60: bad-free in autocorrect_free_results). */
+    /// Always zero the results struct before any further early return
+    /// so callers can safely call autocorrect_free_results() on it
+    /// regardless of whether we found suggestions, ran at all, or
+    /// bailed because autocorrect is disabled. The previous code
+    /// exited on the !enabled check before the memset, leaving the
+    /// caller with an uninitialised stack struct that free_results
+    /// then passed to free() on the next "command not found" event
+    /// (issue #60: bad-free in autocorrect_free_results).
     memset(results, 0, sizeof(correction_results_t));
 
     if (!autocorrect_config.enabled) {
         return 0;
     }
 
-    /* Skip autocorrect in non-interactive shells. The "did you mean ...?"
-     * suggestions are useful only when the user reads them; in scripts
-     * and tight command-not-found loops they are wasted CPU. Per #84
-     * sample profile, autocorrect_suggest_path_commands accounts for
-     * ~95% of per-iteration cost in a `for ((;;)); do bad; done` loop
-     * because every iteration walks $PATH, stat()s every binary, and
-     * runs Damerau-Levenshtein fuzzy matching. Skipping in non-
-     * interactive mode eliminates the amplifier entirely; interactive
-     * users still get suggestions on real misspellings. */
+    /// Skip autocorrect in non-interactive shells. The "did you mean ...?"
+    /// suggestions are useful only when the user reads them; in scripts
+    /// and tight command-not-found loops they are wasted CPU. Per #84
+    /// sample profile, autocorrect_suggest_path_commands accounts for
+    /// ~95% of per-iteration cost in a `for ((;;)); do bad; done` loop
+    /// because every iteration walks $PATH, stat()s every binary, and
+    /// runs Damerau-Levenshtein fuzzy matching. Skipping in non-
+    /// interactive mode eliminates the amplifier entirely; interactive
+    /// users still get suggestions on real misspellings.
     if (!is_interactive_shell()) {
         return 0;
     }
@@ -305,9 +305,9 @@ bool autocorrect_prompt_user(const correction_results_t *results,
     printf("\nSelect (0-%d): ", results->count);
     fflush(stdout);
 
-    /* Ensure terminal is in canonical mode with proper CR->NL translation.
-     * This is needed because LLE may have left terminal in a state where
-     * ICRNL is disabled, causing fgets() to see raw CR (^M) instead of NL. */
+    /// Ensure terminal is in canonical mode with proper CR->NL translation.
+    /// This is needed because LLE may have left terminal in a state where
+    /// ICRNL is disabled, causing fgets() to see raw CR (^M) instead of NL.
     struct termios orig_term, cooked_term;
     bool term_modified = false;
     if (tcgetattr(STDIN_FILENO, &orig_term) == 0) {
@@ -597,8 +597,8 @@ static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
     if (len_diff > max_dist)
         return max_dist + 1;
 
-    /* Full matrix for Damerau-Levenshtein (need prev-prev row for
-     * transpositions) */
+    /// Full matrix for Damerau-Levenshtein (need prev-prev row for
+    /// transpositions)
     int matrix[34][34];
 
     for (size_t i = 0; i <= len1; i++)
@@ -673,8 +673,8 @@ int autocorrect_suggest_path_commands(const char *command,
     /// Pre-filter threshold: commands within 3 edits are candidates
     const int prefilter_max_dist = 3;
 
-    /* Collect more candidates than requested, then sort and take best.
-     * Use local array to avoid overflowing caller's buffer. */
+    /// Collect more candidates than requested, then sort and take best.
+    /// Use local array to avoid overflowing caller's buffer.
     const int max_candidates = 50;
     correction_t candidates[50];
     int candidate_count = 0;
@@ -704,8 +704,8 @@ int autocorrect_suggest_path_commands(const char *command,
             snprintf(full_path, sizeof(full_path), "%s/%s", dir, entry->d_name);
 
             if (is_executable_file(full_path)) {
-                /* Full Unicode-aware scoring for candidates that passed
-                 * pre-filter */
+                /// Full Unicode-aware scoring for candidates that passed
+                /// pre-filter
                 int score = autocorrect_similarity_score(command, entry->d_name,
                                                          case_sensitive);
 

@@ -828,9 +828,9 @@ lle_memory_pool_create_from_lush(lle_memory_pool_t **lle_pool,
     memset(pool->free_blocks, 0, sizeof(pool->free_blocks));
     pool->free_block_count = 0;
 
-    /* Note: We don't allocate memory_region here because lush_pool handles it
-     * The lush_pool pointer is passed in and allocations go through it
-     * This pool structure is just for tracking and coordination */
+    /// Note: We don't allocate memory_region here because lush_pool handles it
+    /// The lush_pool pointer is passed in and allocations go through it
+    /// This pool structure is just for tracking and coordination
     pool->memory_region = NULL; /// Managed externally by lush_pool
 
     /// Mark that this pool uses external (Lush) allocation
@@ -855,9 +855,9 @@ void lle_memory_pool_destroy(lle_memory_pool_t *pool) {
     /// Destroy mutex
     pthread_mutex_destroy(&pool->lock);
 
-    /* Note: We don't free pool->memory_region because it's managed by
-     * lush_pool We also don't free allocations because they're tracked by
-     * lush_pool */
+    /// Note: We don't free pool->memory_region because it's managed by
+    /// lush_pool We also don't free allocations because they're tracked by
+    /// lush_pool
 
     /// Free the pool structure itself
     free(pool);
@@ -895,8 +895,8 @@ void *lle_pool_alloc(size_t size) {
             clock_gettime(CLOCK_MONOTONIC,
                           &lle_memory_global.allocations[idx].allocation_time);
         }
-        /* If table is full, we can't track this allocation precisely but still
-         * update stats */
+        /// If table is full, we can't track this allocation precisely but still
+        /// update stats
 
         pthread_mutex_unlock(&lle_memory_global.global_lock);
     }
@@ -1003,8 +1003,8 @@ bool lle_memory_is_valid_transition(lle_memory_state_t old_state,
                 new_state == LLE_MEMORY_STATE_ERROR);
 
     case LLE_MEMORY_STATE_ACTIVE:
-        /* From ACTIVE can go to OPTIMIZING, GC_RUNNING, LOW_MEMORY, ERROR, or
-         * SHUTDOWN */
+        /// From ACTIVE can go to OPTIMIZING, GC_RUNNING, LOW_MEMORY, ERROR, or
+        /// SHUTDOWN
         return (new_state == LLE_MEMORY_STATE_OPTIMIZING ||
                 new_state == LLE_MEMORY_STATE_GC_RUNNING ||
                 new_state == LLE_MEMORY_STATE_LOW_MEMORY ||
@@ -1255,9 +1255,9 @@ lle_create_shared_memory_regions(lle_memory_manager_t *manager,
     if (!manager || !lush_config)
         return LLE_ERROR_NULL_POINTER;
 
-    /* LLE uses Lush's memory pools directly, so shared memory is inherent.
-     * Both LLE and Lush subsystems allocate from the same global_memory_pool.
-     * No separate shared regions needed - the pools themselves are shared. */
+    /// LLE uses Lush's memory pools directly, so shared memory is inherent.
+    /// Both LLE and Lush subsystems allocate from the same global_memory_pool.
+    /// No separate shared regions needed - the pools themselves are shared.
 
     manager->lush_pools = global_memory_pool;
     manager->lush_integration_active = true;
@@ -1270,10 +1270,10 @@ lle_initialize_cross_allocation_tables(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Cross-allocation tracking is handled by our global allocation tracking
-     * table in lle_memory_global.allocations[], which tracks all allocations
-     * regardless of which pool they came from. This provides unified tracking
-     * across pools. */
+    /// Cross-allocation tracking is handled by our global allocation tracking
+    /// table in lle_memory_global.allocations[], which tracks all allocations
+    /// regardless of which pool they came from. This provides unified tracking
+    /// across pools.
 
     /// Ensure global tracking is initialized
     if (!lle_memory_global.initialized) {
@@ -1288,10 +1288,11 @@ lle_result_t lle_start_integration_monitoring(lle_memory_manager_t *manager) {
     if (!manager)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Integration monitoring tracks memory usage statistics which are already
-     * being collected in lle_memory_global.stats and global_memory_pool->stats.
-     * No additional monitoring infrastructure needed - stats are updated
-     * automatically during allocation and deallocation. */
+    /// Integration monitoring tracks memory usage statistics which are already
+    /// being collected in lle_memory_global.stats and
+    /// global_memory_pool->stats. No additional monitoring infrastructure
+    /// needed - stats are updated automatically during allocation and
+    /// deallocation.
 
     /// Verify statistics collection is enabled in Lush pools
     if (global_memory_pool) {
@@ -1433,8 +1434,8 @@ int lle_find_suitable_fragment(void *pool, size_t size) {
     if (!pool)
         return -1;
     (void)size;
-    /* Fragment management not needed with Lush's fixed-size block pools.
-     * Lush handles fragmentation through its free list management. */
+    /// Fragment management not needed with Lush's fixed-size block pools.
+    /// Lush handles fragmentation through its free list management.
     return -1; /// No fragment found - use normal allocation
 }
 
@@ -1848,10 +1849,10 @@ lle_result_t lle_gc_mark_phase(lle_garbage_collector_t *gc,
     if (!gc)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Mark phase: Scan Lush memory pools and count allocated blocks.
-     * With Lush's pool metadata, we can see which blocks are in_use.
-     * This is a conservative mark - we consider all in_use blocks as reachable.
-     */
+    /// Mark phase: Scan Lush memory pools and count allocated blocks.
+    /// With Lush's pool metadata, we can see which blocks are in_use.
+    /// This is a conservative mark - we consider all in_use blocks as
+    /// reachable.
 
     size_t total_marked = 0;
 
@@ -1883,11 +1884,11 @@ lle_result_t lle_gc_sweep_phase(lle_garbage_collector_t *gc,
     if (!gc)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Sweep phase: Scan for old allocations that may be leaks.
-     * Since we can't trace pointers without type info, we use a heuristic:
-     * Free blocks that have been allocated for longer than a threshold.
-     * This implements a generational GC approach where very old allocations
-     * that haven't been freed are likely leaked. */
+    /// Sweep phase: Scan for old allocations that may be leaks.
+    /// Since we can't trace pointers without type info, we use a heuristic:
+    /// Free blocks that have been allocated for longer than a threshold.
+    /// This implements a generational GC approach where very old allocations
+    /// that haven't been freed are likely leaked.
 
     size_t total_freed = 0;
     uint64_t current_time =
@@ -1904,14 +1905,14 @@ lle_result_t lle_gc_sweep_phase(lle_garbage_collector_t *gc,
                  block_idx++) {
                 lush_pool_block_t *block = &pool->all_blocks[block_idx];
 
-                /* Check if block is old enough to be considered potentially
-                 * leaked */
+                /// Check if block is old enough to be considered potentially
+                /// leaked
                 if (block->in_use && block->allocation_time_us > 0) {
                     uint64_t age = current_time - block->allocation_time_us;
 
-                    /* Only free extremely old allocations during GC sweep
-                     * This is conservative - real applications should manage
-                     * their memory */
+                    /// Only free extremely old allocations during GC sweep
+                    /// This is conservative - real applications should manage
+                    /// their memory
                     if (age > age_threshold_us) {
                         /// Free this potentially leaked block
                         lush_pool_free(block->memory);
@@ -1933,17 +1934,16 @@ lle_result_t lle_gc_compact_phase(lle_garbage_collector_t *gc) {
     if (!gc)
         return LLE_ERROR_NULL_POINTER;
 
-    /* Compact phase: Reduce fragmentation in memory pools.
-     * Lush's pool design already minimizes fragmentation through fixed-size
-     * blocks. However, we can optimize the free list organization to improve
-     * allocation speed. */
+    /// Compact phase: Reduce fragmentation in memory pools.
+    /// Lush's pool design already minimizes fragmentation through fixed-size
+    /// blocks. However, we can optimize the free list organization to improve
+    /// allocation speed.
 
     if (global_memory_pool && global_memory_pool->initialized) {
         for (int pool_idx = 0; pool_idx < LUSH_POOL_COUNT; pool_idx++) {
             lush_pool_t *pool = &global_memory_pool->pools[pool_idx];
 
-            /* Rebuild free list in optimal order (contiguous blocks together)
-             */
+            /// Rebuild free list in optimal order (contiguous blocks together)
             pool->free_list = NULL;
             pool->free_blocks = 0;
 

@@ -121,9 +121,9 @@ static void test_insert_updates_utf8_index() {
     ASSERT_EQ(buffer->length, 11, "Buffer length includes UTF-8 bytes");
     ASSERT_EQ(buffer->codepoint_count, 7, "Codepoint count correct with UTF-8");
 
-    /* UTF-8 index is lazily built - after modifications it's invalidated.
-     * The codepoint_count is updated incrementally (verified above),
-     * but the full index structure needs rebuilding on next access. */
+    /// UTF-8 index is lazily built - after modifications it's invalidated.
+    /// The codepoint_count is updated incrementally (verified above),
+    /// but the full index structure needs rebuilding on next access.
     ASSERT_FALSE(buffer->utf8_index_valid,
                  "UTF-8 index invalidated after modification");
 

@@ -18,11 +18,11 @@
 #include "lle/completion/custom_source.h"
 
 int display_lle_completion(int argc, char **argv) {
-    /* LLE completion subsystem. The umbrella command groups
-     * source-list management (under `sources`) with future
-     * behavior knobs registered alongside it. Bare
-     * `display lle completion` prints the namespace help; an
-     * unrecognized subcommand is an error. */
+    /// LLE completion subsystem. The umbrella command groups
+    /// source-list management (under `sources`) with future
+    /// behavior knobs registered alongside it. Bare
+    /// `display lle completion` prints the namespace help; an
+    /// unrecognized subcommand is an error.
     const char *comp_subcmd = (argc >= 2) ? argv[1] : "help";
 
     if (strcmp(comp_subcmd, "sources") == 0) {
@@ -126,10 +126,10 @@ int display_lle_completion(int argc, char **argv) {
         }
 
     } else if (strcmp(comp_subcmd, "chain_directories") == 0) {
-        /* completion.chain_directories: when on, accepting a
-         * directory completion auto-re-triggers completion at
-         * the new prefix (fish-style cascading). Per-mode
-         * default: lush=true, others=false. */
+        /// completion.chain_directories: when on, accepting a
+        /// directory completion auto-re-triggers completion at
+        /// the new prefix (fish-style cascading). Per-mode
+        /// default: lush=true, others=false.
         if (argc < 3) {
             bool cur = false;
             creg_result_t r = config_registry_get_boolean(

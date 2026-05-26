@@ -311,8 +311,8 @@ TEST(breakpoint_in_loop_body_fires_each_iteration) {
     ASSERT_NOT_NULL(exec, "executor_new");
     ASSERT_NOT_NULL(ctx, "debug_ctx_new_captured");
 
-    /* Lines: 1 `for i in a b c` / 2 `do` / 3 `echo $i` / 4 `done`.
-     * Line 3 runs once per loop iteration -- three times. */
+    /// Lines: 1 `for i in a b c` / 2 `do` / 3 `echo $i` / 4 `done`.
+    /// Line 3 runs once per loop iteration -- three times.
     int id = debug_add_breakpoint(ctx, "gate.sh", 3, NULL);
     ASSERT_TRUE(id >= 0, "breakpoint added");
 
@@ -375,8 +375,8 @@ TEST(step_mode_breaks_at_next_node) {
 
     char log[4096];
     debug_ctx_read_output(ctx, log, sizeof(log));
-    /* The framed step banner -- "[STEP]" is the title token, reliable
-     * across the UTF-8 and ASCII glyph sets. */
+    /// The framed step banner -- "[STEP]" is the title token, reliable
+    /// across the UTF-8 and ASCII glyph sets.
     ASSERT_TRUE(strstr(log, "[STEP]") != NULL,
                 "step branch reached during execution");
     ASSERT_FALSE(ctx->step_mode, "EOF at the debug prompt cleared step mode");
@@ -411,8 +411,8 @@ TEST(debug_stack_marks_typed_fn_frame_as_lexical) {
     ASSERT_NOT_NULL(exec, "executor_new");
     ASSERT_NOT_NULL(ctx, "debug_ctx_new_captured");
 
-    /* A typed fn calls `debug stack` from its own body; the rendered
-     * frame for that call must carry `[lexical]`. */
+    /// A typed fn calls `debug stack` from its own body; the rendered
+    /// frame for that call must carry `[lexical]`.
     const char *script = "fn show() -> scalar { debug stack; return \"ok\"; }\n"
                          "let r = show()\n";
     run_under_debugger(exec, ctx, script, true);

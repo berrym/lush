@@ -96,8 +96,8 @@ static inline run_result_t run_shell_with_executor(executor_t *exec,
     FILE *out_tmp = tmpfile();
     FILE *err_tmp = tmpfile();
     if (!out_tmp || !err_tmp) {
-        /* Fall back to uncaptured execution rather than failing the test;
-         * the caller's exit-status assertion will still run. */
+        /// Fall back to uncaptured execution rather than failing the test;
+        /// the caller's exit-status assertion will still run.
         r.exit_status = executor_execute_command_line(exec, src, 1);
         if (out_tmp) {
             fclose(out_tmp);
@@ -231,10 +231,10 @@ static inline run_result_t run_shell_subprocess(const char *src) {
         return r;
     }
 
-    /* Use the project's fork wrapper so any pending stdio buffer
-     * content is flushed before the child inherits it — otherwise
-     * captured output may include duplicated bytes from the parent's
-     * pre-fork stdio state. */
+    /// Use the project's fork wrapper so any pending stdio buffer
+    /// content is flushed before the child inherits it — otherwise
+    /// captured output may include duplicated bytes from the parent's
+    /// pre-fork stdio state.
     pid_t pid = lush_fork();
     if (pid < 0) {
         close(out_pipe[0]);

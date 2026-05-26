@@ -125,8 +125,8 @@ bool lle_notification_should_dismiss_for_action(
         return false; /// Nothing to dismiss
     }
 
-    /* If the incoming action matches the trigger, don't dismiss
-     * (suppress-on-repeat) */
+    /// If the incoming action matches the trigger, don't dismiss
+    /// (suppress-on-repeat)
     if (action != LLE_NOTIF_ACTION_NONE && action == state->trigger_action) {
         return false;
     }

@@ -61,14 +61,14 @@ TEST(context_initialization) {
         lle_adaptive_context_t *context = NULL;
         res = lle_initialize_adaptive_context(&context, detection, NULL);
 
-        /* In non-TTY environments (CI), mode may be NONE which returns an error
-         */
+        /// In non-TTY environments (CI), mode may be NONE which returns an
+        /// error
         if (has_tty || detection->recommended_mode != LLE_ADAPTIVE_MODE_NONE) {
             TEST_ASSERT(res == LLE_SUCCESS, "Context initialization succeeds");
             TEST_ASSERT(context != NULL, "Context is created");
         } else {
-            /* Non-interactive mode - context init returns feature not available
-             */
+            /// Non-interactive mode - context init returns feature not
+            /// available
             TEST_ASSERT(res == LLE_ERROR_FEATURE_NOT_AVAILABLE ||
                             res == LLE_SUCCESS,
                         "Context initialization handles non-TTY correctly");
@@ -100,8 +100,8 @@ TEST(context_initialization) {
 TEST(interface_creation) {
     printf("\nInterface Creation Tests:\n");
 
-    /* Check if we have a TTY - interface creation requires interactive terminal
-     */
+    /// Check if we have a TTY - interface creation requires interactive
+    /// terminal
     bool has_tty = isatty(STDIN_FILENO) || isatty(STDOUT_FILENO);
 
     lle_adaptive_interface_t *interface = NULL;

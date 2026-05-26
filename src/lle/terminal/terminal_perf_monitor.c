@@ -46,14 +46,13 @@ void lle_terminal_track_operation_time(lle_performance_monitor_t *perf_monitor,
 
     uint64_t duration_us = end_time_us - start_time_us;
 
-    /* When Spec 14 performance system is fully implemented, this will call:
-     *
-     * lle_performance_record_operation(perf_monitor,
-     *                                 operation_name,
-     *                                 duration_us);
-     *
-     * For now, operation recorded successfully (placeholder).
-     */
+    /// When Spec 14 performance system is fully implemented, this will call:
+    ///
+    /// lle_performance_record_operation(perf_monitor,
+    ///                                 operation_name,
+    ///                                 duration_us);
+    ///
+    /// For now, operation recorded successfully (placeholder).
 
     (void)duration_us; /// Suppress unused warning
 }
@@ -137,13 +136,12 @@ lle_result_t lle_terminal_get_performance_stats(
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* When Spec 14 performance system is fully implemented, this will:
-     * 1. Query performance data from monitor
-     * 2. Calculate averages for display/input operations
-     * 3. Return aggregate statistics
-     *
-     * For now, return placeholder values.
-     */
+    /// When Spec 14 performance system is fully implemented, this will:
+    /// 1. Query performance data from monitor
+    /// 2. Calculate averages for display/input operations
+    /// 3. Return aggregate statistics
+    ///
+    /// For now, return placeholder values.
 
     *avg_display_time_us = 0;
     *avg_input_time_us = 0;

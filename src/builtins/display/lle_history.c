@@ -164,8 +164,7 @@ int display_lle_history(int argc, char **argv) {
             } else if (strcmp(scope_val, "global") == 0) {
                 config.lle_dedup_scope = LLE_DEDUP_SCOPE_GLOBAL;
 
-                /* When switching to global scope, run full dedup scan
-                 */
+                /// When switching to global scope, run full dedup scan
                 lle_editor_t *editor = lle_get_global_editor();
                 if (editor && editor->history_system &&
                     editor->history_system->dedup_engine) {

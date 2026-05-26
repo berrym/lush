@@ -75,10 +75,10 @@ static lle_result_t collect_callback(const char *section, const char *key,
     item->type = value->type;
     switch (value->type) {
     case LLE_THEME_VALUE_STRING:
-        /* string_value is sized to match the parser's string buffer, so
-         * memcpy of the full N bytes (already NUL-terminated upstream)
-         * is exact and avoids both -Wformat-truncation (snprintf path)
-         * and -Wstringop-truncation (strncpy + sizeof-1 path). */
+        /// string_value is sized to match the parser's string buffer, so
+        /// memcpy of the full N bytes (already NUL-terminated upstream)
+        /// is exact and avoids both -Wformat-truncation (snprintf path)
+        /// and -Wstringop-truncation (strncpy + sizeof-1 path).
         memcpy(item->string_value, value->data.string,
                sizeof(item->string_value));
         break;
@@ -89,8 +89,8 @@ static lle_result_t collect_callback(const char *section, const char *key,
         item->bool_value = value->data.boolean;
         break;
     default:
-        /* Arrays and tables — recorded as type only; tests can re-parse
-         * via the value pointer if they need finer detail. */
+        /// Arrays and tables — recorded as type only; tests can re-parse
+        /// via the value pointer if they need finer detail.
         break;
     }
     return c->return_code;

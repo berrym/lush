@@ -870,9 +870,9 @@ creg_result_t config_registry_apply_mode_defaults(shell_mode_t mode) {
         if (!md->active || md->mode != mode) {
             continue;
         }
-        /* Best-effort apply; a single failure should not abort the
-         * whole walk. The error case is rare (e.g. type mismatch
-         * caught at registration time), but defensive. */
+        /// Best-effort apply; a single failure should not abort the
+        /// whole walk. The error case is rare (e.g. type mismatch
+        /// caught at registration time), but defensive.
         (void)config_registry_set(md->key, &md->value);
     }
     return CREG_SUCCESS;

@@ -136,8 +136,7 @@ int display_lle_keybindings(int argc, char **argv) {
 
     } else if (strcmp(kb_subcmd, "list") == 0 ||
                strcmp(kb_subcmd, "help") == 0 || kb_subcmd[0] == '-') {
-        /* Show help if --help or just 'list' with no bindings to show
-         */
+        /// Show help if --help or just 'list' with no bindings to show
         if (strcmp(kb_subcmd, "help") == 0 ||
             strcmp(kb_subcmd, "--help") == 0) {
             printf("LLE Keybinding Commands\n");

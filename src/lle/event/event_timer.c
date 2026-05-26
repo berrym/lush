@@ -104,8 +104,8 @@ static void remove_timer_at_index(lle_timer_system_t *ts, size_t index) {
 
     /// Free the timer and its event
     if (ts->timers[index]->event) {
-        /* Note: We need the event system to properly destroy the event,
-         * but we don't have it here. For now, just free the event data. */
+        /// Note: We need the event system to properly destroy the event,
+        /// but we don't have it here. For now, just free the event data.
         if (ts->timers[index]->event->data) {
             free(ts->timers[index]->event->data);
         }
@@ -611,8 +611,7 @@ lle_result_t lle_event_timer_process(lle_event_system_t *system) {
             /// Re-lock mutex
             pthread_mutex_lock(&ts->timer_mutex);
 
-            /* Timer array may have changed during dispatch - find timer again
-             */
+            /// Timer array may have changed during dispatch - find timer again
             int index = find_timer_index(ts, timer->timer_id);
             if (index < 0) {
                 /// Timer was cancelled during dispatch

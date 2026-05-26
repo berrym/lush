@@ -389,8 +389,8 @@ static void test_mouse_drag(void) {
     lle_pool_free(event);
     event = NULL;
 
-    /* Then: movement with button held (drag) - button code 32 (0x20 + motion
-     * flag) */
+    /// Then: movement with button held (drag) - button code 32 (0x20 + motion
+    /// flag)
     const char drag_seq[] = "\x1B[<32;15;10M";
     result = lle_mouse_parser_parse_sequence(parser, drag_seq, 13, &event);
     TEST_ASSERT(result == LLE_SUCCESS, "Failed to parse drag");

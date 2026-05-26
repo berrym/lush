@@ -221,11 +221,11 @@ int bin_printf(int argc, char **argv) {
                 const char *format_arg =
                     (arg_index < argc) ? argv[arg_index] : "";
 
-                /* Reconstruct the user's original conversion spec
-                 * (e.g. "%05d", "%+8.2f") so libc printf handles all
-                 * flags — `0`, `+`, ` `, `#`, `-` — uniformly across
-                 * every numeric specifier. Without this, lush would
-                 * silently drop every flag except `-`. */
+                /// Reconstruct the user's original conversion spec
+                /// (e.g. "%05d", "%+8.2f") so libc printf handles all
+                /// flags — `0`, `+`, ` `, `#`, `-` — uniformly across
+                /// every numeric specifier. Without this, lush would
+                /// silently drop every flag except `-`.
                 char fwd_fmt[64];
                 {
                     size_t fwd_len = (size_t)(i - spec_start + 1);

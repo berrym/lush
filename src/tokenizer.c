@@ -93,8 +93,8 @@ tokenizer_t *tokenizer_new_at(const char *input, size_t starting_line) {
     tokenizer->enable_keywords = true;
     tokenizer->arith_cmd_depth = 0;
 
-    /* Initialize by getting the first two tokens. The line number must
-     * be set BEFORE tokenize_next, since lookahead pre-tokenizes too. */
+    /// Initialize by getting the first two tokens. The line number must
+    /// be set BEFORE tokenize_next, since lookahead pre-tokenizes too.
     tokenizer->current = tokenize_next(tokenizer);
     tokenizer->lookahead = tokenize_next(tokenizer);
 
@@ -553,10 +553,10 @@ static token_t *token_new(token_type_t type, const char *text, size_t length,
     token->line = line;
     token->column = column;
     token->position = position;
-    /* end_position is provisional here; tokenize_next() stamps the
-     * authoritative post-token input position over this. The default is
-     * the conservative position + length so consumers that bypass the
-     * wrapper still get a usable value for unquoted tokens. */
+    /// end_position is provisional here; tokenize_next() stamps the
+    /// authoritative post-token input position over this. The default is
+    /// the conservative position + length so consumers that bypass the
+    /// wrapper still get a usable value for unquoted tokens.
     token->end_position = position + length;
     token->next = NULL;
 
@@ -643,11 +643,11 @@ static bool is_operator_char(char c) {
  * @return true if character can be part of a word
  */
 static bool is_word_char(char c) {
-    /* ',' is intentionally NOT a word char: it is emitted as TOK_COMMA
-     * (parser-level adjacency reassembles `noatime,noexec` into a single
-     * shell word via collect_word_argument). Tokenizer-level brace
-     * expansion scans `,` directly from the input buffer (not via this
-     * helper), so `{a,b,c}` continues to tokenize as one TOK_WORD. */
+    /// ',' is intentionally NOT a word char: it is emitted as TOK_COMMA
+    /// (parser-level adjacency reassembles `noatime,noexec` into a single
+    /// shell word via collect_word_argument). Tokenizer-level brace
+    /// expansion scans `,` directly from the input buffer (not via this
+    /// helper), so `{a,b,c}` continues to tokenize as one TOK_WORD.
     return isalnum(c) || strchr("_.-/~:@*?[]+%!^#", c) != NULL;
 }
 
@@ -1181,15 +1181,15 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
 
                 if (tokenizer->position < tokenizer->input_length &&
                     tokenizer->input[tokenizer->position] == '(') {
-                    /* `$((` is ambiguous: it could begin arithmetic
-                     * expansion `$((expr))` OR command substitution of
-                     * an anonymous function `$(() { body; } args)`.
-                     * Arithmetic content cannot contain braces, semicolons,
-                     * or newlines at the top level, so if a lookahead
-                     * scan finds any of those before the matched `))`,
-                     * the input is really `$(` followed by a `(` -- back
-                     * up the second `(` and reparse as command sub.
-                     * Issue #99. */
+                    /// `$((` is ambiguous: it could begin arithmetic
+                    /// expansion `$((expr))` OR command substitution of
+                    /// an anonymous function `$(() { body; } args)`.
+                    /// Arithmetic content cannot contain braces, semicolons,
+                    /// or newlines at the top level, so if a lookahead
+                    /// scan finds any of those before the matched `))`,
+                    /// the input is really `$(` followed by a `(` -- back
+                    /// up the second `(` and reparse as command sub.
+                    /// Issue #99.
                     size_t scan = tokenizer->position + 1;
                     int depth = 2; /// counting the two outer `(`
                     bool looks_arith = true;
@@ -1200,12 +1200,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         } else if (sc == ')') {
                             depth--;
                             if (depth == 0) {
-                                /* Verify the closing is actually `))`
-                                 * by checking we came down from 2 with
-                                 * the immediately preceding char also
-                                 * being `)` (i.e. the inner closes
-                                 * before the outer). Walking the depth
-                                 * counter has already ensured this. */
+                                /// Verify the closing is actually `))`
+                                /// by checking we came down from 2 with
+                                /// the immediately preceding char also
+                                /// being `)` (i.e. the inner closes
+                                /// before the outer). Walking the depth
+                                /// counter has already ensured this.
                                 break;
                             }
                         } else if (sc == '{' || sc == '}' || sc == ';' ||
@@ -1250,11 +1250,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                          &tokenizer->input[start], length,
                                          start_line, start_column, start_pos);
                     }
-                    /* Fall through to command-sub handling below.
-                     * Position is currently at the second `(` of `$((`,
-                     * which is the start of the inner subshell or
-                     * anonymous function body that the command-sub
-                     * paren-counter will track. */
+                    /// Fall through to command-sub handling below.
+                    /// Position is currently at the second `(` of `$((`,
+                    /// which is the start of the inner subshell or
+                    /// anonymous function body that the command-sub
+                    /// paren-counter will track.
                 }
                 {
                     /// Command substitution $(cmd)
@@ -1414,25 +1414,25 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         }
                     }
 
-                    /* Zsh bare-form subscript: $var[N] / $var[N,M] in
-                     * unquoted context. Without this, the tokenizer
-                     * emits TOK_VARIABLE($var) + TOK_LBRACKET([) + ...
-                     * and the parser dispatches `[1]` as the `[` test
-                     * builtin (issue #58). When FEATURE_ZSH_BARE_SUBSCRIPT
-                     * is enabled, absorb the entire [...] into the
-                     * TOK_VARIABLE so parse_parameter_expansion sees
-                     * `$var[N]` as one unit -- same shape as the brace
-                     * form ${var[N]} and the quoted bare form "$var[N]"
-                     * which both already work.
-                     *
-                     * The subscript is scanned by balanced-bracket
-                     * counter so nested brackets in expressions like
-                     * $arr[$other[i]] or $a[$((b[c]+1))] absorb
-                     * correctly. A bracket without a matching close is
-                     * left for the parser to surface as a normal error;
-                     * we don't advance position in that case. The flag
-                     * is curated true in zsh+lush modes, false in
-                     * posix+bash (see src/shell_mode.c). */
+                    /// Zsh bare-form subscript: $var[N] / $var[N,M] in
+                    /// unquoted context. Without this, the tokenizer
+                    /// emits TOK_VARIABLE($var) + TOK_LBRACKET([) + ...
+                    /// and the parser dispatches `[1]` as the `[` test
+                    /// builtin (issue #58). When FEATURE_ZSH_BARE_SUBSCRIPT
+                    /// is enabled, absorb the entire [...] into the
+                    /// TOK_VARIABLE so parse_parameter_expansion sees
+                    /// `$var[N]` as one unit -- same shape as the brace
+                    /// form ${var[N]} and the quoted bare form "$var[N]"
+                    /// which both already work.
+                    ///
+                    /// The subscript is scanned by balanced-bracket
+                    /// counter so nested brackets in expressions like
+                    /// $arr[$other[i]] or $a[$((b[c]+1))] absorb
+                    /// correctly. A bracket without a matching close is
+                    /// left for the parser to surface as a normal error;
+                    /// we don't advance position in that case. The flag
+                    /// is curated true in zsh+lush modes, false in
+                    /// posix+bash (see src/shell_mode.c).
                     if (tokenizer->position < tokenizer->input_length &&
                         tokenizer->input[tokenizer->position] == '[' &&
                         shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
@@ -2052,13 +2052,13 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             strchr("_.-/~:@*?+%!", sc) != NULL) {
                             scan_pos++;
                         } else if ((unsigned char)sc >= 0x80) {
-                            /* Skip the rest of this UTF-8 sequence. Use the
-                             * shared LLE primitive so the byte-pattern logic
-                             * lives in exactly one place (issue #50). The
-                             * primitive reports what the lead byte CLAIMS;
-                             * the caller is responsible for clamping against
-                             * the input length so a partial sequence at the
-                             * end of the buffer cannot walk past it. */
+                            /// Skip the rest of this UTF-8 sequence. Use the
+                            /// shared LLE primitive so the byte-pattern logic
+                            /// lives in exactly one place (issue #50). The
+                            /// primitive reports what the lead byte CLAIMS;
+                            /// the caller is responsible for clamping against
+                            /// the input length so a partial sequence at the
+                            /// end of the buffer cannot walk past it.
                             int seq_len =
                                 lle_utf8_sequence_length((unsigned char)sc);
                             if (seq_len <= 0) {
@@ -2310,15 +2310,15 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                          start_pos);
     }
 
-    /* Kind-sigil dispatch: when FEATURE_KIND_SIGILS is enabled and a `@` or
-     * `%` sits at the start of a fresh token followed immediately by a valid
-     * identifier-start character ([A-Za-z_]), tokenize it as a TOK_VARIABLE
-     * carrying the sigil prefix.  Other uses of `@` and `%` (mid-word
-     * `user@host`, extglob `@(foo|bar)`, git refs `@{-1}`, arithmetic `%`,
-     * job specifiers `%1`) all fail this regex check and fall through to the
-     * normal word/operator paths -- exactly the disambiguation the spec
-     * settled on.  Disabled in posix/bash/zsh modes so those profiles keep
-     * the historical word-character reading of `@` and `%`. */
+    /// Kind-sigil dispatch: when FEATURE_KIND_SIGILS is enabled and a `@` or
+    /// `%` sits at the start of a fresh token followed immediately by a valid
+    /// identifier-start character ([A-Za-z_]), tokenize it as a TOK_VARIABLE
+    /// carrying the sigil prefix.  Other uses of `@` and `%` (mid-word
+    /// `user@host`, extglob `@(foo|bar)`, git refs `@{-1}`, arithmetic `%`,
+    /// job specifiers `%1`) all fail this regex check and fall through to the
+    /// normal word/operator paths -- exactly the disambiguation the spec
+    /// settled on.  Disabled in posix/bash/zsh modes so those profiles keep
+    /// the historical word-character reading of `@` and `%`.
     if ((c == '@' || c == '%') && shell_mode_allows(FEATURE_KIND_SIGILS) &&
         tokenizer->position + 1 < tokenizer->input_length) {
         unsigned char nx =
@@ -2521,15 +2521,14 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             continue;
                         }
                     }
-                    /* Check for a trailing zsh glob qualifier:
-                     * `*.txt(N)`, `foo(.@)`, etc. A '(' that follows a
-                     * word character and encloses ONLY glob-qualifier
-                     * characters, with the matching ')' ending the
-                     * word, is part of the glob word -- not a subshell.
-                     * (`*(.N)` is already absorbed by the extglob
-                     * branch above via prev=='*'; this handles the
-                     * prefixed-pattern form the extglob branch misses.)
-                     */
+                    /// Check for a trailing zsh glob qualifier:
+                    /// `*.txt(N)`, `foo(.@)`, etc. A '(' that follows a
+                    /// word character and encloses ONLY glob-qualifier
+                    /// characters, with the matching ')' ending the
+                    /// word, is part of the glob word -- not a subshell.
+                    /// (`*(.N)` is already absorbed by the extglob
+                    /// branch above via prev=='*'; this handles the
+                    /// prefixed-pattern form the extglob branch misses.)
                     else if (shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
                         size_t scan_pos = tokenizer->position + 1;
                         bool only_qual = true;
@@ -2548,10 +2547,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         }
                         if (found_close && only_qual &&
                             scan_pos > tokenizer->position + 1) {
-                            /* The qualifier must end the word: after
-                             * ')' expect whitespace, EOF, or a token
-                             * boundary (incl. the ')' of an enclosing
-                             * array literal). */
+                            /// The qualifier must end the word: after
+                            /// ')' expect whitespace, EOF, or a token
+                            /// boundary (incl. the ')' of an enclosing
+                            /// array literal).
                             size_t after = scan_pos + 1;
                             char ac = (after < tokenizer->input_length)
                                           ? tokenizer->input[after]

@@ -284,18 +284,18 @@ lle_result_t lle_prompt_context_init(lle_prompt_context_t *ctx) {
     ctx->terminal_width = 80;
     ctx->terminal_height = 24;
 
-    /* Use adaptive terminal detection for color capabilities.
-     * Note: The optimized detection returns a cached result that is
-     * managed by the detection system - do NOT destroy it, as that
-     * could cause a double-free if the cache was refreshed. */
+    /// Use adaptive terminal detection for color capabilities.
+    /// Note: The optimized detection returns a cached result that is
+    /// managed by the detection system - do NOT destroy it, as that
+    /// could cause a double-free if the cache was refreshed.
     lle_terminal_detection_result_t *detection = NULL;
     lle_result_t det_result =
         lle_detect_terminal_capabilities_optimized(&detection);
     if (det_result == LLE_SUCCESS && detection) {
         ctx->has_256_color = detection->supports_256_colors;
         ctx->has_true_color = detection->supports_truecolor;
-        /* Do NOT call lle_terminal_detection_result_destroy here -
-         * the optimized version manages the cached result internally */
+        /// Do NOT call lle_terminal_detection_result_destroy here -
+        /// the optimized version manages the cached result internally
     } else {
         /// Default to 256 colors if detection fails
         ctx->has_256_color = true;
@@ -1461,9 +1461,9 @@ static void segment_git_async_callback(const lle_async_response_t *response,
 
     pthread_mutex_lock(&state->async_mutex);
 
-    /* Check if cache was invalidated while async request was in-flight.
-     * If the generation has changed, the cache was invalidated after this
-     * request was queued, so the response contains stale data. Discard it. */
+    /// Check if cache was invalidated while async request was in-flight.
+    /// If the generation has changed, the cache was invalidated after this
+    /// request was queued, so the response contains stale data. Discard it.
     if (state->pending_generation != state->cache_generation) {
         state->async_pending = false;
         pthread_mutex_unlock(&state->async_mutex);
@@ -1483,8 +1483,8 @@ static void segment_git_async_callback(const lle_async_response_t *response,
             state->untracked = git->untracked_count;
             state->ahead = git->ahead;
             state->behind = git->behind;
-            /* Note: stash_count and has_conflicts not in async response,
-             * these would require extending lle_git_status_data_t */
+            /// Note: stash_count and has_conflicts not in async response,
+            /// these would require extending lle_git_status_data_t
             state->cache_valid = true;
         } else {
             state->branch[0] = '\0';
@@ -1587,14 +1587,14 @@ static lle_result_t segment_git_render(const lle_prompt_segment_t *self,
 
     /// Fetch git status if cache invalid
     if (!state->cache_valid) {
-        /* Always do synchronous fetch when cache is invalid.
-         *
-         * Previously this tried async first and rendered with stale data,
-         * but that caused the git prompt to show outdated status until
-         * a second command was executed (issue #25).
-         *
-         * After a command completes, the user is waiting for the prompt
-         * anyway, so a brief sync fetch is acceptable for accuracy. */
+        /// Always do synchronous fetch when cache is invalid.
+        ///
+        /// Previously this tried async first and rendered with stale data,
+        /// but that caused the git prompt to show outdated status until
+        /// a second command was executed (issue #25).
+        ///
+        /// After a command completes, the user is waiting for the prompt
+        /// anyway, so a brief sync fetch is acceptable for accuracy.
         fetch_git_status(state);
     }
 

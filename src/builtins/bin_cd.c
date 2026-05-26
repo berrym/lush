@@ -333,11 +333,10 @@ cd_success:
         }
     }
 
-    /* Fire LLE shell event for directory change (Spec 26)
-     * This notifies registered handlers (prompt composer, autosuggestions,
-     * etc.) that the working directory has changed. previous_dir holds the old
-     * dir.
-     */
+    /// Fire LLE shell event for directory change (Spec 26)
+    /// This notifies registered handlers (prompt composer, autosuggestions,
+    /// etc.) that the working directory has changed. previous_dir holds the old
+    /// dir.
     lle_fire_directory_changed(previous_dir, NULL);
 
     return 0;

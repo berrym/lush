@@ -671,8 +671,7 @@ lle_keybinding_load_user_config(lle_keybinding_manager_t *manager,
         return path_result;
     }
 
-    /* Load from file (LLE_ERROR_NOT_FOUND is acceptable - config is optional)
-     */
+    /// Load from file (LLE_ERROR_NOT_FOUND is acceptable - config is optional)
     return lle_keybinding_load_from_file(manager, config_path, result);
 }
 

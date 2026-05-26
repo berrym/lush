@@ -107,8 +107,8 @@ TEST(timeout_short) {
     ASSERT(event.type == LLE_INPUT_TYPE_TIMEOUT);
     ASSERT(event.timestamp > 0);
 
-    /* Note: We don't check exact timing as it can vary in test environments
-     * The important thing is that it returns a timeout event */
+    /// Note: We don't check exact timing as it can vary in test environments
+    /// The important thing is that it returns a timeout event
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);
@@ -339,8 +339,8 @@ TEST(function_keys_f1_f4) {
     interface->terminal_fd = STDIN_FILENO;
 
     /// Without parser initialization, should use fallback escape handling
-    /* The fallback won't recognize F1, so it will return ESC or partial
-     * sequence */
+    /// The fallback won't recognize F1, so it will return ESC or partial
+    /// sequence
     /// With parser, it would recognize F1
 
     /// For now, just verify it doesn't crash and returns some event
@@ -348,8 +348,8 @@ TEST(function_keys_f1_f4) {
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
     ASSERT(result == LLE_SUCCESS);
-    /* Event type could be CHARACTER (ESC), SPECIAL_KEY, or TIMEOUT depending on
-     * parser */
+    /// Event type could be CHARACTER (ESC), SPECIAL_KEY, or TIMEOUT depending
+    /// on parser
 
     dup2(saved_stdin, STDIN_FILENO);
     close(saved_stdin);

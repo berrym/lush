@@ -103,8 +103,8 @@ TEST(test_f1_detection_with_parser) {
     lle_input_event_t event;
     result = lle_unix_interface_read_event(interface, &event, 1000);
 
-    /* With parser initialized, we might need multiple reads to accumulate the
-     * sequence */
+    /// With parser initialized, we might need multiple reads to accumulate the
+    /// sequence
     /// Try reading up to 3 times to get the complete event
     int read_attempts = 0;
     while (result == LLE_SUCCESS && event.type == LLE_INPUT_TYPE_TIMEOUT &&

@@ -240,8 +240,8 @@ bool lle_async_worker_is_running(const lle_async_worker_t *worker) {
         return false;
     }
 
-    /* Note: This is a simple check without locking for performance.
-     * The running flag is set atomically by the worker lifecycle functions. */
+    /// Note: This is a simple check without locking for performance.
+    /// The running flag is set atomically by the worker lifecycle functions.
     return worker->running && !worker->shutdown_requested;
 }
 
@@ -250,8 +250,8 @@ size_t lle_async_worker_pending_count(const lle_async_worker_t *worker) {
         return 0;
     }
 
-    /* Note: queue_size is updated under mutex, but this read is safe
-     * for informational purposes. */
+    /// Note: queue_size is updated under mutex, but this read is safe
+    /// for informational purposes.
     return worker->queue_size;
 }
 
@@ -343,8 +343,8 @@ static void *lle_async_worker_thread(void *arg) {
             break;
         }
 
-        /* Update stats before callback so they're visible when callback signals
-         */
+        /// Update stats before callback so they're visible when callback
+        /// signals
         pthread_mutex_lock(&worker->queue_mutex);
         worker->total_completed++;
         pthread_mutex_unlock(&worker->queue_mutex);

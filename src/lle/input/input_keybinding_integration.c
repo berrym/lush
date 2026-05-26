@@ -83,8 +83,8 @@ lle_keybinding_integration_init(lle_keybinding_integration_t **integration,
     kb->total_lookup_time_us = 0;
     kb->max_lookup_time_us = 0;
 
-    /* Lookup cache would be initialized here when keybinding engine is
-     * available */
+    /// Lookup cache would be initialized here when keybinding engine is
+    /// available
     kb->lookup_cache = NULL;
 
     *integration = kb;
@@ -161,8 +161,7 @@ lle_input_process_with_keybinding_lookup(lle_input_parser_system_t *parser,
         }
     }
 
-    /* Keybinding lookup would happen here when keybinding engine is available
-     */
+    /// Keybinding lookup would happen here when keybinding engine is available
     /// For now, mark as not found and let normal processing continue
     bool keybinding_found = false;
 

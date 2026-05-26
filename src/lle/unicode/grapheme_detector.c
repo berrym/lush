@@ -141,8 +141,7 @@ bool is_grapheme_cluster_boundary(uint32_t cp1, uint32_t cp2, bool prev_was_zwj,
         return false; /// No break
     }
 
-    /* GB11: \p{Extended_Pictographic} Extend* ZWJ × \p{Extended_Pictographic}
-     */
+    /// GB11: \p{Extended_Pictographic} Extend* ZWJ × \p{Extended_Pictographic}
     if (prev_was_zwj && prop1 == GB_EXTENDED_PICTOGRAPHIC &&
         prop2 == GB_EXTENDED_PICTOGRAPHIC) {
         return false; /// No break (emoji sequence)

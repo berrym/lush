@@ -651,8 +651,8 @@ lle_sequence_parser_check_timeout(lle_sequence_parser_t *parser,
         return LLE_ERROR_NOT_FOUND; /// Timeout not yet exceeded
     }
 
-    /* Timeout exceeded - if in ESCAPE state with just ESC buffered, return ESC
-     * key */
+    /// Timeout exceeded - if in ESCAPE state with just ESC buffered, return ESC
+    /// key
     if (parser->state == LLE_PARSER_STATE_ESCAPE && parser->buffer_pos == 1 &&
         parser->buffer[0] == 0x1B) {
 

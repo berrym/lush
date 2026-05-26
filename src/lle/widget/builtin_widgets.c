@@ -420,9 +420,9 @@ static lle_result_t widget_transient_prompt(lle_editor_t *editor,
         return LLE_SUCCESS;
     }
 
-    /* Render transient format through Spec 28 two-pass expansion engine.
-     * This routes the transient format string through lle_prompt_expand()
-     * which handles bash \X, zsh %X, and LLE ${segment} syntax. */
+    /// Render transient format through Spec 28 two-pass expansion engine.
+    /// This routes the transient format string through lle_prompt_expand()
+    /// which handles bash \X, zsh %X, and LLE ${segment} syntax.
     lle_template_render_ctx_t render_ctx =
         lle_composer_create_render_ctx(composer);
 
@@ -601,8 +601,8 @@ lle_result_t lle_register_builtin_widgets(lle_widget_registry_t *registry) {
     if (result != LLE_SUCCESS)
         return result;
 
-    /* Note: beginning-of-history and end-of-history widgets pending
-     * implementation of underlying action functions */
+    /// Note: beginning-of-history and end-of-history widgets pending
+    /// implementation of underlying action functions
 
     // Completion widgets
     result = lle_widget_register(registry, "complete", widget_complete,
@@ -654,9 +654,9 @@ lle_register_builtin_widget_hooks(lle_widget_hooks_manager_t *hooks_manager) {
 
     lle_result_t result;
 
-    /* Register transient-prompt widget for LINE_ACCEPTED hook
-     * This applies transient prompt when user presses Enter, before
-     * cursor moves to output area (Spec 25 Section 12) */
+    /// Register transient-prompt widget for LINE_ACCEPTED hook
+    /// This applies transient prompt when user presses Enter, before
+    /// cursor moves to output area (Spec 25 Section 12)
     result = lle_widget_hook_register(hooks_manager, LLE_HOOK_LINE_ACCEPTED,
                                       "transient-prompt");
     if (result != LLE_SUCCESS && result != LLE_ERROR_NOT_FOUND) {

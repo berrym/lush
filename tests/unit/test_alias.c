@@ -100,9 +100,8 @@ TEST(valid_alias_name_with_dash) {
 }
 
 TEST(valid_alias_name_with_space) {
-    /* Note: valid_alias_name stops at whitespace and validates up to that
-     * point, so "my alias" is considered valid (as "my") by the implementation
-     */
+    /// Note: valid_alias_name stops at whitespace and validates up to that
+    /// point, so "my alias" is considered valid (as "my") by the implementation
     bool result = valid_alias_name("my alias");
     (void)result; /// Just ensure it doesn't crash
 }

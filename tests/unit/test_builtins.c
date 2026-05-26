@@ -629,9 +629,9 @@ TEST(eval_no_args) {
 TEST(shift_default) {
     executor_t *exec = setup_executor();
 
-    /* shift requires positional parameters available; overshift is a
-     * diagnostic error per POSIX (matching dash, bash, zsh). Set up
-     * three positional params, then shift by the default count of 1. */
+    /// shift requires positional parameters available; overshift is a
+    /// diagnostic error per POSIX (matching dash, bash, zsh). Set up
+    /// three positional params, then shift by the default count of 1.
     executor_execute_command_line(exec, "set -- a b c", 1);
     int status = executor_execute_command_line(exec, "shift", 1);
     ASSERT_EQ(status, 0, "shift should succeed when params available");
@@ -653,8 +653,8 @@ TEST(shift_explicit_count) {
 TEST(shift_overshift_errors) {
     executor_t *exec = setup_executor();
 
-    /* Overshift (count > $#) must produce a diagnostic and return
-     * non-zero, matching dash/bash/zsh and the POSIX convention. */
+    /// Overshift (count > $#) must produce a diagnostic and return
+    /// non-zero, matching dash/bash/zsh and the POSIX convention.
     executor_execute_command_line(exec, "set -- a b", 1);
     int status = executor_execute_command_line(exec, "shift 5", 1);
     ASSERT_EQ(status, 1, "shift 5 with 2 params should fail");
@@ -817,12 +817,10 @@ TEST(readonly_variable) {
 }
 
 TEST(readonly_prevents_modification) {
-    /*
-     * KNOWN LIMITATION: readonly enforcement not yet implemented
-     * The readonly builtin sets variables but doesn't prevent modification.
-     * See bin_readonly() comments in builtins.c - "simplified implementation"
-     * TODO: Implement readonly enforcement in symbol table
-     */
+    /// KNOWN LIMITATION: readonly enforcement not yet implemented
+    /// The readonly builtin sets variables but doesn't prevent modification.
+    /// See bin_readonly() comments in builtins.c - "simplified implementation"
+    /// TODO: Implement readonly enforcement in symbol table
     executor_t *exec = setup_executor();
 
     executor_execute_command_line(exec, "readonly ROVAR2=original", 1);

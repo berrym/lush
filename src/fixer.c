@@ -905,10 +905,10 @@ fixer_result_t fixer_interactive_apply(fixer_interactive_t *session,
     qsort(session->ctx->fixes, session->ctx->count, sizeof(fixer_fix_t),
           compare_fixes_reverse);
 
-    /* We need to re-map accepted flags after sort - but since we sorted
-     * by match_start descending, we need to track which fixes were accepted
-     * by their original index. For simplicity, we'll apply all accepted
-     * fixes based on the match_start position. */
+    /// We need to re-map accepted flags after sort - but since we sorted
+    /// by match_start descending, we need to track which fixes were accepted
+    /// by their original index. For simplicity, we'll apply all accepted
+    /// fixes based on the match_start position.
 
     /// Start with a copy of the original
     size_t buf_size = session->ctx->content_len * 2 + 1;

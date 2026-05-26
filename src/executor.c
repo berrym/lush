@@ -365,8 +365,8 @@ executor_t *executor_new(void) {
     executor->alloc_fd_count = 0;
     executor->alloc_fd_cap = 0;
 
-    /* Source-text retention starts empty; populated per-batch by
-     * executor_execute_command_line. */
+    /// Source-text retention starts empty; populated per-batch by
+    /// executor_execute_command_line.
     executor->source_text = NULL;
     executor->source_starting_line = 0;
 
@@ -432,8 +432,8 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->alloc_fd_count = 0;
     executor->alloc_fd_cap = 0;
 
-    /* Source-text retention starts empty; populated per-batch by
-     * executor_execute_command_line. */
+    /// Source-text retention starts empty; populated per-batch by
+    /// executor_execute_command_line.
     executor->source_text = NULL;
     executor->source_starting_line = 0;
 
@@ -780,8 +780,8 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         return;
     }
 
-    /* Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
-     * Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up. */
+    /// Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
+    /// Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up.
     if (SOURCE_LOC_VALID(loc)) {
         char *src_line = executor_get_source_line(executor, loc.line);
         if (src_line) {
@@ -802,8 +802,8 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
     /// Display the error immediately
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
-    /* Set legacy error state for compatibility - use NULL since error was
-     * already displayed */
+    /// Set legacy error state for compatibility - use NULL since error was
+    /// already displayed
     executor->has_error = true;
     executor->error_message = NULL; /// Already displayed via structured system
 
@@ -836,8 +836,8 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         return;
     }
 
-    /* Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
-     * Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up. */
+    /// Attach source line for the rust-style snippet block (`N | ... / ^~~~~`).
+    /// Skipped for SOURCE_LOC_UNKNOWN since there is no line to look up.
     if (SOURCE_LOC_VALID(loc)) {
         char *src_line = executor_get_source_line(executor, loc.line);
         if (src_line) {
@@ -858,8 +858,8 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
     /// Display the error immediately
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
-    /* Set legacy error state for compatibility - use NULL since error was
-     * already displayed */
+    /// Set legacy error state for compatibility - use NULL since error was
+    /// already displayed
     executor->has_error = true;
     executor->error_message = NULL; /// Already displayed via structured system
 
@@ -914,8 +914,7 @@ static void report_command_not_found(executor_t *executor, const char *command,
         }
     }
 
-    /* Get suggestions from autocorrect (builtins + PATH with fast pre-filter)
-     */
+    /// Get suggestions from autocorrect (builtins + PATH with fast pre-filter)
     correction_results_t results;
     int num_suggestions =
         autocorrect_find_suggestions(executor, command, &results);
@@ -948,8 +947,8 @@ static void report_command_not_found(executor_t *executor, const char *command,
         shell_error_set_suggestion(error, suggestion);
     }
 
-    /* Always free autocorrect results (original_command is allocated even with
-     * no suggestions) */
+    /// Always free autocorrect results (original_command is allocated even with
+    /// no suggestions)
     autocorrect_free_results(&results);
 
     /// Display the error
@@ -1013,14 +1012,14 @@ int executor_execute_command_line(executor_t *executor, const char *input,
         starting_line = 1;
     }
 
-    /* Stash source text for the structured-error system. Any error
-     * site emitting via shell_error_create() can pull the actual
-     * source line via executor_get_source_line() and attach it via
-     * shell_error_set_source_line() to produce the full rust-style
-     * snippet block (`N | source line / ^~~~~`). The stash is set to
-     * the input we're about to parse and restored on exit so re-entrant
-     * dispatch (e.g. command substitution running its own batch
-     * recursively) doesn't leak text from one batch into another. */
+    /// Stash source text for the structured-error system. Any error
+    /// site emitting via shell_error_create() can pull the actual
+    /// source line via executor_get_source_line() and attach it via
+    /// shell_error_set_source_line() to produce the full rust-style
+    /// snippet block (`N | source line / ^~~~~`). The stash is set to
+    /// the input we're about to parse and restored on exit so re-entrant
+    /// dispatch (e.g. command substitution running its own batch
+    /// recursively) doesn't leak text from one batch into another.
     const char *saved_source_text = executor->source_text;
     size_t saved_source_starting_line = executor->source_starting_line;
     executor->source_text = input;
@@ -1072,8 +1071,8 @@ int executor_execute_command_line(executor_t *executor, const char *input,
         if (parser_has_error(parser)) {
             /// Display structured errors if available
             parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
-            /* Set executor error for legacy compatibility (may be NULL with new
-             * system) */
+            /// Set executor error for legacy compatibility (may be NULL with
+            /// new system)
             const char *legacy_err = parser_error(parser);
             if (legacy_err) {
                 set_executor_error(executor, legacy_err);
@@ -1089,8 +1088,8 @@ int executor_execute_command_line(executor_t *executor, const char *input,
     if (parser_has_error(parser)) {
         /// Display structured errors if available
         parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
-        /* Set executor error for legacy compatibility (may be NULL with new
-         * system) */
+        /// Set executor error for legacy compatibility (may be NULL with new
+        /// system)
         const char *legacy_err = parser_error(parser);
         if (legacy_err) {
             set_executor_error(executor, legacy_err);
@@ -1113,8 +1112,8 @@ int executor_execute_command_line(executor_t *executor, const char *input,
 
 cleanup:
     free(processed_input);
-    /* Restore previous source-text stash so re-entrant batches don't
-     * leak text from one batch into another. */
+    /// Restore previous source-text stash so re-entrant batches don't
+    /// leak text from one batch into another.
     executor->source_text = saved_source_text;
     executor->source_starting_line = saved_source_starting_line;
     return result;
@@ -1127,9 +1126,9 @@ char *executor_get_source_line(executor_t *executor, size_t file_line) {
         return NULL;
     }
 
-    /* Translate file-relative line number into batch-relative line
-     * number. The batch's first line is executor->source_starting_line
-     * in the original file; that's batch line 1. */
+    /// Translate file-relative line number into batch-relative line
+    /// number. The batch's first line is executor->source_starting_line
+    /// in the original file; that's batch line 1.
     size_t batch_line = file_line - executor->source_starting_line + 1;
 
     const char *src = executor->source_text;
@@ -1319,8 +1318,8 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return 0; /// Syntax check mode - don't execute
         }
 
-        /* Bash-style DEBUG pseudo-signal: fires BEFORE every command.
-         * fire_debug_trap itself gates on functrace + function scope. */
+        /// Bash-style DEBUG pseudo-signal: fires BEFORE every command.
+        /// fire_debug_trap itself gates on functrace + function scope.
         fire_debug_trap();
 
         last_result = execute_node(executor, current);
@@ -1330,24 +1329,24 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return last_result;
         }
 
-        /* POSIX-required shell abort (set by executor_request_posix_exit
-         * from sites like ${var:?word}). Subsequent statements in this
-         * batch must not run; the REPL terminates the shell with
-         * shell_exit_status after we return. */
+        /// POSIX-required shell abort (set by executor_request_posix_exit
+        /// from sites like ${var:?word}). Subsequent statements in this
+        /// batch must not run; the REPL terminates the shell with
+        /// shell_exit_status after we return.
         if (executor->shell_exit_requested) {
             return executor->shell_exit_status;
         }
 
-        /* `exit` builtin requested shell termination. bin_exit sets the
-         * global exit_flag (the REPL polls it to leave its top-level
-         * loop) and stashes the chosen status in last_exit_status. The
-         * REPL alone is not enough: when a script is run as a single
-         * parsed AST, the whole tree executes inside ONE call to
-         * execute_command_list, so without this check every statement
-         * after `exit` still runs (real_world/posix/101 fell through
-         * `exit $?` and ran trailing `rm -f` / `exit 0`). Honor it
-         * here so `exit` inside any nested construct - case arm, if
-         * body, brace group, loop - immediately propagates up. */
+        /// `exit` builtin requested shell termination. bin_exit sets the
+        /// global exit_flag (the REPL polls it to leave its top-level
+        /// loop) and stashes the chosen status in last_exit_status. The
+        /// REPL alone is not enough: when a script is run as a single
+        /// parsed AST, the whole tree executes inside ONE call to
+        /// execute_command_list, so without this check every statement
+        /// after `exit` still runs (real_world/posix/101 fell through
+        /// `exit $?` and ran trailing `rm -f` / `exit 0`). Honor it
+        /// here so `exit` inside any nested construct - case arm, if
+        /// body, brace group, loop - immediately propagates up.
         if (exit_flag) {
             return last_exit_status;
         }
@@ -1362,8 +1361,8 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             printf("DEBUG: Command result: %d\n", last_result);
         }
 
-        /* Bash-style ERR pseudo-signal: fires after a non-zero command
-         * exit, before set -e gets a chance to abort. */
+        /// Bash-style ERR pseudo-signal: fires after a non-zero command
+        /// exit, before set -e gets a chance to abort.
         if (last_result != 0) {
             fire_err_trap();
         }
@@ -1505,8 +1504,8 @@ static int prefix_apply(executor_t *executor, node_t *command, bool transient,
             if (!transient) {
                 free(name);
             }
-            /* On failure idx-th save (if transient) holds this name;
-             * include it so restore undoes any partial apply. */
+            /// On failure idx-th save (if transient) holds this name;
+            /// include it so restore undoes any partial apply.
             if (transient) {
                 idx++;
                 *out_saves = saves;
@@ -1959,12 +1958,10 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
             struct stat st;
             /// Check if the command is actually a directory
             if (stat(argv[0], &st) == 0 && S_ISDIR(st.st_mode)) {
-                /**
-                 * @brief Save old directory for event firing
-                 *
-                 * Required by Spec 26 shell event hub to notify handlers
-                 * of directory change with both old and new paths.
-                 */
+                /// @brief Save old directory for event firing
+                ///
+                /// Required by Spec 26 shell event hub to notify handlers
+                /// of directory change with both old and new paths.
                 char *old_pwd = getcwd(NULL, 0);
 
                 /// Auto-cd to the directory
@@ -1974,16 +1971,14 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                     if (new_pwd) {
                         symtable_set_global("PWD", new_pwd);
 
-                        /**
-                         * @brief Fire directory changed event for LLE shell
-                         * integration
-                         *
-                         * This notifies the prompt composer which:
-                         * - Refreshes context.cwd
-                         * - Invalidates all segment caches
-                         * - Sets needs_regeneration flag
-                         * - Triggers async git status refresh
-                         */
+                        /// @brief Fire directory changed event for LLE shell
+                        /// integration
+                        ///
+                        /// This notifies the prompt composer which:
+                        /// - Refreshes context.cwd
+                        /// - Invalidates all segment caches
+                        /// - Sets needs_regeneration flag
+                        /// - Triggers async git status refresh
                         lle_fire_directory_changed(old_pwd, new_pwd);
 
                         free(new_pwd);
@@ -2396,15 +2391,15 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
             return last_result;
         }
 
-        /* POSIX-required shell abort: short-circuit the chain so the
-         * abort propagates up to execute_command_list and the REPL. */
+        /// POSIX-required shell abort: short-circuit the chain so the
+        /// abort propagates up to execute_command_list and the REPL.
         if (executor->shell_exit_requested) {
             return executor->shell_exit_status;
         }
 
-        /* Bash-style ERR pseudo-signal: fires after a non-zero command
-         * exit, before set -e gets a chance to abort. Matches bash's
-         * "ERR trap before errexit" ordering. */
+        /// Bash-style ERR pseudo-signal: fires after a non-zero command
+        /// exit, before set -e gets a chance to abort. Matches bash's
+        /// "ERR trap before errexit" ordering.
         if (last_result != 0) {
             fire_err_trap();
         }
@@ -2711,8 +2706,8 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             /// Continue to next iteration (just reset and loop again)
         }
 
-        /* `return` inside the body: stop iterating, propagate the
-         * function-return signal to the enclosing function. */
+        /// `return` inside the body: stop iterating, propagate the
+        /// function-return signal to the enclosing function.
         if (loop_body_is_function_return(last_result)) {
             break;
         }
@@ -2842,8 +2837,8 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             /// Continue to next iteration
         }
 
-        /* `return` inside the body: stop iterating, propagate the
-         * function-return signal to the enclosing function. */
+        /// `return` inside the body: stop iterating, propagate the
+        /// function-return signal to the enclosing function.
         if (loop_body_is_function_return(last_result)) {
             break;
         }
@@ -2926,10 +2921,10 @@ static int execute_repeat(executor_t *executor, node_t *repeat_node) {
         return 1;
     }
 
-    /* Evaluate count via the standard arg-expansion path (handles
-     * $var, $(cmd), $((expr)), literal numbers) and then parse as
-     * an integer. zsh accepts a negative or zero count as "do
-     * nothing"; match that. */
+    /// Evaluate count via the standard arg-expansion path (handles
+    /// $var, $(cmd), $((expr)), literal numbers) and then parse as
+    /// an integer. zsh accepts a negative or zero count as "do
+    /// nothing"; match that.
     char *count_text = expand_arg_node(executor, count_node);
     if (!count_text) {
         return 1;
@@ -2963,8 +2958,8 @@ static int execute_repeat(executor_t *executor, node_t *repeat_node) {
             executor->loop_control = LOOP_NORMAL;
             continue;
         }
-        /* `return` inside the body: stop iterating, propagate the
-         * function-return signal to the enclosing function. */
+        /// `return` inside the body: stop iterating, propagate the
+        /// function-return signal to the enclosing function.
         if (loop_body_is_function_return(last_result)) {
             break;
         }
@@ -3130,11 +3125,11 @@ static int execute_for(executor_t *executor, node_t *for_node) {
     if (word_list && word_list->first_child) {
         node_t *word = word_list->first_child;
         while (word) {
-            /* Index into expanded_words where this word node's
-             * normal-expansion output begins, and whether that output
-             * is eligible for pathname expansion. -1 until the normal
-             * expansion path runs (the `$@` and vector paths produce
-             * already-final values that are never glob-expanded). */
+            /// Index into expanded_words where this word node's
+            /// normal-expansion output begins, and whether that output
+            /// is eligible for pathname expansion. -1 until the normal
+            /// expansion path runs (the `$@` and vector paths produce
+            /// already-final values that are never glob-expanded).
             int normal_wc_start = -1;
             bool word_globbable = false;
             if (word->val.str) {
@@ -3195,16 +3190,16 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                         }
                     }
                 } else {
-                    /* Vector-yielding expansions in for-loop word lists:
-                     * `$@`, `"$@"`, `${arr[@]}`, `"${arr[@]}"`,
-                     * `${!arr[@]}`, bare `$arr` (zsh/lush mode), and
-                     * slice variants. Each produces N separate iteration
-                     * values regardless of word-split setting -- the
-                     * for-loop semantics are intrinsically per-element
-                     * for these forms in both bash and zsh. Without this
-                     * the FEATURE_WORD_SPLIT_DEFAULT=false path
-                     * (zsh/lush mode default) treats the joined string
-                     * as one iteration. Issue #99. */
+                    /// Vector-yielding expansions in for-loop word lists:
+                    /// `$@`, `"$@"`, `${arr[@]}`, `"${arr[@]}"`,
+                    /// `${!arr[@]}`, bare `$arr` (zsh/lush mode), and
+                    /// slice variants. Each produces N separate iteration
+                    /// values regardless of word-split setting -- the
+                    /// for-loop semantics are intrinsically per-element
+                    /// for these forms in both bash and zsh. Without this
+                    /// the FEATURE_WORD_SPLIT_DEFAULT=false path
+                    /// (zsh/lush mode default) treats the joined string
+                    /// as one iteration. Issue #99.
                     char **vec = NULL;
                     int vcount = 0;
                     if (try_expand_vector_arg(executor, word, &vec, &vcount)) {
@@ -3348,10 +3343,10 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                     }
                 }
             }
-            /* Pathname-expand the words this UNQUOTED word node just
-             * produced. normal_wc_start is -1 for the `$@` / vector
-             * paths and for quoted word nodes, leaving those
-             * untouched. */
+            /// Pathname-expand the words this UNQUOTED word node just
+            /// produced. normal_wc_start is -1 for the `$@` / vector
+            /// paths and for quoted word nodes, leaving those
+            /// untouched.
             if (normal_wc_start >= 0 && word_globbable) {
                 if (!for_word_list_glob_range(&expanded_words, &word_count,
                                               normal_wc_start)) {
@@ -3416,8 +3411,8 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                 /// Continue to next iteration
             }
 
-            /* `return` inside the body: stop iterating, propagate the
-             * function-return signal to the enclosing function. */
+            /// `return` inside the body: stop iterating, propagate the
+            /// function-return signal to the enclosing function.
             if (loop_body_is_function_return(last_result)) {
                 break;
             }
@@ -3625,8 +3620,8 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
             /// Fall through to update expression
         }
 
-        /* `return` inside the body: stop iterating, propagate the
-         * function-return signal to the enclosing function. */
+        /// `return` inside the body: stop iterating, propagate the
+        /// function-return signal to the enclosing function.
         if (loop_body_is_function_return(last_result)) {
             break;
         }
@@ -3636,8 +3631,8 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
             break;
         }
 
-        /* POSIX-required shell abort fired from inside the body --
-         * skip the update expression and exit the loop. */
+        /// POSIX-required shell abort fired from inside the body --
+        /// skip the update expression and exit the loop.
         if (executor->shell_exit_requested) {
             break;
         }
@@ -4136,12 +4131,12 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
         return 0; /// Empty anonymous function
     }
 
-    /* Collect and expand trailing arguments BEFORE pushing the
-     * function scope. Arg expressions (e.g. $vars inside double-quoted
-     * args) must resolve in the caller's scope, mirroring how
-     * build_argv_from_ast / execute_function_call do for regular
-     * function calls. The expanded strings are then set as positional
-     * parameters once the new scope is active. */
+    /// Collect and expand trailing arguments BEFORE pushing the
+    /// function scope. Arg expressions (e.g. $vars inside double-quoted
+    /// args) must resolve in the caller's scope, mirroring how
+    /// build_argv_from_ast / execute_function_call do for regular
+    /// function calls. The expanded strings are then set as positional
+    /// parameters once the new scope is active.
     int argc = 0;
     for (node_t *arg = body->next_sibling; arg; arg = arg->next_sibling) {
         argc++;
@@ -4157,11 +4152,11 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
         }
         int i = 0;
         for (node_t *arg = body->next_sibling; arg; arg = arg->next_sibling) {
-            /* Use the shared type-aware expansion helper so anon-function
-             * args follow the same per-node-type semantics as regular
-             * command arguments — single-quoted stays literal, double-
-             * quoted expands variables, arith / command substitution /
-             * process substitution all dispatch correctly. */
+            /// Use the shared type-aware expansion helper so anon-function
+            /// args follow the same per-node-type semantics as regular
+            /// command arguments — single-quoted stays literal, double-
+            /// quoted expands variables, arith / command substitution /
+            /// process substitution all dispatch correctly.
             argv[i++] = expand_arg_node(executor, arg);
             if (!argv[i - 1]) {
                 argv[i - 1] = strdup("");
@@ -4474,9 +4469,9 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
     if (!node || !node->val.str) {
         return false;
     }
-    /* Only quoted-string and string-expandable shapes carry a single
-     * parameter-expansion as their entire payload. Other node types
-     * (command sub, arith, etc.) are not vector candidates. */
+    /// Only quoted-string and string-expandable shapes carry a single
+    /// parameter-expansion as their entire payload. Other node types
+    /// (command sub, arith, etc.) are not vector candidates.
     if (node->type != NODE_STRING_EXPANDABLE && node->type != NODE_VAR) {
         return false;
     }
@@ -4498,13 +4493,13 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         (len == 2 && s[0] == '$' && (s[1] == '@' || s[1] == '*'));
     /// ${...} braced forms.
     bool braced = (len >= 3 && s[0] == '$' && s[1] == '{' && s[len - 1] == '}');
-    /* Bare `$NAME` where NAME is an array. zsh expands bare array
-     * references to N words in word-list contexts (for-loop iteration,
-     * command argv) regardless of word-split setting. Bash's `$arr`
-     * is the first element only, so only treat this as vector form
-     * in zsh/lush mode. Detected here so execute_for and
-     * build_argv_from_ast both honor it via the same helper.
-     * Issue #99. */
+    /// Bare `$NAME` where NAME is an array. zsh expands bare array
+    /// references to N words in word-list contexts (for-loop iteration,
+    /// command argv) regardless of word-split setting. Bash's `$arr`
+    /// is the first element only, so only treat this as vector form
+    /// in zsh/lush mode. Detected here so execute_for and
+    /// build_argv_from_ast both honor it via the same helper.
+    /// Issue #99.
     bool bare_array = false;
     if (!positional_at && !braced && len >= 2 && s[0] == '$' &&
         (isalpha((unsigned char)s[1]) || s[1] == '_')) {
@@ -4524,9 +4519,9 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 array_value_t *probe = symtable_get_array(name_buf);
                 if (probe) {
                     shell_mode_t mode = shell_mode_get();
-                    /* Curated: zsh + lush explode bare $arr; bash + posix
-                     * keep it scalar (first element via the existing
-                     * expand_array_unsubscripted path). */
+                    /// Curated: zsh + lush explode bare $arr; bash + posix
+                    /// keep it scalar (first element via the existing
+                    /// expand_array_unsubscripted path).
                     if (mode == SHELL_MODE_ZSH || mode == SHELL_MODE_LUSH) {
                         bare_array = true;
                     }
@@ -4539,14 +4534,13 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         return false;
     }
 
-    /* Distinguish what's inside the braces. For positional_at the
-     * "name" is `@` / `*`; subscript is implied. For braced forms:
-     * - `${@}` / `${*}` -> positional, same as $@/$*
-     * - `${NAME[@]}` / `${NAME[*]}` -> array all
-     * - `${!NAME[@]}` -> array keys
-     * - any of the above with `:N` or `:N:M` slicing suffix
-     * - anything else -> not a vector form
-     */
+    /// Distinguish what's inside the braces. For positional_at the
+    /// "name" is `@` / `*`; subscript is implied. For braced forms:
+    /// - `${@}` / `${*}` -> positional, same as $@/$*
+    /// - `${NAME[@]}` / `${NAME[*]}` -> array all
+    /// - `${!NAME[@]}` -> array keys
+    /// - any of the above with `:N` or `:N:M` slicing suffix
+    /// - anything else -> not a vector form
     bool keys_form = false;
     const char *name_start = NULL;
     size_t name_len = 0;
@@ -4559,8 +4553,8 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
     if (positional_at) {
         subscript = s[1];
     } else if (bare_array) {
-        /* Bare $NAME: name is s+1, length is len-1. Treat as if it
-         * were ${NAME[@]} -- produce all elements as separate words. */
+        /// Bare $NAME: name is s+1, length is len-1. Treat as if it
+        /// were ${NAME[@]} -- produce all elements as separate words.
         name_start = s + 1;
         name_len = len - 1;
         subscript = '@';
@@ -4571,11 +4565,11 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         if (p == end) {
             return false;
         }
-        /* ${(FLAGS)NAME} -- zsh parameter-flag vector form. Recognised
-         * flag chars: k (keys), v (values, default), o (sort ascending),
-         * O (sort descending), a (array-order, no sort), u (unique).
-         * Builds the vector directly and short-circuits the rest of
-         * try_expand_vector_arg. Issue #104. */
+        /// ${(FLAGS)NAME} -- zsh parameter-flag vector form. Recognised
+        /// flag chars: k (keys), v (values, default), o (sort ascending),
+        /// O (sort descending), a (array-order, no sort), u (unique).
+        /// Builds the vector directly and short-circuits the rest of
+        /// try_expand_vector_arg. Issue #104.
         if (*p == '(') {
             const char *flag_start = p + 1;
             const char *flag_end = flag_start;
@@ -4735,15 +4729,15 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
             if (name_len == 0) {
                 return false;
             }
-            /* Braced bare `${NAME}` (no subscript). Per SEMANTICS.md
-             * section 3.9, a bare reference to a list/map value is a
-             * vector-yielding expansion -- it contributes its elements
-             * to the surrounding argv/word-list slot, exactly as
-             * `${NAME[@]}` does. Curated zsh/lush behavior; bash and
-             * posix mode keep the legacy "first-element" form via
-             * expand_array_unsubscripted. The unbraced `$NAME` case
-             * is already handled above; this is the braced peer.
-             * Issue: SEMANTICS section 3.9 conformance. */
+            /// Braced bare `${NAME}` (no subscript). Per SEMANTICS.md
+            /// section 3.9, a bare reference to a list/map value is a
+            /// vector-yielding expansion -- it contributes its elements
+            /// to the surrounding argv/word-list slot, exactly as
+            /// `${NAME[@]}` does. Curated zsh/lush behavior; bash and
+            /// posix mode keep the legacy "first-element" form via
+            /// expand_array_unsubscripted. The unbraced `$NAME` case
+            /// is already handled above; this is the braced peer.
+            /// Issue: SEMANTICS section 3.9 conformance.
             if (!keys_form && p == end) {
                 char nb[256];
                 if (name_len >= sizeof(nb)) {
@@ -4784,8 +4778,8 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     return false;
                 }
                 char *endp = NULL;
-                /* end is past the trailing `}`; we need a NUL-terminated
-                 * span. Copy the slice spec into a scratch buffer. */
+                /// end is past the trailing `}`; we need a NUL-terminated
+                /// span. Copy the slice spec into a scratch buffer.
                 size_t spec_len = (size_t)(end - p);
                 char spec[64];
                 if (spec_len >= sizeof(spec)) {
@@ -4816,9 +4810,9 @@ braced_bare_array_ready:;
     int vcap = 0;
 
     if (is_positional) {
-        /* Iterate $1..$N from positional params. Match the existing
-         * "$@" loop in execute_for: in function scope use symtable
-         * "1".."N"; otherwise use shell_argv. */
+        /// Iterate $1..$N from positional params. Match the existing
+        /// "$@" loop in execute_for: in function scope use symtable
+        /// "1".."N"; otherwise use shell_argv.
         int total;
         if (symtable_in_function_scope(executor->symtable)) {
             char *argc_str = symtable_get_var(executor->symtable, "#");
@@ -4912,14 +4906,14 @@ braced_bare_array_ready:;
                 }
                 free(keys);
             } else {
-                /* Indexed array: keys are the ACTUAL stored indices.
-                 * For dense arrays these are 0..N-1; for sparse arrays
-                 * they are the explicit indices assigned. The prior
-                 * implementation generated 0..N-1 dense, which
-                 * silently turned sparse arrays into dense ones and
-                 * broke `for k in "${!arr[@]}"; do echo arr[$k]` on
-                 * sparse data (issue #101). symtable_array_get_keys
-                 * returns the real indices via array->indices[]. */
+                /// Indexed array: keys are the ACTUAL stored indices.
+                /// For dense arrays these are 0..N-1; for sparse arrays
+                /// they are the explicit indices assigned. The prior
+                /// implementation generated 0..N-1 dense, which
+                /// silently turned sparse arrays into dense ones and
+                /// broke `for k in "${!arr[@]}"; do echo arr[$k]` on
+                /// sparse data (issue #101). symtable_array_get_keys
+                /// returns the real indices via array->indices[].
                 size_t kcount = 0;
                 char **keys = symtable_array_get_keys(array, &kcount);
                 if (!keys) {
@@ -5020,10 +5014,10 @@ static char *expand_arg_node(executor_t *executor, node_t *node) {
         }
         return strdup(node->val.str);
     case NODE_STRING_EXPANDABLE:
-        /* Per parser.c collect_word_argument: word-context backslashes
-         * have been pre-stripped during multi-token concat, so any `\X`
-         * still present in node->val.str came from a `"..."` segment and
-         * must be resolved with double-quote rules. */
+        /// Per parser.c collect_word_argument: word-context backslashes
+        /// have been pre-stripped during multi-token concat, so any `\X`
+        /// still present in node->val.str came from a `"..."` segment and
+        /// must be resolved with double-quote rules.
         return expand_quoted_string(executor, node->val.str, true);
     case NODE_ARITH_EXP:
         return expand_arithmetic(executor, node->val.str);
@@ -5073,16 +5067,16 @@ static char *expand_array_unsubscripted(executor_t *executor,
         const char *first = symtable_array_get_index(array, 0);
         return strdup(first ? first : "");
     }
-    /* zsh/lush mode: per SEMANTICS.md section 3.9, a list/map value
-     * reaching a scalar slot (or glued to text within a word) is a
-     * runtime type error. We get here only AFTER try_expand_vector_arg
-     * declined to handle the reference as vector-yielding -- which
-     * means the surrounding context is scalar (variable assignment
-     * RHS, case word, here-string, arithmetic operand, conditional-
-     * expression operand, or a within-word "glued" position). Emit
-     * the type-mismatch diagnostic via the structured-error system
-     * and request a POSIX shell abort so a script halts before the
-     * bad value reaches a downstream command. */
+    /// zsh/lush mode: per SEMANTICS.md section 3.9, a list/map value
+    /// reaching a scalar slot (or glued to text within a word) is a
+    /// runtime type error. We get here only AFTER try_expand_vector_arg
+    /// declined to handle the reference as vector-yielding -- which
+    /// means the surrounding context is scalar (variable assignment
+    /// RHS, case word, here-string, arithmetic operand, conditional-
+    /// expression operand, or a within-word "glued" position). Emit
+    /// the type-mismatch diagnostic via the structured-error system
+    /// and request a POSIX shell abort so a script halts before the
+    /// bad value reaches a downstream command.
     shell_error_t *err = shell_error_create(
         SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
         executor_current_loc(executor),
@@ -5165,12 +5159,12 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                 }
 
                 if (!is_delimiter) {
-                    /* Vector-yielding expansion: `"$@"`, `"${arr[@]}"`,
-                     * `"${!arr[@]}"` and their slice variants must
-                     * produce N separate argv slots, not one
-                     * concatenated slot. Detect before scalar
-                     * expansion so the original element boundaries
-                     * survive (issue #97). */
+                    /// Vector-yielding expansion: `"$@"`, `"${arr[@]}"`,
+                    /// `"${!arr[@]}"` and their slice variants must
+                    /// produce N separate argv slots, not one
+                    /// concatenated slot. Detect before scalar
+                    /// expansion so the original element boundaries
+                    /// survive (issue #97).
                     char **vec = NULL;
                     int vcount = 0;
                     if (try_expand_vector_arg(executor, child, &vec, &vcount)) {
@@ -5189,10 +5183,10 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                         continue;
                     }
 
-                    /* Type-aware expansion via the shared helper.
-                     * Process substitution is the only path that
-                     * propagates failure as NULL — everything else
-                     * either succeeds or returns "". */
+                    /// Type-aware expansion via the shared helper.
+                    /// Process substitution is the only path that
+                    /// propagates failure as NULL — everything else
+                    /// either succeeds or returns "".
                     char *expanded_arg = expand_arg_node(executor, child);
                     if (!expanded_arg && (child->type == NODE_PROC_SUB_IN ||
                                           child->type == NODE_PROC_SUB_OUT)) {
@@ -5730,13 +5724,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
     /// Single-quoted content should not be expanded (POSIX requirement)
     /// BUT: Don't enter this path for command substitution $(...) or `...`
     /// which may contain quotes internally
-    /* Enter the single-quote-handling block only when the text has
-     * at least one MATCHED pair of UNESCAPED single quotes. The
-     * parser pre-escapes `'` chars inside TOK_EXPANDABLE_STRING
-     * content (issue #102) so they appear here as `\'` and must
-     * not count toward the pair check -- those are literal
-     * characters that the POSIX-unquoted backslash rule resolves
-     * downstream. */
+    /// Enter the single-quote-handling block only when the text has
+    /// at least one MATCHED pair of UNESCAPED single quotes. The
+    /// parser pre-escapes `'` chars inside TOK_EXPANDABLE_STRING
+    /// content (issue #102) so they appear here as `\'` and must
+    /// not count toward the pair check -- those are literal
+    /// characters that the POSIX-unquoted backslash rule resolves
+    /// downstream.
     bool has_paired_single_quote = false;
     {
         size_t unescaped = 0;
@@ -5963,8 +5957,8 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             /// Tilde was expanded, now check if result needs variable expansion
             const char *first_dollar = strchr(tilde_expanded, '$');
             if (first_dollar) {
-                /* Unquoted text post-tilde-expansion: POSIX-unquoted
-                 * escape rules apply to any surviving backslashes. */
+                /// Unquoted text post-tilde-expansion: POSIX-unquoted
+                /// escape rules apply to any surviving backslashes.
                 char *final_result =
                     expand_quoted_string(executor, tilde_expanded, false);
                 free(tilde_expanded);
@@ -6042,11 +6036,11 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             }
             return strdup(text);
         } else if (strncmp(text, "$((", 3) == 0) {
-            /* Disambiguate `$((` between arithmetic and command-sub
-             * of an anonymous function `$(() {...})`. Same shape as
-             * the tokenizer and expand_variables_in_string detectors
-             * (issue #99): if the lookahead from after $(( finds {,
-             * }, ;, or \n before matched )), route to command-sub. */
+            /// Disambiguate `$((` between arithmetic and command-sub
+            /// of an anonymous function `$(() {...})`. Same shape as
+            /// the tokenizer and expand_variables_in_string detectors
+            /// (issue #99): if the lookahead from after $(( finds {,
+            /// }, ;, or \n before matched )), route to command-sub.
             bool looks_arith = true;
             {
                 size_t tlen = strlen(text);
@@ -6108,16 +6102,16 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         return expand_command_substitution(executor, text);
     }
 
-    /* Regular text reaching this path has no quote machinery and no
-     * expansion markers ($, ~, `, ') -- only possibly backslash
-     * escapes. Per POSIX, `\X` outside any quote produces a literal X
-     * (with `\<newline>` removed entirely as line continuation). The
-     * older code was returning strdup(text) here, which left the
-     * backslashes in the argument and produced bug #90 (a typed
-     * `rm a\ test\ file.txt` shipped the literal backslash through
-     * to rm). The fix walks the text removing the escape backslashes;
-     * the post-walk string is the dequoted form the executor will
-     * eventually pass through field splitting and into argv. */
+    /// Regular text reaching this path has no quote machinery and no
+    /// expansion markers ($, ~, `, ') -- only possibly backslash
+    /// escapes. Per POSIX, `\X` outside any quote produces a literal X
+    /// (with `\<newline>` removed entirely as line continuation). The
+    /// older code was returning strdup(text) here, which left the
+    /// backslashes in the argument and produced bug #90 (a typed
+    /// `rm a\ test\ file.txt` shipped the literal backslash through
+    /// to rm). The fix walks the text removing the escape backslashes;
+    /// the post-walk string is the dequoted form the executor will
+    /// eventually pass through field splitting and into argv.
     {
         size_t len = strlen(text);
         char *result = malloc(len + 1);
@@ -6132,11 +6126,11 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     i++;
                     continue;
                 }
-                /* Strip the backslash; emit the escaped character.
-                 * Multi-byte UTF-8 escapees survive because their
-                 * continuation bytes are >= 0x80 and are not '\\'
-                 * themselves; the next loop iteration sees them as
-                 * regular bytes and copies them through. */
+                /// Strip the backslash; emit the escaped character.
+                /// Multi-byte UTF-8 escapees survive because their
+                /// continuation bytes are >= 0x80 and are not '\\'
+                /// themselves; the next loop iteration sees them as
+                /// regular bytes and copies them through.
                 result[out++] = next;
                 i++;
                 continue;
@@ -6220,8 +6214,8 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             continue;
         }
 
-        /* Bash-style DEBUG pseudo-signal: fires BEFORE each command in a
-         * brace group. fire_debug_trap gates on functrace + scope. */
+        /// Bash-style DEBUG pseudo-signal: fires BEFORE each command in a
+        /// brace group. fire_debug_trap gates on functrace + scope.
         fire_debug_trap();
 
         last_result = execute_node(executor, command);
@@ -6230,11 +6224,11 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             printf("DEBUG: Brace group command result: %d\n", last_result);
         }
 
-        /* Bash-style ERR pseudo-signal: fires on a non-zero exit
-         * inside a brace group. fire_err_trap itself gates on
-         * errtrace + function scope so the trap is suppressed inside
-         * functions by default and surfaces only when the user opts
-         * in. */
+        /// Bash-style ERR pseudo-signal: fires on a non-zero exit
+        /// inside a brace group. fire_err_trap itself gates on
+        /// errtrace + function scope so the trap is suppressed inside
+        /// functions by default and surfaces only when the user opts
+        /// in.
         if (last_result != 0 && last_result < 200) {
             fire_err_trap();
         }
@@ -6253,8 +6247,8 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             break;
         }
 
-        /* POSIX-required shell abort: drop out of the brace group so
-         * the request propagates to the surrounding command list. */
+        /// POSIX-required shell abort: drop out of the brace group so
+        /// the request propagates to the surrounding command list.
         if (executor->shell_exit_requested) {
             break;
         }
@@ -6322,31 +6316,31 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
             }
             last_result = execute_node(executor, command);
 
-            /* Update $? between subshell commands so subsequent
-             * argv expansions see the correct exit status. NODE_PIPE
-             * and NODE_BUILTIN paths set last_exit_status via
-             * set_exit_status() inside execute_command, but the
-             * pipeline executor itself returns directly without
-             * updating it. The outer execute_command_list does this
-             * after each command; the subshell loop was missing the
-             * same update. Issue #100. */
+            /// Update $? between subshell commands so subsequent
+            /// argv expansions see the correct exit status. NODE_PIPE
+            /// and NODE_BUILTIN paths set last_exit_status via
+            /// set_exit_status() inside execute_command, but the
+            /// pipeline executor itself returns directly without
+            /// updating it. The outer execute_command_list does this
+            /// after each command; the subshell loop was missing the
+            /// same update. Issue #100.
             set_exit_status(last_result);
 
-            /* Honor set -e inside the subshell: if a command fails
-             * (non-zero exit) and the option is on, abort the rest
-             * of the subshell body. The existing exit_on_error check
-             * lives in execute_command_list / execute_command_chain
-             * which the subshell loop bypasses. The standard
-             * exceptions for if-conditions and ||/&& chains are
-             * already handled by their respective execute_* paths
-             * not propagating last_result to here. Issue #100. */
+            /// Honor set -e inside the subshell: if a command fails
+            /// (non-zero exit) and the option is on, abort the rest
+            /// of the subshell body. The existing exit_on_error check
+            /// lives in execute_command_list / execute_command_chain
+            /// which the subshell loop bypasses. The standard
+            /// exceptions for if-conditions and ||/&& chains are
+            /// already handled by their respective execute_* paths
+            /// not propagating last_result to here. Issue #100.
             if (shell_opts.exit_on_error && last_result != 0) {
                 break;
             }
 
-            /* POSIX-required shell abort -- same flag the outer
-             * walker honors; if the subshell hit a ${var:?} or
-             * similar, terminate. */
+            /// POSIX-required shell abort -- same flag the outer
+            /// walker honors; if the subshell hit a ${var:?} or
+            /// similar, terminate.
             if (executor->shell_exit_requested) {
                 last_result = executor->shell_exit_status;
                 break;
@@ -7545,8 +7539,8 @@ static char **expand_glob_dotglob(const char *base_pattern,
             strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-        /* fnmatch without FNM_PERIOD: `*` matches leading-dot names,
-         * which is exactly the D-qualifier semantics. */
+        /// fnmatch without FNM_PERIOD: `*` matches leading-dot names,
+        /// which is exactly the D-qualifier semantics.
         if (fnmatch(filepat, entry->d_name, 0) != 0) {
             continue;
         }
@@ -7735,13 +7729,13 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    /* Ensure base_pattern is set to a strdup of the original pattern
-     * when no qualifier was parsed. parse_glob_qualifier already does
-     * this on its GLOB_QUAL_NONE return paths (lines 5887, 5959), so
-     * we only need to strdup here when the qualifier feature is
-     * disabled and parse_glob_qualifier was therefore never called --
-     * doing it unconditionally would leak the parse_glob_qualifier
-     * allocation (issue #112). */
+    /// Ensure base_pattern is set to a strdup of the original pattern
+    /// when no qualifier was parsed. parse_glob_qualifier already does
+    /// this on its GLOB_QUAL_NONE return paths (lines 5887, 5959), so
+    /// we only need to strdup here when the qualifier feature is
+    /// disabled and parse_glob_qualifier was therefore never called --
+    /// doing it unconditionally would leak the parse_glob_qualifier
+    /// allocation (issue #112).
     if (qualifier == GLOB_QUAL_NONE && !base_pattern) {
         base_pattern = strdup(pattern);
     }
@@ -7751,8 +7745,8 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
-    /* The zsh `D` qualifier requests dotfile matching, which libc
-     * glob() cannot do portably -- route through a readdir scan. */
+    /// The zsh `D` qualifier requests dotfile matching, which libc
+    /// glob() cannot do portably -- route through a readdir scan.
     if (qualifier & GLOB_QUAL_DOTGLOB) {
         char **dot_results =
             expand_glob_dotglob(base_pattern, qualifier, expanded_count);
@@ -8130,12 +8124,12 @@ static char **expand_brace_range(const char *prefix, const char *content,
 
     int cap = brace_expansion_cap();
     if (count <= 0 || (cap > 0 && count > cap)) {
-        /* Range exceeds configured cap (or is degenerate). Signal
-         * limit-exceeded distinctly from malloc/parse failure so the
-         * top-level caller can produce a real diagnostic. The cap path
-         * relies on the sentinel; the count<=0 path keeps prior
-         * "fall back to original pattern" behaviour by returning NULL
-         * with *expanded_count = 0 unchanged. */
+        /// Range exceeds configured cap (or is degenerate). Signal
+        /// limit-exceeded distinctly from malloc/parse failure so the
+        /// top-level caller can produce a real diagnostic. The cap path
+        /// relies on the sentinel; the count<=0 path keeps prior
+        /// "fall back to original pattern" behaviour by returning NULL
+        /// with *expanded_count = 0 unchanged.
         if (cap > 0 && count > cap) {
             *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
         }
@@ -8335,11 +8329,11 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    /* Find the matching close brace, tracking nesting depth so that
-     * patterns like `{{1..3},{a..c}}` resolve the OUTER brace first
-     * rather than the first inner `}`. Without this, the function
-     * splits content as `{1..3` and bails, leaving the pattern
-     * un-expanded (real_world/bash/206). */
+    /// Find the matching close brace, tracking nesting depth so that
+    /// patterns like `{{1..3},{a..c}}` resolve the OUTER brace first
+    /// rather than the first inner `}`. Without this, the function
+    /// splits content as `{1..3` and bails, leaving the pattern
+    /// un-expanded (real_world/bash/206).
     const char *close = NULL;
     {
         int depth = 1;
@@ -8387,11 +8381,11 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     strncpy(content, open + 1, content_len);
     content[content_len] = '\0';
 
-    /* Check if this is a SIMPLE range pattern (e.g. `1..10`, `a..z`,
-     * `1..10..2`). A range pattern has `..` and no top-level commas
-     * and no nested braces — otherwise it's a comma-list whose items
-     * happen to contain ranges (e.g. `{{1..3},{a..c}}`) and must be
-     * split on the outer commas first. */
+    /// Check if this is a SIMPLE range pattern (e.g. `1..10`, `a..z`,
+    /// `1..10..2`). A range pattern has `..` and no top-level commas
+    /// and no nested braces — otherwise it's a comma-list whose items
+    /// happen to contain ranges (e.g. `{{1..3},{a..c}}`) and must be
+    /// split on the outer commas first.
     bool is_range = false;
     if (strstr(content, "..")) {
         is_range = true;
@@ -8425,10 +8419,10 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    /* Count comma-separated items at the TOP LEVEL only. Commas
-     * inside nested braces belong to the inner pattern and must not
-     * split the outer one (e.g. `{{1..3},{a..c}}` has two outer
-     * items, not five). */
+    /// Count comma-separated items at the TOP LEVEL only. Commas
+    /// inside nested braces belong to the inner pattern and must not
+    /// split the outer one (e.g. `{{1..3},{a..c}}` has two outer
+    /// items, not five).
     int item_count = 1;
     {
         int depth = 0;
@@ -8458,8 +8452,8 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     char *comma_pos = content;
 
     while (result_index < item_count) {
-        /* Find next TOP-LEVEL comma (depth 0) or end of string.
-         * Nested braces hide their commas from the outer split. */
+        /// Find next TOP-LEVEL comma (depth 0) or end of string.
+        /// Nested braces hide their commas from the outer split.
         int depth = 0;
         while (*comma_pos && !(depth == 0 && *comma_pos == ',')) {
             if (*comma_pos == '{') {
@@ -8523,11 +8517,11 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
     free(prefix);
     free(content);
 
-    /* Recursively expand any remaining brace patterns in results.
-     * This handles Cartesian products like `{1..2}{a..b}` (where the
-     * suffix carries another brace) AND nested patterns like
-     * `{{1..3},{a..c}}` (where each comma-separated item is itself a
-     * brace pattern). Scan all results so neither case is missed. */
+    /// Recursively expand any remaining brace patterns in results.
+    /// This handles Cartesian products like `{1..2}{a..b}` (where the
+    /// suffix carries another brace) AND nested patterns like
+    /// `{{1..3},{a..c}}` (where each comma-separated item is itself a
+    /// brace pattern). Scan all results so neither case is missed.
     bool any_result_has_brace = false;
     for (int i = 0; i < item_count; i++) {
         if (strchr(result[i], '{')) {
@@ -8543,8 +8537,8 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
 
         for (int i = 0; i < item_count; i++) {
             if (limit_hit) {
-                /* Already over cap — drain remaining originals
-                 * cleanly to avoid leaks. */
+                /// Already over cap — drain remaining originals
+                /// cleanly to avoid leaks.
                 free(result[i]);
                 continue;
             }
@@ -8599,9 +8593,9 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                         final_results = new_final;
                         final_results[final_count++] = result[i];
                     } else {
-                        /* realloc failed — original was unmodified, but
-                         * result[i] is now orphaned; free it to avoid
-                         * a leak under malloc pressure. */
+                        /// realloc failed — original was unmodified, but
+                        /// result[i] is now orphaned; free it to avoid
+                        /// a leak under malloc pressure.
                         free(result[i]);
                     }
                 }
@@ -8626,8 +8620,8 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         free(result); /// Free original array
 
         if (limit_hit) {
-            /* Cap exceeded — release the partial accumulation cleanly
-             * and return the limit sentinel for the top-level caller. */
+            /// Cap exceeded — release the partial accumulation cleanly
+            /// and return the limit sentinel for the top-level caller.
             for (int j = 0; j < final_count; j++) {
                 free(final_results[j]);
             }
@@ -8814,13 +8808,13 @@ static int execute_builtin_command(executor_t *executor, char **argv,
     /// Set global executor for job control builtins
     current_executor = executor;
 
-    /* Stash the call-site source location for the duration of this
-     * builtin invocation so builtin error helpers can produce a real
-     * `--> file:line:col` line and source-snippet caret. The swap
-     * returns the previously-stashed loc, which we restore on every
-     * exit path so a re-entrant builtin (e.g. `eval` invoking another
-     * builtin) doesn't clobber the outer caller's location when the
-     * inner call returns. */
+    /// Stash the call-site source location for the duration of this
+    /// builtin invocation so builtin error helpers can produce a real
+    /// `--> file:line:col` line and source-snippet caret. The swap
+    /// returns the previously-stashed loc, which we restore on every
+    /// exit path so a re-entrant builtin (e.g. `eval` invoking another
+    /// builtin) doesn't clobber the outer caller's location when the
+    /// inner call returns.
     source_location_t saved_loc = builtin_swap_source_location(loc);
 
     /// Find the builtin function in the builtin table
@@ -8853,13 +8847,13 @@ static int execute_builtin_command(executor_t *executor, char **argv,
                 argc++;
             }
 
-            /* Push "in builtin '<name>'" onto the executor's context
-             * stack for the duration of this builtin invocation.
-             * executor_error_report() (the canonical wrapper) walks
-             * the context stack at display time, so any error a
-             * builtin emits — directly or via the wrapper — picks up
-             * this context frame automatically. Per-builtin sites no
-             * longer need to push it themselves. */
+            /// Push "in builtin '<name>'" onto the executor's context
+            /// stack for the duration of this builtin invocation.
+            /// executor_error_report() (the canonical wrapper) walks
+            /// the context stack at display time, so any error a
+            /// builtin emits — directly or via the wrapper — picks up
+            /// this context frame automatically. Per-builtin sites no
+            /// longer need to push it themselves.
             executor_push_context(executor, loc, "in builtin '%s'", argv[0]);
 
             int result = builtins[i].func(argc, argv);
@@ -9103,27 +9097,27 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     char *value = expand_if_needed(executor, eq + 1);
     int cmd_sub_exit_status = executor->exit_status;
 
-    /* Propagate expansion failure. ${var:?word} and friends set
-     * expansion_error during expand_if_needed; without this check
-     * execute_assignment silently stores the empty fallback and
-     * returns 0, masking the failure from the caller (execute_command
-     * does check this flag in the command-not-assignment path, but
-     * assignment-only commands bypassed that check). Free what was
-     * allocated and surface expansion_exit_status. shell_exit_requested,
-     * if set, has already been raised by executor_request_posix_exit
-     * and will short-circuit the surrounding command list / loop /
-     * function body. */
+    /// Propagate expansion failure. ${var:?word} and friends set
+    /// expansion_error during expand_if_needed; without this check
+    /// execute_assignment silently stores the empty fallback and
+    /// returns 0, masking the failure from the caller (execute_command
+    /// does check this flag in the command-not-assignment path, but
+    /// assignment-only commands bypassed that check). Free what was
+    /// allocated and surface expansion_exit_status. shell_exit_requested,
+    /// if set, has already been raised by executor_request_posix_exit
+    /// and will short-circuit the surrounding command list / loop /
+    /// function body.
     if (executor->expansion_error) {
         free(value);
         free(var_name);
         return executor->expansion_exit_status;
     }
 
-    /* Integer attribute (declare -i): subsequent assignments to the
-     * variable arith-evaluate the RHS rather than storing the literal
-     * string. `declare -i n; n=5+3` stores "8", not "5+3". Same for
-     * `n=other_var+1` -- the RHS is evaluated as an arithmetic
-     * expression which resolves identifiers as variables. Issue #102. */
+    /// Integer attribute (declare -i): subsequent assignments to the
+    /// variable arith-evaluate the RHS rather than storing the literal
+    /// string. `declare -i n; n=5+3` stores "8", not "5+3". Same for
+    /// `n=other_var+1` -- the RHS is evaluated as an arithmetic
+    /// expression which resolves identifiers as variables. Issue #102.
     if (symtable_get_flags(executor->symtable, var_name) &
         SYMVAR_INTEGER_ATTR) {
         char *evaluated =
@@ -9299,15 +9293,15 @@ static int execute_case(executor_t *executor, node_t *node) {
             execute_next; /// If fall-through, execute without testing
 
         if (!matched) {
-            /* Split patterns by `|` and test each. strtok cannot be
-             * used here because it skips empty tokens -- POSIX `case`
-             * accepts an empty pattern (`''` matches the empty word),
-             * and a multi-pattern arm may legitimately contain an
-             * empty alternative (`case x in ''|a) ...`). strtok would
-             * silently drop those, falling through to the default
-             * `*)` and producing a POSIX-violating result (issue #95).
-             *
-             * Use strchr-based splitting that emits empty tokens. */
+            /// Split patterns by `|` and test each. strtok cannot be
+            /// used here because it skips empty tokens -- POSIX `case`
+            /// accepts an empty pattern (`''` matches the empty word),
+            /// and a multi-pattern arm may legitimately contain an
+            /// empty alternative (`case x in ''|a) ...`). strtok would
+            /// silently drop those, falling through to the default
+            /// `*)` and producing a POSIX-violating result (issue #95).
+            ///
+            /// Use strchr-based splitting that emits empty tokens.
             const char *p = patterns;
             while (p && !matched) {
                 const char *bar = strchr(p, '|');
@@ -9337,16 +9331,16 @@ static int execute_case(executor_t *executor, node_t *node) {
         }
 
         if (matched) {
-            /* Execute commands for this case item. A case arm is a
-             * command list - run every statement sequentially. Do NOT
-             * short-circuit on a non-zero status (that was wrong: it
-             * dropped `exit $?` after a non-zero `do_status` in
-             * real_world/posix/101 init scripts, and silently dropped
-             * later statements in `x) echo a; false; echo b ;;`).
-             * Errexit (set -e) is enforced at execute_command_list,
-             * not here. Honor loop control / shell exit between
-             * statements so `break` / `continue` / `exit` propagate
-             * out of the arm without running trailing commands. */
+            /// Execute commands for this case item. A case arm is a
+            /// command list - run every statement sequentially. Do NOT
+            /// short-circuit on a non-zero status (that was wrong: it
+            /// dropped `exit $?` after a non-zero `do_status` in
+            /// real_world/posix/101 init scripts, and silently dropped
+            /// later statements in `x) echo a; false; echo b ;;`).
+            /// Errexit (set -e) is enforced at execute_command_list,
+            /// not here. Honor loop control / shell exit between
+            /// statements so `break` / `continue` / `exit` propagate
+            /// out of the arm without running trailing commands.
             node_t *commands = case_item->first_child;
             while (commands) {
                 result = execute_node(executor, commands);
@@ -9640,19 +9634,19 @@ static int execute_function_call(executor_t *executor,
             continue;
         }
 
-        /* Bash-style DEBUG pseudo-signal: fires BEFORE each command in
-         * the function body. fire_debug_trap gates on functrace +
-         * function scope, so by default it stays silent inside
-         * functions and surfaces only when the user opts in. */
+        /// Bash-style DEBUG pseudo-signal: fires BEFORE each command in
+        /// the function body. fire_debug_trap gates on functrace +
+        /// function scope, so by default it stays silent inside
+        /// functions and surfaces only when the user opts in.
         fire_debug_trap();
 
         result = execute_node(executor, command);
 
-        /* Bash-style ERR pseudo-signal: fires on a non-zero exit
-         * inside the function body. fire_err_trap itself gates on
-         * errtrace + function scope so the trap is suppressed inside
-         * functions by default and surfaces only when the user has
-         * `set -o errtrace`. */
+        /// Bash-style ERR pseudo-signal: fires on a non-zero exit
+        /// inside the function body. fire_err_trap itself gates on
+        /// errtrace + function scope so the trap is suppressed inside
+        /// functions by default and surfaces only when the user has
+        /// `set -o errtrace`.
         if (result != 0 && result < 200) {
             fire_err_trap();
         }
@@ -9662,10 +9656,10 @@ static int execute_function_call(executor_t *executor,
             /// Extract the actual return value from the special code
             int actual_return = result - 200;
 
-            /* Bash-style RETURN pseudo-signal: fires when a function
-             * returns via the `return` builtin. fire_return_trap gates
-             * on functrace; fires BEFORE we pop the scope so the trap
-             * runs in the function's frame. */
+            /// Bash-style RETURN pseudo-signal: fires when a function
+            /// returns via the `return` builtin. fire_return_trap gates
+            /// on functrace; fires BEFORE we pop the scope so the trap
+            /// runs in the function's frame.
             fire_return_trap();
 
             if (has_redirections) {
@@ -9687,10 +9681,10 @@ static int execute_function_call(executor_t *executor,
         command = command->next_sibling;
     }
 
-    /* Bash-style RETURN pseudo-signal: fires when a function returns
-     * by falling off the end of its body (no explicit `return`).
-     * Fires BEFORE we pop the scope so the trap runs in the
-     * function's frame. */
+    /// Bash-style RETURN pseudo-signal: fires when a function returns
+    /// by falling off the end of its body (no explicit `return`).
+    /// Fires BEFORE we pop the scope so the trap runs in the
+    /// function's frame.
     fire_return_trap();
 
     if (has_redirections) {
@@ -10116,14 +10110,14 @@ static bool match_pattern(const char *str, const char *pattern) {
             }
 
             while (*p && *p != ']') {
-                /* POSIX character class [:CLASS:] (e.g. [:space:],
-                 * [:alpha:], [:digit:]). Used heavily by real-world
-                 * trim/parse idioms - `${s%%[![:space:]]*}` was
-                 * silently treating [:space:] as the literal
-                 * character set { '[', ':', 's', 'p', 'a', 'c', 'e' }
-                 * because the class form was never parsed
-                 * (real_world/bash/201 trim function). Scan for `:]`
-                 * to delimit the class name, then test via ctype. */
+                /// POSIX character class [:CLASS:] (e.g. [:space:],
+                /// [:alpha:], [:digit:]). Used heavily by real-world
+                /// trim/parse idioms - `${s%%[![:space:]]*}` was
+                /// silently treating [:space:] as the literal
+                /// character set { '[', ':', 's', 'p', 'a', 'c', 'e' }
+                /// because the class form was never parsed
+                /// (real_world/bash/201 trim function). Scan for `:]`
+                /// to delimit the class name, then test via ctype.
                 if (p[0] == '[' && p[1] == ':') {
                     const char *class_start = p + 2;
                     const char *class_end = strstr(class_start, ":]");
@@ -10406,10 +10400,10 @@ static char *convert_case_pattern(const char *str, const char *pattern,
         char c = str[i];
         bool should_convert;
         if (first_only && i > 0) {
-            /* Per bash spec: `^pat` / `,pat` only inspect the first
-             * character of the expanded value; subsequent characters
-             * are copied unchanged regardless of whether they would
-             * match the pattern. */
+            /// Per bash spec: `^pat` / `,pat` only inspect the first
+            /// character of the expanded value; subsequent characters
+            /// are copied unchanged regardless of whether they would
+            /// match the pattern.
             should_convert = false;
         } else if (!any_pattern) {
             should_convert = true;
@@ -10601,14 +10595,13 @@ static char *pattern_substitute(const char *str, const char *pattern,
         replacement = "";
     }
 
-    /* Bash anchored-substitution prefixes:
-     *   ${var/#pat/repl}  match pat at the START of str only
-     *   ${var/%pat/repl}  match pat at the END of str only
-     * Detect and strip the marker; the remainder is the real pattern.
-     * Anchored substitution implies a single replacement -- there is
-     * only one start and one end -- so global is ignored when anchored.
-     * Issue #96.
-     */
+    /// Bash anchored-substitution prefixes:
+    ///   ${var/#pat/repl}  match pat at the START of str only
+    ///   ${var/%pat/repl}  match pat at the END of str only
+    /// Detect and strip the marker; the remainder is the real pattern.
+    /// Anchored substitution implies a single replacement -- there is
+    /// only one start and one end -- so global is ignored when anchored.
+    /// Issue #96.
     bool anchor_start = false;
     bool anchor_end = false;
     if (pattern[0] == '#') {
@@ -10626,18 +10619,18 @@ static char *pattern_substitute(const char *str, const char *pattern,
     size_t pattern_len = strlen(pattern);
     size_t replacement_len = strlen(replacement);
 
-    /* Detect glob metacharacters that route through fnmatch. The
-     * original check missed `[` (character class) and treated `[bd]`
-     * patterns as exact-substring matches, which never matched
-     * because the literal string never contained `[bd]`. fnmatch
-     * supports character classes natively. */
+    /// Detect glob metacharacters that route through fnmatch. The
+    /// original check missed `[` (character class) and treated `[bd]`
+    /// patterns as exact-substring matches, which never matched
+    /// because the literal string never contained `[bd]`. fnmatch
+    /// supports character classes natively.
     bool is_glob =
         (strchr(pattern, '*') || strchr(pattern, '?') || strchr(pattern, '['));
 
-    /* Anchored-start: match pattern once at position 0, then copy the
-     * remainder. Anchored-end: match pattern once at the suffix, copy
-     * the prefix then the replacement. Both are simpler one-shot
-     * cases than the general scanner below. */
+    /// Anchored-start: match pattern once at position 0, then copy the
+    /// remainder. Anchored-end: match pattern once at the suffix, copy
+    /// the prefix then the replacement. Both are simpler one-shot
+    /// cases than the general scanner below.
     if (anchor_start) {
         size_t match_len = 0;
         bool matched = false;
@@ -10698,9 +10691,9 @@ static char *pattern_substitute(const char *str, const char *pattern,
         size_t match_len = 0;
         bool matched = false;
         if (is_glob) {
-            /* Try suffixes from longest to shortest. For * patterns we
-             * want longest; for fixed-length patterns either order is
-             * fine. Longest-first matches bash. */
+            /// Try suffixes from longest to shortest. For * patterns we
+            /// want longest; for fixed-length patterns either order is
+            /// fine. Longest-first matches bash.
             for (size_t try_len = str_len; try_len >= 1; try_len--) {
                 size_t start = str_len - try_len;
                 char *substr = malloc(try_len + 1);
@@ -10848,16 +10841,15 @@ char *transform_quote(const char *str) {
 
     size_t len = strlen(str);
 
-    /* ${var@Q} produces a quoted representation safe to re-eval.
-     * bash uses two output forms:
-     *   - For printable strings without control chars: 'content'
-     *     with embedded single quotes escaped as '\'' (close quote,
-     *     literal '\'', reopen quote).
-     *   - For strings containing control chars (\n, \t, etc): $'...'
-     *     ANSI-C quoting with \n / \t / \xNN escapes.
-     * Match bash's choice so diff_oracle can byte-compare against
-     * the corpus. Issue #102.
-     */
+    /// ${var@Q} produces a quoted representation safe to re-eval.
+    /// bash uses two output forms:
+    ///   - For printable strings without control chars: 'content'
+    ///     with embedded single quotes escaped as '\'' (close quote,
+    ///     literal '\'', reopen quote).
+    ///   - For strings containing control chars (\n, \t, etc): $'...'
+    ///     ANSI-C quoting with \n / \t / \xNN escapes.
+    /// Match bash's choice so diff_oracle can byte-compare against
+    /// the corpus. Issue #102.
     bool has_control = false;
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)str[i];
@@ -10907,13 +10899,13 @@ char *transform_quote(const char *str) {
         result[pos] = '\0';
         return result;
     } else {
-        /* Single-quoted form with bash's close-escape-reopen idiom
-         * for embedded single quotes. Each `'` in str becomes
-         * `'\''`: close the open quote (`'`), emit a literal-quoted
-         * single quote (`\'`), then reopen (`'`). For a string
-         * with no embedded quotes this collapses to the simple
-         * `'content'` form. Each `'` worst-case expands to 4 chars,
-         * so worst-case output size is len*4 + 3. */
+        /// Single-quoted form with bash's close-escape-reopen idiom
+        /// for embedded single quotes. Each `'` in str becomes
+        /// `'\''`: close the open quote (`'`), emit a literal-quoted
+        /// single quote (`\'`), then reopen (`'`). For a string
+        /// with no embedded quotes this collapses to the simple
+        /// `'content'` form. Each `'` worst-case expands to 4 chars,
+        /// so worst-case output size is len*4 + 3.
         size_t result_size = len * 4 + 3;
         char *result = malloc(result_size);
         if (!result) {
@@ -11241,11 +11233,11 @@ static char *get_variable_attributes(const char *name) {
     /// Get variable flags
     symvar_flags_t flags = symtable_get_flags(mgr, name);
 
-    /* Bash ${var@a} attribute-string ordering: bash emits `irx` form
-     * (integer, readonly, exported) and 'a' / 'A' for indexed /
-     * associative arrays. Order matters only for stylistic match
-     * with bash output; bash's actual order is by attribute introduction
-     * date. Issue #102. */
+    /// Bash ${var@a} attribute-string ordering: bash emits `irx` form
+    /// (integer, readonly, exported) and 'a' / 'A' for indexed /
+    /// associative arrays. Order matters only for stylistic match
+    /// with bash output; bash's actual order is by attribute introduction
+    /// date. Issue #102.
     if (flags & SYMVAR_INTEGER_ATTR) {
         attrs[idx++] = 'i';
     }
@@ -11303,15 +11295,15 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
         if (str[i] == '$') {
             /// Check for arithmetic expansion $((...)
             if (i + 2 < len && str[i + 1] == '(' && str[i + 2] == '(') {
-                /* $(( is ambiguous: arithmetic expansion or command
-                 * substitution of an anonymous function `$(() {...})`.
-                 * Same disambiguation rule as the tokenizer (issue #99):
-                 * if the lookahead from after $(( finds `{`, `}`, `;`,
-                 * or `\n` before matched `))`, the input is command
-                 * substitution and must be routed through the next-
-                 * branch's $(...) handler instead. Walk the lookahead;
-                 * if it doesn't pass the arithmetic shape check, fall
-                 * through to the $(...) handler below. */
+                /// $(( is ambiguous: arithmetic expansion or command
+                /// substitution of an anonymous function `$(() {...})`.
+                /// Same disambiguation rule as the tokenizer (issue #99):
+                /// if the lookahead from after $(( finds `{`, `}`, `;`,
+                /// or `\n` before matched `))`, the input is command
+                /// substitution and must be routed through the next-
+                /// branch's $(...) handler instead. Walk the lookahead;
+                /// if it doesn't pass the arithmetic shape check, fall
+                /// through to the $(...) handler below.
                 bool looks_arith = true;
                 {
                     size_t s = i + 3;
@@ -11334,15 +11326,15 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                     }
                 }
                 if (!looks_arith) {
-                    /* Re-route into the $(...) command-sub handler at
-                     * the next branch (else-if on str[i + 1] == '('),
-                     * which fires when str[i+2] != '(' OR when we
-                     * intentionally skip the arithmetic path. To
-                     * trigger it cleanly, just fall through to the
-                     * next condition test by NOT entering the arith
-                     * block. The post-block `i = arith_end - 1`
-                     * advancement is skipped because we don't `continue`
-                     * here. */
+                    /// Re-route into the $(...) command-sub handler at
+                    /// the next branch (else-if on str[i + 1] == '('),
+                    /// which fires when str[i+2] != '(' OR when we
+                    /// intentionally skip the arithmetic path. To
+                    /// trigger it cleanly, just fall through to the
+                    /// next condition test by NOT entering the arith
+                    /// block. The post-block `i = arith_end - 1`
+                    /// advancement is skipped because we don't `continue`
+                    /// here.
                     goto try_cmd_sub_path;
                 }
                 /// This is arithmetic expansion $((expr))
@@ -11502,11 +11494,11 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                            (isalnum(str[var_end]) || str[var_end] == '_')) {
                         var_end++;
                     }
-                    /* Zsh bare-subscript form: $var[N] / $var[N,M].
-                     * Consume the bracket span so var_expr becomes
-                     * "$var[N]" rather than "$var" + literal "[N]".
-                     * Gated on FEATURE_ZSH_BARE_SUBSCRIPT — bash mode
-                     * keeps the literal-[N]-after-$var semantic. */
+                    /// Zsh bare-subscript form: $var[N] / $var[N,M].
+                    /// Consume the bracket span so var_expr becomes
+                    /// "$var[N]" rather than "$var" + literal "[N]".
+                    /// Gated on FEATURE_ZSH_BARE_SUBSCRIPT — bash mode
+                    /// keeps the literal-[N]-after-$var semantic.
                     if (var_end > var_start && var_end < len &&
                         str[var_end] == '[' &&
                         shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
@@ -11703,11 +11695,11 @@ static char *slice_string_graphemes(const char *str, size_t str_len,
 
     size_t i = 0;
     while (i < str_len) {
-        /* Check grapheme boundary at this codepoint start (not at every
-         * byte — continuation bytes would falsely register as boundaries
-         * because lle_is_grapheme_boundary treats invalid UTF-8 as a
-         * boundary, and continuation bytes alone are invalid as a
-         * standalone codepoint). */
+        /// Check grapheme boundary at this codepoint start (not at every
+        /// byte — continuation bytes would falsely register as boundaries
+        /// because lle_is_grapheme_boundary treats invalid UTF-8 as a
+        /// boundary, and continuation bytes alone are invalid as a
+        /// standalone codepoint).
         if (lle_is_grapheme_boundary(str + i, str, str + str_len)) {
             if (grapheme_idx == start_grapheme) {
                 byte_start = i;
@@ -11901,12 +11893,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                     }
                     if (array && shell_mode_get() == SHELL_MODE_ZSH &&
                         !array->is_associative) {
-                        /* zsh-mode special case: ${(kv)indexed_array}
-                         * emits values only — zsh treats indexed arrays
-                         * as having no meaningful "keys" so (kv) collapses
-                         * to (v). lush mode keeps the interleaved
-                         * indices+values form (curated pick: internally
-                         * consistent with lush's (k)/(v) semantics). */
+                        /// zsh-mode special case: ${(kv)indexed_array}
+                        /// emits values only — zsh treats indexed arrays
+                        /// as having no meaningful "keys" so (kv) collapses
+                        /// to (v). lush mode keeps the interleaved
+                        /// indices+values form (curated pick: internally
+                        /// consistent with lush's (k)/(v) semantics).
                         inner_result = symtable_array_expand(array, " ");
                     } else if (array) {
                         size_t kc = 0, vc = 0;
@@ -11985,13 +11977,13 @@ static char *parse_parameter_expansion(executor_t *executor,
                     }
                     if (array && shell_mode_get() == SHELL_MODE_ZSH &&
                         !array->is_associative) {
-                        /* zsh-mode special case: ${(k)indexed_array} emits
-                         * values only (zsh treats indexed-array indices as
-                         * not meaningfully "keys" — `(k)` collapses to
-                         * `(v)`). lush mode keeps the existing 0-based
-                         * indices behavior (curated pick: more useful for
-                         * iteration / debugging than redundantly emitting
-                         * values which `(v)` and `${arr[@]}` already give). */
+                        /// zsh-mode special case: ${(k)indexed_array} emits
+                        /// values only (zsh treats indexed-array indices as
+                        /// not meaningfully "keys" — `(k)` collapses to
+                        /// `(v)`). lush mode keeps the existing 0-based
+                        /// indices behavior (curated pick: more useful for
+                        /// iteration / debugging than redundantly emitting
+                        /// values which `(v)` and `${arr[@]}` already give).
                         inner_result = symtable_array_expand(array, " ");
                     } else if (array) {
                         /// Get all keys from array (works for both indexed and
@@ -12048,23 +12040,23 @@ static char *parse_parameter_expansion(executor_t *executor,
                     inner_result = strdup("0");
                 }
             } else {
-                /* Collection-operand resolution for the flag pipeline.
-                 *
-                 * Several flags ((U)(L)(C)(s)(j)(o)(O)(u)(f)) operate on
-                 * the space-separated string form of a collection's
-                 * elements. The default recursive call below (the older
-                 * "Normal expansion" path) routes `arr[@]` through the
-                 * general path that rejects list-in-scalar-slot at the
-                 * subscript handler, so the flag never gets to do its
-                 * work. Detect when `rest` is a collection reference
-                 * (bare name, name[@], or name[*]) and extract elements
-                 * directly via symtable_get_array, joining with " " --
-                 * the format every flag handler in this loop already
-                 * expects.
-                 *
-                 * Also catches collection-only flags ((j)(k)(v)) applied
-                 * to a scalar and raises SHELL_ERR_TYPE_MISMATCH at
-                 * that site rather than silently returning empty. */
+                /// Collection-operand resolution for the flag pipeline.
+                ///
+                /// Several flags ((U)(L)(C)(s)(j)(o)(O)(u)(f)) operate on
+                /// the space-separated string form of a collection's
+                /// elements. The default recursive call below (the older
+                /// "Normal expansion" path) routes `arr[@]` through the
+                /// general path that rejects list-in-scalar-slot at the
+                /// subscript handler, so the flag never gets to do its
+                /// work. Detect when `rest` is a collection reference
+                /// (bare name, name[@], or name[*]) and extract elements
+                /// directly via symtable_get_array, joining with " " --
+                /// the format every flag handler in this loop already
+                /// expects.
+                ///
+                /// Also catches collection-only flags ((j)(k)(v)) applied
+                /// to a scalar and raises SHELL_ERR_TYPE_MISMATCH at
+                /// that site rather than silently returning empty.
                 char *arr_name = NULL;
                 bool rest_is_simple_ref = false;
                 const char *bracket = strchr(rest, '[');
@@ -12128,11 +12120,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                     free(flags);
                     return strdup("");
                 } else {
-                    /* Existing path. `rest` is what comes after the
-                     * flag-paren group: a scalar variable, or a nested
-                     * full parameter expansion like ${(s/,/)${INNER}}
-                     * (the zsh idiom ${(flag)${INNER}} applies the
-                     * outer flag to the inner expansion's result). */
+                    /// Existing path. `rest` is what comes after the
+                    /// flag-paren group: a scalar variable, or a nested
+                    /// full parameter expansion like ${(s/,/)${INNER}}
+                    /// (the zsh idiom ${(flag)${INNER}} applies the
+                    /// outer flag to the inner expansion's result).
                     free(arr_name);
                     if (rest[0] == '$' && rest[1] == '{') {
                         inner_result = expand_variable(executor, rest);
@@ -12466,11 +12458,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'u': {
-                    /* Unique: dedupe consecutive (and non-consecutive)
-                     * elements after splitting on spaces. zsh's (u)
-                     * removes ALL duplicates, not just adjacent ones.
-                     * Combine with (o) or (O) for sort+unique. Issue
-                     * #103. */
+                    /// Unique: dedupe consecutive (and non-consecutive)
+                    /// elements after splitting on spaces. zsh's (u)
+                    /// removes ALL duplicates, not just adjacent ones.
+                    /// Combine with (o) or (O) for sort+unique. Issue
+                    /// #103.
                     size_t word_count = 0;
                     bool in_word = false;
                     for (const char *c = result; *c; c++) {
@@ -12489,10 +12481,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 size_t idx = 0;
                                 char *tok = strtok(copy, " ");
                                 while (tok && idx < word_count) {
-                                    /* Skip if already seen. O(N^2)
-                                     * is fine for typical zsh array
-                                     * sizes; switching to a hash set
-                                     * would be premature. */
+                                    /// Skip if already seen. O(N^2)
+                                    /// is fine for typical zsh array
+                                    /// sizes; switching to a hash set
+                                    /// would be premature.
                                     bool seen = false;
                                     for (size_t k = 0; k < idx; k++) {
                                         if (strcmp(words[k], tok) == 0) {
@@ -12540,16 +12532,16 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                 case 'l':
                 case 'r': {
-                    /* Padding flags. zsh syntax:
-                     *   (l:N:)              -- left-pad to width N w/ spaces
-                     *   (l:N::FILL:)        -- left-pad with FILL string
-                     *   (r:N:) / (r:N::FILL:) -- right-pad analogously
-                     * If the value is wider than N, zsh truncates the
-                     * value to N chars (left-pad keeps the rightmost
-                     * N; right-pad keeps the leftmost N). The N
-                     * argument is bracketed by `:` chars (zsh accepts
-                     * any non-`)` delimiter; we accept `:` to match
-                     * the common form the corpus uses). Issue #103. */
+                    /// Padding flags. zsh syntax:
+                    ///   (l:N:)              -- left-pad to width N w/ spaces
+                    ///   (l:N::FILL:)        -- left-pad with FILL string
+                    ///   (r:N:) / (r:N::FILL:) -- right-pad analogously
+                    /// If the value is wider than N, zsh truncates the
+                    /// value to N chars (left-pad keeps the rightmost
+                    /// N; right-pad keeps the leftmost N). The N
+                    /// argument is bracketed by `:` chars (zsh accepts
+                    /// any non-`)` delimiter; we accept `:` to match
+                    /// the common form the corpus uses). Issue #103.
                     bool pad_left = (*p == 'l');
                     char open = p[1];
                     if (!open || open == ')') {
@@ -12592,12 +12584,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                     }
 
-                    /* Advance p past the entire (l:N::FILL:) span,
-                     * up to but not including the closing `)` of the
-                     * flag group -- the outer while loop is iterating
-                     * `flags` which is the content between `(` and `)`
-                     * already, so `closing` is the position right
-                     * after the trailing `:`. */
+                    /// Advance p past the entire (l:N::FILL:) span,
+                    /// up to but not including the closing `)` of the
+                    /// flag group -- the outer while loop is iterating
+                    /// `flags` which is the content between `(` and `)`
+                    /// already, so `closing` is the position right
+                    /// after the trailing `:`.
                     p = closing;
 
                     const char *fill_str = (fill && fill[0]) ? fill : " ";
@@ -12609,8 +12601,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         break;
                     }
                     if ((int)result_len >= width) {
-                        /* Truncate. For left-pad, keep last N chars;
-                         * for right-pad, keep first N chars. */
+                        /// Truncate. For left-pad, keep last N chars;
+                        /// for right-pad, keep first N chars.
                         new_result = malloc((size_t)width + 1);
                         if (new_result) {
                             if (pad_left) {
@@ -12653,11 +12645,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
 
                 case 'Q': {
-                    /* (Q) flag: strip one level of quoting from the
-                     * value. zsh accepts `'a b c'` -> `a b c` and
-                     * `"a b c"` -> `a b c`. If the value isn't wrapped
-                     * in matching quotes, return unchanged.
-                     * Issue #103. */
+                    /// (Q) flag: strip one level of quoting from the
+                    /// value. zsh accepts `'a b c'` -> `a b c` and
+                    /// `"a b c"` -> `a b c`. If the value isn't wrapped
+                    /// in matching quotes, return unchanged.
+                    /// Issue #103.
                     size_t result_len = strlen(result);
                     if (result_len >= 2 &&
                         ((result[0] == '\'' &&
@@ -12682,12 +12674,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
 
                 case 'q': {
-                    /* Quote-family flags (issue #103):
-                     *   (q)   -- backslash-escape shell metacharacters
-                     *   (qq)  -- single-quote the entire value
-                     *   (qqq) -- double-quote the entire value
-                     * Count consecutive 'q' chars to pick the variant.
-                     */
+                    /// Quote-family flags (issue #103):
+                    ///   (q)   -- backslash-escape shell metacharacters
+                    ///   (qq)  -- single-quote the entire value
+                    ///   (qqq) -- double-quote the entire value
+                    /// Count consecutive 'q' chars to pick the variant.
                     int q_count = 0;
                     while (p[q_count] == 'q') {
                         q_count++;
@@ -12695,9 +12686,9 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                     size_t result_len = strlen(result);
                     if (q_count == 2) {
-                        /* Single-quote: wrap with ' and escape any
-                         * embedded ' using bash's '\\'' idiom (zsh
-                         * accepts the same form). */
+                        /// Single-quote: wrap with ' and escape any
+                        /// embedded ' using bash's '\\'' idiom (zsh
+                        /// accepts the same form).
                         size_t cap = result_len * 4 + 3;
                         new_result = malloc(cap);
                         if (new_result) {
@@ -12717,8 +12708,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                             new_result[pos] = '\0';
                         }
                     } else if (q_count == 3) {
-                        /* Double-quote: wrap with " and escape `"` `$`
-                         * `` ` `` `\` chars. */
+                        /// Double-quote: wrap with " and escape `"` `$`
+                        /// `` ` `` `\` chars.
                         size_t cap = result_len * 2 + 3;
                         new_result = malloc(cap);
                         if (new_result) {
@@ -12736,12 +12727,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                             new_result[pos] = '\0';
                         }
                     } else {
-                        /* (q): backslash-escape shell-meta chars. zsh's
-                         * (q) escapes characters that would be
-                         * special in any shell context -- space, tab,
-                         * newline, and shell metacharacters
-                         * (; & | < > ( ) { } [ ] $ ` " ' \ * ? ~ # !
-                         * = % ^). */
+                        /// (q): backslash-escape shell-meta chars. zsh's
+                        /// (q) escapes characters that would be
+                        /// special in any shell context -- space, tab,
+                        /// newline, and shell metacharacters
+                        /// (; & | < > ( ) { } [ ] $ ` " ' \ * ? ~ # !
+                        /// = % ^).
                         size_t cap = result_len * 2 + 1;
                         new_result = malloc(cap);
                         if (new_result) {
@@ -12808,15 +12799,15 @@ static char *parse_parameter_expansion(executor_t *executor,
             strncpy(prefix, var_name, name_len - 1);
             prefix[name_len - 1] = '\0';
 
-            /* Enumerate the symbol table for matching names. The prior
-             * implementation only scanned `environ` (exported vars
-             * only); most shell-local variables never reach environ.
-             * Collect into a dynamic array via the symtable enumerator,
-             * sort alphabetically for determinism (bash documents the
-             * order as unspecified but the corpus depends on a stable
-             * order for byte-for-byte diff_oracle comparison).
-             * Issue #102. The callback and qsort comparator are
-             * file-scope helpers because C lacks nested functions. */
+            /// Enumerate the symbol table for matching names. The prior
+            /// implementation only scanned `environ` (exported vars
+            /// only); most shell-local variables never reach environ.
+            /// Collect into a dynamic array via the symtable enumerator,
+            /// sort alphabetically for determinism (bash documents the
+            /// order as unspecified but the corpus depends on a stable
+            /// order for byte-for-byte diff_oracle comparison).
+            /// Issue #102. The callback and qsort comparator are
+            /// file-scope helpers because C lacks nested functions.
             prefix_collect_ctx_t ctx = {NULL, 0, 0, prefix, strlen(prefix)};
             symtable_enumerate_global_vars(prefix_collect_cb, &ctx);
 
@@ -12907,9 +12898,9 @@ static char *parse_parameter_expansion(executor_t *executor,
     if (expansion[0] == '#') {
         const char *var_name = expansion + 1;
 
-        /* Nested form ${#${INNER}}: count the length of the inner
-         * expansion's result. expand_variable handles the full ${...}
-         * form. Issue #98. */
+        /// Nested form ${#${INNER}}: count the length of the inner
+        /// expansion's result. expand_variable handles the full ${...}
+        /// form. Issue #98.
         if (var_name[0] == '$' && var_name[1] == '{') {
             char *inner = expand_variable(executor, var_name);
             if (inner) {
@@ -12960,11 +12951,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 int idx = (int)strtoll(idx_result, NULL, 10);
                                 free(idx_result);
 
-                                /* Same indexing convention as ${arr[n]}:
-                                 * zsh-mode rejects 0, decrements positives,
-                                 * passes negatives through to the symtable
-                                 * helper's "from-end" handler. Lush/bash
-                                 * pass through directly. (Issue #68.) */
+                                /// Same indexing convention as ${arr[n]}:
+                                /// zsh-mode rejects 0, decrements positives,
+                                /// passes negatives through to the symtable
+                                /// helper's "from-end" handler. Lush/bash
+                                /// pass through directly. (Issue #68.)
                                 if (!shell_mode_allows(
                                         FEATURE_ARRAY_ZERO_INDEXED)) {
                                     if (idx == 0) {
@@ -13006,14 +12997,14 @@ static char *parse_parameter_expansion(executor_t *executor,
             return strdup("0");
         }
 
-        /* Regular variable length: ${#var}. Mode-aware for the array
-         * case on a bare array name (issue #99):
-         *   zsh:  number of elements
-         *   bash: length of arr[0] (treats $arr as ${arr[0]})
-         *   lush: number of elements (curated zsh idiom)
-         *   posix: arrays don't exist, but if one was carried over
-         *          from a prior mode, match bash's first-element rule.
-         * Unified lookup branches on kind in a single call. */
+        /// Regular variable length: ${#var}. Mode-aware for the array
+        /// case on a bare array name (issue #99):
+        ///   zsh:  number of elements
+        ///   bash: length of arr[0] (treats $arr as ${arr[0]})
+        ///   lush: number of elements (curated zsh idiom)
+        ///   posix: arrays don't exist, but if one was carried over
+        ///          from a prior mode, match bash's first-element rule.
+        /// Unified lookup branches on kind in a single call.
         lush_value_view_t view = {0};
         symtable_lookup(var_name, &view);
         if (view.kind == LUSH_VALUE_SCALAR) {
@@ -13046,14 +13037,14 @@ static char *parse_parameter_expansion(executor_t *executor,
         return strdup("0");
     }
 
-    /* Handle array element access: ${arr[n]}, ${arr[@]}, ${arr[*]}.
-     * Only routes through this branch when the prefix before `[` is a
-     * valid shell identifier; otherwise the `[` belongs to something
-     * else (e.g. the character-class pattern inside a substitution
-     * `${var/[abc]/X}`) and must not be consumed here. The prior
-     * unconditional `strchr(expansion, '[')` matched any `[` and
-     * silently emptied substitutions whose patterns happened to
-     * contain a bracket. Issue #96. */
+    /// Handle array element access: ${arr[n]}, ${arr[@]}, ${arr[*]}.
+    /// Only routes through this branch when the prefix before `[` is a
+    /// valid shell identifier; otherwise the `[` belongs to something
+    /// else (e.g. the character-class pattern inside a substitution
+    /// `${var/[abc]/X}`) and must not be consumed here. The prior
+    /// unconditional `strchr(expansion, '[')` matched any `[` and
+    /// silently emptied substitutions whose patterns happened to
+    /// contain a bracket. Issue #96.
     const char *bracket = strchr(expansion, '[');
     if (bracket && bracket > expansion) {
         size_t name_len = bracket - expansion;
@@ -13073,25 +13064,25 @@ static char *parse_parameter_expansion(executor_t *executor,
             bracket = NULL;
         }
     } else if (bracket && bracket == expansion) {
-        /* `[` at the very start means there is no name -- not an
-         * array access. */
+        /// `[` at the very start means there is no name -- not an
+        /// array access.
         bracket = NULL;
     }
-    /* Per-element passthrough: ${arr[@]op...} and ${arr[*]op...} should
-     * route through the operator dispatch below so the trailing op
-     * applies to each element. The bracket block would otherwise
-     * intercept the [@]/[*] subscript and raise a list-in-scalar-slot
-     * mismatch before the operator gets to dispatch.
-     *
-     * Conditions to skip the bracket block:
-     *   - subscript is exactly @ or *
-     *   - the next char after ] starts a per-element-amenable scalar
-     *     operator (^, ',', #, %, /, @). Notably NOT `:` -- slicing
-     *     ${arr[@]:0:2} and the conditional family ${arr[@]:-default}
-     *     keep their existing handling in the bracket block.
-     *   - the name resolves to a known array (otherwise the bracket
-     *     belongs to something else and the existing block handles
-     *     non-array names correctly). */
+    /// Per-element passthrough: ${arr[@]op...} and ${arr[*]op...} should
+    /// route through the operator dispatch below so the trailing op
+    /// applies to each element. The bracket block would otherwise
+    /// intercept the [@]/[*] subscript and raise a list-in-scalar-slot
+    /// mismatch before the operator gets to dispatch.
+    ///
+    /// Conditions to skip the bracket block:
+    ///   - subscript is exactly @ or *
+    ///   - the next char after ] starts a per-element-amenable scalar
+    ///     operator (^, ',', #, %, /, @). Notably NOT `:` -- slicing
+    ///     ${arr[@]:0:2} and the conditional family ${arr[@]:-default}
+    ///     keep their existing handling in the bracket block.
+    ///   - the name resolves to a known array (otherwise the bracket
+    ///     belongs to something else and the existing block handles
+    ///     non-array names correctly).
     if (bracket) {
         const char *close = strchr(bracket, ']');
         if (close && close[1] != '\0' && close[1] != ':') {
@@ -13145,16 +13136,16 @@ static char *parse_parameter_expansion(executor_t *executor,
                 if (array) {
                     char *result = NULL;
 
-                    /* Detect a bash slicing suffix `:N` / `:N:M` after
-                     * the closing `]`. ${arr[@]:N}, ${arr[@]:N:M},
-                     * ${arr[*]:N:M} are element-wise slices on the
-                     * array, not byte-wise on the joined string -- the
-                     * generic substring case (parse_parameter_expansion
-                     * case 14) would silently drop these because it
-                     * couldn't resolve `arr[@]` as a scalar var, and
-                     * even with a resolution it would byte-slice the
-                     * joined string instead of picking elements. Issue
-                     * #97. */
+                    /// Detect a bash slicing suffix `:N` / `:N:M` after
+                    /// the closing `]`. ${arr[@]:N}, ${arr[@]:N:M},
+                    /// ${arr[*]:N:M} are element-wise slices on the
+                    /// array, not byte-wise on the joined string -- the
+                    /// generic substring case (parse_parameter_expansion
+                    /// case 14) would silently drop these because it
+                    /// couldn't resolve `arr[@]` as a scalar var, and
+                    /// even with a resolution it would byte-slice the
+                    /// joined string instead of picking elements. Issue
+                    /// #97.
                     int slice_offset = 0;
                     int slice_length = -1; /// -1 = "to end"
                     bool has_slice = (close[1] == ':' &&
@@ -13266,19 +13257,19 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 "scalar position",
                                 arr_name ? arr_name : "?");
                         }
-                        /* SEMANTICS.md section 3.9 enforcement: in a
-                         * script, a type mismatch aborts before the bad
-                         * value can reach a downstream command;
-                         * interactively, the prompt continues. */
+                        /// SEMANTICS.md section 3.9 enforcement: in a
+                        /// script, a type mismatch aborts before the bad
+                        /// value can reach a downstream command;
+                        /// interactively, the prompt continues.
                         executor_request_posix_exit(executor, 1);
                         result = strdup("");
                     } else if ((strncmp(subscript, "(r)", 3) == 0 ||
                                 strncmp(subscript, "(R)", 3) == 0) &&
                                !array->is_associative) {
-                        /* zsh subscript flags ${arr[(r)pat]} / ${arr[(R)pat]}:
-                         * return the VALUE of the first / last element
-                         * matching pat, or empty string on no match.
-                         * pat is fnmatch-style. Issue #104. */
+                        /// zsh subscript flags ${arr[(r)pat]} / ${arr[(R)pat]}:
+                        /// return the VALUE of the first / last element
+                        /// matching pat, or empty string on no match.
+                        /// pat is fnmatch-style. Issue #104.
                         bool last_match = (subscript[1] == 'R');
                         const char *pat = subscript + 3;
                         size_t total = symtable_array_length(array);
@@ -13308,10 +13299,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                     } else if ((strncmp(subscript, "(i)", 3) == 0 ||
                                 strncmp(subscript, "(I)", 3) == 0) &&
                                !array->is_associative) {
-                        /* zsh subscript flags ${arr[(i)pat]} / ${arr[(I)pat]}:
-                         * return the 1-based index of the first / last
-                         * element matching pat, or N+1 / 0 if no match.
-                         * pat is fnmatch-style. Issue #99. */
+                        /// zsh subscript flags ${arr[(i)pat]} / ${arr[(I)pat]}:
+                        /// return the 1-based index of the first / last
+                        /// element matching pat, or N+1 / 0 if no match.
+                        /// pat is fnmatch-style. Issue #99.
                         bool last_index = (subscript[1] == 'I');
                         const char *pat = subscript + 3;
                         size_t total = symtable_array_length(array);
@@ -13349,19 +13340,19 @@ static char *parse_parameter_expansion(executor_t *executor,
                         result = strdup(buf);
                     } else if (strchr(subscript, ',') &&
                                !array->is_associative) {
-                        /* zsh-style range subscript ${arr[N,M]} / $arr[N,M]
-                         * on an indexed array: join elements N..M with a
-                         * single space, matching zsh's default output of
-                         * `$arr[N,M]`. The arithmetic expander interprets
-                         * `N,M` as the C comma operator and returns M --
-                         * which without this branch silently selected the
-                         * M-th element instead of slicing. Supports
-                         * negative indices (zsh: -1 = last); honors
-                         * FEATURE_ARRAY_ZERO_INDEXED for the 1-based vs
-                         * 0-based decision (same shape as the string-
-                         * slicing fallback further down). Comma in
-                         * associative-array subscripts has no range
-                         * meaning -- those keep the C-comma key path. */
+                        /// zsh-style range subscript ${arr[N,M]} / $arr[N,M]
+                        /// on an indexed array: join elements N..M with a
+                        /// single space, matching zsh's default output of
+                        /// `$arr[N,M]`. The arithmetic expander interprets
+                        /// `N,M` as the C comma operator and returns M --
+                        /// which without this branch silently selected the
+                        /// M-th element instead of slicing. Supports
+                        /// negative indices (zsh: -1 = last); honors
+                        /// FEATURE_ARRAY_ZERO_INDEXED for the 1-based vs
+                        /// 0-based decision (same shape as the string-
+                        /// slicing fallback further down). Comma in
+                        /// associative-array subscripts has no range
+                        /// meaning -- those keep the C-comma key path.
                         char *comma = strchr(subscript, ',');
                         *comma = '\0';
                         int start_idx = atoi(subscript);
@@ -13395,8 +13386,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         if (end_idx < start_idx || (int)total == 0) {
                             result = strdup("");
                         } else {
-                            /* Concatenate elements [start_idx..end_idx]
-                             * with single-space separator. */
+                            /// Concatenate elements [start_idx..end_idx]
+                            /// with single-space separator.
                             size_t cap = 64;
                             size_t pos = 0;
                             result = malloc(cap);
@@ -13451,13 +13442,13 @@ static char *parse_parameter_expansion(executor_t *executor,
                             int idx = (int)strtoll(idx_result, NULL, 10);
                             free(idx_result);
 
-                            /* zsh-mode (1-based): 0 is invalid (returns
-                             * empty); positive indices need
-                             * decrement-to-0-based; negative indices pass
-                             * through unchanged so the symtable helper's
-                             * built-in "from-end" handling fires.
-                             * lush/bash-mode (0-based): pass through
-                             * directly. (Issue #68 — array half.) */
+                            /// zsh-mode (1-based): 0 is invalid (returns
+                            /// empty); positive indices need
+                            /// decrement-to-0-based; negative indices pass
+                            /// through unchanged so the symtable helper's
+                            /// built-in "from-end" handling fires.
+                            /// lush/bash-mode (0-based): pass through
+                            /// directly. (Issue #68 — array half.)
                             if (!shell_mode_allows(
                                     FEATURE_ARRAY_ZERO_INDEXED)) {
                                 if (idx == 0) {
@@ -13482,18 +13473,18 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                     }
 
-                    /* Apply trailing parameter-expansion operator on an
-                     * indexed/associative element: `${arr[key]:-default}`,
-                     * `${arr[key]:+alt}`, etc. Without this, the array
-                     * branch returned the (possibly empty) element value
-                     * unconditionally, dropping the operator entirely
-                     * (real_world/bash/200 fell back to "" instead of the
-                     * `:-info` default for a missing assoc key). For
-                     * arrays we can't distinguish unset from empty (a
-                     * missing key reads as ""), so both `:-` and `-`
-                     * behave identically here, as do `:+` and `+`. The
-                     * default/alt RHS is variable-expanded so
-                     * `${arr[k]:-$fallback}` works. */
+                    /// Apply trailing parameter-expansion operator on an
+                    /// indexed/associative element: `${arr[key]:-default}`,
+                    /// `${arr[key]:+alt}`, etc. Without this, the array
+                    /// branch returned the (possibly empty) element value
+                    /// unconditionally, dropping the operator entirely
+                    /// (real_world/bash/200 fell back to "" instead of the
+                    /// `:-info` default for a missing assoc key). For
+                    /// arrays we can't distinguish unset from empty (a
+                    /// missing key reads as ""), so both `:-` and `-`
+                    /// behave identically here, as do `:+` and `+`. The
+                    /// default/alt RHS is variable-expanded so
+                    /// `${arr[k]:-$fallback}` works.
                     const char *after_bracket = close + 1;
                     if (*after_bracket != '\0') {
                         bool value_is_empty = (!result || !*result);
@@ -13572,14 +13563,14 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                         size_t value_len = strlen(str_value);
 
-                        /* Negative-index handling: ${str[-N]} counts from
-                         * the end. zsh-mode (1-based): -1 = last grapheme
-                         * (position total). lush/bash-mode (0-based):
-                         * -1 = last (position total-1). Computes the
-                         * grapheme count via lle_utf8_count_graphemes
-                         * (TR#29-correct, same primitive
-                         * slice_string_graphemes uses internally).
-                         * (Issue #68.) */
+                        /// Negative-index handling: ${str[-N]} counts from
+                        /// the end. zsh-mode (1-based): -1 = last grapheme
+                        /// (position total). lush/bash-mode (0-based):
+                        /// -1 = last (position total-1). Computes the
+                        /// grapheme count via lle_utf8_count_graphemes
+                        /// (TR#29-correct, same primitive
+                        /// slice_string_graphemes uses internally).
+                        /// (Issue #68.)
                         if (start_idx < 0 || end_idx < 0) {
                             int total = (int)lle_utf8_count_graphemes(
                                 str_value, value_len);
@@ -13606,9 +13597,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                             end_idx--;
                         }
 
-                        /* Inverted range yields empty (catches both user-
-                         * written ${str[3,1]} and post-conversion
-                         * overshoots in 0-based mode). */
+                        /// Inverted range yields empty (catches both user-
+                        /// written ${str[3,1]} and post-conversion
+                        /// overshoots in 0-based mode).
                         if (end_idx < start_idx) {
                             free(str_value);
                             free(subscript);
@@ -13660,12 +13651,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                                NULL};
     int op_type = -1;
 
-    /* Special-parameter names at position 0 (@, *, #, ?, !, $, -, 0..9)
-     * are variable names, not operators. Without this guard ${@^}
-     * gets parsed as the `@` transformation operator (op_type 17)
-     * applied to an empty var_name, instead of `@` as the variable
-     * with the `^` case-mod operator. Same for ${*^}, ${#:-default}
-     * variants on the special params, etc. Issue #96. */
+    /// Special-parameter names at position 0 (@, *, #, ?, !, $, -, 0..9)
+    /// are variable names, not operators. Without this guard ${@^}
+    /// gets parsed as the `@` transformation operator (op_type 17)
+    /// applied to an empty var_name, instead of `@` as the variable
+    /// with the `^` case-mod operator. Same for ${*^}, ${#:-default}
+    /// variants on the special params, etc. Issue #96.
     bool first_is_special_param = false;
     if (expansion[0]) {
         char c0 = expansion[0];
@@ -13680,9 +13671,9 @@ static char *parse_parameter_expansion(executor_t *executor,
     /// (notably `@` in `arr[@]`) don't get picked as operators.
     for (int i = 0; operators[i]; i++) {
         const char *found = find_op_outside_brackets(expansion, operators[i]);
-        /* If the operator matches at position 0 and the first char is
-         * a special-param name, search again starting after it -- the
-         * apparent operator at position 0 is really the variable. */
+        /// If the operator matches at position 0 and the first char is
+        /// a special-param name, search again starting after it -- the
+        /// apparent operator at position 0 is really the variable.
         if (found == expansion && first_is_special_param) {
             found = find_op_outside_brackets(expansion + 1, operators[i]);
         }
@@ -13758,23 +13749,23 @@ static char *parse_parameter_expansion(executor_t *executor,
         strncpy(var_name, expansion, var_len);
         var_name[var_len] = '\0';
 
-        /* Scalar-operator on bare collection: type mismatch.
-         *
-         * A bare name like ${arr:-default} or ${arr##pattern} or
-         * ${arr^^} reaches this dispatch when arr is a list/map.
-         * The operator is scalar-shaped; applying it would either
-         * silently degrade the collection or treat the unset-scalar
-         * path as if the collection were empty. Both are exactly
-         * the implicit list-to-scalar coercion the engine is
-         * designed to reject. Surface a type mismatch with a hint
-         * pointing at the explicit forms (slice + scalar op, or
-         * [@]-vectorized op).
-         *
-         * Subscripted forms ${arr[@]op...} and ${arr[N]op...} go
-         * through a different path; they're already vectorized or
-         * single-element. The bare-name check fires only when the
-         * operator's left operand is a complete collection
-         * identifier with no subscript. */
+        /// Scalar-operator on bare collection: type mismatch.
+        ///
+        /// A bare name like ${arr:-default} or ${arr##pattern} or
+        /// ${arr^^} reaches this dispatch when arr is a list/map.
+        /// The operator is scalar-shaped; applying it would either
+        /// silently degrade the collection or treat the unset-scalar
+        /// path as if the collection were empty. Both are exactly
+        /// the implicit list-to-scalar coercion the engine is
+        /// designed to reject. Surface a type mismatch with a hint
+        /// pointing at the explicit forms (slice + scalar op, or
+        /// [@]-vectorized op).
+        ///
+        /// Subscripted forms ${arr[@]op...} and ${arr[N]op...} go
+        /// through a different path; they're already vectorized or
+        /// single-element. The bare-name check fires only when the
+        /// operator's left operand is a complete collection
+        /// identifier with no subscript.
         if (var_len > 0) {
             array_value_t *bare_array = symtable_get_array(var_name);
             if (bare_array) {
@@ -13828,15 +13819,15 @@ static char *parse_parameter_expansion(executor_t *executor,
                     "'%s', which is a %s",
                     op_str, var_name, kind_label);
                 if (hint) {
-                    /* The error_report path emits the message
-                     * immediately; the help line is set as part of
-                     * the structured error if we have one. The
-                     * downstream display already includes the help
-                     * field from the most recent error in the
-                     * collector, so we don't need to re-emit. The
-                     * hint stays paired with the operator class
-                     * above so future operators get a tailored
-                     * suggestion when they land. */
+                    /// The error_report path emits the message
+                    /// immediately; the help line is set as part of
+                    /// the structured error if we have one. The
+                    /// downstream display already includes the help
+                    /// field from the most recent error in the
+                    /// collector, so we don't need to re-emit. The
+                    /// hint stays paired with the operator class
+                    /// above so future operators get a tailored
+                    /// suggestion when they land.
                     (void)hint;
                 }
                 executor_request_posix_exit(executor, 1);
@@ -13855,21 +13846,21 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         char *result = NULL;
 
-        /* Per-element dispatch for vector-yielding var names with case-
-         * modification operators. ${@^}, ${@^^[pat]}, ${@,}, ${@,,[pat]}
-         * and the analogous ${arr[@]^^[pat]} family apply the operator
-         * to each positional parameter or array element independently,
-         * then join with space. Bash semantics; scope intentionally
-         * narrowed to case-mod ops for issue #96 (other operators on
-         * vector names -- substitution, trim, substring -- are
-         * separate work). */
+        /// Per-element dispatch for vector-yielding var names with case-
+        /// modification operators. ${@^}, ${@^^[pat]}, ${@,}, ${@,,[pat]}
+        /// and the analogous ${arr[@]^^[pat]} family apply the operator
+        /// to each positional parameter or array element independently,
+        /// then join with space. Bash semantics; scope intentionally
+        /// narrowed to case-mod ops for issue #96 (other operators on
+        /// vector names -- substitution, trim, substring -- are
+        /// separate work).
         bool case_mod_op =
             (op_type == 4 || op_type == 5 || op_type == 8 || op_type == 9);
-        /* Per-element-amenable scalar operators when the variable
-         * is a vector ($@, $* or arr[@] / arr[*]): case-mod, pattern
-         * strip, replace, and the @-transform family. Each applies
-         * to each element independently and the results join with
-         * space. */
+        /// Per-element-amenable scalar operators when the variable
+        /// is a vector ($@, $* or arr[@] / arr[*]): case-mod, pattern
+        /// strip, replace, and the @-transform family. Each applies
+        /// to each element independently and the results join with
+        /// space.
         bool per_element_op = case_mod_op || op_type == 2 || op_type == 3 ||
                               op_type == 6 || op_type == 7 || op_type == 15 ||
                               op_type == 16 || op_type == 17;
@@ -14179,10 +14170,10 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         case 4: /// ${var^^[pat]} - convert all characters to uppercase
             if (var_value) {
-                /* Pattern restriction (issue #96): ${var^^[abc]} converts
-                 * only characters matching the glob pattern. Empty
-                 * pattern falls through to the UTF-8-aware path so
-                 * non-ASCII content is upper-cased correctly. */
+                /// Pattern restriction (issue #96): ${var^^[abc]} converts
+                /// only characters matching the glob pattern. Empty
+                /// pattern falls through to the UTF-8-aware path so
+                /// non-ASCII content is upper-cased correctly.
                 if (expanded_default && expanded_default[0]) {
                     result = convert_case_pattern(var_value, expanded_default,
                                                   true, false);
@@ -14324,15 +14315,15 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         case 15: /// ${var//pattern/replacement} - replace all occurrences
         case 16: /// ${var/pattern/replacement} - replace first occurrence
-            /* Pattern/replacement split honoring backslash-escaped
-             * slashes. ${path//\//.} has pattern `\/` (literal slash)
-             * and replacement `.`; the prior strchr-based split took
-             * the FIRST `/` as the separator even when it was preceded
-             * by `\`, splitting pattern as `\` (nothing) and replacement
-             * as `/.` -- silently producing the original string back.
-             * Walk the spec and break at the first unescaped `/`.
-             * Backslash-escapes other than `\/` pass through to
-             * fnmatch which handles them per glob spec. Issue #96. */
+            /// Pattern/replacement split honoring backslash-escaped
+            /// slashes. ${path//\//.} has pattern `\/` (literal slash)
+            /// and replacement `.`; the prior strchr-based split took
+            /// the FIRST `/` as the separator even when it was preceded
+            /// by `\`, splitting pattern as `\` (nothing) and replacement
+            /// as `/.` -- silently producing the original string back.
+            /// Walk the spec and break at the first unescaped `/`.
+            /// Backslash-escapes other than `\/` pass through to
+            /// fnmatch which handles them per glob spec. Issue #96.
             if (var_value) {
                 char *sep = NULL;
                 for (char *p = expanded_default; *p; p++) {
@@ -14350,10 +14341,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                     size_t pattern_len = sep - expanded_default;
                     char *pattern = malloc(pattern_len + 1);
                     if (pattern) {
-                        /* Strip `\/` -> `/` in the extracted pattern
-                         * so downstream matchers see the canonical
-                         * literal slash. Other backslash sequences
-                         * pass through. */
+                        /// Strip `\/` -> `/` in the extracted pattern
+                        /// so downstream matchers see the canonical
+                        /// literal slash. Other backslash sequences
+                        /// pass through.
                         size_t pj = 0;
                         for (size_t pi = 0; pi < pattern_len; pi++) {
                             if (expanded_default[pi] == '\\' &&
@@ -14374,8 +14365,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                         result = strdup(var_value);
                     }
                 } else {
-                    /* No replacement, just remove pattern. Same `\/`
-                     * canonicalization as the pattern half. */
+                    /// No replacement, just remove pattern. Same `\/`
+                    /// canonicalization as the pattern half.
                     size_t plen = strlen(expanded_default);
                     char *pattern = malloc(plen + 1);
                     if (pattern) {
@@ -14405,14 +14396,14 @@ static char *parse_parameter_expansion(executor_t *executor,
         case 17: /// ${var@op} - transformations
             if (expanded_default[0]) {
                 char op = expanded_default[0];
-                /* The @a (attribute query) variant only inspects the
-                 * variable's metadata and doesn't need var_value to
-                 * be set. Arrays specifically have NULL var_value
-                 * (scalar lookup misses them), so the prior
-                 * `if (var_value && ...)` guard hid the attribute
-                 * for `declare -A arr; echo "${arr@a}"`. Issue #102.
-                 * Other @op flavors do still need a value; for those
-                 * fall through to the empty-result path. */
+                /// The @a (attribute query) variant only inspects the
+                /// variable's metadata and doesn't need var_value to
+                /// be set. Arrays specifically have NULL var_value
+                /// (scalar lookup misses them), so the prior
+                /// `if (var_value && ...)` guard hid the attribute
+                /// for `declare -A arr; echo "${arr@a}"`. Issue #102.
+                /// Other @op flavors do still need a value; for those
+                /// fall through to the empty-result path.
                 if (op == 'a') {
                     result = get_variable_attributes(var_name);
                     break;
@@ -14647,9 +14638,9 @@ static char *parse_parameter_expansion(executor_t *executor,
         lush_value_view_clear(&view);
         return result;
     }
-    /* Transfer ownership of the scalar strdup out of the view so the
-     * subsequent free path stays the same as the legacy code. clear()
-     * is now a no-op on the (zeroed) scalar field. */
+    /// Transfer ownership of the scalar strdup out of the view so the
+    /// subsequent free path stays the same as the legacy code. clear()
+    /// is now a no-op on the (zeroed) scalar field.
     char *value = view.scalar_value;
     view.scalar_value = NULL;
     lush_value_view_clear(&view);
@@ -14723,12 +14714,12 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
     /// Handle ${var} format with advanced parameter expansion
     if (var_name[0] == '{') {
 
-        /* Find the matching closing brace, not the first one. Nested
-         * parameter expansion ${(flag)${INNER}} has an inner `}` that
-         * the outer brace match must skip past. strchr would stop at
-         * the inner brace and leave the outer expansion truncated.
-         * find_closing_brace counts depth and returns the matched
-         * close. Issue #98. */
+        /// Find the matching closing brace, not the first one. Nested
+        /// parameter expansion ${(flag)${INNER}} has an inner `}` that
+        /// the outer brace match must skip past. strchr would stop at
+        /// the inner brace and leave the outer expansion truncated.
+        /// find_closing_brace counts depth and returns the matched
+        /// close. Issue #98.
         size_t close_offset = find_closing_brace((char *)var_name);
         char *close = close_offset > 0 ? (char *)(var_name + close_offset)
                                        : strchr(var_name, '}');
@@ -14762,13 +14753,13 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
             }
         }
 
-        /* Zsh bare-subscript form: $var[N] / $var[N,M]. The caller in
-         * expand_variables_in_string already consumed the bracket span
-         * into var_text when FEATURE_ZSH_BARE_SUBSCRIPT is enabled, so
-         * if we see '[' after the name we route through
-         * parse_parameter_expansion("var[N]") — same backend as the
-         * brace form ${var[N]}. Gating here is a defensive double-check;
-         * the primary gate is at the caller. */
+        /// Zsh bare-subscript form: $var[N] / $var[N,M]. The caller in
+        /// expand_variables_in_string already consumed the bracket span
+        /// into var_text when FEATURE_ZSH_BARE_SUBSCRIPT is enabled, so
+        /// if we see '[' after the name we route through
+        /// parse_parameter_expansion("var[N]") — same backend as the
+        /// brace form ${var[N]}. Gating here is a defensive double-check;
+        /// the primary gate is at the caller.
         if (name_len > 0 && var_name[name_len] == '[' &&
             shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
             const char *bracket_end = strchr(var_name + name_len + 1, ']');
@@ -14821,12 +14812,12 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                         free(resolved_to_free);
                     }
                     free(name);
-                    /* Caller (expand_variables_in_string) appends any
-                     * trailing literal text after the variable name. */
+                    /// Caller (expand_variables_in_string) appends any
+                    /// trailing literal text after the variable name.
                     return result ? result : strdup("");
                 }
-                /* Transfer ownership of the scalar out of the view so
-                 * the legacy unset / set -u path below stays identical. */
+                /// Transfer ownership of the scalar out of the view so
+                /// the legacy unset / set -u path below stays identical.
                 char *value = view.scalar_value;
                 view.scalar_value = NULL;
                 lush_value_view_clear(&view);
@@ -15229,13 +15220,12 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
         return result;
     }
 
-    /* Drain the typed error state from arithmetic.c and emit a fully
-     * structured shell error: specific code (one per failure mode rather
-     * than the old blanket SHELL_ERR_ARITHMETIC_SYNTAX), site-specific
-     * `while:` context, and site-specific `help:` suggestion. The
-     * arithmetic module owns the error semantics; the executor owns
-     * displaying them.
-     */
+    /// Drain the typed error state from arithmetic.c and emit a fully
+    /// structured shell error: specific code (one per failure mode rather
+    /// than the old blanket SHELL_ERR_ARITHMETIC_SYNTAX), site-specific
+    /// `while:` context, and site-specific `help:` suggestion. The
+    /// arithmetic module owns the error semantics; the executor owns
+    /// displaying them.
     if (arithm_error_is_flagged()) {
         const char *msg = arithm_error_message();
         const char *while_ctx = arithm_error_while();
@@ -15327,17 +15317,17 @@ static char *expand_command_substitution(executor_t *executor,
         }
     }
 
-    /* Pre-fork variable expansion of the command text was removed in
-     * the #97 fix: it collapsed array values ("${!arr[@]}", "${arr[@]}")
-     * into space-joined scalars before the child parser ever saw them,
-     * which destroyed the per-element word boundaries the child would
-     * otherwise have honored via the vector-expansion path in
-     * build_argv_from_ast. The child inherits parent state through
-     * fork() (full memory copy, including non-exported locals), so it
-     * can parse and expand the raw command text natively -- which is
-     * also what bash/dash/zsh do for $(...) -- and produce correctly
-     * separated arguments. Pre-expansion was an architectural layering
-     * violation that masked array semantics. */
+    /// Pre-fork variable expansion of the command text was removed in
+    /// the #97 fix: it collapsed array values ("${!arr[@]}", "${arr[@]}")
+    /// into space-joined scalars before the child parser ever saw them,
+    /// which destroyed the per-element word boundaries the child would
+    /// otherwise have honored via the vector-expansion path in
+    /// build_argv_from_ast. The child inherits parent state through
+    /// fork() (full memory copy, including non-exported locals), so it
+    /// can parse and expand the raw command text natively -- which is
+    /// also what bash/dash/zsh do for $(...) -- and produce correctly
+    /// separated arguments. Pre-expansion was an architectural layering
+    /// violation that masked array semantics.
 
     /// Create a pipe to capture command output
     int pipefd[2];
@@ -15365,8 +15355,8 @@ static char *expand_command_substitution(executor_t *executor,
         const char *src_name = executor->current_script_file
                                    ? executor->current_script_file
                                    : "<command substitution>";
-        /* Command substitution context: input is its own logical
-         * source slice, line 1 of that slice. */
+        /// Command substitution context: input is its own logical
+        /// source slice, line 1 of that slice.
         parser_t *parser = parser_new_with_source(command, src_name, 1);
         int result = 127;
 
@@ -15835,12 +15825,12 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
     size_t i = 0;
 
     while (i < len) {
-        /* Kind sigil inside a double-quoted string: `"@x"` and `"%x"` must
-         * produce the same result as bare `@x` / `%x` per the §3.6 rule
-         * that quoting is irrelevant to presentation.  The check mirrors the
-         * tokenizer: sigil at this slot AND followed by a valid identifier
-         * AND FEATURE_KIND_SIGILS is enabled.  Splice the expanded text into
-         * the result buffer and advance past the consumed span. */
+        /// Kind sigil inside a double-quoted string: `"@x"` and `"%x"` must
+        /// produce the same result as bare `@x` / `%x` per the §3.6 rule
+        /// that quoting is irrelevant to presentation.  The check mirrors the
+        /// tokenizer: sigil at this slot AND followed by a valid identifier
+        /// AND FEATURE_KIND_SIGILS is enabled.  Splice the expanded text into
+        /// the result buffer and advance past the consumed span.
         if ((str[i] == '@' || str[i] == '%') && i + 1 < len &&
             shell_mode_allows(FEATURE_KIND_SIGILS) &&
             (isalpha((unsigned char)str[i + 1]) || str[i + 1] == '_')) {
@@ -15881,10 +15871,10 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
 
             /// Check for arithmetic expansion $((...))
             if (str[i + 1] == '(' && i + 2 < len && str[i + 2] == '(') {
-                /* $(( disambiguation: arithmetic vs command-sub of
-                 * anonymous function. Same shape as tokenizer +
-                 * expand_variables_in_string + expand_if_needed
-                 * (issue #99). */
+                /// $(( disambiguation: arithmetic vs command-sub of
+                /// anonymous function. Same shape as tokenizer +
+                /// expand_variables_in_string + expand_if_needed
+                /// (issue #99).
                 bool qs_looks_arith = true;
                 {
                     size_t s = i + 3;
@@ -15907,14 +15897,14 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                     }
                 }
                 if (!qs_looks_arith) {
-                    /* Fall through to the $(...) command-sub handler
-                     * later in this function -- which is exactly the
-                     * else-if test on str[i+1] == '(' that doesn't
-                     * require str[i+2] == '('. To avoid restructuring
-                     * the giant conditional chain, mark this branch
-                     * as "not arithmetic" by setting paren_depth so
-                     * the post-check fails through. Simplest path:
-                     * just skip and let the next branch handle it. */
+                    /// Fall through to the $(...) command-sub handler
+                    /// later in this function -- which is exactly the
+                    /// else-if test on str[i+1] == '(' that doesn't
+                    /// require str[i+2] == '('. To avoid restructuring
+                    /// the giant conditional chain, mark this branch
+                    /// as "not arithmetic" by setting paren_depth so
+                    /// the post-check fails through. Simplest path:
+                    /// just skip and let the next branch handle it.
                     goto qs_try_cmd_sub;
                 }
                 /// This is arithmetic expansion $((expr))
@@ -16107,14 +16097,14 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                             str[var_start + var_name_len] == '_')) {
                         var_name_len++;
                     }
-                    /* Zsh bare-subscript form: $var[N] / $var[N,M] inside
-                     * a double-quoted string. Extend var_name_len through
-                     * the bracket span so we pass "$var[N]" to
-                     * expand_variable, which routes it through
-                     * parse_parameter_expansion. Gated on
-                     * FEATURE_ZSH_BARE_SUBSCRIPT — bash mode keeps the
-                     * literal-[N]-after-$var semantic. Mirrors the
-                     * unquoted path in expand_variables_in_string. */
+                    /// Zsh bare-subscript form: $var[N] / $var[N,M] inside
+                    /// a double-quoted string. Extend var_name_len through
+                    /// the bracket span so we pass "$var[N]" to
+                    /// expand_variable, which routes it through
+                    /// parse_parameter_expansion. Gated on
+                    /// FEATURE_ZSH_BARE_SUBSCRIPT — bash mode keeps the
+                    /// literal-[N]-after-$var semantic. Mirrors the
+                    /// unquoted path in expand_variables_in_string.
                     if (var_name_len > 0 && var_start + var_name_len < len &&
                         str[var_start + var_name_len] == '[' &&
                         shell_mode_allows(FEATURE_ZSH_BARE_SUBSCRIPT)) {
@@ -16222,20 +16212,20 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
             /// If we get here, no matching backtick found, treat as literal
             result[result_pos++] = str[i++];
         } else if (str[i] == '\\' && i + 1 < len) {
-            /* Two escape regimes share this loop:
-             *  in_double_quotes=true  -- POSIX double-quote: only \\, \",
-             *      \$, \` are meaningful; all other `\X` is kept literally
-             *      as `\X` so the consumer (e.g. echo with XPG escape
-             *      interp) can still process it.
-             *  in_double_quotes=false -- POSIX unquoted: any `\X` (other
-             *      than `\<newline>` already eaten by the tokenizer)
-             *      collapses to literal X, including suppressing the
-             *      special meaning of `$` and `` ` `` so that `\$VAR`
-             *      yields literal `$VAR` with no parameter expansion.
-             *      Single-pass interleaving with variable expansion
-             *      relies on emitting the literal byte and skipping past
-             *      it, so we never re-enter the var-scan on the escaped
-             *      character. */
+            /// Two escape regimes share this loop:
+            ///  in_double_quotes=true  -- POSIX double-quote: only \\, \",
+            ///      \$, \` are meaningful; all other `\X` is kept literally
+            ///      as `\X` so the consumer (e.g. echo with XPG escape
+            ///      interp) can still process it.
+            ///  in_double_quotes=false -- POSIX unquoted: any `\X` (other
+            ///      than `\<newline>` already eaten by the tokenizer)
+            ///      collapses to literal X, including suppressing the
+            ///      special meaning of `$` and `` ` `` so that `\$VAR`
+            ///      yields literal `$VAR` with no parameter expansion.
+            ///      Single-pass interleaving with variable expansion
+            ///      relies on emitting the literal byte and skipping past
+            ///      it, so we never re-enter the var-scan on the escaped
+            ///      character.
             char next_char = str[i + 1];
             bool is_dq_meta = (next_char == '\\' || next_char == '"' ||
                                next_char == '$' || next_char == '`');
@@ -16307,15 +16297,15 @@ static void initialize_job_control(executor_t *executor) {
     executor->next_job_id = 1;
 
 #ifdef LUSH_FUZZ_SANDBOX
-    /* Fuzz harness must not perform tty job-control operations.
-     * executor_new() runs per fuzz iteration; tcgetpgrp / tcsetpgrp /
-     * kill(-pgid, SIGTTIN) inside this function send signals to the
-     * fuzzer's process group every iteration when stdin is a TTY,
-     * causing eventual SIGABRT after many iterations as accumulated
-     * signal state corrupts the process. The fuzz binary never needs
-     * to take terminal control — it does not run external commands
-     * (LUSH_FUZZ_SANDBOX makes lush_fork() return -1) and has no
-     * interactive prompt. (Issue #75.) */
+    /// Fuzz harness must not perform tty job-control operations.
+    /// executor_new() runs per fuzz iteration; tcgetpgrp / tcsetpgrp /
+    /// kill(-pgid, SIGTTIN) inside this function send signals to the
+    /// fuzzer's process group every iteration when stdin is a TTY,
+    /// causing eventual SIGABRT after many iterations as accumulated
+    /// signal state corrupts the process. The fuzz binary never needs
+    /// to take terminal control — it does not run external commands
+    /// (LUSH_FUZZ_SANDBOX makes lush_fork() return -1) and has no
+    /// interactive prompt. (Issue #75.)
     executor->shell_pgid = getpgrp();
     return;
 #endif
@@ -17478,11 +17468,11 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
         } else if (strcmp(op, "-n") == 0) {
             result = (*p != '\0');
         } else if (strcmp(op, "-v") == 0) {
-            /* -v NAME -- true if scalar variable NAME is set.
-             * -v NAME[KEY] / NAME[N] -- true if the array element
-             * is set (associative key present, indexed slot has a
-             * value). Bash semantics: -v on an unset arr[k] returns
-             * false; on an unset scalar also false. Issue #97. */
+            /// -v NAME -- true if scalar variable NAME is set.
+            /// -v NAME[KEY] / NAME[N] -- true if the array element
+            /// is set (associative key present, indexed slot has a
+            /// value). Bash semantics: -v on an unset arr[k] returns
+            /// false; on an unset scalar also false. Issue #97.
             char *arg = strdup(p);
             if (arg) {
                 char *end = arg + strlen(arg) - 1;
@@ -17512,12 +17502,12 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                         }
                     }
                 } else {
-                    /* -v NAME without subscript: true for any kind of
-                     * binding (scalar OR array). Pre-migration this
-                     * only checked symtable_get_var, missing arrays --
-                     * `arr=(a); [[ -v arr ]]` was false in lush but
-                     * true in bash. The unified view fixes that by
-                     * returning true on any LUSH_VALUE_* hit. */
+                    /// -v NAME without subscript: true for any kind of
+                    /// binding (scalar OR array). Pre-migration this
+                    /// only checked symtable_get_var, missing arrays --
+                    /// `arr=(a); [[ -v arr ]]` was false in lush but
+                    /// true in bash. The unified view fixes that by
+                    /// returning true on any LUSH_VALUE_* hit.
                     lush_value_view_t view = {0};
                     result = symtable_lookup(arg, &view);
                     lush_value_view_clear(&view);
@@ -17926,13 +17916,13 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         bool is_quoted = (elem->type == NODE_STRING_LITERAL ||
                                           elem->type == NODE_STRING_EXPANDABLE);
 
-                        /* Brace expansion on unquoted indexed-array
-                         * elements: `arr=(/tmp/{a,b}/sub)` must yield
-                         * two elements, matching bash/zsh behavior.
-                         * Each brace-expansion result becomes its own
-                         * array element regardless of internal spaces
-                         * (the brace expander has already partitioned
-                         * the source into discrete words). */
+                        /// Brace expansion on unquoted indexed-array
+                        /// elements: `arr=(/tmp/{a,b}/sub)` must yield
+                        /// two elements, matching bash/zsh behavior.
+                        /// Each brace-expansion result becomes its own
+                        /// array element regardless of internal spaces
+                        /// (the brace expander has already partitioned
+                        /// the source into discrete words).
                         if (!is_quoted && needs_brace_expansion(final_value)) {
                             int brace_count = 0;
                             char **brace_results =
@@ -17953,12 +17943,12 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                             }
                         }
 
-                        /* Pathname (glob) expansion on unquoted
-                         * indexed-array elements: `arr=(*.txt)` must
-                         * list the matching files, not iterate the
-                         * literal pattern. expand_glob_pattern handles
-                         * zsh glob qualifiers, extglob, nullglob, and
-                         * `set -f` internally. */
+                        /// Pathname (glob) expansion on unquoted
+                        /// indexed-array elements: `arr=(*.txt)` must
+                        /// list the matching files, not iterate the
+                        /// literal pattern. expand_glob_pattern handles
+                        /// zsh glob qualifiers, extglob, nullglob, and
+                        /// `set -f` internally.
                         if (!is_quoted && needs_glob_expansion(final_value)) {
                             int glob_count = 0;
                             char **glob_results =

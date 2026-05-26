@@ -484,8 +484,8 @@ lle_hashtable_factory_create_strstr(lle_hashtable_factory_t *factory,
         return LLE_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Note: libhashtable callbacks are set during creation, not after.
-     * For now, memory pool integration will be added in a future phase. */
+    /// Note: libhashtable callbacks are set during creation, not after.
+    /// For now, memory pool integration will be added in a future phase.
 
     /// Initialize performance metrics if enabled
     if (cfg->performance_monitoring) {
@@ -826,10 +826,10 @@ size_t lle_strstr_hashtable_size(lle_strstr_hashtable_t *ht) {
         pthread_rwlock_rdlock(ht->lock);
     }
 
-    /* Return the tracked entry count
-     * Note: We maintain our own count because libhashtable's enumeration
-     * has a bug where it doesn't correctly count all entries in collision
-     * chains */
+    /// Return the tracked entry count
+    /// Note: We maintain our own count because libhashtable's enumeration
+    /// has a bug where it doesn't correctly count all entries in collision
+    /// chains
     size_t count = ht->entry_count;
 
     /// Release lock if thread-safe

@@ -181,12 +181,12 @@ int bin_read(int argc, char **argv) {
         return 1;
     }
 
-    /* POSIX read accepts one or more variable names. With N names,
-     * the input line is split on IFS into the first N-1 fields
-     * (whitespace coalesced for default IFS) and the remainder
-     * (including any internal IFS chars) is assigned to the Nth
-     * variable. If fewer than N words are present, trailing
-     * variables get the empty string. Issue #101. */
+    /// POSIX read accepts one or more variable names. With N names,
+    /// the input line is split on IFS into the first N-1 fields
+    /// (whitespace coalesced for default IFS) and the remainder
+    /// (including any internal IFS chars) is assigned to the Nth
+    /// variable. If fewer than N words are present, trailing
+    /// variables get the empty string. Issue #101.
     int n_varnames = argc - opt_index;
     if (n_varnames <= 0) {
         executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
@@ -391,22 +391,22 @@ int bin_read(int argc, char **argv) {
         }
     }
 
-    /* Assign the line to one or more variables. Single-name fast
-     * path matches POSIX read's default behavior (entire line ->
-     * the one variable). For N>1 names, split on IFS into N-1
-     * leading fields and assign the remainder (preserving internal
-     * IFS chars) to the last variable. */
+    /// Assign the line to one or more variables. Single-name fast
+    /// path matches POSIX read's default behavior (entire line ->
+    /// the one variable). For N>1 names, split on IFS into N-1
+    /// leading fields and assign the remainder (preserving internal
+    /// IFS chars) to the last variable.
     if (n_varnames == 1) {
         symtable_set_global(varname, line ? line : "");
     } else {
         const char *src = line ? line : "";
-        /* POSIX IFS default is space, tab, newline. Honor a user-set
-         * IFS if present in the symbol table. Read IFS as the SET
-         * of delimiter chars; consecutive whitespace IFS chars are
-         * collapsed by POSIX field-splitting semantics, but
-         * non-whitespace IFS chars produce empty fields. For the
-         * canonical read-line case (default IFS), the whitespace-
-         * coalescing behavior is what real scripts depend on. */
+        /// POSIX IFS default is space, tab, newline. Honor a user-set
+        /// IFS if present in the symbol table. Read IFS as the SET
+        /// of delimiter chars; consecutive whitespace IFS chars are
+        /// collapsed by POSIX field-splitting semantics, but
+        /// non-whitespace IFS chars produce empty fields. For the
+        /// canonical read-line case (default IFS), the whitespace-
+        /// coalescing behavior is what real scripts depend on.
         char *ifs_val = symtable_get_var(current_executor->symtable, "IFS");
         const char *ifs = ifs_val ? ifs_val : " \t\n";
 
@@ -431,9 +431,9 @@ int bin_read(int argc, char **argv) {
             symtable_set_global(argv[opt_index + i], field);
             free(field);
         }
-        /* Last variable: skip one leading IFS-whitespace run then
-         * take everything else verbatim (including internal IFS
-         * chars). */
+        /// Last variable: skip one leading IFS-whitespace run then
+        /// take everything else verbatim (including internal IFS
+        /// chars).
         while (*src && strchr(ifs, *src)) {
             src++;
         }

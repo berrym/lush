@@ -229,8 +229,8 @@ void test_phase1_api_functions(void) {
     /// These functions must exist and be callable
     /// Just verify they link - actual functionality tested in unit tests
 
-    /* Note: We don't actually call these in compliance test to avoid runtime
-     * dependencies */
+    /// Note: We don't actually call these in compliance test to avoid runtime
+    /// dependencies
     /// The fact that this compiles and links proves the API exists
 
     TEST_ASSERT(1,
@@ -369,8 +369,8 @@ void test_phase5_1_api_functions(void) {
                 "default options has multi-column enabled");
     TEST_ASSERT(options.max_rows == 20, "default options has correct max_rows");
 
-    /* Test column calculation functions exist (just verify they compile and
-     * link) */
+    /// Test column calculation functions exist (just verify they compile and
+    /// link)
     size_t width = lle_menu_renderer_calculate_column_width(NULL, 0, 80, 4);
     TEST_ASSERT(width >= LLE_MENU_RENDERER_MIN_COL_WIDTH,
                 "lle_menu_renderer_calculate_column_width exists");

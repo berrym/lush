@@ -471,12 +471,12 @@ lle_result_t lle_history_expand_capacity(lle_history_core_t *core) {
         return LLE_ERROR_INVALID_PARAMETER;
     }
 
-    /* Calculate new capacity (double it, or use initial minimum if currently 0)
-     */
+    /// Calculate new capacity (double it, or use initial minimum if currently
+    /// 0)
     size_t new_capacity;
     if (core->entry_capacity == 0) {
-        /* Handle case where initial_capacity was set to 0 - use a reasonable
-         * minimum */
+        /// Handle case where initial_capacity was set to 0 - use a reasonable
+        /// minimum
         new_capacity = 100;
     } else {
         new_capacity = core->entry_capacity * 2;
@@ -775,8 +775,8 @@ lle_result_t lle_history_get_entry_by_id(lle_history_core_t *core,
     struct timeval start_time;
     gettimeofday(&start_time, NULL);
 
-    /* Phase 1 Day 2: Use hashtable lookup if available, otherwise linear search
-     */
+    /// Phase 1 Day 2: Use hashtable lookup if available, otherwise linear
+    /// search
     lle_history_entry_t *found = NULL;
     lle_result_t lookup_result;
 

@@ -275,8 +275,8 @@ TEST(render_controller_double_cleanup) {
     result = lle_render_controller_cleanup(controller);
     ASSERT_EQ(result, LLE_SUCCESS, "First cleanup should succeed");
 
-    /* Second cleanup - controller memory was freed, so we can't safely call
-     * again */
+    /// Second cleanup - controller memory was freed, so we can't safely call
+    /// again
     /// This test just verifies that single cleanup works correctly
 
     /// Bridge cleanup

@@ -109,8 +109,7 @@ static lle_result_t deserialize_cache_entry(const void *serialized,
 
     const char *bytes = serialized;
 
-    /* Parse metadata header (header section ends at '|' and contains no NULs)
-     */
+    /// Parse metadata header (header section ends at '|' and contains no NULs)
     uint64_t timestamp, last_access;
     unsigned int access_count;
     int valid;
@@ -350,13 +349,13 @@ lle_result_t lle_display_cache_init(lle_display_cache_t **cache,
     /// Step 3: Store memory pool reference (cast from LLE to Lush type)
     c->memory_pool = (lush_memory_pool_t *)memory_pool;
 
-    /* Step 4: Create binary-safe libhashtable for cache storage. The cache
-     * stores serialized entries that contain arbitrary data bytes (issue
-     * #49 — embedded NULs were silently truncated under the previous
-     * string-only hashtable wrapper). render_cache provides its own
-     * rwlock and metrics so the bare libhashtable type is sufficient
-     * here; an lle_strblob wrapper can be added later if a second
-     * consumer needs memory-context or metrics integration. */
+    /// Step 4: Create binary-safe libhashtable for cache storage. The cache
+    /// stores serialized entries that contain arbitrary data bytes (issue
+    /// #49 — embedded NULs were silently truncated under the previous
+    /// string-only hashtable wrapper). render_cache provides its own
+    /// rwlock and metrics so the bare libhashtable type is sufficient
+    /// here; an lle_strblob wrapper can be added later if a second
+    /// consumer needs memory-context or metrics integration.
     c->cache_table = ht_strblob_create(HT_SEED_RANDOM);
     if (!c->cache_table) {
         lle_pool_free(c);

@@ -90,10 +90,10 @@ int bin_source(int argc, char **argv) {
 
     char *complete_input;
     int result = 0;
-    /* 1-based file line of the first character of the next construct.
-     * Threaded into parse_and_execute as the parser's starting line so
-     * node->loc.line carries the absolute source line -- what both
-     * breakpoints and structured-error snippets match against. */
+    /// 1-based file line of the first character of the next construct.
+    /// Threaded into parse_and_execute as the parser's starting line so
+    /// node->loc.line carries the absolute source line -- what both
+    /// breakpoints and structured-error snippets match against.
     size_t source_line = 1;
 
     /// Read complete multi-line constructs instead of line by line

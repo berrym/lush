@@ -1237,9 +1237,9 @@ static lle_result_t theme_builder_callback(const char *section, const char *key,
     /// [symbols.ascii] section - ASCII fallback symbols
     if (strcmp(section, "symbols.ascii") == 0 &&
         value->type == LLE_THEME_VALUE_STRING) {
-        /* Note: ASCII fallbacks are stored in the same symbol set when
-         * the theme is used in ASCII mode. For now, we just ignore these
-         * during parsing and let the theme loader handle mode selection. */
+        /// Note: ASCII fallbacks are stored in the same symbol set when
+        /// the theme is used in ASCII mode. For now, we just ignore these
+        /// during parsing and let the theme loader handle mode selection.
         return LLE_SUCCESS;
     }
 

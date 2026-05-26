@@ -66,8 +66,8 @@ void lle_event_queue_destroy(lle_event_queue_t *queue) {
         return;
     }
 
-    /* Note: We don't destroy events here - they should be dequeued first
-     * or destroyed by the event system */
+    /// Note: We don't destroy events here - they should be dequeued first
+    /// or destroyed by the event system
 
     /// Free event array
     if (queue->events) {

@@ -71,22 +71,22 @@ int bin_zmodload(int argc __attribute__((unused)),
 }
 
 int bin_emulate(int argc, char **argv) {
-    /* `emulate [-LR] [shell]` switches the shell's emulation context.
-     * Real zsh recognises `zsh`, `sh`, `csh`, `ksh` and -L (local to
-     * the enclosing function) / -R (reset options first) / -c <cmd>.
-     *
-     * Lush's `mode` builtin already does mode switching, but function-
-     * local restoration is not yet plumbed through the call frame, so
-     * a real `emulate -L` would not auto-restore on return. Rather
-     * than do half the job, accept the full option grammar and treat
-     * the call as a no-op when the requested target matches the
-     * current mode (or when no target is given). Any mismatch is
-     * silently accepted: autoloaded zsh functions calling
-     * `emulate -L zsh` while lush is already in zsh mode -- the
-     * actual corpus shape -- get the correct behaviour.
-     *
-     * When the underlying function-scoped option stash lands, this
-     * stub will be retired in favour of the real switch. */
+    /// `emulate [-LR] [shell]` switches the shell's emulation context.
+    /// Real zsh recognises `zsh`, `sh`, `csh`, `ksh` and -L (local to
+    /// the enclosing function) / -R (reset options first) / -c <cmd>.
+    ///
+    /// Lush's `mode` builtin already does mode switching, but function-
+    /// local restoration is not yet plumbed through the call frame, so
+    /// a real `emulate -L` would not auto-restore on return. Rather
+    /// than do half the job, accept the full option grammar and treat
+    /// the call as a no-op when the requested target matches the
+    /// current mode (or when no target is given). Any mismatch is
+    /// silently accepted: autoloaded zsh functions calling
+    /// `emulate -L zsh` while lush is already in zsh mode -- the
+    /// actual corpus shape -- get the correct behaviour.
+    ///
+    /// When the underlying function-scoped option stash lands, this
+    /// stub will be retired in favour of the real switch.
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
         if (!arg || !*arg) {

@@ -129,8 +129,8 @@ int bin_trap(int argc, char **argv) {
     for (int i = arg_index; i < argc; i++) {
         int signal = get_signal_number(argv[i]);
 
-        /* Negative pseudo-signal sentinels (TRAP_PSEUDO_ERR etc.) are
-         * legitimate; only -1 (the "unknown name" return) is rejected. */
+        /// Negative pseudo-signal sentinels (TRAP_PSEUDO_ERR etc.) are
+        /// legitimate; only -1 (the "unknown name" return) is rejected.
         if (signal == -1) {
             source_location_t loc = builtin_get_source_location();
             shell_error_t *err = shell_error_create(

@@ -187,11 +187,11 @@ lle_result_t lle_completion_source_commands(lle_memory_pool_t *pool,
 
                 struct stat st;
                 if (stat(full_path, &st) == 0 && (st.st_mode & S_IXUSR)) {
-                    /* Shadowing detection: external commands that
-                     * share a name with a builtin or alias get the
-                     * full PATH-resolved path stored in description
-                     * so the engine can splice the disambiguating
-                     * absolute path on selection. */
+                    /// Shadowing detection: external commands that
+                    /// share a name with a builtin or alias get the
+                    /// full PATH-resolved path stored in description
+                    /// so the engine can splice the disambiguating
+                    /// absolute path on selection.
                     const char *desc = NULL;
                     if (lle_shell_is_builtin(entry->d_name) ||
                         lle_shell_is_alias(entry->d_name)) {
@@ -265,10 +265,10 @@ static lle_result_t files_internal(lle_memory_pool_t *pool,
         if (directories_only && !is_dir)
             continue;
 
-        /* Emit ONLY the filename literal. The splicer uses
-         * filename_portion_start to splice this in at the right
-         * byte offset, preserving the user's typed path-prefix
-         * bytes (~/, $VAR/, etc.) verbatim. */
+        /// Emit ONLY the filename literal. The splicer uses
+        /// filename_portion_start to splice this in at the right
+        /// byte offset, preserving the user's typed path-prefix
+        /// bytes (~/, $VAR/, etc.) verbatim.
         lle_result_t r =
             lle_completion_result_add(result, entry->d_name, NULL, type, score);
         if (r != LLE_SUCCESS && final_result == LLE_SUCCESS)
@@ -305,8 +305,8 @@ lle_result_t lle_completion_source_variables(lle_memory_pool_t *pool,
     if (!prefix)
         return LLE_ERROR_INVALID_PARAMETER;
 
-    /* Strip a leading '$' if the engine forwarded it; sources match
-     * against the bare variable name. */
+    /// Strip a leading '$' if the engine forwarded it; sources match
+    /// against the bare variable name.
     if (prefix[0] == '$')
         prefix++;
 
@@ -329,8 +329,8 @@ lle_result_t lle_completion_source_variables(lle_memory_pool_t *pool,
         free(var_name);
     }
 
-    /* Special variables ($?, $$, $!, etc.) are emitted as
-     * single-character names. */
+    /// Special variables ($?, $$, $!, etc.) are emitted as
+    /// single-character names.
     static const char *special_vars[] = {"?", "$", "!", "0", "#",
                                          "*", "@", "-", "_"};
     for (size_t i = 0; i < sizeof(special_vars) / sizeof(special_vars[0]);
@@ -357,9 +357,9 @@ lle_result_t lle_completion_source_history(lle_memory_pool_t *pool,
                                            lle_completion_result_t *result) {
     if (!pool || !context || !result)
         return LLE_ERROR_INVALID_PARAMETER;
-    /* History integration with LLE is a future concern; this source
-     * currently produces no candidates. The architecture is in place
-     * for it to be filled in without touching anything else. */
+    /// History integration with LLE is a future concern; this source
+    /// currently produces no candidates. The architecture is in place
+    /// for it to be filled in without touching anything else.
     return LLE_SUCCESS;
 }
 
@@ -381,31 +381,31 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
     if (!cache || cache->count == 0)
         return LLE_SUCCESS;
 
-    /* Three prefix forms come through this source:
-     *   - bare:        "git" or "" (whole prefix matches against host)
-     *   - user-prefix: "alice@git" (post-@ matches against host; the
-     *                  literal user-prefix the user typed is preserved
-     *                  in the emitted candidate so we don't override
-     *                  their explicit choice with a Host-stanza User)
-     *   - remote:path: "host:" or "host:p/q" -- only relevant for
-     *                  scp/sftp/rsync. We treat the segment before the
-     *                  first ':' as the host prefix; once the user has
-     *                  typed past the colon they are completing a
-     *                  remote path, which this source does not handle
-     *                  (separate, larger feature). The ':' check below
-     *                  short-circuits in that case.
-     *
-     * Splice math: dequoted_filename_prefix runs from
-     * context->filename_portion_start to context->word_end; the splicer
-     * replaces that range with the emitted candidate. Emitting
-     * "alice@gitlab.com" when the user typed "alice@git" is exactly
-     * what fills in -- the splicer overwrites the whole "alice@git"
-     * segment with the candidate, preserving the alice@ literal. */
+    /// Three prefix forms come through this source:
+    ///   - bare:        "git" or "" (whole prefix matches against host)
+    ///   - user-prefix: "alice@git" (post-@ matches against host; the
+    ///                  literal user-prefix the user typed is preserved
+    ///                  in the emitted candidate so we don't override
+    ///                  their explicit choice with a Host-stanza User)
+    ///   - remote:path: "host:" or "host:p/q" -- only relevant for
+    ///                  scp/sftp/rsync. We treat the segment before the
+    ///                  first ':' as the host prefix; once the user has
+    ///                  typed past the colon they are completing a
+    ///                  remote path, which this source does not handle
+    ///                  (separate, larger feature). The ':' check below
+    ///                  short-circuits in that case.
+    ///
+    /// Splice math: dequoted_filename_prefix runs from
+    /// context->filename_portion_start to context->word_end; the splicer
+    /// replaces that range with the emitted candidate. Emitting
+    /// "alice@gitlab.com" when the user typed "alice@git" is exactly
+    /// what fills in -- the splicer overwrites the whole "alice@git"
+    /// segment with the candidate, preserving the alice@ literal.
 
     const char *colon = strchr(prefix, ':');
     if (colon) {
-        /* Past the host position into remote-path territory; defer to
-         * a future remote-path source. */
+        /// Past the host position into remote-path territory; defer to
+        /// a future remote-path source.
         return LLE_SUCCESS;
     }
 
@@ -432,8 +432,8 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
                 snprintf(completion, sizeof(completion), "%s%s", user_prefix,
                          host->hostname);
             } else if (host->user[0]) {
-                /* User typed nothing for the user; honor the Host-stanza
-                 * User if one is configured. */
+                /// User typed nothing for the user; honor the Host-stanza
+                /// User if one is configured.
                 snprintf(completion, sizeof(completion), "%s@%s", host->user,
                          host->hostname);
             } else {
@@ -447,8 +447,8 @@ lle_result_t lle_completion_source_ssh_hosts(lle_memory_pool_t *pool,
             continue;
         }
 
-        /* Aliases (Host-stanza name distinct from HostName) are matched
-         * the same way and emitted with any user prefix preserved. */
+        /// Aliases (Host-stanza name distinct from HostName) are matched
+        /// the same way and emitted with any user prefix preserved.
         if (host->alias[0] && nfc_prefix_match(host_prefix, host->alias)) {
             char completion[320];
             if (user_prefix[0]) {

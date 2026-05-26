@@ -91,45 +91,45 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
     (void)argc;
     (void)argv;
 
-    /* CPU limit: 1 hour cumulative process CPU time. RLIMIT_CPU is
-     * a process-lifetime limit (NOT per-input), so the value must
-     * accommodate full fuzz sessions. libFuzzer's own -timeout=N
-     * flag is the proper per-input safety net (fires SIGALRM after
-     * N seconds for a single input, recorded as a timeout artifact,
-     * fuzzer continues). The earlier 30s value here was a defense-
-     * in-depth cap that misfired on every multi-minute fuzz session,
-     * killing the process well short of -max_total_time and wasting
-     * 95%+ of intended fuzz budget (issue #74). 1 hour is far above
-     * any plausible single-session run while still bounding pathological
-     * runaway behavior. */
+    /// CPU limit: 1 hour cumulative process CPU time. RLIMIT_CPU is
+    /// a process-lifetime limit (NOT per-input), so the value must
+    /// accommodate full fuzz sessions. libFuzzer's own -timeout=N
+    /// flag is the proper per-input safety net (fires SIGALRM after
+    /// N seconds for a single input, recorded as a timeout artifact,
+    /// fuzzer continues). The earlier 30s value here was a defense-
+    /// in-depth cap that misfired on every multi-minute fuzz session,
+    /// killing the process well short of -max_total_time and wasting
+    /// 95%+ of intended fuzz budget (issue #74). 1 hour is far above
+    /// any plausible single-session run while still bounding pathological
+    /// runaway behavior.
     struct rlimit cpu = {.rlim_cur = 3600, .rlim_max = 3600};
     setrlimit(RLIMIT_CPU, &cpu);
 
-    /* File size limit: 256 MiB. Bounds disk-fill from output
-     * redirection or heredoc body collection while leaving generous
-     * headroom for libFuzzer's own log output (which is subject to
-     * the same RLIMIT_FSIZE when callers pipe the fuzzer's stdio
-     * through a shell `>` redirect). A 1 MiB cap was tripping on the
-     * executor's parse-error spam during long runs and killing the
-     * fuzzer with SIGXFSZ. */
+    /// File size limit: 256 MiB. Bounds disk-fill from output
+    /// redirection or heredoc body collection while leaving generous
+    /// headroom for libFuzzer's own log output (which is subject to
+    /// the same RLIMIT_FSIZE when callers pipe the fuzzer's stdio
+    /// through a shell `>` redirect). A 1 MiB cap was tripping on the
+    /// executor's parse-error spam during long runs and killing the
+    /// fuzzer with SIGXFSZ.
     struct rlimit fs = {.rlim_cur = 1 << 28, .rlim_max = 1 << 28};
     setrlimit(RLIMIT_FSIZE, &fs);
 
-    /* Process limit. lush_fork() returns -1 under LUSH_FUZZ_SANDBOX so
-     * the shell itself never spawns. The cap exists in case a stray
-     * fork() site is added later. The sanitizer runtime (ASan/UBSan)
-     * still needs to fork to spawn its external symbolizer when
-     * formatting stack traces — a too-low cap silently breaks crash
-     * reporting (symbolizer fork fails, stacks come back as raw
-     * addresses, libFuzzer exits with a non-standard code and no
-     * usable diagnostic). 256 leaves comfortable headroom for the
-     * symbolizer plus libFuzzer's own bookkeeping while still
-     * bounding any genuine fork-bomb. */
+    /// Process limit. lush_fork() returns -1 under LUSH_FUZZ_SANDBOX so
+    /// the shell itself never spawns. The cap exists in case a stray
+    /// fork() site is added later. The sanitizer runtime (ASan/UBSan)
+    /// still needs to fork to spawn its external symbolizer when
+    /// formatting stack traces — a too-low cap silently breaks crash
+    /// reporting (symbolizer fork fails, stacks come back as raw
+    /// addresses, libFuzzer exits with a non-standard code and no
+    /// usable diagnostic). 256 leaves comfortable headroom for the
+    /// symbolizer plus libFuzzer's own bookkeeping while still
+    /// bounding any genuine fork-bomb.
     struct rlimit np = {.rlim_cur = 256, .rlim_max = 256};
     setrlimit(RLIMIT_NPROC, &np);
 
-    /* Scratch directory. Use a per-PID path so concurrent fuzzers
-     * (libFuzzer's `-jobs=N`) don't collide. */
+    /// Scratch directory. Use a per-PID path so concurrent fuzzers
+    /// (libFuzzer's `-jobs=N`) don't collide.
     char tmpdir[256];
     snprintf(tmpdir, sizeof(tmpdir), "/tmp/lush-fuzz-exec-%d", (int)getpid());
     mkdir(tmpdir, 0700);
@@ -140,9 +140,9 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
     /// Initialize shell mode system once for the whole fuzz session.
     shell_mode_init();
 
-    /* The global symbol table manager must exist before
-     * executor_new() will succeed; it normally gets initialised
-     * during shell startup in src/init.c (which we exclude). */
+    /// The global symbol table manager must exist before
+    /// executor_new() will succeed; it normally gets initialised
+    /// during shell startup in src/init.c (which we exclude).
     init_symtable(); /// idempotent
 
     return 0;
@@ -154,8 +154,8 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
  */
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    /* Cap input size; very large inputs aren't representative of
-     * real shell sessions and slow the fuzzer disproportionately. */
+    /// Cap input size; very large inputs aren't representative of
+    /// real shell sessions and slow the fuzzer disproportionately.
     if (size > 65536) {
         return 0;
     }
@@ -168,29 +168,29 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     memcpy(input, data, size);
     input[size] = '\0';
 
-    /* Reject inputs containing literal NUL bytes — the executor's
-     * command-line API can't see past them. The PARSER fuzzer already
-     * exercises NUL-byte handling at the parse layer; the executor
-     * fuzzer's job is the post-parse code. */
+    /// Reject inputs containing literal NUL bytes — the executor's
+    /// command-line API can't see past them. The PARSER fuzzer already
+    /// exercises NUL-byte handling at the parse layer; the executor
+    /// fuzzer's job is the post-parse code.
     if (strlen(input) != size) {
         free(input);
         return 0;
     }
 
-    /* Build a fresh executor for each input. Reusing one across
-     * inputs would let earlier executions' state (variables,
-     * functions, traps, options) leak into later ones, making
-     * crashes harder to minimize. */
+    /// Build a fresh executor for each input. Reusing one across
+    /// inputs would let earlier executions' state (variables,
+    /// functions, traps, options) leak into later ones, making
+    /// crashes harder to minimize.
     executor_t *executor = executor_new();
     if (!executor) {
         free(input);
         return 0;
     }
 
-    /* This is the call we're fuzzing: parse + execute end-to-end.
-     * Internally walks parser_new -> parser_parse -> executor_execute.
-     * Any segfault, ASan finding, UBSan finding, or libFuzzer timeout
-     * is recorded by libFuzzer as a crash artifact. */
+    /// This is the call we're fuzzing: parse + execute end-to-end.
+    /// Internally walks parser_new -> parser_parse -> executor_execute.
+    /// Any segfault, ASan finding, UBSan finding, or libFuzzer timeout
+    /// is recorded by libFuzzer as a crash artifact.
     (void)executor_execute_command_line(executor, input, 1);
 
     executor_free(executor);

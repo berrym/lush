@@ -251,16 +251,16 @@ static int execute_command(const char *command) {
         return 1;
     }
 
-    /* fc re-executes a history entry; the joined command has no
-     * surrounding source, so line 1. */
+    /// fc re-executes a history entry; the joined command has no
+    /// surrounding source, so line 1.
     int exit_status = executor_execute_command_line(executor, command, 1);
 
-    /* Forward only legacy-text errors from the sub-executor. Structured
-     * errors set executor->error_message to NULL after displaying, so
-     * this branch fires solely for the diminishing pool of bare-string
-     * errors that haven't been migrated yet. Wrapping that opaque text
-     * in a fresh shell_error layer here would obscure the real origin,
-     * so keep a plain forwarding print. */
+    /// Forward only legacy-text errors from the sub-executor. Structured
+    /// errors set executor->error_message to NULL after displaying, so
+    /// this branch fires solely for the diminishing pool of bare-string
+    /// errors that haven't been migrated yet. Wrapping that opaque text
+    /// in a fresh shell_error layer here would obscure the real origin,
+    /// so keep a plain forwarding print.
     const char *err_msg = executor_error(executor);
     if (executor_has_error(executor) && err_msg) {
         fprintf(stderr, "lush: fc: %s\n", err_msg);

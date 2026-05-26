@@ -89,9 +89,8 @@ lle_result_t lle_display_bridge_init(lle_display_bridge_t **bridge,
     memset(br, 0, sizeof(lle_display_bridge_t));
 
     /// Step 3: Connect to LLE systems
-    /* NOTE: editor is opaque until lle_editor_t is fully defined in future spec
-     */
-    /// For now, we store the reference but don't dereference it
+    /// NOTE: editor is opaque until lle_editor_t is fully defined in future
+    /// spec For now, we store the reference but don't dereference it
     br->lle_event_manager = editor; /// Store editor as event manager reference
     br->active_buffer = NULL;       /// Will be set when editor type is defined
     br->cursor_pos = NULL;          /// Will be set when editor type is defined
@@ -207,9 +206,9 @@ lle_result_t lle_display_bridge_cleanup(lle_display_bridge_t *bridge) {
     bridge->active_buffer = NULL;
     bridge->cursor_pos = NULL;
 
-    /* Note: The bridge structure itself is not freed here.
-     * It should be freed by the caller using the same memory pool
-     * that was used to allocate it. */
+    /// Note: The bridge structure itself is not freed here.
+    /// It should be freed by the caller using the same memory pool
+    /// that was used to allocate it.
 
     return LLE_SUCCESS;
 }
@@ -277,18 +276,17 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
         command_text = render_output->content;
     }
 
-    /* Calculate cursor screen position using incremental tracking
-     *
-     * Per MODERN_EDITOR_WRAPPING_RESEARCH.md, modern editors (Replxx, Fish,
-     * ZLE) calculate cursor position incrementally during rendering, NOT via
-     * division/modulo.
-     *
-     * This handles:
-     * - Multi-byte UTF-8 characters
-     * - Wide characters (2 columns)
-     * - Line wrapping at terminal boundaries
-     * - ANSI escape sequences (0 width)
-     */
+    /// Calculate cursor screen position using incremental tracking
+    ///
+    /// Per MODERN_EDITOR_WRAPPING_RESEARCH.md, modern editors (Replxx, Fish,
+    /// ZLE) calculate cursor position incrementally during rendering, NOT via
+    /// division/modulo.
+    ///
+    /// This handles:
+    /// - Multi-byte UTF-8 characters
+    /// - Wide characters (2 columns)
+    /// - Line wrapping at terminal boundaries
+    /// - ANSI escape sequences (0 width)
     if (cursor && cursor->position_valid && render_output) {
         cursor_pos = cursor->byte_offset;
 
@@ -303,9 +301,9 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
             }
         }
 
-        /* Get prompt width from composition engine
-         * Per MODERN_EDITOR_WRAPPING_RESEARCH.md, we start at prompt_indent
-         * like Replxx */
+        /// Get prompt width from composition engine
+        /// Per MODERN_EDITOR_WRAPPING_RESEARCH.md, we start at prompt_indent
+        /// like Replxx
         size_t prompt_width = 0;
         if (bridge->composition_engine &&
             bridge->composition_engine->prompt_layer) {
@@ -315,8 +313,8 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
             prompt_layer_get_rendered_content(prompt_layer, prompt_buffer,
                                               sizeof(prompt_buffer));
 
-            /* Calculate visual width (excluding ANSI codes and readline
-             * markers) */
+            /// Calculate visual width (excluding ANSI codes and readline
+            /// markers)
             bool in_escape = false;
             for (const char *p = prompt_buffer; *p; p++) {
                 if (*p == '\001' || *p == '\002')
@@ -337,14 +335,13 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
             }
         }
 
-        /* IMPORTANT: Per Replxx approach, LLE calculates cursor position
-         * starting from prompt_width (like Replxx's prompt_indent), so first
-         * line has less space available. This gives us ABSOLUTE screen
-         * coordinates, not relative to command start. */
+        /// IMPORTANT: Per Replxx approach, LLE calculates cursor position
+        /// starting from prompt_width (like Replxx's prompt_indent), so first
+        /// line has less space available. This gives us ABSOLUTE screen
+        /// coordinates, not relative to command start.
 
-        /* Calculate cursor screen position using incremental tracking
-         * Starting from prompt_width (where command actually starts on screen)
-         */
+        /// Calculate cursor screen position using incremental tracking
+        /// Starting from prompt_width (where command actually starts on screen)
         size_t cursor_row = 0, cursor_col = 0;
         calculate_cursor_screen_position(
             command_text, cursor_pos,
@@ -353,12 +350,12 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
             terminal_width, &cursor_row, &cursor_col);
 
         /// DEBUG: Log what we calculated
-        /* Temporarily disabled - interferes with display
-        fprintf(stderr, "[BRIDGE_DEBUG] Calculated cursor position: row=%zu,
-        col=%zu (cursor_pos=%zu, prompt_width=%zu, term_width=%zu)\n",
-                cursor_row, cursor_col, cursor_pos, prompt_width,
-        terminal_width); fflush(stderr);
-        */
+        /// Temporarily disabled - interferes with display
+        ///         fprintf(stderr, "[BRIDGE_DEBUG] Calculated cursor position:
+        ///         row=%zu, col=%zu (cursor_pos=%zu, prompt_width=%zu,
+        ///         term_width=%zu)\n",
+        ///                 cursor_row, cursor_col, cursor_pos, prompt_width,
+        ///         terminal_width); fflush(stderr);
 
         /// Store in render output for display system to use
         render_output->cursor_screen_row = cursor_row;
@@ -374,8 +371,8 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
         cmd_layer->cursor_screen_position_valid = false;
     }
 
-    /* Update command layer with new text and cursor position
-     * This performs syntax highlighting and publishes REDRAW_NEEDED event */
+    /// Update command layer with new text and cursor position
+    /// This performs syntax highlighting and publishes REDRAW_NEEDED event
     command_layer_error_t error =
         command_layer_set_command(cmd_layer, command_text, cursor_pos);
 
@@ -384,9 +381,8 @@ lle_result_t lle_display_bridge_send_output(lle_display_bridge_t *bridge,
         return LLE_ERROR_DISPLAY_INTEGRATION;
     }
 
-    /* Process layer events to trigger display update
-     * This causes display_controller to handle REDRAW_NEEDED event
-     */
+    /// Process layer events to trigger display update
+    /// This causes display_controller to handle REDRAW_NEEDED event
     if (bridge->layer_events) {
         layer_events_process_pending(bridge->layer_events, 10, 0);
     }
@@ -469,8 +465,8 @@ static lle_result_t lle_render_queue_cleanup(lle_coord_queue_t *queue) {
     /// Destroy mutex
     pthread_mutex_destroy(&queue->lock);
 
-    /* Note: requests array and queue structure are freed by caller
-     * using the same memory pool they were allocated from */
+    /// Note: requests array and queue structure are freed by caller
+    /// using the same memory pool they were allocated from
     queue->requests = NULL;
     queue->capacity = 0;
     queue->count = 0;
@@ -575,9 +571,9 @@ static void calculate_cursor_screen_position(const char *text,
 
     /// Walk through text character by character
     for (size_t i = 0; i < text_len;) {
-        /* CRITICAL: Check cursor position BEFORE processing next character
-         * This ensures we capture the position before the character at
-         * cursor_byte_offset */
+        /// CRITICAL: Check cursor position BEFORE processing next character
+        /// This ensures we capture the position before the character at
+        /// cursor_byte_offset
         if (bytes_processed == cursor_byte_offset) {
             *out_row = y;
             *out_col = x;
@@ -641,23 +637,21 @@ static void calculate_cursor_screen_position(const char *text,
             continue;
         }
 
-        /* GRAPHEME-AWARE WIDTH CALCULATION (Phase 2 Fix)
-         *
-         * Instead of processing individual UTF-8 codepoints, we now process
-         * entire grapheme clusters as atomic units. This correctly handles:
-         * - CJK characters (2 columns)
-         * - Emoji (2 columns)
-         * - Combining marks (0 additional columns)
-         * - ZWJ sequences (rendered as single unit)
-         * - Regional Indicator pairs (flags)
-         * - Emoji with skin tone modifiers
-         */
+        /// GRAPHEME-AWARE WIDTH CALCULATION (Phase 2 Fix)
+        ///
+        /// Instead of processing individual UTF-8 codepoints, we now process
+        /// entire grapheme clusters as atomic units. This correctly handles:
+        /// - CJK characters (2 columns)
+        /// - Emoji (2 columns)
+        /// - Combining marks (0 additional columns)
+        /// - ZWJ sequences (rendered as single unit)
+        /// - Regional Indicator pairs (flags)
+        /// - Emoji with skin tone modifiers
 
-        /* Find the end of this grapheme cluster
-         * CRITICAL: Must advance by UTF-8 character boundaries, not individual
-         * bytes! lle_is_grapheme_boundary() requires valid UTF-8 character
-         * starts.
-         */
+        /// Find the end of this grapheme cluster
+        /// CRITICAL: Must advance by UTF-8 character boundaries, not individual
+        /// bytes! lle_is_grapheme_boundary() requires valid UTF-8 character
+        /// starts.
         const char *grapheme_start = text + i;
         const char *grapheme_end = grapheme_start;
 
@@ -682,18 +676,17 @@ static void calculate_cursor_screen_position(const char *text,
 
         size_t grapheme_bytes = grapheme_end - grapheme_start;
 
-        /* Calculate visual width of this grapheme cluster
-         *
-         * Strategy:
-         * 1. Decode first codepoint of grapheme (base character)
-         * 2. Use wcwidth() on base character for width
-         * 3. Treat entire grapheme cluster as that width
-         *
-         * This handles:
-         * - Base emoji + modifier → base determines width
-         * - Base char + combining mark → base determines width
-         * - ZWJ sequences → first emoji determines width
-         */
+        /// Calculate visual width of this grapheme cluster
+        ///
+        /// Strategy:
+        /// 1. Decode first codepoint of grapheme (base character)
+        /// 2. Use wcwidth() on base character for width
+        /// 3. Treat entire grapheme cluster as that width
+        ///
+        /// This handles:
+        /// - Base emoji + modifier → base determines width
+        /// - Base char + combining mark → base determines width
+        /// - ZWJ sequences → first emoji determines width
         uint32_t base_codepoint = 0;
         int decode_result = lle_utf8_decode_codepoint(
             grapheme_start, grapheme_bytes, &base_codepoint);
@@ -709,8 +702,8 @@ static void calculate_cursor_screen_position(const char *text,
                 /// wcwidth() returned valid width (0, 1, or 2)
                 visual_width = wc_width;
             } else {
-                /* wcwidth() returned -1 (non-printable or error)
-                 * Default to 1 column for safety */
+                /// wcwidth() returned -1 (non-printable or error)
+                /// Default to 1 column for safety
                 visual_width = 1;
             }
         }
@@ -718,9 +711,9 @@ static void calculate_cursor_screen_position(const char *text,
         /// Advance x position for this grapheme cluster
         x += visual_width;
 
-        /* Handle line wrap: if we've exceeded terminal width, wrap to next line
-         * IMPORTANT: Wrap happens AFTER incrementing x, before processing next
-         * char */
+        /// Handle line wrap: if we've exceeded terminal width, wrap to next
+        /// line IMPORTANT: Wrap happens AFTER incrementing x, before processing
+        /// next char
         if (x >= terminal_width) {
             x = 0;
             y++;

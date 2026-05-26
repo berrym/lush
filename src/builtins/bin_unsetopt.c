@@ -64,8 +64,8 @@ int bin_unsetopt(int argc, char **argv) {
             return 1;
         }
 
-        /* Disable from the alias's perspective; flip on the underlying
-         * feature when the alias is inverted. */
+        /// Disable from the alias's perspective; flip on the underlying
+        /// feature when the alias is inverted.
         bool target_value = invert;
         if (target_value) {
             shell_feature_enable(feature);

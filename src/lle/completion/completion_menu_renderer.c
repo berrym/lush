@@ -76,8 +76,8 @@ static size_t visual_width(const char *str) {
         return lle_utf8_string_width(str, len);
     }
 
-    /* Slow path: string contains ANSI escape sequences
-     * Process segments between escape sequences */
+    /// Slow path: string contains ANSI escape sequences
+    /// Process segments between escape sequences
     size_t width = 0;
     size_t i = 0;
 
@@ -88,8 +88,8 @@ static size_t visual_width(const char *str) {
         if (c == 0x1B && i + 1 < len) {
             unsigned char next = (unsigned char)str[i + 1];
             if (next == '[') {
-                /* CSI sequence: ESC [ ... final_byte
-                 * Skip until we find the final byte (0x40-0x7E) */
+                /// CSI sequence: ESC [ ... final_byte
+                /// Skip until we find the final byte (0x40-0x7E)
                 i += 2; /// Skip ESC [
                 while (i < len) {
                     unsigned char seq_char = (unsigned char)str[i];

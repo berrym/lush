@@ -200,12 +200,12 @@ lle_result_t lle_input_trigger_widget_hooks(lle_input_parser_system_t *parser,
 
     lle_result_t result = LLE_SUCCESS;
 
-    /* Hook triggering is tracked. Actual hook execution happens at a higher
-     * level where editor context is available. The input parser detects when
-     * hooks should trigger and sets appropriate flags in the parsed input
-     * structure. The caller (typically lle_readline or command processing) then
-     * triggers the hooks with the full editor context via
-     * lle_widget_hook_trigger(). */
+    /// Hook triggering is tracked. Actual hook execution happens at a higher
+    /// level where editor context is available. The input parser detects when
+    /// hooks should trigger and sets appropriate flags in the parsed input
+    /// structure. The caller (typically lle_readline or command processing)
+    /// then triggers the hooks with the full editor context via
+    /// lle_widget_hook_trigger().
     if (should_trigger) {
         __atomic_fetch_add(&wh->hooks_triggered, 1, __ATOMIC_SEQ_CST);
     }

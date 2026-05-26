@@ -273,8 +273,8 @@ static toml_result_t compat_toml_callback(const char *section, const char *key,
         return TOML_SUCCESS;
     }
 
-    /* Parse section path: entry_id or entry_id.behavior or entry_id.lint or
-     * entry_id.fix */
+    /// Parse section path: entry_id or entry_id.behavior or entry_id.lint or
+    /// entry_id.fix
     char entry_id[256];
     const char *dot = strchr(section, '.');
 
@@ -553,15 +553,13 @@ int compat_init(const char *data_dir) {
         goto finalize;
     }
 
-    /*
-     * XDG-compliant search order:
-     * 1. $XDG_DATA_HOME/lush/compat (user customizations)
-     * 2. $XDG_DATA_DIRS/lush/compat (each dir in colon-separated list)
-     * 3. /usr/local/share/lush/compat (local installations)
-     * 4. /usr/share/lush/compat (system packages)
-     * 5. Relative to executable (development builds)
-     * 6. ./data/compat (CWD fallback for development)
-     */
+    /// XDG-compliant search order:
+    /// 1. $XDG_DATA_HOME/lush/compat (user customizations)
+    /// 2. $XDG_DATA_DIRS/lush/compat (each dir in colon-separated list)
+    /// 3. /usr/local/share/lush/compat (local installations)
+    /// 4. /usr/share/lush/compat (system packages)
+    /// 5. Relative to executable (development builds)
+    /// 6. ./data/compat (CWD fallback for development)
 
     /// 1. XDG_DATA_HOME (user data)
     const char *xdg_data_home = getenv("XDG_DATA_HOME");
@@ -632,8 +630,8 @@ finalize:
 
     g_compat.initialized = true;
 
-    /* Always succeed on init, even if no data files are loaded.
-     * The module can operate with defaults when no compat data exists. */
+    /// Always succeed on init, even if no data files are loaded.
+    /// The module can operate with defaults when no compat data exists.
     (void)total_loaded;
     return 0;
 }
@@ -805,8 +803,7 @@ bool compat_is_portable(const char *construct, shell_mode_t target,
                 break;
             }
 
-            /* If behavior differs from lush default, it's a portability issue
-             */
+            /// If behavior differs from lush default, it's a portability issue
             if (target_behavior && entry->behavior_lush &&
                 strcmp(target_behavior, entry->behavior_lush) != 0) {
                 if (result) {

@@ -180,8 +180,8 @@ static ssize_t find_expansion_marker(const char *str, size_t start_pos) {
 
         /// Check for expansion markers only outside quotes
         if (c == '!') {
-            /* Check if it's escaped (already handled above, but double-check
-             * for cases where escape wasn't at i-1 due to other chars) */
+            /// Check if it's escaped (already handled above, but double-check
+            /// for cases where escape wasn't at i-1 due to other chars)
             if (i > 0 && str[i - 1] == '\\') {
                 continue; /// Escaped, not an expansion
             }
