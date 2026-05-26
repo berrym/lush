@@ -42,13 +42,13 @@ static const char *find_close_paren(const char *p) {
             continue;
         }
         if (*p == '[') {
-            // Skip char class so a `(` or `)` inside is literal.
+            /// Skip char class so a `(` or `)` inside is literal.
             p++;
             if (*p == '!' || *p == '^') {
                 p++;
             }
             if (*p == ']') {
-                p++; // first `]` after `[` (or `[!`) is literal
+                p++; /// first `]` after `[` (or `[!`) is literal
             }
             while (*p && *p != ']') {
                 if (*p == '\\' && p[1]) {
@@ -130,7 +130,7 @@ static const char *find_next_alt_separator(const char *p, const char *close) {
  */
 static int match_char_class(const char *s, const char *p, const char **end) {
     if (*s == '\0') {
-        // Walk past the class so callers see the right end pointer.
+        /// Walk past the class so callers see the right end pointer.
         p++;
         if (*p == '!' || *p == '^') {
             p++;
@@ -151,7 +151,7 @@ static int match_char_class(const char *s, const char *p, const char **end) {
         *end = p;
         return 0;
     }
-    p++; // past `[`
+    p++; /// past `[`
     bool negate = false;
     if (*p == '!' || *p == '^') {
         negate = true;
@@ -269,14 +269,14 @@ static bool match(const char *s, const char *p) {
             op = *p;
             paren_inside = p + 2;
         } else if (*p == '(') {
-            op = '@'; // zsh bare-alternation = @
+            op = '@'; /// zsh bare-alternation = @
             paren_inside = p + 1;
         }
 
         if (paren_inside) {
             const char *close = find_close_paren(paren_inside);
             if (!close) {
-                // Unbalanced; fall through to literal handling for `*p`.
+                /// Unbalanced; fall through to literal handling for `*p`.
                 goto literal_token;
             }
             const char *rest = close + 1;
@@ -297,11 +297,11 @@ static bool match(const char *s, const char *p) {
             }
 
             if (op == '?') {
-                // Zero occurrences: rest matches whole s.
+                /// Zero occurrences: rest matches whole s.
                 if (match(s, rest)) {
                     return true;
                 }
-                // One occurrence: identical to @.
+                /// One occurrence: identical to @.
                 const char *alt_start = paren_inside;
                 while (alt_start <= close) {
                     const char *sep = find_next_alt_separator(alt_start, close);
@@ -317,7 +317,7 @@ static bool match(const char *s, const char *p) {
             }
 
             if (op == '*' || op == '+') {
-                // Zero (only valid for `*`): rest matches whole s.
+                /// Zero (only valid for `*`): rest matches whole s.
                 if (op == '*' && match(s, rest)) {
                     return true;
                 }
@@ -331,7 +331,7 @@ static bool match(const char *s, const char *p) {
                  * positional iterator isn't needed. */
                 size_t group_inside_len = (size_t)(close - paren_inside);
                 size_t rest_len = strlen(rest);
-                // Reserve "*(" + content + ")" + rest + NUL
+                /// Reserve "*(" + content + ")" + rest + NUL
                 char *kleene = malloc(group_inside_len + rest_len + 4);
                 if (!kleene) {
                     return false;
@@ -346,8 +346,8 @@ static bool match(const char *s, const char *p) {
                 bool found = false;
                 size_t s_len = strlen(s);
                 for (size_t split = 1; split <= s_len && !found; split++) {
-                    // Build candidate: try matching some alt against the
-                    // L-length prefix, then `kleene` against the suffix.
+                    /// Build candidate: try matching some alt against the
+                    /// L-length prefix, then `kleene` against the suffix.
                     const char *alt_start = paren_inside;
                     while (alt_start <= close && !found) {
                         const char *sep =
@@ -410,7 +410,7 @@ static bool match(const char *s, const char *p) {
                 }
                 s++;
             }
-            return match(s, p); // try with empty tail
+            return match(s, p); /// try with empty tail
         }
         if (*p == '?') {
             if (*s == '\0') {

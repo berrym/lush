@@ -61,13 +61,13 @@ extern lle_result_t lush_register_inspect_widget(lle_widget_registry_t *);
 #ifdef __linux__
 #include <sys/sysmacros.h>
 #else
-// macOS doesn't have sys/sysmacros.h, major/minor are in sys/types.h
-// but we'll avoid using them for portability
+/// macOS doesn't have sys/sysmacros.h, major/minor are in sys/types.h
+/// but we'll avoid using them for portability
 #endif
 
 extern char **environ;
 
-// POSIX-compliant shell type tracking
+/// POSIX-compliant shell type tracking
 static int SHELL_TYPE;
 static bool IS_LOGIN_SHELL = false;
 static bool IS_INTERACTIVE_SHELL = false;
@@ -94,23 +94,23 @@ static void usage(int err);
 static void init_login_environment(const char *argv0) {
     struct passwd *pw = getpwuid(getuid());
 
-    // Set SHELL if not already set
+    /// Set SHELL if not already set
     if (!getenv("SHELL")) {
-        // Try to find our executable path
+        /// Try to find our executable path
         char shell_path[PATH_MAX];
         bool found_path = false;
 
         if (argv0 && argv0[0] == '/') {
-            // Absolute path provided
+            /// Absolute path provided
             setenv("SHELL", argv0, 0);
             found_path = true;
         }
 #ifdef __APPLE__
         if (!found_path) {
-            // macOS: use _NSGetExecutablePath
+            /// macOS: use _NSGetExecutablePath
             uint32_t size = sizeof(shell_path);
             if (_NSGetExecutablePath(shell_path, &size) == 0) {
-                // Resolve symlinks to get canonical path
+                /// Resolve symlinks to get canonical path
                 char resolved[PATH_MAX];
                 if (realpath(shell_path, resolved) != NULL) {
                     setenv("SHELL", resolved, 0);
@@ -122,21 +122,21 @@ static void init_login_environment(const char *argv0) {
         }
 #else
         if (!found_path && realpath("/proc/self/exe", shell_path) != NULL) {
-            // Linux: use /proc/self/exe
+            /// Linux: use /proc/self/exe
             setenv("SHELL", shell_path, 0);
             found_path = true;
         }
 #endif
         if (!found_path && pw && pw->pw_shell && pw->pw_shell[0]) {
-            // Fall back to passwd entry
+            /// Fall back to passwd entry
             setenv("SHELL", pw->pw_shell, 0);
             found_path = true;
         }
         if (!found_path) {
-            // Last resort: assume we're in PATH
+            /// Last resort: assume we're in PATH
             setenv("SHELL", "lush", 0);
         }
-        // Also set in symbol table
+        /// Also set in symbol table
         const char *shell = getenv("SHELL");
         if (shell) {
             symtable_set_global("SHELL", shell);
@@ -144,7 +144,7 @@ static void init_login_environment(const char *argv0) {
         }
     }
 
-    // Set USER if not already set
+    /// Set USER if not already set
     if (!getenv("USER")) {
         if (pw && pw->pw_name) {
             setenv("USER", pw->pw_name, 0);
@@ -153,7 +153,7 @@ static void init_login_environment(const char *argv0) {
         }
     }
 
-    // Set LOGNAME if not already set (POSIX standard)
+    /// Set LOGNAME if not already set (POSIX standard)
     if (!getenv("LOGNAME")) {
         if (pw && pw->pw_name) {
             setenv("LOGNAME", pw->pw_name, 0);
@@ -162,7 +162,7 @@ static void init_login_environment(const char *argv0) {
         }
     }
 
-    // Set HOME if not already set
+    /// Set HOME if not already set
     if (!getenv("HOME")) {
         if (pw && pw->pw_dir) {
             setenv("HOME", pw->pw_dir, 0);
@@ -171,7 +171,7 @@ static void init_login_environment(const char *argv0) {
         }
     }
 
-    // Set PATH if completely unset (very rare, but handle it)
+    /// Set PATH if completely unset (very rare, but handle it)
     if (!getenv("PATH")) {
         const char *default_path = "/usr/local/bin:/usr/bin:/bin";
         setenv("PATH", default_path, 0);
@@ -199,7 +199,7 @@ static void ensure_bottom_margin(void) {
         rows = 24;
     }
 
-    // Save cursor, move to bottom, scroll, restore
+    /// Save cursor, move to bottom, scroll, restore
     char cmd[64];
     int len = snprintf(cmd, sizeof(cmd), "\x1b[s\x1b[%d;1H\n\x1b[u", rows);
     if (len > 0 && (size_t)len < sizeof(cmd)) {
@@ -232,7 +232,7 @@ static void ensure_bottom_margin(void) {
  * @return Initial shell mode.
  */
 static shell_mode_t detect_initial_mode(int argc, char **argv, size_t optind) {
-    // CLI flag: highest priority.
+    /// CLI flag: highest priority.
     if (shell_opts.cli_mode_override_set) {
         return (shell_mode_t)shell_opts.cli_mode_override;
     }
@@ -257,7 +257,7 @@ static shell_mode_t detect_initial_mode(int argc, char **argv, size_t optind) {
         }
     }
 
-    // Default.
+    /// Default.
     return SHELL_MODE_LUSH;
 }
 
@@ -275,32 +275,32 @@ static void process_shebang(FILE *file) {
         return;
     }
 
-    // Check if the first line starts with #!
+    /// Check if the first line starts with #!
     long pos = ftell(file);
     char line[256];
 
     if (fgets(line, sizeof(line), file) != NULL) {
         if (strncmp(line, "#!", 2) == 0) {
-            // This is a shebang line - detect shell mode from it
-            // Examples:
-            //   #!/bin/bash      -> SHELL_MODE_BASH
-            //   #!/bin/zsh       -> SHELL_MODE_ZSH
-            //   #!/bin/sh        -> SHELL_MODE_POSIX
-            //   #!/usr/bin/env bash -> SHELL_MODE_BASH
-            //   #!/usr/bin/env lush -> SHELL_MODE_LUSH (default)
+            /// This is a shebang line - detect shell mode from it
+            /// Examples:
+            ///   #!/bin/bash      -> SHELL_MODE_BASH
+            ///   #!/bin/zsh       -> SHELL_MODE_ZSH
+            ///   #!/bin/sh        -> SHELL_MODE_POSIX
+            ///   #!/usr/bin/env bash -> SHELL_MODE_BASH
+            ///   #!/usr/bin/env lush -> SHELL_MODE_LUSH (default)
             shell_mode_t detected;
             if (shell_mode_detect_from_shebang(line, &detected)) {
                 if (detected != SHELL_MODE_LUSH) {
-                    // Only switch if not already the default mode
+                    /// Only switch if not already the default mode
                     shell_mode_set(detected);
                 }
             }
-            // Shebang line consumed - continue with rest of script
+            /// Shebang line consumed - continue with rest of script
             return;
         }
     }
 
-    // Not a shebang line, rewind to beginning
+    /// Not a shebang line, rewind to beginning
     fseek(file, pos, SEEK_SET);
 }
 
@@ -366,27 +366,27 @@ static void posix_history_cleanup(void) {
  * @return 0 on success, non-zero on failure
  */
 int init(int argc, char **argv, FILE **in) {
-    struct stat st; // stat buffer
+    struct stat st; /// stat buffer
 
     if (argv == NULL) {
         exit(EXIT_FAILURE);
     }
 
-    // Set all locales according to environment
+    /// Set all locales according to environment
     setlocale(LC_ALL, "");
 
-    // Setup signal handlers
+    /// Setup signal handlers
     init_signal_handlers();
 
-    // Initialize symbol table
+    /// Initialize symbol table
     init_symtable();
 
-    // Import environment variables into symtable
+    /// Import environment variables into symtable
     char **env_ptr = environ;
     while (*env_ptr) {
         char *eq = strchr(*env_ptr, '=');
         if (eq) {
-            // Split name=value
+            /// Split name=value
             size_t name_len = eq - *env_ptr;
             char *name = malloc(name_len + 1);
             if (!name) {
@@ -397,13 +397,13 @@ int init(int argc, char **argv, FILE **in) {
             strncpy(name, *env_ptr, name_len);
             name[name_len] = '\0';
 
-            // Set variable and mark as exported
+            /// Set variable and mark as exported
             symtable_set_global(name, eq + 1);
             symtable_export_global(name);
 
             free(name);
         } else {
-            // Environment variable without value (set but empty)
+            /// Environment variable without value (set but empty)
             symtable_set_global(*env_ptr, "");
             symtable_export_global(*env_ptr);
         }
@@ -412,65 +412,67 @@ int init(int argc, char **argv, FILE **in) {
 
     init_shell_opts();
 
-    // Initialize POSIX shell options with defaults
+    /// Initialize POSIX shell options with defaults
     init_posix_options();
 
-    // Parse command line options EARLY - needed for login/interactive detection
+    /// Parse command line options EARLY - needed for login/interactive
+    /// detection
     size_t optind = parse_opts(argc, argv);
 
-    // Resolve initial shell mode BEFORE config_init so the user's
-    // lushrc layers on top of the right preset. Priority: CLI flag
-    // (--posix/--bash/--zsh/--lush) -> shebang of script argument ->
-    // default lush. The registry isn't initialized yet, so
-    // apply_mode_preset() only flips the feature matrix and the legacy
-    // posix_mode mirror; config_registry_apply_mode_defaults fires
-    // inside config_init() after section registration but before user
-    // config load.
+    /// Resolve initial shell mode BEFORE config_init so the user's
+    /// lushrc layers on top of the right preset. Priority: CLI flag
+    /// (--posix/--bash/--zsh/--lush) -> shebang of script argument ->
+    /// default lush. The registry isn't initialized yet, so
+    /// apply_mode_preset() only flips the feature matrix and the legacy
+    /// posix_mode mirror; config_registry_apply_mode_defaults fires
+    /// inside config_init() after section registration but before user
+    /// config load.
     shell_mode_t initial_mode = detect_initial_mode(argc, argv, optind);
     apply_mode_preset(initial_mode);
 
-    // POSIX-compliant shell type determination - must happen before config
-    // scripts
-    // 1. Determine if this is a login shell
+    /// POSIX-compliant shell type determination - must happen before config
+    /// scripts
+    /// 1. Determine if this is a login shell
     IS_LOGIN_SHELL = (**argv == '-') || shell_opts.login_shell;
 
-    // 2. Check if we are the session leader (PID == SID)
+    /// 2. Check if we are the session leader (PID == SID)
     IS_SESSION_LEADER = (getsid(0) == getpid());
 
-    // 3. Preliminary interactive detection for startup scripts
-    // Full detection happens later after we know about script files
+    /// 3. Preliminary interactive detection for startup scripts
+    /// Full detection happens later after we know about script files
     bool preliminary_interactive =
         shell_opts.interactive ||
         (isatty(STDIN_FILENO) && isatty(STDOUT_FILENO));
 
-    // Initialize configuration system
+    /// Initialize configuration system
     config_init();
 
-    // Initialize critical environment variables for login shells
-    // This must happen before profile scripts which may depend on them
+    /// Initialize critical environment variables for login shells
+    /// This must happen before profile scripts which may depend on them
     if (IS_LOGIN_SHELL) {
         init_login_environment(argv[0]);
     }
 
-    // Execute login scripts for login shells
+    /// Execute login scripts for login shells
     if (IS_LOGIN_SHELL) {
-        // First source system-wide profiles (/etc/profile, /etc/profile.d/*.sh)
+        /// First source system-wide profiles (/etc/profile,
+        /// /etc/profile.d/*.sh)
         config_execute_system_profile();
-        // Then source user profiles (~/.profile, ~/.lush_login)
+        /// Then source user profiles (~/.profile, ~/.lush_login)
         config_execute_login_scripts();
     }
 
-    // Execute startup scripts for interactive shells (preliminary check)
-    // Note: This uses a preliminary check; full interactive detection happens
-    // below
+    /// Execute startup scripts for interactive shells (preliminary check)
+    /// Note: This uses a preliminary check; full interactive detection happens
+    /// below
     if (preliminary_interactive && !shell_opts.command_mode) {
         config_execute_startup_scripts();
     }
 
-    // Initialize auto-correction system
+    /// Initialize auto-correction system
     autocorrect_init();
 
-    // Initialize SSH host cache for completion
+    /// Initialize SSH host cache for completion
     if (ssh_hosts_init() != 0) {
         if (IS_INTERACTIVE_SHELL) {
             shell_error_t *err = shell_error_create(
@@ -486,7 +488,7 @@ int init(int argc, char **argv, FILE **in) {
         }
     }
 
-    // Initialize terminal capabilities via LLE adaptive detection
+    /// Initialize terminal capabilities via LLE adaptive detection
     lle_terminal_detection_result_t *detection = NULL;
     if (lle_detect_terminal_capabilities_optimized(&detection) != LLE_SUCCESS) {
         if (IS_INTERACTIVE_SHELL) {
@@ -503,17 +505,17 @@ int init(int argc, char **argv, FILE **in) {
             }
         }
     } else {
-        // Terminal capabilities successfully detected
+        /// Terminal capabilities successfully detected
         if (IS_INTERACTIVE_SHELL && detection->stdout_is_tty) {
-            // Create safe bottom margin for interactive shells
+            /// Create safe bottom margin for interactive shells
             ensure_bottom_margin();
         }
-        // Note: detection result is cached, no need to destroy here
+        /// Note: detection result is cached, no need to destroy here
     }
 
-    // Theme system removed - LLE prompt composer handles themes now
+    /// Theme system removed - LLE prompt composer handles themes now
 
-    // Set up auto-correction configuration from config system
+    /// Set up auto-correction configuration from config system
     autocorrect_config_t autocorrect_cfg;
     autocorrect_get_default_config(&autocorrect_cfg);
     autocorrect_cfg.enabled = config.spell_correction;
@@ -526,20 +528,20 @@ int init(int argc, char **argv, FILE **in) {
     autocorrect_cfg.case_sensitive = config.autocorrect_case_sensitive;
     autocorrect_load_config(&autocorrect_cfg);
 
-    // Final interactive vs non-interactive determination
-    // (parse_opts and login/session detection already done above)
+    /// Final interactive vs non-interactive determination
+    /// (parse_opts and login/session detection already done above)
     bool has_script_file = (optind && argv[optind] && *argv[optind]);
     bool forced_interactive = shell_opts.interactive;
     bool stdin_is_terminal = isatty(STDIN_FILENO);
 
-    // Debug: Show TTY detection details
+    /// Debug: Show TTY detection details
     const char *debug_env = getenv("LUSH_DEBUG");
     if (debug_env &&
         (strcmp(debug_env, "1") == 0 || strcmp(debug_env, "true") == 0)) {
         fprintf(stderr, "[INIT] TTY Detection: STDIN_FILENO=%d, isatty()=%s\n",
                 STDIN_FILENO, stdin_is_terminal ? "true" : "false");
 
-        // Show what stdin is connected to
+        /// Show what stdin is connected to
         struct stat st;
         if (fstat(STDIN_FILENO, &st) == 0) {
             if (S_ISREG(st.st_mode)) {
@@ -573,16 +575,16 @@ int init(int argc, char **argv, FILE **in) {
     }
 
     if (shell_opts.command_mode) {
-        // -c command mode: always non-interactive
+        /// -c command mode: always non-interactive
         IS_INTERACTIVE_SHELL = false;
         SHELL_TYPE = SHELL_NON_INTERACTIVE;
-        *in = stdin; // Not used in -c mode
+        *in = stdin; /// Not used in -c mode
     } else if (has_script_file) {
-        // Script file execution: always non-interactive
+        /// Script file execution: always non-interactive
         IS_INTERACTIVE_SHELL = false;
         SHELL_TYPE = SHELL_NON_INTERACTIVE;
 
-        // Check that the script file is valid
+        /// Check that the script file is valid
         stat(argv[optind], &st);
         if (!(S_ISREG(st.st_mode))) {
             shell_error_t *err = shell_error_create(
@@ -597,7 +599,7 @@ int init(int argc, char **argv, FILE **in) {
                 fprintf(stderr, "lush: %s is not a regular file\n",
                         argv[optind]);
             }
-            // Fall back to interactive mode
+            /// Fall back to interactive mode
             IS_INTERACTIVE_SHELL = true;
             SHELL_TYPE = SHELL_INTERACTIVE;
             optind = 0;
@@ -624,7 +626,7 @@ int init(int argc, char **argv, FILE **in) {
         SHELL_TYPE = SHELL_INTERACTIVE;
         *in = stdin;
 
-        // Debug: Show interactive detection
+        /// Debug: Show interactive detection
         const char *debug_env = getenv("LUSH_DEBUG");
         if (debug_env &&
             (strcmp(debug_env, "1") == 0 || strcmp(debug_env, "true") == 0)) {
@@ -638,12 +640,12 @@ int init(int argc, char **argv, FILE **in) {
                     shell_opts.stdin_mode ? "true" : "false");
         }
     } else {
-        // Non-interactive: piped input, -s mode, or no capable terminal
+        /// Non-interactive: piped input, -s mode, or no capable terminal
         IS_INTERACTIVE_SHELL = false;
         SHELL_TYPE = SHELL_NON_INTERACTIVE;
         *in = stdin;
 
-        // Debug: Show non-interactive detection
+        /// Debug: Show non-interactive detection
         const char *debug_env = getenv("LUSH_DEBUG");
         if (debug_env &&
             (strcmp(debug_env, "1") == 0 || strcmp(debug_env, "true") == 0)) {
@@ -657,32 +659,33 @@ int init(int argc, char **argv, FILE **in) {
         }
     }
 
-    // Set up interactive shell features if needed
+    /// Set up interactive shell features if needed
     if (IS_INTERACTIVE_SHELL) {
-        // Enable job control by default for interactive shells (POSIX behavior)
-        // This allows background jobs (cmd &) to be tracked and managed
+        /// Enable job control by default for interactive shells (POSIX
+        /// behavior) This allows background jobs (cmd &) to be tracked and
+        /// managed
         shell_opts.job_control = true;
 
-        // Initialize display integration system config first (needed for debug
-        // flags)
+        /// Initialize display integration system config first (needed for debug
+        /// flags)
         display_integration_config_t display_config;
         display_integration_create_default_config(&display_config);
 
-        // Configure based on environment and user preferences
+        /// Configure based on environment and user preferences
         const char *layered_display_env = getenv("LUSH_LAYERED_DISPLAY");
         if (layered_display_env) {
-            // v1.3.0: Layered display is now exclusive - environment variable
-            // ignored Layered display is always enabled
+            /// v1.3.0: Layered display is now exclusive - environment variable
+            /// ignored Layered display is always enabled
         }
 
-        // Enable debug mode if requested
+        /// Enable debug mode if requested
         const char *display_debug_env = getenv("LUSH_DISPLAY_DEBUG");
         if (display_debug_env && (strcmp(display_debug_env, "1") == 0 ||
                                   strcmp(display_debug_env, "true") == 0)) {
             display_config.debug_mode = true;
         }
 
-        // Set optimization level based on environment
+        /// Set optimization level based on environment
         const char *optimization_env = getenv("LUSH_DISPLAY_OPTIMIZATION");
         if (optimization_env) {
             int opt_level = atoi(optimization_env);
@@ -693,7 +696,7 @@ int init(int argc, char **argv, FILE **in) {
             }
         }
 
-        // Initialize memory pool system FIRST - required by LLE and display
+        /// Initialize memory pool system FIRST - required by LLE and display
         lush_pool_config_t pool_config =
             lush_pool_get_display_optimized_config();
         pool_config.enable_debugging = (getenv("LUSH_MEMORY_DEBUG") != NULL);
@@ -741,55 +744,55 @@ int init(int argc, char **argv, FILE **in) {
                 shell_error_free(err);
             }
         } else {
-            // Shell-side built-in widgets that need the symbol table -- liblle
-            // cannot link symtable directly, so we register them once the
-            // editor exists.
+            /// Shell-side built-in widgets that need the symbol table -- liblle
+            /// cannot link symtable directly, so we register them once the
+            /// editor exists.
             lle_editor_t *ed = lle_get_global_editor();
             if (ed && ed->widget_registry) {
                 lush_register_inspect_widget(ed->widget_registry);
             }
         }
 
-        // Initialize display integration ONLY in interactive mode
+        /// Initialize display integration ONLY in interactive mode
         if (IS_INTERACTIVE_SHELL) {
-            // Configure display options based on environment and command line
-            // v1.3.0: Layered display is now exclusive - always enabled
-            // No configuration needed
+            /// Configure display options based on environment and command line
+            /// v1.3.0: Layered display is now exclusive - always enabled
+            /// No configuration needed
 
-            // Always initialize display integration to support runtime display
-            // enable
+            /// Always initialize display integration to support runtime display
+            /// enable
             if (!display_integration_init(&display_config)) {
                 if (display_config.debug_mode || getenv("LUSH_DISPLAY_DEBUG")) {
                     fprintf(stderr, "Warning: Failed to initialize display "
                                     "integration, using standard display\n");
                 }
-                // Continue with standard display - no fatal error
+                /// Continue with standard display - no fatal error
             } else {
-                // Announce activation with visual impact (only when debug mode
-                // enabled)
+                /// Announce activation with visual impact (only when debug mode
+                /// enabled)
                 if (display_config.debug_mode) {
                     printf("Display integration initialized "
                            "(layered_display=exclusive)\n");
                 }
             }
         } else {
-            // Non-interactive mode: no display integration needed
+            /// Non-interactive mode: no display integration needed
             if (getenv("LUSH_DISPLAY_DEBUG")) {
                 fprintf(stderr,
                         "Display integration skipped (non-interactive mode)\n");
             }
         }
 
-        // Generate initial prompt
+        /// Generate initial prompt
         lle_shell_update_prompt();
     }
 
-    // For login shells, set the appropriate type
+    /// For login shells, set the appropriate type
     if (IS_LOGIN_SHELL) {
         SHELL_TYPE = SHELL_LOGIN;
     }
 
-    // Get and set shell's ppid in environment
+    /// Get and set shell's ppid in environment
     pid_t ppid = getppid();
     char ppid_str[32];
     snprintf(ppid_str, sizeof(ppid_str), "%d", ppid);
@@ -797,37 +800,37 @@ int init(int argc, char **argv, FILE **in) {
     symtable_set_global("PPID", ppid_str);
     symtable_export_global("PPID");
 
-    // Set initial exit status
+    /// Set initial exit status
     set_exit_status(0);
 
-    // Set shell PID ($$ special variable)
+    /// Set shell PID ($$ special variable)
     pid_t shell_pid = getpid();
     char shell_pid_str[32];
     snprintf(shell_pid_str, sizeof(shell_pid_str), "%d", (int)shell_pid);
     symtable_set_global("$", shell_pid_str);
 
-    // Set shell name/script name and positional parameters
+    /// Set shell name/script name and positional parameters
     if (shell_type() == NORMAL_SHELL && optind > 0 && argv[optind]) {
-        // Running a script - set up script arguments
-        symtable_set_global("0", argv[optind]); // Script name
+        /// Running a script - set up script arguments
+        symtable_set_global("0", argv[optind]); /// Script name
 
-        // Update global shell_argc and shell_argv for script arguments
+        /// Update global shell_argc and shell_argv for script arguments
         shell_argc =
-            argc - optind; // Number of script args (including script name)
-        shell_argv = &argv[optind]; // Pointer to script args
+            argc - optind; /// Number of script args (including script name)
+        shell_argv = &argv[optind]; /// Pointer to script args
     } else {
-        // Interactive or command mode - use shell arguments
+        /// Interactive or command mode - use shell arguments
         symtable_set_global("0", argv[0]);
     }
 
-    // Initialize history for interactive shells
+    /// Initialize history for interactive shells
     if (IS_INTERACTIVE_SHELL) {
-        // LLE history is initialized via lle_shell_integration_init()
-        // Initialize enhanced POSIX history system
+        /// LLE history is initialized via lle_shell_integration_init()
+        /// Initialize enhanced POSIX history system
         if (!global_posix_history) {
             global_posix_history = posix_history_create(0);
             if (global_posix_history) {
-                // Set default filename and load existing history
+                /// Set default filename and load existing history
                 char *home = symtable_get_global_default("HOME", "");
                 if (home && *home) {
                     char histfile[1024];
@@ -839,30 +842,30 @@ int init(int argc, char **argv, FILE **in) {
                 free(home); /* symtable_get_global_default returns strdup'd
                                value */
 
-                // Enable duplicate detection by default
+                /// Enable duplicate detection by default
                 posix_history_set_no_duplicates(global_posix_history, true);
             }
         }
     }
 
-    // Initialize aliases
+    /// Initialize aliases
     init_aliases();
 
-    // Initialize command hash table
+    /// Initialize command hash table
     init_command_hash();
 
-    // Initialize directory stack for pushd/popd
+    /// Initialize directory stack for pushd/popd
     dirstack_init();
 
-    // Completion is handled automatically by readline integration
-    // No need to set callbacks - they're integrated in lush_readline_init()
+    /// Completion is handled automatically by readline integration
+    /// No need to set callbacks - they're integrated in lush_readline_init()
 
-    // Hints system is not implemented in readline integration yet
-    // TODO: Implement hints for readline if needed
+    /// Hints system is not implemented in readline integration yet
+    /// TODO: Implement hints for readline if needed
 
-    // Set memory cleanup procedures on termination
-    // Note: atexit handlers run in REVERSE order of registration (LIFO)
-    // Register in order: last-to-run first, first-to-run last
+    /// Set memory cleanup procedures on termination
+    /// Note: atexit handlers run in REVERSE order of registration (LIFO)
+    /// Register in order: last-to-run first, first-to-run last
     atexit(free_global_symtable);
     atexit(free_aliases);
     atexit(free_command_hash);
@@ -874,12 +877,12 @@ int init(int argc, char **argv, FILE **in) {
     atexit(lle_terminal_detection_cache_cleanup);
     atexit(free_input_buffers);
 
-    // Process shebang if the shell is invoked with a script
+    /// Process shebang if the shell is invoked with a script
     if (!IS_INTERACTIVE_SHELL && *in && has_script_file) {
         process_shebang(*in);
     }
 
-    // Register cleanup for display integration
+    /// Register cleanup for display integration
     if (IS_INTERACTIVE_SHELL) {
         atexit(display_integration_cleanup);
     }
@@ -905,29 +908,29 @@ int init(int argc, char **argv, FILE **in) {
  * @return Index of first non-option argument (script name)
  */
 static int parse_opts(int argc, char **argv) {
-    // POSIX-compliant argument parsing: shell [options] script [script-args]
-    // Only parse options that come before the script name
-    // Everything after the script name should be treated as script arguments
+    /// POSIX-compliant argument parsing: shell [options] script [script-args]
+    /// Only parse options that come before the script name
+    /// Everything after the script name should be treated as script arguments
 
-    int arg_index = 1; // Start from first argument (skip program name)
+    int arg_index = 1; /// Start from first argument (skip program name)
 
-    // Manual option parsing to properly handle POSIX argument separation
+    /// Manual option parsing to properly handle POSIX argument separation
     while (arg_index < argc) {
         char *arg = argv[arg_index];
 
-        // If argument doesn't start with '-', it's the script name
-        // Stop parsing options here - everything after is script arguments
+        /// If argument doesn't start with '-', it's the script name
+        /// Stop parsing options here - everything after is script arguments
         if (arg[0] != '-' || strlen(arg) == 1) {
             break;
         }
 
-        // Handle special case: "--" ends option parsing
+        /// Handle special case: "--" ends option parsing
         if (strcmp(arg, "--") == 0) {
-            arg_index++; // Skip the "--"
+            arg_index++; /// Skip the "--"
             break;
         }
 
-        // Handle long options
+        /// Handle long options
         if (arg[0] == '-' && arg[1] == '-') {
             if (strcmp(arg, "--help") == 0) {
                 usage(EXIT_SUCCESS);
@@ -938,7 +941,7 @@ static int parse_opts(int argc, char **argv) {
                        "MIT.\n");
                 exit(EXIT_SUCCESS);
             } else if (strcmp(arg, "--strict") == 0) {
-                // Enable strict compatibility mode - warnings become errors
+                /// Enable strict compatibility mode - warnings become errors
                 compat_set_strict(true);
             } else if (strcmp(arg, "--lush") == 0) {
                 shell_opts.cli_mode_override = (int)SHELL_MODE_LUSH;
@@ -953,12 +956,12 @@ static int parse_opts(int argc, char **argv) {
                 shell_opts.cli_mode_override = (int)SHELL_MODE_ZSH;
                 shell_opts.cli_mode_override_set = true;
             } else if (strncmp(arg, "--target=", 9) == 0) {
-                // Set target shell for compatibility checking (stored as
-                // string)
+                /// Set target shell for compatibility checking (stored as
+                /// string)
                 const char *target_name = arg + 9;
                 compat_set_target(target_name);
             } else if (strncmp(arg, "--target", 8) == 0) {
-                // Handle --target <shell> (space-separated)
+                /// Handle --target <shell> (space-separated)
                 if (arg_index + 1 < argc) {
                     arg_index++;
                     const char *target_name = argv[arg_index];
@@ -974,33 +977,33 @@ static int parse_opts(int argc, char **argv) {
                     usage(EXIT_FAILURE);
                 }
             } else if (strcmp(arg, "--analyze") == 0) {
-                // Enable full analyze mode
+                /// Enable full analyze mode
                 shell_opts.analyze_mode = true;
             } else if (strcmp(arg, "--lint") == 0) {
-                // Enable lint mode (actionable issues only)
+                /// Enable lint mode (actionable issues only)
                 shell_opts.lint_mode = true;
             } else if (strncmp(arg, "--analyze=", 10) == 0) {
-                // --analyze=FILE
+                /// --analyze=FILE
                 shell_opts.analyze_mode = true;
                 shell_opts.analyze_file = strdup(arg + 10);
             } else if (strncmp(arg, "--lint=", 7) == 0) {
-                // --lint=FILE (actionable linting)
+                /// --lint=FILE (actionable linting)
                 shell_opts.lint_mode = true;
                 shell_opts.analyze_file = strdup(arg + 7);
             } else if (strcmp(arg, "--fix") == 0) {
-                // Enable safe auto-fix (implies --lint)
+                /// Enable safe auto-fix (implies --lint)
                 shell_opts.lint_mode = true;
                 shell_opts.fix_mode = true;
             } else if (strcmp(arg, "--unsafe-fixes") == 0) {
-                // Include unsafe fixes (implies --fix and --lint)
+                /// Include unsafe fixes (implies --fix and --lint)
                 shell_opts.lint_mode = true;
                 shell_opts.fix_mode = true;
                 shell_opts.unsafe_fixes = true;
             } else if (strcmp(arg, "--dry-run") == 0) {
-                // Preview fixes without applying
+                /// Preview fixes without applying
                 shell_opts.dry_run = true;
             } else if (strcmp(arg, "--format") == 0) {
-                // --format <fmt> (space-separated)
+                /// --format <fmt> (space-separated)
                 if (arg_index + 1 < argc) {
                     arg_index++;
                     shell_opts.output_format = strdup(argv[arg_index]);
@@ -1015,7 +1018,7 @@ static int parse_opts(int argc, char **argv) {
                     usage(EXIT_FAILURE);
                 }
             } else if (strncmp(arg, "--format=", 9) == 0) {
-                // --format=FMT
+                /// --format=FMT
                 shell_opts.output_format = strdup(arg + 9);
             } else {
                 shell_error_t *err = shell_error_create(
@@ -1031,7 +1034,7 @@ static int parse_opts(int argc, char **argv) {
             continue;
         }
 
-        // Handle short options (can be combined like -abc)
+        /// Handle short options (can be combined like -abc)
         for (int i = 1; arg[i] != '\0'; i++) {
             char opt = arg[i];
 
@@ -1047,18 +1050,18 @@ static int parse_opts(int argc, char **argv) {
                 exit(EXIT_SUCCESS);
                 break;
             case 'c':
-                // Execute command string - requires argument
+                /// Execute command string - requires argument
                 if (arg[i + 1] != '\0') {
-                    // Argument attached to option: -ccommand
+                    /// Argument attached to option: -ccommand
                     shell_opts.command_mode = true;
                     shell_opts.command_string = strdup(&arg[i + 1]);
                     if (!shell_opts.command_string) {
                         error_abort(
                             "failed to allocate memory for command string");
                     }
-                    goto next_arg; // Skip rest of this argument
+                    goto next_arg; /// Skip rest of this argument
                 } else if (arg_index + 1 < argc) {
-                    // Argument in next parameter: -c command
+                    /// Argument in next parameter: -c command
                     arg_index++;
                     shell_opts.command_mode = true;
                     shell_opts.command_string = strdup(argv[arg_index]);
@@ -1138,7 +1141,7 @@ static int parse_opts(int argc, char **argv) {
         arg_index++;
     }
 
-    // Return the index of the first non-option argument (script name)
+    /// Return the index of the first non-option argument (script name)
     return arg_index;
 }
 

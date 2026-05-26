@@ -42,22 +42,22 @@
 #define MAXNUMSTACK 64
 #define MAXBASE 36
 
-// Stack item for arithmetic evaluation
+/// Stack item for arithmetic evaluation
 typedef struct {
     enum { ITEM_LONG_INT = 1, ITEM_VAR_PTR = 2 } type;
 
     union {
         ssize_t val;
-        char *var_name; // Store variable name instead of pointer
+        char *var_name; /// Store variable name instead of pointer
     };
-    void *executor_context; // Store executor context for scoped variable
-                            // resolution
+    void *executor_context; /// Store executor context for scoped variable
+                            /// resolution
 } stack_item_t;
 
-// Operator associativity
+/// Operator associativity
 enum { ASSOC_NONE = 0, ASSOC_LEFT = 1, ASSOC_RIGHT = 2 };
 
-// Operator structure
+/// Operator structure
 typedef struct {
     char op;
     int prec;
@@ -67,7 +67,7 @@ typedef struct {
     ssize_t (*eval)(stack_item_t *a1, stack_item_t *a2);
 } op_t;
 
-// Arithmetic evaluation context
+/// Arithmetic evaluation context
 typedef struct {
     op_t *opstack[MAXOPSTACK];
     int nopstack;
@@ -75,7 +75,7 @@ typedef struct {
     int nnumstack;
     bool errflag;
     char *error_message;
-    void *executor; // Store executor context for scoped variable resolution
+    void *executor; /// Store executor context for scoped variable resolution
 } arithm_context_t;
 
 /**
@@ -91,10 +91,10 @@ static void arithm_context_cleanup(arithm_context_t *ctx) {
         return;
     }
 
-    // Free any variable names stored in the number stack
-    // IMPORTANT: Only free var_name if type is ITEM_VAR_PTR, since
-    // val and var_name share the same memory (union) and we must not
-    // free numeric values as pointers
+    /// Free any variable names stored in the number stack
+    /// IMPORTANT: Only free var_name if type is ITEM_VAR_PTR, since
+    /// val and var_name share the same memory (union) and we must not
+    /// free numeric values as pointers
     for (int i = 0; i < ctx->nnumstack; i++) {
         if (ctx->numstack[i].type == ITEM_VAR_PTR &&
             ctx->numstack[i].var_name) {
@@ -147,7 +147,7 @@ typedef struct {
 
 static arithm_error_state_t s_arithm_error;
 
-// Forward declarations for internal functions
+/// Forward declarations for internal functions
 static ssize_t long_value(stack_item_t *item);
 static void push_opstack(arithm_context_t *ctx, op_t *op);
 static op_t *pop_opstack(arithm_context_t *ctx);
@@ -160,9 +160,9 @@ static ssize_t get_num(const char *expr, int *nchars);
 static char *get_var_name(const char *expr, int *nchars);
 static bool valid_name_char(char c);
 
-// ============================================================================
-// OPERATOR EVALUATION FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// OPERATOR EVALUATION FUNCTIONS
+/// ============================================================================
 
 /* Signed-overflow-safe primitives. Bash and zsh both rely on signed
  * wraparound for +, -, *, unary -, <<; in standard C that is undefined
@@ -344,7 +344,7 @@ static ssize_t eval_logor(stack_item_t *a1, stack_item_t *a2) {
 
 /** @brief Comma operator - evaluates both, returns second */
 static ssize_t eval_comma(stack_item_t *a1, stack_item_t *a2) {
-    (void)a1; // First expression is evaluated but result discarded
+    (void)a1; /// First expression is evaluated but result discarded
     return long_value(a2);
 }
 
@@ -352,7 +352,7 @@ static ssize_t eval_comma(stack_item_t *a1, stack_item_t *a2) {
 static ssize_t eval_ternary_colon(stack_item_t *a1, stack_item_t *a2) {
     (void)a1;
     (void)a2;
-    // This should never be called directly - handled in shunt_op
+    /// This should never be called directly - handled in shunt_op
     return 0;
 }
 
@@ -360,13 +360,13 @@ static ssize_t eval_ternary_colon(stack_item_t *a1, stack_item_t *a2) {
 static ssize_t eval_ternary_question(stack_item_t *a1, stack_item_t *a2) {
     (void)a1;
     (void)a2;
-    // This should never be called directly - handled in shunt_op
+    /// This should never be called directly - handled in shunt_op
     return 0;
 }
 
-// ============================================================================
-// ASSIGNMENT OPERATORS
-// ============================================================================
+/// ============================================================================
+/// ASSIGNMENT OPERATORS
+/// ============================================================================
 
 /**
  * @brief Get variable value using executor context if available
@@ -382,7 +382,7 @@ static ssize_t get_var_value_scoped(stack_item_t *item) {
         return 0;
     }
 
-    // Use executor context if available for scoped variable resolution
+    /// Use executor context if available for scoped variable resolution
     if (item->executor_context) {
         executor_t *exec = (executor_t *)item->executor_context;
         if (exec && exec->symtable) {
@@ -395,7 +395,7 @@ static ssize_t get_var_value_scoped(stack_item_t *item) {
         }
     }
 
-    // Fallback to global
+    /// Fallback to global
     char *value = symtable_get_global(item->var_name);
     if (value) {
         return strtol(value, NULL, 10);
@@ -420,7 +420,7 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
     char value_str[32];
     snprintf(value_str, sizeof(value_str), "%zd", value);
 
-    // Use executor context if available for scoped variable assignment
+    /// Use executor context if available for scoped variable assignment
     if (item->executor_context) {
         executor_t *exec = (executor_t *)item->executor_context;
         if (exec && exec->symtable) {
@@ -430,7 +430,7 @@ static void set_var_value_scoped(stack_item_t *item, ssize_t value) {
         }
     }
 
-    // Fallback to global
+    /// Fallback to global
     symtable_set_global(item->var_name, value_str);
 }
 
@@ -529,9 +529,9 @@ static ssize_t eval_modeq(stack_item_t *a1, stack_item_t *a2) {
     return result;
 }
 
-// ============================================================================
-// INCREMENT/DECREMENT OPERATORS
-// ============================================================================
+/// ============================================================================
+/// INCREMENT/DECREMENT OPERATORS
+/// ============================================================================
 
 #define ARITHM_REQUIRE_INC_TARGET(item, op)                                    \
     do {                                                                       \
@@ -622,7 +622,7 @@ static ssize_t eval_exp(stack_item_t *a1, stack_item_t *a2) {
     return result;
 }
 
-// Operator character constants
+/// Operator character constants
 #define CH_GT '>'
 #define CH_LT '<'
 #define CH_GE 0x01
@@ -644,11 +644,11 @@ static ssize_t eval_exp(stack_item_t *a1, stack_item_t *a2) {
 #define CH_MULEQ 0x11
 #define CH_DIVEQ 0x12
 #define CH_MODEQ 0x13
-#define CH_TERNARY_Q 0x14 // ? part of ternary
-#define CH_TERNARY_C 0x15 // : part of ternary
-#define CH_COMMA 0x16     // comma operator
+#define CH_TERNARY_Q 0x14 /// ? part of ternary
+#define CH_TERNARY_C 0x15 /// : part of ternary
+#define CH_COMMA 0x16     /// comma operator
 
-// Operator definitions (only binary operators in main table)
+/// Operator definitions (only binary operators in main table)
 static op_t operators[] = {
     {         '(',  0,  ASSOC_NONE, 0, 1,                  NULL},
     {         ')',  0,  ASSOC_NONE, 0, 1,                  NULL},
@@ -685,7 +685,7 @@ static op_t operators[] = {
     {           0,  0,           0, 0, 0,                  NULL}
 };
 
-// Unary operator definitions (separate from main table)
+/// Unary operator definitions (separate from main table)
 static op_t op_uminus = {'-', 2, ASSOC_RIGHT, 1, 1, eval_uminus};
 static op_t op_uplus = {'+', 2, ASSOC_RIGHT, 1, 1, eval_uplus};
 static op_t op_preinc = {CH_PREINC, 2, ASSOC_RIGHT, 1, 2, eval_preinc};
@@ -693,7 +693,7 @@ static op_t op_predec = {CH_PREDEC, 2, ASSOC_RIGHT, 1, 2, eval_predec};
 static op_t op_postinc = {CH_POSTINC, 1, ASSOC_LEFT, 1, 2, eval_postinc};
 static op_t op_postdec = {CH_POSTDEC, 1, ASSOC_LEFT, 1, 2, eval_postdec};
 
-// Operator shortcuts
+/// Operator shortcuts
 #define OP_UMINUS (&op_uminus)
 #define OP_UPLUS (&op_uplus)
 #define OP_PREINC (&op_preinc)
@@ -701,9 +701,9 @@ static op_t op_postdec = {CH_POSTDEC, 1, ASSOC_LEFT, 1, 2, eval_postdec};
 #define OP_POSTINC (&op_postinc)
 #define OP_POSTDEC (&op_postdec)
 
-// ============================================================================
-// STACK MANAGEMENT AND VALUE CONVERSION
-// ============================================================================
+/// ============================================================================
+/// STACK MANAGEMENT AND VALUE CONVERSION
+/// ============================================================================
 
 /**
  * @brief Get the numeric value from a stack item
@@ -721,9 +721,9 @@ static ssize_t long_value(stack_item_t *item) {
         return item->val;
     case ITEM_VAR_PTR: {
         if (item->var_name) {
-            // Use executor context if available for scoped variable resolution
+            /// Use executor context if available for scoped variable resolution
             if (item->executor_context) {
-                // Use proper executor structure from executor.h
+                /// Use proper executor structure from executor.h
                 executor_t *exec = (executor_t *)item->executor_context;
 
                 if (exec && exec->symtable) {
@@ -737,7 +737,7 @@ static ssize_t long_value(stack_item_t *item) {
                 }
             }
 
-            // Fallback to global manager
+            /// Fallback to global manager
             symtable_manager_t *manager = symtable_get_global_manager();
             if (manager) {
                 char *value = symtable_get_var(manager, item->var_name);
@@ -855,9 +855,9 @@ static stack_item_t pop_numstack(arithm_context_t *ctx) {
  */
 static bool valid_name_char(char c) { return isalnum(c) || c == '_'; }
 
-// ============================================================================
-// EXPRESSION PARSING
-// ============================================================================
+/// ============================================================================
+/// EXPRESSION PARSING
+/// ============================================================================
 
 /**
  * @brief Look up an operator from expression text
@@ -870,14 +870,14 @@ static bool valid_name_char(char c) { return isalnum(c) || c == '_'; }
  * @return Pointer to operator structure, or NULL if not an operator
  */
 static op_t *get_op(const char *expr) {
-    // Check for increment/decrement operators first (they are 2-char)
+    /// Check for increment/decrement operators first (they are 2-char)
     if (expr[0] == '+' && expr[1] == '+') {
-        return OP_PREINC; // Will be handled as pre/post in main parsing
+        return OP_PREINC; /// Will be handled as pre/post in main parsing
     } else if (expr[0] == '-' && expr[1] == '-') {
-        return OP_PREDEC; // Will be handled as pre/post in main parsing
+        return OP_PREDEC; /// Will be handled as pre/post in main parsing
     }
 
-    // Check two-character operators first to avoid conflicts
+    /// Check two-character operators first to avoid conflicts
     for (op_t *op = operators; op->op; op++) {
         if (op->chars == 2) {
             if (op->op == CH_EQ && expr[0] == '=' && expr[1] == '=') {
@@ -912,12 +912,12 @@ static op_t *get_op(const char *expr) {
         }
     }
 
-    // Then check single-character operators
+    /// Then check single-character operators
     for (op_t *op = operators; op->op; op++) {
         if (op->chars == 1 && *expr == op->op) {
             return op;
         }
-        // Special handling for operators with character codes
+        /// Special handling for operators with character codes
         if (op->op == CH_TERNARY_Q && *expr == '?') {
             return op;
         }
@@ -946,13 +946,13 @@ static ssize_t get_num(const char *expr, int *nchars) {
     ssize_t result;
 
     if (expr[0] == '0' && (expr[1] == 'x' || expr[1] == 'X')) {
-        // Hexadecimal
+        /// Hexadecimal
         result = strtol(expr, &endptr, 16);
     } else if (expr[0] == '0' && isdigit(expr[1])) {
-        // Octal
+        /// Octal
         result = strtol(expr, &endptr, 8);
     } else {
-        // Decimal
+        /// Decimal
         result = strtol(expr, &endptr, 10);
     }
 
@@ -978,25 +978,26 @@ static char *get_var_name_with_context(arithm_context_t *ctx
     const char *start = expr;
     *nchars = 0;
 
-    // Variable names start with letter, underscore, or digit (for positional
-    // parameters)
+    /// Variable names start with letter, underscore, or digit (for positional
+    /// parameters)
     if (!isalpha(*expr) && *expr != '_' && !isdigit(*expr)) {
         return NULL;
     }
 
-    // For numeric positional parameters like $1, $2, only take the single digit
+    /// For numeric positional parameters like $1, $2, only take the single
+    /// digit
     if (isdigit(*expr)) {
         *nchars = 1;
         expr++;
     } else {
-        // Count valid name characters for regular variables
+        /// Count valid name characters for regular variables
         while (valid_name_char(*expr)) {
             expr++;
             (*nchars)++;
         }
     }
 
-    // Extract variable name
+    /// Extract variable name
     char *name = malloc(*nchars + 1);
     if (!name) {
         arithm_set_error(SHELL_ERR_OUT_OF_MEMORY,
@@ -1008,9 +1009,9 @@ static char *get_var_name_with_context(arithm_context_t *ctx
     strncpy(name, start, *nchars);
     name[*nchars] = '\0';
 
-    // Always ensure variable exists in global symbol table with default value
-    // "0" The actual value resolution will happen during evaluation using
-    // executor context
+    /// Always ensure variable exists in global symbol table with default value
+    /// "0" The actual value resolution will happen during evaluation using
+    /// executor context
     symtable_manager_t *manager = symtable_get_global_manager();
     if (manager && !symtable_var_exists(manager, name)) {
         symtable_set_var(manager, name, "0", SYMVAR_NONE);
@@ -1038,7 +1039,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
     if (op->op == '(') {
         push_opstack(ctx, op);
     } else if (op->op == CH_TERNARY_C) {
-        // Colon in ternary - process operators until we find the matching '?'
+        /// Colon in ternary - process operators until we find the matching '?'
         while (ctx->nopstack > 0 &&
                ctx->opstack[ctx->nopstack - 1]->op != '(' &&
                ctx->opstack[ctx->nopstack - 1]->op != CH_TERNARY_Q) {
@@ -1070,7 +1071,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 return;
             }
         }
-        // Push the colon operator to mark the separation
+        /// Push the colon operator to mark the separation
         push_opstack(ctx, op);
     } else if (op->op == ')') {
         while (ctx->nopstack > 0 &&
@@ -1080,20 +1081,20 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 return;
             }
 
-            // Handle ternary operator specially
+            /// Handle ternary operator specially
             if (pop_op->op == CH_TERNARY_C) {
-                // We have the false value on the stack
+                /// We have the false value on the stack
                 stack_item_t false_val = pop_numstack(ctx);
                 if (ctx->errflag) {
                     return;
                 }
 
-                // Next operator should be '?'
+                /// Next operator should be '?'
                 if (ctx->nopstack > 0 &&
                     ctx->opstack[ctx->nopstack - 1]->op == CH_TERNARY_Q) {
-                    pop_opstack(ctx); // Remove the '?'
+                    pop_opstack(ctx); /// Remove the '?'
 
-                    // Get true value and condition
+                    /// Get true value and condition
                     stack_item_t true_val = pop_numstack(ctx);
                     if (ctx->errflag) {
                         stack_item_cleanup(&false_val);
@@ -1106,7 +1107,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                         return;
                     }
 
-                    // Evaluate: condition ? true_val : false_val
+                    /// Evaluate: condition ? true_val : false_val
                     ssize_t result = long_value(&condition)
                                          ? long_value(&true_val)
                                          : long_value(&false_val);
@@ -1159,7 +1160,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
         }
 
         if (ctx->nopstack > 0 && ctx->opstack[ctx->nopstack - 1]->op == '(') {
-            pop_opstack(ctx); // Remove the '('
+            pop_opstack(ctx); /// Remove the '('
         } else {
             ctx->errflag = true;
             arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_PARENS,
@@ -1181,20 +1182,20 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                 return;
             }
 
-            // Handle ternary operator specially
+            /// Handle ternary operator specially
             if (pop_op->op == CH_TERNARY_C) {
-                // We have the false value on the stack
+                /// We have the false value on the stack
                 stack_item_t false_val = pop_numstack(ctx);
                 if (ctx->errflag) {
                     return;
                 }
 
-                // Next operator should be '?'
+                /// Next operator should be '?'
                 if (ctx->nopstack > 0 &&
                     ctx->opstack[ctx->nopstack - 1]->op == CH_TERNARY_Q) {
-                    pop_opstack(ctx); // Remove the '?'
+                    pop_opstack(ctx); /// Remove the '?'
 
-                    // Get true value and condition
+                    /// Get true value and condition
                     stack_item_t true_val = pop_numstack(ctx);
                     if (ctx->errflag) {
                         stack_item_cleanup(&false_val);
@@ -1207,7 +1208,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
                         return;
                     }
 
-                    // Evaluate: condition ? true_val : false_val
+                    /// Evaluate: condition ? true_val : false_val
                     ssize_t result = long_value(&condition)
                                          ? long_value(&true_val)
                                          : long_value(&false_val);
@@ -1263,7 +1264,7 @@ static void shunt_op(arithm_context_t *ctx, op_t *op) {
     }
 }
 
-// Error handling functions
+/// Error handling functions
 void arithm_init(void) { arithm_clear_error(); }
 
 void arithm_cleanup(void) { arithm_clear_error(); }
@@ -1323,8 +1324,8 @@ const char *arithm_error_help(void) {
     return s_arithm_error.help[0] ? s_arithm_error.help : NULL;
 }
 
-// Main arithmetic expansion function
-// Forward declaration for the executor-aware version
+/// Main arithmetic expansion function
+/// Forward declaration for the executor-aware version
 static char *arithm_expand_internal(void *executor, const char *orig_expr);
 
 char *arithm_expand(const char *orig_expr) {
@@ -1340,12 +1341,12 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         return strdup("0");
     }
 
-    // Initialize context
+    /// Initialize context
     arithm_context_t ctx = {0};
-    ctx.executor = executor; // Store executor context in arithmetic context
+    ctx.executor = executor; /// Store executor context in arithmetic context
     arithm_clear_error();
 
-    // Parse expression and remove $(( )) wrapper if present
+    /// Parse expression and remove $(( )) wrapper if present
     const char *expr;
     char *cleaned_expr = NULL;
 
@@ -1353,7 +1354,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         size_t len = strlen(orig_expr);
         if (len >= 5 && orig_expr[len - 2] == ')' &&
             orig_expr[len - 1] == ')') {
-            // Extract expression between $(( and ))
+            /// Extract expression between $(( and ))
             size_t expr_len = len - 5;
             cleaned_expr = malloc(expr_len + 1);
             if (!cleaned_expr) {
@@ -1377,13 +1378,13 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         expr = orig_expr;
     }
 
-    // Tokenize and evaluate expression using clearer state management
+    /// Tokenize and evaluate expression using clearer state management
     const char *current = expr;
     op_t start_op = {'X', 0, ASSOC_NONE, 0, 0, NULL};
     op_t *last_op = &start_op;
 
     while (*current && !ctx.errflag) {
-        // Skip whitespace
+        /// Skip whitespace
         while (*current && isspace(*current)) {
             current++;
         }
@@ -1392,18 +1393,18 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             break;
         }
 
-        // Try to parse an operator first
+        /// Try to parse an operator first
         op_t *op = get_op(current);
         if (op) {
-            // Handle increment/decrement operators
+            /// Handle increment/decrement operators
             if (op == OP_PREINC || op == OP_PREDEC) {
-                // Check if this should be post-increment/decrement
-                // If the last token was a variable or closing paren, it's
-                // post-increment
+                /// Check if this should be post-increment/decrement
+                /// If the last token was a variable or closing paren, it's
+                /// post-increment
                 if (ctx.nnumstack > 0 &&
                     (ctx.numstack[ctx.nnumstack - 1].type == ITEM_VAR_PTR ||
                      (last_op && last_op->op == ')'))) {
-                    // Convert to post-increment/decrement
+                    /// Convert to post-increment/decrement
                     if (op == OP_PREINC) {
                         op = OP_POSTINC;
                     } else {
@@ -1452,7 +1453,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             last_op = op;
             current += op->chars;
         } else if (isdigit(*current)) {
-            // Parse number
+            /// Parse number
             int nchars;
             ssize_t num = get_num(current, &nchars);
             push_numstackl(&ctx, num);
@@ -1462,10 +1463,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             last_op = NULL;
             current += nchars;
         } else if (*current == '$' && *(current + 1) == '(') {
-            // Handle command substitution $(command) in arithmetic expressions
-            // Find the matching closing parenthesis
+            /// Handle command substitution $(command) in arithmetic expressions
+            /// Find the matching closing parenthesis
             int paren_count = 1;
-            const char *start = current + 2; // Skip $(
+            const char *start = current + 2; /// Skip $(
             const char *end = start;
 
             while (*end && paren_count > 0) {
@@ -1480,20 +1481,20 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             }
 
             if (paren_count == 0 && *end == ')') {
-                // Extract command and execute it
+                /// Extract command and execute it
                 size_t cmd_len = end - start;
                 char *command = malloc(cmd_len + 1);
                 if (command) {
                     strncpy(command, start, cmd_len);
                     command[cmd_len] = '\0';
 
-                    // Simple implementation: handle basic echo commands
+                    /// Simple implementation: handle basic echo commands
                     char *trimmed = command;
                     while (*trimmed && isspace(*trimmed)) {
                         trimmed++;
                     }
 
-                    // Check if it's a simple echo number command
+                    /// Check if it's a simple echo number command
                     if (strncmp(trimmed, "echo ", 5) == 0) {
                         char *num_str = trimmed + 5;
                         while (*num_str && isspace(*num_str)) {
@@ -1507,7 +1508,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                             push_numstackl(&ctx, 0);
                         }
                     } else {
-                        // For other commands, default to 0 for now
+                        /// For other commands, default to 0 for now
                         push_numstackl(&ctx, 0);
                     }
 
@@ -1516,7 +1517,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                     push_numstackl(&ctx, 0);
                 }
 
-                current = end + 1; // Skip past the closing )
+                current = end + 1; /// Skip past the closing )
             } else {
                 arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
                                  "scanning $(...) in arithmetic expression",
@@ -1531,15 +1532,15 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             }
             last_op = NULL;
         } else if (*current == '$' && *(current + 1) == '{') {
-            // Handle ${variable} syntax in arithmetic expressions
-            const char *start = current + 2; // Skip ${
+            /// Handle ${variable} syntax in arithmetic expressions
+            const char *start = current + 2; /// Skip ${
             const char *end = strchr(start, '}');
 
             if (end) {
-                // Extract variable name (handle simple ${var} for now)
-                // More complex forms like ${var:-default} would need executor
+                /// Extract variable name (handle simple ${var} for now)
+                /// More complex forms like ${var:-default} would need executor
 
-                // Find the end of the variable name (before any operator)
+                /// Find the end of the variable name (before any operator)
                 const char *name_end = start;
                 while (name_end < end &&
                        (isalnum(*name_end) || *name_end == '_')) {
@@ -1561,7 +1562,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                     push_numstackl(&ctx, 0);
                 }
 
-                current = end + 1; // Skip past }
+                current = end + 1; /// Skip past }
             } else {
                 arithm_set_error(SHELL_ERR_ARITHMETIC_SYNTAX,
                                  "scanning ${...} in arithmetic expression",
@@ -1575,15 +1576,15 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             }
             last_op = NULL;
         } else if (*current == '$' && valid_name_char(*(current + 1))) {
-            // Handle $variable syntax in arithmetic expressions
-            current++; // Skip the '$'
+            /// Handle $variable syntax in arithmetic expressions
+            current++; /// Skip the '$'
             int nchars;
             char *var_name = get_var_name_with_context(&ctx, current, &nchars);
             if (var_name) {
                 push_numstackv_with_context(&ctx, var_name);
                 free(var_name);
             } else {
-                push_numstackl(&ctx, 0); // Undefined variable = 0
+                push_numstackl(&ctx, 0); /// Undefined variable = 0
             }
             if (ctx.errflag) {
                 break;
@@ -1591,14 +1592,14 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             last_op = NULL;
             current += nchars;
         } else if (valid_name_char(*current)) {
-            // Parse variable name
+            /// Parse variable name
             int nchars;
             char *var_name = get_var_name_with_context(&ctx, current, &nchars);
             if (var_name) {
                 push_numstackv_with_context(&ctx, var_name);
                 free(var_name);
             } else {
-                push_numstackl(&ctx, 0); // Undefined variable = 0
+                push_numstackl(&ctx, 0); /// Undefined variable = 0
             }
             if (ctx.errflag) {
                 break;
@@ -1614,18 +1615,18 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         }
     }
 
-    // Process remaining operators
+    /// Process remaining operators
     while (ctx.nopstack > 0 && !ctx.errflag) {
         op_t *op = pop_opstack(&ctx);
         if (ctx.errflag) {
             break;
         }
 
-        // '(' and ')' are paren-balance markers with eval==NULL, normally
-        // removed by shunt_op when the matching ')' is processed. If one
-        // survives to end-of-expression, the input was unbalanced; falling
-        // through to the binary-apply path below would call op->eval which
-        // is NULL. Treat it the same as shunt_op's ')' branch does.
+        /// '(' and ')' are paren-balance markers with eval==NULL, normally
+        /// removed by shunt_op when the matching ')' is processed. If one
+        /// survives to end-of-expression, the input was unbalanced; falling
+        /// through to the binary-apply path below would call op->eval which
+        /// is NULL. Treat it the same as shunt_op's ')' branch does.
         if (op->op == '(' || op->op == ')') {
             arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_PARENS,
                              "parsing parenthesized expression",
@@ -1635,20 +1636,20 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             break;
         }
 
-        // Handle ternary operator specially
+        /// Handle ternary operator specially
         if (op->op == CH_TERNARY_C) {
-            // We have the false value on the stack
+            /// We have the false value on the stack
             stack_item_t false_val = pop_numstack(&ctx);
             if (ctx.errflag) {
                 break;
             }
 
-            // Next operator should be '?'
+            /// Next operator should be '?'
             if (ctx.nopstack > 0 &&
                 ctx.opstack[ctx.nopstack - 1]->op == CH_TERNARY_Q) {
-                pop_opstack(&ctx); // Remove the '?'
+                pop_opstack(&ctx); /// Remove the '?'
 
-                // Get true value and condition
+                /// Get true value and condition
                 stack_item_t true_val = pop_numstack(&ctx);
                 if (ctx.errflag) {
                     stack_item_cleanup(&false_val);
@@ -1661,7 +1662,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                     break;
                 }
 
-                // Evaluate: condition ? true_val : false_val
+                /// Evaluate: condition ? true_val : false_val
                 ssize_t result = long_value(&condition)
                                      ? long_value(&true_val)
                                      : long_value(&false_val);
@@ -1682,7 +1683,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             continue;
         }
 
-        // Skip '?' - it's handled with ':'
+        /// Skip '?' - it's handled with ':'
         if (op->op == CH_TERNARY_Q) {
             arithm_set_error(SHELL_ERR_ARITH_MISMATCHED_TERNARY,
                              "evaluating ternary expression",
@@ -1723,18 +1724,18 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         }
     }
 
-    // Clean up
+    /// Clean up
     if (cleaned_expr) {
         free(cleaned_expr);
     }
 
-    // Check for errors
+    /// Check for errors
     if (ctx.errflag || s_arithm_error.flagged) {
         arithm_context_cleanup(&ctx);
         return NULL;
     }
 
-    // Should have exactly one result
+    /// Should have exactly one result
     if (ctx.nnumstack != 1) {
         arithm_set_error(
             SHELL_ERR_ARITHMETIC_SYNTAX, "evaluating arithmetic expression",
@@ -1743,7 +1744,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
         return NULL;
     }
 
-    // Format result
+    /// Format result
     ssize_t result = long_value(&ctx.numstack[0]);
     char *result_str = malloc(32);
     if (!result_str) {

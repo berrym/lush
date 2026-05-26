@@ -56,16 +56,16 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-// Global executor pointer for job control builtins
+/// Global executor pointer for job control builtins
 executor_t *current_executor = NULL;
 
-// Forward declarations
-// Forward declarations - updated for symtable
+/// Forward declarations
+/// Forward declarations - updated for symtable
 static int execute_node(executor_t *executor, node_t *node);
 static int execute_command(executor_t *executor, node_t *command);
 static int execute_pipeline(executor_t *executor, node_t *pipeline);
 static int execute_function_definition(executor_t *executor, node_t *function);
-// Typed-function form -- declaration, call, return, let-capture.
+/// Typed-function form -- declaration, call, return, let-capture.
 static void executor_typed_fns_clear(executor_t *executor);
 static int execute_typed_fn_decl(executor_t *executor, node_t *node);
 static int execute_typed_fn_call(executor_t *executor, node_t *node);
@@ -150,7 +150,7 @@ static int add_to_argv_list(char ***argv_list, int *argv_count,
 static char **ifs_field_split(const char *text, const char *ifs, int *count);
 static void cleanup_procsub_fds(executor_t *executor);
 
-// Forward declarations for POSIX compliance
+/// Forward declarations for POSIX compliance
 bool is_posix_mode_enabled(void);
 bool is_pipefail_enabled(void);
 bool is_pipeline_diagnostic_enabled(void);
@@ -169,10 +169,10 @@ static int execute_arithmetic_command(executor_t *executor, node_t *arith_node);
 static int execute_array_assignment(executor_t *executor, node_t *assign_node);
 static int execute_array_append(executor_t *executor, node_t *append_node);
 
-// Forward declarations for Phase 2: Extended Tests
+/// Forward declarations for Phase 2: Extended Tests
 static int execute_extended_test(executor_t *executor, node_t *test_node);
 
-// Forward declarations for Phase 3: Process Substitution
+/// Forward declarations for Phase 3: Process Substitution
 char *expand_process_substitution(executor_t *executor, node_t *proc_sub);
 static bool is_builtin_command(const char *cmd);
 static void set_executor_error(executor_t *executor, const char *message);
@@ -225,15 +225,15 @@ static bool match_pattern(const char *str, const char *pattern);
  */
 static bool is_privileged_command_allowed(const char *command) {
     if (!shell_opts.privileged_mode || !command) {
-        return true; // Allow if not in privileged mode
+        return true; /// Allow if not in privileged mode
     }
 
-    // Block commands containing '/' (absolute/relative paths)
+    /// Block commands containing '/' (absolute/relative paths)
     if (strchr(command, '/') != NULL) {
         return false;
     }
 
-    // Block dangerous built-in commands in privileged mode
+    /// Block dangerous built-in commands in privileged mode
     if (strcmp(command, "exec") == 0 || strcmp(command, "cd") == 0 ||
         strcmp(command, "set") == 0) {
         return false;
@@ -254,15 +254,15 @@ static bool is_privileged_command_allowed(const char *command) {
  */
 bool is_privileged_redirection_allowed(const char *target) {
     if (!shell_opts.privileged_mode || !target) {
-        return true; // Allow if not in privileged mode
+        return true; /// Allow if not in privileged mode
     }
 
-    // Block absolute path redirections
+    /// Block absolute path redirections
     if (target[0] == '/') {
         return false;
     }
 
-    // Block redirection to parent directories
+    /// Block redirection to parent directories
     if (strstr(target, "../") != NULL || strcmp(target, "..") == 0) {
         return false;
     }
@@ -285,10 +285,10 @@ bool is_privileged_redirection_allowed(const char *target) {
  */
 static bool is_privileged_path_modification_allowed(const char *var_name) {
     if (!shell_opts.privileged_mode || !var_name) {
-        return true; // Allow if not in privileged mode
+        return true; /// Allow if not in privileged mode
     }
 
-    // Block PATH modifications
+    /// Block PATH modifications
     if (strcmp(var_name, "PATH") == 0 || strcmp(var_name, "IFS") == 0 ||
         strcmp(var_name, "ENV") == 0 || strcmp(var_name, "SHELL") == 0) {
         return false;
@@ -323,7 +323,7 @@ executor_t *executor_new(void) {
         return NULL;
     }
 
-    // Use global symbol table manager from modernized legacy interface
+    /// Use global symbol table manager from modernized legacy interface
     executor->symtable = symtable_get_global_manager();
     if (!executor->symtable) {
         free(executor);
@@ -347,7 +347,7 @@ executor_t *executor_new(void) {
     executor->source_depth = 0;
     executor->source_return = false;
 
-    // Initialize error context stack (Phase 3)
+    /// Initialize error context stack (Phase 3)
     executor->context_depth = 0;
     for (size_t i = 0; i < EXECUTOR_CONTEXT_STACK_MAX; i++) {
         executor->context_stack[i] = NULL;
@@ -355,12 +355,12 @@ executor_t *executor_new(void) {
     }
     executor->active_loc = SOURCE_LOC_UNKNOWN;
 
-    // Initialize process substitution fd tracking
+    /// Initialize process substitution fd tracking
     executor->procsub_fd_count = 0;
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
 
-    // Variable-allocated fd registry starts empty; grown on demand.
+    /// Variable-allocated fd registry starts empty; grown on demand.
     executor->alloc_fds = NULL;
     executor->alloc_fd_count = 0;
     executor->alloc_fd_cap = 0;
@@ -370,7 +370,7 @@ executor_t *executor_new(void) {
     executor->source_text = NULL;
     executor->source_starting_line = 0;
 
-    // Typed-function state starts empty.
+    /// Typed-function state starts empty.
     executor->typed_fns = NULL;
     executor->typed_fn_return_pending = false;
     executor->typed_fn_return_value.kind = LUSH_VALUE_NONE;
@@ -394,7 +394,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
         return NULL;
     }
 
-    // Use provided symtable
+    /// Use provided symtable
     executor->symtable = symtable;
 
     executor->interactive = false;
@@ -414,7 +414,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->source_depth = 0;
     executor->source_return = false;
 
-    // Initialize error context stack (Phase 3)
+    /// Initialize error context stack (Phase 3)
     executor->context_depth = 0;
     for (size_t i = 0; i < EXECUTOR_CONTEXT_STACK_MAX; i++) {
         executor->context_stack[i] = NULL;
@@ -422,12 +422,12 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     }
     executor->active_loc = SOURCE_LOC_UNKNOWN;
 
-    // Initialize process substitution fd tracking
+    /// Initialize process substitution fd tracking
     executor->procsub_fd_count = 0;
     memset(executor->procsub_fds, -1, sizeof(executor->procsub_fds));
     memset(executor->procsub_pids, 0, sizeof(executor->procsub_pids));
 
-    // Variable-allocated fd registry starts empty; grown on demand.
+    /// Variable-allocated fd registry starts empty; grown on demand.
     executor->alloc_fds = NULL;
     executor->alloc_fd_count = 0;
     executor->alloc_fd_cap = 0;
@@ -437,7 +437,7 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->source_text = NULL;
     executor->source_starting_line = 0;
 
-    // Typed-function state starts empty.
+    /// Typed-function state starts empty.
     executor->typed_fns = NULL;
     executor->typed_fn_return_pending = false;
     executor->typed_fn_return_value.kind = LUSH_VALUE_NONE;
@@ -459,9 +459,9 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
  */
 void executor_free(executor_t *executor) {
     if (executor) {
-        // Don't free global symtable - it's managed globally
+        /// Don't free global symtable - it's managed globally
 
-        // Free function table
+        /// Free function table
         function_def_t *func = executor->functions;
         while (func) {
             function_def_t *next = func->next;
@@ -472,23 +472,23 @@ void executor_free(executor_t *executor) {
             func = next;
         }
 
-        // Free typed-function registry.
+        /// Free typed-function registry.
         executor_typed_fns_clear(executor);
 
-        // Free any pending typed-return value (defensive; cleared on
-        // unwind under normal flow).
+        /// Free any pending typed-return value (defensive; cleared on
+        /// unwind under normal flow).
         lush_value_view_clear(&executor->typed_fn_return_value);
 
-        // Free script context
+        /// Free script context
         free(executor->current_script_file);
 
-        // Free error context stack
+        /// Free error context stack
         executor_clear_context(executor);
 
-        // Close any variable-allocated fds the script never closed. Done
-        // before freeing the array; errors here are intentionally silent
-        // (the kernel will reclaim on process exit regardless, and a
-        // script-side close that already raced us would return EBADF).
+        /// Close any variable-allocated fds the script never closed. Done
+        /// before freeing the array; errors here are intentionally silent
+        /// (the kernel will reclaim on process exit regardless, and a
+        /// script-side close that already raced us would return EBADF).
         if (executor->alloc_fds) {
             for (size_t i = 0; i < executor->alloc_fd_count; i++) {
                 if (executor->alloc_fds[i] >= 0) {
@@ -514,8 +514,8 @@ void executor_track_alloc_fd(executor_t *executor, int fd) {
             executor->alloc_fd_cap == 0 ? 8 : executor->alloc_fd_cap * 2;
         int *grown = realloc(executor->alloc_fds, new_cap * sizeof(int));
         if (!grown) {
-            // OOM during tracking: fd is still allocated and usable; just
-            // not auto-cleaned at shell exit. The kernel reclaims on exit.
+            /// OOM during tracking: fd is still allocated and usable; just
+            /// not auto-cleaned at shell exit. The kernel reclaims on exit.
             return;
         }
         executor->alloc_fds = grown;
@@ -530,8 +530,8 @@ void executor_untrack_alloc_fd(executor_t *executor, int fd) {
     }
     for (size_t i = 0; i < executor->alloc_fd_count; i++) {
         if (executor->alloc_fds[i] == fd) {
-            // Swap-with-last, then shrink count. Order doesn't matter; the
-            // registry is treated as a set.
+            /// Swap-with-last, then shrink count. Order doesn't matter; the
+            /// registry is treated as a set.
             executor->alloc_fds[i] =
                 executor->alloc_fds[executor->alloc_fd_count - 1];
             executor->alloc_fd_count--;
@@ -575,7 +575,7 @@ void executor_set_interactive(executor_t *executor, bool interactive) {
  */
 void executor_set_symtable(executor_t *executor, symtable_manager_t *symtable) {
     if (executor) {
-        // Don't free the old symtable if it exists - it might be external
+        /// Don't free the old symtable if it exists - it might be external
         executor->symtable = symtable;
     }
 }
@@ -596,10 +596,10 @@ void executor_set_script_context(executor_t *executor,
         return;
     }
 
-    // Free existing script file name
+    /// Free existing script file name
     free(executor->current_script_file);
 
-    // Set new script context
+    /// Set new script context
     executor->current_script_file = script_file ? strdup(script_file) : NULL;
     executor->in_script_execution = (script_file != NULL);
 }
@@ -767,7 +767,7 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         return;
     }
 
-    // Create the error
+    /// Create the error
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -775,7 +775,7 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
     va_end(args);
 
     if (!error) {
-        // Fallback to legacy error system
+        /// Fallback to legacy error system
         set_executor_error(executor, "runtime error");
         return;
     }
@@ -791,7 +791,7 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    // Add context stack to error
+    /// Add context stack to error
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
         if (executor->context_stack[i]) {
@@ -799,13 +799,13 @@ void executor_error_report(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    // Display the error immediately
+    /// Display the error immediately
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
     /* Set legacy error state for compatibility - use NULL since error was
      * already displayed */
     executor->has_error = true;
-    executor->error_message = NULL; // Already displayed via structured system
+    executor->error_message = NULL; /// Already displayed via structured system
 
     shell_error_free(error);
 }
@@ -823,7 +823,7 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         return;
     }
 
-    // Create the error
+    /// Create the error
     va_list args;
     va_start(args, fmt);
     shell_error_t *error =
@@ -831,7 +831,7 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
     va_end(args);
 
     if (!error) {
-        // Fallback to legacy error system
+        /// Fallback to legacy error system
         set_executor_error(executor, "runtime error");
         return;
     }
@@ -847,7 +847,7 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    // Add context stack to error
+    /// Add context stack to error
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
         if (executor->context_stack[i]) {
@@ -855,13 +855,13 @@ void executor_error_add(executor_t *executor, shell_error_code_t code,
         }
     }
 
-    // Display the error immediately
+    /// Display the error immediately
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
     /* Set legacy error state for compatibility - use NULL since error was
      * already displayed */
     executor->has_error = true;
-    executor->error_message = NULL; // Already displayed via structured system
+    executor->error_message = NULL; /// Already displayed via structured system
 
     shell_error_free(error);
 }
@@ -886,17 +886,17 @@ static void report_command_not_found(executor_t *executor, const char *command,
         return;
     }
 
-    // Create the error
+    /// Create the error
     shell_error_t *error =
         shell_error_create(SHELL_ERR_COMMAND_NOT_FOUND, SHELL_SEVERITY_ERROR,
                            loc, "%s: command not found", command);
     if (!error) {
-        // Fallback to simple error message
+        /// Fallback to simple error message
         fprintf(stderr, "lush: %s: command not found\n", command);
         return;
     }
 
-    // Attach source line for the rust-style snippet block
+    /// Attach source line for the rust-style snippet block
     if (SOURCE_LOC_VALID(loc)) {
         char *src_line = executor_get_source_line(executor, loc.line);
         if (src_line) {
@@ -906,7 +906,7 @@ static void report_command_not_found(executor_t *executor, const char *command,
         }
     }
 
-    // Add context stack to error
+    /// Add context stack to error
     for (size_t i = 0;
          i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX; i++) {
         if (executor->context_stack[i]) {
@@ -921,7 +921,7 @@ static void report_command_not_found(executor_t *executor, const char *command,
         autocorrect_find_suggestions(executor, command, &results);
 
     if (num_suggestions > 0) {
-        // Build suggestion string
+        /// Build suggestion string
         char suggestion[256];
         if (num_suggestions == 1) {
             snprintf(suggestion, sizeof(suggestion), "did you mean '%s'?",
@@ -952,10 +952,10 @@ static void report_command_not_found(executor_t *executor, const char *command,
      * no suggestions) */
     autocorrect_free_results(&results);
 
-    // Display the error
+    /// Display the error
     shell_error_display(error, stderr, isatty(STDERR_FILENO));
 
-    // Set legacy error state
+    /// Set legacy error state
     executor->has_error = true;
     executor->error_message = NULL;
 
@@ -980,14 +980,14 @@ int executor_execute(executor_t *executor, node_t *ast) {
     executor->has_error = false;
     executor->error_message = NULL;
 
-    // Check if this is a command sequence (has siblings) or a single command
+    /// Check if this is a command sequence (has siblings) or a single command
     if (ast->next_sibling) {
-        // This is a command sequence, execute all siblings
+        /// This is a command sequence, execute all siblings
         int result = execute_command_list(executor, ast);
         executor->exit_status = result;
         return result;
     } else {
-        // Single command, execute normally
+        /// Single command, execute normally
         int result = execute_node(executor, ast);
         executor->exit_status = result;
         return result;
@@ -1026,23 +1026,23 @@ int executor_execute_command_line(executor_t *executor, const char *input,
     executor->source_text = input;
     executor->source_starting_line = starting_line;
 
-    // Preprocess input to handle line continuation (backslash-newline)
-    // This is needed for -c option where the string comes directly without
-    // going through get_input_complete() which normally handles this
+    /// Preprocess input to handle line continuation (backslash-newline)
+    /// This is needed for -c option where the string comes directly without
+    /// going through get_input_complete() which normally handles this
     char *processed_input = NULL;
     const char *parse_input = input;
 
     if (strchr(input, '\\') != NULL) {
-        // May contain line continuations - preprocess
+        /// May contain line continuations - preprocess
         size_t len = strlen(input);
         processed_input = malloc(len + 1);
         if (processed_input) {
             size_t j = 0;
             for (size_t i = 0; i < len; i++) {
                 if (input[i] == '\\' && i + 1 < len && input[i + 1] == '\n') {
-                    // Skip backslash-newline (line continuation)
-                    i++; // Skip the newline too (loop will increment past
-                         // backslash)
+                    /// Skip backslash-newline (line continuation)
+                    i++; /// Skip the newline too (loop will increment past
+                         /// backslash)
                 } else {
                     processed_input[j++] = input[i];
                 }
@@ -1052,7 +1052,7 @@ int executor_execute_command_line(executor_t *executor, const char *input,
         }
     }
 
-    // Parse the input, using script filename if executing a script
+    /// Parse the input, using script filename if executing a script
     const char *source_name = executor->current_script_file
                                   ? executor->current_script_file
                                   : "<stdin>";
@@ -1067,10 +1067,10 @@ int executor_execute_command_line(executor_t *executor, const char *input,
 
     node_t *ast = parser_parse(parser);
 
-    // Check syntax check mode (set -n) - parse but don't execute
+    /// Check syntax check mode (set -n) - parse but don't execute
     if (shell_opts.syntax_check) {
         if (parser_has_error(parser)) {
-            // Display structured errors if available
+            /// Display structured errors if available
             parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
             /* Set executor error for legacy compatibility (may be NULL with new
              * system) */
@@ -1078,16 +1078,16 @@ int executor_execute_command_line(executor_t *executor, const char *input,
             if (legacy_err) {
                 set_executor_error(executor, legacy_err);
             }
-            result = 2; // Syntax error
+            result = 2; /// Syntax error
         } else {
-            result = 0; // Syntax check successful
+            result = 0; /// Syntax check successful
         }
         parser_free(parser);
         goto cleanup;
     }
 
     if (parser_has_error(parser)) {
-        // Display structured errors if available
+        /// Display structured errors if available
         parser_display_errors(parser, stderr, isatty(STDERR_FILENO));
         /* Set executor error for legacy compatibility (may be NULL with new
          * system) */
@@ -1102,7 +1102,7 @@ int executor_execute_command_line(executor_t *executor, const char *input,
 
     if (!ast) {
         parser_free(parser);
-        result = 0; // Empty command
+        result = 0; /// Empty command
         goto cleanup;
     }
 
@@ -1137,7 +1137,7 @@ char *executor_get_source_line(executor_t *executor, size_t file_line) {
     size_t line_start = 0;
     size_t i = 0;
 
-    // Walk to the start of the requested batch-relative line.
+    /// Walk to the start of the requested batch-relative line.
     while (src[i] != '\0' && current_line < batch_line) {
         if (src[i] == '\n') {
             current_line++;
@@ -1146,10 +1146,10 @@ char *executor_get_source_line(executor_t *executor, size_t file_line) {
         i++;
     }
     if (current_line != batch_line) {
-        return NULL; // Requested line is past end of batch text.
+        return NULL; /// Requested line is past end of batch text.
     }
 
-    // Find the end of the line (newline or end-of-string).
+    /// Find the end of the line (newline or end-of-string).
     size_t line_end = line_start;
     while (src[line_end] != '\0' && src[line_end] != '\n') {
         line_end++;
@@ -1181,12 +1181,12 @@ static int execute_node(executor_t *executor, node_t *node) {
         return 0;
     }
 
-    // Check syntax check mode (set -n) - don't execute any nodes
+    /// Check syntax check mode (set -n) - don't execute any nodes
     if (shell_opts.syntax_check) {
-        return 0; // Syntax check mode - don't execute
+        return 0; /// Syntax check mode - don't execute
     }
 
-    // Enhanced debug tracing
+    /// Enhanced debug tracing
     if (executor->debug) {
         printf("DEBUG: Executing node type %d\n", node->type);
         if (node->val.str) {
@@ -1194,13 +1194,13 @@ static int execute_node(executor_t *executor, node_t *node) {
         }
     }
 
-    // Advanced debug system integration
+    /// Advanced debug system integration
     DEBUG_TRACE_NODE(node, __FILE__, __LINE__);
 
-    // Check for a breakpoint at this node's source line. node->loc.line
-    // is the absolute 1-based source line (0 when the parser recorded no
-    // location); debug_check_breakpoint ignores line 0, so an unlocated
-    // node is skipped and its executable children carry the real line.
+    /// Check for a breakpoint at this node's source line. node->loc.line
+    /// is the absolute 1-based source line (0 when the parser recorded no
+    /// location); debug_check_breakpoint ignores line 0, so an unlocated
+    /// node is skipped and its executable children carry the real line.
     if (executor->in_script_execution && executor->current_script_file) {
         DEBUG_BREAKPOINT_CHECK(executor->current_script_file,
                                (int)node->loc.line);
@@ -1209,7 +1209,7 @@ static int execute_node(executor_t *executor, node_t *node) {
     switch (node->type) {
     case NODE_COMMAND: {
         int result = execute_command(executor, node);
-        // Clean up any process substitution fds after command execution
+        /// Clean up any process substitution fds after command execution
         cleanup_procsub_fds(executor);
         return result;
     }
@@ -1252,7 +1252,7 @@ static int execute_node(executor_t *executor, node_t *node) {
     case NODE_NEGATE:
         return execute_negate(executor, node);
     case NODE_VAR:
-        // Variable nodes are typically handled by their parent
+        /// Variable nodes are typically handled by their parent
         return 0;
     case NODE_ARITH_CMD:
         return execute_arithmetic_command(executor, node);
@@ -1263,10 +1263,10 @@ static int execute_node(executor_t *executor, node_t *node) {
     case NODE_ARRAY_APPEND:
         return execute_array_append(executor, node);
     case NODE_ARRAY_LITERAL:
-        // Array literals are typically handled by NODE_ARRAY_ASSIGN
+        /// Array literals are typically handled by NODE_ARRAY_ASSIGN
         return 0;
     case NODE_ARRAY_ACCESS:
-        // Array access is typically handled during variable expansion
+        /// Array access is typically handled during variable expansion
         return 0;
     case NODE_ANON_FUNCTION:
         return execute_anonymous_function(executor, node);
@@ -1304,18 +1304,19 @@ static int execute_command_list(executor_t *executor, node_t *list) {
     int last_result = 0;
     node_t *current;
 
-    // Handle NODE_COMMAND_LIST with children
+    /// Handle NODE_COMMAND_LIST with children
     if (list->type == NODE_COMMAND_LIST) {
         current = list->first_child;
     } else {
-        // Handle legacy case where list is the first command in a sibling chain
+        /// Handle legacy case where list is the first command in a sibling
+        /// chain
         current = list;
     }
 
     while (current) {
-        // Check syntax check mode (set -n) - don't execute commands
+        /// Check syntax check mode (set -n) - don't execute commands
         if (shell_opts.syntax_check) {
-            return 0; // Syntax check mode - don't execute
+            return 0; /// Syntax check mode - don't execute
         }
 
         /* Bash-style DEBUG pseudo-signal: fires BEFORE every command.
@@ -1324,7 +1325,7 @@ static int execute_command_list(executor_t *executor, node_t *list) {
 
         last_result = execute_node(executor, current);
 
-        // Check for loop control (break/continue) - stop executing list
+        /// Check for loop control (break/continue) - stop executing list
         if (executor->loop_control != LOOP_NORMAL) {
             return last_result;
         }
@@ -1351,10 +1352,10 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             return last_exit_status;
         }
 
-        // Flush stdout to prevent pipeline from picking up residual output
+        /// Flush stdout to prevent pipeline from picking up residual output
         fflush(stdout);
 
-        // Update exit status after each command in the sequence
+        /// Update exit status after each command in the sequence
         set_exit_status(last_result);
 
         if (executor->debug) {
@@ -1367,7 +1368,7 @@ static int execute_command_list(executor_t *executor, node_t *list) {
             fire_err_trap();
         }
 
-        // Handle set -e (exit_on_error): exit if command failed
+        /// Handle set -e (exit_on_error): exit if command failed
         if (shell_opts.exit_on_error && last_result != 0) {
             executor->exit_status = last_result;
             return last_result;
@@ -1412,7 +1413,7 @@ static int execute_command_dispatch(executor_t *executor, node_t *command);
 typedef struct {
     char *name;
     bool existed;
-    char *old_value; /**< strdup of prior value when existed */
+    char *old_value; ///< strdup of prior value when existed
     bool was_exported;
 } prefix_save_t;
 
@@ -1428,7 +1429,7 @@ static char *prefix_assign_name(const char *s) {
     }
     size_t n = (size_t)(eq - s);
     if (n > 0 && s[n - 1] == '+') {
-        n--; // += append
+        n--; /// += append
     }
     if (n == 0) {
         return NULL;
@@ -1493,7 +1494,7 @@ static int prefix_apply(executor_t *executor, node_t *command, bool transient,
             char *old = existed ? symtable_get_global(name) : NULL;
             symvar_flags_t fl =
                 mgr ? symtable_get_flags(mgr, name) : SYMVAR_NONE;
-            saves[idx].name = name; // ownership moves to saves
+            saves[idx].name = name; /// ownership moves to saves
             saves[idx].existed = existed;
             saves[idx].old_value = old;
             saves[idx].was_exported = (fl & SYMVAR_EXPORTED) != 0;
@@ -1513,7 +1514,7 @@ static int prefix_apply(executor_t *executor, node_t *command, bool transient,
             }
             return st;
         }
-        symtable_export_global(name); // setenv: child/env-readers see it
+        symtable_export_global(name); /// setenv: child/env-readers see it
 
         if (transient) {
             idx++;
@@ -1529,7 +1530,7 @@ static int prefix_apply(executor_t *executor, node_t *command, bool transient,
     return 0;
 }
 
-// Undo a transient prefix_apply() and free the snapshot array.
+/// Undo a transient prefix_apply() and free the snapshot array.
 static void prefix_restore_and_free(prefix_save_t *saves, int n) {
     if (!saves) {
         return;
@@ -1579,19 +1580,19 @@ static int execute_command(executor_t *executor, node_t *command) {
 }
 
 static int execute_command_inner(executor_t *executor, node_t *command) {
-    // command non-null and NODE_COMMAND is guaranteed by the wrapper.
+    /// command non-null and NODE_COMMAND is guaranteed by the wrapper.
 
-    // Reset expansion error flags for this command
+    /// Reset expansion error flags for this command
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
 
-    // Check for assignment (legacy lone-assignment shape: val.str is
-    // "var=value" with no NODE_ASSIGN children).
+    /// Check for assignment (legacy lone-assignment shape: val.str is
+    /// "var=value" with no NODE_ASSIGN children).
     if (command->val.str && is_assignment(command->val.str)) {
         return execute_assignment(executor, command->val.str, command->loc);
     }
 
-    // POSIX cmd_prefix: NODE_ASSIGN children precede the command word.
+    /// POSIX cmd_prefix: NODE_ASSIGN children precede the command word.
     int n_prefix = 0;
     for (node_t *c = command->first_child; c; c = c->next_sibling) {
         if (c->type == NODE_ASSIGN) {
@@ -1600,8 +1601,8 @@ static int execute_command_inner(executor_t *executor, node_t *command) {
     }
 
     if (n_prefix > 0 && command->val.str == NULL) {
-        // Pure prefix, no command word: `x=1`, `x=1 >file`. POSIX:
-        // redirections are performed, then assignments persist.
+        /// Pure prefix, no command word: `x=1`, `x=1 >file`. POSIX:
+        /// redirections are performed, then assignments persist.
         bool have_redir = count_redirections(command) > 0;
         redirection_state_t rs;
         if (have_redir) {
@@ -1621,10 +1622,10 @@ static int execute_command_inner(executor_t *executor, node_t *command) {
     }
 
     if (n_prefix > 0) {
-        // Command word present: apply prefix transiently, dispatch, then
-        // restore. An external command forks (its child inherits the
-        // exported vars via environ); the parent-side restore reverts the
-        // shell's own view for all command kinds.
+        /// Command word present: apply prefix transiently, dispatch, then
+        /// restore. An external command forks (its child inherits the
+        /// exported vars via environ); the parent-side restore reverts the
+        /// shell's own view for all command kinds.
         prefix_save_t *saves = NULL;
         int nsaves = 0;
         int st = prefix_apply(executor, command, /*transient=*/true, &saves,
@@ -1644,30 +1645,30 @@ static int execute_command_inner(executor_t *executor, node_t *command) {
 
 static int execute_command_dispatch(executor_t *executor, node_t *command) {
 
-    // Note: Parameter expansions like ${CMD} in command position are handled
-    // by build_argv_from_ast() which calls expand_if_needed() on the command
-    // name. The expanded result becomes the command to execute, matching
-    // bash/zsh behavior. Previously this code had an early-return that
-    // discarded the expansion result without executing - that was a bug.
+    /// Note: Parameter expansions like ${CMD} in command position are handled
+    /// by build_argv_from_ast() which calls expand_if_needed() on the command
+    /// name. The expanded result becomes the command to execute, matching
+    /// bash/zsh behavior. Previously this code had an early-return that
+    /// discarded the expansion result without executing - that was a bug.
 
-    // Check if command has redirections
+    /// Check if command has redirections
     bool has_redirections = count_redirections(command) > 0;
 
-    // Build argument vector (excluding redirection nodes)
+    /// Build argument vector (excluding redirection nodes)
     int argc;
     char **argv = build_argv_from_ast(executor, command, &argc);
     if (!argv || argc == 0) {
         return 1;
     }
 
-    // Parser-internal array-literal sentinel (\x1F) housekeeping:
-    // the parser prefixes any unquoted `name=(...)` argv element with
-    // \x1F so assignment-aware builtins (local, declare, typeset,
-    // readonly, export) can distinguish it from a quoted scalar.
-    // External commands and non-assignment builtins must not see
-    // that internal byte. Strip it from EVERY argv element when the
-    // command is NOT one of the assignment-aware set; the targeted
-    // builtins handle the sentinel themselves.
+    /// Parser-internal array-literal sentinel (\x1F) housekeeping:
+    /// the parser prefixes any unquoted `name=(...)` argv element with
+    /// \x1F so assignment-aware builtins (local, declare, typeset,
+    /// readonly, export) can distinguish it from a quoted scalar.
+    /// External commands and non-assignment builtins must not see
+    /// that internal byte. Strip it from EVERY argv element when the
+    /// command is NOT one of the assignment-aware set; the targeted
+    /// builtins handle the sentinel themselves.
     if (argc > 0 && argv[0]) {
         const char *cmd = argv[0];
         bool sentinel_aware =
@@ -1677,16 +1678,16 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         if (!sentinel_aware) {
             for (int i = 0; i < argc; i++) {
                 if (argv[i] && argv[i][0] == '\x1F') {
-                    // Shift the string left by one to drop the prefix
-                    // byte; the allocation came from build_argv_from_ast
-                    // and is owned by us, so an in-place shift is safe.
+                    /// Shift the string left by one to drop the prefix
+                    /// byte; the allocation came from build_argv_from_ast
+                    /// and is owned by us, so an in-place shift is safe.
                     memmove(argv[i], argv[i] + 1, strlen(argv[i]));
                 }
             }
         }
     }
 
-    // Privileged mode security check
+    /// Privileged mode security check
     if (argc > 0 && !is_privileged_command_allowed(argv[0])) {
         executor_error_report(
             executor, SHELL_ERR_PERMISSION_DENIED, command->loc,
@@ -1698,9 +1699,9 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         return 1;
     }
 
-    // Check for expansion errors (like arithmetic division by zero)
+    /// Check for expansion errors (like arithmetic division by zero)
     if (executor->expansion_error) {
-        // Free argv before returning
+        /// Free argv before returning
         for (int i = 0; i < argc; i++) {
             free(argv[i]);
         }
@@ -1708,17 +1709,17 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         return executor->expansion_exit_status;
     }
 
-    // Note: Parameter expansion arguments are already expanded by
-    // build_argv_from_ast() via expand_if_needed(). The expanded values
-    // are in argv and will be passed to the command. No need for
-    // special handling here - let the command execute normally.
+    /// Note: Parameter expansion arguments are already expanded by
+    /// build_argv_from_ast() via expand_if_needed(). The expanded values
+    /// are in argv and will be passed to the command. No need for
+    /// special handling here - let the command execute normally.
 
-    // Check for stderr redirection pattern (2>/dev/null or 2> /dev/null)
+    /// Check for stderr redirection pattern (2>/dev/null or 2> /dev/null)
     bool redirect_stderr = false;
     char **filtered_argv = NULL;
     int filtered_argc = 0;
 
-    // Look for 2>/dev/null pattern in arguments
+    /// Look for 2>/dev/null pattern in arguments
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "2>/dev/null") == 0) {
             redirect_stderr = true;
@@ -1732,10 +1733,10 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
     }
 
     if (redirect_stderr) {
-        // Create filtered argv without redirection tokens
+        /// Create filtered argv without redirection tokens
         filtered_argv = malloc((argc + 1) * sizeof(char *));
         if (!filtered_argv) {
-            // Free original argv and return error
+            /// Free original argv and return error
             for (int i = 0; i < argc; i++) {
                 free(argv[i]);
             }
@@ -1746,12 +1747,12 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         int j = 0;
         for (int i = 0; i < argc; i++) {
             if (strcmp(argv[i], "2>/dev/null") == 0) {
-                // Skip this token
+                /// Skip this token
                 continue;
             } else if (i + 2 < argc && strcmp(argv[i], "2") == 0 &&
                        strcmp(argv[i + 1], ">") == 0 &&
                        strcmp(argv[i + 2], "/dev/null") == 0) {
-                // Skip these three tokens
+                /// Skip these three tokens
                 i += 2;
                 continue;
             } else {
@@ -1777,12 +1778,12 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         }
     }
 
-    // Check for alias expansion and rebuild argv if needed
+    /// Check for alias expansion and rebuild argv if needed
     char *alias_expanded = lookup_alias(filtered_argv[0]);
     if (alias_expanded) {
-        // Reconstruct original command for expansion
+        /// Reconstruct original command for expansion
         char *original_command = NULL;
-        size_t total_len = 1; // for null terminator
+        size_t total_len = 1; /// for null terminator
 
         for (int i = 0; i < filtered_argc; i++) {
             total_len += strlen(filtered_argv[i]) + (i > 0 ? 1 : 0);
@@ -1796,16 +1797,16 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                 strcat(original_command, filtered_argv[i]);
             }
 
-            // Expand the full command line with recursive expansion
+            /// Expand the full command line with recursive expansion
             char *recursive_expanded =
-                expand_aliases_recursive(filtered_argv[0], 10); // max depth 10
+                expand_aliases_recursive(filtered_argv[0], 10); /// max depth 10
             char *expanded_command = NULL;
 
             if (recursive_expanded) {
-                // If recursive expansion succeeded, use it to build full
-                // command
+                /// If recursive expansion succeeded, use it to build full
+                /// command
                 if (filtered_argc > 1) {
-                    // Add original arguments to recursively expanded command
+                    /// Add original arguments to recursively expanded command
                     size_t len = strlen(recursive_expanded) + 1;
                     for (int i = 1; i < filtered_argc; i++) {
                         len += strlen(filtered_argv[i]) + 1;
@@ -1823,16 +1824,16 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                 }
                 free(recursive_expanded);
             } else {
-                // Fall back to simple first-word expansion
+                /// Fall back to simple first-word expansion
                 expanded_command = expand_first_word_alias(original_command);
             }
             if (expanded_command &&
                 strcmp(expanded_command, original_command) != 0) {
-                // Create new argv array for expanded command
+                /// Create new argv array for expanded command
                 char **new_argv =
-                    malloc(256 * sizeof(char *)); // reasonable limit
+                    malloc(256 * sizeof(char *)); /// reasonable limit
                 if (new_argv) {
-                    // Tokenize expanded command into new argv
+                    /// Tokenize expanded command into new argv
                     char *expanded_copy = strdup(expanded_command);
                     char *token = strtok(expanded_copy, " ");
                     int new_argc = 0;
@@ -1844,10 +1845,10 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                     }
                     new_argv[new_argc] = NULL;
 
-                    // Only replace if we successfully created the new argv
+                    /// Only replace if we successfully created the new argv
                     if (new_argc > 0) {
-                        // Free old argv only if it's not the same as original
-                        // argv
+                        /// Free old argv only if it's not the same as original
+                        /// argv
                         if (filtered_argv != argv) {
                             for (int i = 0; i < filtered_argc; i++) {
                                 free(filtered_argv[i]);
@@ -1858,7 +1859,7 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                         filtered_argv = new_argv;
                         filtered_argc = new_argc;
                     } else {
-                        // Failed to create new argv, clean up
+                        /// Failed to create new argv, clean up
                         free(new_argv);
                     }
 
@@ -1873,10 +1874,10 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
 
     int result;
 
-    // Get debug context for profiling and frame management
+    /// Get debug context for profiling and frame management
     const char *command_name = filtered_argv[0];
 
-    // Push debug frame and start profiling for this command
+    /// Push debug frame and start profiling for this command
     if (g_debug_context && g_debug_context->enabled) {
         debug_push_frame(g_debug_context, command_name, NULL, 0);
 
@@ -1886,12 +1887,12 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         }
     }
 
-    // Zsh-style autoload: if the name was declared via `autoload NAME`
-    // and the function isn't yet defined, try to resolve it now via
-    // fpath. On success the function joins the live table and the
-    // subsequent is_function_defined check picks it up. Done BEFORE
-    // builtin lookup so an autoloadable name doesn't get shadowed by
-    // a same-named builtin the user explicitly chose to override.
+    /// Zsh-style autoload: if the name was declared via `autoload NAME`
+    /// and the function isn't yet defined, try to resolve it now via
+    /// fpath. On success the function joins the live table and the
+    /// subsequent is_function_defined check picks it up. Done BEFORE
+    /// builtin lookup so an autoloadable name doesn't get shadowed by
+    /// a same-named builtin the user explicitly chose to override.
     if (!is_function_defined(executor, filtered_argv[0])) {
         (void)autoload_try_resolve(executor, filtered_argv[0]);
     }
@@ -1901,30 +1902,30 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
             execute_function_call(executor, filtered_argv[0], filtered_argv,
                                   filtered_argc, command->loc);
     } else if (is_builtin_command(filtered_argv[0])) {
-        // For builtin commands with stdout redirections, check if stdout is
-        // captured. Only fork for "pure" builtins that don't modify shell
-        // state.
+        /// For builtin commands with stdout redirections, check if stdout is
+        /// captured. Only fork for "pure" builtins that don't modify shell
+        /// state.
         if (has_redirections && has_stdout_redirections(command) &&
             is_stdout_captured() && builtin_can_fork(filtered_argv[0])) {
-            // When stdout is captured externally and command has stdout
-            // redirections, use child process to avoid file descriptor
-            // interference (only for pure builtins)
+            /// When stdout is captured externally and command has stdout
+            /// redirections, use child process to avoid file descriptor
+            /// interference (only for pure builtins)
             result = execute_builtin_with_captured_stdout(
                 executor, filtered_argv, command);
         } else {
-            // Normal case: handle redirections in parent process
+            /// Normal case: handle redirections in parent process
             redirection_state_t redir_state;
             if (has_redirections) {
                 save_file_descriptors(&redir_state);
                 int redir_result = setup_redirections(executor, command);
                 if (redir_result != 0) {
                     restore_file_descriptors(&redir_state);
-                    // Free argv
+                    /// Free argv
                     for (int i = 0; i < argc; i++) {
                         free(argv[i]);
                     }
                     free(argv);
-                    // Free filtered argv if separately allocated
+                    /// Free filtered argv if separately allocated
                     if (filtered_argv != NULL && filtered_argv != argv) {
                         for (int i = 0; i < filtered_argc; i++) {
                             free(filtered_argv[i]);
@@ -1938,25 +1939,25 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
             result =
                 execute_builtin_command(executor, filtered_argv, command->loc);
 
-            // Flush output streams after builtin execution
-            // This ensures output appears immediately, especially under
-            // valgrind/piping
+            /// Flush output streams after builtin execution
+            /// This ensures output appears immediately, especially under
+            /// valgrind/piping
             fflush(stdout);
             fflush(stderr);
 
-            // Restore file descriptors after builtin execution
-            // EXCEPT for 'exec' builtin - its redirections are permanent
+            /// Restore file descriptors after builtin execution
+            /// EXCEPT for 'exec' builtin - its redirections are permanent
             if (has_redirections &&
                 !(filtered_argv[0] && strcmp(filtered_argv[0], "exec") == 0)) {
                 restore_file_descriptors(&redir_state);
             }
         }
     } else {
-        // Check auto_cd before attempting external command execution
+        /// Check auto_cd before attempting external command execution
         int auto_cd_enabled = symtable_get_global_int("AUTO_CD", 0);
         if (auto_cd_enabled && argc > 0 && argv[0]) {
             struct stat st;
-            // Check if the command is actually a directory
+            /// Check if the command is actually a directory
             if (stat(argv[0], &st) == 0 && S_ISDIR(st.st_mode)) {
                 /**
                  * @brief Save old directory for event firing
@@ -1966,9 +1967,9 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                  */
                 char *old_pwd = getcwd(NULL, 0);
 
-                // Auto-cd to the directory
+                /// Auto-cd to the directory
                 if (chdir(argv[0]) == 0) {
-                    // Successfully changed directory, update PWD
+                    /// Successfully changed directory, update PWD
                     char *new_pwd = getcwd(NULL, 0);
                     if (new_pwd) {
                         symtable_set_global("PWD", new_pwd);
@@ -1987,9 +1988,9 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
 
                         free(new_pwd);
                     }
-                    result = 0; // Success
+                    result = 0; /// Success
                 } else {
-                    // Failed to change directory, show error
+                    /// Failed to change directory, show error
                     shell_error_t *error = shell_error_create(
                         SHELL_ERR_FILE_NOT_FOUND, SHELL_SEVERITY_ERROR,
                         executor_current_loc(executor), "cd: %s: %s", argv[0],
@@ -2003,24 +2004,24 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                     free(old_pwd);
                 }
             } else {
-                // Not a directory, proceed with normal command execution
+                /// Not a directory, proceed with normal command execution
                 goto normal_execution;
             }
         } else {
-        // Auto-cd disabled, proceed with normal command execution
+        /// Auto-cd disabled, proceed with normal command execution
         normal_execution:
-            // Check if command exists first, offer auto-correction if not
-            // Only do interactive autocorrect if:
-            // 1. spell_correction is enabled
-            // 2. autocorrect is enabled
-            // 3. interactive prompts are enabled (otherwise no point in
-            // searching)
-            // 4. stdin is a tty (user can actually respond)
+            /// Check if command exists first, offer auto-correction if not
+            /// Only do interactive autocorrect if:
+            /// 1. spell_correction is enabled
+            /// 2. autocorrect is enabled
+            /// 3. interactive prompts are enabled (otherwise no point in
+            /// searching)
+            /// 4. stdin is a tty (user can actually respond)
             if (config.spell_correction && autocorrect_is_enabled() &&
                 config.autocorrect_interactive && isatty(STDIN_FILENO)) {
-                // First, check if the command actually exists
+                /// First, check if the command actually exists
                 if (!autocorrect_command_exists(executor, filtered_argv[0])) {
-                    // Command doesn't exist, try auto-correction
+                    /// Command doesn't exist, try auto-correction
                     correction_results_t correction_results;
                     int suggestions = autocorrect_find_suggestions(
                         executor, filtered_argv[0], &correction_results);
@@ -2029,15 +2030,15 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                         char selected_command[MAX_COMMAND_LENGTH];
                         if (autocorrect_prompt_user(&correction_results,
                                                     selected_command)) {
-                            // User selected a correction, replace the command
+                            /// User selected a correction, replace the command
                             free(filtered_argv[0]);
                             filtered_argv[0] = strdup(selected_command);
 
-                            // Learn the corrected command
+                            /// Learn the corrected command
                             autocorrect_learn_command(selected_command);
 
-                            // Re-check if it's a builtin or function after
-                            // correction
+                            /// Re-check if it's a builtin or function after
+                            /// correction
                             if (is_builtin_command(filtered_argv[0])) {
                                 result = execute_builtin_command(
                                     executor, filtered_argv, command->loc);
@@ -2049,44 +2050,44 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
                                     executor, filtered_argv[0], filtered_argv,
                                     filtered_argc, command->loc);
                             } else {
-                                // Execute the corrected external command
+                                /// Execute the corrected external command
                                 result = execute_external_command_with_setup(
                                     executor, filtered_argv, redirect_stderr,
                                     command);
                             }
                         } else {
-                            // User declined correction, show original error
-                            result = 127; // Command not found
+                            /// User declined correction, show original error
+                            result = 127; /// Command not found
                         }
                     } else {
-                        // No suggestions or interactive prompts disabled
+                        /// No suggestions or interactive prompts disabled
                         result = execute_external_command_with_setup(
                             executor, filtered_argv, redirect_stderr, command);
                     }
 
-                    // Clean up correction results
+                    /// Clean up correction results
                     autocorrect_free_results(&correction_results);
                 } else {
-                    // Command exists, execute normally
+                    /// Command exists, execute normally
                     result = execute_external_command_with_setup(
                         executor, filtered_argv, redirect_stderr, command);
                 }
             } else {
-                // Auto-correction disabled, execute normally
+                /// Auto-correction disabled, execute normally
                 result = execute_external_command_with_setup(
                     executor, filtered_argv, redirect_stderr, command);
             }
         }
     }
 
-    // Free argv
+    /// Free argv
     for (int i = 0; i < argc; i++) {
         free(argv[i]);
     }
     free(argv);
 
-    // Free filtered argv if it was separately allocated (from redirect or alias
-    // expansion)
+    /// Free filtered argv if it was separately allocated (from redirect or
+    /// alias expansion)
     if (filtered_argv != NULL && filtered_argv != argv) {
         for (int i = 0; i < filtered_argc; i++) {
             free(filtered_argv[i]);
@@ -2094,7 +2095,7 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         free(filtered_argv);
     }
 
-    // End profiling and pop debug frame for this command
+    /// End profiling and pop debug frame for this command
     if (g_debug_context && g_debug_context->enabled) {
         if (g_debug_context->profile_enabled) {
             debug_profile_function_exit(g_debug_context, command_name);
@@ -2102,10 +2103,10 @@ static int execute_command_dispatch(executor_t *executor, node_t *command) {
         debug_pop_frame(g_debug_context);
     }
 
-    // Update exit status for $? variable
+    /// Update exit status for $? variable
     set_exit_status(result);
 
-    // Profile function exit
+    /// Profile function exit
     DEBUG_PROFILE_EXIT("execute_command");
 
     return result;
@@ -2187,8 +2188,8 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         return 1;
     }
 
-    // N-1 pipes connect N stages. pipes[i] connects stage i (writer) to stage
-    // i+1 (reader).
+    /// N-1 pipes connect N stages. pipes[i] connects stage i (writer) to stage
+    /// i+1 (reader).
     size_t npipes = nstages - 1;
     int (*pipes)[2] = calloc(npipes, sizeof(*pipes));
     if (!pipes) {
@@ -2231,7 +2232,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
             executor_error_add(executor, SHELL_ERR_FORK_FAILED, pipeline->loc,
                                "failed to fork for pipeline: %s",
                                strerror(errno));
-            // Close all pipes and reap any children already forked.
+            /// Close all pipes and reap any children already forked.
             for (size_t j = 0; j < npipes; j++) {
                 close(pipes[j][0]);
                 close(pipes[j][1]);
@@ -2247,8 +2248,8 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         }
 
         if (pid == 0) {
-            // Child: wire stdin from the previous pipe and stdout (plus stderr
-            // if |&) to the next.
+            /// Child: wire stdin from the previous pipe and stdout (plus stderr
+            /// if |&) to the next.
             if (i > 0) {
                 dup2(pipes[i - 1][0], STDIN_FILENO);
             }
@@ -2258,7 +2259,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
                     dup2(pipes[i][1], STDERR_FILENO);
                 }
             }
-            // Close every pipe fd; dup2 already preserved what we need.
+            /// Close every pipe fd; dup2 already preserved what we need.
             for (size_t j = 0; j < npipes; j++) {
                 close(pipes[j][0]);
                 close(pipes[j][1]);
@@ -2274,7 +2275,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         pids[i] = pid;
     }
 
-    // Parent: close all pipes so children see EOF as their stages exit.
+    /// Parent: close all pipes so children see EOF as their stages exit.
     for (size_t i = 0; i < npipes; i++) {
         close(pipes[i][0]);
         close(pipes[i][1]);
@@ -2283,7 +2284,7 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
 
     int *stage_exit = calloc(nstages, sizeof(int));
     if (!stage_exit) {
-        // Reap children before giving up so we don't leak zombies.
+        /// Reap children before giving up so we don't leak zombies.
         for (size_t i = 0; i < nstages; i++) {
             while (waitpid(pids[i], NULL, 0) == -1 && errno == EINTR)
                 ;
@@ -2315,10 +2316,10 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         }
     }
 
-    // pipeline-diagnostic: queue a structured error for each non-zero stage so
-    // tools can see exactly which junction failed without parsing exit codes
-    // out of the pipefail collapse.  The overall pipeline exit becomes strict
-    // (rightmost non-zero) under this mode regardless of pipefail.
+    /// pipeline-diagnostic: queue a structured error for each non-zero stage so
+    /// tools can see exactly which junction failed without parsing exit codes
+    /// out of the pipefail collapse.  The overall pipeline exit becomes strict
+    /// (rightmost non-zero) under this mode regardless of pipefail.
     bool diag = is_pipeline_diagnostic_enabled();
     if (diag) {
         for (size_t i = 0; i < nstages; i++) {
@@ -2334,9 +2335,9 @@ static int execute_pipeline(executor_t *executor, node_t *pipeline) {
         }
     }
 
-    // Publish per-stage exit codes under both polyglot names so callers can
-    // diagnose which stage failed.  Both arrays are 0-indexed; the data is
-    // identical.
+    /// Publish per-stage exit codes under both polyglot names so callers can
+    /// diagnose which stage failed.  Both arrays are 0-indexed; the data is
+    /// identical.
     {
         array_value_t *bash_arr = symtable_array_create(false);
         array_value_t *lush_arr = symtable_array_create(false);
@@ -2390,7 +2391,7 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
     while (current) {
         last_result = execute_node(executor, current);
 
-        // Check for loop control (break/continue) - stop executing chain
+        /// Check for loop control (break/continue) - stop executing chain
         if (executor->loop_control != LOOP_NORMAL) {
             return last_result;
         }
@@ -2408,11 +2409,11 @@ static int execute_command_chain(executor_t *executor, node_t *first_command) {
             fire_err_trap();
         }
 
-        // Handle set -e (exit_on_error): exit if command failed and not part of
-        // conditional
+        /// Handle set -e (exit_on_error): exit if command failed and not part
+        /// of conditional
         if (shell_opts.exit_on_error && last_result != 0) {
-            // Don't exit on error for certain contexts (conditionals,
-            // pipelines, etc.) For now, implement basic exit-on-error behavior
+            /// Don't exit on error for certain contexts (conditionals,
+            /// pipelines, etc.) For now, implement basic exit-on-error behavior
             executor->exit_status = last_result;
             return last_result;
         }
@@ -2441,7 +2442,7 @@ static int execute_if(executor_t *executor, node_t *if_node) {
         return 1;
     }
 
-    // Check for trailing redirections on the if statement
+    /// Check for trailing redirections on the if statement
     bool has_redirections = count_redirections(if_node) > 0;
     redirection_state_t redir_state;
 
@@ -2456,7 +2457,7 @@ static int execute_if(executor_t *executor, node_t *if_node) {
 
     int result = 0;
 
-    // Traverse through all children of the if statement
+    /// Traverse through all children of the if statement
     node_t *current = if_node->first_child;
     if (!current || is_redirection_node(current)) {
         executor_error_add(executor, SHELL_ERR_MALFORMED_CONSTRUCT,
@@ -2465,11 +2466,11 @@ static int execute_if(executor_t *executor, node_t *if_node) {
         goto cleanup;
     }
 
-    // First child is always the if condition
+    /// First child is always the if condition
     node_t *condition = current;
     current = current->next_sibling;
 
-    // Skip any redirection nodes to find then body
+    /// Skip any redirection nodes to find then body
     while (current && is_redirection_node(current)) {
         current = current->next_sibling;
     }
@@ -2482,26 +2483,26 @@ static int execute_if(executor_t *executor, node_t *if_node) {
         goto cleanup;
     }
 
-    // Execute the initial if condition
+    /// Execute the initial if condition
     int condition_result = execute_node(executor, condition);
 
-    if (condition_result == 0) { // Success in shell terms
-        // Execute the then body (second child)
+    if (condition_result == 0) { /// Success in shell terms
+        /// Execute the then body (second child)
         result = execute_node(executor, current);
         goto cleanup;
     }
 
-    // Move to next child (elif condition or else body)
+    /// Move to next child (elif condition or else body)
     current = current->next_sibling;
 
-    // Skip any redirection nodes
+    /// Skip any redirection nodes
     while (current && is_redirection_node(current)) {
         current = current->next_sibling;
     }
 
-    // Process elif clauses - they come in pairs (condition, body)
+    /// Process elif clauses - they come in pairs (condition, body)
     while (current && current->next_sibling) {
-        // Skip redirection nodes
+        /// Skip redirection nodes
         node_t *next = current->next_sibling;
         while (next && is_redirection_node(next)) {
             next = next->next_sibling;
@@ -2509,23 +2510,23 @@ static int execute_if(executor_t *executor, node_t *if_node) {
         if (!next)
             break;
 
-        // Execute elif condition
+        /// Execute elif condition
         condition_result = execute_node(executor, current);
 
-        if (condition_result == 0) { // Success in shell terms
-            // Execute elif body (next sibling)
+        if (condition_result == 0) { /// Success in shell terms
+            /// Execute elif body (next sibling)
             result = execute_node(executor, next);
             goto cleanup;
         }
 
-        // Move past the elif body to the next elif condition or else body
+        /// Move past the elif body to the next elif condition or else body
         current = next->next_sibling;
         while (current && is_redirection_node(current)) {
             current = current->next_sibling;
         }
     }
 
-    // Handle final else clause if present (no condition, just body)
+    /// Handle final else clause if present (no condition, just body)
     if (current && !is_redirection_node(current)) {
         result = execute_node(executor, current);
         goto cleanup;
@@ -2534,7 +2535,7 @@ static int execute_if(executor_t *executor, node_t *if_node) {
     result = 0;
 
 cleanup:
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
@@ -2557,10 +2558,10 @@ cleanup:
  * and match bash/zsh exactly.
  */
 typedef struct {
-    int streak;            /**< consecutive non-zero body exits */
-    int last_status;       /**< last non-zero status seen */
-    struct timespec start; /**< monotonic clock at first non-zero of streak */
-    bool armed;            /**< streak start time captured */
+    int streak;            ///< consecutive non-zero body exits
+    int last_status;       ///< last non-zero status seen
+    struct timespec start; ///< monotonic clock at first non-zero of streak
+    bool armed;            ///< streak start time captured
 } loop_monitor_t;
 
 static void loop_monitor_init(loop_monitor_t *m) {
@@ -2596,7 +2597,7 @@ static bool loop_monitor_check(loop_monitor_t *m, int body_status) {
     int n_threshold = config.loop_failure_streak;
     int t_threshold = config.loop_failure_seconds;
     if (n_threshold <= 0) {
-        // heuristic disabled
+        /// heuristic disabled
         return false;
     }
     if (body_status == 0) {
@@ -2641,11 +2642,11 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     node_t *condition = while_node->first_child;
     node_t *body = condition ? condition->next_sibling : NULL;
 
-    // Skip past body to find any non-redirection node issues
-    // Body might be followed by redirection nodes
+    /// Skip past body to find any non-redirection node issues
+    /// Body might be followed by redirection nodes
     if (body && is_redirection_node(body)) {
-        // If what we think is body is a redirection, we have malformed
-        // structure
+        /// If what we think is body is a redirection, we have malformed
+        /// structure
         executor_error_add(executor, SHELL_ERR_MALFORMED_CONSTRUCT,
                            while_node->loc, "malformed while loop");
         return 1;
@@ -2664,10 +2665,10 @@ static int execute_while(executor_t *executor, node_t *while_node) {
     bool errexit_tripped = false;
     int iteration = 0;
 
-    // Push loop context for error reporting (Phase 3)
+    /// Push loop context for error reporting (Phase 3)
     executor_push_context(executor, while_node->loc, "in while loop");
 
-    // Check for trailing redirections on the while loop
+    /// Check for trailing redirections on the while loop
     bool has_redirections = count_redirections(while_node) > 0;
     redirection_state_t redir_state;
 
@@ -2681,33 +2682,33 @@ static int execute_while(executor_t *executor, node_t *while_node) {
         }
     }
 
-    // Increment loop depth - enables break/continue builtins
+    /// Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
     for (;;) {
-        // Execute condition
+        /// Execute condition
         int condition_result = execute_node(executor, condition);
 
         if (executor->debug) {
             printf("DEBUG: WHILE condition result: %d\n", condition_result);
         }
 
-        // If condition fails, exit loop
+        /// If condition fails, exit loop
         if (condition_result != 0) {
             break;
         }
 
-        // Execute body
+        /// Execute body
         last_result = execute_command_chain(executor, body);
         iteration++;
 
-        // Check for break/continue
+        /// Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
             executor->loop_control = LOOP_NORMAL;
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
-            // Continue to next iteration (just reset and loop again)
+            /// Continue to next iteration (just reset and loop again)
         }
 
         /* `return` inside the body: stop iterating, propagate the
@@ -2726,21 +2727,21 @@ static int execute_while(executor_t *executor, node_t *while_node) {
             break;
         }
 
-        // POSIX-required shell abort fired from inside the body.
+        /// POSIX-required shell abort fired from inside the body.
         if (executor->shell_exit_requested) {
             break;
         }
     }
 
-    // Decrement loop depth before returning
+    /// Decrement loop depth before returning
     executor->loop_depth--;
 
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
 
-    // Pop loop context
+    /// Pop loop context
     executor_pop_context(executor);
 
     if (errexit_tripped) {
@@ -2798,7 +2799,7 @@ static int execute_until(executor_t *executor, node_t *until_node) {
     bool errexit_tripped = false;
     int iteration = 0;
 
-    // Check for trailing redirections on the until loop
+    /// Check for trailing redirections on the until loop
     bool has_redirections = count_redirections(until_node) > 0;
     redirection_state_t redir_state;
 
@@ -2811,34 +2812,34 @@ static int execute_until(executor_t *executor, node_t *until_node) {
         }
     }
 
-    // Increment loop depth - enables break/continue builtins
+    /// Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
     for (;;) {
-        // Execute condition
+        /// Execute condition
         int condition_result = execute_node(executor, condition);
 
         if (executor->debug) {
             printf("DEBUG: UNTIL condition result: %d\n", condition_result);
         }
 
-        // If condition succeeds (returns 0), exit loop
-        // This is the key difference from while loop
+        /// If condition succeeds (returns 0), exit loop
+        /// This is the key difference from while loop
         if (condition_result == 0) {
             break;
         }
 
-        // Execute body
+        /// Execute body
         last_result = execute_command_chain(executor, body);
         iteration++;
 
-        // Check for break/continue
+        /// Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
             executor->loop_control = LOOP_NORMAL;
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
-            // Continue to next iteration
+            /// Continue to next iteration
         }
 
         /* `return` inside the body: stop iterating, propagate the
@@ -2857,21 +2858,21 @@ static int execute_until(executor_t *executor, node_t *until_node) {
             break;
         }
 
-        // POSIX-required shell abort fired from inside the body.
+        /// POSIX-required shell abort fired from inside the body.
         if (executor->shell_exit_requested) {
             break;
         }
     }
 
-    // Decrement loop depth before returning
+    /// Decrement loop depth before returning
     executor->loop_depth--;
 
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
 
-    // Pop error context
+    /// Pop error context
     executor_pop_context(executor);
 
     if (errexit_tripped) {
@@ -3082,7 +3083,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
         return 1;
     }
 
-    // Check for trailing redirections on the for loop
+    /// Check for trailing redirections on the for loop
     bool has_redirections = count_redirections(for_node) > 0;
     redirection_state_t redir_state;
 
@@ -3095,22 +3096,22 @@ static int execute_for(executor_t *executor, node_t *for_node) {
         }
     }
 
-    // Push loop scope
+    /// Push loop scope
     if (symtable_push_scope(executor->symtable, SCOPE_LOOP, "for-loop") != 0) {
         executor_error_add(executor, SHELL_ERR_SCOPE_ERROR, for_node->loc,
                            "failed to create loop scope");
         return 1;
     }
 
-    // Notify debug system we're entering a loop
+    /// Notify debug system we're entering a loop
     if (g_debug_context && g_debug_context->enabled) {
         debug_enter_loop(g_debug_context, "for", var_name, NULL);
     }
 
-    // Increment loop depth - enables break/continue builtins
+    /// Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
-    // Push error context for structured error reporting
+    /// Push error context for structured error reporting
     executor_push_context(executor, for_node->loc, "in for loop over '%s'",
                           var_name);
 
@@ -3121,11 +3122,11 @@ static int execute_for(executor_t *executor, node_t *for_node) {
     bool errexit_tripped = false;
     int iteration = 0;
 
-    // Build expanded word list for iteration
+    /// Build expanded word list for iteration
     char **expanded_words = NULL;
     int word_count = 0;
 
-    // Process each word in the word list, expanding and splitting
+    /// Process each word in the word list, expanding and splitting
     if (word_list && word_list->first_child) {
         node_t *word = word_list->first_child;
         while (word) {
@@ -3137,13 +3138,13 @@ static int execute_for(executor_t *executor, node_t *for_node) {
             int normal_wc_start = -1;
             bool word_globbable = false;
             if (word->val.str) {
-                // Special handling for "$@" to preserve word boundaries
+                /// Special handling for "$@" to preserve word boundaries
                 if (strcmp(word->val.str, "\"$@\"") == 0 ||
                     strcmp(word->val.str, "$@") == 0) {
-                    // Handle quoted "$@" - preserve word boundaries
-                    // Check if we're in a function scope
+                    /// Handle quoted "$@" - preserve word boundaries
+                    /// Check if we're in a function scope
                     if (symtable_in_function_scope(executor->symtable)) {
-                        // In function scope - use local positional parameters
+                        /// In function scope - use local positional parameters
                         char *argc_str =
                             symtable_get_var(executor->symtable, "#");
                         int func_argc = argc_str ? atoi(argc_str) : 0;
@@ -3173,7 +3174,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                             }
                         }
                     } else {
-                        // Not in function scope - use global shell_argv
+                        /// Not in function scope - use global shell_argv
                         for (int i = 1; i < shell_argc; i++) {
                             if (shell_argv[i]) {
                                 expanded_words =
@@ -3229,15 +3230,15 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                         continue;
                     }
 
-                    // Normal expansion and splitting for other words.
-                    // Record the start index and quotedness so the
-                    // words produced below can be pathname-expanded.
+                    /// Normal expansion and splitting for other words.
+                    /// Record the start index and quotedness so the
+                    /// words produced below can be pathname-expanded.
                     normal_wc_start = word_count;
                     word_globbable = (word->type != NODE_STRING_LITERAL &&
                                       word->type != NODE_STRING_EXPANDABLE);
                     char *expanded = expand_if_needed(executor, word->val.str);
                     if (expanded) {
-                        // Check for brace expansion first
+                        /// Check for brace expansion first
                         if (needs_brace_expansion(expanded)) {
                             int brace_count;
                             char **brace_results =
@@ -3254,7 +3255,7 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                                 return 1;
                             }
                             if (brace_results) {
-                                // Add each brace expansion result
+                                /// Add each brace expansion result
                                 for (int b = 0; b < brace_count; b++) {
                                     expanded_words = realloc(
                                         expanded_words,
@@ -3275,12 +3276,12 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                                         brace_results[b];
                                     word_count++;
                                 }
-                                free(
-                                    brace_results); // Free array, not strings
-                                                    // (moved to expanded_words)
+                                free(brace_results); /// Free array, not strings
+                                                     /// (moved to
+                                                     /// expanded_words)
                                 free(expanded);
                             } else {
-                                // Brace expansion failed, use original
+                                /// Brace expansion failed, use original
                                 expanded_words =
                                     realloc(expanded_words,
                                             (word_count + 1) * sizeof(char *));
@@ -3292,24 +3293,24 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                                 }
                             }
                         } else {
-                            // No brace expansion needed - check if IFS
-                            // splitting is enabled
+                            /// No brace expansion needed - check if IFS
+                            /// splitting is enabled
                             if (shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT)) {
-                                // IFS splitting enabled - split the expanded
-                                // string
+                                /// IFS splitting enabled - split the expanded
+                                /// string
                                 const char *ifs =
                                     symtable_get(executor->symtable, "IFS");
                                 if (!ifs) {
-                                    ifs = " \t\n"; // Default IFS
+                                    ifs = " \t\n"; /// Default IFS
                                 }
 
-                                // Split the expanded string into individual
-                                // words
+                                /// Split the expanded string into individual
+                                /// words
                                 char *expanded_copy = strdup(expanded);
                                 char *token = strtok(expanded_copy, ifs);
 
                                 while (token) {
-                                    // Resize array if needed
+                                    /// Resize array if needed
                                     expanded_words = realloc(
                                         expanded_words,
                                         (word_count + 1) * sizeof(char *));
@@ -3331,8 +3332,8 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                                 free(expanded_copy);
                                 free(expanded);
                             } else {
-                                // Word splitting disabled (zsh-style) - keep as
-                                // single word
+                                /// Word splitting disabled (zsh-style) - keep
+                                /// as single word
                                 expanded_words =
                                     realloc(expanded_words,
                                             (word_count + 1) * sizeof(char *));
@@ -3368,17 +3369,17 @@ static int execute_for(executor_t *executor, node_t *for_node) {
         }
     }
 
-    // Iterate over expanded words
+    /// Iterate over expanded words
     for (int i = 0; i < word_count; i++) {
         if (expanded_words[i]) {
-            // Update loop variable using POSIX scope-chain semantics: if
-            // a local of this name already exists (e.g. `local i` in the
-            // enclosing function), update that local instead of creating
-            // a parallel global. See issue #47.
+            /// Update loop variable using POSIX scope-chain semantics: if
+            /// a local of this name already exists (e.g. `local i` in the
+            /// enclosing function), update that local instead of creating
+            /// a parallel global. See issue #47.
             if (symtable_assign_var(executor->symtable, var_name,
                                     expanded_words[i]) != 0) {
                 set_executor_error(executor, "Failed to set loop variable");
-                // Cleanup expanded words
+                /// Cleanup expanded words
                 for (int j = 0; j < word_count; j++) {
                     free(expanded_words[j]);
                 }
@@ -3396,23 +3397,23 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                        expanded_words[i]);
             }
 
-            // Notify debug system of loop variable update
+            /// Notify debug system of loop variable update
             if (g_debug_context && g_debug_context->enabled) {
                 debug_update_loop_variable(g_debug_context, var_name,
                                            expanded_words[i]);
             }
 
-            // Execute body
+            /// Execute body
             last_result = execute_command_chain(executor, body);
             iteration++;
 
-            // Check for break/continue
+            /// Check for break/continue
             if (executor->loop_control == LOOP_BREAK) {
                 executor->loop_control = LOOP_NORMAL;
                 break;
             } else if (executor->loop_control == LOOP_CONTINUE) {
                 executor->loop_control = LOOP_NORMAL;
-                // Continue to next iteration
+                /// Continue to next iteration
             }
 
             /* `return` inside the body: stop iterating, propagate the
@@ -3431,41 +3432,41 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                 break;
             }
 
-            // POSIX-required shell abort fired from inside the body.
+            /// POSIX-required shell abort fired from inside the body.
             if (executor->shell_exit_requested) {
                 break;
             }
         }
 
-        // Honor abort across the outer iteration as well.
+        /// Honor abort across the outer iteration as well.
         if (executor->shell_exit_requested) {
             break;
         }
     }
 
-    // Cleanup expanded words
+    /// Cleanup expanded words
     for (int i = 0; i < word_count; i++) {
         free(expanded_words[i]);
     }
     free(expanded_words);
 
-    // Notify debug system we're exiting the loop
+    /// Notify debug system we're exiting the loop
     if (g_debug_context && g_debug_context->enabled) {
         debug_exit_loop(g_debug_context);
     }
 
-    // Decrement loop depth before returning
+    /// Decrement loop depth before returning
     executor->loop_depth--;
 
-    // Pop loop scope
+    /// Pop loop scope
     symtable_pop_scope(executor->symtable);
 
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
 
-    // Pop error context
+    /// Pop error context
     executor_pop_context(executor);
 
     if (errexit_tripped) {
@@ -3510,7 +3511,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         return 1;
     }
 
-    // Get the four children: init, test, update, body
+    /// Get the four children: init, test, update, body
     node_t *init_node = for_arith_node->first_child;
     node_t *test_node = init_node ? init_node->next_sibling : NULL;
     node_t *update_node = test_node ? test_node->next_sibling : NULL;
@@ -3523,7 +3524,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         return 1;
     }
 
-    // Check for trailing redirections
+    /// Check for trailing redirections
     bool has_redirections = count_redirections(for_arith_node) > 0;
     redirection_state_t redir_state;
 
@@ -3536,7 +3537,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         }
     }
 
-    // Push loop scope
+    /// Push loop scope
     if (symtable_push_scope(executor->symtable, SCOPE_LOOP, "for-arith-loop") !=
         0) {
         executor_error_add(executor, SHELL_ERR_SCOPE_ERROR, for_arith_node->loc,
@@ -3544,15 +3545,15 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         return 1;
     }
 
-    // Notify debug system we're entering a loop
+    /// Notify debug system we're entering a loop
     if (g_debug_context && g_debug_context->enabled) {
         debug_enter_loop(g_debug_context, "for", "(arithmetic)", NULL);
     }
 
-    // Increment loop depth - enables break/continue builtins
+    /// Increment loop depth - enables break/continue builtins
     executor->loop_depth++;
 
-    // Push error context for structured error reporting
+    /// Push error context for structured error reporting
     executor_push_context(executor, for_arith_node->loc, "in C-style for loop");
 
     int last_result = 0;
@@ -3562,7 +3563,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
     bool errexit_tripped = false;
     int iteration = 0;
 
-    // Execute init expression (once at the start)
+    /// Execute init expression (once at the start)
     if (init_node && init_node->val.str && init_node->val.str[0] != '\0') {
         char *init_expanded = expand_if_needed(executor, init_node->val.str);
         if (init_expanded) {
@@ -3580,9 +3581,9 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         }
     }
 
-    // Loop: test, execute body, update
+    /// Loop: test, execute body, update
     while (1) {
-        // Evaluate test expression (if empty, treat as true - infinite loop)
+        /// Evaluate test expression (if empty, treat as true - infinite loop)
         if (test_node && test_node->val.str && test_node->val.str[0] != '\0') {
             char *test_expanded =
                 expand_if_needed(executor, test_node->val.str);
@@ -3591,37 +3592,37 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
                 char *result_str =
                     arithm_expand_with_executor(executor, test_expanded);
                 if (!result_str || arithm_error_is_flagged()) {
-                    // Arithmetic error
+                    /// Arithmetic error
                     free(result_str);
                     free(test_expanded);
                     last_result = 1;
                     break;
                 }
 
-                // Convert result to check if non-zero
+                /// Convert result to check if non-zero
                 long long test_result = strtoll(result_str, NULL, 10);
                 free(result_str);
                 free(test_expanded);
 
-                // If test result is 0, exit the loop
+                /// If test result is 0, exit the loop
                 if (test_result == 0) {
                     break;
                 }
             }
         }
-        // If test is empty, continue (infinite loop until break)
+        /// If test is empty, continue (infinite loop until break)
 
-        // Execute body
+        /// Execute body
         last_result = execute_command_chain(executor, body);
         iteration++;
 
-        // Check for break/continue
+        /// Check for break/continue
         if (executor->loop_control == LOOP_BREAK) {
             executor->loop_control = LOOP_NORMAL;
             break;
         } else if (executor->loop_control == LOOP_CONTINUE) {
             executor->loop_control = LOOP_NORMAL;
-            // Fall through to update expression
+            /// Fall through to update expression
         }
 
         /* `return` inside the body: stop iterating, propagate the
@@ -3641,7 +3642,7 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
             break;
         }
 
-        // Execute update expression
+        /// Execute update expression
         if (update_node && update_node->val.str &&
             update_node->val.str[0] != '\0') {
             char *update_expanded =
@@ -3667,23 +3668,23 @@ static int execute_for_arith(executor_t *executor, node_t *for_arith_node) {
         }
     }
 
-    // Notify debug system we're exiting the loop
+    /// Notify debug system we're exiting the loop
     if (g_debug_context && g_debug_context->enabled) {
         debug_exit_loop(g_debug_context);
     }
 
-    // Decrement loop depth before returning
+    /// Decrement loop depth before returning
     executor->loop_depth--;
 
-    // Pop loop scope
+    /// Pop loop scope
     symtable_pop_scope(executor->symtable);
 
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
 
-    // Pop error context
+    /// Pop error context
     executor_pop_context(executor);
 
     if (errexit_tripped) {
@@ -3742,7 +3743,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
         return 1;
     }
 
-    // Check for trailing redirections on the select loop
+    /// Check for trailing redirections on the select loop
     bool has_redirections = count_redirections(select_node) > 0;
     redirection_state_t redir_state;
 
@@ -3755,7 +3756,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
         }
     }
 
-    // Build expanded word list for menu
+    /// Build expanded word list for menu
     char **menu_items = NULL;
     int item_count = 0;
 
@@ -3765,14 +3766,14 @@ static int execute_select(executor_t *executor, node_t *select_node) {
             if (word->val.str) {
                 char *expanded = expand_if_needed(executor, word->val.str);
                 if (expanded) {
-                    // Check if this was a quoted string (no IFS splitting)
+                    /// Check if this was a quoted string (no IFS splitting)
                     bool is_quoted = (word->type == NODE_STRING_LITERAL ||
                                       word->type == NODE_STRING_EXPANDABLE);
 
                     if (is_quoted ||
                         !shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT)) {
-                        // Quoted strings or no-word-split mode: keep as single
-                        // item
+                        /// Quoted strings or no-word-split mode: keep as single
+                        /// item
                         menu_items = realloc(menu_items,
                                              (item_count + 1) * sizeof(char *));
                         if (!menu_items) {
@@ -3782,7 +3783,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
                         menu_items[item_count] = expanded;
                         item_count++;
                     } else {
-                        // Unquoted: Split by IFS
+                        /// Unquoted: Split by IFS
                         const char *ifs =
                             symtable_get(executor->symtable, "IFS");
                         if (!ifs) {
@@ -3818,10 +3819,10 @@ static int execute_select(executor_t *executor, node_t *select_node) {
         if (has_redirections) {
             restore_file_descriptors(&redir_state);
         }
-        return 0; // No items, nothing to do
+        return 0; /// No items, nothing to do
     }
 
-    // Push loop scope
+    /// Push loop scope
     if (symtable_push_scope(executor->symtable, SCOPE_LOOP, "select-loop") !=
         0) {
         for (int i = 0; i < item_count; i++) {
@@ -3839,62 +3840,62 @@ static int execute_select(executor_t *executor, node_t *select_node) {
     int last_result = 0;
     char input_buf[256];
 
-    // Get PS3 prompt (default is "#? ")
+    /// Get PS3 prompt (default is "#? ")
     const char *ps3 = symtable_get(executor->symtable, "PS3");
     if (!ps3 || !*ps3) {
         ps3 = "#? ";
     }
 
     while (1) {
-        // Display menu
+        /// Display menu
         for (int i = 0; i < item_count; i++) {
             fprintf(stderr, "%d) %s\n", i + 1, menu_items[i]);
         }
 
-        // Display prompt and read input
+        /// Display prompt and read input
         fprintf(stderr, "%s", ps3);
         fflush(stderr);
 
         if (!fgets(input_buf, sizeof(input_buf), stdin)) {
-            // EOF - exit loop
+            /// EOF - exit loop
             break;
         }
 
-        // Remove trailing newline
+        /// Remove trailing newline
         size_t len = strlen(input_buf);
         if (len > 0 && input_buf[len - 1] == '\n') {
             input_buf[len - 1] = '\0';
         }
 
-        // Set REPLY to the raw input
+        /// Set REPLY to the raw input
         symtable_set(executor->symtable, "REPLY", input_buf);
 
-        // Parse selection number
+        /// Parse selection number
         char *endptr;
         long selection = strtol(input_buf, &endptr, 10);
 
-        // Set loop variable using POSIX scope-chain semantics (issue #47)
+        /// Set loop variable using POSIX scope-chain semantics (issue #47)
         if (*input_buf != '\0' && *endptr == '\0' && selection >= 1 &&
             selection <= item_count) {
-            // Valid selection
+            /// Valid selection
             symtable_assign_var(executor->symtable, var_name,
                                 menu_items[selection - 1]);
         } else {
-            // Invalid or empty input - set variable to empty
+            /// Invalid or empty input - set variable to empty
             symtable_assign_var(executor->symtable, var_name, "");
         }
 
-        // Execute body
+        /// Execute body
         node_t *cmd = body;
         while (cmd) {
             last_result = execute_node(executor, cmd);
 
-            // Check for break/continue
+            /// Check for break/continue
             if (executor->loop_control != LOOP_NORMAL) {
                 break;
             }
 
-            // POSIX-required shell abort: drop out of the select body.
+            /// POSIX-required shell abort: drop out of the select body.
             if (executor->shell_exit_requested) {
                 break;
             }
@@ -3902,7 +3903,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
             cmd = cmd->next_sibling;
         }
 
-        // Handle break from body
+        /// Handle break from body
         if (executor->loop_control == LOOP_BREAK) {
             executor->loop_control = LOOP_NORMAL;
             break;
@@ -3911,13 +3912,13 @@ static int execute_select(executor_t *executor, node_t *select_node) {
             continue;
         }
 
-        // POSIX-required shell abort: stop the outer select loop.
+        /// POSIX-required shell abort: stop the outer select loop.
         if (executor->shell_exit_requested) {
             break;
         }
     }
 
-    // Cleanup
+    /// Cleanup
     executor->loop_depth--;
     symtable_pop_scope(executor->symtable);
 
@@ -3926,7 +3927,7 @@ static int execute_select(executor_t *executor, node_t *select_node) {
     }
     free(menu_items);
 
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
@@ -3954,24 +3955,24 @@ static int execute_time(executor_t *executor, node_t *time_node) {
     node_t *pipeline = time_node->first_child;
 
     if (!pipeline) {
-        return 0; // Nothing to time
+        return 0; /// Nothing to time
     }
 
-    // Get start time
+    /// Get start time
     struct timeval start_time, end_time;
     struct rusage start_usage, end_usage;
 
     gettimeofday(&start_time, NULL);
     getrusage(RUSAGE_CHILDREN, &start_usage);
 
-    // Execute the pipeline
+    /// Execute the pipeline
     int result = execute_node(executor, pipeline);
 
-    // Get end time
+    /// Get end time
     gettimeofday(&end_time, NULL);
     getrusage(RUSAGE_CHILDREN, &end_usage);
 
-    // Calculate elapsed times
+    /// Calculate elapsed times
     double real_time = (end_time.tv_sec - start_time.tv_sec) +
                        (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
 
@@ -3983,19 +3984,19 @@ static int execute_time(executor_t *executor, node_t *time_node) {
         (end_usage.ru_stime.tv_sec - start_usage.ru_stime.tv_sec) +
         (end_usage.ru_stime.tv_usec - start_usage.ru_stime.tv_usec) / 1000000.0;
 
-    // Check for TIMEFORMAT variable (Bash extension)
+    /// Check for TIMEFORMAT variable (Bash extension)
     const char *timeformat = symtable_get(executor->symtable, "TIMEFORMAT");
 
     if (posix_format) {
-        // POSIX format: real, user, sys in seconds
+        /// POSIX format: real, user, sys in seconds
         fprintf(stderr, "real %.2f\nuser %.2f\nsys %.2f\n", real_time,
                 user_time, sys_time);
     } else if (timeformat && *timeformat) {
-        // Custom format (simplified - just show the times)
+        /// Custom format (simplified - just show the times)
         fprintf(stderr, "\nreal\t%.3fs\nuser\t%.3fs\nsys\t%.3fs\n", real_time,
                 user_time, sys_time);
     } else {
-        // Default Bash-like format
+        /// Default Bash-like format
         fprintf(stderr, "\nreal\t%dm%.3fs\nuser\t%dm%.3fs\nsys\t%dm%.3fs\n",
                 (int)(real_time / 60), fmod(real_time, 60.0),
                 (int)(user_time / 60), fmod(user_time, 60.0),
@@ -4028,15 +4029,15 @@ static int execute_coproc(executor_t *executor, node_t *coproc_node) {
         return 1;
     }
 
-    // Get the coprocess name (default to "COPROC")
+    /// Get the coprocess name (default to "COPROC")
     const char *coproc_name = coproc_node->val.str;
     if (!coproc_name || !*coproc_name) {
         coproc_name = "COPROC";
     }
 
-    // Create pipes for bidirectional communication
-    // pipe_to_coproc: parent writes to [1], coproc reads from [0]
-    // pipe_from_coproc: coproc writes to [1], parent reads from [0]
+    /// Create pipes for bidirectional communication
+    /// pipe_to_coproc: parent writes to [1], coproc reads from [0]
+    /// pipe_from_coproc: coproc writes to [1], parent reads from [0]
     int pipe_to_coproc[2];
     int pipe_from_coproc[2];
 
@@ -4063,19 +4064,19 @@ static int execute_coproc(executor_t *executor, node_t *coproc_node) {
     }
 
     if (pid == 0) {
-        // Child process (the coprocess)
+        /// Child process (the coprocess)
 
-        // Redirect stdin from pipe_to_coproc[0]
-        close(pipe_to_coproc[1]); // Close write end
+        /// Redirect stdin from pipe_to_coproc[0]
+        close(pipe_to_coproc[1]); /// Close write end
         dup2(pipe_to_coproc[0], STDIN_FILENO);
         close(pipe_to_coproc[0]);
 
-        // Redirect stdout to pipe_from_coproc[1]
-        close(pipe_from_coproc[0]); // Close read end
+        /// Redirect stdout to pipe_from_coproc[1]
+        close(pipe_from_coproc[0]); /// Close read end
         dup2(pipe_from_coproc[1], STDOUT_FILENO);
         close(pipe_from_coproc[1]);
 
-        // Execute the command
+        /// Execute the command
         int result = execute_node(executor, command);
         fflush(stdout);
         fflush(stderr);
@@ -4083,34 +4084,34 @@ static int execute_coproc(executor_t *executor, node_t *coproc_node) {
         _exit(result);
     }
 
-    // Parent process
+    /// Parent process
 
-    // Close the ends we don't need
-    close(pipe_to_coproc[0]);   // Close read end of input pipe
-    close(pipe_from_coproc[1]); // Close write end of output pipe
+    /// Close the ends we don't need
+    close(pipe_to_coproc[0]);   /// Close read end of input pipe
+    close(pipe_from_coproc[1]); /// Close write end of output pipe
 
-    // Store file descriptors in NAME array
-    // NAME[0] = fd to read from coproc (pipe_from_coproc[0])
-    // NAME[1] = fd to write to coproc (pipe_to_coproc[1])
+    /// Store file descriptors in NAME array
+    /// NAME[0] = fd to read from coproc (pipe_from_coproc[0])
+    /// NAME[1] = fd to write to coproc (pipe_to_coproc[1])
     char fd_str[32];
 
-    // Set NAME[0] - read fd
+    /// Set NAME[0] - read fd
     snprintf(fd_str, sizeof(fd_str), "%d", pipe_from_coproc[0]);
     symtable_set_array_element(coproc_name, "0", fd_str);
 
-    // Set NAME[1] - write fd
+    /// Set NAME[1] - write fd
     snprintf(fd_str, sizeof(fd_str), "%d", pipe_to_coproc[1]);
     symtable_set_array_element(coproc_name, "1", fd_str);
 
-    // Store PID in NAME_PID variable
+    /// Store PID in NAME_PID variable
     char pid_var_name[256];
     snprintf(pid_var_name, sizeof(pid_var_name), "%s_PID", coproc_name);
     char pid_str[32];
     snprintf(pid_str, sizeof(pid_str), "%d", (int)pid);
     symtable_set_global(pid_var_name, pid_str);
 
-    // Add to job table (background job)
-    // The coprocess runs in background, so we don't wait for it here
+    /// Add to job table (background job)
+    /// The coprocess runs in background, so we don't wait for it here
 
     return 0;
 }
@@ -4132,7 +4133,7 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
 
     node_t *body = anon_node->first_child;
     if (!body) {
-        return 0; // Empty anonymous function
+        return 0; /// Empty anonymous function
     }
 
     /* Collect and expand trailing arguments BEFORE pushing the
@@ -4168,7 +4169,7 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
         }
     }
 
-    // Create a new scope for the anonymous function
+    /// Create a new scope for the anonymous function
     if (symtable_push_scope(executor->symtable, SCOPE_FUNCTION,
                             "<anonymous>") != 0) {
         for (int i = 0; i < argc; i++) {
@@ -4180,7 +4181,7 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
         return 1;
     }
 
-    // Set positional parameters $1..$N from the pre-expanded args.
+    /// Set positional parameters $1..$N from the pre-expanded args.
     for (int i = 0; i < argc; i++) {
         char param_name[16];
         snprintf(param_name, sizeof(param_name), "%d", i + 1);
@@ -4191,21 +4192,21 @@ static int execute_anonymous_function(executor_t *executor, node_t *anon_node) {
     snprintf(argc_str, sizeof(argc_str), "%d", argc);
     symtable_set_local_var(executor->symtable, "#", argc_str);
 
-    // Free the expanded arg strings; symtable owns its own copies.
+    /// Free the expanded arg strings; symtable owns its own copies.
     for (int i = 0; i < argc; i++) {
         free(argv[i]);
     }
     free(argv);
 
-    // Execute the body
+    /// Execute the body
     int result = execute_node(executor, body);
 
-    // Check for function return (special code 200-455)
+    /// Check for function return (special code 200-455)
     if (result >= 200 && result <= 455) {
-        result = result - 200; // Extract actual return value
+        result = result - 200; /// Extract actual return value
     }
 
-    // Pop the scope
+    /// Pop the scope
     symtable_pop_scope(executor->symtable);
 
     return result;
@@ -4234,15 +4235,15 @@ static int execute_logical_and(executor_t *executor, node_t *and_node) {
         return 1;
     }
 
-    // Execute left command
+    /// Execute left command
     int left_result = execute_node(executor, left);
 
-    // Only execute right command if left succeeded (exit code 0)
+    /// Only execute right command if left succeeded (exit code 0)
     if (left_result == 0) {
         return execute_node(executor, right);
     }
 
-    // Left failed, return its exit code without executing right
+    /// Left failed, return its exit code without executing right
     return left_result;
 }
 
@@ -4269,15 +4270,15 @@ static int execute_logical_or(executor_t *executor, node_t *or_node) {
         return 1;
     }
 
-    // Execute left command
+    /// Execute left command
     int left_result = execute_node(executor, left);
 
-    // Only execute right command if left failed (non-zero exit code)
+    /// Only execute right command if left failed (non-zero exit code)
     if (left_result != 0) {
         return execute_node(executor, right);
     }
 
-    // Left succeeded, return its exit code without executing right
+    /// Left succeeded, return its exit code without executing right
     return left_result;
 }
 
@@ -4299,7 +4300,7 @@ static int add_to_argv_list(char ***argv_list, int *argv_count,
         *argv_capacity = *argv_capacity ? *argv_capacity * 2 : 8;
         char **new_list = realloc(*argv_list, *argv_capacity * sizeof(char *));
         if (!new_list) {
-            return 0; // Failed to expand
+            return 0; /// Failed to expand
         }
         *argv_list = new_list;
     }
@@ -4324,7 +4325,7 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
         return NULL;
     }
 
-    // Default IFS if not provided
+    /// Default IFS if not provided
     if (!ifs) {
         ifs = " \t\n";
     }
@@ -4337,7 +4338,7 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
     const char *end = text;
 
     while (*end) {
-        // Skip leading delimiters
+        /// Skip leading delimiters
         while (*start && strchr(ifs, *start)) {
             start++;
         }
@@ -4345,21 +4346,21 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
         if (!*start)
             break;
 
-        // Find end of current field
+        /// Find end of current field
         end = start;
         while (*end && !strchr(ifs, *end)) {
             end++;
         }
 
-        // Extract field
+        /// Extract field
         size_t field_len = end - start;
         if (field_len > 0) {
-            // Expand result array if needed
+            /// Expand result array if needed
             if (*count >= capacity) {
                 capacity = capacity ? capacity * 2 : 4;
                 char **new_result = realloc(result, capacity * sizeof(char *));
                 if (!new_result) {
-                    // Cleanup on failure
+                    /// Cleanup on failure
                     for (int i = 0; i < *count; i++) {
                         free(result[i]);
                     }
@@ -4372,7 +4373,7 @@ static char **ifs_field_split(const char *text, const char *ifs, int *count) {
 
             result[*count] = malloc(field_len + 1);
             if (!result[*count]) {
-                // Cleanup on failure
+                /// Cleanup on failure
                 for (int i = 0; i < *count; i++) {
                     free(result[i]);
                 }
@@ -4492,10 +4493,10 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         return false;
     }
 
-    // $@ / $* (unbraced).
+    /// $@ / $* (unbraced).
     bool positional_at =
         (len == 2 && s[0] == '$' && (s[1] == '@' || s[1] == '*'));
-    // ${...} braced forms.
+    /// ${...} braced forms.
     bool braced = (len >= 3 && s[0] == '$' && s[1] == '{' && s[len - 1] == '}');
     /* Bare `$NAME` where NAME is an array. zsh expands bare array
      * references to N words in word-list contexts (for-loop iteration,
@@ -4549,9 +4550,9 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
     bool keys_form = false;
     const char *name_start = NULL;
     size_t name_len = 0;
-    char subscript = '@'; // @ vs *; only matters for joining policy
+    char subscript = '@'; /// @ vs *; only matters for joining policy
     int slice_offset = 0;
-    int slice_length = -1; // -1 = "to end"
+    int slice_length = -1; /// -1 = "to end"
     bool has_slice = false;
     bool is_positional = positional_at;
 
@@ -4564,7 +4565,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         name_len = len - 1;
         subscript = '@';
     } else {
-        // inner content between { and }
+        /// inner content between { and }
         const char *p = s + 2;
         const char *end = s + len - 1;
         if (p == end) {
@@ -4600,7 +4601,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                         flag_O = true;
                         break;
                     case 'a':
-                        // array order, no sort -- default
+                        /// array order, no sort -- default
                         flag_o = false;
                         flag_O = false;
                         break;
@@ -4608,11 +4609,11 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                         flag_u = true;
                         break;
                     case '@':
-                        // Per SEMANTICS.md section 3.7, (@) is a
-                        // spelling alias for vector presentation --
-                        // redundant with the [@] subscript. Accept
-                        // it as a no-op flag so ${(@)arr} yields
-                        // exactly what ${arr[@]} would.
+                        /// Per SEMANTICS.md section 3.7, (@) is a
+                        /// spelling alias for vector presentation --
+                        /// redundant with the [@] subscript. Accept
+                        /// it as a no-op flag so ${(@)arr} yields
+                        /// exactly what ${arr[@]} would.
                         break;
                     default:
                         ok_flags = false;
@@ -4710,7 +4711,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     }
                 }
             }
-            // Not our shape -- not a vector form.
+            /// Not our shape -- not a vector form.
             return false;
         }
         if (*p == '!') {
@@ -4720,12 +4721,12 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         if (p == end) {
             return false;
         }
-        // Special-cased ${@} / ${*}: positional, no subscript.
+        /// Special-cased ${@} / ${*}: positional, no subscript.
         if (!keys_form && (end - p) == 1 && (*p == '@' || *p == '*')) {
             is_positional = true;
             subscript = *p;
         } else {
-            // Must be NAME[@] / NAME[*] optionally followed by :N or :N:M
+            /// Must be NAME[@] / NAME[*] optionally followed by :N or :N:M
             name_start = p;
             while (p < end && (isalnum((unsigned char)*p) || *p == '_')) {
                 p++;
@@ -4759,7 +4760,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     return false;
                 }
                 subscript = '@';
-                // Fall through to the per-array assembly path below.
+                /// Fall through to the per-array assembly path below.
                 goto braced_bare_array_ready;
             }
             if (p >= end || *p != '[') {
@@ -4775,7 +4776,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 return false;
             }
             p++;
-            // Optional slicing :N or :N:M.
+            /// Optional slicing :N or :N:M.
             if (p < end && *p == ':') {
                 has_slice = true;
                 p++;
@@ -4802,14 +4803,14 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     return false;
                 }
             } else if (p != end) {
-                // Junk between `]` and `}`. Not a recognised vector form.
+                /// Junk between `]` and `}`. Not a recognised vector form.
                 return false;
             }
         }
     }
 
 braced_bare_array_ready:;
-    // Now produce the element vector.
+    /// Now produce the element vector.
     char **vec = NULL;
     int vcount = 0;
     int vcap = 0;
@@ -4852,7 +4853,7 @@ braced_bare_array_ready:;
             }
         }
     } else {
-        // Array name lookup. Need a NUL-terminated name.
+        /// Array name lookup. Need a NUL-terminated name.
         char name_buf[256];
         if (name_len >= sizeof(name_buf)) {
             return false;
@@ -4862,12 +4863,12 @@ braced_bare_array_ready:;
 
         array_value_t *array = symtable_get_array(name_buf);
         if (!array) {
-            // Not actually an array -- not our case; fall back.
+            /// Not actually an array -- not our case; fall back.
             return false;
         }
 
         if (keys_form) {
-            // Produce keys (assoc) or indices (indexed). Honor slicing.
+            /// Produce keys (assoc) or indices (indexed). Honor slicing.
             if (array->is_associative) {
                 size_t kcount = 0;
                 char **keys = symtable_array_get_keys(array, &kcount);
@@ -4962,7 +4963,7 @@ braced_bare_array_ready:;
                 free(keys);
             }
         } else {
-            // Produce values. Honor slicing.
+            /// Produce values. Honor slicing.
             size_t total = symtable_array_length(array);
             int start = 0, end_idx = (int)total - 1;
             if (has_slice) {
@@ -5114,12 +5115,12 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
         return NULL;
     }
 
-    // Dynamic argument list to handle glob expansion
+    /// Dynamic argument list to handle glob expansion
     char **argv_list = NULL;
     int argv_count = 0;
     int argv_capacity = 0;
 
-    // Find here document delimiters to exclude
+    /// Find here document delimiters to exclude
     char *heredoc_delimiters[10] = {0};
     int delimiter_count = 0;
 
@@ -5135,7 +5136,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
         child = child->next_sibling;
     }
 
-    // Add command name (no glob expansion for command names)
+    /// Add command name (no glob expansion for command names)
     if (command->val.str) {
         char *expanded_cmd = expand_if_needed(executor, command->val.str);
         if (!add_to_argv_list(&argv_list, &argv_count, &argv_capacity,
@@ -5145,15 +5146,15 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
         }
     }
 
-    // Process arguments with glob expansion
+    /// Process arguments with glob expansion
     child = command->first_child;
     while (child) {
-        // Skip redirection nodes and cmd_prefix assignments (NODE_ASSIGN
-        // children are applied as the command's temporary environment,
-        // not passed as argv words).
+        /// Skip redirection nodes and cmd_prefix assignments (NODE_ASSIGN
+        /// children are applied as the command's temporary environment,
+        /// not passed as argv words).
         if (!is_redirection_node(child) && child->type != NODE_ASSIGN) {
             if (child->val.str) {
-                // Check if this is a here document delimiter
+                /// Check if this is a here document delimiter
                 bool is_delimiter = false;
                 for (int i = 0; i < delimiter_count; i++) {
                     if (heredoc_delimiters[i] &&
@@ -5204,8 +5205,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 child->val.str, expanded_arg);
                     }
 
-                    // Check if argument needs brace expansion first
-                    // Skip brace/glob expansion for quoted strings
+                    /// Check if argument needs brace expansion first
+                    /// Skip brace/glob expansion for quoted strings
                     if (child->type != NODE_STRING_LITERAL &&
                         child->type != NODE_STRING_EXPANDABLE &&
                         needs_brace_expansion(expanded_arg)) {
@@ -5224,8 +5225,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                             goto cleanup_and_fail;
                         }
                         if (brace_results) {
-                            // Process each brace expansion result for potential
-                            // glob expansion
+                            /// Process each brace expansion result for
+                            /// potential glob expansion
                             for (int j = 0; j < brace_count; j++) {
                                 if (needs_glob_expansion(brace_results[j])) {
                                     int glob_count;
@@ -5233,16 +5234,16 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                         brace_results[j], &glob_count);
 
                                     if (glob_results) {
-                                        // Add all glob results, free brace
-                                        // result since we won't use it
+                                        /// Add all glob results, free brace
+                                        /// result since we won't use it
                                         free(brace_results[j]);
                                         for (int k = 0; k < glob_count; k++) {
                                             if (!add_to_argv_list(
                                                     &argv_list, &argv_count,
                                                     &argv_capacity,
                                                     glob_results[k])) {
-                                                // Cleanup remaining strings on
-                                                // failure
+                                                /// Cleanup remaining strings on
+                                                /// failure
                                                 for (int l = k; l < glob_count;
                                                      l++) {
                                                     free(glob_results[l]);
@@ -5259,8 +5260,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                         }
                                         free(glob_results);
                                     } else {
-                                        // Glob expansion failed, use brace
-                                        // result
+                                        /// Glob expansion failed, use brace
+                                        /// result
                                         if (!add_to_argv_list(
                                                 &argv_list, &argv_count,
                                                 &argv_capacity,
@@ -5275,8 +5276,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                         }
                                     }
                                 } else {
-                                    // No glob expansion needed, use brace
-                                    // result directly
+                                    /// No glob expansion needed, use brace
+                                    /// result directly
                                     if (!add_to_argv_list(
                                             &argv_list, &argv_count,
                                             &argv_capacity, brace_results[j])) {
@@ -5292,8 +5293,8 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                             }
                             free(brace_results);
                         } else {
-                            // Brace expansion failed, fall back to normal
-                            // expansion
+                            /// Brace expansion failed, fall back to normal
+                            /// expansion
                             if (needs_glob_expansion(expanded_arg)) {
                                 int glob_count;
                                 char **glob_results = expand_glob_pattern(
@@ -5323,7 +5324,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                         goto cleanup_and_fail;
                                     }
                                     expanded_arg =
-                                        NULL; // Ownership transferred
+                                        NULL; /// Ownership transferred
                                 }
                             } else {
                                 if (!add_to_argv_list(&argv_list, &argv_count,
@@ -5332,7 +5333,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                     free(expanded_arg);
                                     goto cleanup_and_fail;
                                 }
-                                expanded_arg = NULL; // Ownership transferred
+                                expanded_arg = NULL; /// Ownership transferred
                             }
                         }
                         if (expanded_arg) {
@@ -5341,19 +5342,19 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                     } else if (child->type != NODE_STRING_LITERAL &&
                                child->type != NODE_STRING_EXPANDABLE &&
                                needs_glob_expansion(expanded_arg)) {
-                        // No brace expansion, check for glob expansion
-                        // Skip glob expansion for quoted strings
+                        /// No brace expansion, check for glob expansion
+                        /// Skip glob expansion for quoted strings
                         int glob_count;
                         char **glob_results =
                             expand_glob_pattern(expanded_arg, &glob_count);
 
                         if (glob_results) {
-                            // Add all glob results
+                            /// Add all glob results
                             for (int j = 0; j < glob_count; j++) {
                                 if (!add_to_argv_list(&argv_list, &argv_count,
                                                       &argv_capacity,
                                                       glob_results[j])) {
-                                    // Cleanup on failure
+                                    /// Cleanup on failure
                                     for (int k = j; k < glob_count; k++) {
                                         free(glob_results[k]);
                                     }
@@ -5362,10 +5363,10 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                     goto cleanup_and_fail;
                                 }
                             }
-                            free(glob_results); // Free the array but not the
-                                                // strings
+                            free(glob_results); /// Free the array but not the
+                                                /// strings
                         } else {
-                            // Glob expansion failed, use original
+                            /// Glob expansion failed, use original
                             if (!add_to_argv_list(&argv_list, &argv_count,
                                                   &argv_capacity,
                                                   expanded_arg)) {
@@ -5373,39 +5374,40 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 goto cleanup_and_fail;
                             }
                         }
-                        free(
-                            expanded_arg); // We copied the strings or used them
+                        free(expanded_arg); /// We copied the strings or used
+                                            /// them
                     } else {
-                        // Check if this needs field splitting
-                        // - Command substitution $(cmd): always split (all
-                        // shells do this)
-                        // - Parameter expansion $var: only split if
-                        // FEATURE_WORD_SPLIT_DEFAULT enabled
-                        // - Quoted strings: never split
+                        /// Check if this needs field splitting
+                        /// - Command substitution $(cmd): always split (all
+                        /// shells do this)
+                        /// - Parameter expansion $var: only split if
+                        /// FEATURE_WORD_SPLIT_DEFAULT enabled
+                        /// - Quoted strings: never split
                         bool should_word_split = false;
                         if (child->type == NODE_COMMAND_SUB) {
-                            // Command substitution always gets word split
+                            /// Command substitution always gets word split
                             should_word_split = true;
                         } else if (child->type == NODE_VAR &&
                                    shell_mode_allows(
                                        FEATURE_WORD_SPLIT_DEFAULT)) {
-                            // Parameter expansion only splits if feature
-                            // enabled
+                            /// Parameter expansion only splits if feature
+                            /// enabled
                             should_word_split = true;
                         }
-                        // Quoted strings (NODE_STRING_LITERAL,
-                        // NODE_STRING_EXPANDABLE) never split
+                        /// Quoted strings (NODE_STRING_LITERAL,
+                        /// NODE_STRING_EXPANDABLE) never split
 
                         if (should_word_split) {
 
-                            // Get IFS for field splitting
+                            /// Get IFS for field splitting
                             const char *ifs =
                                 symtable_get(executor->symtable, "IFS");
                             if (!ifs) {
-                                ifs = " \t\n"; // Default IFS
+                                ifs = " \t\n"; /// Default IFS
                             }
 
-                            // Check if expanded_arg contains any IFS characters
+                            /// Check if expanded_arg contains any IFS
+                            /// characters
                             bool needs_splitting = false;
                             for (const char *p = ifs; *p; p++) {
                                 if (strchr(expanded_arg, *p)) {
@@ -5420,13 +5422,13 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                     expanded_arg, ifs, &field_count);
 
                                 if (fields && field_count > 0) {
-                                    // Add each field as separate argument
+                                    /// Add each field as separate argument
                                     for (int i = 0; i < field_count; i++) {
                                         if (!add_to_argv_list(
                                                 &argv_list, &argv_count,
                                                 &argv_capacity, fields[i])) {
-                                            // Cleanup remaining fields on
-                                            // failure
+                                            /// Cleanup remaining fields on
+                                            /// failure
                                             for (int j = i; j < field_count;
                                                  j++) {
                                                 free(fields[j]);
@@ -5435,13 +5437,13 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                             free(expanded_arg);
                                             goto cleanup_and_fail;
                                         }
-                                        // Ownership transferred, don't free
-                                        // fields[i]
+                                        /// Ownership transferred, don't free
+                                        /// fields[i]
                                     }
                                     free(fields);
                                     free(expanded_arg);
                                 } else {
-                                    // Field splitting failed, use original
+                                    /// Field splitting failed, use original
                                     if (!add_to_argv_list(
                                             &argv_list, &argv_count,
                                             &argv_capacity, expanded_arg)) {
@@ -5450,7 +5452,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                     }
                                 }
                             } else {
-                                // No field splitting needed
+                                /// No field splitting needed
                                 if (!add_to_argv_list(&argv_list, &argv_count,
                                                       &argv_capacity,
                                                       expanded_arg)) {
@@ -5459,7 +5461,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                                 }
                             }
                         } else {
-                            // No field splitting for non-variables
+                            /// No field splitting for non-variables
                             if (!add_to_argv_list(&argv_list, &argv_count,
                                                   &argv_capacity,
                                                   expanded_arg)) {
@@ -5480,7 +5482,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
         goto cleanup_delimiters;
     }
 
-    // Convert to final argv array
+    /// Convert to final argv array
     char **argv = malloc((argv_count + 1) * sizeof(char *));
     if (!argv) {
         goto cleanup_and_fail;
@@ -5494,7 +5496,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
     *argc = argv_count;
     free(argv_list);
 
-    // Clean up here document delimiters
+    /// Clean up here document delimiters
     for (int k = 0; k < delimiter_count; k++) {
         free(heredoc_delimiters[k]);
     }
@@ -5502,14 +5504,14 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
     return argv;
 
 cleanup_and_fail:
-    // Free all allocated arguments
+    /// Free all allocated arguments
     for (int i = 0; i < argv_count; i++) {
         free(argv_list[i]);
     }
     free(argv_list);
 
 cleanup_delimiters:
-    // Clean up here document delimiters
+    /// Clean up here document delimiters
     for (int k = 0; k < delimiter_count; k++) {
         free(heredoc_delimiters[k]);
     }
@@ -5554,8 +5556,8 @@ static char *expand_kind_sigil(executor_t *executor, const char *text) {
 
     lush_value_view_t view;
     if (!symtable_lookup(name, &view)) {
-        // Unset name: empty expansion -- matches bash `${var:-}` shape for an
-        // unset variable in unquoted context.
+        /// Unset name: empty expansion -- matches bash `${var:-}` shape for an
+        /// unset variable in unquoted context.
         return strdup("");
     }
 
@@ -5604,7 +5606,7 @@ static char *expand_kind_sigil(executor_t *executor, const char *text) {
             result = strdup("");
             break;
         }
-    } else { // sigil == '%'
+    } else { /// sigil == '%'
         switch (view.kind) {
         case LUSH_VALUE_SCALAR:
             executor_error_add(
@@ -5620,7 +5622,7 @@ static char *expand_kind_sigil(executor_t *executor, const char *text) {
             char **values = view.array
                                 ? symtable_array_get_values(view.array, &count)
                                 : NULL;
-            // worst case: "INT v INT v ..." -- 32 bytes per entry is plenty
+            /// worst case: "INT v INT v ..." -- 32 bytes per entry is plenty
             size_t total = 1;
             for (size_t i = 0; i < count; i++) {
                 total += 32 + strlen(values[i] ? values[i] : "") + 2;
@@ -5687,11 +5689,11 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         return NULL;
     }
 
-    // zsh `$+NAME` / `$+NAME[SUBSCRIPT]` unbraced is-set test. Rewrite
-    // to the braced ${+NAME...} form so the existing parameter-expansion
-    // handler in parse_parameter_expansion picks it up. The whole
-    // span is one token coming out of the tokenizer (see the $+IDENT
-    // handler in src/tokenizer.c), so the rewrite is just text-shape.
+    /// zsh `$+NAME` / `$+NAME[SUBSCRIPT]` unbraced is-set test. Rewrite
+    /// to the braced ${+NAME...} form so the existing parameter-expansion
+    /// handler in parse_parameter_expansion picks it up. The whole
+    /// span is one token coming out of the tokenizer (see the $+IDENT
+    /// handler in src/tokenizer.c), so the rewrite is just text-shape.
     if (text[0] == '$' && text[1] == '+' &&
         (isalpha((unsigned char)text[2]) || text[2] == '_')) {
         size_t orig_len = strlen(text);
@@ -5709,9 +5711,9 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         }
     }
 
-    // Kind sigil top-level dispatch: `@NAME` / `%NAME` with NAME a valid
-    // identifier.  Tokenizer has already done the regex check; we just need
-    // to verify the shape before routing to expand_kind_sigil.
+    /// Kind sigil top-level dispatch: `@NAME` / `%NAME` with NAME a valid
+    /// identifier.  Tokenizer has already done the regex check; we just need
+    /// to verify the shape before routing to expand_kind_sigil.
     if ((text[0] == '@' || text[0] == '%') &&
         shell_mode_allows(FEATURE_KIND_SIGILS) &&
         (isalpha((unsigned char)text[1]) || text[1] == '_')) {
@@ -5724,10 +5726,10 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         }
     }
 
-    // Handle strings that contain single quotes - process them specially
-    // Single-quoted content should not be expanded (POSIX requirement)
-    // BUT: Don't enter this path for command substitution $(...) or `...`
-    // which may contain quotes internally
+    /// Handle strings that contain single quotes - process them specially
+    /// Single-quoted content should not be expanded (POSIX requirement)
+    /// BUT: Don't enter this path for command substitution $(...) or `...`
+    /// which may contain quotes internally
     /* Enter the single-quote-handling block only when the text has
      * at least one MATCHED pair of UNESCAPED single quotes. The
      * parser pre-escapes `'` chars inside TOK_EXPANDABLE_STRING
@@ -5764,20 +5766,20 @@ char *expand_if_needed(executor_t *executor, const char *text) {
 
         for (size_t i = 0; i < len; i++) {
             if (text[i] == '$' && i + 1 < len && text[i + 1] == '\'') {
-                // ANSI-C quoting $'...' - expand escape sequences
-                i += 2; // Skip $'
+                /// ANSI-C quoting $'...' - expand escape sequences
+                i += 2; /// Skip $'
                 size_t content_start = i;
-                // Find closing quote (handling escaped quotes)
+                /// Find closing quote (handling escaped quotes)
                 while (i < len) {
                     if (text[i] == '\\' && i + 1 < len) {
-                        i += 2; // Skip escaped character
+                        i += 2; /// Skip escaped character
                     } else if (text[i] == '\'') {
                         break;
                     } else {
                         i++;
                     }
                 }
-                // Extract and expand the ANSI-C string content
+                /// Extract and expand the ANSI-C string content
                 size_t content_len = i - content_start;
                 if (shell_mode_allows(FEATURE_ANSI_QUOTING)) {
                     char *expanded =
@@ -5799,7 +5801,7 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                         free(expanded);
                     }
                 } else {
-                    // Feature disabled - copy literally (including $')
+                    /// Feature disabled - copy literally (including $')
                     while (result_pos + content_len + 3 >= result_capacity) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
@@ -5816,11 +5818,11 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     result_pos += content_len;
                     result[result_pos++] = '\'';
                 }
-                // i now points to closing quote (or end of string)
+                /// i now points to closing quote (or end of string)
             } else if (text[i] == '\'') {
-                // Regular single quote - copy content literally until closing
-                // quote
-                i++; // Skip opening quote
+                /// Regular single quote - copy content literally until closing
+                /// quote
+                i++; /// Skip opening quote
                 while (i < len && text[i] != '\'') {
                     if (result_pos >= result_capacity - 1) {
                         result_capacity *= 2;
@@ -5833,10 +5835,10 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     }
                     result[result_pos++] = text[i++];
                 }
-                // i now points to closing quote (or end of string)
+                /// i now points to closing quote (or end of string)
             } else if (text[i] == '"') {
-                // Double quote - expand content until closing quote
-                i++; // Skip opening quote
+                /// Double quote - expand content until closing quote
+                i++; /// Skip opening quote
                 size_t dq_start = i;
                 int depth = 1;
                 while (i < len && depth > 0) {
@@ -5847,13 +5849,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     }
                     i++;
                 }
-                // Extract double-quoted content and expand it
+                /// Extract double-quoted content and expand it
                 size_t dq_len = i - dq_start;
                 char *dq_content = malloc(dq_len + 1);
                 if (dq_content) {
                     strncpy(dq_content, &text[dq_start], dq_len);
                     dq_content[dq_len] = '\0';
-                    // Content inside `"..."` -- DQ rules apply.
+                    /// Content inside `"..."` -- DQ rules apply.
                     char *expanded =
                         expand_quoted_string(executor, dq_content, true);
                     free(dq_content);
@@ -5874,13 +5876,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                         free(expanded);
                     }
                 }
-                // i now points to closing quote
+                /// i now points to closing quote
             } else if (text[i] == '$') {
-                // Outside quotes - expand variable
+                /// Outside quotes - expand variable
                 size_t var_start = i;
-                // Find end of variable reference
+                /// Find end of variable reference
                 if (i + 1 < len && text[i + 1] == '{') {
-                    // ${var} format - find closing brace
+                    /// ${var} format - find closing brace
                     size_t brace_end = i + 2;
                     int brace_depth = 1;
                     while (brace_end < len && brace_depth > 0) {
@@ -5892,7 +5894,7 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     }
                     i = brace_end - 1;
                 } else if (i + 1 < len && text[i + 1] == '(') {
-                    // $(cmd) or $((arith)) - find closing paren
+                    /// $(cmd) or $((arith)) - find closing paren
                     size_t paren_end = i + 2;
                     int paren_depth = 1;
                     while (paren_end < len && paren_depth > 0) {
@@ -5904,14 +5906,14 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     }
                     i = paren_end - 1;
                 } else {
-                    // $var format
+                    /// $var format
                     i++;
                     while (i < len && (isalnum(text[i]) || text[i] == '_')) {
                         i++;
                     }
-                    i--; // Back up to last char of variable
+                    i--; /// Back up to last char of variable
                 }
-                // Extract and expand the variable reference
+                /// Extract and expand the variable reference
                 size_t var_len = i - var_start + 1;
                 char *var_ref = malloc(var_len + 1);
                 if (var_ref) {
@@ -5937,7 +5939,7 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                     }
                 }
             } else {
-                // Regular character outside quotes
+                /// Regular character outside quotes
                 if (result_pos >= result_capacity - 1) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
@@ -5954,11 +5956,11 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         return result;
     }
 
-    // Check for tilde expansion first
+    /// Check for tilde expansion first
     if (text[0] == '~') {
         char *tilde_expanded = expand_tilde(text);
         if (tilde_expanded && strcmp(tilde_expanded, text) != 0) {
-            // Tilde was expanded, now check if result needs variable expansion
+            /// Tilde was expanded, now check if result needs variable expansion
             const char *first_dollar = strchr(tilde_expanded, '$');
             if (first_dollar) {
                 /* Unquoted text post-tilde-expansion: POSIX-unquoted
@@ -5975,11 +5977,11 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         }
     }
 
-    // Check if this looks like it contains variables (has $)
-    // This is a heuristic for expandable strings
+    /// Check if this looks like it contains variables (has $)
+    /// This is a heuristic for expandable strings
     const char *first_dollar = strchr(text, '$');
     if (first_dollar) {
-        // Count dollar signs to determine if we have multiple variables
+        /// Count dollar signs to determine if we have multiple variables
         int dollar_count = 0;
         for (const char *p = text; *p; p++) {
             if (*p == '$') {
@@ -5987,19 +5989,19 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             }
         }
 
-        // If we have multiple dollar signs or the first dollar is not at
-        // position 0, treat as quoted string with multiple expansions.
-        // This branch is reached from unquoted contexts (NODE_VAR with
-        // embedded $ etc.); pass in_double_quotes=false so any surviving
-        // `\X` follows POSIX-unquoted rules.
+        /// If we have multiple dollar signs or the first dollar is not at
+        /// position 0, treat as quoted string with multiple expansions.
+        /// This branch is reached from unquoted contexts (NODE_VAR with
+        /// embedded $ etc.); pass in_double_quotes=false so any surviving
+        /// `\X` follows POSIX-unquoted rules.
         if (dollar_count > 1 || first_dollar != text) {
             return expand_quoted_string(executor, text, false);
         }
 
-        // Single expansion starting at position 0
+        /// Single expansion starting at position 0
         if (strncmp(text, "$'", 2) == 0) {
-            // ANSI-C quoting $'...'
-            // Find closing quote (handling escaped quotes)
+            /// ANSI-C quoting $'...'
+            /// Find closing quote (handling escaped quotes)
             size_t len = strlen(text);
             size_t quote_end = 2;
             while (quote_end < len) {
@@ -6012,13 +6014,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                 }
             }
             if (quote_end < len && text[quote_end] == '\'') {
-                // Check if feature is allowed
+                /// Check if feature is allowed
                 if (!shell_mode_allows(FEATURE_ANSI_QUOTING)) {
-                    // Feature disabled, return literal
+                    /// Feature disabled, return literal
                     return strdup(text);
                 }
                 char *expanded = expand_ansi_c_string(text + 2, quote_end - 2);
-                // If there's text after the closing quote, append it
+                /// If there's text after the closing quote, append it
                 if (text[quote_end + 1] != '\0') {
                     char *rest =
                         expand_if_needed(executor, text + quote_end + 1);
@@ -6074,26 +6076,26 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         } else if (strncmp(text, "$(", 2) == 0) {
             return expand_command_substitution(executor, text);
         } else if (strncmp(text, "${", 2) == 0) {
-            // ${var} format - check if there's more text after }
+            /// ${var} format - check if there's more text after }
             const char *close_brace = strchr(text, '}');
             if (close_brace && close_brace[1] != '\0') {
-                // Text continues after ${var}; unquoted context.
+                /// Text continues after ${var}; unquoted context.
                 return expand_quoted_string(executor, text, false);
             }
             return expand_variable(executor, text);
         } else {
-            // $var format - check if there's more text after variable name
-            const char *p = text + 1; // Skip $
-            // Find end of variable name
+            /// $var format - check if there's more text after variable name
+            const char *p = text + 1; /// Skip $
+            /// Find end of variable name
             if (*p == '?' || *p == '$' || *p == '#' || *p == '*' || *p == '@' ||
                 *p == '!' || *p == '-' || (*p >= '0' && *p <= '9')) {
-                p++; // Single character special variable
+                p++; /// Single character special variable
             } else {
                 while (*p && (isalnum(*p) || *p == '_')) {
                     p++;
                 }
             }
-            // Trailing text after the variable; unquoted context.
+            /// Trailing text after the variable; unquoted context.
             if (*p != '\0') {
                 return expand_quoted_string(executor, text, false);
             }
@@ -6101,7 +6103,7 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         }
     }
 
-    // Check for backtick command substitution
+    /// Check for backtick command substitution
     if (text[0] == '`') {
         return expand_command_substitution(executor, text);
     }
@@ -6120,13 +6122,13 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         size_t len = strlen(text);
         char *result = malloc(len + 1);
         if (!result)
-            return strdup(text); // OOM fallback
+            return strdup(text); /// OOM fallback
         size_t out = 0;
         for (size_t i = 0; i < len; i++) {
             if (text[i] == '\\' && i + 1 < len) {
                 char next = text[i + 1];
                 if (next == '\n') {
-                    // Line continuation: drop both bytes.
+                    /// Line continuation: drop both bytes.
                     i++;
                     continue;
                 }
@@ -6161,7 +6163,7 @@ static int execute_negate(executor_t *executor, node_t *negate_node) {
         return 1;
     }
 
-    // Execute the child (pipeline)
+    /// Execute the child (pipeline)
     node_t *child = negate_node->first_child;
     if (!child) {
         return 1;
@@ -6169,7 +6171,7 @@ static int execute_negate(executor_t *executor, node_t *negate_node) {
 
     int result = execute_node(executor, child);
 
-    // Invert the exit status: 0 -> 1, non-zero -> 0
+    /// Invert the exit status: 0 -> 1, non-zero -> 0
     int inverted = (result == 0) ? 1 : 0;
     executor->exit_status = inverted;
 
@@ -6191,10 +6193,10 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
         return 1;
     }
 
-    // Push error context for structured error reporting
+    /// Push error context for structured error reporting
     executor_push_context(executor, group->loc, "in brace group");
 
-    // Check for trailing redirections on the brace group
+    /// Check for trailing redirections on the brace group
     bool has_redirections = count_redirections(group) > 0;
     redirection_state_t redir_state;
 
@@ -6212,7 +6214,7 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
     node_t *command = group->first_child;
 
     while (command) {
-        // Skip redirection nodes - they've already been processed
+        /// Skip redirection nodes - they've already been processed
         if (is_redirection_node(command)) {
             command = command->next_sibling;
             continue;
@@ -6237,7 +6239,7 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             fire_err_trap();
         }
 
-        // Check for function return (special code 200-455) - propagate it
+        /// Check for function return (special code 200-455) - propagate it
         if (last_result >= 200 && last_result <= 455) {
             if (has_redirections) {
                 restore_file_descriptors(&redir_state);
@@ -6246,7 +6248,7 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
             return last_result;
         }
 
-        // Check for loop control (break/continue)
+        /// Check for loop control (break/continue)
         if (executor->loop_control != LOOP_NORMAL) {
             break;
         }
@@ -6260,12 +6262,12 @@ static int execute_brace_group(executor_t *executor, node_t *group) {
         command = command->next_sibling;
     }
 
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
 
-    // Pop error context
+    /// Pop error context
     executor_pop_context(executor);
 
     return last_result;
@@ -6286,10 +6288,10 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
         return 1;
     }
 
-    // Push error context for structured error reporting
+    /// Push error context for structured error reporting
     executor_push_context(executor, subshell->loc, "in subshell");
 
-    // Fork a new process for the subshell
+    /// Fork a new process for the subshell
     pid_t pid = lush_fork();
     if (pid == -1) {
         executor_error_add(executor, SHELL_ERR_FORK_FAILED, subshell->loc,
@@ -6299,9 +6301,9 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
     }
 
     if (pid == 0) {
-        // Child process - execute commands in subshell environment
+        /// Child process - execute commands in subshell environment
 
-        // Set up any redirections attached to the subshell
+        /// Set up any redirections attached to the subshell
         if (count_redirections(subshell) > 0) {
             int redir_result = setup_redirections(executor, subshell);
             if (redir_result != 0) {
@@ -6313,7 +6315,7 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
         node_t *command = subshell->first_child;
 
         while (command) {
-            // Skip redirection nodes - they've already been applied
+            /// Skip redirection nodes - they've already been applied
             if (is_redirection_node(command)) {
                 command = command->next_sibling;
                 continue;
@@ -6353,12 +6355,12 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
             command = command->next_sibling;
         }
 
-        // Exit with the last command's result
+        /// Exit with the last command's result
         exit(last_result);
     } else {
-        // Parent process - wait for subshell to complete
+        /// Parent process - wait for subshell to complete
         int status;
-        // Wait for child, retrying on EINTR (signal interruption)
+        /// Wait for child, retrying on EINTR (signal interruption)
         while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
             ;
 
@@ -6366,14 +6368,14 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
         if (WIFEXITED(status)) {
             result = WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
-            // Child was killed by signal - return 128 + signal number (bash
-            // convention)
+            /// Child was killed by signal - return 128 + signal number (bash
+            /// convention)
             result = 128 + WTERMSIG(status);
         } else {
-            result = 1; // Abnormal termination
+            result = 1; /// Abnormal termination
         }
 
-        // Pop error context
+        /// Pop error context
         executor_pop_context(executor);
 
         return result;
@@ -6398,16 +6400,16 @@ static int execute_subshell(executor_t *executor, node_t *subshell) {
  * *(.,@))
  */
 typedef enum {
-    GLOB_QUAL_NONE = 0,      // No qualifier
-    GLOB_QUAL_FILE = 1,      // (.) - regular files only
-    GLOB_QUAL_DIR = 2,       // (/) - directories only
-    GLOB_QUAL_LINK = 4,      // (@) - symbolic links only
-    GLOB_QUAL_EXEC = 8,      // (*) - executable files
-    GLOB_QUAL_READABLE = 16, // (r) - readable files
-    GLOB_QUAL_WRITABLE = 32, // (w) - writable files
-    // Behavior modifiers (not type/permission filters):
-    GLOB_QUAL_NULLGLOB = 64, // (N) - no match -> empty, never literal
-    GLOB_QUAL_DOTGLOB = 128, // (D) - include dot (hidden) files
+    GLOB_QUAL_NONE = 0,      /// No qualifier
+    GLOB_QUAL_FILE = 1,      /// (.) - regular files only
+    GLOB_QUAL_DIR = 2,       /// (/) - directories only
+    GLOB_QUAL_LINK = 4,      /// (@) - symbolic links only
+    GLOB_QUAL_EXEC = 8,      /// (*) - executable files
+    GLOB_QUAL_READABLE = 16, /// (r) - readable files
+    GLOB_QUAL_WRITABLE = 32, /// (w) - writable files
+    /// Behavior modifiers (not type/permission filters):
+    GLOB_QUAL_NULLGLOB = 64, /// (N) - no match -> empty, never literal
+    GLOB_QUAL_DOTGLOB = 128, /// (D) - include dot (hidden) files
 } glob_qualifier_t;
 
 /* Bits that filter by file type or permission (vs. behavior modifiers
@@ -6433,11 +6435,12 @@ static glob_qualifier_t parse_glob_qualifier(const char *pattern,
 
     size_t len = strlen(pattern);
 
-    // Check for qualifier pattern: ends with (X) or (X,Y,...) where X,Y are
-    // qualifier chars
+    /// Check for qualifier pattern: ends with (X) or (X,Y,...) where X,Y are
+    /// qualifier chars
     if (len >= 3 && pattern[len - 1] == ')') {
-        // Find matching open paren - must be near end (qualifiers are short)
-        // Limit search to last 10 chars (or start of string for short patterns)
+        /// Find matching open paren - must be near end (qualifiers are short)
+        /// Limit search to last 10 chars (or start of string for short
+        /// patterns)
         const char *open_paren = NULL;
         size_t min_idx = (len > 10) ? (len - 10) : 1;
         for (size_t i = len - 2; i >= min_idx; i--) {
@@ -6446,11 +6449,11 @@ static glob_qualifier_t parse_glob_qualifier(const char *pattern,
                 break;
             }
             if (i == min_idx)
-                break; // Prevent underflow on decrement
+                break; /// Prevent underflow on decrement
         }
 
         if (open_paren) {
-            // Parse all qualifier characters between ( and )
+            /// Parse all qualifier characters between ( and )
             glob_qualifier_t qual = GLOB_QUAL_NONE;
             bool valid_qualifier = true;
 
@@ -6481,9 +6484,9 @@ static glob_qualifier_t parse_glob_qualifier(const char *pattern,
                     qual |= GLOB_QUAL_DOTGLOB;
                     break;
                 case ',':
-                    break; // Separator, ignore
+                    break; /// Separator, ignore
                 default:
-                    // Unknown character - not a valid glob qualifier
+                    /// Unknown character - not a valid glob qualifier
                     valid_qualifier = false;
                     break;
                 }
@@ -6492,7 +6495,7 @@ static glob_qualifier_t parse_glob_qualifier(const char *pattern,
             }
 
             if (valid_qualifier && qual != GLOB_QUAL_NONE) {
-                // Strip the qualifier
+                /// Strip the qualifier
                 *base_pattern = strndup(pattern, open_paren - pattern);
                 return qual;
             }
@@ -6521,12 +6524,12 @@ static bool matches_glob_qualifier(const char *path,
         return false;
     }
 
-    // With combined qualifiers (bitmask), file must match ANY of the type
-    // qualifiers For example, *(.,@) matches files OR symlinks
+    /// With combined qualifiers (bitmask), file must match ANY of the type
+    /// qualifiers For example, *(.,@) matches files OR symlinks
     bool type_match = false;
     bool has_type_qualifier = false;
 
-    // Check type qualifiers (file, dir, link, exec) - OR logic
+    /// Check type qualifiers (file, dir, link, exec) - OR logic
     if (qualifier & GLOB_QUAL_FILE) {
         has_type_qualifier = true;
         if (S_ISREG(st.st_mode))
@@ -6550,7 +6553,7 @@ static bool matches_glob_qualifier(const char *path,
         }
     }
 
-    // If no type qualifiers specified, default to matching any type
+    /// If no type qualifiers specified, default to matching any type
     if (!has_type_qualifier) {
         type_match = true;
     }
@@ -6559,7 +6562,7 @@ static bool matches_glob_qualifier(const char *path,
         return false;
     }
 
-    // Check permission qualifiers - AND logic (must satisfy all)
+    /// Check permission qualifiers - AND logic (must satisfy all)
     if (qualifier & GLOB_QUAL_READABLE) {
         if (access(path, R_OK) != 0)
             return false;
@@ -6572,15 +6575,15 @@ static bool matches_glob_qualifier(const char *path,
     return true;
 }
 
-// =============================================================================
-// ZSH EXTENDED GLOB PATTERNS
-// =============================================================================
-// Zsh extended glob uses different syntax than bash:
-//   X#   - zero or more of X (like * in regex)
-//   X##  - one or more of X (like + in regex)
-//   (a|b) - alternation (without preceding operator)
-//   ^pat - negation (match everything except pattern)
-// =============================================================================
+/// =============================================================================
+/// ZSH EXTENDED GLOB PATTERNS
+/// =============================================================================
+/// Zsh extended glob uses different syntax than bash:
+///   X#   - zero or more of X (like * in regex)
+///   X##  - one or more of X (like + in regex)
+///   (a|b) - alternation (without preceding operator)
+///   ^pat - negation (match everything except pattern)
+/// =============================================================================
 
 /**
  * @brief Check if pattern contains zsh-style extglob syntax
@@ -6592,17 +6595,17 @@ static bool has_zsh_extglob_pattern(const char *pattern) {
         return false;
     }
 
-    // Check for ^pattern negation at start
+    /// Check for ^pattern negation at start
     if (pattern[0] == '^') {
         return true;
     }
 
-    // Check for (a|b) alternation - parentheses with | inside, NOT preceded by
-    // extglob op
+    /// Check for (a|b) alternation - parentheses with | inside, NOT preceded by
+    /// extglob op
     const char *p = pattern;
     while (*p) {
         if (*p == '(' && (p == pattern || !strchr("?*+@!", *(p - 1)))) {
-            // Found ( not preceded by extglob operator - check for | inside
+            /// Found ( not preceded by extglob operator - check for | inside
             const char *inner = p + 1;
             int depth = 1;
             while (*inner && depth > 0) {
@@ -6618,11 +6621,11 @@ static bool has_zsh_extglob_pattern(const char *pattern) {
         p++;
     }
 
-    // Check for # or ## quantifiers (after a char or ])
+    /// Check for # or ## quantifiers (after a char or ])
     p = pattern;
     while (*p) {
         if (*p == '#') {
-            // # must be preceded by something (char, ], or ))
+            /// # must be preceded by something (char, ], or ))
             if (p > pattern) {
                 char prev = *(p - 1);
                 if (prev != '/' && prev != ' ' && prev != '\t') {
@@ -6655,26 +6658,26 @@ static char *zsh_extglob_to_regex(const char *pattern) {
     if (!pattern)
         return NULL;
 
-    // Allocate generous buffer
+    /// Allocate generous buffer
     size_t max_len = strlen(pattern) * 4 + 10;
     char *regex = malloc(max_len);
     if (!regex)
         return NULL;
 
     char *out = regex;
-    *out++ = '^'; // Anchor at start
+    *out++ = '^'; /// Anchor at start
 
     const char *p = pattern;
     while (*p) {
         if (*p == '[') {
-            // Character class - copy until ]
+            /// Character class - copy until ]
             *out++ = *p++;
-            // Handle negation [^ or [!
+            /// Handle negation [^ or [!
             if (*p == '^' || *p == '!') {
                 *out++ = '^';
                 p++;
             }
-            // Handle ] as first char (literal)
+            /// Handle ] as first char (literal)
             if (*p == ']') {
                 *out++ = *p++;
             }
@@ -6684,18 +6687,18 @@ static char *zsh_extglob_to_regex(const char *pattern) {
             if (*p == ']') {
                 *out++ = *p++;
             }
-            // Check for # or ## after char class
+            /// Check for # or ## after char class
             if (*p == '#') {
                 if (*(p + 1) == '#') {
-                    *out++ = '+'; // ## = one or more
+                    *out++ = '+'; /// ## = one or more
                     p += 2;
                 } else {
-                    *out++ = '*'; // # = zero or more
+                    *out++ = '*'; /// # = zero or more
                     p++;
                 }
             }
         } else if (*p == '(') {
-            // Alternation group - copy as-is, handling nested parens
+            /// Alternation group - copy as-is, handling nested parens
             *out++ = *p++;
             int depth = 1;
             while (*p && depth > 0) {
@@ -6706,7 +6709,7 @@ static char *zsh_extglob_to_regex(const char *pattern) {
                     depth--;
                     *out++ = *p++;
                 } else if (*p == '*') {
-                    // Glob * inside alternation
+                    /// Glob * inside alternation
                     *out++ = '.';
                     *out++ = '*';
                     p++;
@@ -6722,44 +6725,44 @@ static char *zsh_extglob_to_regex(const char *pattern) {
                 }
             }
         } else if (*p == '*') {
-            // Glob * -> regex .*
+            /// Glob * -> regex .*
             *out++ = '.';
             *out++ = '*';
             p++;
         } else if (*p == '?') {
-            // Glob ? -> regex .
+            /// Glob ? -> regex .
             *out++ = '.';
             p++;
         } else if (*p == '.') {
-            // Escape literal dot
+            /// Escape literal dot
             *out++ = '\\';
             *out++ = '.';
             p++;
         } else if (*p == '#') {
-            // Standalone # - should not happen if preceded by nothing
-            // Skip it (treat as literal)
+            /// Standalone # - should not happen if preceded by nothing
+            /// Skip it (treat as literal)
             *out++ = '#';
             p++;
         } else {
-            // Regular character
+            /// Regular character
             char c = *p++;
-            // Check for # or ## quantifier after this char
+            /// Check for # or ## quantifier after this char
             if (*p == '#') {
-                // Need to wrap single char in group for regex
-                // But first, escape regex metacharacters
+                /// Need to wrap single char in group for regex
+                /// But first, escape regex metacharacters
                 if (strchr("^$+{}\\|()", c)) {
                     *out++ = '\\';
                 }
                 *out++ = c;
                 if (*(p + 1) == '#') {
-                    *out++ = '+'; // ## = one or more
+                    *out++ = '+'; /// ## = one or more
                     p += 2;
                 } else {
-                    *out++ = '*'; // # = zero or more
+                    *out++ = '*'; /// # = zero or more
                     p++;
                 }
             } else {
-                // No quantifier - regular char, might need escaping
+                /// No quantifier - regular char, might need escaping
                 if (strchr("^$+{}\\|", c)) {
                     *out++ = '\\';
                 }
@@ -6768,7 +6771,7 @@ static char *zsh_extglob_to_regex(const char *pattern) {
         }
     }
 
-    *out++ = '$'; // Anchor at end
+    *out++ = '$'; /// Anchor at end
     *out = '\0';
 
     return regex;
@@ -6797,7 +6800,7 @@ static bool regex_pattern_is_safe(const char *pattern) {
         return false;
     }
     if (config.regex_pattern_max <= 0) {
-        return true; // explicitly unbounded
+        return true; /// explicitly unbounded
     }
     return strlen(pattern) <= (size_t)config.regex_pattern_max;
 }
@@ -6828,7 +6831,7 @@ static bool match_zsh_extglob(const char *filename, const char *pattern,
 
     bool matches = (ret == 0);
 
-    // For ^pattern, invert the result
+    /// For ^pattern, invert the result
     if (is_negated) {
         matches = !matches;
     }
@@ -6847,11 +6850,11 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
         return NULL;
     }
 
-    // Check for ^pattern negation
+    /// Check for ^pattern negation
     bool is_negated = (pattern[0] == '^');
     const char *match_pattern = is_negated ? pattern + 1 : pattern;
 
-    // Split pattern into directory and filename parts
+    /// Split pattern into directory and filename parts
     char *pattern_copy = strdup(match_pattern);
     if (!pattern_copy)
         return NULL;
@@ -6875,33 +6878,33 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
         return NULL;
     }
 
-    // Collect matching entries
+    /// Collect matching entries
     char **results = NULL;
     size_t result_count = 0;
     size_t result_capacity = 0;
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        // Skip . and ..
+        /// Skip . and ..
         if (strcmp(entry->d_name, ".") == 0 ||
             strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        // Skip hidden files unless pattern starts with .
+        /// Skip hidden files unless pattern starts with .
         if (entry->d_name[0] == '.' && file_pattern[0] != '.') {
             continue;
         }
 
         if (match_zsh_extglob(entry->d_name, file_pattern, is_negated)) {
-            // Grow array if needed
+            /// Grow array if needed
             if (result_count >= result_capacity) {
                 size_t new_capacity =
                     result_capacity == 0 ? 16 : result_capacity * 2;
                 char **new_results =
                     realloc(results, (new_capacity + 1) * sizeof(char *));
                 if (!new_results) {
-                    // Cleanup on failure
+                    /// Cleanup on failure
                     for (size_t i = 0; i < result_count; i++) {
                         free(results[i]);
                     }
@@ -6914,7 +6917,7 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
                 result_capacity = new_capacity;
             }
 
-            // Build full path if in subdirectory
+            /// Build full path if in subdirectory
             char *full_path;
             if (last_slash) {
                 size_t dir_len = strlen(dir_path);
@@ -6943,7 +6946,7 @@ static char **expand_zsh_extglob_pattern(const char *pattern,
         return NULL;
     }
 
-    // Sort results
+    /// Sort results
     qsort(results, result_count, sizeof(char *),
           (int (*)(const void *, const void *))strcmp);
 
@@ -6997,24 +7000,24 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
 
     *is_negated = false;
 
-    // Allocate generous buffer (pattern can expand significantly)
+    /// Allocate generous buffer (pattern can expand significantly)
     size_t max_len = strlen(pattern) * 4 + 10;
     char *regex = malloc(max_len);
     if (!regex)
         return NULL;
 
     char *out = regex;
-    *out++ = '^'; // Anchor at start
+    *out++ = '^'; /// Anchor at start
 
     const char *p = pattern;
     while (*p) {
-        // Check for extglob operators
+        /// Check for extglob operators
         if ((*p == '?' || *p == '*' || *p == '+' || *p == '@' || *p == '!') &&
             *(p + 1) == '(') {
             char op = *p;
-            p += 2; // Skip operator and (
+            p += 2; /// Skip operator and (
 
-            // Find matching closing paren
+            /// Find matching closing paren
             int depth = 1;
             const char *start = p;
             while (*p && depth > 0) {
@@ -7027,16 +7030,16 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
             }
 
             if (depth != 0) {
-                // Unmatched paren - treat literally
+                /// Unmatched paren - treat literally
                 free(regex);
                 return NULL;
             }
 
-            // Copy the inner pattern
+            /// Copy the inner pattern
             *out++ = '(';
             size_t inner_len = p - start;
 
-            // Convert inner pattern (replace | with |, escape regex chars)
+            /// Convert inner pattern (replace | with |, escape regex chars)
             for (size_t i = 0; i < inner_len; i++) {
                 char c = start[i];
                 if (c == '*') {
@@ -7055,7 +7058,7 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
             }
             *out++ = ')';
 
-            // Add quantifier based on operator
+            /// Add quantifier based on operator
             switch (op) {
             case '?':
                 *out++ = '?';
@@ -7066,30 +7069,30 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
             case '+':
                 *out++ = '+';
                 break;
-            case '@': // exactly one, no quantifier
+            case '@': /// exactly one, no quantifier
                 break;
             case '!':
                 *is_negated = true;
                 break;
             }
 
-            p++; // Skip closing paren
+            p++; /// Skip closing paren
         } else if (*p == '*') {
-            // Glob * -> regex .*
+            /// Glob * -> regex .*
             *out++ = '.';
             *out++ = '*';
             p++;
         } else if (*p == '?') {
-            // Glob ? -> regex .
+            /// Glob ? -> regex .
             *out++ = '.';
             p++;
         } else if (*p == '.') {
-            // Escape literal dot
+            /// Escape literal dot
             *out++ = '\\';
             *out++ = '.';
             p++;
         } else if (*p == '[') {
-            // Character class - copy as-is until ]
+            /// Character class - copy as-is until ]
             *out++ = *p++;
             while (*p && *p != ']') {
                 *out++ = *p++;
@@ -7098,7 +7101,7 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
                 *out++ = *p++;
             }
         } else {
-            // Regular character - might need escaping
+            /// Regular character - might need escaping
             if (strchr("^$+{}\\", *p)) {
                 *out++ = '\\';
             }
@@ -7106,7 +7109,7 @@ static char *extglob_to_regex(const char *pattern, bool *is_negated) {
         }
     }
 
-    *out++ = '$'; // Anchor at end
+    *out++ = '$'; /// Anchor at end
     *out = '\0';
 
     return regex;
@@ -7142,7 +7145,7 @@ static bool match_extglob(const char *filename, const char *pattern) {
 
     bool matches = (ret == 0);
 
-    // For !(pattern), invert the result
+    /// For !(pattern), invert the result
     if (is_negated) {
         matches = !matches;
     }
@@ -7164,7 +7167,7 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
-    // Split pattern into directory and filename parts
+    /// Split pattern into directory and filename parts
     char *pattern_copy = strdup(pattern);
     if (!pattern_copy)
         return NULL;
@@ -7182,21 +7185,21 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
         file_pattern = pattern_copy;
     }
 
-    // Open directory
+    /// Open directory
     DIR *dir = opendir(dir_path);
     if (!dir) {
         free(pattern_copy);
         return NULL;
     }
 
-    // Collect matching entries
+    /// Collect matching entries
     char **results = NULL;
     int count = 0;
     int capacity = 0;
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        // Skip . and .. unless pattern explicitly starts with .
+        /// Skip . and .. unless pattern explicitly starts with .
         if (entry->d_name[0] == '.' && file_pattern[0] != '.') {
             if (!shell_mode_allows(FEATURE_DOT_GLOB)) {
                 continue;
@@ -7204,7 +7207,7 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
         }
 
         if (match_extglob(entry->d_name, file_pattern)) {
-            // Resize array if needed
+            /// Resize array if needed
             if (count >= capacity) {
                 capacity = capacity ? capacity * 2 : 16;
                 char **new_results =
@@ -7220,7 +7223,7 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
                 results = new_results;
             }
 
-            // Build full path
+            /// Build full path
             char *full_path;
             if (last_slash) {
                 size_t len = strlen(dir_path) + strlen(entry->d_name) + 2;
@@ -7253,7 +7256,7 @@ static char **expand_extglob_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
-    // Add NULL terminator
+    /// Add NULL terminator
     char **final = realloc(results, (count + 1) * sizeof(char *));
     if (final) {
         final[count] = NULL;
@@ -7292,23 +7295,23 @@ static int expand_globstar_recursive(const char *base_dir,
                                      int *capacity) {
     DIR *dir = opendir(base_dir[0] ? base_dir : ".");
     if (!dir) {
-        return 0; // Not an error - directory might not be readable
+        return 0; /// Not an error - directory might not be readable
     }
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        // Skip . and ..
+        /// Skip . and ..
         if (strcmp(entry->d_name, ".") == 0 ||
             strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        // Skip hidden files unless dotglob is enabled
+        /// Skip hidden files unless dotglob is enabled
         if (entry->d_name[0] == '.' && !shell_mode_allows(FEATURE_DOT_GLOB)) {
             continue;
         }
 
-        // Build full path
+        /// Build full path
         char full_path[PATH_MAX];
         if (base_dir[0]) {
             snprintf(full_path, sizeof(full_path), "%s/%s", base_dir,
@@ -7317,21 +7320,21 @@ static int expand_globstar_recursive(const char *base_dir,
             snprintf(full_path, sizeof(full_path), "%s", entry->d_name);
         }
 
-        // Check if this path matches the remaining pattern
+        /// Check if this path matches the remaining pattern
         if (remaining_pattern && remaining_pattern[0]) {
-            // Build candidate path with remaining pattern
+            /// Build candidate path with remaining pattern
             char candidate[PATH_MAX];
             int written = snprintf(candidate, sizeof(candidate), "%s/%s",
                                    full_path, remaining_pattern);
             if (written < 0 || (size_t)written >= sizeof(candidate)) {
-                continue; // Path too long, skip this entry
+                continue; /// Path too long, skip this entry
             }
 
-            // Use glob to match the remaining pattern
+            /// Use glob to match the remaining pattern
             glob_t globbuf;
             if (glob(candidate, GLOB_NOSORT, NULL, &globbuf) == 0) {
                 for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-                    // Resize array if needed
+                    /// Resize array if needed
                     if (*count >= *capacity) {
                         *capacity = *capacity ? *capacity * 2 : 32;
                         char **new_results =
@@ -7348,7 +7351,7 @@ static int expand_globstar_recursive(const char *base_dir,
                 globfree(&globbuf);
             }
         } else {
-            // No remaining pattern - match the path itself
+            /// No remaining pattern - match the path itself
             if (*count >= *capacity) {
                 *capacity = *capacity ? *capacity * 2 : 32;
                 char **new_results =
@@ -7362,7 +7365,7 @@ static int expand_globstar_recursive(const char *base_dir,
             (*results)[(*count)++] = strdup(full_path);
         }
 
-        // Recurse into directories
+        /// Recurse into directories
         struct stat st;
         if (stat(full_path, &st) == 0 && S_ISDIR(st.st_mode)) {
             if (expand_globstar_recursive(full_path, remaining_pattern, results,
@@ -7395,13 +7398,13 @@ static char **expand_globstar_pattern(const char *pattern,
         return NULL;
     }
 
-    // Find the ** in the pattern
+    /// Find the ** in the pattern
     const char *starstar = strstr(pattern, "**");
     if (!starstar) {
         return NULL;
     }
 
-    // Split into prefix (before **) and suffix (after **)
+    /// Split into prefix (before **) and suffix (after **)
     size_t prefix_len = starstar - pattern;
     char *prefix = malloc(prefix_len + 1);
     if (!prefix)
@@ -7410,25 +7413,25 @@ static char **expand_globstar_pattern(const char *pattern,
     strncpy(prefix, pattern, prefix_len);
     prefix[prefix_len] = '\0';
 
-    // Remove trailing slash from prefix if present
+    /// Remove trailing slash from prefix if present
     if (prefix_len > 0 && prefix[prefix_len - 1] == '/') {
         prefix[prefix_len - 1] = '\0';
     }
 
-    // Get suffix (after **)
+    /// Get suffix (after **)
     const char *suffix = starstar + 2;
     if (*suffix == '/')
         suffix++; /* Skip leading slash after ** */
 
-    // Initialize results
+    /// Initialize results
     char **results = NULL;
     int count = 0;
     int capacity = 0;
 
-    // Start directory
+    /// Start directory
     const char *start_dir = prefix[0] ? prefix : ".";
 
-    // First, match the start directory itself with the suffix pattern
+    /// First, match the start directory itself with the suffix pattern
     if (suffix[0]) {
         char candidate[PATH_MAX];
         if (prefix[0]) {
@@ -7460,7 +7463,7 @@ static char **expand_globstar_pattern(const char *pattern,
         }
     }
 
-    // Recursively expand through directories
+    /// Recursively expand through directories
     if (expand_globstar_recursive(start_dir, suffix[0] ? suffix : NULL,
                                   &results, &count, &capacity) < 0) {
         free(prefix);
@@ -7477,7 +7480,7 @@ static char **expand_globstar_pattern(const char *pattern,
         return NULL;
     }
 
-    // Add NULL terminator
+    /// Add NULL terminator
     char **final = realloc(results, (count + 1) * sizeof(char *));
     if (final) {
         final[count] = NULL;
@@ -7512,7 +7515,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
                                   glob_qualifier_t qualifier, int *count) {
     *count = 0;
 
-    // Split into directory and filename pattern at the last '/'.
+    /// Split into directory and filename pattern at the last '/'.
     const char *slash = strrchr(base_pattern, '/');
     char *dir = NULL;
     const char *filepat = base_pattern;
@@ -7547,7 +7550,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
         if (fnmatch(filepat, entry->d_name, 0) != 0) {
             continue;
         }
-        // Build the path as the caller would see it.
+        /// Build the path as the caller would see it.
         char *path;
         if (dir) {
             size_t plen = strlen(dir) + 1 + strlen(entry->d_name) + 1;
@@ -7582,7 +7585,7 @@ static char **expand_glob_dotglob(const char *base_pattern,
     free(dir);
 
     if (!result) {
-        // No matches: hand back an empty (non-NULL) array.
+        /// No matches: hand back an empty (non-NULL) array.
         result = malloc(sizeof(char *));
         if (result) {
             result[0] = NULL;
@@ -7601,9 +7604,9 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
-    // Check if globbing is disabled (set -f)
+    /// Check if globbing is disabled (set -f)
     if (shell_opts.no_globbing) {
-        // Return the original pattern without expansion
+        /// Return the original pattern without expansion
         char **result = malloc(sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -7614,17 +7617,17 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
-    // Try globstar expansion if ** pattern and FEATURE_GLOBSTAR is enabled
+    /// Try globstar expansion if ** pattern and FEATURE_GLOBSTAR is enabled
     if (shell_mode_allows(FEATURE_GLOBSTAR) && has_globstar_pattern(pattern)) {
         char **globstar_results =
             expand_globstar_pattern(pattern, expanded_count);
         if (globstar_results && *expanded_count > 0) {
             return globstar_results;
         }
-        // Globstar expansion failed or no matches - fall through to handle
-        // according to nullglob setting
+        /// Globstar expansion failed or no matches - fall through to handle
+        /// according to nullglob setting
         if (shell_mode_allows(FEATURE_NULL_GLOB)) {
-            // Return empty array
+            /// Return empty array
             char **result = malloc(sizeof(char *));
             if (result) {
                 result[0] = NULL;
@@ -7634,7 +7637,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
             *expanded_count = 0;
             return NULL;
         }
-        // Return original pattern
+        /// Return original pattern
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -7646,11 +7649,11 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    // Parse glob qualifier FIRST (Zsh-style)
-    // This must happen before extglob detection because *(.) could be either:
-    //   - Zsh glob qualifier: * with file qualifier (.)
-    //   - Bash extglob: zero or more of pattern "."
-    // Glob qualifiers are always a single char at the END, so check that first
+    /// Parse glob qualifier FIRST (Zsh-style)
+    /// This must happen before extglob detection because *(.) could be either:
+    ///   - Zsh glob qualifier: * with file qualifier (.)
+    ///   - Bash extglob: zero or more of pattern "."
+    /// Glob qualifiers are always a single char at the END, so check that first
     char *base_pattern = NULL;
     glob_qualifier_t qualifier = GLOB_QUAL_NONE;
 
@@ -7658,23 +7661,23 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         qualifier = parse_glob_qualifier(pattern, &base_pattern);
     }
 
-    // If we found a glob qualifier, use the base pattern for further expansion
-    // Otherwise, use the original pattern
+    /// If we found a glob qualifier, use the base pattern for further expansion
+    /// Otherwise, use the original pattern
     const char *pattern_to_expand =
         (qualifier != GLOB_QUAL_NONE) ? base_pattern : pattern;
 
-    // Try zsh-style extglob expansion first (X#, X##, (a|b), ^pattern)
+    /// Try zsh-style extglob expansion first (X#, X##, (a|b), ^pattern)
     if (qualifier == GLOB_QUAL_NONE &&
         has_zsh_extglob_pattern(pattern_to_expand)) {
-        // Free base_pattern if it was allocated by parse_glob_qualifier
+        /// Free base_pattern if it was allocated by parse_glob_qualifier
         free(base_pattern);
         char **zsh_results =
             expand_zsh_extglob_pattern(pattern_to_expand, expanded_count);
         if (zsh_results && *expanded_count > 0) {
             return zsh_results;
         }
-        // Zsh extglob expansion failed or no matches - handle according to
-        // nullglob
+        /// Zsh extglob expansion failed or no matches - handle according to
+        /// nullglob
         if (shell_mode_allows(FEATURE_NULL_GLOB)) {
             char **result = malloc(sizeof(char *));
             if (result) {
@@ -7685,7 +7688,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
             *expanded_count = 0;
             return NULL;
         }
-        // Return original pattern
+        /// Return original pattern
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -7697,20 +7700,20 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    // Try bash-style extglob expansion if pattern contains extglob syntax
-    // (only if we didn't already strip a glob qualifier)
+    /// Try bash-style extglob expansion if pattern contains extglob syntax
+    /// (only if we didn't already strip a glob qualifier)
     if (qualifier == GLOB_QUAL_NONE && has_extglob_pattern(pattern_to_expand)) {
-        // Free base_pattern if it was allocated by parse_glob_qualifier
+        /// Free base_pattern if it was allocated by parse_glob_qualifier
         free(base_pattern);
         char **extglob_results =
             expand_extglob_pattern(pattern_to_expand, expanded_count);
         if (extglob_results && *expanded_count > 0) {
             return extglob_results;
         }
-        // Extglob expansion failed or no matches - fall through to handle
-        // according to nullglob setting
+        /// Extglob expansion failed or no matches - fall through to handle
+        /// according to nullglob setting
         if (shell_mode_allows(FEATURE_NULL_GLOB)) {
-            // Return empty array
+            /// Return empty array
             char **result = malloc(sizeof(char *));
             if (result) {
                 result[0] = NULL;
@@ -7720,7 +7723,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
             *expanded_count = 0;
             return NULL;
         }
-        // Return original pattern
+        /// Return original pattern
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -7757,7 +7760,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         if (dot_results) {
             return dot_results;
         }
-        // Scan failed: fall back to the literal pattern.
+        /// Scan failed: fall back to the literal pattern.
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -7774,12 +7777,12 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
     free(base_pattern);
 
     if (glob_result == GLOB_NOMATCH) {
-        // No matches - nullglob mode OR an explicit (N) qualifier
-        // both mean "expand to nothing" rather than the literal.
+        /// No matches - nullglob mode OR an explicit (N) qualifier
+        /// both mean "expand to nothing" rather than the literal.
         if (shell_mode_allows(FEATURE_NULL_GLOB) ||
             (qualifier & GLOB_QUAL_NULLGLOB)) {
-            // Nullglob: unmatched patterns expand to nothing
-            // Return empty array (not NULL, to distinguish from error)
+            /// Nullglob: unmatched patterns expand to nothing
+            /// Return empty array (not NULL, to distinguish from error)
             char **result = malloc(sizeof(char *));
             if (result) {
                 result[0] = NULL;
@@ -7789,7 +7792,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
             *expanded_count = 0;
             return NULL;
         }
-        // Default POSIX behavior: return original pattern
+        /// Default POSIX behavior: return original pattern
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -7800,14 +7803,14 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         }
         return result;
     } else if (glob_result != 0) {
-        // Error in globbing
+        /// Error in globbing
         *expanded_count = 0;
         return NULL;
     }
 
-    // Success - copy results, filtering by qualifier if present
+    /// Success - copy results, filtering by qualifier if present
     if (qualifier == GLOB_QUAL_NONE) {
-        // No filtering needed
+        /// No filtering needed
         *expanded_count = globbuf.gl_pathc;
         char **result = malloc((globbuf.gl_pathc + 1) * sizeof(char *));
         if (!result) {
@@ -7820,7 +7823,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
             result[i] = strdup(globbuf.gl_pathv[i]);
 
             if (!result[i]) {
-                // Cleanup on allocation failure
+                /// Cleanup on allocation failure
                 for (size_t j = 0; j < i; j++) {
                     free(result[j]);
                 }
@@ -7835,7 +7838,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         globfree(&globbuf);
         return result;
     } else {
-        // Filter results by glob qualifier
+        /// Filter results by glob qualifier
         char **result = malloc((globbuf.gl_pathc + 1) * sizeof(char *));
         if (!result) {
             globfree(&globbuf);
@@ -7848,7 +7851,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
             if (matches_glob_qualifier(globbuf.gl_pathv[i], qualifier)) {
                 result[match_count] = strdup(globbuf.gl_pathv[i]);
                 if (!result[match_count]) {
-                    // Cleanup on allocation failure
+                    /// Cleanup on allocation failure
                     for (size_t j = 0; j < match_count; j++) {
                         free(result[j]);
                     }
@@ -7865,13 +7868,13 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
         globfree(&globbuf);
 
         if (match_count == 0) {
-            // No matches after filtering - nullglob mode OR an
-            // explicit (N) qualifier both expand to nothing.
+            /// No matches after filtering - nullglob mode OR an
+            /// explicit (N) qualifier both expand to nothing.
             free(result);
             if (shell_mode_allows(FEATURE_NULL_GLOB) ||
                 (qualifier & GLOB_QUAL_NULLGLOB)) {
-                // Nullglob: expand to nothing
-                // Return empty array (not NULL, to distinguish from error)
+                /// Nullglob: expand to nothing
+                /// Return empty array (not NULL, to distinguish from error)
                 result = malloc(sizeof(char *));
                 if (result) {
                     result[0] = NULL;
@@ -7881,7 +7884,7 @@ static char **expand_glob_pattern(const char *pattern, int *expanded_count) {
                 *expanded_count = 0;
                 return NULL;
             }
-            // Default: return original pattern
+            /// Default: return original pattern
             result = malloc(2 * sizeof(char *));
             if (result) {
                 result[0] = strdup(pattern);
@@ -7911,35 +7914,35 @@ static bool needs_glob_expansion(const char *str) {
         return false;
     }
 
-    // Check for glob metacharacters: *, ?, and character classes [...]
+    /// Check for glob metacharacters: *, ?, and character classes [...]
     const char *p = str;
     while (*p) {
         if (*p == '*' || *p == '?' || *p == '[') {
             return true;
         }
-        // Check for bash-style extglob patterns: ?(pat), *(pat), +(pat),
-        // @(pat), !(pat)
+        /// Check for bash-style extglob patterns: ?(pat), *(pat), +(pat),
+        /// @(pat), !(pat)
         if (shell_mode_allows(FEATURE_EXTENDED_GLOB)) {
             if ((*p == '?' || *p == '*' || *p == '+' || *p == '@' ||
                  *p == '!') &&
                 *(p + 1) == '(') {
                 return true;
             }
-            // Check for zsh-style extglob: ^pattern, X#, X##, (a|b)
-            // ^ at start = negation
+            /// Check for zsh-style extglob: ^pattern, X#, X##, (a|b)
+            /// ^ at start = negation
             if (p == str && *p == '^') {
                 return true;
             }
-            // # after a char or ] = zero or more quantifier
+            /// # after a char or ] = zero or more quantifier
             if (*p == '#' && p > str) {
                 char prev = *(p - 1);
                 if (prev != '/' && prev != ' ' && prev != '\t') {
                     return true;
                 }
             }
-            // ( not preceded by extglob op may be zsh alternation
+            /// ( not preceded by extglob op may be zsh alternation
             if (*p == '(' && (p == str || !strchr("?*+@!", *(p - 1)))) {
-                // Check for | inside
+                /// Check for | inside
                 const char *inner = p + 1;
                 int depth = 1;
                 while (*inner && depth > 0) {
@@ -7971,18 +7974,18 @@ static bool needs_brace_expansion(const char *str) {
         return false;
     }
 
-    // Check for brace expansion patterns: {a,b,c} or {1..10}
+    /// Check for brace expansion patterns: {a,b,c} or {1..10}
     const char *p = str;
     while (*p) {
         if (*p == '{') {
             const char *close = strchr(p + 1, '}');
             if (close) {
-                // Look for comma pattern: {a,b,c}
+                /// Look for comma pattern: {a,b,c}
                 const char *comma = strchr(p + 1, ',');
                 if (comma && comma < close) {
                     return true;
                 }
-                // Look for range pattern: {1..10} or {a..z}
+                /// Look for range pattern: {1..10} or {a..z}
                 const char *dotdot = strstr(p + 1, "..");
                 if (dotdot && dotdot < close) {
                     return true;
@@ -8020,19 +8023,19 @@ static char **expand_brace_range(const char *prefix, const char *content,
                                  const char *suffix, int *expanded_count) {
     *expanded_count = 0;
 
-    // Parse: start..end or start..end..step
+    /// Parse: start..end or start..end..step
     const char *dotdot1 = strstr(content, "..");
     if (!dotdot1) {
         return NULL;
     }
 
-    // Extract start
+    /// Extract start
     size_t start_len = dotdot1 - content;
     char *start_str = strndup(content, start_len);
     if (!start_str)
         return NULL;
 
-    // Find second .. for step (optional)
+    /// Find second .. for step (optional)
     const char *after_first = dotdot1 + 2;
     const char *dotdot2 = strstr(after_first, "..");
 
@@ -8040,12 +8043,12 @@ static char **expand_brace_range(const char *prefix, const char *content,
     char *step_str = NULL;
 
     if (dotdot2) {
-        // Has step: start..end..step
+        /// Has step: start..end..step
         size_t end_len = dotdot2 - after_first;
         end_str = strndup(after_first, end_len);
         step_str = strdup(dotdot2 + 2);
     } else {
-        // No step: start..end
+        /// No step: start..end
         end_str = strdup(after_first);
     }
 
@@ -8055,12 +8058,12 @@ static char **expand_brace_range(const char *prefix, const char *content,
         return NULL;
     }
 
-    // Determine if numeric or character range
+    /// Determine if numeric or character range
     bool is_numeric = false;
     bool is_char = false;
     int pad_width = 0;
 
-    // Check for zero-padding in numeric (e.g., "01")
+    /// Check for zero-padding in numeric (e.g., "01")
     if (start_str[0] == '0' && strlen(start_str) > 1) {
         pad_width = strlen(start_str);
     }
@@ -8070,45 +8073,45 @@ static char **expand_brace_range(const char *prefix, const char *content,
             pad_width = end_pad;
     }
 
-    // Check if start/end are single chars
+    /// Check if start/end are single chars
     if (strlen(start_str) == 1 && strlen(end_str) == 1 &&
         isalpha(start_str[0]) && isalpha(end_str[0])) {
         is_char = true;
     } else {
-        // Try to parse as numbers
+        /// Try to parse as numbers
         char *endptr;
         long start_val = strtol(start_str, &endptr, 10);
         if (*endptr == '\0') {
             long end_val = strtol(end_str, &endptr, 10);
             if (*endptr == '\0') {
                 is_numeric = true;
-                (void)start_val; // Used below
+                (void)start_val; /// Used below
                 (void)end_val;
             }
         }
     }
 
     if (!is_numeric && !is_char) {
-        // Invalid range - return NULL, caller will use original
+        /// Invalid range - return NULL, caller will use original
         free(start_str);
         free(end_str);
         free(step_str);
         return NULL;
     }
 
-    // Parse step value
+    /// Parse step value
     long step = 1;
     if (step_str && strlen(step_str) > 0) {
         char *endptr;
         step = strtol(step_str, &endptr, 10);
         if (*endptr != '\0' || step == 0) {
-            step = 1; // Invalid step, use default
+            step = 1; /// Invalid step, use default
         }
         if (step < 0)
-            step = -step; // Step is always positive, direction from start/end
+            step = -step; /// Step is always positive, direction from start/end
     }
 
-    // Calculate range
+    /// Calculate range
     long start_val, end_val;
     if (is_char) {
         start_val = start_str[0];
@@ -8118,10 +8121,10 @@ static char **expand_brace_range(const char *prefix, const char *content,
         end_val = strtol(end_str, NULL, 10);
     }
 
-    // Determine direction
+    /// Determine direction
     bool reverse = (start_val > end_val);
 
-    // Count items
+    /// Count items
     long range = reverse ? (start_val - end_val) : (end_val - start_val);
     int count = (int)(range / step) + 1;
 
@@ -8142,7 +8145,7 @@ static char **expand_brace_range(const char *prefix, const char *content,
         return NULL;
     }
 
-    // Allocate result array
+    /// Allocate result array
     char **result = malloc((count + 1) * sizeof(char *));
     if (!result) {
         free(start_str);
@@ -8151,7 +8154,7 @@ static char **expand_brace_range(const char *prefix, const char *content,
         return NULL;
     }
 
-    // Generate expansions
+    /// Generate expansions
     size_t prefix_len = strlen(prefix);
     size_t suffix_len = strlen(suffix);
 
@@ -8170,7 +8173,7 @@ static char **expand_brace_range(const char *prefix, const char *content,
         size_t full_len = prefix_len + strlen(item_buf) + suffix_len;
         result[i] = malloc(full_len + 1);
         if (!result[i]) {
-            // Cleanup on failure
+            /// Cleanup on failure
             for (int j = 0; j < i; j++) {
                 free(result[j]);
             }
@@ -8193,8 +8196,8 @@ static char **expand_brace_range(const char *prefix, const char *content,
     free(end_str);
     free(step_str);
 
-    // Recursively expand any remaining brace patterns in suffix
-    // This handles Cartesian products like {1..2}{a..b}
+    /// Recursively expand any remaining brace patterns in suffix
+    /// This handles Cartesian products like {1..2}{a..b}
     if (strchr(suffix, '{')) {
         char **final_results = NULL;
         int final_count = 0;
@@ -8225,7 +8228,7 @@ static char **expand_brace_range(const char *prefix, const char *content,
                         limit_hit = true;
                         continue;
                     }
-                    // Add all sub-results to final
+                    /// Add all sub-results to final
                     char **new_final =
                         realloc(final_results,
                                 (final_count + sub_count) * sizeof(char *));
@@ -8317,10 +8320,10 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
-    // Find the first brace pattern
+    /// Find the first brace pattern
     const char *open = strchr(pattern, '{');
     if (!open) {
-        // No braces - return original pattern
+        /// No braces - return original pattern
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -8353,7 +8356,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         }
     }
     if (!close) {
-        // Malformed brace - return original pattern
+        /// Malformed brace - return original pattern
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -8365,7 +8368,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return result;
     }
 
-    // Extract prefix, brace content, and suffix
+    /// Extract prefix, brace content, and suffix
     size_t prefix_len = open - pattern;
     size_t content_len = close - open - 1;
     const char *suffix = close + 1;
@@ -8412,7 +8415,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         if (range_result) {
             return range_result;
         }
-        // Range expansion failed - fall through to return original pattern
+        /// Range expansion failed - fall through to return original pattern
         char **result = malloc(2 * sizeof(char *));
         if (result) {
             result[0] = strdup(pattern);
@@ -8440,7 +8443,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         }
     }
 
-    // Allocate result array
+    /// Allocate result array
     char **result = malloc((item_count + 1) * sizeof(char *));
     if (!result) {
         free(prefix);
@@ -8449,7 +8452,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         return NULL;
     }
 
-    // Split content by commas and build result strings
+    /// Split content by commas and build result strings
     int result_index = 0;
     char *item_start = content;
     char *comma_pos = content;
@@ -8467,11 +8470,11 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
             comma_pos++;
         }
 
-        // Extract current item
+        /// Extract current item
         size_t item_len = comma_pos - item_start;
         char *item = malloc(item_len + 1);
         if (!item) {
-            // Cleanup on failure
+            /// Cleanup on failure
             for (int i = 0; i < result_index; i++) {
                 free(result[i]);
             }
@@ -8484,11 +8487,11 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         strncpy(item, item_start, item_len);
         item[item_len] = '\0';
 
-        // Build full result string: prefix + item + suffix
+        /// Build full result string: prefix + item + suffix
         size_t full_len = strlen(prefix) + strlen(item) + strlen(suffix);
         result[result_index] = malloc(full_len + 1);
         if (!result[result_index]) {
-            // Cleanup on failure
+            /// Cleanup on failure
             free(item);
             for (int i = 0; i < result_index; i++) {
                 free(result[i]);
@@ -8507,7 +8510,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
         free(item);
         result_index++;
 
-        // Move to next item
+        /// Move to next item
         if (*comma_pos == ',') {
             comma_pos++;
             item_start = comma_pos;
@@ -8550,7 +8553,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                 char **sub_results =
                     expand_brace_pattern(result[i], &sub_count);
                 if (sub_count == BRACE_EXPANSION_LIMIT_SENTINEL) {
-                    // Recursive cap propagation.
+                    /// Recursive cap propagation.
                     free(result[i]);
                     limit_hit = true;
                     continue;
@@ -8565,7 +8568,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                         limit_hit = true;
                         continue;
                     }
-                    // Add all sub-results to final
+                    /// Add all sub-results to final
                     char **new_final =
                         realloc(final_results,
                                 (final_count + sub_count) * sizeof(char *));
@@ -8574,17 +8577,17 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                         for (int j = 0; j < sub_count; j++) {
                             final_results[final_count++] = sub_results[j];
                         }
-                        free(sub_results); // Free array, not strings
+                        free(sub_results); /// Free array, not strings
                     } else {
-                        // Memory error - cleanup and return what we have
+                        /// Memory error - cleanup and return what we have
                         for (int j = 0; j < sub_count; j++) {
                             free(sub_results[j]);
                         }
                         free(sub_results);
                     }
-                    free(result[i]); // Free original since we expanded it
+                    free(result[i]); /// Free original since we expanded it
                 } else {
-                    // Sub-expansion failed, keep original
+                    /// Sub-expansion failed, keep original
                     if (cap > 0 && final_count + 1 > cap) {
                         free(result[i]);
                         limit_hit = true;
@@ -8603,7 +8606,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
                     }
                 }
             } else {
-                // No more braces, keep as-is
+                /// No more braces, keep as-is
                 if (cap > 0 && final_count + 1 > cap) {
                     free(result[i]);
                     limit_hit = true;
@@ -8620,7 +8623,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
             }
         }
 
-        free(result); // Free original array
+        free(result); /// Free original array
 
         if (limit_hit) {
             /* Cap exceeded — release the partial accumulation cleanly
@@ -8633,7 +8636,7 @@ char **expand_brace_pattern(const char *pattern, int *expanded_count) {
             return NULL;
         }
 
-        // Add NULL terminator
+        /// Add NULL terminator
         char **terminated =
             realloc(final_results, (final_count + 1) * sizeof(char *));
         if (terminated) {
@@ -8669,19 +8672,19 @@ static int execute_external_command_with_setup(executor_t *executor,
         return 1;
     }
 
-    // Check if command exists before forking (for better error messages)
-    // Skip this check for path-based commands (containing '/')
+    /// Check if command exists before forking (for better error messages)
+    /// Skip this check for path-based commands (containing '/')
     char *full_path = NULL;
     if (!strchr(argv[0], '/')) {
         full_path = find_command_in_path(argv[0]);
         if (!full_path) {
-            // Command not found - report with suggestions from parent process
+            /// Command not found - report with suggestions from parent process
             source_location_t loc = command ? command->loc : SOURCE_LOC_UNKNOWN;
             report_command_not_found(executor, argv[0], loc);
             return 127;
         }
 
-        // If hashall is enabled, remember this command's location
+        /// If hashall is enabled, remember this command's location
         if (shell_opts.hash_commands) {
             init_command_hash();
             if (command_hash) {
@@ -8691,8 +8694,8 @@ static int execute_external_command_with_setup(executor_t *executor,
         free(full_path);
     }
 
-    // Reset terminal state before forking for external commands
-    // This ensures git and other commands get proper TTY behavior
+    /// Reset terminal state before forking for external commands
+    /// This ensures git and other commands get proper TTY behavior
     if (is_interactive_shell()) {
         fflush(stdout);
         fflush(stderr);
@@ -8705,14 +8708,14 @@ static int execute_external_command_with_setup(executor_t *executor,
     }
 
     if (pid == 0) {
-        // Child process - setup redirections here
+        /// Child process - setup redirections here
         int redir_result = setup_redirections(executor, command);
         if (redir_result != 0) {
             exit(1);
         }
 
         if (redirect_stderr) {
-            // Redirect stderr to /dev/null
+            /// Redirect stderr to /dev/null
             int null_fd = open("/dev/null", O_WRONLY);
             if (null_fd != -1) {
                 dup2(null_fd, STDERR_FILENO);
@@ -8721,12 +8724,12 @@ static int execute_external_command_with_setup(executor_t *executor,
         }
 
         execvp(argv[0], argv);
-        // Check errno to determine appropriate exit code
-        int exit_code = 127; // Default: command not found
+        /// Check errno to determine appropriate exit code
+        int exit_code = 127; /// Default: command not found
         if (errno == EACCES) {
-            exit_code = 126; // Permission denied
+            exit_code = 126; /// Permission denied
         } else if (errno == ENOENT) {
-            exit_code = 127; // Command not found
+            exit_code = 127; /// Command not found
         }
         if (!redirect_stderr) {
             int saved_errno = errno;
@@ -8736,15 +8739,15 @@ static int execute_external_command_with_setup(executor_t *executor,
         }
         exit(exit_code);
     } else {
-        // Parent process
+        /// Parent process
         set_current_child_pid(pid);
 
-        // Print trace for external command if -x is enabled
+        /// Print trace for external command if -x is enabled
         if (should_trace_execution()) {
-            // Build command string from argv for tracing
-            size_t cmd_len = 1; // for null terminator
+            /// Build command string from argv for tracing
+            size_t cmd_len = 1; /// for null terminator
             for (int j = 0; argv[j]; j++) {
-                cmd_len += strlen(argv[j]) + (j > 0 ? 1 : 0); // +1 for space
+                cmd_len += strlen(argv[j]) + (j > 0 ? 1 : 0); /// +1 for space
             }
 
             char *cmd_str = malloc(cmd_len);
@@ -8759,37 +8762,37 @@ static int execute_external_command_with_setup(executor_t *executor,
             }
         }
 
-        // Enhanced debug tracing for external commands with setup
+        /// Enhanced debug tracing for external commands with setup
         DEBUG_TRACE_COMMAND(argv[0], argv, 0);
         DEBUG_PROFILE_ENTER(argv[0]);
 
         int status;
-        // Wait for child, retrying on EINTR (signal interruption)
+        /// Wait for child, retrying on EINTR (signal interruption)
         while (waitpid(pid, &status, 0) == -1) {
             if (errno != EINTR) {
-                // Real error - child may have already been reaped
+                /// Real error - child may have already been reaped
                 clear_current_child_pid();
                 return 1;
             }
-            // EINTR - signal interrupted wait, continue waiting
+            /// EINTR - signal interrupted wait, continue waiting
         }
         clear_current_child_pid();
 
         DEBUG_PROFILE_EXIT(argv[0]);
 
-        // Handle exit status properly - child may have exited or been signaled
+        /// Handle exit status properly - child may have exited or been signaled
         if (WIFEXITED(status)) {
             return WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
-            // Child was killed by signal - return 128 + signal number (bash
-            // convention)
+            /// Child was killed by signal - return 128 + signal number (bash
+            /// convention)
             return 128 + WTERMSIG(status);
         }
         return 1;
     }
 }
 
-// Forward declaration for test builtin
+/// Forward declaration for test builtin
 static int execute_test_builtin(executor_t *executor, char **argv);
 
 /**
@@ -8808,7 +8811,7 @@ static int execute_builtin_command(executor_t *executor, char **argv,
         return 1;
     }
 
-    // Set global executor for job control builtins
+    /// Set global executor for job control builtins
     current_executor = executor;
 
     /* Stash the call-site source location for the duration of this
@@ -8820,16 +8823,16 @@ static int execute_builtin_command(executor_t *executor, char **argv,
      * inner call returns. */
     source_location_t saved_loc = builtin_swap_source_location(loc);
 
-    // Find the builtin function in the builtin table
+    /// Find the builtin function in the builtin table
     for (size_t i = 0; i < builtins_count; i++) {
         if (strcmp(argv[0], builtins[i].name) == 0) {
-            // Print trace for builtin command if -x is enabled
+            /// Print trace for builtin command if -x is enabled
             if (should_trace_execution()) {
-                // Build command string from argv for tracing
-                size_t cmd_len = 1; // for null terminator
+                /// Build command string from argv for tracing
+                size_t cmd_len = 1; /// for null terminator
                 for (int j = 0; argv[j]; j++) {
                     cmd_len +=
-                        strlen(argv[j]) + (j > 0 ? 1 : 0); // +1 for space
+                        strlen(argv[j]) + (j > 0 ? 1 : 0); /// +1 for space
                 }
 
                 char *cmd_str = malloc(cmd_len);
@@ -8844,7 +8847,7 @@ static int execute_builtin_command(executor_t *executor, char **argv,
                 }
             }
 
-            // Count arguments
+            /// Count arguments
             int argc = 0;
             while (argv[argc]) {
                 argc++;
@@ -8861,7 +8864,7 @@ static int execute_builtin_command(executor_t *executor, char **argv,
 
             int result = builtins[i].func(argc, argv);
 
-            // Restore previous loc + clear builtin context + global executor
+            /// Restore previous loc + clear builtin context + global executor
             executor_pop_context(executor);
             (void)builtin_swap_source_location(saved_loc);
             current_executor = NULL;
@@ -8870,11 +8873,11 @@ static int execute_builtin_command(executor_t *executor, char **argv,
         }
     }
 
-    // Restore previous loc + clear global executor
+    /// Restore previous loc + clear global executor
     (void)builtin_swap_source_location(saved_loc);
     current_executor = NULL;
 
-    return 1; // Command not found
+    return 1; /// Command not found
 }
 
 /**
@@ -8898,110 +8901,110 @@ static bool is_builtin_command(const char *cmd) { return is_builtin(cmd); }
  */
 MAYBE_UNUSED
 static int execute_test_builtin(executor_t *executor, char **argv) {
-    (void)executor; // Reserved for executor-aware test evaluation
+    (void)executor; /// Reserved for executor-aware test evaluation
     if (!argv || !argv[0]) {
         return 1;
     }
 
-    // Count arguments
+    /// Count arguments
     int argc = 0;
     while (argv[argc]) {
         argc++;
     }
 
-    // Handle [ command - must end with ]
+    /// Handle [ command - must end with ]
     if (strcmp(argv[0], "[") == 0) {
         if (argc < 2 || strcmp(argv[argc - 1], "]") != 0) {
-            return 1; // Missing closing ]
+            return 1; /// Missing closing ]
         }
-        argc--; // Don't count the closing ]
+        argc--; /// Don't count the closing ]
     }
 
-    // Handle different test cases
+    /// Handle different test cases
     if (argc == 1) {
-        // test with no arguments - false
+        /// test with no arguments - false
         return 1;
     }
 
     if (argc == 2) {
-        // test STRING - true if STRING is non-empty
+        /// test STRING - true if STRING is non-empty
         return (argv[1] && strlen(argv[1]) > 0) ? 0 : 1;
     }
 
     if (argc == 3) {
-        // Unary operators
+        /// Unary operators
         if (strcmp(argv[1], "-z") == 0) {
-            // -z STRING - true if STRING is empty
+            /// -z STRING - true if STRING is empty
             return (argv[2] && strlen(argv[2]) == 0) ? 0 : 1;
         }
         if (strcmp(argv[1], "-n") == 0) {
-            // -n STRING - true if STRING is non-empty
+            /// -n STRING - true if STRING is non-empty
             return (argv[2] && strlen(argv[2]) > 0) ? 0 : 1;
         }
-        // Add more unary operators as needed
+        /// Add more unary operators as needed
         return 1;
     }
 
     if (argc == 4) {
-        // Binary operators: STRING1 OP STRING2
+        /// Binary operators: STRING1 OP STRING2
         char *str1 = argv[1];
         char *op = argv[2];
         char *str2 = argv[3];
 
         if (strcmp(op, "=") == 0 || strcmp(op, "==") == 0) {
-            // String equality
+            /// String equality
             return strcmp(str1, str2) == 0 ? 0 : 1;
         }
 
         if (strcmp(op, "!=") == 0) {
-            // String inequality
+            /// String inequality
             return strcmp(str1, str2) != 0 ? 0 : 1;
         }
 
         if (strcmp(op, "-eq") == 0) {
-            // Numeric equality
+            /// Numeric equality
             int num1 = atoi(str1);
             int num2 = atoi(str2);
             return (num1 == num2) ? 0 : 1;
         }
 
         if (strcmp(op, "-ne") == 0) {
-            // Numeric inequality
+            /// Numeric inequality
             int num1 = atoi(str1);
             int num2 = atoi(str2);
             return (num1 != num2) ? 0 : 1;
         }
 
         if (strcmp(op, "-lt") == 0) {
-            // Numeric less than
+            /// Numeric less than
             int num1 = atoi(str1);
             int num2 = atoi(str2);
             return (num1 < num2) ? 0 : 1;
         }
 
         if (strcmp(op, "-le") == 0) {
-            // Numeric less than or equal
+            /// Numeric less than or equal
             int num1 = atoi(str1);
             int num2 = atoi(str2);
             return (num1 <= num2) ? 0 : 1;
         }
 
         if (strcmp(op, "-gt") == 0) {
-            // Numeric greater than
+            /// Numeric greater than
             int num1 = atoi(str1);
             int num2 = atoi(str2);
             return (num1 > num2) ? 0 : 1;
         }
 
         if (strcmp(op, "-ge") == 0) {
-            // Numeric greater than or equal
+            /// Numeric greater than or equal
             int num1 = atoi(str1);
             int num2 = atoi(str2);
             return (num1 >= num2) ? 0 : 1;
         }
     }
 
-    // Default: false
+    /// Default: false
     return 1;
 }
 
@@ -9019,12 +9022,12 @@ static bool is_assignment(const char *text) {
         return false;
     }
 
-    // Don't treat parameter expansion ${...} as assignment
+    /// Don't treat parameter expansion ${...} as assignment
     if (text[0] == '$' && text[1] == '{') {
         return false;
     }
 
-    // Look for '=' not at the beginning
+    /// Look for '=' not at the beginning
     const char *eq = strchr(text, '=');
     return eq && eq != text;
 }
@@ -9054,13 +9057,13 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         return 1;
     }
 
-    // Check for += append operation
+    /// Check for += append operation
     bool is_append = (eq > assignment && *(eq - 1) == '+');
 
-    // Split into variable and value
+    /// Split into variable and value
     size_t var_len = eq - assignment;
     if (is_append) {
-        var_len--; // Exclude the '+' from variable name
+        var_len--; /// Exclude the '+' from variable name
     }
 
     char *var_name = malloc(var_len + 1);
@@ -9071,7 +9074,7 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     strncpy(var_name, assignment, var_len);
     var_name[var_len] = '\0';
 
-    // Privileged mode security check for environment variable modifications
+    /// Privileged mode security check for environment variable modifications
     if (!is_privileged_path_modification_allowed(var_name)) {
         executor_error_report(
             executor, SHELL_ERR_PERMISSION_DENIED, loc,
@@ -9081,7 +9084,7 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         return 1;
     }
 
-    // Validate variable name
+    /// Validate variable name
     if (!var_name[0] || (!isalpha(var_name[0]) && var_name[0] != '_')) {
         free(var_name);
         return 1;
@@ -9094,9 +9097,9 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         }
     }
 
-    // Expand the value using modern expansion
-    // Save exit status set by command substitution (POSIX: assignment-only
-    // commands should return the exit status of the last command substitution)
+    /// Expand the value using modern expansion
+    /// Save exit status set by command substitution (POSIX: assignment-only
+    /// commands should return the exit status of the last command substitution)
     char *value = expand_if_needed(executor, eq + 1);
     int cmd_sub_exit_status = executor->exit_status;
 
@@ -9131,27 +9134,27 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         }
     }
 
-    // Resolve nameref if the variable is a nameref (max depth 10)
+    /// Resolve nameref if the variable is a nameref (max depth 10)
     const char *target_name = var_name;
-    char *resolved_to_free = NULL; // Track if we need to free resolved name
+    char *resolved_to_free = NULL; /// Track if we need to free resolved name
     if (symtable_is_nameref(executor->symtable, var_name)) {
         const char *resolved =
             symtable_resolve_nameref(executor->symtable, var_name, 10);
         if (resolved && resolved != var_name) {
             target_name = resolved;
-            resolved_to_free = (char *)resolved; // May need to free this
+            resolved_to_free = (char *)resolved; /// May need to free this
         }
     }
 
-    // POSIX compliance: variable assignments are GLOBAL by default
-    // Local variables are only created via explicit 'local' builtin
+    /// POSIX compliance: variable assignments are GLOBAL by default
+    /// Local variables are only created via explicit 'local' builtin
     int result;
 
     if (is_append) {
-        // += dispatches on the target's kind: list/map appends element,
-        // scalar concatenates string. One symtable_lookup tags the kind
-        // explicitly instead of the legacy "try array, fall back to
-        // scalar" dance.
+        /// += dispatches on the target's kind: list/map appends element,
+        /// scalar concatenates string. One symtable_lookup tags the kind
+        /// explicitly instead of the legacy "try array, fall back to
+        /// scalar" dance.
         lush_value_view_t view = {0};
         symtable_lookup(target_name, &view);
         if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
@@ -9159,8 +9162,8 @@ static int execute_assignment(executor_t *executor, const char *assignment,
             lush_value_view_clear(&view);
             result = 0;
         } else {
-            // String append: take ownership of the scalar out of the view
-            // and proceed with the existing concatenate-and-reassign path.
+            /// String append: take ownership of the scalar out of the view
+            /// and proceed with the existing concatenate-and-reassign path.
             char *existing = view.scalar_value;
             view.scalar_value = NULL;
             lush_value_view_clear(&view);
@@ -9180,12 +9183,12 @@ static int execute_assignment(executor_t *executor, const char *assignment,
                     result = -1;
                 }
             } else {
-                // No existing value, just set the new value
+                /// No existing value, just set the new value
                 result = symtable_assign_var(executor->symtable, target_name,
                                              value ? value : "");
             }
-            // symtable_get_var returns a strdup; free it. Pre-existing
-            // leak fixed as part of the symtable_lookup migration.
+            /// symtable_get_var returns a strdup; free it. Pre-existing
+            /// leak fixed as part of the symtable_lookup migration.
             free(existing);
         }
     } else {
@@ -9193,17 +9196,17 @@ static int execute_assignment(executor_t *executor, const char *assignment,
                                      value ? value : "");
     }
 
-    // Free resolved nameref if it was allocated
+    /// Free resolved nameref if it was allocated
     if (resolved_to_free) {
         free(resolved_to_free);
     }
 
-    // POSIX -a (allexport): automatically export assigned variables
+    /// POSIX -a (allexport): automatically export assigned variables
     if (result == 0 && should_auto_export()) {
         symtable_export_global(var_name);
     }
 
-    // Notify LLE prompt system when prompt variables are set by user code
+    /// Notify LLE prompt system when prompt variables are set by user code
     if (result == 0 &&
         (strcmp(var_name, "PS1") == 0 || strcmp(var_name, "PS2") == 0 ||
          strcmp(var_name, "PROMPT") == 0 || strcmp(var_name, "RPROMPT") == 0 ||
@@ -9219,9 +9222,9 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     free(var_name);
     free(value);
 
-    // POSIX: For assignment-only commands, return the exit status of the
-    // last command substitution performed during value expansion, or 0
-    // if no command substitution was performed or if the assignment failed
+    /// POSIX: For assignment-only commands, return the exit status of the
+    /// last command substitution performed during value expansion, or 0
+    /// if no command substitution was performed or if the assignment failed
     if (result == 0) {
         executor->exit_status = cmd_sub_exit_status;
         return cmd_sub_exit_status;
@@ -9244,16 +9247,16 @@ static int execute_case(executor_t *executor, node_t *node) {
         return 1;
     }
 
-    // Get the test word and expand variables in it
+    /// Get the test word and expand variables in it
     char *test_word = expand_if_needed(executor, node->val.str);
     if (!test_word) {
         return 1;
     }
 
-    // Push error context for structured error reporting
+    /// Push error context for structured error reporting
     executor_push_context(executor, node->loc, "in case statement");
 
-    // Check for trailing redirections on the case statement
+    /// Check for trailing redirections on the case statement
     bool has_redirections = count_redirections(node) > 0;
     redirection_state_t redir_state;
 
@@ -9270,29 +9273,30 @@ static int execute_case(executor_t *executor, node_t *node) {
 
     int result = 0;
     bool done = false;
-    bool execute_next = false; // For ;& fall-through
+    bool execute_next = false; /// For ;& fall-through
 
-    // Iterate through case items (children)
+    /// Iterate through case items (children)
     node_t *case_item = node->first_child;
     while (case_item && !done) {
-        // The pattern is stored in case_item->val.str with terminator prefix
-        // Format: "<terminator_char><pattern>" where terminator_char is '0',
-        // '1', or '2'
+        /// The pattern is stored in case_item->val.str with terminator prefix
+        /// Format: "<terminator_char><pattern>" where terminator_char is '0',
+        /// '1', or '2'
         char *patterns = case_item->val.str;
         if (!patterns || !*patterns) {
             case_item = case_item->next_sibling;
             continue;
         }
 
-        // Extract terminator type from pattern prefix (for NODE_CASE_ITEM)
+        /// Extract terminator type from pattern prefix (for NODE_CASE_ITEM)
         case_terminator_t terminator = CASE_TERM_BREAK;
         if (case_item->type == NODE_CASE_ITEM && patterns[0] >= '0' &&
             patterns[0] <= '2') {
             terminator = (case_terminator_t)(patterns[0] - '0');
-            patterns++; // Skip the prefix byte
+            patterns++; /// Skip the prefix byte
         }
 
-        bool matched = execute_next; // If fall-through, execute without testing
+        bool matched =
+            execute_next; /// If fall-through, execute without testing
 
         if (!matched) {
             /* Split patterns by `|` and test each. strtok cannot be
@@ -9353,19 +9357,19 @@ static int execute_case(executor_t *executor, node_t *node) {
                 commands = commands->next_sibling;
             }
 
-            // Handle terminator behavior
+            /// Handle terminator behavior
             switch (terminator) {
             case CASE_TERM_BREAK:
-                // ;; - stop processing case items
+                /// ;; - stop processing case items
                 done = true;
                 execute_next = false;
                 break;
             case CASE_TERM_FALLTHROUGH:
-                // ;& - execute next case item without testing pattern
+                /// ;& - execute next case item without testing pattern
                 execute_next = true;
                 break;
             case CASE_TERM_CONTINUE:
-                // ;;& - continue testing next patterns
+                /// ;;& - continue testing next patterns
                 execute_next = false;
                 break;
             }
@@ -9378,12 +9382,12 @@ static int execute_case(executor_t *executor, node_t *node) {
 
     free(test_word);
 
-    // Restore file descriptors if we set up redirections
+    /// Restore file descriptors if we set up redirections
     if (has_redirections) {
         restore_file_descriptors(&redir_state);
     }
 
-    // Pop error context
+    /// Pop error context
     executor_pop_context(executor);
 
     return result;
@@ -9411,33 +9415,33 @@ static int execute_function_definition(executor_t *executor, node_t *node) {
         return 1;
     }
 
-    // Get function body (can be NULL for empty function bodies)
+    /// Get function body (can be NULL for empty function bodies)
     node_t *body = node->first_child;
 
-    // Extract parameter information from function name if encoded
+    /// Extract parameter information from function name if encoded
     function_param_t *params = NULL;
     int param_count = 0;
     char *actual_function_name = function_name;
 
-    // Check if function name contains parameter encoding
-    // POSIX compliance: disable advanced parameter syntax in strict POSIX mode
+    /// Check if function name contains parameter encoding
+    /// POSIX compliance: disable advanced parameter syntax in strict POSIX mode
     char *param_separator = strchr(function_name, '|');
     if (param_separator && !is_posix_mode_enabled()) {
-        // Extract actual function name
+        /// Extract actual function name
         size_t name_len = param_separator - function_name;
         actual_function_name = malloc(name_len + 1);
         strncpy(actual_function_name, function_name, name_len);
         actual_function_name[name_len] = '\0';
 
-        // Parse parameter information
+        /// Parse parameter information
         char *param_info = param_separator + 1;
         if (strncmp(param_info, "PARAMS{", 7) == 0) {
             char *param_list = param_info + 7;
             char *end_brace = strchr(param_list, '}');
             if (end_brace) {
-                *end_brace = '\0'; // Temporarily null-terminate
+                *end_brace = '\0'; /// Temporarily null-terminate
 
-                // Parse parameter list
+                /// Parse parameter list
                 char *param_copy = strdup(param_list);
                 char *token = strtok(param_copy, ",");
                 function_param_t *last_param = NULL;
@@ -9468,12 +9472,12 @@ static int execute_function_definition(executor_t *executor, node_t *node) {
                 }
 
                 free(param_copy);
-                *end_brace = '}'; // Restore original string
+                *end_brace = '}'; /// Restore original string
             }
         }
     }
 
-    // Store function in function table
+    /// Store function in function table
     if (store_function(executor, actual_function_name, body, params,
                        param_count) != 0) {
         set_executor_error(executor, "Failed to define function");
@@ -9488,7 +9492,7 @@ static int execute_function_definition(executor_t *executor, node_t *node) {
                actual_function_name, param_count);
     }
 
-    // Clean up allocated function name if we created one
+    /// Clean up allocated function name if we created one
     if (actual_function_name != function_name) {
         free(actual_function_name);
     }
@@ -9533,7 +9537,7 @@ static int execute_function_call(executor_t *executor,
         return 1;
     }
 
-    // Validate function parameters (errors already displayed structurally)
+    /// Validate function parameters (errors already displayed structurally)
     if (validate_function_parameters(executor, func, argv, argc, loc) != 0) {
         return 1;
     }
@@ -9543,31 +9547,31 @@ static int execute_function_call(executor_t *executor,
                argc - 1);
     }
 
-    // Create new scope for function
+    /// Create new scope for function
     if (symtable_push_scope(executor->symtable, SCOPE_FUNCTION,
                             function_name) != 0) {
         set_executor_error(executor, "Failed to create function scope");
         return 1;
     }
 
-    // Set parameters (both positional and named)
+    /// Set parameters (both positional and named)
     if (func->params) {
-        // Set named parameters with defaults
-        int arg_index = 1; // Skip function name at argv[0]
+        /// Set named parameters with defaults
+        int arg_index = 1; /// Skip function name at argv[0]
         function_param_t *param = func->params;
 
         while (param) {
             const char *value;
             if (arg_index < argc) {
-                // Use provided argument
+                /// Use provided argument
                 value = argv[arg_index++];
             } else {
-                // Use default value (already validated that required params are
-                // present)
+                /// Use default value (already validated that required params
+                /// are present)
                 value = param->default_value ? param->default_value : "";
             }
 
-            // Set named parameter
+            /// Set named parameter
             if (symtable_set_local_var(executor->symtable, param->name,
                                        value) != 0) {
                 symtable_pop_scope(executor->symtable);
@@ -9579,7 +9583,7 @@ static int execute_function_call(executor_t *executor,
         }
     }
 
-    // Set positional parameters ($1, $2, etc.) for backward compatibility
+    /// Set positional parameters ($1, $2, etc.) for backward compatibility
     for (int i = 1; i < argc; i++) {
         char param_name[16];
         snprintf(param_name, sizeof(param_name), "%d", i);
@@ -9591,26 +9595,26 @@ static int execute_function_call(executor_t *executor,
         }
     }
 
-    // Set $# (argument count)
+    /// Set $# (argument count)
     char argc_str[16];
     snprintf(argc_str, sizeof(argc_str), "%d", argc - 1);
     symtable_set_local_var(executor->symtable, "#", argc_str);
 
-    // No need to clear environment variables with new approach
+    /// No need to clear environment variables with new approach
 
-    // Push function context for error reporting (Phase 3)
+    /// Push function context for error reporting (Phase 3)
     source_location_t func_loc =
         func->body ? func->body->loc : SOURCE_LOC_UNKNOWN;
     executor_push_context(executor, func_loc, "in function '%s'",
                           function_name);
 
-    // Apply trailing redirections attached to the function definition (issue
-    // #48). The redirection nodes were appended as siblings of the body by
-    // parse_function_definition + parse_trailing_redirections (issue #43);
-    // copy_ast_chain pulled them along into func->body. Use a synthetic
-    // parent so setup_redirections can walk them via first_child like every
-    // other compound command. Save/restore fds so the redirection only
-    // applies for the duration of this call.
+    /// Apply trailing redirections attached to the function definition (issue
+    /// #48). The redirection nodes were appended as siblings of the body by
+    /// parse_function_definition + parse_trailing_redirections (issue #43);
+    /// copy_ast_chain pulled them along into func->body. Use a synthetic
+    /// parent so setup_redirections can walk them via first_child like every
+    /// other compound command. Save/restore fds so the redirection only
+    /// applies for the duration of this call.
     node_t synthetic_parent = {0};
     synthetic_parent.first_child = func->body;
     bool has_redirections = count_redirections(&synthetic_parent) > 0;
@@ -9626,8 +9630,8 @@ static int execute_function_call(executor_t *executor,
         }
     }
 
-    // Execute function body (handle multiple commands; skip redirection
-    // siblings, which were already applied above)
+    /// Execute function body (handle multiple commands; skip redirection
+    /// siblings, which were already applied above)
     int result = 0;
     node_t *command = func->body;
     while (command) {
@@ -9653,9 +9657,9 @@ static int execute_function_call(executor_t *executor,
             fire_err_trap();
         }
 
-        // Check if this is a function return (special code 200-255)
+        /// Check if this is a function return (special code 200-255)
         if (result >= 200 && result <= 255) {
-            // Extract the actual return value from the special code
+            /// Extract the actual return value from the special code
             int actual_return = result - 200;
 
             /* Bash-style RETURN pseudo-signal: fires when a function
@@ -9668,17 +9672,17 @@ static int execute_function_call(executor_t *executor,
                 restore_file_descriptors(&redir_state);
             }
 
-            // Pop function context before returning
+            /// Pop function context before returning
             executor_pop_context(executor);
 
-            // Restore previous scope before returning
+            /// Restore previous scope before returning
             symtable_pop_scope(executor->symtable);
 
             return actual_return;
         }
 
         if (result != 0) {
-            break; // Stop on first error
+            break; /// Stop on first error
         }
         command = command->next_sibling;
     }
@@ -9693,10 +9697,10 @@ static int execute_function_call(executor_t *executor,
         restore_file_descriptors(&redir_state);
     }
 
-    // Pop function context
+    /// Pop function context
     executor_pop_context(executor);
 
-    // Restore previous scope
+    /// Restore previous scope
     symtable_pop_scope(executor->symtable);
 
     return result;
@@ -9769,41 +9773,41 @@ void free_function_params(function_param_t *params) {
 static int validate_function_parameters(executor_t *executor,
                                         function_def_t *func, char **argv,
                                         int argc, source_location_t loc) {
-    (void)argv; // Reserved for argument type validation
-    (void)argc; // Reserved for arity checking
+    (void)argv; /// Reserved for argument type validation
+    (void)argc; /// Reserved for arity checking
     if (!func) {
         return 1;
     }
 
-    // POSIX compliance: disable parameter validation in strict POSIX mode
+    /// POSIX compliance: disable parameter validation in strict POSIX mode
     if (is_posix_mode_enabled()) {
         return 0;
     }
 
-    // If no parameters defined, allow any arguments (backward compatibility)
+    /// If no parameters defined, allow any arguments (backward compatibility)
     if (!func->params) {
         return 0;
     }
 
-    int arg_index = 1; // Skip function name at argv[0]
+    int arg_index = 1; /// Skip function name at argv[0]
     function_param_t *param = func->params;
 
     while (param) {
         if (arg_index < argc) {
-            // Argument provided for this parameter
+            /// Argument provided for this parameter
             arg_index++;
         } else if (param->is_required) {
-            // Required parameter missing
+            /// Required parameter missing
             executor_error_report(executor, SHELL_ERR_FUNCTION_ERROR, loc,
                                   "function '%s' requires parameter '%s'",
                                   func->name, param->name);
             return 1;
         }
-        // Optional parameter without argument - will use default
+        /// Optional parameter without argument - will use default
         param = param->next;
     }
 
-    // Check for too many arguments
+    /// Check for too many arguments
     if (arg_index < argc) {
         executor_error_report(
             executor, SHELL_ERR_FUNCTION_ERROR, loc,
@@ -9862,7 +9866,7 @@ static int store_function(executor_t *executor, const char *function_name,
         return 1;
     }
 
-    // Check if function already exists and remove it
+    /// Check if function already exists and remove it
     function_def_t **current = &executor->functions;
     while (*current) {
         if (strcmp((*current)->name, function_name) == 0) {
@@ -9877,7 +9881,7 @@ static int store_function(executor_t *executor, const char *function_name,
         current = &(*current)->next;
     }
 
-    // Create new function definition
+    /// Create new function definition
     function_def_t *new_func = malloc(sizeof(function_def_t));
     if (!new_func) {
         return 1;
@@ -9889,21 +9893,21 @@ static int store_function(executor_t *executor, const char *function_name,
         return 1;
     }
 
-    // Create a deep copy of the body AST (including sibling chain)
-    // Allow NULL bodies for empty functions
+    /// Create a deep copy of the body AST (including sibling chain)
+    /// Allow NULL bodies for empty functions
     new_func->body = copy_ast_chain(body);
     if (!new_func->body && body != NULL) {
-        // Only fail if body was non-NULL but copy failed
+        /// Only fail if body was non-NULL but copy failed
         free(new_func->name);
         free(new_func);
         return 1;
     }
 
-    // Store parameter information
+    /// Store parameter information
     new_func->params = params;
     new_func->param_count = param_count;
 
-    // Add to front of function list
+    /// Add to front of function list
     new_func->next = executor->functions;
     executor->functions = new_func;
 
@@ -9929,7 +9933,7 @@ node_t *copy_ast_node(node_t *node) {
         return NULL;
     }
 
-    // Copy value
+    /// Copy value
     copy->val_type = node->val_type;
     if (node->val.str) {
         copy->val.str = strdup(node->val.str);
@@ -9941,7 +9945,7 @@ node_t *copy_ast_node(node_t *node) {
         copy->val = node->val;
     }
 
-    // Copy children
+    /// Copy children
     node_t *child = node->first_child;
     while (child) {
         node_t *child_copy = copy_ast_node(child);
@@ -10068,16 +10072,16 @@ static bool match_pattern(const char *str, const char *pattern) {
 
     while (*p) {
         if (*p == '*') {
-            // Handle wildcard
-            p++; // Skip the *
+            /// Handle wildcard
+            p++; /// Skip the *
 
-            // If * is at the end, it matches everything remaining
+            /// If * is at the end, it matches everything remaining
             if (*p == '\0') {
                 return true;
             }
 
-            // Try to match the rest of the pattern at each position in the
-            // string
+            /// Try to match the rest of the pattern at each position in the
+            /// string
             while (*s) {
                 if (match_pattern(s, p)) {
                     return true;
@@ -10085,27 +10089,27 @@ static bool match_pattern(const char *str, const char *pattern) {
                 s++;
             }
 
-            // Try matching the pattern with empty string (for cases like
-            // "*suffix")
+            /// Try matching the pattern with empty string (for cases like
+            /// "*suffix")
             return match_pattern(s, p);
         } else if (*p == '?') {
-            // Wildcard matches any single character
+            /// Wildcard matches any single character
             if (*s == '\0') {
-                return false; // ? can't match empty
+                return false; /// ? can't match empty
             }
             s++;
             p++;
         } else if (*p == '[') {
-            // Character class pattern [abc] or [a-z]
+            /// Character class pattern [abc] or [a-z]
             if (*s == '\0') {
-                return false; // Character class can't match empty
+                return false; /// Character class can't match empty
             }
 
-            p++; // Skip opening [
+            p++; /// Skip opening [
             bool matched = false;
             bool negated = false;
 
-            // Check for negation [!abc] or [^abc]
+            /// Check for negation [!abc] or [^abc]
             if (*p == '!' || *p == '^') {
                 negated = true;
                 p++;
@@ -10166,18 +10170,18 @@ static bool match_pattern(const char *str, const char *pattern) {
                         if (cls_match) {
                             matched = true;
                         }
-                        p = class_end + 2; // past `:]`
+                        p = class_end + 2; /// past `:]`
                         continue;
                     }
                 }
                 if (p[1] == '-' && p[2] != ']' && p[2] != '\0') {
-                    // Range pattern like a-z
+                    /// Range pattern like a-z
                     if (*s >= *p && *s <= p[2]) {
                         matched = true;
                     }
-                    p += 3; // Skip a-z
+                    p += 3; /// Skip a-z
                 } else {
-                    // Single character
+                    /// Single character
                     if (*s == *p) {
                         matched = true;
                     }
@@ -10186,10 +10190,10 @@ static bool match_pattern(const char *str, const char *pattern) {
             }
 
             if (*p == ']') {
-                p++; // Skip closing ]
+                p++; /// Skip closing ]
             }
 
-            // Apply negation if needed
+            /// Apply negation if needed
             if (negated) {
                 matched = !matched;
             }
@@ -10200,7 +10204,8 @@ static bool match_pattern(const char *str, const char *pattern) {
 
             s++;
         } else {
-            // Literal character match (including special chars like : @ / etc.)
+            /// Literal character match (including special chars like : @ /
+            /// etc.)
             if (*s != *p) {
                 return false;
             }
@@ -10209,7 +10214,7 @@ static bool match_pattern(const char *str, const char *pattern) {
         }
     }
 
-    // Pattern is exhausted, string should be too for a complete match
+    /// Pattern is exhausted, string should be too for a complete match
     return *s == '\0';
 }
 
@@ -10246,7 +10251,7 @@ static int find_prefix_match(const char *str, const char *pattern,
             match_len = i;
             if (!longest) {
                 free(substr);
-                break; // Return first (shortest) match
+                break; /// Return first (shortest) match
             }
         }
         free(substr);
@@ -10280,7 +10285,7 @@ static int find_suffix_match(const char *str, const char *pattern,
         if (match_pattern(suffix, pattern)) {
             match_len = i;
             if (!longest) {
-                break; // Return first (shortest) match
+                break; /// Return first (shortest) match
             }
         }
     }
@@ -10306,8 +10311,8 @@ static char *convert_case_first_upper(const char *str) {
         return strdup("");
     }
 
-    // Allocate buffer for Unicode conversion (may need more space)
-    size_t buf_size = len * 4 + 1; // UTF-8 worst case
+    /// Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; /// UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -10315,7 +10320,7 @@ static char *convert_case_first_upper(const char *str) {
 
     size_t out_len = lle_utf8_toupper_first(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        // Fallback to simple copy on error
+        /// Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -10341,8 +10346,8 @@ static char *convert_case_first_lower(const char *str) {
         return strdup("");
     }
 
-    // Allocate buffer for Unicode conversion (may need more space)
-    size_t buf_size = len * 4 + 1; // UTF-8 worst case
+    /// Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; /// UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -10350,7 +10355,7 @@ static char *convert_case_first_lower(const char *str) {
 
     size_t out_len = lle_utf8_tolower_first(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        // Fallback to simple copy on error
+        /// Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -10433,8 +10438,8 @@ static char *convert_case_all_upper(const char *str) {
         return strdup("");
     }
 
-    // Allocate buffer for Unicode conversion (may need more space)
-    size_t buf_size = len * 4 + 1; // UTF-8 worst case
+    /// Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; /// UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -10442,7 +10447,7 @@ static char *convert_case_all_upper(const char *str) {
 
     size_t out_len = lle_utf8_toupper(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        // Fallback to simple copy on error
+        /// Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -10468,8 +10473,8 @@ static char *convert_case_all_lower(const char *str) {
         return strdup("");
     }
 
-    // Allocate buffer for Unicode conversion (may need more space)
-    size_t buf_size = len * 4 + 1; // UTF-8 worst case
+    /// Allocate buffer for Unicode conversion (may need more space)
+    size_t buf_size = len * 4 + 1; /// UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -10477,7 +10482,7 @@ static char *convert_case_all_lower(const char *str) {
 
     size_t out_len = lle_utf8_tolower(str, len, result, buf_size);
     if (out_len == (size_t)-1) {
-        // Fallback to simple copy on error
+        /// Fallback to simple copy on error
         free(result);
         return strdup(str);
     }
@@ -10504,8 +10509,8 @@ static char *convert_case_capitalize_words(const char *str) {
         return strdup("");
     }
 
-    // Allocate buffer - capitalize shouldn't change length significantly
-    size_t buf_size = len * 4 + 1; // UTF-8 worst case
+    /// Allocate buffer - capitalize shouldn't change length significantly
+    size_t buf_size = len * 4 + 1; /// UTF-8 worst case
     char *result = malloc(buf_size);
     if (!result) {
         return strdup("");
@@ -10516,7 +10521,7 @@ static char *convert_case_capitalize_words(const char *str) {
     bool word_start = true;
 
     while (*src) {
-        // Get UTF-8 codepoint length
+        /// Get UTF-8 codepoint length
         size_t cp_len = 1;
         unsigned char c = (unsigned char)*src;
         if (c >= 0xC0 && c < 0xE0)
@@ -10526,7 +10531,7 @@ static char *convert_case_capitalize_words(const char *str) {
         else if (c >= 0xF0)
             cp_len = 4;
 
-        // Ensure we don't read past end
+        /// Ensure we don't read past end
         size_t remaining = strlen(src);
         if (cp_len > remaining)
             cp_len = remaining;
@@ -10535,7 +10540,7 @@ static char *convert_case_capitalize_words(const char *str) {
             *dst++ = *src++;
             word_start = true;
         } else if (word_start) {
-            // Uppercase the first character of word
+            /// Uppercase the first character of word
             char temp[8] = {0};
             memcpy(temp, src, cp_len);
             char upper[16] = {0};
@@ -10551,7 +10556,7 @@ static char *convert_case_capitalize_words(const char *str) {
             src += cp_len;
             word_start = false;
         } else {
-            // Lowercase the rest
+            /// Lowercase the rest
             char temp[8] = {0};
             memcpy(temp, src, cp_len);
             char lower[16] = {0};
@@ -10647,7 +10652,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 if (fnmatch(pattern, substr, 0) == 0) {
                     matched = true;
                     match_len = try_len;
-                    // For glob with *, prefer longest match.
+                    /// For glob with *, prefer longest match.
                     if (strchr(pattern, '*')) {
                         for (size_t longer = try_len + 1; longer <= str_len;
                              longer++) {
@@ -10733,7 +10738,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
         return result;
     }
 
-    // Allocate result buffer - estimate size
+    /// Allocate result buffer - estimate size
     size_t result_size = str_len * 2 + 1;
     char *result = malloc(result_size);
     if (!result) {
@@ -10746,14 +10751,14 @@ static char *pattern_substitute(const char *str, const char *pattern,
     bool replaced = false;
 
     while (i < str_len) {
-        // Try to match pattern at current position
+        /// Try to match pattern at current position
         bool matched = false;
         size_t match_len = 0;
 
-        // Simple pattern matching - check for exact match or glob
+        /// Simple pattern matching - check for exact match or glob
         if (is_glob) {
-            // Use fnmatch for glob patterns
-            // Try increasing lengths to find the match
+            /// Use fnmatch for glob patterns
+            /// Try increasing lengths to find the match
             for (size_t try_len = 1; try_len <= str_len - i; try_len++) {
                 char *substr = malloc(try_len + 1);
                 if (substr) {
@@ -10762,7 +10767,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                     if (fnmatch(pattern, substr, 0) == 0) {
                         matched = true;
                         match_len = try_len;
-                        // For greedy matching with *, keep trying longer
+                        /// For greedy matching with *, keep trying longer
                         if (strchr(pattern, '*')) {
                             for (size_t longer = try_len + 1;
                                  longer <= str_len - i; longer++) {
@@ -10785,7 +10790,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 }
             }
         } else {
-            // Exact substring match
+            /// Exact substring match
             if (strncmp(str + i, pattern, pattern_len) == 0) {
                 matched = true;
                 match_len = pattern_len;
@@ -10793,7 +10798,7 @@ static char *pattern_substitute(const char *str, const char *pattern,
         }
 
         if (matched && (!replaced || global)) {
-            // Ensure we have enough space
+            /// Ensure we have enough space
             if (result_pos + replacement_len + 1 >= result_size) {
                 result_size = result_size * 2 + replacement_len;
                 char *new_result = realloc(result, result_size);
@@ -10804,13 +10809,13 @@ static char *pattern_substitute(const char *str, const char *pattern,
                 result = new_result;
             }
 
-            // Copy replacement
+            /// Copy replacement
             strcpy(result + result_pos, replacement);
             result_pos += replacement_len;
             i += match_len;
             replaced = true;
         } else {
-            // No match, copy current character
+            /// No match, copy current character
             if (result_pos + 1 >= result_size) {
                 result_size *= 2;
                 char *new_result = realloc(result, result_size);
@@ -10863,7 +10868,7 @@ char *transform_quote(const char *str) {
     }
 
     if (has_control) {
-        // $'...' ANSI-C form for strings with control chars.
+        /// $'...' ANSI-C form for strings with control chars.
         size_t result_size = len * 4 + 4;
         char *result = malloc(result_size);
         if (!result) {
@@ -10919,7 +10924,7 @@ char *transform_quote(const char *str) {
         for (size_t i = 0; i < len; i++) {
             unsigned char c = (unsigned char)str[i];
             if (c == '\'') {
-                // Emit `'\''`: close, escape, reopen.
+                /// Emit `'\''`: close, escape, reopen.
                 result[pos++] = '\'';
                 result[pos++] = '\\';
                 result[pos++] = '\'';
@@ -11001,7 +11006,7 @@ static char *transform_escape(const char *str) {
                 result[j++] = '\v';
                 i++;
                 break;
-            case 'x': // Hex escape \xHH
+            case 'x': /// Hex escape \xHH
                 if (i + 3 < len && isxdigit(str[i + 2]) &&
                     isxdigit(str[i + 3])) {
                     char hex[3] = {str[i + 2], str[i + 3], '\0'};
@@ -11041,7 +11046,7 @@ static char *transform_assignment(const char *name, const char *value) {
         value = "";
     }
 
-    // Quote the value
+    /// Quote the value
     char *quoted = transform_quote(value);
     if (!quoted) {
         return strdup("");
@@ -11082,7 +11087,7 @@ static char *transform_prompt(const char *str) {
     }
 
     size_t len = strlen(str);
-    size_t result_size = len * 4 + 256; // Allow for expansion
+    size_t result_size = len * 4 + 256; /// Allow for expansion
     char *result = malloc(result_size);
     if (!result) {
         return strdup("");
@@ -11094,7 +11099,7 @@ static char *transform_prompt(const char *str) {
             char next = str[i + 1];
             switch (next) {
             case 'u': {
-                // Username
+                /// Username
                 struct passwd *pw = getpwuid(getuid());
                 const char *user = pw ? pw->pw_name : "user";
                 size_t ulen = strlen(user);
@@ -11106,7 +11111,7 @@ static char *transform_prompt(const char *str) {
                 break;
             }
             case 'h': {
-                // Hostname (short - up to first dot)
+                /// Hostname (short - up to first dot)
                 char hostname[256];
                 if (gethostname(hostname, sizeof(hostname)) == 0) {
                     char *dot = strchr(hostname, '.');
@@ -11122,7 +11127,7 @@ static char *transform_prompt(const char *str) {
                 break;
             }
             case 'H': {
-                // Hostname (full)
+                /// Hostname (full)
                 char hostname[256];
                 if (gethostname(hostname, sizeof(hostname)) == 0) {
                     size_t hlen = strlen(hostname);
@@ -11135,10 +11140,10 @@ static char *transform_prompt(const char *str) {
                 break;
             }
             case 'w': {
-                // Current working directory
+                /// Current working directory
                 char cwd[PATH_MAX];
                 if (getcwd(cwd, sizeof(cwd))) {
-                    // Replace home dir with ~
+                    /// Replace home dir with ~
                     struct passwd *pw = getpwuid(getuid());
                     const char *home = pw ? pw->pw_dir : getenv("HOME");
                     if (home && strncmp(cwd, home, strlen(home)) == 0) {
@@ -11160,7 +11165,7 @@ static char *transform_prompt(const char *str) {
                 break;
             }
             case 'W': {
-                // Basename of current working directory
+                /// Basename of current working directory
                 char cwd[PATH_MAX];
                 if (getcwd(cwd, sizeof(cwd))) {
                     const char *base = strrchr(cwd, '/');
@@ -11177,7 +11182,7 @@ static char *transform_prompt(const char *str) {
                 break;
             }
             case '$':
-                // $ or # based on UID
+                /// $ or # based on UID
                 result[j++] = (getuid() == 0) ? '#' : '$';
                 i++;
                 break;
@@ -11194,7 +11199,7 @@ static char *transform_prompt(const char *str) {
                 i++;
                 break;
             default:
-                // Unknown escape, keep as-is
+                /// Unknown escape, keep as-is
                 result[j++] = str[i];
                 break;
             }
@@ -11233,7 +11238,7 @@ static char *get_variable_attributes(const char *name) {
         return strdup("");
     }
 
-    // Get variable flags
+    /// Get variable flags
     symvar_flags_t flags = symtable_get_flags(mgr, name);
 
     /* Bash ${var@a} attribute-string ordering: bash emits `irx` form
@@ -11251,7 +11256,7 @@ static char *get_variable_attributes(const char *name) {
         attrs[idx++] = 'x';
     }
 
-    // Check if it's an array
+    /// Check if it's an array
     if (symtable_is_array(name)) {
         array_value_t *arr = symtable_get_array(name);
         if (arr && arr->is_associative) {
@@ -11261,7 +11266,7 @@ static char *get_variable_attributes(const char *name) {
         }
     }
 
-    // Check for nameref
+    /// Check for nameref
     if (symtable_is_nameref(mgr, name)) {
         attrs[idx++] = 'n';
     }
@@ -11286,7 +11291,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
     }
 
     size_t len = strlen(str);
-    char *result = malloc(len * 2 + 1); // Start with double size
+    char *result = malloc(len * 2 + 1); /// Start with double size
     if (!result) {
         return strdup("");
     }
@@ -11296,7 +11301,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
 
     for (size_t i = 0; i < len; i++) {
         if (str[i] == '$') {
-            // Check for arithmetic expansion $((...)
+            /// Check for arithmetic expansion $((...)
             if (i + 2 < len && str[i + 1] == '(' && str[i + 2] == '(') {
                 /* $(( is ambiguous: arithmetic expansion or command
                  * substitution of an anonymous function `$(() {...})`.
@@ -11340,7 +11345,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                      * here. */
                     goto try_cmd_sub_path;
                 }
-                // This is arithmetic expansion $((expr))
+                /// This is arithmetic expansion $((expr))
                 size_t arith_start = i;
                 size_t arith_end = i + 3;
                 int paren_depth = 2;
@@ -11355,7 +11360,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                 }
 
                 if (paren_depth == 0) {
-                    // Extract arithmetic expression including $(( and ))
+                    /// Extract arithmetic expression including $(( and ))
                     size_t full_arith_len = arith_end - arith_start;
                     char *full_arith_expr = malloc(full_arith_len + 1);
                     if (full_arith_expr) {
@@ -11363,13 +11368,13 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                                 full_arith_len);
                         full_arith_expr[full_arith_len] = '\0';
 
-                        // Expand arithmetic expression
+                        /// Expand arithmetic expression
                         char *arith_result =
                             expand_arithmetic(executor, full_arith_expr);
                         if (arith_result) {
                             size_t result_len = strlen(arith_result);
 
-                            // Ensure buffer is large enough
+                            /// Ensure buffer is large enough
                             while (result_pos + result_len >= result_size) {
                                 result_size *= 2;
                                 char *new_result = realloc(result, result_size);
@@ -11382,7 +11387,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                                 result = new_result;
                             }
 
-                            // Copy arithmetic result
+                            /// Copy arithmetic result
                             strcpy(&result[result_pos], arith_result);
                             result_pos += result_len;
                             free(arith_result);
@@ -11390,31 +11395,31 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                         free(full_arith_expr);
                     }
 
-                    i = arith_end - 1; // Skip past the entire $((...)
+                    i = arith_end - 1; /// Skip past the entire $((...)
                     continue;
                 }
             }
-            // Check for command substitution $(...)
+            /// Check for command substitution $(...)
             else if (i + 1 < len && str[i + 1] == '(') {
             try_cmd_sub_path:;
-                // Find matching closing parenthesis using find_closing_brace
+                /// Find matching closing parenthesis using find_closing_brace
                 char *temp_str =
-                    (char *)&str[i + 1]; // Start from the opening parenthesis
+                    (char *)&str[i + 1]; /// Start from the opening parenthesis
                 size_t brace_offset = find_closing_brace(temp_str);
 
                 if (brace_offset > 0) {
-                    // Extract command from $(...)
+                    /// Extract command from $(...)
                     size_t cmd_len =
-                        brace_offset - 1; // Exclude the closing paren
+                        brace_offset - 1; /// Exclude the closing paren
                     char *command = malloc(cmd_len + 1);
                     if (command) {
-                        strncpy(command, &str[i + 2], cmd_len); // Skip $(
+                        strncpy(command, &str[i + 2], cmd_len); /// Skip $(
                         command[cmd_len] = '\0';
 
-                        // Execute command substitution - need to wrap in $()
-                        // format
+                        /// Execute command substitution - need to wrap in $()
+                        /// format
                         char *wrapped_cmd =
-                            malloc(cmd_len + 4); // +3 for $() +1 for null
+                            malloc(cmd_len + 4); /// +3 for $() +1 for null
                         if (wrapped_cmd) {
                             snprintf(wrapped_cmd, cmd_len + 4, "$(%s)",
                                      command);
@@ -11424,7 +11429,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                             if (cmd_result) {
                                 size_t value_len = strlen(cmd_result);
 
-                                // Ensure buffer is large enough
+                                /// Ensure buffer is large enough
                                 while (result_pos + value_len >= result_size) {
                                     result_size *= 2;
                                     char *new_result =
@@ -11445,31 +11450,32 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                         }
 
                         free(command);
-                        i = i + 1 + brace_offset; // Skip past the entire $(...)
+                        i = i + 1 +
+                            brace_offset; /// Skip past the entire $(...)
                         continue;
                     }
                 }
             }
 
-            // Find variable name
+            /// Find variable name
             size_t var_start = i + 1;
             size_t var_end = var_start;
 
-            // Handle ${var} format
+            /// Handle ${var} format
             if (var_start < len && str[var_start] == '{') {
-                // Use proper brace matching for nested expressions
+                /// Use proper brace matching for nested expressions
                 char *brace_str = (char *)&str[var_start];
                 size_t brace_len = find_closing_brace(brace_str);
 
                 if (brace_len > 0) {
-                    // brace_len is the index of the closing brace
+                    /// brace_len is the index of the closing brace
                     var_end = var_start + brace_len +
-                              1; // Point to after closing brace
+                              1; /// Point to after closing brace
                 } else {
-                    // Fallback: find closing brace manually with nesting
-                    // support
+                    /// Fallback: find closing brace manually with nesting
+                    /// support
                     int brace_count = 1;
-                    var_end = var_start + 1; // Start after opening {
+                    var_end = var_start + 1; /// Start after opening {
 
                     while (var_end < len && brace_count > 0) {
                         if (str[var_end] == '{') {
@@ -11481,17 +11487,17 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                     }
                 }
             } else {
-                // Handle $var format
-                // Check for special single-character variables first
+                /// Handle $var format
+                /// Check for special single-character variables first
                 if (var_end < len &&
                     (str[var_end] == '?' || str[var_end] == '$' ||
                      str[var_end] == '#' || str[var_end] == '*' ||
                      str[var_end] == '@' || str[var_end] == '!' ||
                      str[var_end] == '-' ||
                      (str[var_end] >= '0' && str[var_end] <= '9'))) {
-                    var_end++; // Single character special variable
+                    var_end++; /// Single character special variable
                 } else {
-                    // Regular variable names (alphanumeric + underscore)
+                    /// Regular variable names (alphanumeric + underscore)
                     while (var_end < len &&
                            (isalnum(str[var_end]) || str[var_end] == '_')) {
                         var_end++;
@@ -11516,7 +11522,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
             }
 
             if (var_end > var_start) {
-                // Extract and expand variable
+                /// Extract and expand variable
                 size_t var_len = var_end - i;
                 char *var_expr = malloc(var_len + 1);
                 if (var_expr) {
@@ -11527,7 +11533,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                     if (var_value) {
                         size_t value_len = strlen(var_value);
 
-                        // Ensure buffer is large enough
+                        /// Ensure buffer is large enough
                         while (result_pos + value_len >= result_size) {
                             result_size *= 2;
                             char *new_result = realloc(result, result_size);
@@ -11546,13 +11552,13 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                     }
 
                     free(var_expr);
-                    i = var_end - 1; // Skip past variable
+                    i = var_end - 1; /// Skip past variable
                     continue;
                 }
             }
         }
 
-        // Regular character - ensure buffer space
+        /// Regular character - ensure buffer space
         if (result_pos + 1 >= result_size) {
             result_size *= 2;
             char *new_result = realloc(result, result_size);
@@ -11713,11 +11719,11 @@ static char *slice_string_graphemes(const char *str, size_t str_len,
             grapheme_idx++;
         }
 
-        // Advance by one codepoint.
+        /// Advance by one codepoint.
         uint32_t cp;
         int cp_len = lle_utf8_decode_codepoint(str + i, str_len - i, &cp);
         if (cp_len <= 0) {
-            i++; // Skip invalid byte to avoid infinite loop.
+            i++; /// Skip invalid byte to avoid infinite loop.
         } else {
             i += (size_t)cp_len;
         }
@@ -11779,19 +11785,19 @@ static char *parse_parameter_expansion(executor_t *executor,
         return strdup("");
     }
 
-    // zsh `${+NAME}` is-set test: returns "1" if NAME is bound, "0"
-    // otherwise. Used heavily in arithmetic contexts -- `(( ${+v} ))`
-    // is the idiomatic zsh test for variable presence. Real-world
-    // corpus example: `(( ${+commands[dircolors]} ))` checks whether
-    // `dircolors` is on $path via zsh's special `$commands` hash.
-    //
-    // Lush handles the plain `${+NAME}` form by walking the symbol
-    // table, and the `${+commands[NAME]}` shape as a PATH lookup
-    // (since lush has no `$commands` hash but the user-observable
-    // semantic is "is this command available?").
+    /// zsh `${+NAME}` is-set test: returns "1" if NAME is bound, "0"
+    /// otherwise. Used heavily in arithmetic contexts -- `(( ${+v} ))`
+    /// is the idiomatic zsh test for variable presence. Real-world
+    /// corpus example: `(( ${+commands[dircolors]} ))` checks whether
+    /// `dircolors` is on $path via zsh's special `$commands` hash.
+    ///
+    /// Lush handles the plain `${+NAME}` form by walking the symbol
+    /// table, and the `${+commands[NAME]}` shape as a PATH lookup
+    /// (since lush has no `$commands` hash but the user-observable
+    /// semantic is "is this command available?").
     if (expansion[0] == '+' && expansion[1] != '\0') {
         const char *name = expansion + 1;
-        // Special-case zsh's $commands[X] -- treat as a PATH lookup.
+        /// Special-case zsh's $commands[X] -- treat as a PATH lookup.
         if (strncmp(name, "commands[", 9) == 0) {
             const char *cmd_start = name + 9;
             const char *cmd_end = strchr(cmd_start, ']');
@@ -11809,8 +11815,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                 return strdup(found ? "1" : "0");
             }
         }
-        // Plain ${+NAME}: ignore any trailing [subscript] for now and
-        // probe the symbol table for the base name.
+        /// Plain ${+NAME}: ignore any trailing [subscript] for now and
+        /// probe the symbol table for the base name.
         const char *bracket = strchr(name, '[');
         char *probe_name =
             bracket ? strndup(name, (size_t)(bracket - name)) : strdup(name);
@@ -11826,14 +11832,14 @@ static char *parse_parameter_expansion(executor_t *executor,
         return strdup(bound ? "1" : "0");
     }
 
-    // Handle zsh-style parameter flags: ${(X)var}
-    // Flags: U=uppercase, L=lowercase, C=capitalize, f=split on newlines,
-    //        o=sort ascending, O=sort descending, k=keys, v=values
-    //        j:X:=join with X, s:X:=split on X
+    /// Handle zsh-style parameter flags: ${(X)var}
+    /// Flags: U=uppercase, L=lowercase, C=capitalize, f=split on newlines,
+    ///        o=sort ascending, O=sort descending, k=keys, v=values
+    ///        j:X:=join with X, s:X:=split on X
     if (expansion[0] == '(') {
         const char *close_paren = strchr(expansion, ')');
         if (close_paren && close_paren > expansion + 1) {
-            // Extract flags between ( and )
+            /// Extract flags between ( and )
             size_t flags_len = close_paren - expansion - 1;
             char *flags = malloc(flags_len + 1);
             if (!flags) {
@@ -11842,24 +11848,24 @@ static char *parse_parameter_expansion(executor_t *executor,
             strncpy(flags, expansion + 1, flags_len);
             flags[flags_len] = '\0';
 
-            // Rest of expansion after )
+            /// Rest of expansion after )
             const char *rest = close_paren + 1;
 
-            // Check for 'k' / 'v' flags (return keys / values for arrays).
-            // The combination 'kv' (or 'vk') asks for interleaved key/value
-            // pairs and must be detected before the keys-only branch — see
-            // the (want_keys && want_values) handler below.
+            /// Check for 'k' / 'v' flags (return keys / values for arrays).
+            /// The combination 'kv' (or 'vk') asks for interleaved key/value
+            /// pairs and must be detected before the keys-only branch — see
+            /// the (want_keys && want_values) handler below.
             bool want_keys = (strchr(flags, 'k') != NULL);
             bool want_values = (strchr(flags, 'v') != NULL);
 
             char *inner_result = NULL;
 
             if (want_keys && want_values) {
-                // Handle (kv)/(vk): emit interleaved "k1 v1 k2 v2 ..."
-                // Both symtable_array_get_keys() and
-                // symtable_array_get_values() iterate the same source data
-                // (hashtable for assoc, indices array for indexed) in the
-                // same order, so keys[i] pairs with values[i].
+                /// Handle (kv)/(vk): emit interleaved "k1 v1 k2 v2 ..."
+                /// Both symtable_array_get_keys() and
+                /// symtable_array_get_values() iterate the same source data
+                /// (hashtable for assoc, indices array for indexed) in the
+                /// same order, so keys[i] pairs with values[i].
                 char *arr_name = NULL;
                 const char *bracket = strchr(rest, '[');
                 if (bracket) {
@@ -11871,11 +11877,11 @@ static char *parse_parameter_expansion(executor_t *executor,
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
                     if (!array) {
-                        // (kv) on a non-collection is a type mismatch.
-                        // Distinguish unset (silent empty) from scalar
-                        // (error) so unset-by-omission stays a non-event
-                        // while genuine misapplication on a scalar
-                        // surfaces as a runtime error.
+                        /// (kv) on a non-collection is a type mismatch.
+                        /// Distinguish unset (silent empty) from scalar
+                        /// (error) so unset-by-omission stays a non-event
+                        /// while genuine misapplication on a scalar
+                        /// surfaces as a runtime error.
                         char *probe =
                             symtable_get_var(executor->symtable, arr_name);
                         if (probe) {
@@ -11944,8 +11950,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                     inner_result = strdup("");
                 }
             } else if (want_keys) {
-                // Handle (k) flag: return array keys instead of values
-                // Parse array name from rest (e.g., "arr[@]" -> "arr")
+                /// Handle (k) flag: return array keys instead of values
+                /// Parse array name from rest (e.g., "arr[@]" -> "arr")
                 char *arr_name = NULL;
                 const char *bracket = strchr(rest, '[');
                 if (bracket) {
@@ -11957,9 +11963,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                 if (arr_name) {
                     array_value_t *array = symtable_get_array(arr_name);
                     if (!array) {
-                        // (k) on a non-collection is a type mismatch.
-                        // See the (kv) branch above for the unset vs
-                        // scalar distinction.
+                        /// (k) on a non-collection is a type mismatch.
+                        /// See the (kv) branch above for the unset vs
+                        /// scalar distinction.
                         char *probe =
                             symtable_get_var(executor->symtable, arr_name);
                         if (probe) {
@@ -11988,12 +11994,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                          * values which `(v)` and `${arr[@]}` already give). */
                         inner_result = symtable_array_expand(array, " ");
                     } else if (array) {
-                        // Get all keys from array (works for both indexed and
-                        // associative)
+                        /// Get all keys from array (works for both indexed and
+                        /// associative)
                         size_t count;
                         char **keys = symtable_array_get_keys(array, &count);
                         if (keys && count > 0) {
-                            // Calculate total length needed
+                            /// Calculate total length needed
                             size_t total_len = 0;
                             for (size_t i = 0; i < count; i++) {
                                 total_len += strlen(keys[i]) + 1;
@@ -12017,12 +12023,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                     inner_result = strdup("");
                 }
             } else if (strchr(flags, 'w') != NULL && rest[0] == '#') {
-                // Handle (w)# - word count instead of character count
-                // Get the variable value first
-                const char *var_name = rest + 1; // Skip the #
+                /// Handle (w)# - word count instead of character count
+                /// Get the variable value first
+                const char *var_name = rest + 1; /// Skip the #
                 char *var_value = parse_parameter_expansion(executor, var_name);
                 if (var_value) {
-                    // Count words (space-separated)
+                    /// Count words (space-separated)
                     size_t word_count = 0;
                     bool in_word = false;
                     for (const char *c = var_value; *c; c++) {
@@ -12033,7 +12039,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             in_word = true;
                         }
                     }
-                    // Return word count as string
+                    /// Return word count as string
                     char count_buf[32];
                     snprintf(count_buf, sizeof(count_buf), "%zu", word_count);
                     inner_result = strdup(count_buf);
@@ -12063,7 +12069,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 bool rest_is_simple_ref = false;
                 const char *bracket = strchr(rest, '[');
                 if (bracket) {
-                    // Allow name[@] and name[*] forms; reject name[N].
+                    /// Allow name[@] and name[*] forms; reject name[N].
                     if ((bracket[1] == '@' || bracket[1] == '*') &&
                         bracket[2] == ']' && bracket[3] == '\0') {
                         arr_name = strndup(rest, (size_t)(bracket - rest));
@@ -12071,7 +12077,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     }
                 } else if (rest[0] && (isalpha((unsigned char)rest[0]) ||
                                        rest[0] == '_')) {
-                    // Bare name; validate it as a plain identifier.
+                    /// Bare name; validate it as a plain identifier.
                     bool plain = true;
                     for (size_t i = 1; rest[i]; i++) {
                         if (!isalnum((unsigned char)rest[i]) &&
@@ -12094,23 +12100,23 @@ static char *parse_parameter_expansion(executor_t *executor,
                     arr_name ? symtable_get_array(arr_name) : NULL;
 
                 if (array) {
-                    // Collection operand: extract elements as space-
-                    // separated string. The flag handlers below iterate
-                    // the words and apply per-element semantics for
-                    // (U)(L)(C)(s)(o)(O)(u)(f), and (j:X:) joins them
-                    // with the user-specified delimiter for the
-                    // explicit list-to-scalar form.
+                    /// Collection operand: extract elements as space-
+                    /// separated string. The flag handlers below iterate
+                    /// the words and apply per-element semantics for
+                    /// (U)(L)(C)(s)(o)(O)(u)(f), and (j:X:) joins them
+                    /// with the user-specified delimiter for the
+                    /// explicit list-to-scalar form.
                     inner_result = symtable_array_expand(array, " ");
                     if (!inner_result) {
                         inner_result = strdup("");
                     }
                     free(arr_name);
                 } else if (rest_is_simple_ref && has_collection_only_flag) {
-                    // The name resolves (or doesn't) to something that
-                    // is not a collection, but the user wrote a flag
-                    // that only makes sense for one. Surface the
-                    // mismatch as a structured runtime error rather
-                    // than silently returning empty.
+                    /// The name resolves (or doesn't) to something that
+                    /// is not a collection, but the user wrote a flag
+                    /// that only makes sense for one. Surface the
+                    /// mismatch as a structured runtime error rather
+                    /// than silently returning empty.
                     executor_error_report(
                         executor, SHELL_ERR_TYPE_MISMATCH,
                         executor_current_loc(executor),
@@ -12142,7 +12148,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 return strdup("");
             }
 
-            // Process flags in order
+            /// Process flags in order
             char *result = inner_result;
             const char *p = flags;
 
@@ -12151,7 +12157,7 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                 switch (*p) {
                 case 'U':
-                    // Uppercase all
+                    /// Uppercase all
                     new_result = convert_case_all_upper(result);
                     if (result != inner_result)
                         free(result);
@@ -12160,7 +12166,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'L':
-                    // Lowercase all
+                    /// Lowercase all
                     new_result = convert_case_all_lower(result);
                     if (result != inner_result)
                         free(result);
@@ -12169,7 +12175,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'C':
-                    // Capitalize each word
+                    /// Capitalize each word
                     new_result = convert_case_capitalize_words(result);
                     if (result != inner_result)
                         free(result);
@@ -12178,8 +12184,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'f':
-                    // Split on newlines - for now, replace newlines with spaces
-                    // (full array support would require different return type)
+                    /// Split on newlines - for now, replace newlines with
+                    /// spaces (full array support would require different
+                    /// return type)
                     {
                         size_t len = strlen(result);
                         new_result = malloc(len + 1);
@@ -12197,12 +12204,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'j': {
-                    // Join with separator: j<DELIM>X<DELIM>
-                    // zsh accepts any non-')' character after 'j' as the
-                    // delimiter; the same character closes the argument.
+                    /// Join with separator: j<DELIM>X<DELIM>
+                    /// zsh accepts any non-')' character after 'j' as the
+                    /// delimiter; the same character closes the argument.
                     char delim = p[1];
                     if (delim && delim != ')') {
-                        // Find closing delim
+                        /// Find closing delim
                         const char *sep_start = p + 2;
                         const char *sep_end = strchr(sep_start, delim);
                         if (sep_end) {
@@ -12212,7 +12219,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 strncpy(sep, sep_start, sep_len);
                                 sep[sep_len] = '\0';
 
-                                // Replace spaces with separator
+                                /// Replace spaces with separator
                                 size_t res_len = strlen(result);
                                 size_t count = 0;
                                 for (size_t i = 0; i < res_len; i++) {
@@ -12240,18 +12247,18 @@ static char *parse_parameter_expansion(executor_t *executor,
                             result = new_result ? new_result : strdup("");
                             p = sep_end + 1;
                         } else {
-                            p++; // Malformed, skip
+                            p++; /// Malformed, skip
                         }
                     } else {
-                        p++; // No separator specified
+                        p++; /// No separator specified
                     }
                     break;
                 }
 
                 case 's': {
-                    // Split on separator: s<DELIM>X<DELIM> - replace X with
-                    // space. zsh accepts any non-')' character after 's' as
-                    // the delimiter; the same character closes the argument.
+                    /// Split on separator: s<DELIM>X<DELIM> - replace X with
+                    /// space. zsh accepts any non-')' character after 's' as
+                    /// the delimiter; the same character closes the argument.
                     char delim = p[1];
                     if (delim && delim != ')') {
                         const char *sep_start = p + 2;
@@ -12263,7 +12270,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                 strncpy(sep, sep_start, sep_len);
                                 sep[sep_len] = '\0';
 
-                                // Replace separator with space
+                                /// Replace separator with space
                                 size_t res_len = strlen(result);
                                 new_result = malloc(res_len + 1);
                                 if (new_result) {
@@ -12300,9 +12307,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
 
                 case 'o':
-                    // Sort ascending - split on spaces, sort, rejoin
+                    /// Sort ascending - split on spaces, sort, rejoin
                     {
-                        // Count words
+                        /// Count words
                         size_t word_count = 0;
                         bool in_word = false;
                         for (const char *c = result; *c; c++) {
@@ -12317,7 +12324,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         if (word_count > 1) {
                             char **words = malloc(word_count * sizeof(char *));
                             if (words) {
-                                // Split into words
+                                /// Split into words
                                 char *copy = strdup(result);
                                 if (copy) {
                                     size_t idx = 0;
@@ -12328,7 +12335,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                     }
                                     word_count = idx;
 
-                                    // Sort ascending
+                                    /// Sort ascending
                                     for (size_t i = 0; i < word_count - 1;
                                          i++) {
                                         for (size_t j = i + 1; j < word_count;
@@ -12342,7 +12349,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                         }
                                     }
 
-                                    // Rejoin
+                                    /// Rejoin
                                     size_t total_len = 0;
                                     for (size_t i = 0; i < word_count; i++) {
                                         total_len += strlen(words[i]) + 1;
@@ -12376,7 +12383,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'O':
-                    // Sort descending - same as 'o' but reverse comparison
+                    /// Sort descending - same as 'o' but reverse comparison
                     {
                         size_t word_count = 0;
                         bool in_word = false;
@@ -12402,7 +12409,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                     }
                                     word_count = idx;
 
-                                    // Sort descending
+                                    /// Sort descending
                                     for (size_t i = 0; i < word_count - 1;
                                          i++) {
                                         for (size_t j = i + 1; j < word_count;
@@ -12449,12 +12456,12 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
 
                 case 'k':
-                    // Keys flag - already handled before inner expansion
+                    /// Keys flag - already handled before inner expansion
                     p++;
                     break;
 
                 case 'v':
-                    // Values flag - no-op (values are the default)
+                    /// Values flag - no-op (values are the default)
                     p++;
                     break;
 
@@ -12565,7 +12572,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     width_buf[width_str_len] = '\0';
                     int width = atoi(width_buf);
 
-                    // Optional fill: another :FILL: after the width.
+                    /// Optional fill: another :FILL: after the width.
                     char *fill = NULL;
                     const char *after_width = width_end + 1;
                     const char *closing = after_width;
@@ -12770,7 +12777,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
 
                 default:
-                    // Unknown flag, skip
+                    /// Unknown flag, skip
                     p++;
                     break;
                 }
@@ -12778,22 +12785,22 @@ static char *parse_parameter_expansion(executor_t *executor,
 
             free(flags);
             if (result == inner_result) {
-                return result; // No transformation applied
+                return result; /// No transformation applied
             }
             free(inner_result);
             return result;
         }
     }
 
-    // Handle indirect expansion: ${!name} or ${!prefix*} or ${!prefix@}
+    /// Handle indirect expansion: ${!name} or ${!prefix*} or ${!prefix@}
     if (expansion[0] == '!') {
         const char *var_name = expansion + 1;
         size_t name_len = strlen(var_name);
 
-        // Check for ${!prefix*} or ${!prefix@} - list variable names
+        /// Check for ${!prefix*} or ${!prefix@} - list variable names
         if (name_len > 0 &&
             (var_name[name_len - 1] == '*' || var_name[name_len - 1] == '@')) {
-            // Extract prefix (without * or @)
+            /// Extract prefix (without * or @)
             char *prefix = malloc(name_len);
             if (!prefix) {
                 return strdup("");
@@ -12817,7 +12824,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 qsort(ctx.names, ctx.count, sizeof(char *), strptr_cmp);
             }
 
-            // Build space-separated result.
+            /// Build space-separated result.
             size_t total_len = 0;
             for (size_t i = 0; i < ctx.count; i++) {
                 total_len += strlen(ctx.names[i]) + 1;
@@ -12845,7 +12852,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             return result ? result : strdup("");
         }
 
-        // Check for ${!arr[@]} or ${!arr[*]} - array keys
+        /// Check for ${!arr[@]} or ${!arr[*]} - array keys
         const char *bracket = strchr(var_name, '[');
         if (bracket) {
             size_t arr_name_len = bracket - var_name;
@@ -12860,11 +12867,11 @@ static char *parse_parameter_expansion(executor_t *executor,
             free(arr_name);
 
             if (array) {
-                // Return array indices as space-separated string
+                /// Return array indices as space-separated string
                 size_t count;
                 char **keys = symtable_array_get_keys(array, &count);
                 if (keys && count > 0) {
-                    size_t result_size = count * 12; // Enough for integers
+                    size_t result_size = count * 12; /// Enough for integers
                     char *result = malloc(result_size);
                     if (result) {
                         result[0] = '\0';
@@ -12885,17 +12892,18 @@ static char *parse_parameter_expansion(executor_t *executor,
             return strdup("");
         }
 
-        // Simple indirect expansion: ${!name} - value of variable named by name
+        /// Simple indirect expansion: ${!name} - value of variable named by
+        /// name
         char *indirect_name = symtable_get_var(executor->symtable, var_name);
         if (indirect_name && indirect_name[0]) {
-            // Get the value of the variable whose name is in indirect_name
+            /// Get the value of the variable whose name is in indirect_name
             char *result = symtable_get_var(executor->symtable, indirect_name);
             return strdup(result ? result : "");
         }
         return strdup("");
     }
 
-    // Handle array length: ${#arr[@]} or ${#arr[*]}
+    /// Handle array length: ${#arr[@]} or ${#arr[*]}
     if (expansion[0] == '#') {
         const char *var_name = expansion + 1;
 
@@ -12914,7 +12922,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             return strdup("0");
         }
 
-        // Check for array subscript
+        /// Check for array subscript
         const char *bracket = strchr(var_name, '[');
         if (bracket) {
             size_t name_len = bracket - var_name;
@@ -12925,7 +12933,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             strncpy(arr_name, var_name, name_len);
             arr_name[name_len] = '\0';
 
-            // Get subscript
+            /// Get subscript
             const char *close = strchr(bracket, ']');
             if (close) {
                 size_t sub_len = close - bracket - 1;
@@ -12934,18 +12942,18 @@ static char *parse_parameter_expansion(executor_t *executor,
                     strncpy(subscript, bracket + 1, sub_len);
                     subscript[sub_len] = '\0';
 
-                    // Check if array exists
+                    /// Check if array exists
                     array_value_t *array = symtable_get_array(arr_name);
                     if (array) {
                         char result_buf[32];
 
                         if (strcmp(subscript, "@") == 0 ||
                             strcmp(subscript, "*") == 0) {
-                            // ${#arr[@]} - number of elements
+                            /// ${#arr[@]} - number of elements
                             snprintf(result_buf, sizeof(result_buf), "%zu",
                                      symtable_array_length(array));
                         } else {
-                            // ${#arr[n]} - length of element at index n
+                            /// ${#arr[n]} - length of element at index n
                             arithm_clear_error();
                             char *idx_result = arithm_expand(subscript);
                             if (idx_result && !arithm_error_is_flagged()) {
@@ -12964,7 +12972,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                                  "0");
                                     } else {
                                         if (idx > 0) {
-                                            idx--; // 1-based -> 0-based
+                                            idx--; /// 1-based -> 0-based
                                         }
                                         const char *elem =
                                             symtable_array_get_index(array,
@@ -13020,7 +13028,7 @@ static char *parse_parameter_expansion(executor_t *executor,
         if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
             array_value_t *array = view.array;
             shell_mode_t mode = shell_mode_get();
-            // size_t can render up to 20 digits on 64-bit + null.
+            /// size_t can render up to 20 digits on 64-bit + null.
             char *result = malloc(24);
             if (!result) {
                 lush_value_view_clear(&view);
@@ -13122,7 +13130,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                 strncpy(subscript, bracket + 1, sub_len);
                 subscript[sub_len] = '\0';
 
-                // Resolve nameref if applicable
+                /// Resolve nameref if applicable
                 const char *resolved_arr_name = arr_name;
                 symtable_manager_t *mgr = symtable_get_global_manager();
                 if (mgr && symtable_is_nameref(mgr, arr_name)) {
@@ -13148,7 +13156,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                      * joined string instead of picking elements. Issue
                      * #97. */
                     int slice_offset = 0;
-                    int slice_length = -1; // -1 = "to end"
+                    int slice_length = -1; /// -1 = "to end"
                     bool has_slice = (close[1] == ':' &&
                                       (strcmp(subscript, "@") == 0 ||
                                        strcmp(subscript, "*") == 0) &&
@@ -13164,7 +13172,7 @@ static char *parse_parameter_expansion(executor_t *executor,
 
                     if (has_slice) {
                         size_t total = symtable_array_length(array);
-                        // Negative offset counts from end (bash).
+                        /// Negative offset counts from end (bash).
                         if (slice_offset < 0) {
                             slice_offset = (int)total + slice_offset;
                             if (slice_offset < 0) {
@@ -13221,19 +13229,19 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                         }
                     } else if (strcmp(subscript, "*") == 0) {
-                        // ${arr[*]} - explicit scalar join (SEMANTICS.md
-                        // section 3.5). All elements joined with the
-                        // first character of IFS (" " here as a fixed
-                        // default, matching prior behavior).
+                        /// ${arr[*]} - explicit scalar join (SEMANTICS.md
+                        /// section 3.5). All elements joined with the
+                        /// first character of IFS (" " here as a fixed
+                        /// default, matching prior behavior).
                         result = symtable_array_expand(array, " ");
                     } else if (strcmp(subscript, "@") == 0) {
-                        // ${arr[@]} reaching this general parameter-
-                        // expansion fallthrough means the expansion sits
-                        // in a SCALAR-REQUIRING context (vector-accepting
-                        // positions are handled earlier by
-                        // try_expand_vector_arg). Per SEMANTICS.md section
-                        // 3.9, this is a runtime type mismatch -- a list
-                        // value cannot flow into a scalar slot.
+                        /// ${arr[@]} reaching this general parameter-
+                        /// expansion fallthrough means the expansion sits
+                        /// in a SCALAR-REQUIRING context (vector-accepting
+                        /// positions are handled earlier by
+                        /// try_expand_vector_arg). Per SEMANTICS.md section
+                        /// 3.9, this is a runtime type mismatch -- a list
+                        /// value cannot flow into a scalar slot.
                         shell_error_t *err = shell_error_create(
                             SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
                             executor_current_loc(executor),
@@ -13426,7 +13434,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                         }
                     } else if (array->is_associative) {
-                        // Associative array - use subscript as string key
+                        /// Associative array - use subscript as string key
                         char *expanded_subscript =
                             expand_variable(executor, subscript);
                         const char *key =
@@ -13436,7 +13444,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                         if (expanded_subscript)
                             free(expanded_subscript);
                     } else {
-                        // Indexed array - ${arr[n]} - specific element
+                        /// Indexed array - ${arr[n]} - specific element
                         arithm_clear_error();
                         char *idx_result = arithm_expand(subscript);
                         if (idx_result && !arithm_error_is_flagged()) {
@@ -13456,7 +13464,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                                     result = strdup("");
                                 } else {
                                     if (idx > 0) {
-                                        idx--; // 1-based -> 0-based
+                                        idx--; /// 1-based -> 0-based
                                     }
                                     const char *elem =
                                         symtable_array_get_index(array, idx);
@@ -13490,8 +13498,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                     if (*after_bracket != '\0') {
                         bool value_is_empty = (!result || !*result);
                         const char *rhs = NULL;
-                        bool want_default_when_empty = false; // :- / -
-                        bool want_alt_when_nonempty = false;  // :+ / +
+                        bool want_default_when_empty = false; /// :- / -
+                        bool want_alt_when_nonempty = false;  /// :+ / +
                         if (after_bracket[0] == ':' &&
                             (after_bracket[1] == '-' ||
                              after_bracket[1] == '+')) {
@@ -13531,21 +13539,21 @@ static char *parse_parameter_expansion(executor_t *executor,
                     return result ? result : strdup("");
                 }
 
-                // Array doesn't exist - check if there are parameter expansion
-                // operators after ]
-                // For example: ${arr[0]:-default}
+                /// Array doesn't exist - check if there are parameter expansion
+                /// operators after ]
+                /// For example: ${arr[0]:-default}
                 const char *after_bracket = close + 1;
                 if (*after_bracket != '\0') {
-                    // There's more after ] - this might be a parameter
-                    // expansion on an unset array element. For now, treat as
-                    // empty.
+                    /// There's more after ] - this might be a parameter
+                    /// expansion on an unset array element. For now, treat as
+                    /// empty.
                 }
 
-                // String-slicing fallback: ${var[N]} / ${var[N,M]} on a
-                // scalar string slices grapheme clusters (TR#29 boundaries).
-                // Honors FEATURE_ARRAY_ZERO_INDEXED: 1-based for zsh-mode,
-                // 0-based for bash/lush-mode. Subscript "@" / "*" are
-                // array-only and have already been handled above.
+                /// String-slicing fallback: ${var[N]} / ${var[N,M]} on a
+                /// scalar string slices grapheme clusters (TR#29 boundaries).
+                /// Honors FEATURE_ARRAY_ZERO_INDEXED: 1-based for zsh-mode,
+                /// 0-based for bash/lush-mode. Subscript "@" / "*" are
+                /// array-only and have already been handled above.
                 if (strcmp(subscript, "@") != 0 &&
                     strcmp(subscript, "*") != 0) {
                     char *str_value =
@@ -13560,7 +13568,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             *comma = ',';
                         } else {
                             start_idx = atoi(subscript);
-                            end_idx = start_idx; // single grapheme
+                            end_idx = start_idx; /// single grapheme
                         }
                         size_t value_len = strlen(str_value);
 
@@ -13586,7 +13594,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                         }
 
-                        // Convert from 1-based (zsh) to 0-based if needed
+                        /// Convert from 1-based (zsh) to 0-based if needed
                         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
                             if (start_idx <= 0 || end_idx <= 0) {
                                 free(str_value);
@@ -13625,30 +13633,30 @@ static char *parse_parameter_expansion(executor_t *executor,
         return strdup("");
     }
 
-    // Look for parameter expansion operators
+    /// Look for parameter expansion operators
     const char *op_pos = NULL;
-    // Order matters: longer operators first, then shorter ones
-    // 0-14: existing operators, 15-18: new Phase 4 operators
-    const char *operators[] = {":-", // 0: use default if unset or empty
-                               ":+", // 1: use alternative if set and non-empty
-                               "##", // 2: remove longest prefix pattern
-                               "%%", // 3: remove longest suffix pattern
-                               "^^", // 4: uppercase all
-                               ",,", // 5: lowercase all
-                               "#",  // 6: remove shortest prefix pattern
-                               "%",  // 7: remove shortest suffix pattern
-                               "^",  // 8: uppercase first
-                               ",",  // 9: lowercase first
-                               "-",  // 10: use default if unset
-                               "+",  // 11: use alternative if set
-                               ":=", // 12: assign default if unset or empty
-                               "=",  // 13: assign default if unset
-                               ":",  // 14: substring
-                               "//", // 15: replace all occurrences
-                               "/",  // 16: replace first occurrence
-                               "@",  // 17: transformations
-                               ":?", // 18: error if unset or null (POSIX)
-                               "?",  // 19: error if unset (POSIX)
+    /// Order matters: longer operators first, then shorter ones
+    /// 0-14: existing operators, 15-18: new Phase 4 operators
+    const char *operators[] = {":-", /// 0: use default if unset or empty
+                               ":+", /// 1: use alternative if set and non-empty
+                               "##", /// 2: remove longest prefix pattern
+                               "%%", /// 3: remove longest suffix pattern
+                               "^^", /// 4: uppercase all
+                               ",,", /// 5: lowercase all
+                               "#",  /// 6: remove shortest prefix pattern
+                               "%",  /// 7: remove shortest suffix pattern
+                               "^",  /// 8: uppercase first
+                               ",",  /// 9: lowercase first
+                               "-",  /// 10: use default if unset
+                               "+",  /// 11: use alternative if set
+                               ":=", /// 12: assign default if unset or empty
+                               "=",  /// 13: assign default if unset
+                               ":",  /// 14: substring
+                               "//", /// 15: replace all occurrences
+                               "/",  /// 16: replace first occurrence
+                               "@",  /// 17: transformations
+                               ":?", /// 18: error if unset or null (POSIX)
+                               "?",  /// 19: error if unset (POSIX)
                                NULL};
     int op_type = -1;
 
@@ -13667,9 +13675,9 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
     }
 
-    // Find the first valid operator - prioritize longer operators first.
-    // Use the bracket-aware variant so subscript chars inside `[...]`
-    // (notably `@` in `arr[@]`) don't get picked as operators.
+    /// Find the first valid operator - prioritize longer operators first.
+    /// Use the bracket-aware variant so subscript chars inside `[...]`
+    /// (notably `@` in `arr[@]`) don't get picked as operators.
     for (int i = 0; operators[i]; i++) {
         const char *found = find_op_outside_brackets(expansion, operators[i]);
         /* If the operator matches at position 0 and the first char is
@@ -13679,12 +13687,12 @@ static char *parse_parameter_expansion(executor_t *executor,
             found = find_op_outside_brackets(expansion + 1, operators[i]);
         }
         if (found) {
-            // Skip single-character operators that are part of longer ones
+            /// Skip single-character operators that are part of longer ones
             if (strlen(operators[i]) == 1) {
-                // Check if this single char is part of a longer operator
+                /// Check if this single char is part of a longer operator
                 bool part_of_longer = false;
 
-                // Check for :- :+ := :? before processing single :
+                /// Check for :- :+ := :? before processing single :
                 if (strcmp(operators[i], ":") == 0) {
                     if ((found > expansion &&
                          (found[-1] == '-' || found[-1] == '+')) ||
@@ -13694,18 +13702,18 @@ static char *parse_parameter_expansion(executor_t *executor,
                     }
                 }
 
-                // Check for ## and %% before processing single # or %
+                /// Check for ## and %% before processing single # or %
                 if (strcmp(operators[i], "#") == 0 && found[1] == '#') {
                     part_of_longer = true;
                 }
                 if (strcmp(operators[i], "%") == 0 && found[1] == '%') {
                     part_of_longer = true;
                 }
-                // Check for // before processing single /
+                /// Check for /// before processing single /
                 if (strcmp(operators[i], "/") == 0 && found[1] == '/') {
                     part_of_longer = true;
                 }
-                // Check for :? before processing single ?
+                /// Check for :? before processing single ?
                 if (strcmp(operators[i], "?") == 0 && found > expansion &&
                     found[-1] == ':') {
                     part_of_longer = true;
@@ -13716,8 +13724,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
             }
 
-            // If we haven't found an operator yet, or this one comes first, use
-            // it
+            /// If we haven't found an operator yet, or this one comes first,
+            /// use it
             if (!op_pos || found < op_pos) {
                 op_pos = found;
                 op_type = i;
@@ -13726,21 +13734,21 @@ static char *parse_parameter_expansion(executor_t *executor,
     }
 
     if (op_pos) {
-        // Extract variable name
+        /// Extract variable name
         size_t var_len = op_pos - expansion;
 
-        // If operator is at position 0, it might actually be a special variable
-        // like $- (which contains the '-' character itself)
+        /// If operator is at position 0, it might actually be a special
+        /// variable like $- (which contains the '-' character itself)
         if (var_len == 0 && strlen(expansion) == 1 && expansion[0] == '-') {
-            // This is $- (shell options), not a parameter expansion operator
-            // Fall through to regular variable lookup below
+            /// This is $- (shell options), not a parameter expansion operator
+            /// Fall through to regular variable lookup below
             op_pos = NULL;
             op_type = -1;
         }
     }
 
     if (op_pos) {
-        // Extract variable name
+        /// Extract variable name
         size_t var_len = op_pos - expansion;
         char *var_name = malloc(var_len + 1);
         if (!var_name) {
@@ -13775,35 +13783,35 @@ static char *parse_parameter_expansion(executor_t *executor,
                     bare_array->is_associative ? "map" : "list";
                 const char *hint = NULL;
                 switch (op_type) {
-                case 0:  // :-
-                case 1:  // :+
-                case 10: // -
-                case 11: // +
-                case 12: // :=
-                case 13: // =
-                case 18: // :?
-                case 19: // ?
+                case 0:  /// :-
+                case 1:  /// :+
+                case 10: /// -
+                case 11: /// +
+                case 12: /// :=
+                case 13: /// =
+                case 18: /// :?
+                case 19: /// ?
                     hint = "use ${name[0]:-default} for a scalar-"
                            "element default, or assign a list literal "
                            "directly for a list-shaped default";
                     break;
-                case 14: // :
+                case 14: /// :
                     hint = "substring is scalar-only -- use "
                            "${name[@]:offset:length} for list slicing, "
                            "or ${name[N]:offset:length} for substring "
                            "of one element";
                     break;
-                case 2:  // ##
-                case 3:  // %%
-                case 6:  // #
-                case 7:  // %
-                case 15: // //
-                case 16: // /
-                case 4:  // ^^
-                case 5:  // ,,
-                case 8:  // ^
-                case 9:  // ,
-                case 17: // @ transformations
+                case 2:  /// ##
+                case 3:  /// %%
+                case 6:  /// #
+                case 7:  /// %
+                case 15: /// ///
+                case 16: /// /
+                case 4:  /// ^^
+                case 5:  /// ,,
+                case 8:  /// ^
+                case 9:  /// ,
+                case 17: /// @ transformations
                     hint = "append '[@]' to the name to vectorize the "
                            "operation across all elements -- "
                            "${name[@]op...}";
@@ -13837,11 +13845,11 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
         }
 
-        // Get variable value
+        /// Get variable value
         char *var_value = symtable_get_var(executor->symtable, var_name);
         const char *default_value = op_pos + strlen(operators[op_type]);
 
-        // Expand variables in default value
+        /// Expand variables in default value
         char *expanded_default =
             expand_variables_in_string(executor, default_value);
 
@@ -13901,7 +13909,7 @@ static char *parse_parameter_expansion(executor_t *executor,
                     }
                 }
             } else {
-                // arr[@] / arr[*]
+                /// arr[@] / arr[*]
                 char arr_name[256];
                 size_t name_len = vn_len - 3;
                 if (name_len < sizeof(arr_name)) {
@@ -13920,10 +13928,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                 }
             }
 
-            // Apply the per-element scalar op to each element and join
-            // results with a single space. Each branch produces a
-            // freshly allocated transformed string per element; the
-            // join loop then concatenates with growth.
+            /// Apply the per-element scalar op to each element and join
+            /// results with a single space. Each branch produces a
+            /// freshly allocated transformed string per element; the
+            /// join loop then concatenates with growth.
             size_t out_cap = 64;
             size_t out_pos = 0;
             char *joined = malloc(out_cap);
@@ -13932,10 +13940,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                 for (int i = 0; i < n_elems; i++) {
                     char *converted = NULL;
                     switch (op_type) {
-                    case 4: // ^^ uppercase all
-                    case 5: // ,, lowercase all
-                    case 8: // ^  uppercase first / match
-                    case 9: // ,  lowercase first / match
+                    case 4: /// ^^ uppercase all
+                    case 5: /// ,, lowercase all
+                    case 8: /// ^  uppercase first / match
+                    case 9: /// ,  lowercase first / match
                     {
                         bool to_upper = (op_type == 4 || op_type == 8);
                         bool first_only = (op_type == 8 || op_type == 9);
@@ -13954,16 +13962,16 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                         break;
                     }
-                    case 2: // ## longest prefix strip
-                    case 6: // #  shortest prefix strip
+                    case 2: /// ## longest prefix strip
+                    case 6: /// #  shortest prefix strip
                     {
                         int match = find_prefix_match(
                             elems[i], expanded_default, op_type == 2);
                         converted = strdup(elems[i] + match);
                         break;
                     }
-                    case 3: // %% longest suffix strip
-                    case 7: // %  shortest suffix strip
+                    case 3: /// %% longest suffix strip
+                    case 7: /// %  shortest suffix strip
                     {
                         int match = find_suffix_match(
                             elems[i], expanded_default, op_type == 3);
@@ -13978,10 +13986,10 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                         break;
                     }
-                    case 15: // // replace all
-                    case 16: // /  replace first
+                    case 15: /// /// replace all
+                    case 16: /// /  replace first
                     {
-                        // Split expanded_default at first unescaped '/'.
+                        /// Split expanded_default at first unescaped '/'.
                         char *sep = NULL;
                         for (char *p = expanded_default; p && *p; p++) {
                             if (*p == '\\' && p[1] == '/') {
@@ -14027,17 +14035,17 @@ static char *parse_parameter_expansion(executor_t *executor,
                         }
                         break;
                     }
-                    case 17: // @transform (Q E P A a)
+                    case 17: /// @transform (Q E P A a)
                     {
                         char tcode = (expanded_default && expanded_default[0])
                                          ? expanded_default[0]
                                          : '\0';
                         switch (tcode) {
-                        case 'Q': // shell-quoted form
+                        case 'Q': /// shell-quoted form
                         {
-                            // Conservative: wrap in single quotes and
-                            // escape embedded single quotes. Matches
-                            // bash's @Q for typical strings.
+                            /// Conservative: wrap in single quotes and
+                            /// escape embedded single quotes. Matches
+                            /// bash's @Q for typical strings.
                             size_t elen = strlen(elems[i]);
                             size_t qcap = elen * 4 + 3;
                             converted = malloc(qcap);
@@ -14059,18 +14067,18 @@ static char *parse_parameter_expansion(executor_t *executor,
                             }
                             break;
                         }
-                        case 'E': // backslash-escape processing
-                            // Passthrough for now; per-element parity
-                            // with the scalar @E path.
+                        case 'E': /// backslash-escape processing
+                            /// Passthrough for now; per-element parity
+                            /// with the scalar @E path.
                             converted = strdup(elems[i]);
                             break;
-                        case 'P': // prompt expansion
+                        case 'P': /// prompt expansion
                             converted = strdup(elems[i]);
                             break;
-                        case 'A': // assignment form
+                        case 'A': /// assignment form
                             converted = strdup(elems[i]);
                             break;
-                        case 'a': // attributes
+                        case 'a': /// attributes
                             converted = strdup("");
                             break;
                         default:
@@ -14123,7 +14131,7 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
 
         switch (op_type) {
-        case 0: // ${var:-default} - use default if var is unset or empty
+        case 0: /// ${var:-default} - use default if var is unset or empty
             if (is_empty_or_null(var_value)) {
                 result = strdup(expanded_default);
             } else {
@@ -14131,8 +14139,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 1: // ${var:+alternative} - use alternative if var is set and
-                // non-empty
+        case 1: /// ${var:+alternative} - use alternative if var is set and
+                /// non-empty
             if (!is_empty_or_null(var_value)) {
                 result = strdup(expanded_default);
             } else {
@@ -14140,8 +14148,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 2: // ${var##pattern} - remove longest match of pattern from
-                // beginning
+        case 2: /// ${var##pattern} - remove longest match of pattern from
+                /// beginning
             if (var_value) {
                 int match_len =
                     find_prefix_match(var_value, expanded_default, true);
@@ -14151,7 +14159,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 3: // ${var%%pattern} - remove longest match of pattern from end
+        case 3: /// ${var%%pattern} - remove longest match of pattern from end
             if (var_value) {
                 int str_len = strlen(var_value);
                 int match_len =
@@ -14169,7 +14177,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 4: // ${var^^[pat]} - convert all characters to uppercase
+        case 4: /// ${var^^[pat]} - convert all characters to uppercase
             if (var_value) {
                 /* Pattern restriction (issue #96): ${var^^[abc]} converts
                  * only characters matching the glob pattern. Empty
@@ -14186,7 +14194,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 5: // ${var,,[pat]} - convert all characters to lowercase
+        case 5: /// ${var,,[pat]} - convert all characters to lowercase
             if (var_value) {
                 if (expanded_default && expanded_default[0]) {
                     result = convert_case_pattern(var_value, expanded_default,
@@ -14199,8 +14207,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 6: // ${var#pattern} - remove shortest match of pattern from
-                // beginning
+        case 6: /// ${var#pattern} - remove shortest match of pattern from
+                /// beginning
             if (var_value) {
                 int match_len =
                     find_prefix_match(var_value, expanded_default, false);
@@ -14210,7 +14218,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 7: // ${var%pattern} - remove shortest match of pattern from end
+        case 7: /// ${var%pattern} - remove shortest match of pattern from end
             if (var_value) {
                 int str_len = strlen(var_value);
                 int match_len =
@@ -14228,7 +14236,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 8: // ${var^[pat]} - convert first matching character to uppercase
+        case 8: /// ${var^[pat]} - convert first matching character to uppercase
             if (var_value) {
                 if (expanded_default && expanded_default[0]) {
                     result = convert_case_pattern(var_value, expanded_default,
@@ -14241,7 +14249,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 9: // ${var,[pat]} - convert first matching character to lowercase
+        case 9: /// ${var,[pat]} - convert first matching character to lowercase
             if (var_value) {
                 if (expanded_default && expanded_default[0]) {
                     result = convert_case_pattern(var_value, expanded_default,
@@ -14254,8 +14262,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 10: // ${var-default} - use default if var is unset (but not if
-                 // empty)
+        case 10: /// ${var-default} - use default if var is unset (but not if
+                 /// empty)
             if (!var_value) {
                 result = strdup(expanded_default);
             } else {
@@ -14263,8 +14271,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 11: // ${var+alternative} - use alternative if var is set (even if
-                 // empty)
+        case 11: /// ${var+alternative} - use alternative if var is set (even if
+                 /// empty)
             if (var_value) {
                 result = strdup(expanded_default);
             } else {
@@ -14272,8 +14280,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 12: // ${var:=default} - assign default if var is unset or empty
-                 // and return it
+        case 12: /// ${var:=default} - assign default if var is unset or empty
+                 /// and return it
             if (is_empty_or_null(var_value)) {
                 symtable_set_var(executor->symtable, var_name, expanded_default,
                                  SYMVAR_NONE);
@@ -14283,8 +14291,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 13: // ${var=default} - assign default if var is unset and return
-                 // it
+        case 13: /// ${var=default} - assign default if var is unset and return
+                 /// it
             if (!var_value) {
                 symtable_set_var(executor->symtable, var_name, expanded_default,
                                  SYMVAR_NONE);
@@ -14294,9 +14302,9 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 14: // ${var:offset:length} - substring expansion
+        case 14: /// ${var:offset:length} - substring expansion
             if (var_value) {
-                // Parse offset and optional length (with variable expansion)
+                /// Parse offset and optional length (with variable expansion)
                 char *expanded_offset_str =
                     expand_variables_in_string(executor, expanded_default);
                 char *endptr;
@@ -14314,8 +14322,8 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 15: // ${var//pattern/replacement} - replace all occurrences
-        case 16: // ${var/pattern/replacement} - replace first occurrence
+        case 15: /// ${var//pattern/replacement} - replace all occurrences
+        case 16: /// ${var/pattern/replacement} - replace first occurrence
             /* Pattern/replacement split honoring backslash-escaped
              * slashes. ${path//\//.} has pattern `\/` (literal slash)
              * and replacement `.`; the prior strchr-based split took
@@ -14394,7 +14402,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 17: // ${var@op} - transformations
+        case 17: /// ${var@op} - transformations
             if (expanded_default[0]) {
                 char op = expanded_default[0];
                 /* The @a (attribute query) variant only inspects the
@@ -14414,25 +14422,25 @@ static char *parse_parameter_expansion(executor_t *executor,
                     break;
                 }
                 switch (op) {
-                case 'Q': // Quote value for reuse as input
+                case 'Q': /// Quote value for reuse as input
                     result = transform_quote(var_value);
                     break;
-                case 'E': // Expand escape sequences
+                case 'E': /// Expand escape sequences
                     result = transform_escape(var_value);
                     break;
-                case 'P': // Expand as prompt string
+                case 'P': /// Expand as prompt string
                     result = transform_prompt(var_value);
                     break;
-                case 'A': // Assignment statement form
+                case 'A': /// Assignment statement form
                     result = transform_assignment(var_name, var_value);
                     break;
-                case 'U': // Uppercase all
+                case 'U': /// Uppercase all
                     result = convert_case_all_upper(var_value);
                     break;
-                case 'u': // Uppercase first
+                case 'u': /// Uppercase first
                     result = convert_case_first_upper(var_value);
                     break;
-                case 'L': // Lowercase all
+                case 'L': /// Lowercase all
                     result = convert_case_all_lower(var_value);
                     break;
                 default:
@@ -14444,7 +14452,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 18: // ${var:?word} - error if var unset or null (POSIX)
+        case 18: /// ${var:?word} - error if var unset or null (POSIX)
             if (is_empty_or_null(var_value)) {
                 result = handle_required_param_error(
                     executor, var_name, expanded_default,
@@ -14454,7 +14462,7 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             break;
 
-        case 19: // ${var?word} - error if var unset (null permitted) (POSIX)
+        case 19: /// ${var?word} - error if var unset (null permitted) (POSIX)
             if (!var_value) {
                 result = handle_required_param_error(
                     executor, var_name, expanded_default, "parameter not set");
@@ -14470,26 +14478,26 @@ static char *parse_parameter_expansion(executor_t *executor,
         return result ? result : strdup("");
     }
 
-    // No operator found, just get the variable value
-    // First check for special variables that aren't in the symbol table
+    /// No operator found, just get the variable value
+    /// First check for special variables that aren't in the symbol table
     if (strlen(expansion) == 1) {
         char buffer[1024];
 
         switch (expansion[0]) {
-        case '?': // Exit status of last command
+        case '?': /// Exit status of last command
             snprintf(buffer, sizeof(buffer), "%d", last_exit_status);
             return strdup(buffer);
 
-        case '$': // Shell process ID
+        case '$': /// Shell process ID
             snprintf(buffer, sizeof(buffer), "%d", (int)shell_pid);
             return strdup(buffer);
 
-        case '#': // Number of positional parameters
+        case '#': /// Number of positional parameters
             snprintf(buffer, sizeof(buffer), "%d",
                      shell_argc > 1 ? shell_argc - 1 : 0);
             return strdup(buffer);
 
-        case '!': // Process ID of last background command
+        case '!': /// Process ID of last background command
             if (last_background_pid > 0) {
                 snprintf(buffer, sizeof(buffer), "%d",
                          (int)last_background_pid);
@@ -14498,8 +14506,8 @@ static char *parse_parameter_expansion(executor_t *executor,
                 return strdup("");
             }
 
-        case '-': { // Current option flags
-            // Build string of current shell option flags
+        case '-': { /// Current option flags
+            /// Build string of current shell option flags
             char flags[32];
             int pos = 0;
             if (is_interactive_shell())
@@ -14536,12 +14544,12 @@ static char *parse_parameter_expansion(executor_t *executor,
             return strdup(flags);
         }
 
-        case '*': // All positional parameters as single word
+        case '*': /// All positional parameters as single word
             if (shell_argc > 1) {
                 size_t total_len = 0;
                 for (int i = 1; i < shell_argc; i++) {
                     if (shell_argv[i]) {
-                        total_len += strlen(shell_argv[i]) + 1; // +1 for space
+                        total_len += strlen(shell_argv[i]) + 1; /// +1 for space
                     }
                 }
                 if (total_len > 0) {
@@ -14562,12 +14570,12 @@ static char *parse_parameter_expansion(executor_t *executor,
             }
             return strdup("");
 
-        case '@': // All positional parameters as separate words
+        case '@': /// All positional parameters as separate words
             if (shell_argc > 1) {
                 size_t total_len = 0;
                 for (int i = 1; i < shell_argc; i++) {
                     if (shell_argv[i]) {
-                        total_len += strlen(shell_argv[i]) + 1; // +1 for space
+                        total_len += strlen(shell_argv[i]) + 1; /// +1 for space
                     }
                 }
                 if (total_len > 0) {
@@ -14590,30 +14598,30 @@ static char *parse_parameter_expansion(executor_t *executor,
 
         default:
             if (expansion[0] >= '0' && expansion[0] <= '9') {
-                // Handle positional parameters $0, $1, $2, etc.
+                /// Handle positional parameters $0, $1, $2, etc.
                 int pos = expansion[0] - '0';
 
                 if (pos == 0) {
-                    // $0 is the script/shell name
+                    /// $0 is the script/shell name
                     return strdup((shell_argc > 0 && shell_argv[0])
                                       ? shell_argv[0]
                                       : "lush");
                 } else if (pos > 0) {
-                    // $1, $2, etc. - check function scope first
+                    /// $1, $2, etc. - check function scope first
                     if (symtable_in_function_scope(executor->symtable)) {
-                        // In function scope - get from local positional params
+                        /// In function scope - get from local positional params
                         char param_name[16];
                         snprintf(param_name, sizeof(param_name), "%d", pos);
                         char *value =
                             symtable_get_var(executor->symtable, param_name);
                         if (value && value[0] != '\0') {
-                            return value; // Already allocated by
-                                          // symtable_get_var
+                            return value; /// Already allocated by
+                                          /// symtable_get_var
                         }
                         free(value);
                         return strdup("");
                     } else if (pos < shell_argc && shell_argv[pos]) {
-                        // Global scope - use shell_argv
+                        /// Global scope - use shell_argv
                         return strdup(shell_argv[pos]);
                     } else {
                         return strdup("");
@@ -14624,13 +14632,13 @@ static char *parse_parameter_expansion(executor_t *executor,
         }
     }
 
-    // Fall back to symbol table lookup for regular variables
-    // Bare ${var} / ${arr} via the unified value view. The view
-    // condenses the historical "try array, fall back to scalar" dance
-    // into one call. For lists/maps, hand to expand_array_unsubscripted
-    // (which enforces SEMANTICS section 3.9 in zsh/lush mode); for
-    // scalars, take ownership of the strdup and continue to the
-    // set -u check.
+    /// Fall back to symbol table lookup for regular variables
+    /// Bare ${var} / ${arr} via the unified value view. The view
+    /// condenses the historical "try array, fall back to scalar" dance
+    /// into one call. For lists/maps, hand to expand_array_unsubscripted
+    /// (which enforces SEMANTICS section 3.9 in zsh/lush mode); for
+    /// scalars, take ownership of the strdup and continue to the
+    /// set -u check.
     lush_value_view_t view = {0};
     symtable_lookup(expansion, &view);
     if (view.kind == LUSH_VALUE_LIST || view.kind == LUSH_VALUE_MAP) {
@@ -14646,26 +14654,26 @@ static char *parse_parameter_expansion(executor_t *executor,
     view.scalar_value = NULL;
     lush_value_view_clear(&view);
 
-    // Check for unset variable error (set -u) for ${var} syntax
+    /// Check for unset variable error (set -u) for ${var} syntax
     if (!value && shell_opts.unset_error) {
-        // Don't error on special variables that have default behavior
+        /// Don't error on special variables that have default behavior
         if (strlen(expansion) != 1 ||
             (expansion[0] != '?' && expansion[0] != '$' &&
              expansion[0] != '#' && expansion[0] != '0' &&
              expansion[0] != '@' && expansion[0] != '*' &&
              expansion[0] != '-' && expansion[0] != '!')) {
-            // Report structured error for unbound variable
+            /// Report structured error for unbound variable
             executor_error_report(executor, SHELL_ERR_UNBOUND_VARIABLE,
                                   executor_current_loc(executor),
                                   "%s: unbound variable", expansion);
-            // Set expansion error instead of exiting to allow || constructs
+            /// Set expansion error instead of exiting to allow || constructs
             executor->expansion_error = true;
             executor->expansion_exit_status = 1;
-            return strdup(""); // Return empty string for unbound variable
+            return strdup(""); /// Return empty string for unbound variable
         }
     }
 
-    // value is already strdup'd by symtable_get_var, don't strdup again
+    /// value is already strdup'd by symtable_get_var, don't strdup again
     return value ? value : strdup("");
 }
 
@@ -14689,21 +14697,21 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
         return strdup(var_text ? var_text : "");
     }
 
-    // Special case: if var_text is exactly "$$", treat it as shell PID
+    /// Special case: if var_text is exactly "$$", treat it as shell PID
     if (strcmp(var_text, "$$") == 0) {
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "%d", (int)shell_pid);
         return strdup(buffer);
     }
 
-    // Special case: if var_text is exactly "$", treat it as shell PID
+    /// Special case: if var_text is exactly "$", treat it as shell PID
     if (strcmp(var_text, "$") == 0) {
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "%d", (int)shell_pid);
         return strdup(buffer);
     }
 
-    // Special case: if var_text is exactly "$?", treat it as exit status
+    /// Special case: if var_text is exactly "$?", treat it as exit status
     if (strcmp(var_text, "$?") == 0) {
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "%d", last_exit_status);
@@ -14712,7 +14720,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
 
     const char *var_name = var_text + 1;
 
-    // Handle ${var} format with advanced parameter expansion
+    /// Handle ${var} format with advanced parameter expansion
     if (var_name[0] == '{') {
 
         /* Find the matching closing brace, not the first one. Nested
@@ -14738,16 +14746,16 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
             }
         }
     } else {
-        // Simple $var format - handle special variables and regular variables
+        /// Simple $var format - handle special variables and regular variables
         size_t name_len = 0;
 
-        // Check for special single-character variables first
+        /// Check for special single-character variables first
         if (var_name[0] == '?' || var_name[0] == '$' || var_name[0] == '#' ||
             var_name[0] == '*' || var_name[0] == '@' || var_name[0] == '!' ||
             var_name[0] == '-' || (var_name[0] >= '0' && var_name[0] <= '9')) {
             name_len = 1;
         } else {
-            // Regular variable names (alphanumeric + underscore)
+            /// Regular variable names (alphanumeric + underscore)
             while (var_name[name_len] &&
                    (isalnum(var_name[name_len]) || var_name[name_len] == '_')) {
                 name_len++;
@@ -14784,9 +14792,10 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                 strncpy(name, var_name, name_len);
                 name[name_len] = '\0';
 
-                // Resolve nameref if applicable (max depth 10 to prevent loops)
+                /// Resolve nameref if applicable (max depth 10 to prevent
+                /// loops)
                 const char *resolved_name = name;
-                char *resolved_to_free = NULL; // Track if we need to free
+                char *resolved_to_free = NULL; /// Track if we need to free
                 if (symtable_is_nameref(executor->symtable, name)) {
                     const char *target =
                         symtable_resolve_nameref(executor->symtable, name, 10);
@@ -14796,11 +14805,11 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                     }
                 }
 
-                // Bare $arr / $var via the unified value view (mirrors
-                // the parse_parameter_expansion braced ${arr} site).
-                // bash mode gives first element, zsh/lush mode raises a
-                // type error in scalar slots; both come out of
-                // expand_array_unsubscripted. (Issue #65.)
+                /// Bare $arr / $var via the unified value view (mirrors
+                /// the parse_parameter_expansion braced ${arr} site).
+                /// bash mode gives first element, zsh/lush mode raises a
+                /// type error in scalar slots; both come out of
+                /// expand_array_unsubscripted. (Issue #65.)
                 lush_value_view_t view = {0};
                 symtable_lookup(resolved_name, &view);
                 if (view.kind == LUSH_VALUE_LIST ||
@@ -14822,58 +14831,58 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                 view.scalar_value = NULL;
                 lush_value_view_clear(&view);
 
-                // Free resolved nameref if it was allocated
+                /// Free resolved nameref if it was allocated
                 if (resolved_to_free) {
                     free(resolved_to_free);
                 }
 
-                // Check for unset variable error (set -u)
+                /// Check for unset variable error (set -u)
                 if (!value && shell_opts.unset_error && name_len > 0) {
-                    // Don't error on special variables that have default
-                    // behavior
+                    /// Don't error on special variables that have default
+                    /// behavior
                     if (name_len != 1 ||
                         (name[0] != '?' && name[0] != '$' && name[0] != '#' &&
                          name[0] != '0' && name[0] != '@' && name[0] != '*' &&
                          name[0] != '-' && name[0] != '!')) {
-                        // Report structured error for unbound variable
+                        /// Report structured error for unbound variable
                         executor_error_report(executor,
                                               SHELL_ERR_UNBOUND_VARIABLE,
                                               executor_current_loc(executor),
                                               "%s: unbound variable", name);
                         free(name);
-                        // Set expansion error instead of exiting to allow ||
-                        // constructs
+                        /// Set expansion error instead of exiting to allow ||
+                        /// constructs
                         executor->expansion_error = true;
                         executor->expansion_exit_status = 1;
                         return strdup(
-                            ""); // Return empty string for unbound variable
+                            ""); /// Return empty string for unbound variable
                     }
                 }
 
-                // If not found in symbol table and it's a special variable,
-                // handle it directly
+                /// If not found in symbol table and it's a special variable,
+                /// handle it directly
                 if (!value && name_len == 1) {
                     char buffer[1024];
 
                     switch (name[0]) {
-                    case '?': // Exit status of last command
+                    case '?': /// Exit status of last command
                         snprintf(buffer, sizeof(buffer), "%d",
                                  last_exit_status);
                         free(name);
                         return strdup(buffer);
 
-                    case '$': // Shell process ID
+                    case '$': /// Shell process ID
                         snprintf(buffer, sizeof(buffer), "%d", (int)shell_pid);
                         free(name);
                         return strdup(buffer);
 
-                    case '#': // Number of positional parameters
+                    case '#': /// Number of positional parameters
                         snprintf(buffer, sizeof(buffer), "%d",
                                  shell_argc > 1 ? shell_argc - 1 : 0);
                         free(name);
                         return strdup(buffer);
 
-                    case '!': // Process ID of last background command
+                    case '!': /// Process ID of last background command
                         if (last_background_pid > 0) {
                             snprintf(buffer, sizeof(buffer), "%d",
                                      (int)last_background_pid);
@@ -14884,19 +14893,19 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                             return strdup("");
                         }
 
-                    case '*': // All positional parameters as single word
+                    case '*': /// All positional parameters as single word
                     {
-                        // Check if we're in function scope - try to get $# from
-                        // local scope
+                        /// Check if we're in function scope - try to get $#
+                        /// from local scope
                         char *func_argc_str =
                             symtable_get_var(executor->symtable, "#");
                         if (func_argc_str && executor->symtable) {
-                            // We're in a function scope - use function
-                            // parameters
+                            /// We're in a function scope - use function
+                            /// parameters
                             int func_argc = atoi(func_argc_str);
                             if (func_argc > 0) {
                                 size_t total_len = 0;
-                                // Calculate total length needed
+                                /// Calculate total length needed
                                 for (int i = 1; i <= func_argc; i++) {
                                     char param_name[16];
                                     snprintf(param_name, sizeof(param_name),
@@ -14905,7 +14914,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                                         executor->symtable, param_name);
                                     if (param_value) {
                                         total_len += strlen(param_value) +
-                                                     1; // +1 for space
+                                                     1; /// +1 for space
                                     }
                                 }
                                 if (total_len > 0) {
@@ -14936,13 +14945,13 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                             free(name);
                             return strdup("");
                         } else {
-                            // Use global shell parameters
+                            /// Use global shell parameters
                             if (shell_argc > 1) {
                                 size_t total_len = 0;
                                 for (int i = 1; i < shell_argc; i++) {
                                     if (shell_argv[i]) {
                                         total_len += strlen(shell_argv[i]) +
-                                                     1; // +1 for space
+                                                     1; /// +1 for space
                                     }
                                 }
                                 if (total_len > 0) {
@@ -14967,19 +14976,19 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                         }
                     }
 
-                    case '@': // All positional parameters as separate words
+                    case '@': /// All positional parameters as separate words
                     {
-                        // Check if we're in function scope - try to get $# from
-                        // local scope
+                        /// Check if we're in function scope - try to get $#
+                        /// from local scope
                         char *func_argc_str =
                             symtable_get_var(executor->symtable, "#");
                         if (func_argc_str && executor->symtable) {
-                            // We're in a function scope - use function
-                            // parameters
+                            /// We're in a function scope - use function
+                            /// parameters
                             int func_argc = atoi(func_argc_str);
                             if (func_argc > 0) {
                                 size_t total_len = 0;
-                                // Calculate total length needed
+                                /// Calculate total length needed
                                 for (int i = 1; i <= func_argc; i++) {
                                     char param_name[16];
                                     snprintf(param_name, sizeof(param_name),
@@ -14988,7 +14997,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                                         executor->symtable, param_name);
                                     if (param_value) {
                                         total_len += strlen(param_value) +
-                                                     1; // +1 for space
+                                                     1; /// +1 for space
                                     }
                                 }
                                 if (total_len > 0) {
@@ -15019,16 +15028,16 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                             free(name);
                             return strdup("");
                         } else {
-                            // Use global shell parameters
-                            // Note: This should ideally preserve word
-                            // boundaries, but for now we'll implement it
-                            // similarly to $* for compatibility
+                            /// Use global shell parameters
+                            /// Note: This should ideally preserve word
+                            /// boundaries, but for now we'll implement it
+                            /// similarly to $* for compatibility
                             if (shell_argc > 1) {
                                 size_t total_len = 0;
                                 for (int i = 1; i < shell_argc; i++) {
                                     if (shell_argv[i]) {
                                         total_len += strlen(shell_argv[i]) +
-                                                     1; // +1 for space
+                                                     1; /// +1 for space
                                     }
                                 }
                                 if (total_len > 0) {
@@ -15053,7 +15062,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                         }
                     }
 
-                    case '-': { // Current option flags
+                    case '-': { /// Current option flags
                         char flags[32];
                         int fpos = 0;
                         if (is_interactive_shell())
@@ -15093,22 +15102,22 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
 
                     default:
                         if (name[0] >= '0' && name[0] <= '9') {
-                            // Handle positional parameters $0, $1, $2, etc.
+                            /// Handle positional parameters $0, $1, $2, etc.
                             int pos = name[0] - '0';
 
                             if (pos == 0) {
-                                // $0 is the script/shell name
+                                /// $0 is the script/shell name
                                 free(name);
                                 return strdup((shell_argc > 0 && shell_argv[0])
                                                   ? shell_argv[0]
                                                   : "lush");
                             } else if (pos > 0 && pos < shell_argc &&
                                        shell_argv[pos]) {
-                                // $1, $2, etc. are script arguments
+                                /// $1, $2, etc. are script arguments
                                 free(name);
                                 return strdup(shell_argv[pos]);
                             } else {
-                                // Parameter doesn't exist, return empty string
+                                /// Parameter doesn't exist, return empty string
                                 free(name);
                                 return strdup("");
                             }
@@ -15118,7 +15127,7 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
                 }
 
                 free(name);
-                // value is already strdup'd by symtable_get_var
+                /// value is already strdup'd by symtable_get_var
                 return value ? value : strdup("");
             }
         }
@@ -15141,16 +15150,16 @@ static char *expand_tilde(const char *text) {
         return strdup(text ? text : "");
     }
 
-    // Find the end of the tilde expression (until '/' or end of string)
+    /// Find the end of the tilde expression (until '/' or end of string)
     const char *slash = strchr(text, '/');
     const char *rest = slash ? slash : "";
     size_t tilde_len = slash ? (size_t)(slash - text) : strlen(text);
 
     if (tilde_len == 1) {
-        // Simple ~ expansion to $HOME
+        /// Simple ~ expansion to $HOME
         const char *home = getenv("HOME");
         if (!home) {
-            // Fallback if HOME is not set
+            /// Fallback if HOME is not set
             struct passwd *pw = getpwuid(getuid());
             home = pw ? pw->pw_dir : "/";
         }
@@ -15167,7 +15176,7 @@ static char *expand_tilde(const char *text) {
             return result;
         }
     } else {
-        // ~user expansion to user's home directory
+        /// ~user expansion to user's home directory
         char *username = malloc(tilde_len);
         if (!username) {
             return strdup(text);
@@ -15180,7 +15189,7 @@ static char *expand_tilde(const char *text) {
         free(username);
 
         if (!pw) {
-            // User not found, return original text
+            /// User not found, return original text
             return strdup(text);
         }
 
@@ -15213,8 +15222,8 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
         return strdup("0");
     }
 
-    // Use the modern arithmetic evaluator with executor context for scoped
-    // variables
+    /// Use the modern arithmetic evaluator with executor context for scoped
+    /// variables
     char *result = arithm_expand_with_executor(executor, arith_text);
     if (result) {
         return result;
@@ -15255,7 +15264,7 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
             executor->has_error = true;
             executor->error_message = NULL;
         } else {
-            // Fallback if shell_error_create failed (e.g. OOM)
+            /// Fallback if shell_error_create failed (e.g. OOM)
             executor_error_report(
                 executor, arithm_error_code(), executor_current_loc(executor),
                 "arithmetic: %s", msg ? msg : "evaluation error");
@@ -15266,7 +15275,7 @@ static char *expand_arithmetic(executor_t *executor, const char *arith_text) {
                               "arithmetic: evaluation error");
     }
 
-    // Set expansion error flag instead of immediate exit status
+    /// Set expansion error flag instead of immediate exit status
     executor->expansion_error = true;
     executor->expansion_exit_status = 1;
     return strdup("");
@@ -15289,12 +15298,12 @@ static char *expand_command_substitution(executor_t *executor,
         return strdup("");
     }
 
-    // Extract command from $(command) or `command` format
+    /// Extract command from $(command) or `command` format
     char *command = NULL;
     if (strncmp(cmd_text, "$(", 2) == 0 &&
         cmd_text[strlen(cmd_text) - 1] == ')') {
-        // Extract from $(command)
-        size_t len = strlen(cmd_text) - 3; // Remove $( and )
+        /// Extract from $(command)
+        size_t len = strlen(cmd_text) - 3; /// Remove $( and )
         command = malloc(len + 1);
         if (!command) {
             return strdup("");
@@ -15302,8 +15311,8 @@ static char *expand_command_substitution(executor_t *executor,
         strncpy(command, cmd_text + 2, len);
         command[len] = '\0';
     } else if (cmd_text[0] == '`' && cmd_text[strlen(cmd_text) - 1] == '`') {
-        // Extract from `command`
-        size_t len = strlen(cmd_text) - 2; // Remove backticks
+        /// Extract from `command`
+        size_t len = strlen(cmd_text) - 2; /// Remove backticks
         command = malloc(len + 1);
         if (!command) {
             return strdup("");
@@ -15311,7 +15320,7 @@ static char *expand_command_substitution(executor_t *executor,
         strncpy(command, cmd_text + 1, len);
         command[len] = '\0';
     } else {
-        // Already extracted command
+        /// Already extracted command
         command = strdup(cmd_text);
         if (!command) {
             return strdup("");
@@ -15330,7 +15339,7 @@ static char *expand_command_substitution(executor_t *executor,
      * separated arguments. Pre-expansion was an architectural layering
      * violation that masked array semantics. */
 
-    // Create a pipe to capture command output
+    /// Create a pipe to capture command output
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         free(command);
@@ -15346,13 +15355,13 @@ static char *expand_command_substitution(executor_t *executor,
     }
 
     if (pid == 0) {
-        // Child process - execute command using lush's own parser/executor
-        close(pipefd[0]);               // Close read end
-        dup2(pipefd[1], STDOUT_FILENO); // Redirect stdout to pipe
+        /// Child process - execute command using lush's own parser/executor
+        close(pipefd[0]);               /// Close read end
+        dup2(pipefd[1], STDOUT_FILENO); /// Redirect stdout to pipe
         close(pipefd[1]);
 
-        // Parse and execute command using lush's own parser/executor
-        // This preserves all function definitions and variables in the child
+        /// Parse and execute command using lush's own parser/executor
+        /// This preserves all function definitions and variables in the child
         const char *src_name = executor->current_script_file
                                    ? executor->current_script_file
                                    : "<command substitution>";
@@ -15364,23 +15373,23 @@ static char *expand_command_substitution(executor_t *executor,
         if (parser) {
             node_t *ast = parser_parse(parser);
             if (!parser_has_error(parser) && ast) {
-                // Execute in current context (functions are inherited via fork)
-                // Use executor_execute to handle command sequences
-                // (next_sibling)
+                /// Execute in current context (functions are inherited via
+                /// fork) Use executor_execute to handle command sequences
+                /// (next_sibling)
                 result = executor_execute(executor, ast);
                 free_node_tree(ast);
             }
             parser_free(parser);
         }
 
-        // Ensure all output is flushed before exit
+        /// Ensure all output is flushed before exit
         fflush(stdout);
         free(command);
         subshell_cleanup();
         _exit(result);
     } else {
-        // Parent process - read output
-        close(pipefd[1]); // Close write end
+        /// Parent process - read output
+        close(pipefd[1]); /// Close write end
         free(command);
 
         char *output = malloc(1024);
@@ -15397,19 +15406,19 @@ static char *expand_command_substitution(executor_t *executor,
         ssize_t bytes_read;
         char buffer[256];
 
-        // Wait for child process to complete first, retrying on EINTR
+        /// Wait for child process to complete first, retrying on EINTR
         int status;
         while (waitpid(pid, &status, 0) == -1 && errno == EINTR)
             ;
 
-        // Propagate child's exit status to executor for $? access
+        /// Propagate child's exit status to executor for $? access
         if (WIFEXITED(status)) {
             executor->exit_status = WEXITSTATUS(status);
         } else if (WIFSIGNALED(status)) {
             executor->exit_status = 128 + WTERMSIG(status);
         }
 
-        // Then read all available output
+        /// Then read all available output
         while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer))) > 0) {
             if (output_len + bytes_read >= output_size) {
                 output_size *= 2;
@@ -15427,7 +15436,7 @@ static char *expand_command_substitution(executor_t *executor,
 
         close(pipefd[0]);
 
-        // Null-terminate the output buffer before string operations
+        /// Null-terminate the output buffer before string operations
         if (output_len >= output_size) {
             char *new_output = realloc(output, output_size + 1);
             if (new_output) {
@@ -15436,7 +15445,7 @@ static char *expand_command_substitution(executor_t *executor,
         }
         output[output_len] = '\0';
 
-        // Null terminate and remove trailing newlines
+        /// Null terminate and remove trailing newlines
         output[output_len] = '\0';
         while (output_len > 0 && (output[output_len - 1] == '\n' ||
                                   output[output_len - 1] == '\r')) {
@@ -15464,7 +15473,7 @@ static void copy_function_definitions(executor_t *dest, executor_t *src) {
 
     function_def_t *src_func = src->functions;
     while (src_func) {
-        // Create a copy of the function definition
+        /// Create a copy of the function definition
         function_def_t *new_func = malloc(sizeof(function_def_t));
         if (!new_func) {
             break;
@@ -15476,7 +15485,7 @@ static void copy_function_definitions(executor_t *dest, executor_t *src) {
             break;
         }
 
-        // Create a simple copy of the function body AST
+        /// Create a simple copy of the function body AST
         new_func->body = copy_node_simple(src_func->body);
         if (!new_func->body) {
             free(new_func->name);
@@ -15484,7 +15493,7 @@ static void copy_function_definitions(executor_t *dest, executor_t *src) {
             break;
         }
 
-        // Add to destination's function list
+        /// Add to destination's function list
         new_func->next = dest->functions;
         dest->functions = new_func;
 
@@ -15514,7 +15523,7 @@ static node_t *copy_node_simple(node_t *original) {
     copy->val_type = original->val_type;
     copy->val = original->val;
 
-    // If the node has a string value, copy it
+    /// If the node has a string value, copy it
     if (original->val_type == VAL_STR && original->val.str) {
         copy->val.str = strdup(original->val.str);
         if (!copy->val.str) {
@@ -15523,7 +15532,7 @@ static node_t *copy_node_simple(node_t *original) {
         }
     }
 
-    // Copy children recursively
+    /// Copy children recursively
     node_t *child = original->first_child;
     while (child) {
         node_t *child_copy = copy_node_simple(child);
@@ -15553,8 +15562,8 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
         return strdup("");
     }
 
-    // Allocate buffer (escape sequences usually shrink the string)
-    size_t buffer_size = len * 4 + 1; // Extra space for Unicode expansion
+    /// Allocate buffer (escape sequences usually shrink the string)
+    size_t buffer_size = len * 4 + 1; /// Extra space for Unicode expansion
     char *result = malloc(buffer_size);
     if (!result) {
         return strdup("");
@@ -15567,60 +15576,60 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
         if (str[i] == '\\' && i + 1 < len) {
             char next = str[i + 1];
             switch (next) {
-            case 'a': // Alert (bell)
+            case 'a': /// Alert (bell)
                 result[result_pos++] = '\a';
                 i += 2;
                 break;
-            case 'b': // Backspace
+            case 'b': /// Backspace
                 result[result_pos++] = '\b';
                 i += 2;
                 break;
-            case 'e': // Escape character
+            case 'e': /// Escape character
             case 'E':
                 result[result_pos++] = '\033';
                 i += 2;
                 break;
-            case 'f': // Form feed
+            case 'f': /// Form feed
                 result[result_pos++] = '\f';
                 i += 2;
                 break;
-            case 'n': // Newline
+            case 'n': /// Newline
                 result[result_pos++] = '\n';
                 i += 2;
                 break;
-            case 'r': // Carriage return
+            case 'r': /// Carriage return
                 result[result_pos++] = '\r';
                 i += 2;
                 break;
-            case 't': // Horizontal tab
+            case 't': /// Horizontal tab
                 result[result_pos++] = '\t';
                 i += 2;
                 break;
-            case 'v': // Vertical tab
+            case 'v': /// Vertical tab
                 result[result_pos++] = '\v';
                 i += 2;
                 break;
-            case '\\': // Backslash
+            case '\\': /// Backslash
                 result[result_pos++] = '\\';
                 i += 2;
                 break;
-            case '\'': // Single quote
+            case '\'': /// Single quote
                 result[result_pos++] = '\'';
                 i += 2;
                 break;
-            case '"': // Double quote
+            case '"': /// Double quote
                 result[result_pos++] = '"';
                 i += 2;
                 break;
-            case '?': // Question mark
+            case '?': /// Question mark
                 result[result_pos++] = '?';
                 i += 2;
                 break;
-            case 'x': // Hex escape \xNN
+            case 'x': /// Hex escape \xNN
                 if (i + 3 < len && isxdigit((unsigned char)str[i + 2])) {
                     char hex[3] = {0};
                     int hex_len = 0;
-                    // Read up to 2 hex digits
+                    /// Read up to 2 hex digits
                     for (int j = 0; j < 2 && i + 2 + j < len; j++) {
                         if (isxdigit((unsigned char)str[i + 2 + j])) {
                             hex[hex_len++] = str[i + 2 + j];
@@ -15639,7 +15648,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
                     result[result_pos++] = str[i++];
                 }
                 break;
-            case 'u': // Unicode escape \uNNNN (4 hex digits)
+            case 'u': /// Unicode escape \uNNNN (4 hex digits)
                 if (i + 5 < len) {
                     char hex[5] = {0};
                     int hex_len = 0;
@@ -15652,7 +15661,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
                     }
                     if (hex_len == 4) {
                         uint32_t codepoint = (uint32_t)strtoul(hex, NULL, 16);
-                        // Encode as UTF-8
+                        /// Encode as UTF-8
                         if (codepoint < 0x80) {
                             result[result_pos++] = (char)codepoint;
                         } else if (codepoint < 0x800) {
@@ -15676,7 +15685,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
                     result[result_pos++] = str[i++];
                 }
                 break;
-            case 'U': // Unicode escape \UNNNNNNNN (8 hex digits)
+            case 'U': /// Unicode escape \UNNNNNNNN (8 hex digits)
                 if (i + 9 < len) {
                     char hex[9] = {0};
                     int hex_len = 0;
@@ -15689,7 +15698,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
                     }
                     if (hex_len == 8) {
                         uint32_t codepoint = (uint32_t)strtoul(hex, NULL, 16);
-                        // Encode as UTF-8
+                        /// Encode as UTF-8
                         if (codepoint < 0x80) {
                             result[result_pos++] = (char)codepoint;
                         } else if (codepoint < 0x800) {
@@ -15729,7 +15738,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
             case '4':
             case '5':
             case '6':
-            case '7': // Octal escape \NNN
+            case '7': /// Octal escape \NNN
             {
                 char octal[4] = {0};
                 int octal_len = 0;
@@ -15750,7 +15759,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
                 }
                 break;
             }
-            case 'c': // Control character \cX
+            case 'c': /// Control character \cX
                 if (i + 2 < len) {
                     char ctrl = str[i + 2];
                     if (ctrl >= '@' && ctrl <= '_') {
@@ -15758,7 +15767,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
                     } else if (ctrl >= 'a' && ctrl <= 'z') {
                         result[result_pos++] = (char)(ctrl - 'a' + 1);
                     } else if (ctrl == '?') {
-                        result[result_pos++] = 127; // DEL
+                        result[result_pos++] = 127; /// DEL
                     } else {
                         result[result_pos++] = str[i++];
                         break;
@@ -15769,7 +15778,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
                 }
                 break;
             default:
-                // Unknown escape - keep the backslash and character
+                /// Unknown escape - keep the backslash and character
                 result[result_pos++] = str[i++];
                 break;
             }
@@ -15777,7 +15786,7 @@ static char *expand_ansi_c_string(const char *str, size_t len) {
             result[result_pos++] = str[i++];
         }
 
-        // Ensure buffer has space
+        /// Ensure buffer has space
         if (result_pos >= buffer_size - 4) {
             buffer_size *= 2;
             char *new_result = realloc(result, buffer_size);
@@ -15815,7 +15824,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
         return strdup("");
     }
 
-    // Allocate a buffer for expansion (estimate double the original size)
+    /// Allocate a buffer for expansion (estimate double the original size)
     size_t buffer_size = len * 2 + 256;
     char *result = malloc(buffer_size);
     if (!result) {
@@ -15866,11 +15875,11 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
         }
 
         if (str[i] == '$' && i + 1 < len) {
-            // NOTE: ANSI-C quoting $'...' is NOT expanded inside double quotes
-            // per POSIX/bash behavior. It's only recognized at the outer level.
-            // So we skip the $' check here and treat it as a literal $.
+            /// NOTE: ANSI-C quoting $'...' is NOT expanded inside double quotes
+            /// per POSIX/bash behavior. It's only recognized at the outer
+            /// level. So we skip the $' check here and treat it as a literal $.
 
-            // Check for arithmetic expansion $((...))
+            /// Check for arithmetic expansion $((...))
             if (str[i + 1] == '(' && i + 2 < len && str[i + 2] == '(') {
                 /* $(( disambiguation: arithmetic vs command-sub of
                  * anonymous function. Same shape as tokenizer +
@@ -15908,7 +15917,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                      * just skip and let the next branch handle it. */
                     goto qs_try_cmd_sub;
                 }
-                // This is arithmetic expansion $((expr))
+                /// This is arithmetic expansion $((expr))
                 size_t arith_start = i;
                 size_t arith_end = i + 3;
                 int paren_depth = 2;
@@ -15923,7 +15932,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 }
 
                 if (paren_depth == 0) {
-                    // Extract arithmetic expression including $(( and ))
+                    /// Extract arithmetic expression including $(( and ))
                     size_t full_arith_len = arith_end - arith_start;
                     char *full_arith_expr = malloc(full_arith_len + 1);
                     if (full_arith_expr) {
@@ -15931,12 +15940,12 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                                 full_arith_len);
                         full_arith_expr[full_arith_len] = '\0';
 
-                        // Expand arithmetic expression
+                        /// Expand arithmetic expression
                         char *arith_result =
                             expand_arithmetic(executor, full_arith_expr);
                         if (arith_result) {
                             size_t result_len = strlen(arith_result);
-                            // Ensure buffer is large enough
+                            /// Ensure buffer is large enough
                             while (result_pos + result_len >= buffer_size) {
                                 buffer_size *= 2;
                                 char *new_result = realloc(result, buffer_size);
@@ -15949,49 +15958,49 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                                 result = new_result;
                             }
 
-                            // Copy arithmetic result
+                            /// Copy arithmetic result
                             strcpy(&result[result_pos], arith_result);
                             result_pos += result_len;
                             free(arith_result);
                         }
 
                         free(full_arith_expr);
-                        i = arith_end; // Skip past the closing ))
+                        i = arith_end; /// Skip past the closing ))
                         continue;
                     }
                 }
             }
-            // Check for command substitution $(...)
+            /// Check for command substitution $(...)
             else if (str[i + 1] == '(') {
             qs_try_cmd_sub:;
-                // Use the robust find_closing_brace function to handle nested
-                // quotes
+                /// Use the robust find_closing_brace function to handle nested
+                /// quotes
                 size_t cmd_start = i;
 
-                // Create a temporary string starting from the '(' to use with
-                // find_closing_brace
+                /// Create a temporary string starting from the '(' to use with
+                /// find_closing_brace
                 char *temp_str =
-                    (char *)&str[i + 1]; // Start from the opening parenthesis
+                    (char *)&str[i + 1]; /// Start from the opening parenthesis
                 size_t brace_offset = find_closing_brace(temp_str);
 
                 if (brace_offset > 0) {
-                    // Found matching closing parenthesis
+                    /// Found matching closing parenthesis
                     size_t cmd_end =
-                        i + 1 + brace_offset; // Points to the closing paren
+                        i + 1 + brace_offset; /// Points to the closing paren
 
-                    // Extract command substitution including $( and )
+                    /// Extract command substitution including $( and )
                     size_t full_cmd_len = cmd_end - cmd_start + 1;
                     char *full_cmd_expr = malloc(full_cmd_len + 1);
                     if (full_cmd_expr) {
                         strncpy(full_cmd_expr, &str[cmd_start], full_cmd_len);
                         full_cmd_expr[full_cmd_len] = '\0';
 
-                        // Expand command substitution
+                        /// Expand command substitution
                         char *cmd_result = expand_command_substitution(
                             executor, full_cmd_expr);
                         if (cmd_result) {
                             size_t result_len = strlen(cmd_result);
-                            // Ensure buffer is large enough
+                            /// Ensure buffer is large enough
                             while (result_pos + result_len >= buffer_size) {
                                 buffer_size *= 2;
                                 char *new_result = realloc(result, buffer_size);
@@ -16004,29 +16013,29 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                                 result = new_result;
                             }
 
-                            // Copy command result
+                            /// Copy command result
                             strcpy(&result[result_pos], cmd_result);
                             result_pos += result_len;
                             free(cmd_result);
                         }
 
                         free(full_cmd_expr);
-                        i = cmd_end + 1; // Skip past the closing )
+                        i = cmd_end + 1; /// Skip past the closing )
                         continue;
                     }
                 }
             }
 
-            // Variable expansion needed
+            /// Variable expansion needed
             size_t var_start = i + 1;
             size_t var_end = var_start;
 
-            // Handle ${var} format
+            /// Handle ${var} format
             if (str[var_start] == '{') {
 
-                // Use proper brace matching for nested expressions
+                /// Use proper brace matching for nested expressions
                 int brace_count = 1;
-                var_end = var_start + 1; // Start after opening {
+                var_end = var_start + 1; /// Start after opening {
 
                 while (var_end < len && brace_count > 0) {
                     if (str[var_end] == '{') {
@@ -16038,23 +16047,23 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 }
 
                 if (brace_count == 0) {
-                    var_start++; // Skip opening brace for variable name
-                                 // extraction
-                    var_end--;   // Point to closing brace
-                    // Extract variable name
+                    var_start++; /// Skip opening brace for variable name
+                                 /// extraction
+                    var_end--;   /// Point to closing brace
+                    /// Extract variable name
                     size_t var_name_len = var_end - var_start;
                     char *var_name = malloc(var_name_len + 1);
                     if (var_name) {
                         strncpy(var_name, &str[var_start], var_name_len);
                         var_name[var_name_len] = '\0';
-                        // Use parameter expansion to handle operators like =,
-                        // :-, etc.
+                        /// Use parameter expansion to handle operators like =,
+                        /// :-, etc.
                         char *var_value =
                             parse_parameter_expansion(executor, var_name);
 
                         if (var_value) {
                             size_t value_len = strlen(var_value);
-                            // Ensure buffer is large enough
+                            /// Ensure buffer is large enough
                             while (result_pos + value_len >= buffer_size) {
                                 buffer_size *= 2;
                                 char *new_result = realloc(result, buffer_size);
@@ -16072,7 +16081,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                         }
 
                         free(var_name);
-                        i = var_end + 1; // Skip past closing brace
+                        i = var_end + 1; /// Skip past closing brace
                     } else {
                         result[result_pos++] = str[i++];
                     }
@@ -16080,11 +16089,11 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                     result[result_pos++] = str[i++];
                 }
             } else {
-                // Simple $var format - handle special variables and regular
-                // variables
+                /// Simple $var format - handle special variables and regular
+                /// variables
                 size_t var_name_len = 0;
 
-                // Check for special single-character variables first
+                /// Check for special single-character variables first
                 if (str[var_start] == '?' || str[var_start] == '$' ||
                     str[var_start] == '#' || str[var_start] == '*' ||
                     str[var_start] == '@' || str[var_start] == '!' ||
@@ -16092,7 +16101,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                     (str[var_start] >= '0' && str[var_start] <= '9')) {
                     var_name_len = 1;
                 } else {
-                    // Regular variable names (alphanumeric + underscore)
+                    /// Regular variable names (alphanumeric + underscore)
                     while (var_start + var_name_len < len &&
                            (isalnum(str[var_start + var_name_len]) ||
                             str[var_start + var_name_len] == '_')) {
@@ -16120,19 +16129,19 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 }
 
                 if (var_name_len > 0) {
-                    // Create variable expression for expansion
+                    /// Create variable expression for expansion
                     char *var_expr = malloc(
-                        var_name_len + 2); // +2 for '$' and null terminator
+                        var_name_len + 2); /// +2 for '$' and null terminator
                     if (var_expr) {
                         var_expr[0] = '$';
                         strncpy(&var_expr[1], &str[var_start], var_name_len);
                         var_expr[var_name_len + 1] = '\0';
 
-                        // Use the main variable expansion function
+                        /// Use the main variable expansion function
                         char *var_value = expand_variable(executor, var_expr);
                         if (var_value) {
                             size_t value_len = strlen(var_value);
-                            // Ensure buffer is large enough
+                            /// Ensure buffer is large enough
                             while (result_pos + value_len >= buffer_size) {
                                 buffer_size *= 2;
                                 char *new_result = realloc(result, buffer_size);
@@ -16159,33 +16168,33 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 }
             }
         } else if (str[i] == '`') {
-            // Handle backtick command substitution
+            /// Handle backtick command substitution
             size_t cmd_start = i;
             size_t cmd_end = i + 1;
 
-            // Find closing backtick
+            /// Find closing backtick
             while (cmd_end < len && str[cmd_end] != '`') {
                 if (str[cmd_end] == '\\' && cmd_end + 1 < len) {
-                    cmd_end += 2; // Skip escaped character
+                    cmd_end += 2; /// Skip escaped character
                 } else {
                     cmd_end++;
                 }
             }
 
             if (cmd_end < len && str[cmd_end] == '`') {
-                // Found matching closing backtick
+                /// Found matching closing backtick
                 size_t full_cmd_len = cmd_end - cmd_start + 1;
                 char *full_cmd_expr = malloc(full_cmd_len + 1);
                 if (full_cmd_expr) {
                     strncpy(full_cmd_expr, &str[cmd_start], full_cmd_len);
                     full_cmd_expr[full_cmd_len] = '\0';
 
-                    // Expand command substitution
+                    /// Expand command substitution
                     char *cmd_result =
                         expand_command_substitution(executor, full_cmd_expr);
                     if (cmd_result) {
                         size_t result_len = strlen(cmd_result);
-                        // Ensure buffer is large enough
+                        /// Ensure buffer is large enough
                         while (result_pos + result_len >= buffer_size) {
                             buffer_size *= 2;
                             char *new_result = realloc(result, buffer_size);
@@ -16198,19 +16207,19 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                             result = new_result;
                         }
 
-                        // Copy command result
+                        /// Copy command result
                         strcpy(&result[result_pos], cmd_result);
                         result_pos += result_len;
                         free(cmd_result);
                     }
 
                     free(full_cmd_expr);
-                    i = cmd_end + 1; // Skip past the closing backtick
+                    i = cmd_end + 1; /// Skip past the closing backtick
                     continue;
                 }
             }
 
-            // If we get here, no matching backtick found, treat as literal
+            /// If we get here, no matching backtick found, treat as literal
             result[result_pos++] = str[i++];
         } else if (str[i] == '\\' && i + 1 < len) {
             /* Two escape regimes share this loop:
@@ -16242,7 +16251,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 result[result_pos++] = next_char;
                 i += 2;
             } else {
-                // DQ + non-meta: keep the backslash and char literally.
+                /// DQ + non-meta: keep the backslash and char literally.
                 if (result_pos >= buffer_size - 2) {
                     buffer_size *= 2;
                     result = realloc(result, buffer_size);
@@ -16255,7 +16264,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 i += 2;
             }
         } else {
-            // Regular character
+            /// Regular character
             if (result_pos >= buffer_size - 1) {
                 buffer_size *= 2;
                 result = realloc(result, buffer_size);
@@ -16311,24 +16320,24 @@ static void initialize_job_control(executor_t *executor) {
     return;
 #endif
 
-    // For interactive login shells, take control of the terminal
+    /// For interactive login shells, take control of the terminal
     if (isatty(STDIN_FILENO)) {
-        // Wait until we're in the foreground
+        /// Wait until we're in the foreground
         while (tcgetpgrp(STDIN_FILENO) != (executor->shell_pgid = getpgrp())) {
             kill(-executor->shell_pgid, SIGTTIN);
         }
 
-        // Put ourselves in our own process group
+        /// Put ourselves in our own process group
         executor->shell_pgid = getpid();
         if (setpgid(0, executor->shell_pgid) < 0) {
-            // Not fatal - we may already be a process group leader
+            /// Not fatal - we may already be a process group leader
             executor->shell_pgid = getpgrp();
         }
 
-        // Grab control of the terminal
+        /// Grab control of the terminal
         tcsetpgrp(STDIN_FILENO, executor->shell_pgid);
 
-        // Ignore interactive and job-control signals in the shell process
+        /// Ignore interactive and job-control signals in the shell process
         signal(SIGTSTP, SIG_IGN);
         signal(SIGTTIN, SIG_IGN);
         signal(SIGTTOU, SIG_IGN);
@@ -16544,10 +16553,10 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         return 1;
     }
 
-    // Check if job control is enabled (set -m)
+    /// Check if job control is enabled (set -m)
     if (!shell_opts.job_control) {
-        // When job control is disabled, execute in background without job
-        // tracking
+        /// When job control is disabled, execute in background without job
+        /// tracking
         pid_t pid = lush_fork();
         if (pid == -1) {
             int saved_errno = errno;
@@ -16558,20 +16567,20 @@ int executor_execute_background(executor_t *executor, node_t *command) {
         }
 
         if (pid == 0) {
-            // Child process - execute the command
+            /// Child process - execute the command
             int result = execute_node(executor, command->first_child);
             fflush(stdout);
             fflush(stderr);
             subshell_cleanup();
             _exit(result);
         } else {
-            // Parent process - store background PID but no job tracking
+            /// Parent process - store background PID but no job tracking
             last_background_pid = pid;
             return 0;
         }
     }
 
-    // Build command line for display
+    /// Build command line for display
     char *command_line = NULL;
     if (command->first_child && command->first_child->type == NODE_COMMAND) {
         command_line = command->first_child->val.str;
@@ -16587,20 +16596,20 @@ int executor_execute_background(executor_t *executor, node_t *command) {
     }
 
     if (pid == 0) {
-        // Child process - create new process group
+        /// Child process - create new process group
         setpgid(0, 0);
 
-        // Execute the command
+        /// Execute the command
         int result = execute_node(executor, command->first_child);
         fflush(stdout);
         fflush(stderr);
         subshell_cleanup();
         _exit(result);
     } else {
-        // Parent process - add to job list
-        setpgid(pid, pid); // Set child's process group
+        /// Parent process - add to job list
+        setpgid(pid, pid); /// Set child's process group
 
-        // Store the background PID for $! variable
+        /// Store the background PID for $! variable
         last_background_pid = pid;
 
         job_t *job = executor_add_job(executor, pid, command_line);
@@ -16608,7 +16617,7 @@ int executor_execute_background(executor_t *executor, node_t *command) {
             printf("[%d] %d\n", job->job_id, pid);
         }
 
-        return 0; // Background job started successfully
+        return 0; /// Background job started successfully
     }
 }
 
@@ -16623,18 +16632,18 @@ int executor_execute_background(executor_t *executor, node_t *command) {
  * @return 0 on success
  */
 int executor_builtin_jobs(executor_t *executor, char **argv) {
-    (void)argv; // Reserved for job filtering options
+    (void)argv; /// Reserved for job filtering options
     if (!executor) {
         return 1;
     }
 
-    // Check if job control is enabled
+    /// Check if job control is enabled
     if (!shell_opts.job_control) {
-        // When job control is disabled, there are no tracked jobs
+        /// When job control is disabled, there are no tracked jobs
         return 0;
     }
 
-    // Update job statuses first
+    /// Update job statuses first
     executor_update_job_status(executor);
 
     job_t *job = executor->jobs;
@@ -16679,7 +16688,7 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         return 1;
     }
 
-    int job_id = 1; // Default to job 1
+    int job_id = 1; /// Default to job 1
     if (argv[1]) {
         job_id = atoi(argv[1]);
     }
@@ -16699,12 +16708,12 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
         return 1;
     }
 
-    // Give the job's process group control of the terminal
+    /// Give the job's process group control of the terminal
     if (isatty(STDIN_FILENO) && job->pgid > 0) {
         tcsetpgrp(STDIN_FILENO, job->pgid);
     }
 
-    // Continue the job if it was stopped
+    /// Continue the job if it was stopped
     if (job->state == JOB_STOPPED) {
         kill(-job->pgid, SIGCONT);
     }
@@ -16712,11 +16721,11 @@ int executor_builtin_fg(executor_t *executor, char **argv) {
     job->foreground = true;
     job->state = JOB_RUNNING;
 
-    // Wait for the job to complete or stop
+    /// Wait for the job to complete or stop
     int status;
     waitpid(-job->pgid, &status, WUNTRACED);
 
-    // Reclaim terminal control for the shell
+    /// Reclaim terminal control for the shell
     if (isatty(STDIN_FILENO)) {
         tcsetpgrp(STDIN_FILENO, executor->shell_pgid);
     }
@@ -16748,7 +16757,7 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
         return 1;
     }
 
-    int job_id = 1; // Default to job 1
+    int job_id = 1; /// Default to job 1
     if (argv[1]) {
         job_id = atoi(argv[1]);
     }
@@ -16768,7 +16777,7 @@ int executor_builtin_bg(executor_t *executor, char **argv) {
         return 1;
     }
 
-    // Continue the job in background
+    /// Continue the job in background
     job->state = JOB_RUNNING;
     job->foreground = false;
     kill(-job->pgid, SIGCONT);
@@ -16793,7 +16802,7 @@ static bool is_stdout_captured(void) {
         return false;
     }
 
-    // If stdout is not a terminal (tty), it's likely being captured
+    /// If stdout is not a terminal (tty), it's likely being captured
     return !isatty(STDOUT_FILENO);
 }
 
@@ -16812,12 +16821,12 @@ static bool has_stdout_redirections(node_t *command) {
 
     node_t *child = command->first_child;
     while (child) {
-        // Check for stdout-affecting redirections
-        if (child->type == NODE_REDIR_OUT ||         // >
-            child->type == NODE_REDIR_APPEND ||      // >>
-            child->type == NODE_REDIR_BOTH ||        // &>
-            child->type == NODE_REDIR_BOTH_APPEND || // &>>
-            child->type == NODE_REDIR_CLOBBER) {     // >|
+        /// Check for stdout-affecting redirections
+        if (child->type == NODE_REDIR_OUT ||         /// >
+            child->type == NODE_REDIR_APPEND ||      /// >>
+            child->type == NODE_REDIR_BOTH ||        /// &>
+            child->type == NODE_REDIR_BOTH_APPEND || /// &>>
+            child->type == NODE_REDIR_CLOBBER) {     /// >|
             return true;
         }
         child = child->next_sibling;
@@ -16839,8 +16848,8 @@ static bool builtin_can_fork(const char *name) {
     if (!name)
         return false;
 
-    // Only these builtins are "pure" - they produce output but don't modify
-    // shell state. All others must run in the parent process.
+    /// Only these builtins are "pure" - they produce output but don't modify
+    /// shell state. All others must run in the parent process.
     static const char *pure_builtins[] = {
         "echo", "printf", "true", "false", "test", "[",
         "type", "which",  "help", "pwd",   "dirs", "times",
@@ -16884,25 +16893,25 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
     }
 
     if (pid == 0) {
-        // Child process - setup redirections and execute builtin
+        /// Child process - setup redirections and execute builtin
         int redir_result = setup_redirections(executor, command);
         if (redir_result != 0) {
             subshell_cleanup();
             _exit(1);
         }
 
-        // Execute the builtin command
+        /// Execute the builtin command
         int result = execute_builtin_command(executor, argv, command->loc);
 
-        // Flush stdio buffers before _exit() - critical for file redirections
-        // Without this, output redirected to files would be lost because
-        // _exit() doesn't flush stdio buffers (unlike exit())
+        /// Flush stdio buffers before _exit() - critical for file redirections
+        /// Without this, output redirected to files would be lost because
+        /// _exit() doesn't flush stdio buffers (unlike exit())
         fflush(stdout);
         fflush(stderr);
         subshell_cleanup();
         _exit(result);
     } else {
-        // Parent process - wait for child, retrying on EINTR
+        /// Parent process - wait for child, retrying on EINTR
         int status;
         while (waitpid(pid, &status, 0) == -1) {
             if (errno != EINTR) {
@@ -16910,7 +16919,7 @@ static int execute_builtin_with_captured_stdout(executor_t *executor,
                                    "Failed to wait for builtin child process");
                 return 1;
             }
-            // EINTR - signal interrupted wait, continue waiting
+            /// EINTR - signal interrupted wait, continue waiting
         }
 
         if (WIFEXITED(status)) {
@@ -16948,14 +16957,14 @@ static int execute_arithmetic_command(executor_t *executor,
         printf("DEBUG: Executing arithmetic command: (( %s ))\n", expr);
     }
 
-    // zsh `$+NAME` is the unbraced shorthand for `${+NAME}` (is-set
-    // test).  Rewrite to the braced form so the existing ${+NAME}
-    // expansion handler in parse_parameter_expansion picks it up.
-    //
-    // Real-world example: `(( $+commands[dircolors] ))` -- common idiom
-    // for "is command available on $path".  Without this rewrite, the
-    // arithmetic parser splits `$+commands[...]` and chokes on the
-    // bare `$`.
+    /// zsh `$+NAME` is the unbraced shorthand for `${+NAME}` (is-set
+    /// test).  Rewrite to the braced form so the existing ${+NAME}
+    /// expansion handler in parse_parameter_expansion picks it up.
+    ///
+    /// Real-world example: `(( $+commands[dircolors] ))` -- common idiom
+    /// for "is command available on $path".  Without this rewrite, the
+    /// arithmetic parser splits `$+commands[...]` and chokes on the
+    /// bare `$`.
     char *rewritten_expr = NULL;
     {
         const char *needle = strstr(expr, "$+");
@@ -16968,7 +16977,7 @@ static int execute_arithmetic_command(executor_t *executor,
                 while (*p) {
                     if (p[0] == '$' && p[1] == '+' &&
                         (isalpha((unsigned char)p[2]) || p[2] == '_')) {
-                        // Emit `${+`
+                        /// Emit `${+`
                         if (out_len + 4 >= out_cap) {
                             out_cap *= 2;
                             char *grown = realloc(rewritten_expr, out_cap);
@@ -16981,8 +16990,8 @@ static int execute_arithmetic_command(executor_t *executor,
                         }
                         memcpy(rewritten_expr + out_len, "${+", 3);
                         out_len += 3;
-                        p += 2; // consume $+
-                        // Copy the name and optional [subscript].
+                        p += 2; /// consume $+
+                        /// Copy the name and optional [subscript].
                         int bracket_depth = 0;
                         while (*p && (isalnum((unsigned char)*p) || *p == '_' ||
                                       (bracket_depth > 0) || *p == '[')) {
@@ -17035,8 +17044,8 @@ static int execute_arithmetic_command(executor_t *executor,
         }
     }
 
-    // Pre-expand ${...} parameter expansions before arithmetic evaluation
-    // The arithmetic module handles simple $var but not complex ${...} syntax
+    /// Pre-expand ${...} parameter expansions before arithmetic evaluation
+    /// The arithmetic module handles simple $var but not complex ${...} syntax
     char *expanded_expr = NULL;
     if (strchr(expr, '{')) {
         expanded_expr = expand_if_needed(executor, expr);
@@ -17049,11 +17058,11 @@ static int execute_arithmetic_command(executor_t *executor,
         }
     }
 
-    // Empty arithmetic command `(( ))` is treated as false by bash and zsh
-    // -- the expression evaluates to 0, the command exits 1 (the inverse
-    // convention). No error is raised. Scripts use this idiom as a
-    // placeholder false. Match the convention before invoking the
-    // evaluator, which would otherwise flag empty input as a syntax error.
+    /// Empty arithmetic command `(( ))` is treated as false by bash and zsh
+    /// -- the expression evaluates to 0, the command exits 1 (the inverse
+    /// convention). No error is raised. Scripts use this idiom as a
+    /// placeholder false. Match the convention before invoking the
+    /// evaluator, which would otherwise flag empty input as a syntax error.
     {
         const char *p = expr;
         while (*p == ' ' || *p == '\t') {
@@ -17066,19 +17075,19 @@ static int execute_arithmetic_command(executor_t *executor,
         }
     }
 
-    // Use the existing arithmetic evaluator with executor context
-    // This handles simple variable expansion internally
+    /// Use the existing arithmetic evaluator with executor context
+    /// This handles simple variable expansion internally
     arithm_clear_error();
     char *result_str = arithm_expand_with_executor(executor, expr);
 
     if (!result_str || arithm_error_is_flagged()) {
-        // Arithmetic error - could be syntax error or division by zero
-        // Create structured error with help suggestion
+        /// Arithmetic error - could be syntax error or division by zero
+        /// Create structured error with help suggestion
         shell_error_t *error = shell_error_create(
             SHELL_ERR_ARITHMETIC_SYNTAX, SHELL_SEVERITY_ERROR, arith_node->loc,
             "arithmetic syntax error in expression: %s", expr);
         if (error) {
-            // Build the source line: (( expr ))
+            /// Build the source line: (( expr ))
             char *source_line = NULL;
             size_t expr_len = strlen(expr);
             if (asprintf(&source_line, "(( %s ))", expr) > 0) {
@@ -17086,10 +17095,11 @@ static int execute_arithmetic_command(executor_t *executor,
                                             3 + expr_len);
                 free(source_line);
             }
-            // Update location to highlight the expression (column is 1-indexed)
-            error->location.column = 4; // After "(( "
+            /// Update location to highlight the expression (column is
+            /// 1-indexed)
+            error->location.column = 4; /// After "(( "
             error->location.length = expr_len;
-            // Add context stack from executor
+            /// Add context stack from executor
             for (size_t i = 0;
                  i < executor->context_depth && i < SHELL_ERROR_CONTEXT_MAX;
                  i++) {
@@ -17098,10 +17108,10 @@ static int execute_arithmetic_command(executor_t *executor,
                                              executor->context_stack[i]);
                 }
             }
-            // Add specific context for arithmetic command
+            /// Add specific context for arithmetic command
             shell_error_push_context(
                 error, "evaluating arithmetic command (( %s ))", expr);
-            // Add help suggestion
+            /// Add help suggestion
             shell_error_set_suggestion(
                 error,
                 "(( )) expects arithmetic expressions, not shell commands");
@@ -17117,13 +17127,13 @@ static int execute_arithmetic_command(executor_t *executor,
         return 1;
     }
 
-    // Convert result to long long to check if non-zero
+    /// Convert result to long long to check if non-zero
     long long result = strtoll(result_str, NULL, 10);
     free(result_str);
-    free(expanded_expr); // Safe to free NULL
+    free(expanded_expr); /// Safe to free NULL
     free(rewritten_expr);
 
-    // Update exit status
+    /// Update exit status
     executor->exit_status = (result != 0) ? 0 : 1;
 
     if (executor->debug) {
@@ -17131,7 +17141,7 @@ static int execute_arithmetic_command(executor_t *executor,
                executor->exit_status);
     }
 
-    // Return 0 if non-zero (true), 1 if zero (false)
+    /// Return 0 if non-zero (true), 1 if zero (false)
     return (result != 0) ? 0 : 1;
 }
 
@@ -17180,7 +17190,7 @@ static bool extended_test_regex_match(executor_t *executor, const char *str,
     regex_t regex;
     int ret = regcomp(&regex, pattern, REG_EXTENDED);
     if (ret != 0) {
-        // Regex compilation failed
+        /// Regex compilation failed
         if (executor->debug) {
             char errbuf[256];
             regerror(ret, &regex, errbuf, sizeof(errbuf));
@@ -17189,13 +17199,13 @@ static bool extended_test_regex_match(executor_t *executor, const char *str,
         return false;
     }
 
-    // Match with capture groups (up to 10 groups)
+    /// Match with capture groups (up to 10 groups)
     regmatch_t matches[10];
     ret = regexec(&regex, str, 10, matches, 0);
 
     if (ret == 0) {
-        // Match successful - populate BASH_REMATCH array
-        // Use symtable_set_array_element which handles array creation
+        /// Match successful - populate BASH_REMATCH array
+        /// Use symtable_set_array_element which handles array creation
         for (int i = 0; i < 10 && matches[i].rm_so != -1; i++) {
             size_t match_len = matches[i].rm_eo - matches[i].rm_so;
             char *match_str = malloc(match_len + 1);
@@ -17203,7 +17213,7 @@ static bool extended_test_regex_match(executor_t *executor, const char *str,
                 strncpy(match_str, str + matches[i].rm_so, match_len);
                 match_str[match_len] = '\0';
 
-                // Convert index to string for subscript
+                /// Convert index to string for subscript
                 char subscript[16];
                 snprintf(subscript, sizeof(subscript), "%d", i);
                 symtable_set_array_element("BASH_REMATCH", subscript,
@@ -17288,7 +17298,7 @@ static bool extended_test_file_test(const char *op, const char *path) {
  * @return 0 if test passes (true), 1 if fails (false)
  */
 
-// Forward declaration for recursive evaluation
+/// Forward declaration for recursive evaluation
 static bool evaluate_simple_test(executor_t *executor, const char *expr);
 
 /**
@@ -17308,14 +17318,14 @@ static char *find_logical_operator(char *expr, int *op_len, char *op_type) {
         } else if (*p == ')') {
             paren_depth--;
         } else if (paren_depth == 0) {
-            // Check for || first (lower precedence, so we want to split on it
-            // first)
+            /// Check for || first (lower precedence, so we want to split on it
+            /// first)
             if (p[0] == '|' && p[1] == '|') {
                 *op_len = 2;
                 *op_type = '|';
                 return p;
             }
-            // Check for &&
+            /// Check for &&
             if (p[0] == '&' && p[1] == '&') {
                 *op_len = 2;
                 *op_type = '&';
@@ -17337,7 +17347,7 @@ static char *find_logical_operator(char *expr, int *op_len, char *op_type) {
  * - Simple test expressions
  */
 static bool evaluate_extended_expr(executor_t *executor, char *expr) {
-    // Trim whitespace
+    /// Trim whitespace
     while (*expr && isspace(*expr))
         expr++;
     char *end = expr + strlen(expr) - 1;
@@ -17348,10 +17358,10 @@ static bool evaluate_extended_expr(executor_t *executor, char *expr) {
         return false;
     }
 
-    // Check if entire expression is wrapped in parentheses
+    /// Check if entire expression is wrapped in parentheses
     if (*expr == '(' && *(expr + strlen(expr) - 1) == ')') {
-        // Check if they match (not just opening and closing from different
-        // groups)
+        /// Check if they match (not just opening and closing from different
+        /// groups)
         int depth = 0;
         bool matched = true;
         for (char *p = expr; *p; p++) {
@@ -17365,37 +17375,37 @@ static bool evaluate_extended_expr(executor_t *executor, char *expr) {
             }
         }
         if (matched) {
-            // Strip outer parentheses
+            /// Strip outer parentheses
             char *inner = expr + 1;
             expr[strlen(expr) - 1] = '\0';
             return evaluate_extended_expr(executor, inner);
         }
     }
 
-    // Look for || first (lowest precedence)
+    /// Look for || first (lowest precedence)
     int op_len = 0;
     char op_type = 0;
     char *op_pos = find_logical_operator(expr, &op_len, &op_type);
 
     if (op_pos && op_type == '|') {
-        // Split on ||
+        /// Split on ||
         *op_pos = '\0';
         char *left = expr;
         char *right = op_pos + 2;
 
-        // Short-circuit: if left is true, don't evaluate right
+        /// Short-circuit: if left is true, don't evaluate right
         if (evaluate_extended_expr(executor, left)) {
             return true;
         }
         return evaluate_extended_expr(executor, right);
     }
 
-    // Look for && (higher precedence than ||)
+    /// Look for && (higher precedence than ||)
     op_pos = NULL;
     op_len = 0;
     op_type = 0;
 
-    // Re-scan for && only
+    /// Re-scan for && only
     int paren_depth = 0;
     for (char *p = expr; *p; p++) {
         if (*p == '(')
@@ -17411,19 +17421,19 @@ static bool evaluate_extended_expr(executor_t *executor, char *expr) {
     }
 
     if (op_pos && op_type == '&') {
-        // Split on &&
+        /// Split on &&
         *op_pos = '\0';
         char *left = expr;
         char *right = op_pos + 2;
 
-        // Short-circuit: if left is false, don't evaluate right
+        /// Short-circuit: if left is false, don't evaluate right
         if (!evaluate_extended_expr(executor, left)) {
             return false;
         }
         return evaluate_extended_expr(executor, right);
     }
 
-    // No logical operators at this level - evaluate as simple test
+    /// No logical operators at this level - evaluate as simple test
     return evaluate_simple_test(executor, expr);
 }
 
@@ -17433,11 +17443,11 @@ static bool evaluate_extended_expr(executor_t *executor, char *expr) {
 static bool evaluate_simple_test(executor_t *executor, const char *expr) {
     char *p = (char *)expr;
 
-    // Skip leading whitespace
+    /// Skip leading whitespace
     while (*p && isspace(*p))
         p++;
 
-    // Check for negation
+    /// Check for negation
     bool negate = false;
     if (*p == '!') {
         negate = true;
@@ -17448,9 +17458,9 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
 
     bool result = false;
 
-    // Check for unary file/string tests
+    /// Check for unary file/string tests
     if (*p == '-' && p[1] && isalpha(p[1])) {
-        // Extract operator
+        /// Extract operator
         char op[4] = {0};
         int op_len = 0;
         while (*p && !isspace(*p) && op_len < 3) {
@@ -17458,11 +17468,11 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
         }
         op[op_len] = '\0';
 
-        // Skip whitespace
+        /// Skip whitespace
         while (*p && isspace(*p))
             p++;
 
-        // String tests
+        /// String tests
         if (strcmp(op, "-z") == 0) {
             result = (*p == '\0');
         } else if (strcmp(op, "-n") == 0) {
@@ -17515,10 +17525,10 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                 free(arg);
             }
         } else if (strcmp(op, "-o") == 0) {
-            // `[[ -o NAME ]]` -- query named shell option state.
-            // Single unified entry point in shell_is_option_set walks
-            // POSIX options, feature matrix names + aliases, noop-alias
-            // recorded state, and the `interactive` pseudo-option.
+            /// `[[ -o NAME ]]` -- query named shell option state.
+            /// Single unified entry point in shell_is_option_set walks
+            /// POSIX options, feature matrix names + aliases, noop-alias
+            /// recorded state, and the `interactive` pseudo-option.
             char *name = strdup(p);
             if (name) {
                 char *end = name + strlen(name) - 1;
@@ -17529,7 +17539,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                 free(name);
             }
         } else {
-            // File tests - get the path (rest of line, trimmed)
+            /// File tests - get the path (rest of line, trimmed)
             char *path = strdup(p);
             if (path) {
                 char *end = path + strlen(path) - 1;
@@ -17540,12 +17550,12 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
             }
         }
     } else {
-        // Binary expression: lhs op rhs
+        /// Binary expression: lhs op rhs
         char *lhs_start = p;
         char *op_start = NULL;
         char op_type[4] = {0};
 
-        // Scan for binary operator
+        /// Scan for binary operator
         char *scan = p;
         int paren_depth = 0;
 
@@ -17568,14 +17578,14 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                     strcpy(op_type, "=~");
                     break;
                 } else if (scan[0] == '=' && scan[1] != '=' && scan[1] != '~') {
-                    // Single `=` -- bash/zsh alias for `==`. Recognized
-                    // even when scan == lhs_start because empty LHS
-                    // (e.g. `[[ "$EMPTY" = "y" ]]` after expansion) is
-                    // a real-world case where the binary-op scan must
-                    // still split off the operator and RHS. Without
-                    // this, `[[ "" = X ]]` falls through to the "no
-                    // operator -- non-empty string is true" branch and
-                    // reports equality regardless of RHS value.
+                    /// Single `=` -- bash/zsh alias for `==`. Recognized
+                    /// even when scan == lhs_start because empty LHS
+                    /// (e.g. `[[ "$EMPTY" = "y" ]]` after expansion) is
+                    /// a real-world case where the binary-op scan must
+                    /// still split off the operator and RHS. Without
+                    /// this, `[[ "" = X ]]` falls through to the "no
+                    /// operator -- non-empty string is true" branch and
+                    /// reports equality regardless of RHS value.
                     if (g_debug_context) {
                         debug_trace_printf(
                             g_debug_context,
@@ -17646,7 +17656,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
         }
 
         if (op_start && op_type[0]) {
-            // Extract LHS
+            /// Extract LHS
             size_t lhs_len = op_start - lhs_start;
             char *lhs = malloc(lhs_len + 1);
             if (lhs) {
@@ -17657,7 +17667,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                     *end-- = '\0';
             }
 
-            // Extract RHS
+            /// Extract RHS
             char *rhs_start = op_start + strlen(op_type);
             while (*rhs_start && isspace(*rhs_start))
                 rhs_start++;
@@ -17668,7 +17678,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                     *end-- = '\0';
             }
 
-            // Evaluate based on operator
+            /// Evaluate based on operator
             if (strcmp(op_type, "==") == 0) {
                 result = extended_test_pattern_match(lhs, rhs);
             } else if (strcmp(op_type, "!=") == 0) {
@@ -17692,7 +17702,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
             } else if (strcmp(op_type, "-ge") == 0) {
                 result = (atoll(lhs ? lhs : "0") >= atoll(rhs ? rhs : "0"));
             } else if (strcmp(op_type, "-nt") == 0) {
-                // File1 newer than file2
+                /// File1 newer than file2
                 struct stat st1, st2;
                 if (lhs && rhs && stat(lhs, &st1) == 0 &&
                     stat(rhs, &st2) == 0) {
@@ -17701,7 +17711,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                     result = false;
                 }
             } else if (strcmp(op_type, "-ot") == 0) {
-                // File1 older than file2
+                /// File1 older than file2
                 struct stat st1, st2;
                 if (lhs && rhs && stat(lhs, &st1) == 0 &&
                     stat(rhs, &st2) == 0) {
@@ -17710,7 +17720,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
                     result = false;
                 }
             } else if (strcmp(op_type, "-ef") == 0) {
-                // File1 and file2 are same file (same device and inode)
+                /// File1 and file2 are same file (same device and inode)
                 struct stat st1, st2;
                 if (lhs && rhs && stat(lhs, &st1) == 0 &&
                     stat(rhs, &st2) == 0) {
@@ -17724,7 +17734,7 @@ static bool evaluate_simple_test(executor_t *executor, const char *expr) {
             free(lhs);
             free(rhs);
         } else {
-            // No operator - non-empty string is true
+            /// No operator - non-empty string is true
             result = (*p != '\0');
         }
     }
@@ -17743,7 +17753,7 @@ static int execute_extended_test(executor_t *executor, node_t *test_node) {
         printf("DEBUG: Executing extended test: [[ %s ]]\n", expr);
     }
 
-    // First, expand variables in the expression
+    /// First, expand variables in the expression
     char *expanded = expand_if_needed(executor, expr);
     if (!expanded) {
         expanded = strdup(expr);
@@ -17756,13 +17766,13 @@ static int execute_extended_test(executor_t *executor, node_t *test_node) {
         printf("DEBUG: Expanded extended test: [[ %s ]]\n", expanded);
     }
 
-    // Evaluate the expression using recursive evaluator
-    // This handles &&, ||, parentheses, and simple tests
+    /// Evaluate the expression using recursive evaluator
+    /// This handles &&, ||, parentheses, and simple tests
     bool result = evaluate_extended_expr(executor, expanded);
 
     free(expanded);
 
-    // Update exit status
+    /// Update exit status
     executor->exit_status = result ? 0 : 1;
 
     if (executor->debug) {
@@ -17802,20 +17812,20 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         printf("DEBUG: Executing array assignment for: %s\n", var_name);
     }
 
-    // Check if this is an array literal assignment: arr=(a b c)
+    /// Check if this is an array literal assignment: arr=(a b c)
     if (first_child->type == NODE_ARRAY_LITERAL) {
-        // Check if variable was already declared as associative array
+        /// Check if variable was already declared as associative array
         array_value_t *existing = symtable_get_array(var_name);
         bool is_associative = existing && existing->is_associative;
 
-        // Create appropriate array type (preserving associative if declared)
+        /// Create appropriate array type (preserving associative if declared)
         array_value_t *array = symtable_array_create(is_associative);
         if (!array) {
             set_executor_error(executor, "Failed to create array");
             return 1;
         }
 
-        // Process each element in the literal
+        /// Process each element in the literal
         int index = 0;
         node_t *elem = first_child->first_child;
 
@@ -17823,35 +17833,35 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             if (elem->val.str) {
                 const char *elem_str = elem->val.str;
 
-                // Check for [index]=value syntax
+                /// Check for [index]=value syntax
                 if (elem_str[0] == '[') {
-                    // Parse [index]=value
+                    /// Parse [index]=value
                     const char *bracket_end = strchr(elem_str, ']');
                     if (bracket_end && bracket_end[1] == '=') {
-                        // Extract index/key
+                        /// Extract index/key
                         size_t idx_len = bracket_end - elem_str - 1;
                         char *idx_str = malloc(idx_len + 1);
                         if (idx_str) {
                             strncpy(idx_str, elem_str + 1, idx_len);
                             idx_str[idx_len] = '\0';
 
-                            // Get value after ]=
+                            /// Get value after ]=
                             const char *value = bracket_end + 2;
 
-                            // Expand value using full expansion (handles $'...'
-                            // ANSI-C quoting)
+                            /// Expand value using full expansion (handles
+                            /// $'...' ANSI-C quoting)
                             char *expanded = expand_if_needed(executor, value);
                             const char *final_value =
                                 expanded ? expanded : value;
 
                             if (is_associative) {
-                                // Use string key directly for associative
-                                // arrays
+                                /// Use string key directly for associative
+                                /// arrays
                                 symtable_array_set_assoc(array, idx_str,
                                                          final_value);
                             } else {
-                                // Evaluate index as arithmetic for indexed
-                                // arrays
+                                /// Evaluate index as arithmetic for indexed
+                                /// arrays
                                 arithm_clear_error();
                                 char *idx_result = arithm_expand(idx_str);
 
@@ -17875,16 +17885,16 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                         }
                     }
                 } else {
-                    // Regular element without [key]=value syntax
+                    /// Regular element without [key]=value syntax
                     if (is_associative) {
-                        // Zsh-style: arr=(key1 val1 key2 val2 ...)
-                        // Alternating key-value pairs
+                        /// Zsh-style: arr=(key1 val1 key2 val2 ...)
+                        /// Alternating key-value pairs
                         char *expanded_key =
                             expand_if_needed(executor, elem_str);
                         const char *key =
                             expanded_key ? expanded_key : elem_str;
 
-                        // Get next element as value
+                        /// Get next element as value
                         node_t *value_elem = elem->next_sibling;
                         if (value_elem && value_elem->val.str) {
                             char *expanded_val =
@@ -17897,22 +17907,22 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
 
                             if (expanded_val)
                                 free(expanded_val);
-                            elem = value_elem; // Skip the value element
+                            elem = value_elem; /// Skip the value element
                         }
                         if (expanded_key)
                             free(expanded_key);
                     } else {
-                        // Indexed array - assign to next index
-                        // Expand the element using full expansion (handles
-                        // $'...' ANSI-C quoting)
+                        /// Indexed array - assign to next index
+                        /// Expand the element using full expansion (handles
+                        /// $'...' ANSI-C quoting)
                         char *expanded = expand_if_needed(executor, elem_str);
                         const char *final_value =
                             expanded ? expanded : elem_str;
 
-                        // Only word split for unquoted elements (NODE_VAR)
-                        // Quoted strings (NODE_STRING_LITERAL,
-                        // NODE_STRING_EXPANDABLE) should be stored as single
-                        // elements even if they contain spaces
+                        /// Only word split for unquoted elements (NODE_VAR)
+                        /// Quoted strings (NODE_STRING_LITERAL,
+                        /// NODE_STRING_EXPANDABLE) should be stored as single
+                        /// elements even if they contain spaces
                         bool is_quoted = (elem->type == NODE_STRING_LITERAL ||
                                           elem->type == NODE_STRING_EXPANDABLE);
 
@@ -17969,19 +17979,19 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                             }
                         }
 
-                        // Word split the expanded value if it contains spaces
-                        // This handles ${(s:,:)var} and ${(f)var} producing
-                        // multiple words but NOT quoted strings like "echo
-                        // hello"
+                        /// Word split the expanded value if it contains spaces
+                        /// This handles ${(s:,:)var} and ${(f)var} producing
+                        /// multiple words but NOT quoted strings like "echo
+                        /// hello"
                         if (!is_quoted && strchr(final_value, ' ') != NULL) {
-                            // Split on spaces and add each word as separate
-                            // element
+                            /// Split on spaces and add each word as separate
+                            /// element
                             char *copy = strdup(final_value);
                             if (copy) {
                                 char *saveptr;
                                 char *word = strtok_r(copy, " ", &saveptr);
                                 while (word) {
-                                    // Skip empty words
+                                    /// Skip empty words
                                     if (*word) {
                                         symtable_array_set_index(array, index,
                                                                  word);
@@ -18005,7 +18015,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             elem = elem->next_sibling;
         }
 
-        // Store the array in the symbol table
+        /// Store the array in the symbol table
         if (symtable_set_array(var_name, array) != 0) {
             symtable_array_free(array);
             set_executor_error(executor, "Failed to store array");
@@ -18020,8 +18030,8 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         return 0;
     }
 
-    // Array element assignment: arr[n]=value
-    // First child is subscript, second child is value
+    /// Array element assignment: arr[n]=value
+    /// First child is subscript, second child is value
     node_t *subscript_node = first_child;
     node_t *value_node = first_child->next_sibling;
 
@@ -18033,21 +18043,21 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
     const char *subscript = subscript_node->val.str;
     const char *value = value_node ? value_node->val.str : "";
 
-    // Check for append operation (value starts with "+=")
+    /// Check for append operation (value starts with "+=")
     bool is_append = false;
     if (value && strlen(value) >= 2 && value[0] == '+' && value[1] == '=') {
         is_append = true;
-        value += 2; // Skip "+=" prefix
+        value += 2; /// Skip "+=" prefix
     }
 
-    // Expand value
+    /// Expand value
     char *expanded_value = expand_variable(executor, value);
     const char *final_value = expanded_value ? expanded_value : value;
 
-    // Get or create the array
+    /// Get or create the array
     array_value_t *array = symtable_get_array(var_name);
     if (!array) {
-        // Create new array if it doesn't exist
+        /// Create new array if it doesn't exist
         array = symtable_array_create(false);
         if (!array) {
             if (expanded_value)
@@ -18064,18 +18074,18 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         }
     }
 
-    // Handle subscript - could be "@", "*", string key, or numeric index
+    /// Handle subscript - could be "@", "*", string key, or numeric index
     if (strcmp(subscript, "@") == 0 || strcmp(subscript, "*") == 0) {
-        // Append to array
+        /// Append to array
         symtable_array_append(array, final_value);
     } else if (array->is_associative) {
-        // Associative array - use subscript as string key
-        // First expand any variables in the subscript
+        /// Associative array - use subscript as string key
+        /// First expand any variables in the subscript
         char *expanded_subscript = expand_variable(executor, subscript);
         const char *key = expanded_subscript ? expanded_subscript : subscript;
 
         if (is_append) {
-            // Append to existing element
+            /// Append to existing element
             const char *existing = symtable_array_get_assoc(array, key);
             if (existing) {
                 size_t new_len = strlen(existing) + strlen(final_value) + 1;
@@ -18097,7 +18107,7 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
             free(expanded_subscript);
         }
     } else {
-        // Indexed array - evaluate subscript as arithmetic expression
+        /// Indexed array - evaluate subscript as arithmetic expression
         arithm_clear_error();
         char *idx_result = arithm_expand(subscript);
 
@@ -18113,9 +18123,9 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         long long idx = strtoll(idx_result, NULL, 10);
         free(idx_result);
 
-        // Adjust for 1-indexed arrays (zsh mode)
-        // When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
-        // internal 0
+        /// Adjust for 1-indexed arrays (zsh mode)
+        /// When FEATURE_ARRAY_ZERO_INDEXED is false, user index 1 maps to
+        /// internal 0
         if (!shell_mode_allows(FEATURE_ARRAY_ZERO_INDEXED)) {
             if (idx <= 0) {
                 if (expanded_value)
@@ -18124,11 +18134,11 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
                                    "Array index must be positive in zsh mode");
                 return 1;
             }
-            idx--; // Convert 1-indexed to 0-indexed internally
+            idx--; /// Convert 1-indexed to 0-indexed internally
         }
 
         if (is_append) {
-            // Append to existing element
+            /// Append to existing element
             const char *existing = symtable_array_get_index(array, (int)idx);
             if (existing) {
                 size_t new_len = strlen(existing) + strlen(final_value) + 1;
@@ -18184,12 +18194,12 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
         printf("DEBUG: Executing array append for: %s\n", var_name);
     }
 
-    // Get existing array or create new one
+    /// Get existing array or create new one
     array_value_t *array = symtable_get_array(var_name);
     bool new_array = false;
 
     if (!array) {
-        // Create new array if it doesn't exist
+        /// Create new array if it doesn't exist
         array = symtable_array_create(false);
         if (!array) {
             set_executor_error(executor, "Failed to create array");
@@ -18198,18 +18208,18 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
         new_array = true;
     }
 
-    // Process each element in the literal and append
+    /// Process each element in the literal and append
     node_t *elem = first_child->first_child;
 
     while (elem) {
         if (elem->val.str) {
             const char *elem_str = elem->val.str;
 
-            // Expand value if needed
+            /// Expand value if needed
             char *expanded = expand_variable(executor, elem_str);
             const char *final_value = expanded ? expanded : elem_str;
 
-            // Append to array using symtable_array_append
+            /// Append to array using symtable_array_append
             symtable_array_append(array, final_value);
 
             if (expanded) {
@@ -18219,7 +18229,7 @@ static int execute_array_append(executor_t *executor, node_t *append_node) {
         elem = elem->next_sibling;
     }
 
-    // Store the array if newly created
+    /// Store the array if newly created
     if (new_array) {
         if (symtable_set_array(var_name, array) != 0) {
             symtable_array_free(array);
@@ -18262,13 +18272,13 @@ static void cleanup_procsub_fds(executor_t *executor) {
     if (!executor) {
         return;
     }
-    // Close all tracked file descriptors first
+    /// Close all tracked file descriptors first
     for (int i = 0; i < executor->procsub_fd_count; i++) {
         if (executor->procsub_fds[i] >= 0) {
             close(executor->procsub_fds[i]);
         }
     }
-    // Wait for all child processes to prevent zombies and terminal issues
+    /// Wait for all child processes to prevent zombies and terminal issues
     for (int i = 0; i < executor->procsub_fd_count; i++) {
         if (executor->procsub_pids[i] > 0) {
             int status;
@@ -18283,15 +18293,15 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
         return NULL;
     }
 
-    // Check if feature is enabled
+    /// Check if feature is enabled
     if (!shell_mode_allows(FEATURE_PROCESS_SUBSTITUTION)) {
         set_executor_error(executor, "Process substitution not enabled");
         return NULL;
     }
 
-    bool is_input = (proc_sub->type == NODE_PROC_SUB_IN); // <(cmd)
+    bool is_input = (proc_sub->type == NODE_PROC_SUB_IN); /// <(cmd)
 
-    // Create a pipe for communication
+    /// Create a pipe for communication
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         set_executor_error(executor,
@@ -18308,37 +18318,37 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
     }
 
     if (pid == 0) {
-        // Child process - execute the command
+        /// Child process - execute the command
         if (is_input) {
-            // <(cmd): command writes to pipe, parent reads
-            close(pipefd[0]); // Close read end
+            /// <(cmd): command writes to pipe, parent reads
+            close(pipefd[0]); /// Close read end
             dup2(pipefd[1], STDOUT_FILENO);
             close(pipefd[1]);
-            // Disconnect stdin from terminal to prevent stealing input
+            /// Disconnect stdin from terminal to prevent stealing input
             int devnull = open("/dev/null", O_RDONLY);
             if (devnull >= 0) {
                 dup2(devnull, STDIN_FILENO);
                 close(devnull);
             }
         } else {
-            // >(cmd): parent writes to pipe, command reads
-            close(pipefd[1]); // Close write end
+            /// >(cmd): parent writes to pipe, command reads
+            close(pipefd[1]); /// Close write end
             dup2(pipefd[0], STDIN_FILENO);
             close(pipefd[0]);
         }
 
-        // Execute the command list in the process substitution
-        // Create a child executor
+        /// Execute the command list in the process substitution
+        /// Create a child executor
         executor_t *child_executor = executor_new();
         if (!child_executor) {
             subshell_cleanup();
             _exit(1);
         }
 
-        // Copy function definitions to child
+        /// Copy function definitions to child
         copy_function_definitions(child_executor, executor);
 
-        // Execute each command in the process substitution
+        /// Execute each command in the process substitution
         int result = 0;
         node_t *cmd = proc_sub->first_child;
         while (cmd) {
@@ -18353,24 +18363,24 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
         _exit(result);
     }
 
-    // Parent process
+    /// Parent process
     char *path = NULL;
     int kept_fd = -1;
 
     if (is_input) {
-        // <(cmd): We need to provide a readable path
-        // Close write end, keep read end
+        /// <(cmd): We need to provide a readable path
+        /// Close write end, keep read end
         close(pipefd[1]);
         kept_fd = pipefd[0];
 
-        // Use /dev/fd/N mechanism if available (macOS and Linux)
+        /// Use /dev/fd/N mechanism if available (macOS and Linux)
         path = malloc(32);
         if (path) {
             snprintf(path, 32, "/dev/fd/%d", kept_fd);
         }
     } else {
-        // >(cmd): We need to provide a writable path
-        // Close read end, keep write end
+        /// >(cmd): We need to provide a writable path
+        /// Close read end, keep write end
         close(pipefd[0]);
         kept_fd = pipefd[1];
 
@@ -18380,9 +18390,9 @@ char *expand_process_substitution(executor_t *executor, node_t *proc_sub) {
         }
     }
 
-    // Track this fd and pid for cleanup after command execution
-    // This prevents fd leaks and zombie processes with nested process
-    // substitutions
+    /// Track this fd and pid for cleanup after command execution
+    /// This prevents fd leaks and zombie processes with nested process
+    /// substitutions
     if (kept_fd >= 0 && executor->procsub_fd_count < 32) {
         executor->procsub_fds[executor->procsub_fd_count] = kept_fd;
         executor->procsub_pids[executor->procsub_fd_count] = pid;
@@ -18422,26 +18432,26 @@ int executor_call_hook(executor_t *executor, const char *hook_name,
         return 0;
     }
 
-    // Check if hook functions are enabled
+    /// Check if hook functions are enabled
     if (!shell_mode_allows(FEATURE_HOOK_FUNCTIONS)) {
         return 0;
     }
 
-    // Prevent recursive hook calls
+    /// Prevent recursive hook calls
     if (g_in_hook_execution) {
         return 0;
     }
 
-    // Look up the hook function
+    /// Look up the hook function
     function_def_t *func = find_function(executor, hook_name);
     if (!func) {
-        return 0; // Hook not defined, that's fine
+        return 0; /// Hook not defined, that's fine
     }
 
-    // Set recursion guard
+    /// Set recursion guard
     g_in_hook_execution = true;
 
-    // Build argv for the function call
+    /// Build argv for the function call
     int argc;
     char *argv[3];
     argv[0] = (char *)hook_name;
@@ -18455,16 +18465,16 @@ int executor_call_hook(executor_t *executor, const char *hook_name,
         argc = 1;
     }
 
-    // Call the function (no AST node for hook invocations)
+    /// Call the function (no AST node for hook invocations)
     int result = execute_function_call(executor, hook_name, argv, argc,
                                        SOURCE_LOC_UNKNOWN);
 
-    // Handle return code translation (200-455 range is internal return signal)
+    /// Handle return code translation (200-455 range is internal return signal)
     if (result >= 200 && result <= 455) {
         result = result - 200;
     }
 
-    // Clear recursion guard
+    /// Clear recursion guard
     g_in_hook_execution = false;
 
     return result;
@@ -18576,10 +18586,10 @@ static const char *fn_kind_name(lush_value_kind_t k) {
     }
 }
 
-// Deep-copy an array_value_t. The source remains owned by its
-// originator (typically the caller's scope binding); the returned
-// copy is independent and owned by the caller of this helper. Returns
-// NULL on allocation failure.
+/// Deep-copy an array_value_t. The source remains owned by its
+/// originator (typically the caller's scope binding); the returned
+/// copy is independent and owned by the caller of this helper. Returns
+/// NULL on allocation failure.
 static array_value_t *typed_fn_dup_array(const array_value_t *src) {
     if (!src) {
         return NULL;
@@ -18590,9 +18600,9 @@ static array_value_t *typed_fn_dup_array(const array_value_t *src) {
         return NULL;
     }
     if (is_assoc) {
-        // Walk insertion order so the copy preserves the map's
-        // original key ordering rather than reflecting hashtable
-        // iteration order.
+        /// Walk insertion order so the copy preserves the map's
+        /// original key ordering rather than reflecting hashtable
+        /// iteration order.
         for (size_t i = 0; i < src->assoc_insertion_count; i++) {
             const char *key = src->assoc_insertion_order[i];
             const char *value =
@@ -18631,8 +18641,8 @@ static void typed_fn_free(typed_fn_t *f) {
     }
     free(f->name);
     typed_fn_param_free(f->params);
-    // body was deep-copied via copy_ast_chain at registration time
-    // (see execute_typed_fn_decl); the registry owns the copy.
+    /// body was deep-copied via copy_ast_chain at registration time
+    /// (see execute_typed_fn_decl); the registry owns the copy.
     if (f->body) {
         free_node_tree(f->body);
     }
@@ -18665,9 +18675,9 @@ static typed_fn_t *executor_typed_fn_find(executor_t *executor,
     return NULL;
 }
 
-// Decode the NODE_FN_DECL encoded val.str of the form
-//   "name\x1F<return_kind>\x1F<p1>:<k1>\x1F<p2>:<k2>..."
-// into a typed_fn_t record. Returns NULL on malformed encoding.
+/// Decode the NODE_FN_DECL encoded val.str of the form
+///   "name\x1F<return_kind>\x1F<p1>:<k1>\x1F<p2>:<k2>..."
+/// into a typed_fn_t record. Returns NULL on malformed encoding.
 static typed_fn_t *decode_fn_signature(const char *encoded) {
     if (!encoded) {
         return NULL;
@@ -18714,7 +18724,7 @@ static typed_fn_t *decode_fn_signature(const char *encoded) {
     }
 
     if (!sep2) {
-        // No parameters.
+        /// No parameters.
         return fn;
     }
     cursor = sep2 + 1;
@@ -18773,9 +18783,9 @@ static typed_fn_t *decode_fn_signature(const char *encoded) {
     return fn;
 }
 
-// Register (or replace) a typed function declaration. Mirrors the
-// POSIX function-table semantics: redeclaring the same name replaces
-// the prior record.
+/// Register (or replace) a typed function declaration. Mirrors the
+/// POSIX function-table semantics: redeclaring the same name replaces
+/// the prior record.
 static int execute_typed_fn_decl(executor_t *executor, node_t *node) {
     if (!executor || !node || !node->val.str) {
         return 1;
@@ -18786,10 +18796,10 @@ static int execute_typed_fn_decl(executor_t *executor, node_t *node) {
                               "malformed typed-function signature");
         return 1;
     }
-    // Deep-copy the body so the registry survives the source AST
-    // being freed at the end of this batch (executor_execute_command_line
-    // frees `ast` after dispatch). copy_ast_chain produces a tree
-    // independent of the parser's allocations.
+    /// Deep-copy the body so the registry survives the source AST
+    /// being freed at the end of this batch (executor_execute_command_line
+    /// frees `ast` after dispatch). copy_ast_chain produces a tree
+    /// independent of the parser's allocations.
     if (node->first_child) {
         fn->body = copy_ast_chain(node->first_child);
         if (!fn->body) {
@@ -18800,17 +18810,17 @@ static int execute_typed_fn_decl(executor_t *executor, node_t *node) {
         }
     }
 
-    // Capture the declaration-site scope as the lexical-closure parent.
-    // For a top-level `fn`, this is the global scope, which the symtable
-    // never pops -- the borrowed pointer is valid for the manager's
-    // lifetime. For an `fn` declared inside another scope, the captured
-    // pointer is only valid until that enclosing scope pops; once
-    // re-decl of an inner fn from an already-popped enclosing scope
-    // becomes a real pattern, the registry will need a stronger
-    // lifetime guarantee. Today's typical case (top-level fn) is safe.
+    /// Capture the declaration-site scope as the lexical-closure parent.
+    /// For a top-level `fn`, this is the global scope, which the symtable
+    /// never pops -- the borrowed pointer is valid for the manager's
+    /// lifetime. For an `fn` declared inside another scope, the captured
+    /// pointer is only valid until that enclosing scope pops; once
+    /// re-decl of an inner fn from an already-popped enclosing scope
+    /// becomes a real pattern, the registry will need a stronger
+    /// lifetime guarantee. Today's typical case (top-level fn) is safe.
     fn->captured_scope = symtable_capture_scope_for_lexical(executor->symtable);
 
-    // Replace existing record under the same name, if any.
+    /// Replace existing record under the same name, if any.
     typed_fn_t **slot = &executor->typed_fns;
     while (*slot) {
         if ((*slot)->name && strcmp((*slot)->name, fn->name) == 0) {
@@ -18826,15 +18836,15 @@ static int execute_typed_fn_decl(executor_t *executor, node_t *node) {
     return 0;
 }
 
-// Evaluate one NODE_FN_CALL argument expression to a kind-tagged
-// value. Argument forms accepted today: scalar literals (the parser
-// stored the arg text in val.str of a NODE_COMMAND); `$var` references
-// resolved to the var's current value+kind; nested NODE_FN_CALL
-// returning a typed value.
-//
-// The caller owns the returned view (scalar_value is strdup'd; array
-// is borrowed from the symtable's current store and remains valid
-// until the call site's scope walk concludes).
+/// Evaluate one NODE_FN_CALL argument expression to a kind-tagged
+/// value. Argument forms accepted today: scalar literals (the parser
+/// stored the arg text in val.str of a NODE_COMMAND); `$var` references
+/// resolved to the var's current value+kind; nested NODE_FN_CALL
+/// returning a typed value.
+///
+/// The caller owns the returned view (scalar_value is strdup'd; array
+/// is borrowed from the symtable's current store and remains valid
+/// until the call site's scope walk concludes).
 static int eval_fn_call_argument(executor_t *executor, node_t *arg,
                                  lush_value_view_t *out) {
     if (!out) {
@@ -18849,7 +18859,7 @@ static int eval_fn_call_argument(executor_t *executor, node_t *arg,
     }
 
     if (arg->type == NODE_FN_CALL) {
-        // Nested typed-fn call as an argument expression.
+        /// Nested typed-fn call as an argument expression.
         executor->typed_fn_return_pending = false;
         lush_value_view_clear(&executor->typed_fn_return_value);
         int rc = execute_node(executor, arg);
@@ -18878,11 +18888,11 @@ static int eval_fn_call_argument(executor_t *executor, node_t *arg,
         return out->scalar_value ? 0 : 1;
     }
 
-    // NODE_VAR carries a bare $name (or ${name}) reference. Strip the
-    // leading '$' / '${...}' to get the variable name and look it up
-    // kind-aware via symtable_lookup. A list or map binding crosses
-    // the call boundary as-is, preserving its kind tag for the
-    // parameter-bind step rather than being flattened to a string.
+    /// NODE_VAR carries a bare $name (or ${name}) reference. Strip the
+    /// leading '$' / '${...}' to get the variable name and look it up
+    /// kind-aware via symtable_lookup. A list or map binding crosses
+    /// the call boundary as-is, preserving its kind tag for the
+    /// parameter-bind step rather than being flattened to a string.
     if (arg->type == NODE_VAR) {
         const char *var_name = text;
         char name_buf[256];
@@ -18905,32 +18915,32 @@ static int eval_fn_call_argument(executor_t *executor, node_t *arg,
             *out = v;
             return 0;
         }
-        // Unset variable -- treat as empty scalar, matching POSIX.
+        /// Unset variable -- treat as empty scalar, matching POSIX.
         out->kind = LUSH_VALUE_SCALAR;
         out->scalar_value = strdup("");
         return out->scalar_value ? 0 : 1;
     }
 
-    // Single-quoted strings carry their text literally; no expansion.
+    /// Single-quoted strings carry their text literally; no expansion.
     if (arg->type == NODE_STRING_LITERAL) {
         out->kind = LUSH_VALUE_SCALAR;
         out->scalar_value = strdup(text);
         return out->scalar_value ? 0 : 1;
     }
 
-    // Bare words, double-quoted strings (NODE_STRING_EXPANDABLE), and
-    // arithmetic numerals all pass through the standard word-expansion
-    // path. This is where `"hello $name!"` style interpolation gets
-    // resolved correctly.
+    /// Bare words, double-quoted strings (NODE_STRING_EXPANDABLE), and
+    /// arithmetic numerals all pass through the standard word-expansion
+    /// path. This is where `"hello $name!"` style interpolation gets
+    /// resolved correctly.
     char *expanded = expand_if_needed(executor, text);
     out->kind = LUSH_VALUE_SCALAR;
     out->scalar_value = expanded ? expanded : strdup("");
     return out->scalar_value ? 0 : 1;
 }
 
-// Bind one parameter (name + declared kind) to an argument value in
-// the current (just-pushed) function scope. Raises a type-mismatch
-// error if the kinds disagree.
+/// Bind one parameter (name + declared kind) to an argument value in
+/// the current (just-pushed) function scope. Raises a type-mismatch
+/// error if the kinds disagree.
 static int bind_typed_fn_param(executor_t *executor, source_location_t loc,
                                const typed_fn_param_t *param,
                                lush_value_view_t *value, const char *callee) {
@@ -18961,8 +18971,8 @@ static int bind_typed_fn_param(executor_t *executor, source_location_t loc,
                                   fn_kind_name(param->kind));
             return 1;
         }
-        // Deep-copy: the function scope owns its parameter binding.
-        // The caller's array remains intact when this scope pops.
+        /// Deep-copy: the function scope owns its parameter binding.
+        /// The caller's array remains intact when this scope pops.
         array_value_t *bound = typed_fn_dup_array(value->array);
         if (!bound) {
             lush_value_view_clear(value);
@@ -18983,11 +18993,11 @@ static int bind_typed_fn_param(executor_t *executor, source_location_t loc,
     return 0;
 }
 
-// Execute a NODE_FN_CALL. On a non-void return, sets
-// executor->typed_fn_return_pending = true and stashes the value in
-// executor->typed_fn_return_value for the caller (either NODE_LET_FN
-// or a nested call) to consume. Returns 0 on success / non-void
-// return, non-zero on error.
+/// Execute a NODE_FN_CALL. On a non-void return, sets
+/// executor->typed_fn_return_pending = true and stashes the value in
+/// executor->typed_fn_return_value for the caller (either NODE_LET_FN
+/// or a nested call) to consume. Returns 0 on success / non-void
+/// return, non-zero on error.
 static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
     if (!executor || !node || node->type != NODE_FN_CALL || !node->val.str) {
         return 1;
@@ -19001,7 +19011,7 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
         return 1;
     }
 
-    // Count arguments and verify arity before pushing scope.
+    /// Count arguments and verify arity before pushing scope.
     int argc = 0;
     for (node_t *a = node->first_child; a; a = a->next_sibling) {
         argc++;
@@ -19014,9 +19024,9 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
         return 1;
     }
 
-    // Evaluate arguments BEFORE pushing scope so $var references
-    // resolve in the caller's scope (the typed-fn body should not see
-    // them as locals; they are values passed in).
+    /// Evaluate arguments BEFORE pushing scope so $var references
+    /// resolve in the caller's scope (the typed-fn body should not see
+    /// them as locals; they are values passed in).
     lush_value_view_t *arg_values =
         argc > 0 ? calloc((size_t)argc, sizeof(lush_value_view_t)) : NULL;
     if (argc > 0 && !arg_values) {
@@ -19036,13 +19046,13 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
         idx++;
     }
 
-    // Push a SCOPE_LEXICAL frame parented at the captured declaration
-    // site rather than the dynamic caller, so free names in the body
-    // resolve through the closure environment. If the fn was declared
-    // at top level the captured scope is the global scope, which
-    // behaves identically to dynamic scoping for global variables --
-    // the distinction surfaces when a POSIX-form caller has its own
-    // locals; those are now invisible to the typed-fn body.
+    /// Push a SCOPE_LEXICAL frame parented at the captured declaration
+    /// site rather than the dynamic caller, so free names in the body
+    /// resolve through the closure environment. If the fn was declared
+    /// at top level the captured scope is the global scope, which
+    /// behaves identically to dynamic scoping for global variables --
+    /// the distinction surfaces when a POSIX-form caller has its own
+    /// locals; those are now invisible to the typed-fn body.
     int push_rc;
     if (fn->captured_scope) {
         push_rc = symtable_push_lexical_scope(executor->symtable, callee,
@@ -19080,9 +19090,9 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
 
     executor_push_context(executor, node->loc, "in typed call '%s'", callee);
 
-    // Push a debug frame and mark it lexical so `debug stack` renders
-    // the discipline. The push only happens when the debug subsystem
-    // is enabled -- mirrors how execute_command guards its push.
+    /// Push a debug frame and mark it lexical so `debug stack` renders
+    /// the discipline. The push only happens when the debug subsystem
+    /// is enabled -- mirrors how execute_command guards its push.
     bool debug_frame_pushed = false;
     if (g_debug_context && g_debug_context->enabled) {
         debug_push_frame(g_debug_context, callee, NULL, (int)node->loc.line);
@@ -19090,8 +19100,8 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
         debug_frame_pushed = true;
     }
 
-    // Execute body. Any NODE_FN_RETURN inside surfaces as
-    // SHELL_FN_RETURN_STATUS, which we consume here.
+    /// Execute body. Any NODE_FN_RETURN inside surfaces as
+    /// SHELL_FN_RETURN_STATUS, which we consume here.
     int result = 0;
     executor->typed_fn_return_pending = false;
     lush_value_view_clear(&executor->typed_fn_return_value);
@@ -19123,7 +19133,7 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
         return result;
     }
 
-    // Validate the captured return against the declared return kind.
+    /// Validate the captured return against the declared return kind.
     if (fn->has_return_kind && !executor->typed_fn_return_pending) {
         executor_error_report(
             executor, SHELL_ERR_TYPE_MISMATCH, node->loc,
@@ -19157,19 +19167,19 @@ static int execute_typed_fn_call_node(executor_t *executor, node_t *node) {
     return 0;
 }
 
-// Top-level dispatch for a NODE_FN_CALL appearing as a statement (its
-// return value is discarded). Used when the user writes `name(args)`
-// or `name args` at command position.
+/// Top-level dispatch for a NODE_FN_CALL appearing as a statement (its
+/// return value is discarded). Used when the user writes `name(args)`
+/// or `name args` at command position.
 static int execute_typed_fn_call(executor_t *executor, node_t *node) {
     int rc = execute_typed_fn_call_node(executor, node);
-    // Discard any return value the call produced.
+    /// Discard any return value the call produced.
     lush_value_view_clear(&executor->typed_fn_return_value);
     executor->typed_fn_return_pending = false;
     return rc;
 }
 
-// `let name = call(args)` capture form. Invokes the call, then binds
-// the LHS in the current scope (kind-aware).
+/// `let name = call(args)` capture form. Invokes the call, then binds
+/// the LHS in the current scope (kind-aware).
 static int execute_typed_let_fn(executor_t *executor, node_t *node) {
     if (!executor || !node || !node->val.str || !node->first_child) {
         return 1;
@@ -19208,12 +19218,12 @@ static int execute_typed_let_fn(executor_t *executor, node_t *node) {
         break;
     case LUSH_VALUE_LIST:
     case LUSH_VALUE_MAP: {
-        // The captured return view borrows from the callee's scope.
-        // That scope has already popped by the time we get here, but
-        // executor->typed_fn_return_value held the borrow; the
-        // underlying array is still valid because the unwind moved
-        // ownership semantics through the view. Take a deep copy so
-        // the caller's binding is independent.
+        /// The captured return view borrows from the callee's scope.
+        /// That scope has already popped by the time we get here, but
+        /// executor->typed_fn_return_value held the borrow; the
+        /// underlying array is still valid because the unwind moved
+        /// ownership semantics through the view. Take a deep copy so
+        /// the caller's binding is independent.
         array_value_t *bound = typed_fn_dup_array(v.array);
         if (!bound) {
             rc = 1;
@@ -19233,9 +19243,9 @@ static int execute_typed_let_fn(executor_t *executor, node_t *node) {
     return rc;
 }
 
-// NODE_FN_RETURN handler. Evaluates the optional return expression to
-// a kind-tagged value, stashes it in executor->typed_fn_return_value,
-// and unwinds via SHELL_FN_RETURN_STATUS.
+/// NODE_FN_RETURN handler. Evaluates the optional return expression to
+/// a kind-tagged value, stashes it in executor->typed_fn_return_value,
+/// and unwinds via SHELL_FN_RETURN_STATUS.
 static int execute_typed_fn_return(executor_t *executor, node_t *node) {
     if (!executor) {
         return 1;

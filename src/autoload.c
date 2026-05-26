@@ -171,8 +171,8 @@ static bool try_dir(const char *dir, const char *name, char *out_path,
 static bool resolve_on_fpath(const char *name, char *out_path,
                              size_t out_size) {
     if (!name || strchr(name, '/')) {
-        // Defense against path traversal: a name containing `/` is not
-        // an autoload candidate, it's a path. Reject.
+        /// Defense against path traversal: a name containing `/` is not
+        /// an autoload candidate, it's a path. Reject.
         return false;
     }
 
@@ -193,9 +193,9 @@ static bool resolve_on_fpath(const char *name, char *out_path,
         free(fpath_copy);
     }
 
-    // Platform defaults via glob expansion. We scan glob results in
-    // order so /usr/share/zsh/<ver>/functions resolves before its
-    // subdirectories (the Misc/, Zle/, Completion/ layout).
+    /// Platform defaults via glob expansion. We scan glob results in
+    /// order so /usr/share/zsh/<ver>/functions resolves before its
+    /// subdirectories (the Misc/, Zle/, Completion/ layout).
     for (int i = 0; DEFAULT_FPATH_GLOBS[i] != NULL; i++) {
         glob_t gl;
         memset(&gl, 0, sizeof(gl));
@@ -262,10 +262,10 @@ bool autoload_try_resolve(struct executor *executor, const char *name) {
 
     char path[4096];
     if (!resolve_on_fpath(name, path, sizeof(path))) {
-        // Not on fpath; leave the entry in the registry so a later
-        // autoload-eligible run (with a different FPATH) could still
-        // resolve it. The dispatcher will fall through to PATH lookup
-        // and ultimately "command not found".
+        /// Not on fpath; leave the entry in the registry so a later
+        /// autoload-eligible run (with a different FPATH) could still
+        /// resolve it. The dispatcher will fall through to PATH lookup
+        /// and ultimately "command not found".
         return false;
     }
 
@@ -318,8 +318,8 @@ bool autoload_try_resolve(struct executor *executor, const char *name) {
     free(wrapped);
 
     if (rc != 0) {
-        // Function definition itself failed (syntax error in the file,
-        // etc). Leave registry untouched so the caller sees no resolution.
+        /// Function definition itself failed (syntax error in the file,
+        /// etc). Leave registry untouched so the caller sees no resolution.
         return false;
     }
 

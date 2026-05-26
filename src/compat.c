@@ -23,7 +23,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// Cross-platform forward declarations
+/// Cross-platform forward declarations
 int strncasecmp(const char *s1, const char *s2, size_t n);
 int strcasecmp(const char *s1, const char *s2);
 
@@ -71,7 +71,7 @@ typedef struct {
     char *lint_message;
     char *lint_suggestion;
     char *lint_pattern;
-    compat_fix_class_t fix_class; /**< Per-shell fix classification */
+    compat_fix_class_t fix_class; ///< Per-shell fix classification
     char *fix_replacement;
     regex_t *compiled_regex;
     bool regex_valid;
@@ -90,7 +90,7 @@ typedef struct {
     internal_entry_t entries[COMPAT_MAX_ENTRIES];
     size_t entry_count;
     bool strict_mode;
-    char target_shell[COMPAT_TARGET_MAX]; /**< Target shell name (string) */
+    char target_shell[COMPAT_TARGET_MAX]; ///< Target shell name (string)
     char data_dir[COMPAT_PATH_MAX];
 } compat_state_t;
 
@@ -243,14 +243,14 @@ typedef struct {
  * @brief Find or create entry by ID
  */
 static internal_entry_t *find_or_create_entry(const char *id) {
-    // Search existing
+    /// Search existing
     for (size_t i = 0; i < g_compat.entry_count; i++) {
         if (g_compat.entries[i].id && strcmp(g_compat.entries[i].id, id) == 0) {
             return &g_compat.entries[i];
         }
     }
 
-    // Create new
+    /// Create new
     if (g_compat.entry_count >= COMPAT_MAX_ENTRIES) {
         return NULL;
     }
@@ -297,16 +297,16 @@ static toml_result_t compat_toml_callback(const char *section, const char *key,
         ctx->in_fix = false;
     }
 
-    // Find or create entry
+    /// Find or create entry
     internal_entry_t *entry = find_or_create_entry(entry_id);
     if (!entry) {
-        return TOML_SUCCESS; // Max entries reached
+        return TOML_SUCCESS; /// Max entries reached
     }
 
     const char *str_val = toml_value_get_string(value);
 
     if (ctx->in_behavior) {
-        // Behavior subsection
+        /// Behavior subsection
         if (strcmp(key, "posix") == 0 && str_val) {
             free(entry->behavior_posix);
             entry->behavior_posix = safe_strdup(str_val);
@@ -321,7 +321,7 @@ static toml_result_t compat_toml_callback(const char *section, const char *key,
             entry->behavior_lush = safe_strdup(str_val);
         }
     } else if (ctx->in_lint) {
-        // Lint subsection
+        /// Lint subsection
         if (strcmp(key, "severity") == 0 && str_val) {
             compat_severity_t sev;
             if (compat_severity_parse(str_val, &sev)) {
@@ -338,7 +338,7 @@ static toml_result_t compat_toml_callback(const char *section, const char *key,
             entry->lint_pattern = safe_strdup(str_val);
         }
     } else if (ctx->in_fix) {
-        // Fix subsection - per-shell classification
+        /// Fix subsection - per-shell classification
         if (strcmp(key, "posix") == 0 && str_val) {
             fix_type_t ftype;
             if (compat_fix_type_parse(str_val, &ftype)) {
@@ -364,7 +364,7 @@ static toml_result_t compat_toml_callback(const char *section, const char *key,
             entry->fix_replacement = safe_strdup(str_val);
         }
     } else {
-        // Main entry section
+        /// Main entry section
         if (strcmp(key, "category") == 0 && str_val) {
             compat_category_t cat;
             if (compat_category_parse(str_val, &cat)) {
@@ -391,12 +391,12 @@ static int load_toml_file(const char *path) {
         return -1;
     }
 
-    // Read entire file
+    /// Read entire file
     fseek(fp, 0, SEEK_END);
     long size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    if (size <= 0 || size > 1024 * 1024) { // Max 1MB
+    if (size <= 0 || size > 1024 * 1024) { /// Max 1MB
         fclose(fp);
         return -1;
     }
@@ -416,7 +416,7 @@ static int load_toml_file(const char *path) {
     }
     content[size] = '\0';
 
-    // Parse TOML
+    /// Parse TOML
     toml_parser_t parser;
     toml_result_t result = toml_parser_init(&parser, content);
     if (result != TOML_SUCCESS) {
@@ -459,10 +459,10 @@ static int load_directory(const char *dir_path) {
         }
 
         if (S_ISDIR(st.st_mode)) {
-            // Recurse into subdirectory
+            /// Recurse into subdirectory
             files_loaded += load_directory(path);
         } else if (S_ISREG(st.st_mode)) {
-            // Check for .toml extension
+            /// Check for .toml extension
             size_t len = strlen(entry->d_name);
             if (len > 5 && strcmp(entry->d_name + len - 5, ".toml") == 0) {
                 if (load_toml_file(path) == 0) {
@@ -511,7 +511,7 @@ static bool get_exe_dir(char *buf, size_t size) {
     }
     exe_path[len] = '\0';
 
-    // Find last slash and truncate to get directory
+    /// Find last slash and truncate to get directory
     char *last_slash = strrchr(exe_path, '/');
     if (last_slash) {
         *last_slash = '\0';
@@ -526,7 +526,7 @@ int compat_init(const char *data_dir) {
         return 0;
     }
 
-    // Preserve target if it was set before init
+    /// Preserve target if it was set before init
     char saved_target[COMPAT_TARGET_MAX] = {0};
     if (g_compat.target_shell[0] != '\0') {
         snprintf(saved_target, sizeof(saved_target), "%s",
@@ -535,7 +535,7 @@ int compat_init(const char *data_dir) {
 
     memset(&g_compat, 0, sizeof(g_compat));
 
-    // Restore target or use default
+    /// Restore target or use default
     if (saved_target[0] != '\0') {
         snprintf(g_compat.target_shell, sizeof(g_compat.target_shell), "%s",
                  saved_target);
@@ -547,7 +547,7 @@ int compat_init(const char *data_dir) {
     int total_loaded = 0;
     char path_buf[COMPAT_PATH_MAX];
 
-    // If explicit path provided, use only that
+    /// If explicit path provided, use only that
     if (data_dir && data_dir[0]) {
         total_loaded = try_load_from_dir(data_dir);
         goto finalize;
@@ -563,14 +563,14 @@ int compat_init(const char *data_dir) {
      * 6. ./data/compat (CWD fallback for development)
      */
 
-    // 1. XDG_DATA_HOME (user data)
+    /// 1. XDG_DATA_HOME (user data)
     const char *xdg_data_home = getenv("XDG_DATA_HOME");
     if (xdg_data_home && xdg_data_home[0]) {
         snprintf(path_buf, sizeof(path_buf), "%s/%s", xdg_data_home,
                  COMPAT_SUBDIR);
         total_loaded += try_load_from_dir(path_buf);
     } else {
-        // Default: ~/.local/share/lush/compat
+        /// Default: ~/.local/share/lush/compat
         const char *home = getenv("HOME");
         if (home && home[0]) {
             snprintf(path_buf, sizeof(path_buf), "%s/%s/%s", home,
@@ -579,7 +579,7 @@ int compat_init(const char *data_dir) {
         }
     }
 
-    // 2. XDG_DATA_DIRS (system data directories)
+    /// 2. XDG_DATA_DIRS (system data directories)
     const char *xdg_data_dirs = getenv("XDG_DATA_DIRS");
     if (xdg_data_dirs && xdg_data_dirs[0]) {
         char *dirs_copy = strdup(xdg_data_dirs);
@@ -596,36 +596,36 @@ int compat_init(const char *data_dir) {
         }
     }
 
-    // 3. /usr/local/share/lush/compat
+    /// 3. /usr/local/share/lush/compat
     total_loaded += try_load_from_dir(COMPAT_LOCAL_SYSTEM_DIR);
 
-    // 4. /usr/share/lush/compat
+    /// 4. /usr/share/lush/compat
     total_loaded += try_load_from_dir(COMPAT_SYSTEM_DATA_DIR);
 
-    // 5. Relative to executable: ../share/lush/compat or ../data/compat
+    /// 5. Relative to executable: ../share/lush/compat or ../data/compat
     if (get_exe_dir(path_buf, sizeof(path_buf))) {
         char exe_relative[COMPAT_PATH_MAX];
 
         int ret;
 
-        // Try ../share/lush/compat (installed layout)
+        /// Try ../share/lush/compat (installed layout)
         ret = snprintf(exe_relative, sizeof(exe_relative), "%s/../share/%s",
                        path_buf, COMPAT_SUBDIR);
         if (ret > 0 && (size_t)ret < sizeof(exe_relative))
             total_loaded += try_load_from_dir(exe_relative);
 
-        // Try ../data/compat (development layout)
+        /// Try ../data/compat (development layout)
         ret = snprintf(exe_relative, sizeof(exe_relative), "%s/../data/compat",
                        path_buf);
         if (ret > 0 && (size_t)ret < sizeof(exe_relative))
             total_loaded += try_load_from_dir(exe_relative);
     }
 
-    // 6. CWD fallback: ./data/compat
+    /// 6. CWD fallback: ./data/compat
     total_loaded += try_load_from_dir("./data/compat");
 
 finalize:
-    // Compile regex patterns for all loaded entries
+    /// Compile regex patterns for all loaded entries
     for (size_t i = 0; i < g_compat.entry_count; i++) {
         compile_entry_regex(&g_compat.entries[i]);
     }
@@ -777,7 +777,7 @@ bool compat_is_portable(const char *construct, shell_mode_t target,
         return true;
     }
 
-    // Check against all entries with patterns
+    /// Check against all entries with patterns
     for (size_t i = 0; i < g_compat.entry_count; i++) {
         internal_entry_t *entry = &g_compat.entries[i];
 
@@ -786,7 +786,7 @@ bool compat_is_portable(const char *construct, shell_mode_t target,
         }
 
         if (regexec(entry->compiled_regex, construct, 0, NULL, 0) == 0) {
-            // Pattern matched - check if it's an issue for target
+            /// Pattern matched - check if it's an issue for target
             const char *target_behavior = NULL;
             switch (target) {
             case SHELL_MODE_POSIX:
@@ -839,10 +839,10 @@ bool compat_is_portable(const char *construct, shell_mode_t target,
  */
 static bool behavior_indicates_unavailable(const char *behavior) {
     if (!behavior) {
-        return false; // No info means we can't say it's unavailable
+        return false; /// No info means we can't say it's unavailable
     }
 
-    // Common patterns indicating feature is not available
+    /// Common patterns indicating feature is not available
     if (strncasecmp(behavior, "Not in POSIX", 12) == 0 ||
         strncasecmp(behavior, "Not specified", 13) == 0 ||
         strncasecmp(behavior, "Not available", 13) == 0 ||
@@ -850,7 +850,7 @@ static bool behavior_indicates_unavailable(const char *behavior) {
         strncasecmp(behavior, "Not applicable", 14) == 0 ||
         strncasecmp(behavior, "Not directly", 12) == 0 ||
         strncasecmp(behavior, "No built-in", 11) == 0 ||
-        strncasecmp(behavior, "Use ", 4) == 0) { // "Use X instead"
+        strncasecmp(behavior, "Use ", 4) == 0) { /// "Use X instead"
         return true;
     }
 
@@ -874,7 +874,7 @@ static const char *get_behavior_for_target(const internal_entry_t *entry,
     } else if (strcasecmp(target, "lush") == 0) {
         return entry->behavior_lush;
     }
-    // Unknown target, default to POSIX (most conservative)
+    /// Unknown target, default to POSIX (most conservative)
     return entry->behavior_posix;
 }
 
@@ -888,7 +888,7 @@ static bool is_issue_for_target(const internal_entry_t *entry,
                                 const char *target) {
     const char *target_behavior = get_behavior_for_target(entry, target);
 
-    // If the feature is unavailable/problematic in target, it's an issue
+    /// If the feature is unavailable/problematic in target, it's an issue
     return behavior_indicates_unavailable(target_behavior);
 }
 
@@ -898,7 +898,7 @@ size_t compat_check_line(const char *line, shell_mode_t target,
         return 0;
     }
 
-    // Convert enum to string for internal comparison
+    /// Convert enum to string for internal comparison
     const char *target_name = shell_mode_name(target);
 
     size_t found = 0;
@@ -910,7 +910,7 @@ size_t compat_check_line(const char *line, shell_mode_t target,
             continue;
         }
 
-        // Skip if this isn't an issue for the target shell
+        /// Skip if this isn't an issue for the target shell
         if (!is_issue_for_target(entry, target_name)) {
             continue;
         }
@@ -949,7 +949,7 @@ size_t compat_check_script(const char *script, shell_mode_t target,
             line_end = line_start + strlen(line_start);
         }
 
-        // Extract line
+        /// Extract line
         size_t line_len = (size_t)(line_end - line_start);
         char *line = malloc(line_len + 1);
         if (!line) {
@@ -958,12 +958,12 @@ size_t compat_check_script(const char *script, shell_mode_t target,
         memcpy(line, line_start, line_len);
         line[line_len] = '\0';
 
-        // Check this line
+        /// Check this line
         size_t remaining = max_results - found;
         size_t line_found =
             compat_check_line(line, target, &results[found], remaining);
 
-        // Set line numbers
+        /// Set line numbers
         for (size_t i = 0; i < line_found; i++) {
             results[found + i].line = line_num;
         }
@@ -996,33 +996,33 @@ static const struct {
     const char *feature;
     const char *description;
 } ast_feature_map[] = {
-    // Extended test and arithmetic
+    /// Extended test and arithmetic
     {    NODE_EXTENDED_TEST,        "extended_test",      "[[ ]] extended test"},
     {        NODE_ARITH_CMD,   "arithmetic_command", "(( )) arithmetic command"},
     {        NODE_FOR_ARITH,       "arithmetic_for",         "C-style for loop"},
 
-    // Process substitution
+    /// Process substitution
     {      NODE_PROC_SUB_IN, "process_substitution", "<() process substitution"},
     {     NODE_PROC_SUB_OUT, "process_substitution", ">() process substitution"},
 
-    // Arrays
+    /// Arrays
     {    NODE_ARRAY_LITERAL,               "arrays",            "array literal"},
     {     NODE_ARRAY_ACCESS,               "arrays",             "array access"},
     {     NODE_ARRAY_ASSIGN,               "arrays",         "array assignment"},
     {     NODE_ARRAY_APPEND,               "arrays",             "array append"},
 
-    // Redirections (non-POSIX)
+    /// Redirections (non-POSIX)
     { NODE_REDIR_HERESTRING,          "here_string",          "<<< here-string"},
     {       NODE_REDIR_BOTH,        "redirect_both", "&> redirect both streams"},
     {NODE_REDIR_BOTH_APPEND, "redirect_append_both",  "&>> append both streams"},
     {   NODE_REDIR_FD_ALLOC,          "redirect_fd",     "{var}> fd allocation"},
 
-    // Control flow extensions
+    /// Control flow extensions
     {           NODE_COPROC,               "coproc",         "coproc coprocess"},
     {           NODE_SELECT,          "select_loop",              "select loop"},
     {             NODE_TIME,         "time_keyword",             "time keyword"},
 
-    // Functions
+    /// Functions
     {    NODE_ANON_FUNCTION,   "anonymous_function",       "anonymous function"},
 };
 
@@ -1041,18 +1041,18 @@ static const struct {
  */
 static bool shell_supports_feature(shell_mode_t shell, const char *feature) {
     if (!feature) {
-        return true; // Unknown feature, assume supported
+        return true; /// Unknown feature, assume supported
     }
 
-    // Look up feature in the TOML database
+    /// Look up feature in the TOML database
     const compat_entry_t *entry = compat_get_first_by_feature(feature);
     if (!entry) {
-        // No TOML entry - fall back to basic heuristics
-        // POSIX generally doesn't support the extended features we detect
+        /// No TOML entry - fall back to basic heuristics
+        /// POSIX generally doesn't support the extended features we detect
         return (shell != SHELL_MODE_POSIX);
     }
 
-    // Get the behavior string for the target shell
+    /// Get the behavior string for the target shell
     const char *behavior = NULL;
     switch (shell) {
     case SHELL_MODE_POSIX:
@@ -1068,14 +1068,14 @@ static bool shell_supports_feature(shell_mode_t shell, const char *feature) {
         behavior = entry->behavior.lush;
         break;
     default:
-        return true; // Unknown shell mode, assume supported
+        return true; /// Unknown shell mode, assume supported
     }
 
     if (!behavior) {
-        return true; // No behavior defined, assume supported
+        return true; /// No behavior defined, assume supported
     }
 
-    // Use unified unavailability check
+    /// Use unified unavailability check
     return !behavior_indicates_unavailable(behavior);
 }
 
@@ -1089,22 +1089,22 @@ static size_t compat_check_ast_node(node_t *node, shell_mode_t target,
         return found;
     }
 
-    // Check if this node type maps to a non-portable feature
+    /// Check if this node type maps to a non-portable feature
     for (size_t i = 0; i < AST_FEATURE_MAP_SIZE; i++) {
         if (node->type == ast_feature_map[i].type) {
-            // Check if target shell supports this feature
+            /// Check if target shell supports this feature
             if (!shell_supports_feature(target, ast_feature_map[i].feature)) {
-                // Look up the feature in the TOML database
+                /// Look up the feature in the TOML database
                 const compat_entry_t *entry =
                     compat_get_first_by_feature(ast_feature_map[i].feature);
 
-                // Use first matching entry, or create a basic result
+                /// Use first matching entry, or create a basic result
                 compat_result_t *result = &results[found];
                 result->is_portable = false;
                 result->target = target;
                 result->line = (int)node->loc.line;
                 result->column = (int)node->loc.column;
-                result->entry = entry; // May be NULL if no TOML entry
+                result->entry = entry; /// May be NULL if no TOML entry
 
                 found++;
                 if (found >= max_results) {
@@ -1115,7 +1115,7 @@ static size_t compat_check_ast_node(node_t *node, shell_mode_t target,
         }
     }
 
-    // Recurse into children
+    /// Recurse into children
     node_t *child = node->first_child;
     while (child && found < max_results) {
         found =
@@ -1123,7 +1123,7 @@ static size_t compat_check_ast_node(node_t *node, shell_mode_t target,
         child = child->next_sibling;
     }
 
-    // Recurse into siblings (for command lists at same level)
+    /// Recurse into siblings (for command lists at same level)
     if (node->next_sibling && found < max_results) {
         found = compat_check_ast_node(node->next_sibling, target, results,
                                       max_results, found);
@@ -1151,7 +1151,7 @@ static size_t compat_collect_ast_issues(node_t *node, shell_mode_t target,
         return found;
     }
 
-    // Check if this node type maps to a non-portable feature
+    /// Check if this node type maps to a non-portable feature
     for (size_t i = 0; i < AST_FEATURE_MAP_SIZE; i++) {
         if (node->type == ast_feature_map[i].type) {
             if (!shell_supports_feature(target, ast_feature_map[i].feature)) {
@@ -1160,7 +1160,7 @@ static size_t compat_collect_ast_issues(node_t *node, shell_mode_t target,
                 issue->column = (int)node->loc.column;
                 issue->feature = ast_feature_map[i].feature;
 
-                // Find the entry in the internal database (stable pointers)
+                /// Find the entry in the internal database (stable pointers)
                 issue->severity = "warning";
                 issue->message = "Non-portable construct";
                 issue->suggestion = NULL;
@@ -1190,7 +1190,7 @@ static size_t compat_collect_ast_issues(node_t *node, shell_mode_t target,
         }
     }
 
-    // Recurse into children
+    /// Recurse into children
     node_t *child = node->first_child;
     while (child && found < max_issues) {
         found =
@@ -1198,7 +1198,7 @@ static size_t compat_collect_ast_issues(node_t *node, shell_mode_t target,
         child = child->next_sibling;
     }
 
-    // Recurse into siblings
+    /// Recurse into siblings
     if (node->next_sibling && found < max_issues) {
         found = compat_collect_ast_issues(node->next_sibling, target, issues,
                                           max_issues, found);
@@ -1254,7 +1254,7 @@ void compat_set_target(const char *target) {
 
 const char *compat_get_target(void) {
     if (g_compat.target_shell[0] == '\0') {
-        return "posix"; // Default if not set
+        return "posix"; /// Default if not set
     }
     return g_compat.target_shell;
 }
@@ -1320,7 +1320,7 @@ bool compat_fix_type_parse(const char *name, fix_type_t *type) {
         return false;
     }
 
-    // Check known fix type names
+    /// Check known fix type names
     if (strcmp(name, "safe") == 0) {
         *type = FIX_TYPE_SAFE;
         return true;
@@ -1354,7 +1354,7 @@ fix_type_t compat_get_fix_type_for_target(const compat_fix_class_t *fix_class,
     } else if (strcasecmp(target, "lush") == 0) {
         return fix_class->lush;
     }
-    // Unknown target, default to POSIX (most conservative)
+    /// Unknown target, default to POSIX (most conservative)
     return fix_class->posix;
 }
 
@@ -1397,7 +1397,7 @@ void compat_debug_print_stats(void) {
     fprintf(stderr, "  Strict mode: %s\n", g_compat.strict_mode ? "yes" : "no");
     fprintf(stderr, "  Target shell: %s\n", compat_get_target());
 
-    // Count by category
+    /// Count by category
     size_t by_category[COMPAT_CATEGORY_COUNT] = {0};
     size_t with_pattern = 0;
 

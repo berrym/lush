@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Keyword lookup table
+/// Keyword lookup table
 static const struct {
     const char *text;
     token_type_t type;
@@ -42,10 +42,10 @@ static const struct {
     {  "coproc",   TOK_COPROC},
     {  "repeat",   TOK_REPEAT},
     {      "fn",       TOK_FN},
-    {      NULL,     TOK_WORD}  // Sentinel
+    {      NULL,     TOK_WORD}  /// Sentinel
 };
 
-// Helper functions
+/// Helper functions
 static token_t *token_new(token_type_t type, const char *text, size_t length,
                           size_t line, size_t column, size_t position);
 static void token_free(token_t *token);
@@ -75,7 +75,7 @@ tokenizer_t *tokenizer_new_at(const char *input, size_t starting_line) {
         return NULL;
     }
     if (starting_line == 0) {
-        starting_line = 1; // defensive: 0 is unknown; 1-based per source
+        starting_line = 1; /// defensive: 0 is unknown; 1-based per source
     }
 
     tokenizer_t *tokenizer = malloc(sizeof(tokenizer_t));
@@ -156,15 +156,15 @@ void tokenizer_advance(tokenizer_t *tokenizer) {
         return;
     }
 
-    // Free the current token
+    /// Free the current token
     if (tokenizer->current) {
         token_free(tokenizer->current);
     }
 
-    // Move lookahead to current
+    /// Move lookahead to current
     tokenizer->current = tokenizer->lookahead;
 
-    // Get new lookahead
+    /// Get new lookahead
     tokenizer->lookahead = tokenize_next(tokenizer);
 }
 
@@ -447,20 +447,20 @@ void tokenizer_refresh_lookahead(tokenizer_t *tokenizer) {
         return;
     }
 
-    // Save the position before the lookahead token
+    /// Save the position before the lookahead token
     size_t saved_position = tokenizer->lookahead->position;
     size_t saved_line = tokenizer->lookahead->line;
     size_t saved_column = tokenizer->lookahead->column;
 
-    // Free the lookahead
+    /// Free the lookahead
     token_free(tokenizer->lookahead);
 
-    // Restore position to where lookahead started
+    /// Restore position to where lookahead started
     tokenizer->position = saved_position;
     tokenizer->line = saved_line;
     tokenizer->column = saved_column;
 
-    // Re-tokenize with current settings
+    /// Re-tokenize with current settings
     tokenizer->lookahead = tokenize_next(tokenizer);
 }
 
@@ -511,7 +511,7 @@ void tokenizer_refresh_from_position(tokenizer_t *tokenizer) {
         return;
     }
 
-    // Free existing tokens
+    /// Free existing tokens
     if (tokenizer->current) {
         token_free(tokenizer->current);
         tokenizer->current = NULL;
@@ -521,7 +521,7 @@ void tokenizer_refresh_from_position(tokenizer_t *tokenizer) {
         tokenizer->lookahead = NULL;
     }
 
-    // Re-tokenize from current position
+    /// Re-tokenize from current position
     tokenizer->current = tokenize_next(tokenizer);
     tokenizer->lookahead = tokenize_next(tokenizer);
 }
@@ -569,7 +569,7 @@ static token_t *token_new(token_type_t type, const char *text, size_t length,
         memcpy(token->text, text, length);
         token->text[length] = '\0';
     } else {
-        // Always allocate text, even for empty strings
+        /// Always allocate text, even for empty strings
         token->text = malloc(1);
         if (!token->text) {
             free(token);
@@ -613,7 +613,7 @@ static token_type_t classify_word(const char *text, size_t length,
         return TOK_WORD;
     }
 
-    // Check against keyword table
+    /// Check against keyword table
     for (size_t i = 0; keywords[i].text; i++) {
         if (strlen(keywords[i].text) == length &&
             strncmp(keywords[i].text, text, length) == 0) {
@@ -662,26 +662,26 @@ static bool is_word_char(char c) {
  * @return true if codepoint can be part of a word
  */
 static bool is_word_codepoint(uint32_t codepoint) {
-    // ASCII range: Use traditional shell word character logic.
-    // ',' is excluded -- see is_word_char() for rationale.
+    /// ASCII range: Use traditional shell word character logic.
+    /// ',' is excluded -- see is_word_char() for rationale.
     if (codepoint < 0x80) {
         char c = (char)codepoint;
         return isalnum(c) || strchr("_.-/~:@*?[]+%!^#", c) != NULL;
     }
 
-    // Non-ASCII UTF-8: All non-ASCII codepoints are valid word characters
-    // This includes:
-    // - Latin Extended (accented characters like é, ñ, ü)
-    // - CJK (Chinese, Japanese, Korean)
-    // - Emoji
-    // - All other Unicode scripts
-    //
-    // We explicitly exclude:
-    // - ASCII control characters (0x00-0x1F, already < 0x80)
-    // - Invalid codepoints (handled by UTF-8 decoder)
-    //
-    // Shell metacharacters (quotes, pipes, etc.) are all ASCII (< 0x80),
-    // so they're handled by the ASCII logic above.
+    /// Non-ASCII UTF-8: All non-ASCII codepoints are valid word characters
+    /// This includes:
+    /// - Latin Extended (accented characters like é, ñ, ü)
+    /// - CJK (Chinese, Japanese, Korean)
+    /// - Emoji
+    /// - All other Unicode scripts
+    ///
+    /// We explicitly exclude:
+    /// - ASCII control characters (0x00-0x1F, already < 0x80)
+    /// - Invalid codepoints (handled by UTF-8 decoder)
+    ///
+    /// Shell metacharacters (quotes, pipes, etc.) are all ASCII (< 0x80),
+    /// so they're handled by the ASCII logic above.
     return true;
 }
 
@@ -756,7 +756,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
     size_t start_column = tokenizer->column;
     char c = tokenizer->input[tokenizer->position];
 
-    // Handle newlines
+    /// Handle newlines
     if (c == '\n') {
         tokenizer->position++;
         tokenizer->line++;
@@ -765,7 +765,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                          start_pos);
     }
 
-    // Handle comments
+    /// Handle comments
     if (c == '#') {
         size_t start = tokenizer->position;
         while (tokenizer->position < tokenizer->input_length &&
@@ -778,10 +778,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                          start_line, start_column, start_pos);
     }
 
-    // Handle quoted strings (with adjacent quote concatenation support)
+    /// Handle quoted strings (with adjacent quote concatenation support)
     if (c == '\'' || c == '"') {
-        // Build a combined token for adjacent quoted segments
-        // We need to extract content from each segment and combine them
+        /// Build a combined token for adjacent quoted segments
+        /// We need to extract content from each segment and combine them
         size_t result_capacity = 256;
         char *result = malloc(result_capacity);
         if (!result) {
@@ -793,22 +793,22 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
 
     parse_next_segment:;
         char quote_char = tokenizer->input[tokenizer->position];
-        tokenizer->position++; // Skip opening quote
+        tokenizer->position++; /// Skip opening quote
         tokenizer->column++;
 
-        // For double-quoted strings, we need to build the result character by
-        // character to properly handle backslash-newline line continuation
-        // (which should be removed entirely per POSIX).
-        // For single-quoted strings, we can still do bulk copy since no
-        // escape processing happens inside single quotes.
+        /// For double-quoted strings, we need to build the result character by
+        /// character to properly handle backslash-newline line continuation
+        /// (which should be removed entirely per POSIX).
+        /// For single-quoted strings, we can still do bulk copy since no
+        /// escape processing happens inside single quotes.
 
         if (quote_char == '\'') {
-            // Single-quoted string: bulk copy (no escape processing)
+            /// Single-quoted string: bulk copy (no escape processing)
             size_t segment_start = tokenizer->position;
             while (tokenizer->position < tokenizer->input_length) {
                 char curr = tokenizer->input[tokenizer->position];
                 if (curr == '\'') {
-                    // Found closing quote - copy segment content
+                    /// Found closing quote - copy segment content
                     size_t segment_len = tokenizer->position - segment_start;
                     while (result_len + segment_len + 1 >= result_capacity) {
                         result_capacity *= 2;
@@ -825,7 +825,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                            &tokenizer->input[segment_start], segment_len);
                     result_len += segment_len;
 
-                    tokenizer->position++; // Skip closing quote
+                    tokenizer->position++; /// Skip closing quote
                     tokenizer->column++;
                     goto check_adjacent;
                 } else if (curr == '\n') {
@@ -837,35 +837,35 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     tokenizer->position++;
                 }
             }
-            // Unterminated single-quoted string -- free the segment
-            // builder buffer before returning, otherwise every input
-            // with an unbalanced quote leaks 256+ bytes (caught via
-            // LeakSanitizer running fuzz_parser; see corresponding
-            // fix at the unterminated-double-quote site below).
+            /// Unterminated single-quoted string -- free the segment
+            /// builder buffer before returning, otherwise every input
+            /// with an unbalanced quote leaks 256+ bytes (caught via
+            /// LeakSanitizer running fuzz_parser; see corresponding
+            /// fix at the unterminated-double-quote site below).
             free(result);
             return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                              tokenizer->position - start_pos, start_line,
                              start_column, start_pos);
         }
 
-        // Double-quoted string: character by character to handle line
-        // continuation
+        /// Double-quoted string: character by character to handle line
+        /// continuation
         has_expandable = true;
         while (tokenizer->position < tokenizer->input_length) {
             char curr = tokenizer->input[tokenizer->position];
 
             if (curr == '"') {
-                // Found closing quote
-                tokenizer->position++; // Skip closing quote
+                /// Found closing quote
+                tokenizer->position++; /// Skip closing quote
                 tokenizer->column++;
                 goto check_adjacent;
             } else if (curr == '$' &&
                        tokenizer->position + 1 < tokenizer->input_length &&
                        tokenizer->input[tokenizer->position + 1] == '(') {
-                // Handle command substitution inside double quotes - copy
-                // verbatim
+                /// Handle command substitution inside double quotes - copy
+                /// verbatim
                 size_t subst_start = tokenizer->position;
-                tokenizer->position += 2; // Skip $(
+                tokenizer->position += 2; /// Skip $(
                 tokenizer->column += 2;
                 int paren_depth = 1;
 
@@ -914,7 +914,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     }
                     tokenizer->position++;
                 }
-                // Copy the entire command substitution to result
+                /// Copy the entire command substitution to result
                 size_t subst_len = tokenizer->position - subst_start;
                 while (result_len + subst_len + 1 >= result_capacity) {
                     result_capacity *= 2;
@@ -931,9 +931,9 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                        subst_len);
                 result_len += subst_len;
             } else if (curr == '`') {
-                // Handle backtick command substitution - copy verbatim
+                /// Handle backtick command substitution - copy verbatim
                 size_t subst_start = tokenizer->position;
-                tokenizer->position++; // Skip opening backtick
+                tokenizer->position++; /// Skip opening backtick
                 tokenizer->column++;
 
                 while (tokenizer->position < tokenizer->input_length) {
@@ -957,7 +957,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     }
                     tokenizer->position++;
                 }
-                // Copy the entire backtick substitution to result
+                /// Copy the entire backtick substitution to result
                 size_t subst_len = tokenizer->position - subst_start;
                 while (result_len + subst_len + 1 >= result_capacity) {
                     result_capacity *= 2;
@@ -975,20 +975,20 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 result_len += subst_len;
             } else if (curr == '\\' &&
                        tokenizer->position + 1 < tokenizer->input_length) {
-                // Handle backslash escapes in double quotes
+                /// Handle backslash escapes in double quotes
                 char escaped = tokenizer->input[tokenizer->position + 1];
                 if (escaped == '\n') {
-                    // Line continuation: skip both backslash and newline
-                    // entirely
+                    /// Line continuation: skip both backslash and newline
+                    /// entirely
                     tokenizer->position += 2;
                     tokenizer->line++;
                     tokenizer->column = 1;
-                    // Don't add anything to result - this is line continuation
+                    /// Don't add anything to result - this is line continuation
                 } else if (escaped == '$' || escaped == '`' || escaped == '"' ||
                            escaped == '\\' || escaped == '\n') {
-                    // These are the only characters that backslash quotes in
-                    // double quotes Add just the escaped character (not the
-                    // backslash)
+                    /// These are the only characters that backslash quotes in
+                    /// double quotes Add just the escaped character (not the
+                    /// backslash)
                     while (result_len + 2 >= result_capacity) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
@@ -1000,13 +1000,14 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         }
                         result = new_result;
                     }
-                    // Keep backslash + escaped char for later escape processing
+                    /// Keep backslash + escaped char for later escape
+                    /// processing
                     result[result_len++] = '\\';
                     result[result_len++] = escaped;
                     tokenizer->position += 2;
                     tokenizer->column += 2;
                 } else {
-                    // Backslash followed by other chars: keep both literally
+                    /// Backslash followed by other chars: keep both literally
                     while (result_len + 2 >= result_capacity) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
@@ -1024,7 +1025,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     tokenizer->column += 2;
                 }
             } else if (curr == '\n') {
-                // Literal newline in double quotes (not escaped)
+                /// Literal newline in double quotes (not escaped)
                 while (result_len + 1 >= result_capacity) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
@@ -1041,7 +1042,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 tokenizer->column = 1;
                 tokenizer->position++;
             } else {
-                // Regular character - add to result
+                /// Regular character - add to result
                 while (result_len + 1 >= result_capacity) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
@@ -1059,29 +1060,29 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             }
         }
 
-        // Unterminated double-quoted string -- free the segment
-        // builder buffer before returning, otherwise every input
-        // with an unbalanced double quote leaks 256+ bytes.
+        /// Unterminated double-quoted string -- free the segment
+        /// builder buffer before returning, otherwise every input
+        /// with an unbalanced double quote leaks 256+ bytes.
         free(result);
         return token_new(TOK_ERROR, &tokenizer->input[start_pos],
                          tokenizer->position - start_pos, start_line,
                          start_column, start_pos);
 
     check_adjacent:
-        // Check for adjacent quote - continue if another quote follows
+        /// Check for adjacent quote - continue if another quote follows
         if (tokenizer->position < tokenizer->input_length) {
             char next = tokenizer->input[tokenizer->position];
             if (next == '\'' || next == '"') {
-                // Adjacent quote - continue parsing
+                /// Adjacent quote - continue parsing
                 goto parse_next_segment;
             }
-            // Check for adjacent $' (ANSI-C quoting)
+            /// Check for adjacent $' (ANSI-C quoting)
             if (next == '$' &&
                 tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '\'') {
-                tokenizer->position++; // Skip $
+                tokenizer->position++; /// Skip $
                 tokenizer->column++;
-                // Add marker for ANSI-C quote in result
+                /// Add marker for ANSI-C quote in result
                 while (result_len + 2 >= result_capacity) {
                     result_capacity *= 2;
                     char *new_result = realloc(result, result_capacity);
@@ -1096,13 +1097,13 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 result[result_len++] = '$';
                 goto parse_next_segment;
             }
-            // Check for adjacent unquoted word characters
+            /// Check for adjacent unquoted word characters
             if (is_word_char(next) || next == '\\' || next == '$') {
-                // Adjacent word - scan until whitespace or special char
+                /// Adjacent word - scan until whitespace or special char
                 while (tokenizer->position < tokenizer->input_length) {
                     char wc = tokenizer->input[tokenizer->position];
                     if (wc == '\'' || wc == '"') {
-                        // Another quote - handle it
+                        /// Another quote - handle it
                         goto parse_next_segment;
                     }
                     if (wc == '$' &&
@@ -1116,7 +1117,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     if (!is_word_char(wc) && wc != '\\' && wc != '$') {
                         break;
                     }
-                    // Add character to result
+                    /// Add character to result
                     if (result_len + 1 >= result_capacity) {
                         result_capacity *= 2;
                         char *new_result = realloc(result, result_capacity);
@@ -1133,13 +1134,13 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         char esc_char =
                             tokenizer->input[tokenizer->position + 1];
                         if (esc_char == '\n') {
-                            // Line continuation outside quotes - skip both
+                            /// Line continuation outside quotes - skip both
                             tokenizer->position += 2;
                             tokenizer->line++;
                             tokenizer->column = 1;
                             continue;
                         }
-                        // Escape sequence
+                        /// Escape sequence
                         tokenizer->position++;
                         tokenizer->column++;
                         result[result_len++] =
@@ -1150,12 +1151,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     tokenizer->position++;
                     tokenizer->column++;
                     has_expandable =
-                        true; // Unquoted content may have expansions
+                        true; /// Unquoted content may have expansions
                 }
             }
         }
 
-        // No more adjacent content - return the complete token
+        /// No more adjacent content - return the complete token
         result[result_len] = '\0';
         token_type_t type = has_expandable ? TOK_EXPANDABLE_STRING : TOK_STRING;
         token_t *tok = token_new(type, result, result_len, start_line,
@@ -1164,7 +1165,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         return tok;
     }
 
-    // Handle variable references ($var, ${var}, $(cmd), $((expr)))
+    /// Handle variable references ($var, ${var}, $(cmd), $((expr)))
     if (c == '$') {
         size_t start = tokenizer->position;
         tokenizer->position++;
@@ -1174,7 +1175,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             char next = tokenizer->input[tokenizer->position];
 
             if (next == '(') {
-                // Check for $(( (arithmetic) or $( (command substitution)
+                /// Check for $(( (arithmetic) or $( (command substitution)
                 tokenizer->position++;
                 tokenizer->column++;
 
@@ -1190,7 +1191,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                      * up the second `(` and reparse as command sub.
                      * Issue #99. */
                     size_t scan = tokenizer->position + 1;
-                    int depth = 2; // counting the two outer `(`
+                    int depth = 2; /// counting the two outer `(`
                     bool looks_arith = true;
                     while (scan < tokenizer->input_length && depth > 0) {
                         char sc = tokenizer->input[scan];
@@ -1216,7 +1217,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     }
 
                     if (looks_arith) {
-                        // Arithmetic expansion $((expr))
+                        /// Arithmetic expansion $((expr))
                         tokenizer->position++;
                         tokenizer->column++;
 
@@ -1236,7 +1237,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             tokenizer->column++;
                         }
 
-                        // Check for unclosed arithmetic expansion
+                        /// Check for unclosed arithmetic expansion
                         if (paren_count > 0) {
                             size_t length = tokenizer->position - start;
                             return token_new(
@@ -1256,7 +1257,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                      * paren-counter will track. */
                 }
                 {
-                    // Command substitution $(cmd)
+                    /// Command substitution $(cmd)
                     int paren_count = 1;
                     while (tokenizer->position < tokenizer->input_length &&
                            paren_count > 0) {
@@ -1273,7 +1274,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         tokenizer->column++;
                     }
 
-                    // Check for unclosed command substitution
+                    /// Check for unclosed command substitution
                     if (paren_count > 0) {
                         size_t length = tokenizer->position - start;
                         return token_new(TOK_ERROR, &tokenizer->input[start],
@@ -1287,21 +1288,21 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                      start_pos);
                 }
             } else if (next == '\'') {
-                // ANSI-C quoting $'...'
-                tokenizer->position++; // Skip the '
+                /// ANSI-C quoting $'...'
+                tokenizer->position++; /// Skip the '
                 tokenizer->column++;
 
                 while (tokenizer->position < tokenizer->input_length) {
                     char curr = tokenizer->input[tokenizer->position];
 
                     if (curr == '\'') {
-                        // End of ANSI-C string
+                        /// End of ANSI-C string
                         tokenizer->position++;
                         tokenizer->column++;
                         break;
                     } else if (curr == '\\' && tokenizer->position + 1 <
                                                    tokenizer->input_length) {
-                        // Escape sequence - skip both chars
+                        /// Escape sequence - skip both chars
                         tokenizer->position += 2;
                         tokenizer->column += 2;
                     } else if (curr == '\n') {
@@ -1318,11 +1319,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 return token_new(TOK_STRING, &tokenizer->input[start], length,
                                  start_line, start_column, start_pos);
             } else if (next == '{') {
-                // Parameter expansion ${var} with proper nested brace handling
+                /// Parameter expansion ${var} with proper nested brace handling
                 tokenizer->position++;
                 tokenizer->column++;
 
-                int brace_count = 1; // We've seen the opening brace
+                int brace_count = 1; /// We've seen the opening brace
                 while (tokenizer->position < tokenizer->input_length &&
                        brace_count > 0) {
                     char curr = tokenizer->input[tokenizer->position];
@@ -1350,12 +1351,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                        (isalpha((unsigned char)tokenizer
                                     ->input[tokenizer->position + 1]) ||
                         tokenizer->input[tokenizer->position + 1] == '_')) {
-                // zsh `$+NAME` (and `$+NAME[SUBSCRIPT]`) is the unbraced
-                // shorthand for `${+NAME}` is-set test. Consume `+`,
-                // the identifier, and any `[...]` subscript so the
-                // expansion path receives one TOK_VARIABLE token rather
-                // than `$` + word + `+NAME[...]`.
-                tokenizer->position++; // consume +
+                /// zsh `$+NAME` (and `$+NAME[SUBSCRIPT]`) is the unbraced
+                /// shorthand for `${+NAME}` is-set test. Consume `+`,
+                /// the identifier, and any `[...]` subscript so the
+                /// expansion path receives one TOK_VARIABLE token rather
+                /// than `$` + word + `+NAME[...]`.
+                tokenizer->position++; /// consume +
                 tokenizer->column++;
                 while (tokenizer->position < tokenizer->input_length) {
                     char curr = tokenizer->input[tokenizer->position];
@@ -1392,17 +1393,17 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             } else if (isalnum(next) || next == '_' || next == '?' ||
                        next == '$' || next == '!' || next == '@' ||
                        next == '*' || next == '#' || next == '-') {
-                // Simple variable $var, $?, $$, $!, $-, etc.
+                /// Simple variable $var, $?, $$, $!, $-, etc.
 
-                // For special single-character variables, only advance by one
+                /// For special single-character variables, only advance by one
                 if (next == '?' || next == '$' || next == '!' || next == '@' ||
                     next == '*' || next == '#' || next == '-') {
                     tokenizer
-                        ->position++; // Just one character for special vars
+                        ->position++; /// Just one character for special vars
                     tokenizer->column++;
                 } else {
-                    // For regular variables, continue until non-identifier
-                    // character
+                    /// For regular variables, continue until non-identifier
+                    /// character
                     while (tokenizer->position < tokenizer->input_length) {
                         char curr = tokenizer->input[tokenizer->position];
                         if (isalnum(curr) || curr == '_') {
@@ -1473,13 +1474,13 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             }
         }
 
-        // Just a plain $ - treat as word
+        /// Just a plain $ - treat as word
         size_t length = tokenizer->position - start;
         return token_new(TOK_WORD, &tokenizer->input[start], length, start_line,
                          start_column, start_pos);
     }
 
-    // Handle backtick command substitution
+    /// Handle backtick command substitution
     if (c == '`') {
         size_t start = tokenizer->position;
         tokenizer->position++;
@@ -1496,10 +1497,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         }
 
         if (tokenizer->position < tokenizer->input_length) {
-            tokenizer->position++; // Skip closing backtick
+            tokenizer->position++; /// Skip closing backtick
             tokenizer->column++;
         } else {
-            // Unclosed backtick - return error token
+            /// Unclosed backtick - return error token
             size_t length = tokenizer->position - start;
             return token_new(TOK_ERROR, &tokenizer->input[start], length,
                              start_line, start_column, start_pos);
@@ -1510,11 +1511,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                          start_line, start_column, start_pos);
     }
 
-    // Handle operators
+    /// Handle operators
     if (is_operator_char(c)) {
         switch (c) {
         case ';':
-            // Check for ;;& (case continue - test next pattern)
+            /// Check for ;;& (case continue - test next pattern)
             if (tokenizer->position + 2 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == ';' &&
                 tokenizer->input[tokenizer->position + 2] == '&') {
@@ -1523,7 +1524,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 return token_new(TOK_CASE_CONTINUE, ";;&", 3, start_line,
                                  start_column, start_pos);
             }
-            // Check for ;& (case fall-through - execute next without test)
+            /// Check for ;& (case fall-through - execute next without test)
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '&') {
                 tokenizer->position += 2;
@@ -1531,7 +1532,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 return token_new(TOK_CASE_FALLTHROUGH, ";&", 2, start_line,
                                  start_column, start_pos);
             }
-            // Regular semicolon
+            /// Regular semicolon
             tokenizer->position++;
             tokenizer->column++;
             return token_new(TOK_SEMICOLON, ";", 1, start_line, start_column,
@@ -1546,7 +1547,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     return token_new(TOK_LOGICAL_OR, "||", 2, start_line,
                                      start_column, start_pos);
                 }
-                // Pipe stderr |& (shorthand for 2>&1 |)
+                /// Pipe stderr |& (shorthand for 2>&1 |)
                 if (next == '&' &&
                     shell_mode_allows(FEATURE_PROCESS_SUBSTITUTION)) {
                     tokenizer->position += 2;
@@ -1569,17 +1570,17 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     return token_new(TOK_LOGICAL_AND, "&&", 2, start_line,
                                      start_column, start_pos);
                 } else if (next == '|' || next == '!') {
-                    // zsh `&|` and `&!` -- background-and-disown. Treated
-                    // as plain background for execution semantics; the
-                    // disown bookkeeping is an optimization the corpus
-                    // does not observe.
+                    /// zsh `&|` and `&!` -- background-and-disown. Treated
+                    /// as plain background for execution semantics; the
+                    /// disown bookkeeping is an optimization the corpus
+                    /// does not observe.
                     char text[3] = {'&', next, '\0'};
                     tokenizer->position += 2;
                     tokenizer->column += 2;
                     return token_new(TOK_BACKGROUND_DISOWN, text, 2, start_line,
                                      start_column, start_pos);
                 } else if (next == '>') {
-                    // Check for &>> (append both stdout and stderr)
+                    /// Check for &>> (append both stdout and stderr)
                     if (tokenizer->position + 2 < tokenizer->input_length &&
                         tokenizer->input[tokenizer->position + 2] == '>' &&
                         shell_mode_allows(FEATURE_PROCESS_SUBSTITUTION)) {
@@ -1602,7 +1603,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         case '<':
             if (tokenizer->position + 1 < tokenizer->input_length) {
                 char next = tokenizer->input[tokenizer->position + 1];
-                // Process substitution <( - check before heredoc
+                /// Process substitution <( - check before heredoc
                 if (next == '(' &&
                     shell_mode_allows(FEATURE_PROCESS_SUBSTITUTION)) {
                     tokenizer->position += 2;
@@ -1632,11 +1633,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                          start_column, start_pos);
                     }
                 }
-                // Handle <&N, <&-, <&$VAR patterns (input fd duplication)
+                /// Handle <&N, <&-, <&$VAR patterns (input fd duplication)
                 if (next == '&' &&
                     tokenizer->position + 2 < tokenizer->input_length) {
                     char fd_char = tokenizer->input[tokenizer->position + 2];
-                    // Handle <&N (dup input from fd N) or <&- (close stdin)
+                    /// Handle <&N (dup input from fd N) or <&- (close stdin)
                     if (isdigit(fd_char) || fd_char == '-') {
                         tokenizer->position += 3;
                         tokenizer->column += 3;
@@ -1644,14 +1645,14 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                          &tokenizer->input[start_pos], 3,
                                          start_line, start_column, start_pos);
                     }
-                    // Handle <&$VAR or <&${VAR} patterns
+                    /// Handle <&$VAR or <&${VAR} patterns
                     if (fd_char == '$') {
                         size_t fd_start = tokenizer->position + 2;
-                        size_t fd_pos = fd_start + 1; // Skip $
-                        // Handle ${...} brace form
+                        size_t fd_pos = fd_start + 1; /// Skip $
+                        /// Handle ${...} brace form
                         if (fd_pos < tokenizer->input_length &&
                             tokenizer->input[fd_pos] == '{') {
-                            fd_pos++; // Skip {
+                            fd_pos++; /// Skip {
                             int brace_depth = 1;
                             while (fd_pos < tokenizer->input_length &&
                                    brace_depth > 0) {
@@ -1662,7 +1663,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                 fd_pos++;
                             }
                         } else {
-                            // Simple $VAR form - scan alphanumeric/underscore
+                            /// Simple $VAR form - scan alphanumeric/underscore
                             while (fd_pos < tokenizer->input_length &&
                                    (isalnum(tokenizer->input[fd_pos]) ||
                                     tokenizer->input[fd_pos] == '_')) {
@@ -1686,7 +1687,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         case '>':
             if (tokenizer->position + 1 < tokenizer->input_length) {
                 char next = tokenizer->input[tokenizer->position + 1];
-                // Process substitution >(
+                /// Process substitution >(
                 if (next == '(' &&
                     shell_mode_allows(FEATURE_PROCESS_SUBSTITUTION)) {
                     tokenizer->position += 2;
@@ -1709,9 +1710,9 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 if (next == '&' &&
                     tokenizer->position + 2 < tokenizer->input_length) {
                     char fd_char = tokenizer->input[tokenizer->position + 2];
-                    // Handle >&N pattern (redirect stdout to file descriptor N)
-                    // Also handle >&- (close fd) and >&$VAR (variable
-                    // expansion)
+                    /// Handle >&N pattern (redirect stdout to file descriptor
+                    /// N) Also handle >&- (close fd) and >&$VAR (variable
+                    /// expansion)
                     if (isdigit(fd_char) || fd_char == '-') {
                         tokenizer->position += 3;
                         tokenizer->column += 3;
@@ -1719,14 +1720,14 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                          &tokenizer->input[start_pos], 3,
                                          start_line, start_column, start_pos);
                     }
-                    // Handle >&$VAR or >&${VAR} patterns
+                    /// Handle >&$VAR or >&${VAR} patterns
                     if (fd_char == '$') {
                         size_t fd_start = tokenizer->position + 2;
-                        size_t fd_pos = fd_start + 1; // Skip $
-                        // Handle ${...} brace form
+                        size_t fd_pos = fd_start + 1; /// Skip $
+                        /// Handle ${...} brace form
                         if (fd_pos < tokenizer->input_length &&
                             tokenizer->input[fd_pos] == '{') {
-                            fd_pos++; // Skip {
+                            fd_pos++; /// Skip {
                             int brace_depth = 1;
                             while (fd_pos < tokenizer->input_length &&
                                    brace_depth > 0) {
@@ -1737,7 +1738,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                 fd_pos++;
                             }
                         } else {
-                            // Simple $VAR form - scan alphanumeric/underscore
+                            /// Simple $VAR form - scan alphanumeric/underscore
                             while (fd_pos < tokenizer->input_length &&
                                    (isalnum(tokenizer->input[fd_pos]) ||
                                     tokenizer->input[fd_pos] == '_')) {
@@ -1759,7 +1760,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                              start_pos);
 
         case '=':
-            // Check for =~ regex match operator (inside [[ ]])
+            /// Check for =~ regex match operator (inside [[ ]])
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '~' &&
                 shell_mode_allows(FEATURE_REGEX_MATCH)) {
@@ -1781,21 +1782,21 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 return token_new(TOK_NOT_EQUAL, "!=", 2, start_line,
                                  start_column, start_pos);
             }
-            // Check for extglob !(pattern)
+            /// Check for extglob !(pattern)
             if (shell_mode_allows(FEATURE_EXTENDED_GLOB) &&
                 tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '(') {
-                // Fall through to word tokenization which handles extglob
+                /// Fall through to word tokenization which handles extglob
                 break;
             }
-            // Standalone ! character (for test negation)
+            /// Standalone ! character (for test negation)
             tokenizer->position++;
             tokenizer->column++;
             return token_new(TOK_WORD, "!", 1, start_line, start_column,
                              start_pos);
 
         case '+':
-            // Check for += (append/add assignment)
+            /// Check for += (append/add assignment)
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '=' &&
                 shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
@@ -1804,25 +1805,25 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 return token_new(TOK_PLUS_ASSIGN, "+=", 2, start_line,
                                  start_column, start_pos);
             }
-            // Let + be handled as part of words (e.g., date +%Y)
-            // Fall through to word tokenization
+            /// Let + be handled as part of words (e.g., date +%Y)
+            /// Fall through to word tokenization
             break;
 
-            // case '-' is not reachable here -- '-' is a word char (not
-            // an operator char) and is consumed by the word tokenizer
-            // below. The '->' arrow is handled before the word path so
-            // it does not get absorbed into a word.
+            /// case '-' is not reachable here -- '-' is a word char (not
+            /// an operator char) and is consumed by the word tokenizer
+            /// below. The '->' arrow is handled before the word path so
+            /// it does not get absorbed into a word.
 
-            // case '*':
-            //     tokenizer->position++;
-            //     tokenizer->column++;
-            //     return token_new(TOK_MULTIPLY, "*", 1, start_line,
-            //     start_column,
-            //                      start_pos);
+            /// case '*':
+            ///     tokenizer->position++;
+            ///     tokenizer->column++;
+            ///     return token_new(TOK_MULTIPLY, "*", 1, start_line,
+            ///     start_column,
+            ///                      start_pos);
 
         case '%':
-            // Let % be handled as part of words (e.g., +%Y format specifiers)
-            // Fall through to word tokenization
+            /// Let % be handled as part of words (e.g., +%Y format specifiers)
+            /// Fall through to word tokenization
             break;
 
         case ',':
@@ -1831,37 +1832,37 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             return token_new(TOK_COMMA, ",", 1, start_line, start_column,
                              start_pos);
 
-            // case '?':
-            //     tokenizer->position++;
-            //     tokenizer->column++;
-            //     return token_new(TOK_QUESTION, "?", 1, start_line,
-            //     start_column,
-            //                      start_pos);
+            /// case '?':
+            ///     tokenizer->position++;
+            ///     tokenizer->column++;
+            ///     return token_new(TOK_QUESTION, "?", 1, start_line,
+            ///     start_column,
+            ///                      start_pos);
 
         case '(':
-            // Check for (( arithmetic command
+            /// Check for (( arithmetic command
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '(' &&
                 shell_mode_allows(FEATURE_ARITH_COMMAND)) {
                 tokenizer->position += 2;
                 tokenizer->column += 2;
-                tokenizer->arith_cmd_depth++; // Track arithmetic context
+                tokenizer->arith_cmd_depth++; /// Track arithmetic context
                 return token_new(TOK_DOUBLE_LPAREN, "((", 2, start_line,
                                  start_column, start_pos);
             }
-            // Check for zsh-style glob alternation: (a|b)suffix
-            // This is a word, not a subshell, when:
-            // 1. Extended glob is enabled
-            // 2. There's a | inside the parens
-            // 3. After ), there's more word-like content (not
-            // whitespace/EOF/operator)
+            /// Check for zsh-style glob alternation: (a|b)suffix
+            /// This is a word, not a subshell, when:
+            /// 1. Extended glob is enabled
+            /// 2. There's a | inside the parens
+            /// 3. After ), there's more word-like content (not
+            /// whitespace/EOF/operator)
             if (shell_mode_allows(FEATURE_EXTENDED_GLOB)) {
                 size_t scan_pos = tokenizer->position + 1;
                 bool has_pipe = false;
                 bool found_close = false;
                 int paren_depth = 1;
 
-                // Scan to find matching ) and check for |
+                /// Scan to find matching ) and check for |
                 while (scan_pos < tokenizer->input_length && paren_depth > 0) {
                     char sc = tokenizer->input[scan_pos];
                     if (sc == '(') {
@@ -1877,22 +1878,22 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     scan_pos++;
                 }
 
-                // If we found (a|b) pattern, check what follows
+                /// If we found (a|b) pattern, check what follows
                 if (found_close && has_pipe) {
-                    // Check if there's word-like content after )
+                    /// Check if there's word-like content after )
                     if (scan_pos < tokenizer->input_length) {
                         char next = tokenizer->input[scan_pos];
-                        // If followed by alphanumeric, dot, or other word
-                        // chars, it's glob alternation
+                        /// If followed by alphanumeric, dot, or other word
+                        /// chars, it's glob alternation
                         if (isalnum(next) || next == '.' || next == '_' ||
                             next == '-' || next == '*' || next == '?') {
-                            // Treat entire (a|b)suffix as a word token
+                            /// Treat entire (a|b)suffix as a word token
                             size_t word_start = tokenizer->position;
-                            // Skip past the closing paren we found
+                            /// Skip past the closing paren we found
                             tokenizer->position = scan_pos;
                             tokenizer->column += (scan_pos - word_start);
 
-                            // Continue scanning word chars after )
+                            /// Continue scanning word chars after )
                             while (tokenizer->position <
                                    tokenizer->input_length) {
                                 char wc = tokenizer->input[tokenizer->position];
@@ -1905,7 +1906,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             }
 
                             size_t word_len = tokenizer->position - word_start;
-                            // token_new copies the text, so pass input directly
+                            /// token_new copies the text, so pass input
+                            /// directly
                             return token_new(
                                 TOK_WORD, &tokenizer->input[word_start],
                                 word_len, start_line, start_column, start_pos);
@@ -1919,17 +1921,17 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                              start_pos);
 
         case ')':
-            // Check for )) arithmetic command end - only when inside (( ))
-            // Without this check, nested process substitutions like
-            // cat <(cat <(echo nested)) would fail because )) gets
-            // tokenized as TOK_DOUBLE_RPAREN instead of two TOK_RPAREN
+            /// Check for )) arithmetic command end - only when inside (( ))
+            /// Without this check, nested process substitutions like
+            /// cat <(cat <(echo nested)) would fail because )) gets
+            /// tokenized as TOK_DOUBLE_RPAREN instead of two TOK_RPAREN
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == ')' &&
                 tokenizer->arith_cmd_depth > 0 &&
                 shell_mode_allows(FEATURE_ARITH_COMMAND)) {
                 tokenizer->position += 2;
                 tokenizer->column += 2;
-                tokenizer->arith_cmd_depth--; // Leaving arithmetic context
+                tokenizer->arith_cmd_depth--; /// Leaving arithmetic context
                 return token_new(TOK_DOUBLE_RPAREN, "))", 2, start_line,
                                  start_column, start_pos);
             }
@@ -1939,11 +1941,11 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                              start_pos);
 
         case '{':
-            // Check for {varname} fd allocation syntax (bash 4.1+/zsh)
-            // Pattern: {identifier}> or {identifier}< for fd allocation
+            /// Check for {varname} fd allocation syntax (bash 4.1+/zsh)
+            /// Pattern: {identifier}> or {identifier}< for fd allocation
             if (tokenizer->position + 2 < tokenizer->input_length) {
-                size_t scan = tokenizer->position + 1; // After '{'
-                // Scan for valid identifier: [a-zA-Z_][a-zA-Z0-9_]*
+                size_t scan = tokenizer->position + 1; /// After '{'
+                /// Scan for valid identifier: [a-zA-Z_][a-zA-Z0-9_]*
                 if (scan < tokenizer->input_length &&
                     (isalpha(tokenizer->input[scan]) ||
                      tokenizer->input[scan] == '_')) {
@@ -1953,25 +1955,25 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             tokenizer->input[scan] == '_')) {
                         scan++;
                     }
-                    // Check for closing } followed by redirection operator
+                    /// Check for closing } followed by redirection operator
                     if (scan < tokenizer->input_length &&
                         tokenizer->input[scan] == '}') {
                         size_t after_brace = scan + 1;
                         if (after_brace < tokenizer->input_length) {
                             char next_ch = tokenizer->input[after_brace];
-                            // Must be followed by > or < for fd allocation
+                            /// Must be followed by > or < for fd allocation
                             if (next_ch == '>' || next_ch == '<') {
-                                // This is {varname}> or {varname}< fd
-                                // allocation Include the entire pattern with
-                                // redirection op
+                                /// This is {varname}> or {varname}< fd
+                                /// allocation Include the entire pattern with
+                                /// redirection op
                                 size_t tok_end = after_brace + 1;
-                                // Check for >> or >& or <& variants
+                                /// Check for >> or >& or <& variants
                                 if (tok_end < tokenizer->input_length) {
                                     char op2 = tokenizer->input[tok_end];
                                     if (op2 == '>' || op2 == '&' ||
                                         op2 == '<') {
                                         tok_end++;
-                                        // Check for >&- pattern
+                                        /// Check for >&- pattern
                                         if (tok_end < tokenizer->input_length &&
                                             tokenizer->input[tok_end] == '-') {
                                             tok_end++;
@@ -1992,9 +1994,9 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     }
                 }
             }
-            // Check if this is brace expansion: {a,b,c} or {1..10}
-            // Or a literal brace word: {solo} or {}
-            // Command groups require whitespace after {: { cmd; }
+            /// Check if this is brace expansion: {a,b,c} or {1..10}
+            /// Or a literal brace word: {solo} or {}
+            /// Command groups require whitespace after {: { cmd; }
             if (shell_mode_allows(FEATURE_BRACE_EXPANSION)) {
                 size_t scan_pos = tokenizer->position + 1;
                 bool has_comma = false;
@@ -2003,12 +2005,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 bool has_whitespace_after_open = false;
                 int brace_depth = 1;
 
-                // Lookahead to find matching } and check for , or ..
+                /// Lookahead to find matching } and check for , or ..
                 while (scan_pos < tokenizer->input_length && brace_depth > 0) {
                     char sc = tokenizer->input[scan_pos];
 
-                    // If we hit whitespace/newline right after {, it's a
-                    // command group
+                    /// If we hit whitespace/newline right after {, it's a
+                    /// command group
                     if (scan_pos == tokenizer->position + 1 &&
                         (sc == ' ' || sc == '\t' || sc == '\n')) {
                         has_whitespace_after_open = true;
@@ -2029,23 +2031,23 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                tokenizer->input[scan_pos + 1] == '.' &&
                                brace_depth == 1) {
                         has_dotdot = true;
-                        scan_pos++; // skip second dot
+                        scan_pos++; /// skip second dot
                     }
                     scan_pos++;
                 }
 
-                // If no whitespace after { and we found matching }, treat as
-                // word This covers: {a,b,c}, {1..10}, {solo}, {} Note:
-                // has_comma/has_dotdot tracked for potential future validation
+                /// If no whitespace after { and we found matching }, treat as
+                /// word This covers: {a,b,c}, {1..10}, {solo}, {} Note:
+                /// has_comma/has_dotdot tracked for potential future validation
                 (void)has_comma;
                 (void)has_dotdot;
                 if (!has_whitespace_after_open && found_close) {
-                    // Also consume suffix: word characters AND additional brace
-                    // patterns This handles {a,b,c}_suffix and {1..2}{a..b}
-                    // Cartesian products
+                    /// Also consume suffix: word characters AND additional
+                    /// brace patterns This handles {a,b,c}_suffix and
+                    /// {1..2}{a..b} Cartesian products
                     while (scan_pos < tokenizer->input_length) {
                         char sc = tokenizer->input[scan_pos];
-                        // Check for word characters that can be part of suffix
+                        /// Check for word characters that can be part of suffix
                         if (isalnum((unsigned char)sc) ||
                             strchr("_.-/~:@*?+%!", sc) != NULL) {
                             scan_pos++;
@@ -2067,8 +2069,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                 scan_pos = tokenizer->input_length;
                             }
                         } else if (sc == '{') {
-                            // Another brace pattern - scan for its closing }
-                            // to support Cartesian products like {1..2}{a..b}
+                            /// Another brace pattern - scan for its closing }
+                            /// to support Cartesian products like {1..2}{a..b}
                             size_t brace_scan = scan_pos + 1;
                             int depth = 1;
                             bool valid_brace = false;
@@ -2086,9 +2088,9 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             }
                             if (valid_brace) {
                                 scan_pos =
-                                    brace_scan; // Include this brace group
+                                    brace_scan; /// Include this brace group
                             } else {
-                                break; // Malformed brace, stop
+                                break; /// Malformed brace, stop
                             }
                         } else {
                             break;
@@ -2105,7 +2107,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     return tok;
                 }
             }
-            // Not a brace expansion - return as command group brace
+            /// Not a brace expansion - return as command group brace
             tokenizer->position++;
             tokenizer->column++;
             return token_new(TOK_LBRACE, "{", 1, start_line, start_column,
@@ -2118,7 +2120,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                              start_pos);
 
         case '[':
-            // Check for [[ extended test
+            /// Check for [[ extended test
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == '[' &&
                 shell_mode_allows(FEATURE_EXTENDED_TEST)) {
@@ -2133,7 +2135,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                              start_pos);
 
         case ']':
-            // Check for ]] extended test end
+            /// Check for ]] extended test end
             if (tokenizer->position + 1 < tokenizer->input_length &&
                 tokenizer->input[tokenizer->position + 1] == ']' &&
                 shell_mode_allows(FEATURE_EXTENDED_TEST)) {
@@ -2149,22 +2151,22 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         }
     }
 
-    // Handle numbered file descriptor redirections first
+    /// Handle numbered file descriptor redirections first
     if (isdigit(c)) {
         size_t num_start = tokenizer->position;
-        // Read the number
+        /// Read the number
         while (tokenizer->position < tokenizer->input_length &&
                isdigit(tokenizer->input[tokenizer->position])) {
             tokenizer->position++;
             tokenizer->column++;
         }
 
-        // Check if followed by >, >>, or >&
+        /// Check if followed by >, >>, or >&
         if (tokenizer->position < tokenizer->input_length) {
             if (tokenizer->input[tokenizer->position] == '>') {
                 if (tokenizer->position + 1 < tokenizer->input_length &&
                     tokenizer->input[tokenizer->position + 1] == '>') {
-                    // Handle N>> (append to file descriptor N)
+                    /// Handle N>> (append to file descriptor N)
                     tokenizer->position += 2;
                     tokenizer->column += 2;
                     size_t length = tokenizer->position - num_start;
@@ -2173,26 +2175,26 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                      start_line, start_column, start_pos);
                 } else if (tokenizer->position + 1 < tokenizer->input_length &&
                            tokenizer->input[tokenizer->position + 1] == '&') {
-                    // Check for N>&M, N>&-, or N>&$VAR patterns
+                    /// Check for N>&M, N>&-, or N>&$VAR patterns
                     if (tokenizer->position + 2 < tokenizer->input_length) {
                         char fd_char =
                             tokenizer->input[tokenizer->position + 2];
                         if (isdigit(fd_char) || fd_char == '-') {
-                            tokenizer->position += 3; // Skip >&M or >&-
+                            tokenizer->position += 3; /// Skip >&M or >&-
                             tokenizer->column += 3;
                             size_t length = tokenizer->position - num_start;
                             return token_new(
                                 TOK_REDIRECT_FD, &tokenizer->input[num_start],
                                 length, start_line, start_column, start_pos);
                         }
-                        // Handle N>&$VAR or N>&${VAR} patterns
+                        /// Handle N>&$VAR or N>&${VAR} patterns
                         if (fd_char == '$') {
                             size_t fd_pos =
-                                tokenizer->position + 3; // After >&$
-                            // Handle ${...} brace form
+                                tokenizer->position + 3; /// After >&$
+                            /// Handle ${...} brace form
                             if (fd_pos < tokenizer->input_length &&
                                 tokenizer->input[fd_pos] == '{') {
-                                fd_pos++; // Skip {
+                                fd_pos++; /// Skip {
                                 int brace_depth = 1;
                                 while (fd_pos < tokenizer->input_length &&
                                        brace_depth > 0) {
@@ -2203,8 +2205,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                     fd_pos++;
                                 }
                             } else {
-                                // Simple $VAR form - scan
-                                // alphanumeric/underscore
+                                /// Simple $VAR form - scan
+                                /// alphanumeric/underscore
                                 while (fd_pos < tokenizer->input_length &&
                                        (isalnum(tokenizer->input[fd_pos]) ||
                                         tokenizer->input[fd_pos] == '_')) {
@@ -2220,7 +2222,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         }
                     }
                 } else {
-                    // Handle N> (redirect file descriptor N)
+                    /// Handle N> (redirect file descriptor N)
                     tokenizer->position++;
                     tokenizer->column++;
                     size_t length = tokenizer->position - num_start;
@@ -2229,30 +2231,30 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                      start_line, start_column, start_pos);
                 }
             } else if (tokenizer->input[tokenizer->position] == '<') {
-                // Check for N<& patterns first
+                /// Check for N<& patterns first
                 if (tokenizer->position + 1 < tokenizer->input_length &&
                     tokenizer->input[tokenizer->position + 1] == '&') {
-                    // Handle N<&M, N<&-, or N<&$VAR patterns (input fd
-                    // duplication)
+                    /// Handle N<&M, N<&-, or N<&$VAR patterns (input fd
+                    /// duplication)
                     if (tokenizer->position + 2 < tokenizer->input_length) {
                         char fd_char =
                             tokenizer->input[tokenizer->position + 2];
                         if (isdigit(fd_char) || fd_char == '-') {
-                            tokenizer->position += 3; // Skip <&M or <&-
+                            tokenizer->position += 3; /// Skip <&M or <&-
                             tokenizer->column += 3;
                             size_t length = tokenizer->position - num_start;
                             return token_new(
                                 TOK_REDIRECT_FD, &tokenizer->input[num_start],
                                 length, start_line, start_column, start_pos);
                         }
-                        // Handle N<&$VAR or N<&${VAR} patterns
+                        /// Handle N<&$VAR or N<&${VAR} patterns
                         if (fd_char == '$') {
                             size_t fd_pos =
-                                tokenizer->position + 3; // After <&$
-                            // Handle ${...} brace form
+                                tokenizer->position + 3; /// After <&$
+                            /// Handle ${...} brace form
                             if (fd_pos < tokenizer->input_length &&
                                 tokenizer->input[fd_pos] == '{') {
-                                fd_pos++; // Skip {
+                                fd_pos++; /// Skip {
                                 int brace_depth = 1;
                                 while (fd_pos < tokenizer->input_length &&
                                        brace_depth > 0) {
@@ -2263,8 +2265,8 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                     fd_pos++;
                                 }
                             } else {
-                                // Simple $VAR form - scan
-                                // alphanumeric/underscore
+                                /// Simple $VAR form - scan
+                                /// alphanumeric/underscore
                                 while (fd_pos < tokenizer->input_length &&
                                        (isalnum(tokenizer->input[fd_pos]) ||
                                         tokenizer->input[fd_pos] == '_')) {
@@ -2280,7 +2282,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                         }
                     }
                 } else {
-                    // Handle N< (redirect input to file descriptor N)
+                    /// Handle N< (redirect input to file descriptor N)
                     tokenizer->position++;
                     tokenizer->column++;
                     size_t length = tokenizer->position - num_start;
@@ -2291,15 +2293,15 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             }
         }
 
-        // Not a redirection, reset position and treat as regular number
+        /// Not a redirection, reset position and treat as regular number
         tokenizer->position = num_start;
         tokenizer->column = start_column;
     }
 
-    // Typed-function return-kind arrow '->'. Match only when '-' and
-    // '>' are adjacent (no whitespace); the design specifies adjacent
-    // recognition so '-' followed by ' >' (with space) parses as a
-    // word '-' followed by the redirection operator, unchanged.
+    /// Typed-function return-kind arrow '->'. Match only when '-' and
+    /// '>' are adjacent (no whitespace); the design specifies adjacent
+    /// recognition so '-' followed by ' >' (with space) parses as a
+    /// word '-' followed by the redirection operator, unchanged.
     if (c == '-' && tokenizer->position + 1 < tokenizer->input_length &&
         tokenizer->input[tokenizer->position + 1] == '>') {
         tokenizer->position += 2;
@@ -2325,7 +2327,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             size_t sigil_start = tokenizer->position;
             size_t sigil_line = tokenizer->line;
             size_t sigil_col = tokenizer->column;
-            tokenizer->position += 2; // consume sigil + first name char
+            tokenizer->position += 2; /// consume sigil + first name char
             tokenizer->column += 2;
             while (tokenizer->position < tokenizer->input_length) {
                 unsigned char ch =
@@ -2343,26 +2345,26 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         }
     }
 
-    // Handle words and numbers (UTF-8 aware)
-    // First, try to decode the current character as UTF-8
+    /// Handle words and numbers (UTF-8 aware)
+    /// First, try to decode the current character as UTF-8
     uint32_t codepoint;
     int char_len = lle_utf8_decode_codepoint(
         &tokenizer->input[tokenizer->position],
         tokenizer->input_length - tokenizer->position, &codepoint);
 
-    // Check if this could be the start of a word
-    // (either ASCII word char or non-ASCII UTF-8)
-    // Also handle backslash-escaped characters as word starters
+    /// Check if this could be the start of a word
+    /// (either ASCII word char or non-ASCII UTF-8)
+    /// Also handle backslash-escaped characters as word starters
     bool could_be_word = false;
     if (char_len > 0) {
         could_be_word = is_word_codepoint(codepoint);
-        // Backslash followed by another char starts a word (escape sequence)
+        /// Backslash followed by another char starts a word (escape sequence)
         if (!could_be_word && codepoint == '\\' &&
             tokenizer->position + 1 < tokenizer->input_length) {
             could_be_word = true;
         }
     } else if (isalnum(c) || is_word_char(c)) {
-        // Fallback for byte-level check (ASCII)
+        /// Fallback for byte-level check (ASCII)
         could_be_word = true;
     }
 
@@ -2370,86 +2372,87 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
         size_t start = tokenizer->position;
         bool is_numeric = (char_len == 1 && isdigit(c));
 
-        // Scan word character by character (UTF-8 aware)
+        /// Scan word character by character (UTF-8 aware)
         while (tokenizer->position < tokenizer->input_length) {
-            // Try to decode UTF-8 codepoint at current position
+            /// Try to decode UTF-8 codepoint at current position
             uint32_t curr_codepoint;
             int curr_char_len = lle_utf8_decode_codepoint(
                 &tokenizer->input[tokenizer->position],
                 tokenizer->input_length - tokenizer->position, &curr_codepoint);
 
             if (curr_char_len > 0) {
-                // Valid UTF-8 character - check if it's a word character
+                /// Valid UTF-8 character - check if it's a word character
                 if (is_word_codepoint(curr_codepoint)) {
-                    // Special case: stop at ] ONLY inside array literals
-                    // For arr[n]=value, we want arr[n] as ONE token (element
-                    // assignment) For [idx]=value inside =(...), we want idx as
-                    // separate token The key distinction: if word started right
-                    // after [, break at ] Otherwise, keep ] as part of the word
+                    /// Special case: stop at ] ONLY inside array literals
+                    /// For arr[n]=value, we want arr[n] as ONE token (element
+                    /// assignment) For [idx]=value inside =(...), we want idx
+                    /// as separate token The key distinction: if word started
+                    /// right after [, break at ] Otherwise, keep ] as part of
+                    /// the word
                     if (curr_codepoint == ']' &&
                         shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
-                        // Only break if we started immediately after a [
-                        // (i.e., we're inside an array literal parsing
-                        // [idx]=value)
+                        /// Only break if we started immediately after a [
+                        /// (i.e., we're inside an array literal parsing
+                        /// [idx]=value)
                         if (start > 0 && tokenizer->input[start - 1] == '[') {
-                            // Don't consume ], let it be tokenized separately
+                            /// Don't consume ], let it be tokenized separately
                             break;
                         }
-                        // Otherwise, include ] in word (for arr[n]=value
-                        // syntax)
+                        /// Otherwise, include ] in word (for arr[n]=value
+                        /// syntax)
                     }
 
-                    // Special case: stop at + if followed by = (for +=
-                    // operator) This allows arr+=(c d) to be parsed as arr
-                    // followed by +=
+                    /// Special case: stop at + if followed by = (for +=
+                    /// operator) This allows arr+=(c d) to be parsed as arr
+                    /// followed by +=
                     if (curr_codepoint == '+' &&
                         shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
                         size_t next_pos = tokenizer->position + 1;
                         if (next_pos < tokenizer->input_length &&
                             tokenizer->input[next_pos] == '=') {
-                            // Stop here, don't include the +
+                            /// Stop here, don't include the +
                             break;
                         }
                     }
 
-                    // Check if still numeric (only single-byte ASCII digits
-                    // count)
+                    /// Check if still numeric (only single-byte ASCII digits
+                    /// count)
                     if (curr_char_len > 1 ||
                         !isdigit(tokenizer->input[tokenizer->position])) {
                         is_numeric = false;
                     }
 
-                    // Advance by the UTF-8 character length
+                    /// Advance by the UTF-8 character length
                     tokenizer->position += curr_char_len;
-                    tokenizer->column++; // One visual column per character
+                    tokenizer->column++; /// One visual column per character
                 } else if (curr_codepoint == '\\' &&
                            tokenizer->position + 1 < tokenizer->input_length) {
-                    // Backslash escape in word context
-                    // Include backslash + next character as part of word
-                    tokenizer->position++; // Skip backslash
+                    /// Backslash escape in word context
+                    /// Include backslash + next character as part of word
+                    tokenizer->position++; /// Skip backslash
                     tokenizer->column++;
 
                     char next = tokenizer->input[tokenizer->position];
                     if (next == '\n') {
-                        // Line continuation - skip the newline and continue
+                        /// Line continuation - skip the newline and continue
                         tokenizer->line++;
                         tokenizer->column = 1;
                         tokenizer->position++;
                     } else {
-                        // Include escaped character in word
+                        /// Include escaped character in word
                         tokenizer->position++;
                         tokenizer->column++;
                     }
                     is_numeric = false;
-                    continue; // Keep scanning for more word characters
+                    continue; /// Keep scanning for more word characters
                 } else if (curr_codepoint == '(' &&
                            tokenizer->position > start) {
                     char prev = tokenizer->input[tokenizer->position - 1];
 
-                    // Check for array literal: var=(...)
+                    /// Check for array literal: var=(...)
                     if (prev == '=' &&
                         shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
-                        // Scan to find matching closing paren
+                        /// Scan to find matching closing paren
                         size_t scan_pos = tokenizer->position + 1;
                         int paren_depth = 1;
                         bool found_close = false;
@@ -2466,27 +2469,27 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                 }
                             } else if (sc == '\\' &&
                                        scan_pos + 1 < tokenizer->input_length) {
-                                scan_pos++; // Skip escaped char
+                                scan_pos++; /// Skip escaped char
                             }
                             scan_pos++;
                         }
 
                         if (found_close) {
-                            // Include the array literal in the word
+                            /// Include the array literal in the word
                             is_numeric = false;
                             size_t old_pos = tokenizer->position;
                             tokenizer->position = scan_pos;
                             tokenizer->column += (scan_pos - old_pos);
-                            // Continue scanning for more word chars
+                            /// Continue scanning for more word chars
                             continue;
                         }
                     }
-                    // Check for extglob pattern: @(...), ?(...), *(...),
-                    // +(...), !(...)
+                    /// Check for extglob pattern: @(...), ?(...), *(...),
+                    /// +(...), !(...)
                     else if (shell_mode_allows(FEATURE_EXTENDED_GLOB) &&
                              (prev == '@' || prev == '?' || prev == '*' ||
                               prev == '+' || prev == '!')) {
-                        // Scan to find matching closing paren
+                        /// Scan to find matching closing paren
                         size_t scan_pos = tokenizer->position + 1;
                         int paren_depth = 1;
                         bool found_close = false;
@@ -2503,18 +2506,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                 }
                             } else if (sc == '\\' &&
                                        scan_pos + 1 < tokenizer->input_length) {
-                                scan_pos++; // Skip escaped char
+                                scan_pos++; /// Skip escaped char
                             }
                             scan_pos++;
                         }
 
                         if (found_close) {
-                            // Include the extglob pattern in the word
+                            /// Include the extglob pattern in the word
                             is_numeric = false;
                             size_t old_pos = tokenizer->position;
                             tokenizer->position = scan_pos;
                             tokenizer->column += (scan_pos - old_pos);
-                            // Continue scanning for more word chars
+                            /// Continue scanning for more word chars
                             continue;
                         }
                     }
@@ -2563,65 +2566,65 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             }
                         }
                     }
-                    // Not an extglob pattern or array literal - end the word
-                    // here
+                    /// Not an extglob pattern or array literal - end the word
+                    /// here
                     break;
                 } else if (curr_codepoint == '$') {
-                    // Check for ANSI-C quoting $'...' first - include as part
-                    // of word
+                    /// Check for ANSI-C quoting $'...' first - include as part
+                    /// of word
                     if (tokenizer->position + 1 < tokenizer->input_length &&
                         tokenizer->input[tokenizer->position + 1] == '\'') {
-                        // Scan forward to find closing quote
+                        /// Scan forward to find closing quote
                         size_t scan_pos = tokenizer->position + 2;
                         while (scan_pos < tokenizer->input_length) {
                             char sc = tokenizer->input[scan_pos];
                             if (sc == '\'') {
-                                // Found closing quote - include $'...' in word
+                                /// Found closing quote - include $'...' in word
                                 scan_pos++;
                                 is_numeric = false;
                                 size_t old_pos = tokenizer->position;
                                 tokenizer->position = scan_pos;
                                 tokenizer->column += (scan_pos - old_pos);
-                                continue; // Continue scanning word
+                                continue; /// Continue scanning word
                             } else if (sc == '\\' &&
                                        scan_pos + 1 < tokenizer->input_length) {
-                                scan_pos += 2; // Skip escaped char
+                                scan_pos += 2; /// Skip escaped char
                             } else {
                                 scan_pos++;
                             }
                         }
-                        // Unterminated ANSI-C quote - fall through to break
+                        /// Unterminated ANSI-C quote - fall through to break
                     }
 
-                    // Check if we're inside brackets (array subscript like
-                    // arr[$i])
+                    /// Check if we're inside brackets (array subscript like
+                    /// arr[$i])
                     if (!shell_mode_allows(FEATURE_INDEXED_ARRAYS)) {
-                        // No array support - end word here
+                        /// No array support - end word here
                         break;
                     }
-                    // Scan backwards to see if there's an unmatched '['
+                    /// Scan backwards to see if there's an unmatched '['
                     bool in_brackets = false;
                     for (size_t i = tokenizer->position; i > start; i--) {
                         if (tokenizer->input[i - 1] == '[') {
                             in_brackets = true;
                             break;
                         } else if (tokenizer->input[i - 1] == ']') {
-                            break; // Found a closing bracket first, not in
-                                   // brackets
+                            break; /// Found a closing bracket first, not in
+                                   /// brackets
                         }
                     }
 
                     if (in_brackets) {
-                        // Scan forward to find the closing bracket, including
-                        // the $ variable
+                        /// Scan forward to find the closing bracket, including
+                        /// the $ variable
                         size_t scan_pos = tokenizer->position + 1;
 
-                        // Skip past the variable name after $
-                        // Handle ${...}, $(...), $((...)), or simple $var
+                        /// Skip past the variable name after $
+                        /// Handle ${...}, $(...), $((...)), or simple $var
                         if (scan_pos < tokenizer->input_length) {
                             char nc = tokenizer->input[scan_pos];
                             if (nc == '{') {
-                                // ${...} - find matching }
+                                /// ${...} - find matching }
                                 int brace_depth = 1;
                                 scan_pos++;
                                 while (scan_pos < tokenizer->input_length &&
@@ -2633,7 +2636,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                     scan_pos++;
                                 }
                             } else if (nc == '(') {
-                                // $(...) or $((...)) - find matching )
+                                /// $(...) or $((...)) - find matching )
                                 int paren_depth = 1;
                                 scan_pos++;
                                 while (scan_pos < tokenizer->input_length &&
@@ -2647,12 +2650,12 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             } else if (isalnum(nc) || nc == '_' || nc == '?' ||
                                        nc == '$' || nc == '!' || nc == '@' ||
                                        nc == '*' || nc == '#') {
-                                // Simple variable $var or special $?, $$, etc.
+                                /// Simple variable $var or special $?, $$, etc.
                                 if (nc == '?' || nc == '$' || nc == '!' ||
                                     nc == '@' || nc == '*' || nc == '#') {
-                                    scan_pos++; // Single char special var
+                                    scan_pos++; /// Single char special var
                                 } else {
-                                    // Regular var - scan alphanumeric and _
+                                    /// Regular var - scan alphanumeric and _
                                     while (
                                         scan_pos < tokenizer->input_length &&
                                         (isalnum(tokenizer->input[scan_pos]) ||
@@ -2663,26 +2666,26 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                             }
                         }
 
-                        // Now look for the closing ]
+                        /// Now look for the closing ]
                         if (scan_pos < tokenizer->input_length &&
                             tokenizer->input[scan_pos] == ']') {
-                            // Include everything up to and including ]
+                            /// Include everything up to and including ]
                             scan_pos++;
                             is_numeric = false;
                             size_t old_pos = tokenizer->position;
                             tokenizer->position = scan_pos;
                             tokenizer->column += (scan_pos - old_pos);
-                            // Stop here - don't continue scanning
-                            // This allows = or += to be tokenized separately
+                            /// Stop here - don't continue scanning
+                            /// This allows = or += to be tokenized separately
                             break;
                         }
                     }
-                    // Not in array subscript context - end word here
+                    /// Not in array subscript context - end word here
                     break;
                 } else if (curr_codepoint == '{' &&
                            shell_mode_allows(FEATURE_BRACE_EXPANSION)) {
-                    // Check if this is a brace expansion pattern embedded in a
-                    // word e.g., file{1..3}.txt or name{a,b,c}.log
+                    /// Check if this is a brace expansion pattern embedded in a
+                    /// word e.g., file{1..3}.txt or name{a,b,c}.log
                     size_t brace_start = tokenizer->position;
                     size_t scan_pos = brace_start + 1;
                     bool has_comma = false;
@@ -2694,7 +2697,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                            brace_depth > 0) {
                         char sc = tokenizer->input[scan_pos];
 
-                        // If whitespace right after {, not a brace expansion
+                        /// If whitespace right after {, not a brace expansion
                         if (scan_pos == brace_start + 1 &&
                             (sc == ' ' || sc == '\t' || sc == '\n')) {
                             break;
@@ -2714,35 +2717,35 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                    tokenizer->input[scan_pos + 1] == '.' &&
                                    brace_depth == 1) {
                             has_dotdot = true;
-                            scan_pos++; // skip second dot
+                            scan_pos++; /// skip second dot
                         }
                         scan_pos++;
                     }
 
                     if (found_close && (has_comma || has_dotdot)) {
-                        // Valid brace expansion - include it in the word
+                        /// Valid brace expansion - include it in the word
                         is_numeric = false;
                         size_t brace_len = scan_pos - brace_start;
                         tokenizer->position = scan_pos;
                         tokenizer->column += brace_len;
-                        // Continue scanning for suffix (e.g., .txt after })
+                        /// Continue scanning for suffix (e.g., .txt after })
                     } else {
-                        // Not a brace expansion - end the word here
+                        /// Not a brace expansion - end the word here
                         break;
                     }
                 } else {
-                    // Not a word character - end of word
+                    /// Not a word character - end of word
                     break;
                 }
             } else {
-                // Invalid UTF-8 sequence - treat as end of word
+                /// Invalid UTF-8 sequence - treat as end of word
                 break;
             }
         }
 
-        // Check for glob qualifier suffix: (.) (/) (@) (*) (r) (w)
-        // Only if FEATURE_GLOB_QUALIFIERS is enabled and word contains glob
-        // chars
+        /// Check for glob qualifier suffix: (.) (/) (@) (*) (r) (w)
+        /// Only if FEATURE_GLOB_QUALIFIERS is enabled and word contains glob
+        /// chars
         if (shell_mode_allows(FEATURE_GLOB_QUALIFIERS)) {
             size_t word_len = tokenizer->position - start;
             bool has_glob_char = false;
@@ -2762,7 +2765,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 if ((qual == '.' || qual == '/' || qual == '@' || qual == '*' ||
                      qual == 'r' || qual == 'w') &&
                     tokenizer->input[tokenizer->position + 2] == ')') {
-                    // Include the glob qualifier in the word token
+                    /// Include the glob qualifier in the word token
                     tokenizer->position += 3;
                     tokenizer->column += 3;
                 }
@@ -2779,7 +2782,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                          start_column, start_pos);
     }
 
-    // Unknown character - treat as error
+    /// Unknown character - treat as error
     tokenizer->position++;
     tokenizer->column++;
     return token_new(TOK_ERROR, &tokenizer->input[start_pos], 1, start_line,

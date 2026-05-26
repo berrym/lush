@@ -60,7 +60,7 @@ bool apply_mode_preset(shell_mode_t mode) {
      * it see the right value. */
     shell_opts.posix_mode = (mode == SHELL_MODE_POSIX);
 
-    // Persist the canonical mode label in the central registry.
+    /// Persist the canonical mode label in the central registry.
     config.shell_mode = (int)mode;
     if (config_registry_is_initialized()) {
         config_registry_set_string("shell.mode", shell_mode_name(mode));
@@ -84,14 +84,14 @@ bool apply_mode_preset(shell_mode_t mode) {
  * @param value The new boolean value
  */
 static void sync_shell_option_to_registry(const char *name, bool value) {
-    // Build the full key: shell.<name>
+    /// Build the full key: shell.<name>
     char key[CREG_KEY_MAX];
     snprintf(key, sizeof(key), "shell.%s", name);
 
-    // Update config system's shell option
+    /// Update config system's shell option
     config_set_shell_option(key, value);
 
-    // Update registry if initialized
+    /// Update registry if initialized
     if (config_registry_is_initialized()) {
         config_registry_set_boolean(key, value);
     }
@@ -104,7 +104,7 @@ static void sync_shell_option_to_registry(const char *name, bool value) {
  * shell initialization before command line parsing.
  */
 void init_posix_options(void) {
-    // Set default values
+    /// Set default values
     shell_opts.command_mode = false;
     shell_opts.command_string = NULL;
     shell_opts.stdin_mode = false;
@@ -116,7 +116,7 @@ void init_posix_options(void) {
     shell_opts.unset_error = false;
     shell_opts.verbose = false;
     shell_opts.no_globbing = false;
-    shell_opts.hash_commands = true; // Default enabled for performance
+    shell_opts.hash_commands = true; /// Default enabled for performance
     shell_opts.job_control = false;
     shell_opts.allexport = false;
     shell_opts.noclobber = false;
@@ -124,21 +124,21 @@ void init_posix_options(void) {
     shell_opts.notify = false;
     shell_opts.ignoreeof = false;
     shell_opts.nolog = false;
-    shell_opts.emacs_mode = true; // Default to emacs mode
-    shell_opts.vi_mode = false;   // Default to emacs mode, not vi
+    shell_opts.emacs_mode = true; /// Default to emacs mode
+    shell_opts.vi_mode = false;   /// Default to emacs mode, not vi
     shell_opts.posix_mode =
-        false; // Default to non-strict mode for compatibility
-    shell_opts.pipefail_mode = false; // Default to standard pipeline behavior
+        false; /// Default to non-strict mode for compatibility
+    shell_opts.pipefail_mode = false; /// Default to standard pipeline behavior
     shell_opts.pipeline_diagnostic_mode =
-        false;                         // Off by default in posix/bash;
-                                       // lush mode enables it
-    shell_opts.histexpand_mode = true; // Default to history expansion enabled
+        false;                         /// Off by default in posix/bash;
+                                       /// lush mode enables it
+    shell_opts.histexpand_mode = true; /// Default to history expansion enabled
     shell_opts.history_mode =
-        true; // Default to command history recording enabled
+        true; /// Default to command history recording enabled
     shell_opts.interactive_comments_mode =
-        true;                         // Default to interactive comments enabled
-    shell_opts.physical_mode = false; // Default to logical directory paths
-    shell_opts.privileged_mode = false; // Default to unrestricted mode
+        true; /// Default to interactive comments enabled
+    shell_opts.physical_mode = false;   /// Default to logical directory paths
+    shell_opts.privileged_mode = false; /// Default to unrestricted mode
 }
 
 /**
@@ -265,9 +265,9 @@ void print_command_trace(const char *command) {
  * Maps long option names to their flag pointers and short option characters.
  */
 typedef struct option_mapping {
-    const char *name; /**< Long option name (e.g., "errexit") */
-    bool *flag;       /**< Pointer to the option flag */
-    char short_opt;   /**< Short option character (e.g., 'e'), 0 if none */
+    const char *name; ///< Long option name (e.g., "errexit")
+    bool *flag;       ///< Pointer to the option flag
+    char short_opt;   ///< Short option character (e.g., 'e'), 0 if none
 } option_mapping_t;
 
 /** @brief Map of option names to flags */
@@ -340,23 +340,23 @@ bool shell_is_option_set(const char *name) {
     if (!name || !*name) {
         return false;
     }
-    // 1. interactive
+    /// 1. interactive
     if (strcasecmp(name, "interactive") == 0) {
         return is_interactive_shell();
     }
-    // 2. POSIX option_map (long names like errexit)
+    /// 2. POSIX option_map (long names like errexit)
     option_mapping_t *opt = find_option_by_name(name);
     if (opt) {
         return *(opt->flag);
     }
-    // 3. feature matrix names + short aliases
+    /// 3. feature matrix names + short aliases
     shell_feature_t feature;
     bool invert = false;
     if (shell_feature_parse(name, &feature, &invert)) {
         bool effective = shell_mode_allows(feature);
         return invert ? !effective : effective;
     }
-    // 4. noop-alias recorded state (default-true for any unset entry)
+    /// 4. noop-alias recorded state (default-true for any unset entry)
     if (shell_feature_is_noop_alias(name)) {
         return shell_feature_noop_alias_is_enabled(name);
     }
@@ -390,7 +390,7 @@ static void print_variable_quoted(const char *key, const char *value) {
         return;
     }
 
-    // Check if value needs quoting (contains special chars)
+    /// Check if value needs quoting (contains special chars)
     bool needs_quote = false;
     for (const char *p = value; *p; p++) {
         if (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\'' || *p == '"' ||
@@ -404,11 +404,11 @@ static void print_variable_quoted(const char *key, const char *value) {
     }
 
     if (needs_quote) {
-        // Use single quotes, escaping any single quotes in value
+        /// Use single quotes, escaping any single quotes in value
         printf("%s='", key);
         for (const char *p = value; *p; p++) {
             if (*p == '\'') {
-                printf("'\\''"); // End quote, escaped quote, start quote
+                printf("'\\''"); /// End quote, escaped quote, start quote
             } else {
                 putchar(*p);
             }
@@ -437,7 +437,7 @@ static void print_variable_callback(const char *key, const char *value,
         return;
     }
 
-    // Skip internal/special variables that start with double underscore
+    /// Skip internal/special variables that start with double underscore
     if (key[0] == '_' && key[1] == '_') {
         return;
     }
@@ -470,7 +470,7 @@ static void print_all_shell_variables(void) {
  * @return 0 on success, 1 on error
  */
 int builtin_set(char **args) {
-    // Privileged mode security check - block all set operations
+    /// Privileged mode security check - block all set operations
     if (shell_opts.privileged_mode && args[1]) {
         executor_error_report(current_executor, SHELL_ERR_PERMISSION_DENIED,
                               builtin_get_source_location(),
@@ -479,8 +479,8 @@ int builtin_set(char **args) {
     }
 
     if (!args[1]) {
-        // No arguments - display all shell variables (POSIX requirement)
-        // Variables are printed in format: NAME=VALUE (quoted if needed)
+        /// No arguments - display all shell variables (POSIX requirement)
+        /// Variables are printed in format: NAME=VALUE (quoted if needed)
         print_all_shell_variables();
         return 0;
     }
@@ -488,11 +488,11 @@ int builtin_set(char **args) {
     for (int i = 1; args[i]; i++) {
         char *arg = args[i];
 
-        // Handle -o and +o options
+        /// Handle -o and +o options
         if (strcmp(arg, "-o") == 0) {
             if (args[i + 1]) {
-                // Set named option
-                i++; // consume the option name
+                /// Set named option
+                i++; /// consume the option name
 
                 /* `set -o posix` is preserved as a recognized
                  * bash-bridge alias for `mode posix`: it's bash's
@@ -527,15 +527,15 @@ int builtin_set(char **args) {
                     if (opt) {
                         *(opt->flag) = true;
                         sync_shell_option_to_registry(opt->name, true);
-                        // Handle mutually exclusive editing modes
+                        /// Handle mutually exclusive editing modes
                         if (strcmp(args[i], "emacs") == 0) {
                             shell_opts.vi_mode =
-                                false; // Disable vi when enabling emacs
+                                false; /// Disable vi when enabling emacs
                             sync_shell_option_to_registry("vi", false);
                             lush_update_editing_mode();
                         } else if (strcmp(args[i], "vi") == 0) {
                             shell_opts.emacs_mode =
-                                false; // Disable emacs when enabling vi
+                                false; /// Disable emacs when enabling vi
                             sync_shell_option_to_registry("emacs", false);
                             lush_update_editing_mode();
                         }
@@ -548,22 +548,22 @@ int builtin_set(char **args) {
                     }
                 }
             } else {
-                // No argument - show all options including shell mode
+                /// No argument - show all options including shell mode
                 printf("Current shell options:\n");
                 for (int j = 0; option_map[j].name; j++) {
                     printf("set %co %s\n", *(option_map[j].flag) ? '-' : '+',
                            option_map[j].name);
                 }
-                // Also show current shell mode (use the `mode` builtin to
-                // change it; `set -o posix` is the bash-bridge alias).
+                /// Also show current shell mode (use the `mode` builtin to
+                /// change it; `set -o posix` is the bash-bridge alias).
                 printf("(shell mode: %s -- use `mode` builtin to change)\n",
                        shell_mode_name(shell_mode_get()));
                 return 0;
             }
         } else if (strcmp(arg, "+o") == 0) {
             if (args[i + 1]) {
-                // Unset named option
-                i++; // consume the option name
+                /// Unset named option
+                i++; /// consume the option name
 
                 /* `set +o posix` is the bash-bridge counterpart to
                  * `set -o posix`: it lifts the POSIX preset and
@@ -592,15 +592,15 @@ int builtin_set(char **args) {
                     if (opt) {
                         *(opt->flag) = false;
                         sync_shell_option_to_registry(opt->name, false);
-                        // Handle mutually exclusive editing modes
+                        /// Handle mutually exclusive editing modes
                         if (strcmp(args[i], "emacs") == 0) {
                             shell_opts.vi_mode =
-                                true; // Enable vi when disabling emacs
+                                true; /// Enable vi when disabling emacs
                             sync_shell_option_to_registry("vi", true);
                             lush_update_editing_mode();
                         } else if (strcmp(args[i], "vi") == 0) {
                             shell_opts.emacs_mode =
-                                true; // Enable emacs when disabling vi
+                                true; /// Enable emacs when disabling vi
                             sync_shell_option_to_registry("emacs", true);
                             lush_update_editing_mode();
                         }
@@ -613,31 +613,31 @@ int builtin_set(char **args) {
                     }
                 }
             } else {
-                // No argument - show all options in +o format (read-only
-                // operation, always allowed)
+                /// No argument - show all options in +o format (read-only
+                /// operation, always allowed)
                 printf("Current shell options:\n");
                 for (int j = 0; option_map[j].name; j++) {
                     printf("set %co %s\n", *(option_map[j].flag) ? '-' : '+',
                            option_map[j].name);
                 }
-                // Also show current shell mode (use the `mode` builtin to
-                // change it; `set -o posix` is the bash-bridge alias).
+                /// Also show current shell mode (use the `mode` builtin to
+                /// change it; `set -o posix` is the bash-bridge alias).
                 printf("(shell mode: %s -- use `mode` builtin to change)\n",
                        shell_mode_name(shell_mode_get()));
                 return 0;
             }
         } else if (strcmp(arg, "--") == 0) {
-            // Handle -- option: end of options, start of positional parameters
-            i++; // Move past the --
+            /// Handle -- option: end of options, start of positional parameters
+            i++; /// Move past the --
 
-            // Clear existing positional parameters $1, $2, etc.
+            /// Clear existing positional parameters $1, $2, etc.
             for (int param_num = 1; param_num <= 99; param_num++) {
                 char param_name[4];
                 snprintf(param_name, sizeof(param_name), "%d", param_num);
                 symtable_unset_global(param_name);
             }
 
-            // Count how many new parameters we have
+            /// Count how many new parameters we have
             int new_argc = 0;
             int temp_i = i;
             while (args[temp_i]) {
@@ -645,7 +645,7 @@ int builtin_set(char **args) {
                 temp_i++;
             }
 
-            // Free existing shell_argv if it was dynamically allocated
+            /// Free existing shell_argv if it was dynamically allocated
             if (shell_argv && shell_argv_is_dynamic) {
                 for (int j = 0; j < shell_argc; j++) {
                     free(shell_argv[j]);
@@ -653,40 +653,40 @@ int builtin_set(char **args) {
                 free(shell_argv);
             }
 
-            // Allocate new shell_argv (include space for program name)
+            /// Allocate new shell_argv (include space for program name)
             shell_argc = new_argc + 1;
             shell_argv = malloc(shell_argc * sizeof(char *));
             if (shell_argv) {
-                // Set program name (shell_argv[0])
+                /// Set program name (shell_argv[0])
                 shell_argv[0] = strdup("lush");
 
-                // Set new positional parameters in both symbol table and global
-                // arrays
+                /// Set new positional parameters in both symbol table and
+                /// global arrays
                 int param_num = 1;
                 while (args[i] && param_num <= 99) {
                     char param_name[4];
                     snprintf(param_name, sizeof(param_name), "%d", param_num);
                     symtable_set_global(param_name, args[i]);
 
-                    // Also update global shell_argv
+                    /// Also update global shell_argv
                     shell_argv[param_num] = strdup(args[i]);
 
                     i++;
                     param_num++;
                 }
 
-                // Mark shell_argv as dynamically allocated
+                /// Mark shell_argv as dynamically allocated
                 shell_argv_is_dynamic = true;
             }
 
-            // Update $# (number of positional parameters)
+            /// Update $# (number of positional parameters)
             char argc_str[16];
             snprintf(argc_str, sizeof(argc_str), "%d", new_argc);
             symtable_set_global("#", argc_str);
 
-            break; // Process no more arguments after --
+            break; /// Process no more arguments after --
         } else if (arg[0] == '-' && arg[1] != '-') {
-            // Handle short options like -e, -x, etc.
+            /// Handle short options like -e, -x, etc.
             for (int j = 1; arg[j]; j++) {
                 option_mapping_t *opt = find_option_by_short(arg[j]);
                 if (opt) {
@@ -701,7 +701,7 @@ int builtin_set(char **args) {
                 }
             }
         } else if (arg[0] == '+' && arg[1] != '+') {
-            // Handle short options like +e, +x, etc.
+            /// Handle short options like +e, +x, etc.
             for (int j = 1; arg[j]; j++) {
                 option_mapping_t *opt = find_option_by_short(arg[j]);
                 if (opt) {
@@ -716,7 +716,7 @@ int builtin_set(char **args) {
                 }
             }
         } else {
-            // Regular positional parameters without -- prefix
+            /// Regular positional parameters without -- prefix
             executor_error_report(current_executor, SHELL_ERR_INVALID_OPTION,
                                   builtin_get_source_location(),
                                   "invalid option: %s", arg);

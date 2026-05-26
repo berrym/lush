@@ -59,7 +59,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-// LLE is the sole line editor - stub definitions for display compatibility
+/// LLE is the sole line editor - stub definitions for display compatibility
 static char *rl_line_buffer = NULL;
 static int rl_end = 0;
 static int rl_point = 0;
@@ -75,18 +75,18 @@ static inline int rl_on_new_line(void) { return 0; }
  * no readline fallback is needed.
  */
 static void do_clear_screen(void) {
-    // ESC[2J clears entire screen, ESC[H moves cursor to home position
+    /// ESC[2J clears entire screen, ESC[H moves cursor to home position
     const char *clear_seq = "\033[2J\033[H";
     if (write(STDOUT_FILENO, clear_seq, strlen(clear_seq)) < 0) {
-        // Ignore write errors - terminal may be in unusual state
+        /// Ignore write errors - terminal may be in unusual state
     }
 }
 
-// ============================================================================
-// FORWARD DECLARATIONS
-// ============================================================================
+/// ============================================================================
+/// FORWARD DECLARATIONS
+/// ============================================================================
 
-// Shell display functions that we're replacing
+/// Shell display functions that we're replacing
 void lush_refresh_line(void);
 void lush_prompt_update(void);
 void lush_clear_screen(void);
@@ -111,7 +111,7 @@ static char *display_generate_prompt(void) {
             return lush_pool_strdup(output.ps1);
         }
     }
-    // Fallback
+    /// Fallback
     return lush_pool_strdup((getuid() > 0) ? "$ " : "# ");
 }
 
@@ -160,7 +160,7 @@ static symbol_compatibility_t get_symbol_mode(void) {
         const lle_theme_t *theme = lle_theme_registry_get_active(
             g_lle_integration->prompt_composer->themes);
         if (theme) {
-            // Map LLE capabilities to symbol mode
+            /// Map LLE capabilities to symbol mode
             if (theme->capabilities & LLE_THEME_CAP_NERD_FONT) {
                 return SYMBOL_MODE_NERD_FONT;
             } else if (theme->capabilities & LLE_THEME_CAP_UNICODE) {
@@ -171,24 +171,24 @@ static symbol_compatibility_t get_symbol_mode(void) {
     return SYMBOL_MODE_ASCII;
 }
 
-// ============================================================================
-// GLOBAL STATE AND CONFIGURATION
-// ============================================================================
+/// ============================================================================
+/// GLOBAL STATE AND CONFIGURATION
+/// ============================================================================
 
-// Display integration state
+/// Display integration state
 static display_controller_t *global_display_controller = NULL;
 static bool layered_display_enabled = false;
 static bool integration_initialized = false;
 static display_integration_config_t current_config = {0};
 
-// Autosuggestions layer integration
+/// Autosuggestions layer integration
 static autosuggestions_layer_t *global_autosuggestions_layer = NULL;
 static bool autosuggestions_layer_initialized = false;
 
-// Performance tracking
+/// Performance tracking
 static display_integration_stats_t integration_stats = {0};
 
-// Layer-specific performance tracking
+/// Layer-specific performance tracking
 static struct {
     uint64_t display_controller_hits;
     uint64_t display_controller_misses;
@@ -202,13 +202,13 @@ static struct {
     uint64_t prompt_layer_misses;
 } layer_cache_stats = {0};
 
-// Buffer for display output (reserved for future batch output optimization)
+/// Buffer for display output (reserved for future batch output optimization)
 MAYBE_UNUSED
 static char display_output_buffer[DISPLAY_INTEGRATION_MAX_OUTPUT_SIZE];
 
-// ============================================================================
-// INITIALIZATION AND CLEANUP
-// ============================================================================
+/// ============================================================================
+/// INITIALIZATION AND CLEANUP
+/// ============================================================================
 
 /**
  * Initialize the display integration system.
@@ -219,18 +219,18 @@ static char display_output_buffer[DISPLAY_INTEGRATION_MAX_OUTPUT_SIZE];
  */
 bool display_integration_init(const display_integration_config_t *init_config) {
     if (integration_initialized) {
-        return true; // Already initialized
+        return true; /// Already initialized
     }
 
-    // Copy configuration
+    /// Copy configuration
     if (init_config) {
         current_config = *init_config;
     } else {
-        // Use default configuration with layered display (always enabled)
+        /// Use default configuration with layered display (always enabled)
         display_integration_create_default_config(&current_config);
     }
 
-    // Create display controller (layered display is exclusive system)
+    /// Create display controller (layered display is exclusive system)
     {
         global_display_controller = display_controller_create();
         if (!global_display_controller) {
@@ -240,12 +240,12 @@ bool display_integration_init(const display_integration_config_t *init_config) {
             return false;
         }
 
-        // Initialize display controller with shell configuration
-        // Create default configuration for display controller
+        /// Initialize display controller with shell configuration
+        /// Create default configuration for display controller
         display_controller_config_t controller_config;
         display_controller_create_default_config(&controller_config);
 
-        // Create layer event system for controller
+        /// Create layer event system for controller
         layer_event_system_t *event_system = layer_events_create(NULL);
         if (!event_system) {
             shell_error_t *err = shell_error_create(
@@ -265,8 +265,8 @@ bool display_integration_init(const display_integration_config_t *init_config) {
             return false;
         }
 
-        // Initialize the event system (critical - required for subscriptions to
-        // work)
+        /// Initialize the event system (critical - required for subscriptions
+        /// to work)
         layer_events_error_t event_init_error = layer_events_init(event_system);
         if (event_init_error != LAYER_EVENTS_SUCCESS) {
             fprintf(
@@ -301,7 +301,7 @@ bool display_integration_init(const display_integration_config_t *init_config) {
             return false;
         }
 
-        // Prepare for shell integration
+        /// Prepare for shell integration
         error = display_controller_prepare_shell_integration(
             global_display_controller, &current_config);
         if (error != DISPLAY_CONTROLLER_SUCCESS) {
@@ -324,7 +324,7 @@ bool display_integration_init(const display_integration_config_t *init_config) {
             return false;
         }
 
-        // Sync command layer syntax highlighting with shell config
+        /// Sync command layer syntax highlighting with shell config
         if (global_display_controller->compositor &&
             global_display_controller->compositor->command_layer) {
             command_layer_set_syntax_enabled(
@@ -332,7 +332,7 @@ bool display_integration_init(const display_integration_config_t *init_config) {
                 config.display_syntax_highlighting);
         }
 
-        // Configure display controller
+        /// Configure display controller
         display_controller_config_t controller_config2;
         display_controller_create_default_config(&controller_config2);
         controller_config2.optimization_level =
@@ -373,15 +373,15 @@ bool display_integration_init(const display_integration_config_t *init_config) {
     integration_stats.layered_display_calls = 0;
     integration_stats.fallback_calls = 0;
 
-    // Initialize autosuggestions layer if layered display is enabled
-    // Always initialize professional autosuggestions for seamless user
-    // experience
+    /// Initialize autosuggestions layer if layered display is enabled
+    /// Always initialize professional autosuggestions for seamless user
+    /// experience
     if (!display_integration_init_autosuggestions()) {
         if (current_config.debug_mode) {
             fprintf(stderr, "display_integration: Warning - autosuggestions "
                             "layer initialization failed\n");
         }
-        // Don't fail the whole initialization - autosuggestions are optional
+        /// Don't fail the whole initialization - autosuggestions are optional
     }
 
     if (current_config.debug_mode) {
@@ -403,7 +403,7 @@ void display_integration_cleanup(void) {
         return;
     }
 
-    // Cleanup autosuggestions layer first
+    /// Cleanup autosuggestions layer first
     display_integration_cleanup_autosuggestions();
 
     if (global_display_controller) {
@@ -416,13 +416,13 @@ void display_integration_cleanup(void) {
     memset(&current_config, 0, sizeof(current_config));
     memset(&integration_stats, 0, sizeof(integration_stats));
 
-    // Note: current_config was zeroed above, so we can't check debug_mode here
-    // Debug output would need to be checked before memset() if needed
+    /// Note: current_config was zeroed above, so we can't check debug_mode here
+    /// Debug output would need to be checked before memset() if needed
 }
 
-// ============================================================================
-// CONFIGURATION MANAGEMENT
-// ============================================================================
+/// ============================================================================
+/// CONFIGURATION MANAGEMENT
+/// ============================================================================
 
 /**
  * Create default configuration for display integration.
@@ -435,8 +435,8 @@ void display_integration_create_default_config(
         return;
 
     memset(config, 0, sizeof(display_integration_config_t));
-    // v1.3.0: Layered display is now the exclusive system - no enable/disable
-    // needed
+    /// v1.3.0: Layered display is now the exclusive system - no enable/disable
+    /// needed
     config->enable_caching = true;
     config->enable_performance_monitoring = true;
     config->optimization_level = DISPLAY_OPTIMIZATION_STANDARD;
@@ -462,19 +462,19 @@ bool display_integration_set_config(
     display_integration_config_t old_config = current_config;
     current_config = *config;
 
-    // v1.3.0: Layered display is exclusive - configuration updates affect
-    // performance and caching settings only Display controller is always
-    // available, just update its configuration
+    /// v1.3.0: Layered display is exclusive - configuration updates affect
+    /// performance and caching settings only Display controller is always
+    /// available, just update its configuration
     if (global_display_controller) {
-        // Enable layered display
+        /// Enable layered display
         if (!global_display_controller) {
             global_display_controller = display_controller_create();
             if (global_display_controller) {
-                // Create default configuration for display controller
+                /// Create default configuration for display controller
                 display_controller_config_t controller_config;
                 display_controller_create_default_config(&controller_config);
 
-                // Create layer event system for controller
+                /// Create layer event system for controller
                 layer_event_system_t *event_system = layer_events_create(NULL);
                 if (!event_system) {
                     display_controller_destroy(global_display_controller);
@@ -483,8 +483,8 @@ bool display_integration_set_config(
                     return false;
                 }
 
-                // Initialize the event system (critical - required for
-                // subscriptions to work)
+                /// Initialize the event system (critical - required for
+                /// subscriptions to work)
                 layer_events_error_t event_init_error =
                     layer_events_init(event_system);
                 if (event_init_error != LAYER_EVENTS_SUCCESS) {
@@ -523,12 +523,12 @@ bool display_integration_set_config(
                 if (!layered_display_enabled) {
                     display_controller_destroy(global_display_controller);
                     global_display_controller = NULL;
-                    current_config = old_config; // Restore old config
+                    current_config = old_config; /// Restore old config
                     return false;
                 }
 
-                // Initialize autosuggestions layer now that layered display is
-                // enabled
+                /// Initialize autosuggestions layer now that layered display is
+                /// enabled
                 if (!display_integration_init_autosuggestions()) {
                     if (current_config.debug_mode) {
                         fprintf(
@@ -536,15 +536,15 @@ bool display_integration_set_config(
                             "display_integration: Warning - autosuggestions "
                             "layer initialization failed during enable\n");
                     }
-                    // Don't fail the whole operation - autosuggestions are
-                    // optional
+                    /// Don't fail the whole operation - autosuggestions are
+                    /// optional
                 }
             }
         }
-        // v1.3.0: No disable logic needed - layered display is exclusive
+        /// v1.3.0: No disable logic needed - layered display is exclusive
     }
 
-    // Update display controller configuration if active
+    /// Update display controller configuration if active
     if (layered_display_enabled && global_display_controller) {
         display_controller_config_t controller_config;
         display_controller_create_default_config(&controller_config);
@@ -589,9 +589,9 @@ bool display_integration_get_config(display_integration_config_t *config) {
     return true;
 }
 
-// ============================================================================
-// MAIN INTEGRATION FUNCTIONS (Shell Function Replacements)
-// ============================================================================
+/// ============================================================================
+/// MAIN INTEGRATION FUNCTIONS (Shell Function Replacements)
+/// ============================================================================
 
 /**
  * Integrated display function - replacement for lush_safe_redisplay().
@@ -601,9 +601,9 @@ bool display_integration_get_config(display_integration_config_t *config) {
 void display_integration_redisplay(void) {
     static volatile sig_atomic_t in_display_redisplay = 0;
 
-    // CRITICAL: Prevent infinite recursion - this was causing stack overflow
+    /// CRITICAL: Prevent infinite recursion - this was causing stack overflow
     if (in_display_redisplay) {
-        // Use safe fallback without any function pointers
+        /// Use safe fallback without any function pointers
         rl_redisplay();
         return;
     }
@@ -611,34 +611,34 @@ void display_integration_redisplay(void) {
     in_display_redisplay = 1;
     integration_stats.total_display_calls++;
 
-    // Enhanced Performance Monitoring: Start timing
+    /// Enhanced Performance Monitoring: Start timing
     struct timeval start_time, end_time;
     gettimeofday(&start_time, NULL);
 
-    // Use layered display controller when available
+    /// Use layered display controller when available
     if (integration_initialized && layered_display_enabled &&
         global_display_controller) {
         integration_stats.layered_display_calls++;
 
-        // Get current prompt and command for display controller
+        /// Get current prompt and command for display controller
         char *current_prompt = lush_generate_prompt();
         char *current_command = rl_line_buffer ? rl_line_buffer : "";
 
-        // Update theme context before display controller operations
+        /// Update theme context before display controller operations
         const char *theme_name = get_active_theme_name();
         symbol_compatibility_t symbol_mode = get_symbol_mode();
 
         display_controller_set_theme_context(global_display_controller,
                                              theme_name, symbol_mode);
 
-        // Use display controller for coordinated display
+        /// Use display controller for coordinated display
         char display_output[4096];
         display_controller_error_t result = display_controller_display(
             global_display_controller, current_prompt, current_command,
             display_output, sizeof(display_output));
 
         if (result == DISPLAY_CONTROLLER_SUCCESS) {
-            // Display controller succeeded - output result
+            /// Display controller succeeded - output result
             printf("%s", display_output);
             fflush(stdout);
             if (current_prompt)
@@ -647,37 +647,37 @@ void display_integration_redisplay(void) {
             return;
         }
 
-        // Clean up prompt
+        /// Clean up prompt
         if (current_prompt)
             lush_pool_free(current_prompt);
     }
 
-    // Fallback to standard display
+    /// Fallback to standard display
     integration_stats.fallback_calls++;
     log_fallback_event("redisplay", INTEGRATION_FALLBACK_CONTROLLER_NULL);
     rl_redisplay();
 
-    // Attempt sophisticated layered display operation
+    /// Attempt sophisticated layered display operation
     if (layered_display_enabled && global_display_controller) {
-        char output_buffer[4096]; // Buffer for full display output
+        char output_buffer[4096]; /// Buffer for full display output
         char *current_prompt = lush_generate_prompt();
 
-        // Update theme context before display controller operations
+        /// Update theme context before display controller operations
         const char *theme_name = get_active_theme_name();
         symbol_compatibility_t symbol_mode = get_symbol_mode();
 
         display_controller_set_theme_context(global_display_controller,
                                              theme_name, symbol_mode);
 
-        // Modern Syntax Highlighting
-        // Use command content during real-time typing, but not during prompt
-        // display This enables syntax highlighting while preventing stale
-        // command display
+        /// Modern Syntax Highlighting
+        /// Use command content during real-time typing, but not during prompt
+        /// display This enables syntax highlighting while preventing stale
+        /// command display
         bool is_real_time_input =
             (rl_line_buffer && rl_end > 0 && rl_point >= 0);
         char *current_command = is_real_time_input ? rl_line_buffer : "";
 
-        // Use display controller for sophisticated rendering
+        /// Use display controller for sophisticated rendering
         display_controller_error_t error = display_controller_display(
             global_display_controller, current_prompt, current_command,
             output_buffer, sizeof(output_buffer));
@@ -685,65 +685,65 @@ void display_integration_redisplay(void) {
         if (error == DISPLAY_CONTROLLER_SUCCESS) {
             integration_stats.layered_display_calls++;
 
-            // Modern Syntax Highlighting
-            // Always use layered display when system is enabled and output is
-            // available
+            /// Modern Syntax Highlighting
+            /// Always use layered display when system is enabled and output is
+            /// available
             if (output_buffer[0] != '\0') {
-                // Work with readline's natural flow for multiline content
-                // Instead of fighting readline's cursor management, work with
-                // it
+                /// Work with readline's natural flow for multiline content
+                /// Instead of fighting readline's cursor management, work with
+                /// it
                 rl_clear_visible_line();
 
-                // Check if this is a multiline prompt by looking for newlines
+                /// Check if this is a multiline prompt by looking for newlines
                 bool is_multiline = (strchr(output_buffer, '\n') != NULL);
 
                 if (is_multiline) {
-                    // For multiline prompts, use a more compatible approach
-                    // Print each line and let readline handle the final
-                    // positioning
+                    /// For multiline prompts, use a more compatible approach
+                    /// Print each line and let readline handle the final
+                    /// positioning
                     char *line_start = output_buffer;
                     char *line_end;
 
                     while ((line_end = strchr(line_start, '\n')) != NULL) {
-                        // Print this line
+                        /// Print this line
                         fwrite(line_start, 1, line_end - line_start, stdout);
                         printf("\n");
                         line_start = line_end + 1;
                     }
 
-                    // Print the final line (without newline)
+                    /// Print the final line (without newline)
                     if (*line_start) {
                         printf("%s", line_start);
                     }
                 } else {
-                    // Single line output - use standard approach
+                    /// Single line output - use standard approach
                     printf("%s", output_buffer);
                 }
 
                 fflush(stdout);
 
-                // Let readline know we're ready for input
+                /// Let readline know we're ready for input
                 rl_on_new_line();
 
-                // Note: current_prompt is managed by readline system, don't
-                // free here
+                /// Note: current_prompt is managed by readline system, don't
+                /// free here
                 in_display_redisplay = 0;
-                return; // Success - skip fallback
+                return; /// Success - skip fallback
             }
         } else {
-            // Layered display failed - log and fallback
+            /// Layered display failed - log and fallback
             integration_stats.fallback_calls++;
             log_controller_error("redisplay", error);
 
-            // Note: current_prompt is managed by readline system, don't free
-            // here
+            /// Note: current_prompt is managed by readline system, don't free
+            /// here
         }
     }
 
-    // Fallback to standard readline display
+    /// Fallback to standard readline display
     rl_redisplay();
 
-    // Enhanced Performance Monitoring: Record timing
+    /// Enhanced Performance Monitoring: Record timing
     gettimeofday(&end_time, NULL);
     uint64_t operation_time_ns =
         ((uint64_t)(end_time.tv_sec - start_time.tv_sec)) * 1000000000ULL +
@@ -760,7 +760,7 @@ void display_integration_redisplay(void) {
 void display_integration_prompt_update(void) {
     static volatile sig_atomic_t in_prompt_update = 0;
 
-    // Prevent infinite recursion
+    /// Prevent infinite recursion
     if (in_prompt_update) {
         return;
     }
@@ -768,50 +768,50 @@ void display_integration_prompt_update(void) {
     in_prompt_update = 1;
     integration_stats.total_display_calls++;
 
-    // Enhanced Performance Monitoring: Start timing
+    /// Enhanced Performance Monitoring: Start timing
     struct timeval start_time, end_time;
     gettimeofday(&start_time, NULL);
 
-    // Use layered display controller for prompt updates when available
+    /// Use layered display controller for prompt updates when available
     if (integration_initialized && layered_display_enabled &&
         global_display_controller) {
         integration_stats.layered_display_calls++;
 
-        // Get current prompt and command for display controller
+        /// Get current prompt and command for display controller
         char *current_prompt = lush_generate_prompt();
         char *current_command = rl_line_buffer ? rl_line_buffer : "";
 
-        // Update theme context before display controller operations
+        /// Update theme context before display controller operations
         const char *theme_name = get_active_theme_name();
         symbol_compatibility_t symbol_mode = get_symbol_mode();
 
         display_controller_set_theme_context(global_display_controller,
                                              theme_name, symbol_mode);
 
-        // Use display controller for coordinated prompt update
+        /// Use display controller for coordinated prompt update
         char display_output[4096];
         display_controller_error_t result = display_controller_display(
             global_display_controller, current_prompt, current_command,
             display_output, sizeof(display_output));
 
         if (result == DISPLAY_CONTROLLER_SUCCESS) {
-            // Display controller succeeded
+            /// Display controller succeeded
             if (current_prompt)
                 lush_pool_free(current_prompt);
             in_prompt_update = 0;
             return;
         }
 
-        // Clean up prompt
+        /// Clean up prompt
         if (current_prompt)
             lush_pool_free(current_prompt);
     }
 
-    // Fallback: call original functions safely
+    /// Fallback: call original functions safely
     lle_shell_update_prompt();
     lush_generate_prompt();
 
-    // Enhanced Performance Monitoring: Record timing
+    /// Enhanced Performance Monitoring: Record timing
     gettimeofday(&end_time, NULL);
     uint64_t operation_time_ns =
         ((uint64_t)(end_time.tv_sec - start_time.tv_sec)) * 1000000000ULL +
@@ -828,7 +828,7 @@ void display_integration_prompt_update(void) {
 void display_integration_clear_screen(void) {
     static volatile sig_atomic_t in_clear_screen = 0;
 
-    // Prevent recursion
+    /// Prevent recursion
     if (in_clear_screen) {
         do_clear_screen();
         return;
@@ -838,29 +838,29 @@ void display_integration_clear_screen(void) {
     integration_stats.total_display_calls++;
     integration_fallback_reason_t fallback_reason;
 
-    // Professional safety check - can we attempt layered display?
+    /// Professional safety check - can we attempt layered display?
     if (!safe_layered_display_attempt("clear_screen", &fallback_reason)) {
         integration_stats.fallback_calls++;
         log_fallback_event("clear_screen", fallback_reason);
 
-        // Graceful fallback to existing system
+        /// Graceful fallback to existing system
         do_clear_screen();
         in_clear_screen = 0;
         return;
     }
 
-    // Attempt layered display clear screen operation
+    /// Attempt layered display clear screen operation
     if (layered_display_enabled && global_display_controller) {
-        char output_buffer[1024]; // Buffer for clear screen sequence
+        char output_buffer[1024]; /// Buffer for clear screen sequence
 
-        // Use display controller for sophisticated clear screen
+        /// Use display controller for sophisticated clear screen
         display_controller_error_t error = display_controller_refresh(
             global_display_controller, output_buffer, sizeof(output_buffer));
 
         if (error == DISPLAY_CONTROLLER_SUCCESS) {
             integration_stats.layered_display_calls++;
 
-            // Use appropriate clear screen for current mode (LLE or readline)
+            /// Use appropriate clear screen for current mode (LLE or readline)
             do_clear_screen();
 
             if (current_config.debug_mode) {
@@ -871,13 +871,13 @@ void display_integration_clear_screen(void) {
             in_clear_screen = 0;
             return;
         } else {
-            // Clear screen failed - log and fallback
+            /// Clear screen failed - log and fallback
             integration_stats.fallback_calls++;
             log_controller_error("clear_screen", error);
         }
     }
 
-    // Fallback to existing system
+    /// Fallback to existing system
     do_clear_screen();
     in_clear_screen = 0;
 }
@@ -890,15 +890,15 @@ void display_integration_clear_screen(void) {
 void display_integration_post_command_update(const char *executed_command) {
     static volatile sig_atomic_t in_post_command_update = 0;
 
-    // Use standard debug mode configuration
+    /// Use standard debug mode configuration
     bool debug_enabled = current_config.debug_mode;
 
-    // Prevent recursion
+    /// Prevent recursion
     if (in_post_command_update) {
         return;
     }
 
-    // Only proceed if layered display is active
+    /// Only proceed if layered display is active
     if (!display_integration_is_layered_active()) {
         if (current_config.debug_mode) {
             fprintf(stderr, "display_integration: Post-command update skipped "
@@ -914,13 +914,13 @@ void display_integration_post_command_update(const char *executed_command) {
     in_post_command_update = 1;
     integration_stats.total_display_calls++;
 
-    // Enhanced Performance Monitoring: Start timing for post-command operation
+    /// Enhanced Performance Monitoring: Start timing for post-command operation
     struct timeval start_time, end_time;
     gettimeofday(&start_time, NULL);
 
     integration_fallback_reason_t fallback_reason;
 
-    // Professional safety check - can we attempt layered display?
+    /// Professional safety check - can we attempt layered display?
     if (!safe_layered_display_attempt("post_command_update",
                                       &fallback_reason)) {
         integration_stats.fallback_calls++;
@@ -929,24 +929,24 @@ void display_integration_post_command_update(const char *executed_command) {
         return;
     }
 
-    // Use layered display controller for post-command rendering
+    /// Use layered display controller for post-command rendering
     if (layered_display_enabled && global_display_controller) {
         integration_stats.layered_display_calls++;
 
-        // Get current prompt for post-command display
+        /// Get current prompt for post-command display
         char *current_prompt = lush_generate_prompt();
-        char *current_command = ""; // Post-command state has no active command
+        char *current_command = ""; /// Post-command state has no active command
 
-        // Update theme context before display controller operations
+        /// Update theme context before display controller operations
         const char *theme_name = get_active_theme_name();
         symbol_compatibility_t symbol_mode = get_symbol_mode();
 
         display_controller_set_theme_context(global_display_controller,
                                              theme_name, symbol_mode);
 
-        // Command Layer Cache Integration for Post-Command Analysis
-        // Analyze the executed command for caching without affecting readline
-        // display
+        /// Command Layer Cache Integration for Post-Command Analysis
+        /// Analyze the executed command for caching without affecting readline
+        /// display
         if (executed_command && strlen(executed_command) > 0) {
             if (debug_enabled) {
                 fprintf(stderr,
@@ -955,7 +955,7 @@ void display_integration_post_command_update(const char *executed_command) {
                         executed_command);
             }
 
-            // Create command layer for safe post-command analysis
+            /// Create command layer for safe post-command analysis
             command_layer_t *cmd_layer = command_layer_create();
             if (cmd_layer) {
                 if (debug_enabled) {
@@ -963,7 +963,7 @@ void display_integration_post_command_update(const char *executed_command) {
                                     "created successfully\n");
                 }
 
-                // Initialize command layer with event system first
+                /// Initialize command layer with event system first
                 layer_event_system_t *event_system =
                     display_controller_get_event_system(
                         global_display_controller);
@@ -971,7 +971,7 @@ void display_integration_post_command_update(const char *executed_command) {
                     command_layer_init(cmd_layer, event_system);
 
                 if (init_error == COMMAND_LAYER_SUCCESS) {
-                    // Enable caching for command analysis
+                    /// Enable caching for command analysis
                     command_syntax_config_t cmd_config;
                     command_layer_error_t config_error =
                         command_layer_create_default_config(&cmd_config);
@@ -982,8 +982,8 @@ void display_integration_post_command_update(const char *executed_command) {
                                                             &cmd_config);
 
                         if (set_config_error == COMMAND_LAYER_SUCCESS) {
-                            // Analyze command for cache optimization
-                            // (post-execution, safe)
+                            /// Analyze command for cache optimization
+                            /// (post-execution, safe)
                             command_layer_error_t set_cmd_error =
                                 command_layer_set_command(cmd_layer,
                                                           executed_command, 0);
@@ -996,8 +996,8 @@ void display_integration_post_command_update(const char *executed_command) {
                             }
 
                             if (set_cmd_error == COMMAND_LAYER_SUCCESS) {
-                                // Force a highlighting operation to trigger
-                                // cache operations
+                                /// Force a highlighting operation to trigger
+                                /// cache operations
                                 char highlighted_output[1024];
                                 command_layer_error_t highlight_error =
                                     command_layer_get_highlighted_text(
@@ -1030,7 +1030,7 @@ void display_integration_post_command_update(const char *executed_command) {
                             init_error);
                 }
 
-                // Clean up command layer
+                /// Clean up command layer
                 command_layer_destroy(cmd_layer);
 
                 if (debug_enabled) {
@@ -1046,15 +1046,15 @@ void display_integration_post_command_update(const char *executed_command) {
             }
         }
 
-        // Use display controller for post-command prompt rendering
+        /// Use display controller for post-command prompt rendering
         char display_output[4096];
         display_controller_error_t result = display_controller_display(
             global_display_controller, current_prompt ? current_prompt : "$ ",
             current_command, display_output, sizeof(display_output));
 
         if (result == DISPLAY_CONTROLLER_SUCCESS) {
-            // Track successful layered display operation
-            // Note: Cache hits are tracked by display controller internally
+            /// Track successful layered display operation
+            /// Note: Cache hits are tracked by display controller internally
 
             if (debug_enabled) {
                 fprintf(stderr,
@@ -1062,7 +1062,7 @@ void display_integration_post_command_update(const char *executed_command) {
                         "display controller returned SUCCESS\n");
             }
         } else {
-            // Display controller failed - track miss and continue
+            /// Display controller failed - track miss and continue
             integration_stats.layered_display_errors++;
             integration_stats.fallback_calls++;
             log_controller_error("post_command_update", result);
@@ -1073,13 +1073,13 @@ void display_integration_post_command_update(const char *executed_command) {
             }
         }
 
-        // Clean up prompt memory
+        /// Clean up prompt memory
         if (current_prompt) {
             lush_pool_free(current_prompt);
         }
     }
 
-    // Enhanced Performance Monitoring: Record timing
+    /// Enhanced Performance Monitoring: Record timing
     gettimeofday(&end_time, NULL);
     uint64_t operation_time_ns =
         ((uint64_t)(end_time.tv_sec - start_time.tv_sec)) * 1000000000ULL +
@@ -1089,9 +1089,9 @@ void display_integration_post_command_update(const char *executed_command) {
     in_post_command_update = 0;
 }
 
-// ============================================================================
-// PERFORMANCE MONITORING AND DIAGNOSTICS
-// ============================================================================
+/// ============================================================================
+/// PERFORMANCE MONITORING AND DIAGNOSTICS
+/// ============================================================================
 
 /**
  * Get display integration performance statistics.
@@ -1106,7 +1106,7 @@ bool display_integration_get_stats(display_integration_stats_t *stats) {
 
     *stats = integration_stats;
 
-    // Get additional performance data from display controller
+    /// Get additional performance data from display controller
     if (layered_display_enabled && global_display_controller) {
         display_controller_performance_t controller_perf;
         display_controller_error_t error = display_controller_get_performance(
@@ -1121,7 +1121,7 @@ bool display_integration_get_stats(display_integration_stats_t *stats) {
         }
     }
 
-    // Calculate health indicators
+    /// Calculate health indicators
     stats->performance_within_threshold =
         (stats->avg_layered_display_time_ns <
          (current_config.performance_threshold_ms * 1000000));
@@ -1129,8 +1129,8 @@ bool display_integration_get_stats(display_integration_stats_t *stats) {
     stats->cache_efficiency_good =
         (stats->cache_hit_rate >= current_config.cache_hit_rate_threshold);
 
-    // Memory usage acceptable if under 10MB (reasonable threshold for display
-    // system)
+    /// Memory usage acceptable if under 10MB (reasonable threshold for display
+    /// system)
     stats->memory_usage_acceptable =
         (stats->memory_usage_bytes < 10 * 1024 * 1024);
 
@@ -1148,7 +1148,7 @@ void display_integration_reset_stats(void) {
     memset(&integration_stats, 0, sizeof(integration_stats));
     integration_stats.init_time = time(NULL);
 
-    // Reset display controller performance if available
+    /// Reset display controller performance if available
     if (layered_display_enabled && global_display_controller) {
         display_controller_reset_performance_metrics(global_display_controller);
     }
@@ -1192,10 +1192,10 @@ display_integration_health_t display_integration_get_health(void) {
         return DISPLAY_INTEGRATION_HEALTH_ERROR;
     }
 
-    // Check performance metrics
+    /// Check performance metrics
     display_integration_stats_t stats;
     if (display_integration_get_stats(&stats)) {
-        // Check if fallback rate is too high
+        /// Check if fallback rate is too high
         if (stats.total_display_calls > 0) {
             double fallback_rate =
                 (double)stats.fallback_calls / stats.total_display_calls;
@@ -1204,7 +1204,7 @@ display_integration_health_t display_integration_get_health(void) {
             }
         }
 
-        // Check performance thresholds
+        /// Check performance thresholds
         if (stats.avg_layered_display_time_ns >
             (current_config.performance_threshold_ms * 1000000)) {
             return DISPLAY_INTEGRATION_HEALTH_DEGRADED;
@@ -1218,9 +1218,9 @@ display_integration_health_t display_integration_get_health(void) {
     return DISPLAY_INTEGRATION_HEALTH_EXCELLENT;
 }
 
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
+/// ============================================================================
+/// UTILITY FUNCTIONS
+/// ============================================================================
 
 /**
  * Get human-readable health status string.
@@ -1262,30 +1262,31 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
 
     *enhanced_prompt = NULL;
 
-    // Prioritize layered display over legacy enhanced display
+    /// Prioritize layered display over legacy enhanced display
     if (!integration_initialized || !global_display_controller) {
-        return false; // Enhanced display not available
+        return false; /// Enhanced display not available
     }
 
     if (!layered_display_enabled) {
-        return false; // No layered display mode active
+        return false; /// No layered display mode active
     }
 
-    // Full Display Controller Integration for Prompt Generation
+    /// Full Display Controller Integration for Prompt Generation
     integration_stats.layered_display_calls++;
 
-    // Enhanced Performance Monitoring: Start timing for prompt generation
+    /// Enhanced Performance Monitoring: Start timing for prompt generation
     struct timeval start_time, end_time;
     gettimeofday(&start_time, NULL);
 
-    // Generate base prompt using memory pool system
+    /// Generate base prompt using memory pool system
     size_t base_prompt_size = 512;
     char *base_prompt = lush_pool_alloc(base_prompt_size);
     if (!base_prompt) {
         return false;
     }
 
-    // Use Spec 25 prompt composer when LLE is active - completely bypass legacy
+    /// Use Spec 25 prompt composer when LLE is active - completely bypass
+    /// legacy
     bool theme_result = false;
     const char *theme_name = "default";
     const char *debug = getenv("LUSH_PROMPT_DEBUG");
@@ -1302,7 +1303,7 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
         lle_prompt_output_t output;
         memset(&output, 0, sizeof(output));
 
-        // Update background job count from executor (Issue #22)
+        /// Update background job count from executor (Issue #22)
         executor_t *executor = get_global_executor();
         if (executor) {
             executor_update_job_status(executor);
@@ -1333,13 +1334,13 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
             return (*enhanced_prompt != NULL);
         }
 
-        // LLE mode but render failed - use minimal failsafe, do NOT use legacy
+        /// LLE mode but render failed - use minimal failsafe, do NOT use legacy
         *enhanced_prompt = lush_pool_strdup((getuid() > 0) ? "$ " : "# ");
         lush_pool_free(base_prompt);
         return (*enhanced_prompt != NULL);
     }
 
-    // Ultimate fallback prompt generation (LLE not configured)
+    /// Ultimate fallback prompt generation (LLE not configured)
     if (!theme_result) {
         char *current_dir = getcwd(NULL, 0);
         const char *user = getenv("USER");
@@ -1360,11 +1361,11 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
             lush_pool_free(current_dir);
     }
 
-    // Update theme context before display controller operations
+    /// Update theme context before display controller operations
     theme_name = get_active_theme_name();
     symbol_compatibility_t symbol_mode = get_symbol_mode();
 
-    // Set theme context in display controller for theme-aware caching
+    /// Set theme context in display controller for theme-aware caching
     display_controller_error_t theme_context_result =
         display_controller_set_theme_context(global_display_controller,
                                              theme_name, symbol_mode);
@@ -1377,17 +1378,17 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
             theme_context_result);
     }
 
-    // Use display controller for sophisticated prompt caching and
-    // optimization
+    /// Use display controller for sophisticated prompt caching and
+    /// optimization
     char display_output[4096];
-    char *current_command = ""; // Prompt generation has no active command
+    char *current_command = ""; /// Prompt generation has no active command
 
     display_controller_error_t result = display_controller_display(
         global_display_controller, base_prompt, current_command, display_output,
         sizeof(display_output));
 
     if (result == DISPLAY_CONTROLLER_SUCCESS) {
-        // Display controller succeeded - use optimized output
+        /// Display controller succeeded - use optimized output
         *enhanced_prompt = lush_pool_strdup(display_output);
         lush_pool_free(base_prompt);
 
@@ -1396,7 +1397,7 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
                             "using display controller cache\n");
         }
 
-        // Enhanced Performance Monitoring: Record timing
+        /// Enhanced Performance Monitoring: Record timing
         gettimeofday(&end_time, NULL);
         uint64_t operation_time_ns =
             ((uint64_t)(end_time.tv_sec - start_time.tv_sec)) * 1000000000ULL +
@@ -1405,7 +1406,7 @@ bool display_integration_get_enhanced_prompt(char **enhanced_prompt) {
 
         return (*enhanced_prompt != NULL);
     } else {
-        // Display controller failed - use base prompt as fallback
+        /// Display controller failed - use base prompt as fallback
         integration_stats.layered_display_errors++;
         integration_stats.fallback_calls++;
         log_controller_error("enhanced_prompt_generation", result);
@@ -1471,9 +1472,9 @@ void display_integration_print_diagnostics(void) {
     printf("=======================================\n");
 }
 
-// ============================================================================
-// v1.3.0 SAFETY INFRASTRUCTURE IMPLEMENTATION
-// ============================================================================
+/// ============================================================================
+/// v1.3.0 SAFETY INFRASTRUCTURE IMPLEMENTATION
+/// ============================================================================
 
 /**
  * Perform comprehensive safety check for layered display operation.
@@ -1481,48 +1482,48 @@ void display_integration_print_diagnostics(void) {
  */
 bool safe_layered_display_attempt(
     const char *function_name, integration_fallback_reason_t *fallback_reason) {
-    (void)function_name; // Reserved for diagnostic logging
+    (void)function_name; /// Reserved for diagnostic logging
     if (!fallback_reason) {
-        return false; // Invalid parameter - cannot proceed safely
+        return false; /// Invalid parameter - cannot proceed safely
     }
 
-    // Initialize fallback reason
+    /// Initialize fallback reason
     *fallback_reason = INTEGRATION_FALLBACK_NONE;
 
-    // Update safety check statistics
+    /// Update safety check statistics
     integration_stats.safety_checks_performed++;
 
-    // Check 1: Integration system initialization
+    /// Check 1: Integration system initialization
     if (!integration_initialized) {
         *fallback_reason = INTEGRATION_FALLBACK_INITIALIZATION_ERROR;
         return false;
     }
 
-    // Check 2: Layered display enablement
-    // The layered display architecture is complete and ready for integration
+    /// Check 2: Layered display enablement
+    /// The layered display architecture is complete and ready for integration
     if (!layered_display_enabled) {
         *fallback_reason = INTEGRATION_FALLBACK_USER_REQUEST;
         return false;
     }
 
-    // Check 3: Display controller availability
+    /// Check 3: Display controller availability
     if (!global_display_controller) {
         *fallback_reason = INTEGRATION_FALLBACK_CONTROLLER_NULL;
         return false;
     }
 
-    // Check 4: Memory and system resources
-    // Static buffer is always valid - memory check placeholder for future
-    // dynamic allocation scenarios
-    (void)0; // Memory check placeholder
+    /// Check 4: Memory and system resources
+    /// Static buffer is always valid - memory check placeholder for future
+    /// dynamic allocation scenarios
+    (void)0; /// Memory check placeholder
 
-    // Check 5: Configuration safety
+    /// Check 5: Configuration safety
     if (current_config.strict_compatibility_mode) {
-        // v1.3.0: Layered display is exclusive - strict mode affects other
-        // settings No fallback needed since layered display is the only system
+        /// v1.3.0: Layered display is exclusive - strict mode affects other
+        /// settings No fallback needed since layered display is the only system
     }
 
-    // All safety checks passed
+    /// All safety checks passed
     return true;
 }
 
@@ -1532,23 +1533,23 @@ bool safe_layered_display_attempt(
 void log_fallback_event(const char *function_name,
                         integration_fallback_reason_t reason) {
     if (!function_name) {
-        return; // Invalid parameter
+        return; /// Invalid parameter
     }
 
-    // Update statistics
+    /// Update statistics
     if (reason >= 0 && reason < 10) {
         integration_stats.fallback_events[reason]++;
     }
     integration_stats.last_fallback_time = time(NULL);
     integration_stats.last_fallback_reason = reason;
 
-    // Debug logging if enabled
+    /// Debug logging if enabled
     if (current_config.debug_mode) {
         fprintf(stderr, "display_integration: %s fallback - %s\n",
                 function_name, integration_fallback_reason_string(reason));
     }
 
-    // Enterprise logging if enabled
+    /// Enterprise logging if enabled
     if (current_config.enable_enterprise_logging) {
         fprintf(
             stderr,
@@ -1564,20 +1565,20 @@ void log_fallback_event(const char *function_name,
 void log_controller_error(const char *function_name,
                           display_controller_error_t error) {
     if (!function_name) {
-        return; // Invalid parameter
+        return; /// Invalid parameter
     }
 
-    // Update error statistics
+    /// Update error statistics
     integration_stats.layered_display_errors++;
     integration_stats.last_error_time = time(NULL);
 
-    // Debug logging if enabled
+    /// Debug logging if enabled
     if (current_config.debug_mode) {
         fprintf(stderr, "display_integration: %s controller error %d\n",
                 function_name, (int)error);
     }
 
-    // Enterprise logging if enabled
+    /// Enterprise logging if enabled
     if (current_config.enable_enterprise_logging) {
         fprintf(
             stderr, "DISPLAY_CONTROLLER_ERROR: function=%s error=%d time=%ld\n",
@@ -1616,9 +1617,9 @@ integration_fallback_reason_string(integration_fallback_reason_t reason) {
     }
 }
 
-// ============================================================================
-// AUTOSUGGESTIONS LAYER INTEGRATION
-// ============================================================================
+/// ============================================================================
+/// AUTOSUGGESTIONS LAYER INTEGRATION
+/// ============================================================================
 
 /**
  * Initialize autosuggestions layer integration.
@@ -1626,7 +1627,7 @@ integration_fallback_reason_string(integration_fallback_reason_t reason) {
  */
 bool display_integration_init_autosuggestions(void) {
     if (autosuggestions_layer_initialized) {
-        return true; // Already initialized
+        return true; /// Already initialized
     }
 
     if (!integration_initialized) {
@@ -1637,13 +1638,13 @@ bool display_integration_init_autosuggestions(void) {
         return false;
     }
 
-    // Create layered display system directly if needed for autosuggestions
+    /// Create layered display system directly if needed for autosuggestions
     if (!layered_display_enabled || !global_display_controller) {
         if (current_config.debug_mode) {
             fprintf(stderr, "display_integration: Creating layered display for "
                             "autosuggestions infrastructure\n");
         }
-        // Initialize layered display components directly to avoid recursion
+        /// Initialize layered display components directly to avoid recursion
         if (!global_display_controller) {
             global_display_controller = display_controller_create();
             if (global_display_controller) {
@@ -1692,7 +1693,7 @@ bool display_integration_init_autosuggestions(void) {
         }
     }
 
-    // Get terminal control and event system from display controller
+    /// Get terminal control and event system from display controller
     terminal_control_t *terminal_ctrl =
         display_controller_get_terminal_control(global_display_controller);
     layer_event_system_t *event_system =
@@ -1706,7 +1707,7 @@ bool display_integration_init_autosuggestions(void) {
         return false;
     }
 
-    // Create the autosuggestions layer
+    /// Create the autosuggestions layer
     global_autosuggestions_layer =
         autosuggestions_layer_create(event_system, terminal_ctrl);
     if (!global_autosuggestions_layer) {
@@ -1717,11 +1718,12 @@ bool display_integration_init_autosuggestions(void) {
         return false;
     }
 
-    // Initialize with default configuration - resilient to terminal limitations
+    /// Initialize with default configuration - resilient to terminal
+    /// limitations
     autosuggestions_layer_error_t init_error =
         autosuggestions_layer_init(global_autosuggestions_layer, NULL);
     if (init_error != AUTOSUGGESTIONS_LAYER_SUCCESS) {
-        // Handle common initialization failures gracefully
+        /// Handle common initialization failures gracefully
         const char *error_desc = "Unknown error";
         switch (init_error) {
         case AUTOSUGGESTIONS_LAYER_ERROR_UNSUPPORTED_TERMINAL:
@@ -1747,14 +1749,15 @@ bool display_integration_init_autosuggestions(void) {
                             "not active - ready for LLE development\n");
         }
 
-        // Clean up but don't fail completely - infrastructure is still valuable
-        // for LLE
+        /// Clean up but don't fail completely - infrastructure is still
+        /// valuable for LLE
         autosuggestions_layer_destroy(&global_autosuggestions_layer);
 
-        // Mark as "initialized" for infrastructure purposes even though not
-        // active This allows cache tracking and preparation for LLE development
+        /// Mark as "initialized" for infrastructure purposes even though not
+        /// active This allows cache tracking and preparation for LLE
+        /// development
         autosuggestions_layer_initialized = true;
-        return true; // Success for infrastructure purposes
+        return true; /// Success for infrastructure purposes
     }
 
     autosuggestions_layer_initialized = true;
@@ -1798,7 +1801,8 @@ bool display_integration_update_autosuggestions(const char *line_buffer,
         return false;
     }
 
-    // Get terminal control and event system using professional getter functions
+    /// Get terminal control and event system using professional getter
+    /// functions
     terminal_control_t *terminal_ctrl =
         display_controller_get_terminal_control(global_display_controller);
     layer_event_system_t *event_system =
@@ -1818,7 +1822,7 @@ bool display_integration_update_autosuggestions(const char *line_buffer,
         return false;
     }
 
-    // Create context from readline parameters
+    /// Create context from readline parameters
     autosuggestions_context_t context;
     autosuggestions_layer_error_t context_error =
         autosuggestions_layer_create_context_from_readline(
@@ -1834,7 +1838,7 @@ bool display_integration_update_autosuggestions(const char *line_buffer,
         return false;
     }
 
-    // Generate and display suggestion using professional layered system
+    /// Generate and display suggestion using professional layered system
     autosuggestions_layer_error_t update_error =
         autosuggestions_layer_update(global_autosuggestions_layer, &context);
 
@@ -1848,13 +1852,13 @@ bool display_integration_update_autosuggestions(const char *line_buffer,
         return false;
     }
 
-    // Successfully generated and displayed suggestion via layered system
+    /// Successfully generated and displayed suggestion via layered system
     if (current_config.debug_mode) {
         fprintf(stderr, "display_integration: Professional layered "
                         "autosuggestions displayed successfully\n");
     }
 
-    return true; // Professional layered autosuggestions system active
+    return true; /// Professional layered autosuggestions system active
 }
 
 /**
@@ -1865,7 +1869,7 @@ bool display_integration_clear_autosuggestions(void) {
         return false;
     }
 
-    // Check if layered display is available and active
+    /// Check if layered display is available and active
     if (!layered_display_enabled || !global_display_controller ||
         !global_autosuggestions_layer) {
         if (current_config.debug_mode) {
@@ -1875,7 +1879,7 @@ bool display_integration_clear_autosuggestions(void) {
         return false;
     }
 
-    // Clear suggestion using professional layered system
+    /// Clear suggestion using professional layered system
     autosuggestions_layer_error_t clear_error =
         autosuggestions_layer_clear(global_autosuggestions_layer);
 
@@ -1889,7 +1893,7 @@ bool display_integration_clear_autosuggestions(void) {
         return false;
     }
 
-    // Successfully cleared suggestion via layered system
+    /// Successfully cleared suggestion via layered system
     if (current_config.debug_mode) {
         fprintf(stderr, "display_integration: Professional layered "
                         "autosuggestions cleared successfully\n");
@@ -1898,11 +1902,11 @@ bool display_integration_clear_autosuggestions(void) {
     return true;
 }
 
-// ============================================================================
-// ENHANCED PERFORMANCE MONITORING IMPLEMENTATION
-// ============================================================================
+/// ============================================================================
+/// ENHANCED PERFORMANCE MONITORING IMPLEMENTATION
+/// ============================================================================
 
-// Global enhanced performance metrics
+/// Global enhanced performance metrics
 static display_perf_metrics_t enhanced_perf_metrics = {0};
 static bool enhanced_perf_monitoring_initialized = false;
 
@@ -1911,21 +1915,21 @@ static bool enhanced_perf_monitoring_initialized = false;
  */
 bool display_integration_perf_monitor_init(void) {
     if (enhanced_perf_monitoring_initialized) {
-        return true; // Already initialized
+        return true; /// Already initialized
     }
 
-    // Initialize metrics structure
+    /// Initialize metrics structure
     memset(&enhanced_perf_metrics, 0, sizeof(display_perf_metrics_t));
 
-    // Set performance targets
+    /// Set performance targets
     enhanced_perf_metrics.cache_hit_rate_target =
-        75.0; // Development phase minimum
-    enhanced_perf_metrics.display_time_target_ms = 50.0; // Release standard
+        75.0; /// Development phase minimum
+    enhanced_perf_metrics.display_time_target_ms = 50.0; /// Release standard
     enhanced_perf_metrics.measurement_frequency_hz =
-        10; // Default 10Hz monitoring
+        10; /// Default 10Hz monitoring
     enhanced_perf_metrics.monitoring_active = true;
 
-    // Initialize timing arrays
+    /// Initialize timing arrays
     for (int i = 0; i < 60; i++) {
         enhanced_perf_metrics.measurements_window[i] = 0;
     }
@@ -1963,11 +1967,11 @@ bool display_integration_record_display_timing(uint64_t operation_time_ns) {
         return false;
     }
 
-    // Update measurement count
+    /// Update measurement count
     enhanced_perf_metrics.display_operations_measured++;
     enhanced_perf_metrics.display_time_total_ns += operation_time_ns;
 
-    // Update min/max timing
+    /// Update min/max timing
     if (enhanced_perf_metrics.display_operations_measured == 1) {
         enhanced_perf_metrics.display_time_min_ns = operation_time_ns;
         enhanced_perf_metrics.display_time_max_ns = operation_time_ns;
@@ -1980,17 +1984,17 @@ bool display_integration_record_display_timing(uint64_t operation_time_ns) {
         }
     }
 
-    // Calculate average in milliseconds
+    /// Calculate average in milliseconds
     enhanced_perf_metrics.display_time_avg_ms =
         (double)enhanced_perf_metrics.display_time_total_ns / 1000000.0 /
         enhanced_perf_metrics.display_operations_measured;
 
-    // Check if timing target is achieved
+    /// Check if timing target is achieved
     enhanced_perf_metrics.display_timing_target_achieved =
         enhanced_perf_metrics.display_time_avg_ms <=
         enhanced_perf_metrics.display_time_target_ms;
 
-    // Update rolling window for trend analysis
+    /// Update rolling window for trend analysis
     enhanced_perf_metrics
         .measurements_window[enhanced_perf_metrics.measurements_index] =
         operation_time_ns;
@@ -2010,7 +2014,7 @@ bool display_integration_record_cache_operation(bool was_hit) {
         return false;
     }
 
-    // Update cache operation counts
+    /// Update cache operation counts
     enhanced_perf_metrics.cache_operations_total++;
 
     if (was_hit) {
@@ -2019,13 +2023,13 @@ bool display_integration_record_cache_operation(bool was_hit) {
         enhanced_perf_metrics.cache_misses_global++;
     }
 
-    // Calculate current cache hit rate
+    /// Calculate current cache hit rate
     if (enhanced_perf_metrics.cache_operations_total > 0) {
         enhanced_perf_metrics.cache_hit_rate_current =
             (100.0 * enhanced_perf_metrics.cache_hits_global) /
             enhanced_perf_metrics.cache_operations_total;
 
-        // Check if cache target is achieved
+        /// Check if cache target is achieved
         enhanced_perf_metrics.cache_target_achieved =
             enhanced_perf_metrics.cache_hit_rate_current >=
             enhanced_perf_metrics.cache_hit_rate_target;
@@ -2042,7 +2046,7 @@ bool display_integration_establish_baseline(void) {
         return false;
     }
 
-    // Require minimum measurements for valid baseline
+    /// Require minimum measurements for valid baseline
     if (enhanced_perf_metrics.display_operations_measured < 10 ||
         enhanced_perf_metrics.cache_operations_total < 20) {
         if (current_config.debug_mode) {
@@ -2055,7 +2059,7 @@ bool display_integration_establish_baseline(void) {
         return false;
     }
 
-    // Establish baseline values
+    /// Establish baseline values
     enhanced_perf_metrics.baseline_cache_hit_rate =
         enhanced_perf_metrics.cache_hit_rate_current;
     enhanced_perf_metrics.baseline_display_time_ms =
@@ -2124,7 +2128,7 @@ void display_integration_record_layer_cache_operation(const char *layer_name,
             layer_cache_stats.prompt_layer_misses++;
     }
 
-    // Also record in global stats for backward compatibility
+    /// Also record in global stats for backward compatibility
     display_integration_record_cache_operation(hit);
 }
 
@@ -2134,7 +2138,7 @@ void display_integration_record_layer_cache_operation(const char *layer_name,
 void display_integration_print_layer_cache_report(void) {
     printf("\n=== Layer-Specific Cache Performance Report ===\n");
 
-    // Display Controller Cache
+    /// Display Controller Cache
     uint64_t dc_total = layer_cache_stats.display_controller_hits +
                         layer_cache_stats.display_controller_misses;
     if (dc_total > 0) {
@@ -2151,7 +2155,7 @@ void display_integration_print_layer_cache_report(void) {
         printf("Display Controller Cache: No operations recorded\n");
     }
 
-    // Composition Engine Cache
+    /// Composition Engine Cache
     uint64_t ce_total = layer_cache_stats.composition_engine_hits +
                         layer_cache_stats.composition_engine_misses;
     if (ce_total > 0) {
@@ -2168,7 +2172,7 @@ void display_integration_print_layer_cache_report(void) {
         printf("Composition Engine Cache: No operations recorded\n");
     }
 
-    // Command Layer Cache
+    /// Command Layer Cache
     uint64_t cl_total = layer_cache_stats.command_layer_hits +
                         layer_cache_stats.command_layer_misses;
     if (cl_total > 0) {
@@ -2180,12 +2184,13 @@ void display_integration_print_layer_cache_report(void) {
                cl_total, layer_cache_stats.command_layer_hits,
                layer_cache_stats.command_layer_misses);
         printf("  Hit Rate: %.1f%% %s\n", cl_hit_rate,
-               cl_hit_rate >= 80.0 ? "✓" : "✗"); // Command layer has 80% target
+               cl_hit_rate >= 80.0 ? "✓"
+                                   : "✗"); /// Command layer has 80% target
     } else {
         printf("Command Layer Cache: No operations recorded\n");
     }
 
-    // Autosuggestions Cache
+    /// Autosuggestions Cache
     uint64_t as_total = layer_cache_stats.autosuggestions_hits +
                         layer_cache_stats.autosuggestions_misses;
     if (as_total > 0) {
@@ -2198,12 +2203,12 @@ void display_integration_print_layer_cache_report(void) {
                layer_cache_stats.autosuggestions_misses);
         printf("  Hit Rate: %.1f%% %s\n", as_hit_rate,
                as_hit_rate >= 70.0 ? "✓"
-                                   : "✗"); // Autosuggestions has 70% target
+                                   : "✗"); /// Autosuggestions has 70% target
     } else {
         printf("Autosuggestions Cache: No operations recorded\n");
     }
 
-    // Prompt Layer Cache
+    /// Prompt Layer Cache
     uint64_t pl_total = layer_cache_stats.prompt_layer_hits +
                         layer_cache_stats.prompt_layer_misses;
     if (pl_total > 0) {
@@ -2241,7 +2246,7 @@ bool display_integration_perf_monitor_report(bool detailed) {
 
     printf("\n=== Enhanced Performance Report ===\n");
 
-    // Cache Performance Analysis
+    /// Cache Performance Analysis
     printf("Cache Performance:\n");
     printf("  Operations: %" PRIu64 " total (%" PRIu64 " hits, %" PRIu64
            " misses)\n",
@@ -2253,7 +2258,7 @@ bool display_integration_perf_monitor_report(bool detailed) {
            enhanced_perf_metrics.cache_hit_rate_target,
            enhanced_perf_metrics.cache_target_achieved ? "✓" : "✗");
 
-    // Display Timing Analysis
+    /// Display Timing Analysis
     printf("Display Timing:\n");
     printf("  Operations: %" PRIu64 " measured\n",
            enhanced_perf_metrics.display_operations_measured);
@@ -2268,7 +2273,7 @@ bool display_integration_perf_monitor_report(bool detailed) {
                enhanced_perf_metrics.display_time_max_ns / 1000000.0);
     }
 
-    // Baseline Comparison
+    /// Baseline Comparison
     if (enhanced_perf_metrics.baseline_established) {
         printf("Baseline Comparison:\n");
         printf("  Cache Rate: %.1f%% -> %.1f%% (%+.1f%%)\n",
@@ -2285,7 +2290,7 @@ bool display_integration_perf_monitor_report(bool detailed) {
         printf("Baseline: Not established (need more measurements)\n");
     }
 
-    // Memory Pool Performance (if available)
+    /// Memory Pool Performance (if available)
     if (global_memory_pool && global_memory_pool->initialized) {
         lush_pool_stats_t pool_stats = lush_pool_get_stats();
         printf("Memory Pool Performance:\n");
@@ -2302,7 +2307,7 @@ bool display_integration_perf_monitor_report(bool detailed) {
                    pool_stats.avg_allocation_time_ns);
         }
 
-        // Memory pool efficiency assessment
+        /// Memory pool efficiency assessment
         printf("  Pool efficiency: ");
         if (pool_stats.pool_hit_rate > 80.0) {
             printf("EXCELLENT ✓\n");
@@ -2313,7 +2318,7 @@ bool display_integration_perf_monitor_report(bool detailed) {
         }
     }
 
-    // Overall Performance Status
+    /// Overall Performance Status
     printf("Performance Status: ");
     if (enhanced_perf_metrics.cache_target_achieved &&
         enhanced_perf_metrics.display_timing_target_achieved) {
@@ -2338,16 +2343,16 @@ bool display_integration_perf_monitor_reset(void) {
         return false;
     }
 
-    // Preserve configuration settings
+    /// Preserve configuration settings
     double cache_target = enhanced_perf_metrics.cache_hit_rate_target;
     double timing_target = enhanced_perf_metrics.display_time_target_ms;
     uint32_t frequency = enhanced_perf_metrics.measurement_frequency_hz;
     bool monitoring = enhanced_perf_metrics.monitoring_active;
 
-    // Reset metrics
+    /// Reset metrics
     memset(&enhanced_perf_metrics, 0, sizeof(display_perf_metrics_t));
 
-    // Restore configuration
+    /// Restore configuration
     enhanced_perf_metrics.cache_hit_rate_target = cache_target;
     enhanced_perf_metrics.display_time_target_ms = timing_target;
     enhanced_perf_metrics.measurement_frequency_hz = frequency;
@@ -2369,7 +2374,7 @@ bool display_integration_perf_monitor_set_active(bool enable,
         return false;
     }
 
-    // Validate frequency range
+    /// Validate frequency range
     if (frequency_hz < 1 || frequency_hz > 60) {
         return false;
     }
