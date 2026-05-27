@@ -19,6 +19,7 @@
 #include "executor.h"
 #include "lle/history.h"
 #include "lle/lle_editor.h"
+#include "lle/lle_pager.h"
 #include "lle/lle_shell_integration.h"
 #include "shell_error.h"
 #include "symtable.h"
@@ -419,6 +420,17 @@ static int fc_list(lle_history_core_t *history, fc_options_t *opts) {
         return 1;
     }
 
+    /// Buffer the listing through open_memstream and hand it to
+    /// lle_pager_present so wide ranges of history paginate in
+    /// interactive shells. Tight ranges (single entry, recent few)
+    /// fall through the pager's fits-in-one-screen branch unchanged.
+    /// On memstream allocation failure the per-iteration writes
+    /// target stdout directly.
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    FILE *sink = out ? out : stdout;
+
     if (opts->reverse_order) {
         for (int i = opts->last; i >= opts->first; i--) {
             lle_history_entry_t *entry = NULL;
@@ -426,9 +438,9 @@ static int fc_list(lle_history_core_t *history, fc_options_t *opts) {
                     LLE_SUCCESS &&
                 entry && entry->command) {
                 if (opts->suppress_numbers) {
-                    printf("%s\n", entry->command);
+                    fprintf(sink, "%s\n", entry->command);
                 } else {
-                    printf("%5d  %s\n", i + 1, entry->command);
+                    fprintf(sink, "%5d  %s\n", i + 1, entry->command);
                 }
             }
         }
@@ -439,12 +451,18 @@ static int fc_list(lle_history_core_t *history, fc_options_t *opts) {
                     LLE_SUCCESS &&
                 entry && entry->command) {
                 if (opts->suppress_numbers) {
-                    printf("%s\n", entry->command);
+                    fprintf(sink, "%s\n", entry->command);
                 } else {
-                    printf("%5d  %s\n", i + 1, entry->command);
+                    fprintf(sink, "%5d  %s\n", i + 1, entry->command);
                 }
             }
         }
+    }
+
+    if (out) {
+        fclose(out);
+        lle_pager_present(NULL, buf);
+        free(buf);
     }
 
     return 0;

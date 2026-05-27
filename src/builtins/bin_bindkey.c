@@ -46,6 +46,7 @@
 #include "builtins.h"
 #include "lle/keybinding_config.h"
 #include "lle/lle_editor.h"
+#include "lle/lle_pager.h"
 #include "lle/lle_shell_integration.h"
 
 #include <stdbool.h>
@@ -165,15 +166,29 @@ static bool try_route_to_lle(const char *key, const char *action) {
  * ============================================================================
  */
 
-static void print_binding(const bindkey_entry_t *e) {
-    printf("\"%s\" %s\n", e->key_sequence, e->action_name);
+static void print_binding(FILE *out, const bindkey_entry_t *e) {
+    fprintf(out, "\"%s\" %s\n", e->key_sequence, e->action_name);
 }
 
 static void list_keymap(const char *keymap) {
+    /// Buffer the listing through open_memstream and hand it to
+    /// lle_pager_present so wide keymaps (the active emacs / vi
+    /// keymap can easily exceed a screen of bindings) paginate
+    /// in interactive shells. On memstream allocation failure
+    /// the per-binding writes target stdout directly.
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    FILE *sink = out ? out : stdout;
     for (bindkey_entry_t *e = g_bindkey_table; e; e = e->next) {
         if (strcmp(e->keymap, keymap) == 0) {
-            print_binding(e);
+            print_binding(sink, e);
         }
+    }
+    if (out) {
+        fclose(out);
+        lle_pager_present(NULL, buf);
+        free(buf);
     }
 }
 
@@ -274,7 +289,7 @@ int bin_bindkey(int argc, char **argv) {
     if (list_mode && positional_count >= 1) {
         bindkey_entry_t *e = find_binding(keymap, positional[0]);
         if (e) {
-            print_binding(e);
+            print_binding(stdout, e);
         }
         return e ? 0 : 1;
     }
@@ -283,7 +298,7 @@ int bin_bindkey(int argc, char **argv) {
     if (positional_count == 1) {
         bindkey_entry_t *e = find_binding(keymap, positional[0]);
         if (e) {
-            print_binding(e);
+            print_binding(stdout, e);
             return 0;
         }
         return 1;

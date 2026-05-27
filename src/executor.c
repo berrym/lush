@@ -21,6 +21,7 @@
 #include "debug.h"
 #include "ht.h"
 #include "init.h"
+#include "lle/lle_pager.h"
 #include "lle/lle_shell_event_hub.h"
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
@@ -16754,6 +16755,15 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
     /// Update job statuses first
     executor_update_job_status(executor);
 
+    /// Buffer the listing through open_memstream and hand it to
+    /// lle_pager_present so long job tables paginate in interactive
+    /// shells. On memstream allocation failure the per-iteration
+    /// writes target stdout directly, preserving prior behaviour.
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    FILE *sink = out ? out : stdout;
+
     job_t *job = executor->jobs;
     while (job) {
         const char *state_str;
@@ -16772,10 +16782,17 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
             break;
         }
 
-        printf("[%d]%c %-20s %s\n", job->job_id, job->foreground ? '+' : '-',
-               state_str, job->command_line ? job->command_line : "unknown");
+        fprintf(sink, "[%d]%c %-20s %s\n", job->job_id,
+                job->foreground ? '+' : '-', state_str,
+                job->command_line ? job->command_line : "unknown");
 
         job = job->next;
+    }
+
+    if (out) {
+        fclose(out);
+        lle_pager_present(NULL, buf);
+        free(buf);
     }
 
     return 0;

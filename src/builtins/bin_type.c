@@ -8,8 +8,11 @@
 
 #include "alias.h"
 #include "builtins.h"
+#include "lle/lle_pager.h"
 #include "symtable.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 
 /**
@@ -86,6 +89,18 @@ int bin_type(int argc, char **argv) {
         return 1;
     }
 
+    /// Buffer the listing through open_memstream and hand it to
+    /// lle_pager_present at the end so `type -a` enumerations across
+    /// many PATH entries or many names paginate in interactive shells.
+    /// Short outputs (single-name lookups, `type -t`, `type -p`) fall
+    /// through the pager's fits-in-one-screen branch unchanged. On
+    /// memstream allocation failure the per-iteration writes target
+    /// stdout directly.
+    char *buf = NULL;
+    size_t buf_len = 0;
+    FILE *out = open_memstream(&buf, &buf_len);
+    FILE *sink = out ? out : stdout;
+
     int result = 0;
     for (int i = name_start; i < argc; i++) {
         const char *name = argv[i];
@@ -96,11 +111,11 @@ int bin_type(int argc, char **argv) {
         if (is_builtin(name)) {
             found_any = true;
             if (type_only) {
-                printf("builtin\n");
+                fputs("builtin\n", sink);
             } else if (path_only) {
                 /// -p flag: builtins have no path, so output nothing
             } else {
-                printf("%s is a shell builtin\n", name);
+                fprintf(sink, "%s is a shell builtin\n", name);
             }
             if (!show_all)
                 continue;
@@ -111,11 +126,11 @@ int bin_type(int argc, char **argv) {
         if (alias_value) {
             found_any = true;
             if (type_only) {
-                printf("alias\n");
+                fputs("alias\n", sink);
             } else if (path_only) {
                 /// -p flag: aliases have no path, so output nothing
             } else {
-                printf("%s is aliased\n", name);
+                fprintf(sink, "%s is aliased\n", name);
             }
             if (!show_all)
                 continue;
@@ -126,11 +141,11 @@ int bin_type(int argc, char **argv) {
         if (func_value && strstr(func_value, "function")) {
             found_any = true;
             if (type_only) {
-                printf("function\n");
+                fputs("function\n", sink);
             } else if (path_only) {
                 /// -p flag: functions have no path, so output nothing
             } else {
-                printf("%s is a function\n", name);
+                fprintf(sink, "%s is a function\n", name);
             }
             if (!show_all)
                 continue;
@@ -152,11 +167,11 @@ int bin_type(int argc, char **argv) {
                     found_in_path = true;
 
                     if (type_only) {
-                        printf("file\n");
+                        fputs("file\n", sink);
                     } else if (path_only) {
-                        printf("%s\n", full_path);
+                        fprintf(sink, "%s\n", full_path);
                     } else {
-                        printf("%s is %s\n", name, full_path);
+                        fprintf(sink, "%s is %s\n", name, full_path);
                     }
 
                     if (!show_all)
@@ -176,10 +191,16 @@ int bin_type(int argc, char **argv) {
             if (type_only || path_only) {
                 /// For -t and -p, output nothing for not found commands
             } else {
-                printf("%s: not found\n", name);
+                fprintf(sink, "%s: not found\n", name);
             }
             result = 1;
         }
+    }
+
+    if (out) {
+        fclose(out);
+        lle_pager_present(NULL, buf);
+        free(buf);
     }
 
     return result;
