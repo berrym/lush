@@ -16,6 +16,7 @@
 #include "builtins.h"
 #include "executor.h"
 #include "init.h"
+#include "lle/unicode_compare.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -232,11 +233,17 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     for (int i = 0; i < temp_count && results->count < max_to_copy; i++) {
         if (temp_suggestions[i].score >=
             autocorrect_config.similarity_threshold) {
-            /// Check for duplicates (same command from different sources)
+            /// Check for duplicates (same command from different
+            /// sources). Compare under NFC equivalence so a PATH-
+            /// supplied name and a builtin / alias / function name
+            /// that differ only in Unicode normalisation collapse
+            /// to a single suggestion. ASCII names (the common case
+            /// for shell commands) hit the primitive's fast path.
             bool is_duplicate = false;
             for (int j = 0; j < results->count; j++) {
-                if (strcmp(results->suggestions[j].command,
-                           temp_suggestions[i].command) == 0) {
+                if (lle_unicode_strings_equal(results->suggestions[j].command,
+                                              temp_suggestions[i].command,
+                                              NULL)) {
                     is_duplicate = true;
                     break;
                 }
@@ -399,9 +406,15 @@ void autocorrect_learn_command(const char *command) {
         return;
     }
 
-    /// Check if command already exists
+    /// Check if command already exists. NFC-equivalent so the
+    /// learning store does not grow a second entry for a command
+    /// the user typed once in one normalisation form and once in
+    /// the other (rare in interactive practice but observable when
+    /// command names come from heterogeneous sources -- e.g. PATH
+    /// scan on macOS NFD + history line on NFC).
     for (int i = 0; i < learned_commands_count; i++) {
-        if (learned_commands[i] && strcmp(learned_commands[i], command) == 0) {
+        if (learned_commands[i] &&
+            lle_unicode_strings_equal(learned_commands[i], command, NULL)) {
             return; /// Already learned
         }
     }

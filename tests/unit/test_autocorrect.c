@@ -415,6 +415,41 @@ TEST(stats_learn_command) {
     autocorrect_cleanup();
 }
 
+TEST(learn_command_nfc_nfd_dedup) {
+    /// Same user-visible command name in NFC and NFD must not
+    /// expand the learned-commands set -- they are canonically
+    /// equivalent strings.
+    autocorrect_init();
+    autocorrect_reset_stats();
+
+    autocorrect_learn_command("caf\xC3\xA9");  /// NFC: e-acute U+00E9
+    autocorrect_learn_command("cafe\xCC\x81"); /// NFD: e + U+0301
+
+    int offered, accepted, learned;
+    autocorrect_get_stats(&offered, &accepted, &learned);
+    ASSERT_EQ(learned, 1,
+              "NFC and NFD encodings of café must collapse to one entry");
+
+    autocorrect_cleanup();
+}
+
+TEST(learn_command_distinct_under_case) {
+    /// NFC equivalence does not paper over case differences --
+    /// "café" and "CAFÉ" remain separate learned entries.
+    autocorrect_init();
+    autocorrect_reset_stats();
+
+    autocorrect_learn_command("caf\xC3\xA9"); /// café (lowercase)
+    autocorrect_learn_command("CAF\xC3\x89"); /// CAFÉ (uppercase)
+
+    int offered, accepted, learned;
+    autocorrect_get_stats(&offered, &accepted, &learned);
+    ASSERT_EQ(learned, 2,
+              "Different case is a different command for dedup purposes");
+
+    autocorrect_cleanup();
+}
+
 /* ============================================================================
  * DEBUG MODE TESTS
  * ============================================================================
@@ -570,6 +605,8 @@ int main(void) {
     RUN_TEST(stats_initial);
     RUN_TEST(stats_reset);
     RUN_TEST(stats_learn_command);
+    RUN_TEST(learn_command_nfc_nfd_dedup);
+    RUN_TEST(learn_command_distinct_under_case);
 
     /// Debug mode tests
     printf("\nDebug Mode Tests:\n");
