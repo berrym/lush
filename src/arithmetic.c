@@ -26,6 +26,7 @@
 #include "arithmetic.h"
 
 #include "executor.h"
+#include "identifier.h"
 #include "lush.h"
 #include "symtable.h"
 
@@ -158,7 +159,6 @@ static void shunt_op(arithm_context_t *ctx, op_t *op);
 static op_t *get_op(const char *expr);
 static ssize_t get_num(const char *expr, int *nchars);
 static char *get_var_name(const char *expr, int *nchars);
-static bool valid_name_char(char c);
 
 /// ============================================================================
 /// OPERATOR EVALUATION FUNCTIONS
@@ -848,13 +848,6 @@ static stack_item_t pop_numstack(arithm_context_t *ctx) {
     return ctx->numstack[--ctx->nnumstack];
 }
 
-/**
- * @brief Check if a character is valid in a variable name
- * @param c Character to check
- * @return true if character is alphanumeric or underscore
- */
-static bool valid_name_char(char c) { return isalnum(c) || c == '_'; }
-
 /// ============================================================================
 /// EXPRESSION PARSING
 /// ============================================================================
@@ -979,21 +972,31 @@ static char *get_var_name_with_context(arithm_context_t *ctx
     *nchars = 0;
 
     /// Variable names start with letter, underscore, or digit (for positional
-    /// parameters)
-    if (!isalpha(*expr) && *expr != '_' && !isdigit(*expr)) {
+    /// parameters). Non-ASCII identifier-start codepoints are accepted under
+    /// FEATURE_UNICODE_IDENTIFIERS via lush_ident_match_start.
+    size_t rem = strlen(expr);
+    size_t start_n = lush_ident_match_start(expr, rem);
+    if (start_n == 0 && !isdigit((unsigned char)*expr)) {
         return NULL;
     }
 
     /// For numeric positional parameters like $1, $2, only take the single
-    /// digit
-    if (isdigit(*expr)) {
+    /// digit. Digits never satisfy ident_match_start, so start_n is 0 here.
+    if (start_n == 0) {
         *nchars = 1;
         expr++;
     } else {
-        /// Count valid name characters for regular variables
-        while (valid_name_char(*expr)) {
-            expr++;
-            (*nchars)++;
+        expr += start_n;
+        *nchars = (int)start_n;
+        rem -= start_n;
+        while (rem > 0) {
+            size_t n = lush_ident_match_continue(expr, rem);
+            if (n == 0) {
+                break;
+            }
+            expr += n;
+            rem -= n;
+            *nchars += (int)n;
         }
     }
 
@@ -1540,11 +1543,18 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                 /// Extract variable name (handle simple ${var} for now)
                 /// More complex forms like ${var:-default} would need executor
 
-                /// Find the end of the variable name (before any operator)
+                /// Find the end of the variable name (before any operator).
+                /// lush_ident_match_continue honours
+                /// FEATURE_UNICODE_IDENTIFIERS so multibyte codepoints inside
+                /// ${...} extend the name.
                 const char *name_end = start;
-                while (name_end < end &&
-                       (isalnum(*name_end) || *name_end == '_')) {
-                    name_end++;
+                while (name_end < end) {
+                    size_t n = lush_ident_match_continue(
+                        name_end, (size_t)(end - name_end));
+                    if (n == 0) {
+                        break;
+                    }
+                    name_end += n;
                 }
 
                 if (name_end > start) {
@@ -1575,7 +1585,10 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                 break;
             }
             last_op = NULL;
-        } else if (*current == '$' && valid_name_char(*(current + 1))) {
+        } else if (*current == '$' &&
+                   (isdigit((unsigned char)current[1]) ||
+                    lush_ident_match_start(current + 1, strlen(current + 1)) >
+                        0)) {
             /// Handle $variable syntax in arithmetic expressions
             current++; /// Skip the '$'
             int nchars;
@@ -1591,7 +1604,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
             }
             last_op = NULL;
             current += nchars;
-        } else if (valid_name_char(*current)) {
+        } else if (lush_ident_match_start(current, strlen(current)) > 0) {
             /// Parse variable name
             int nchars;
             char *var_name = get_var_name_with_context(&ctx, current, &nchars);

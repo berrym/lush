@@ -2342,6 +2342,37 @@ TEST(rt_unicode_ident_invalid_start_still_rejected) {
     ASSERT_STDERR_CONTAINS(r, "not a valid identifier");
 }
 
+TEST(rt_unicode_ident_arithmetic_bare) {
+    /// Non-ASCII identifier as a bare arithmetic operand:
+    /// $((café+1)) reads café from the symbol table.
+    run_result_t r = run_shell("declare café=41\n"
+                               "echo $((café+1))\n");
+    ASSERT_STDOUT_EQ(r, "42\n");
+}
+
+TEST(rt_unicode_ident_arithmetic_dollar) {
+    /// Non-ASCII identifier with $ sigil inside arithmetic.
+    run_result_t r = run_shell("declare Σ=10\n"
+                               "echo $(($Σ*3))\n");
+    ASSERT_STDOUT_EQ(r, "30\n");
+}
+
+TEST(rt_unicode_ident_arithmetic_compound) {
+    /// (( ... )) compound, increment with non-ASCII name.
+    run_result_t r = run_shell("declare имя=7\n"
+                               "(( имя += 5 ))\n"
+                               "echo $имя\n");
+    ASSERT_STDOUT_EQ(r, "12\n");
+}
+
+TEST(rt_unicode_ident_arithmetic_positional_unchanged) {
+    /// Positional parameters in arithmetic (digit-leading) still work;
+    /// my edit to get_var_name_with_context must not regress this.
+    run_result_t r = run_shell("set -- 7 8\n"
+                               "echo $(($1+$2))\n");
+    ASSERT_STDOUT_EQ(r, "15\n");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3606,6 +3637,10 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_opt_in_from_bash_mode);
     RUN_TEST(rt_unicode_ident_ascii_paths_unchanged);
     RUN_TEST(rt_unicode_ident_invalid_start_still_rejected);
+    RUN_TEST(rt_unicode_ident_arithmetic_bare);
+    RUN_TEST(rt_unicode_ident_arithmetic_dollar);
+    RUN_TEST(rt_unicode_ident_arithmetic_compound);
+    RUN_TEST(rt_unicode_ident_arithmetic_positional_unchanged);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
