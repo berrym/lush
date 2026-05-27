@@ -27,6 +27,7 @@
 #include "ht.h"
 #include "init.h"
 #include "lle/unicode_case.h"
+#include "lle/unicode_compare.h"
 #include "lush.h"
 #include "shell_mode.h"
 
@@ -2616,15 +2617,43 @@ const char *symtable_array_get_index(array_value_t *array, int index) {
 }
 
 /**
+ * @brief Normalise an associative-array key to NFC for hash lookup
+ *
+ * Wraps lle_unicode_normalize_nfc_alloc so callers can hand off the
+ * NULL-input check / fallback policy in one line. The hashtable
+ * hashes its keys bytewise; storing NFC bytes (and looking them up
+ * by NFC bytes) lets NFC vs NFD pairs of the same user-visible
+ * string collapse to a single entry. ASCII inputs hit the primitive
+ * fast path and round-trip via strdup with no normalisation
+ * machinery exercised.
+ *
+ * Returns a heap-allocated NFC copy (caller frees) or NULL if the
+ * primitive could not allocate. Callers fall back to the raw key
+ * bytes on NULL so a memory-tight system stays functional with
+ * byte-level semantics; without this fallback, a NULL return would
+ * propagate as a failed set/get/unset.
+ */
+static char *assoc_key_nfc(const char *key) {
+    return lle_unicode_normalize_nfc_alloc(key);
+}
+
+/**
  * @brief Set an element in an associative array
+ *
+ * Keys are stored in NFC; NFC and NFD encodings of the same
+ * user-visible string therefore collapse to a single entry. The
+ * insertion-order list (zsh-style iteration) also holds NFC keys
+ * so listings emit canonical bytes.
  */
 int symtable_array_set_assoc(array_value_t *array, const char *key,
                              const char *value) {
     if (!array || !array->is_associative || !key) {
         return -1;
     }
+    char *nfc = assoc_key_nfc(key);
+    const char *lookup_key = nfc ? nfc : key;
 
-    bool is_new = !ht_strstr_get(array->assoc_map, key);
+    bool is_new = !ht_strstr_get(array->assoc_map, lookup_key);
 
     /// Check if key exists and update count
     if (is_new) {
@@ -2647,7 +2676,7 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
             /// fallback path remains correct.
         }
         if (array->assoc_insertion_count < array->assoc_insertion_capacity) {
-            char *key_copy = strdup(key);
+            char *key_copy = strdup(lookup_key);
             if (key_copy) {
                 array->assoc_insertion_order[array->assoc_insertion_count++] =
                     key_copy;
@@ -2655,19 +2684,26 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
         }
     }
 
-    ht_strstr_insert(array->assoc_map, key, value ? value : "");
+    ht_strstr_insert(array->assoc_map, lookup_key, value ? value : "");
+    free(nfc);
     return 0;
 }
 
 /**
  * @brief Get an element from an associative array
+ *
+ * Lookup key is NFC-normalised so callers passing either NFC or NFD
+ * encodings of the same user-visible string find the same entry.
  */
 const char *symtable_array_get_assoc(array_value_t *array, const char *key) {
     if (!array || !array->is_associative || !key) {
         return NULL;
     }
-
-    return ht_strstr_get(array->assoc_map, key);
+    char *nfc = assoc_key_nfc(key);
+    const char *lookup_key = nfc ? nfc : key;
+    const char *result = ht_strstr_get(array->assoc_map, lookup_key);
+    free(nfc);
+    return result;
 }
 
 /**
@@ -2753,16 +2789,21 @@ int symtable_array_unset_assoc(array_value_t *array, const char *key) {
     if (!array || !array->is_associative || !key) {
         return -1;
     }
+    char *nfc = assoc_key_nfc(key);
+    const char *lookup_key = nfc ? nfc : key;
 
-    if (ht_strstr_get(array->assoc_map, key)) {
-        ht_strstr_remove(array->assoc_map, key);
+    if (ht_strstr_get(array->assoc_map, lookup_key)) {
+        ht_strstr_remove(array->assoc_map, lookup_key);
         array->count--;
 
         /// Remove from insertion-order list. Linear scan + memmove down;
         /// acceptable since assoc-array unset is uncommon and the list
-        /// is typically small. (Issue #69.)
+        /// is typically small. The stored entries are NFC bytes
+        /// (set path uses lookup_key, which is the NFC form), so the
+        /// strcmp here matches byte-for-byte against the same canonical
+        /// form. (Issue #69.)
         for (size_t i = 0; i < array->assoc_insertion_count; i++) {
-            if (strcmp(array->assoc_insertion_order[i], key) == 0) {
+            if (strcmp(array->assoc_insertion_order[i], lookup_key) == 0) {
                 free(array->assoc_insertion_order[i]);
                 size_t to_move = array->assoc_insertion_count - i - 1;
                 if (to_move > 0) {
@@ -2776,6 +2817,7 @@ int symtable_array_unset_assoc(array_value_t *array, const char *key) {
         }
     }
 
+    free(nfc);
     return 0;
 }
 

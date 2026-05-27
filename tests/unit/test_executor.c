@@ -2225,6 +2225,50 @@ TEST(rt_heredoc_delimiter_unequal_when_actually_different) {
     ASSERT_TRUE(r.exit_status != 0, "DONE delimiter is not terminated by EOF");
 }
 
+TEST(rt_assoc_key_nfc_nfd_collapse) {
+    /// declare -A m; m[NFC]=one; m[NFD]=two
+    /// Both keys (NFC e-acute precomposed + NFD e + combining acute)
+    /// must hash to the same entry. The second set overwrites the
+    /// first; the resulting array has one entry and both lookup
+    /// forms find it.
+    run_result_t r = run_shell("declare -A m\n"
+                               "nfc=$'caf\\xc3\\xa9'\n"
+                               "nfd=$'cafe\\xcc\\x81'\n"
+                               "m[$nfc]=one\n"
+                               "m[$nfd]=two\n"
+                               "echo len=${#m[@]}\n"
+                               "echo via_nfc=${m[$nfc]}\n"
+                               "echo via_nfd=${m[$nfd]}\n");
+    ASSERT_STDOUT_EQ(r, "len=1\nvia_nfc=two\nvia_nfd=two\n");
+}
+
+TEST(rt_assoc_key_distinct_when_actually_different) {
+    /// NFC normalisation does not paper over real key differences.
+    /// "café" and "CAFÉ" hash to separate entries (case folding is
+    /// a separate axis from NFC normalisation).
+    run_result_t r = run_shell("declare -A m\n"
+                               "m[café]=lower\n"
+                               "m[CAFÉ]=upper\n"
+                               "echo len=${#m[@]}\n"
+                               "echo lower=${m[café]}\n"
+                               "echo upper=${m[CAFÉ]}\n");
+    ASSERT_STDOUT_EQ(r, "len=2\nlower=lower\nupper=upper\n");
+}
+
+TEST(rt_assoc_key_ascii_paths_unchanged) {
+    /// ASCII keys hit the primitive's strdup fast path -- behaviour
+    /// must be byte-identical to the prior implementation.
+    run_result_t r = run_shell("declare -A m\n"
+                               "m[foo]=one\n"
+                               "m[bar]=two\n"
+                               "m[baz]=three\n"
+                               "echo ${m[foo]}\n"
+                               "echo ${m[bar]}\n"
+                               "echo ${m[baz]}\n"
+                               "echo len=${#m[@]}\n");
+    ASSERT_STDOUT_EQ(r, "one\ntwo\nthree\nlen=3\n");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3476,6 +3520,9 @@ int main(void) {
     RUN_TEST(rt_heredoc_delimiter_nfc_vs_nfd);
     RUN_TEST(rt_heredoc_delimiter_nfd_vs_nfc);
     RUN_TEST(rt_heredoc_delimiter_unequal_when_actually_different);
+    RUN_TEST(rt_assoc_key_nfc_nfd_collapse);
+    RUN_TEST(rt_assoc_key_distinct_when_actually_different);
+    RUN_TEST(rt_assoc_key_ascii_paths_unchanged);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
