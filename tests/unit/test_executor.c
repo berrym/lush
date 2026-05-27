@@ -2568,9 +2568,17 @@ TEST(rt_pe_catalogue_per_element_at_q_via_slice) {
 }
 
 TEST(rt_pipeline_three_stages) {
-    run_result_t r = run_shell("echo hello | cat | wc -c\n");
-    /// "hello\n" = 6 bytes
-    ASSERT_STDOUT_EQ(r, "       6\n");
+    /// Three-stage plumbing: producer | middle | terminator. The
+    /// original form used `wc -c` to count bytes, but `wc -c`
+    /// emits leading-whitespace-padded output on BSD coreutils
+    /// (macOS) and unpadded output on GNU coreutils (Linux),
+    /// which made the literal-output assertion platform-specific.
+    /// `cat | cat` exercises the same N-stage pipeline plumbing
+    /// (data flows through three connected pipes; the final stage
+    /// must terminate the pipeline) with byte-identical output
+    /// across platforms.
+    run_result_t r = run_shell("echo hello | cat | cat\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
 }
 
 TEST(rt_pipeline_four_stages) {
