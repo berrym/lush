@@ -7,7 +7,40 @@
  */
 
 #include "builtins.h"
+#include "lle/lle_pager.h"
 #include "symtable.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+
+/**
+ * @brief Callback for enumerating readonly variables into a FILE*
+ *
+ * Filters symtable_enumerate_global_vars output to entries whose
+ * flags carry SYMVAR_READONLY. Skips internal `__`-prefixed names
+ * (these are shell-private metadata that the user never set).
+ * Output format matches POSIX: `readonly name='value'` with single
+ * quotes around the value.
+ */
+static void readonly_print_callback(const char *key, const char *value,
+                                    void *userdata) {
+    FILE *out = (FILE *)userdata;
+    if (!out || !key) {
+        return;
+    }
+    if (key[0] == '_' && key[1] == '_') {
+        return;
+    }
+    symtable_manager_t *mgr = symtable_get_global_manager();
+    if (!mgr) {
+        return;
+    }
+    symvar_flags_t flags = symtable_get_flags(mgr, key);
+    if (!(flags & SYMVAR_READONLY)) {
+        return;
+    }
+    fprintf(out, "readonly %s='%s'\n", key, value ? value : "");
+}
 
 /**
  * @brief Create read-only variables
@@ -22,7 +55,13 @@
  */
 int bin_readonly(int argc, char **argv) {
     if (argc == 1) {
-        /// No arguments - print all readonly variables
+        /// No arguments - print all readonly variables. Enumerate
+        /// every global scalar and filter by the SYMVAR_READONLY flag;
+        /// the listing is buffered through open_memstream and handed
+        /// to lle_pager_present so long readonly sets paginate. On
+        /// memstream allocation failure the callback writes directly
+        /// to stdout. The symtable manager existence check is kept
+        /// because the callback itself depends on it for flag lookup.
         symtable_manager_t *manager = symtable_get_global_manager();
         if (!manager) {
             executor_error_report(current_executor, SHELL_ERR_STATE_CORRUPTION,
@@ -30,9 +69,16 @@ int bin_readonly(int argc, char **argv) {
                                   "symbol table not available");
             return 1;
         }
-
-        /// Print readonly variables in the format: readonly name=value
-        printf("readonly functionality not fully implemented for listing\n");
+        char *buf = NULL;
+        size_t buf_len = 0;
+        FILE *out = open_memstream(&buf, &buf_len);
+        FILE *sink = out ? out : stdout;
+        symtable_enumerate_global_vars(readonly_print_callback, sink);
+        if (out) {
+            fclose(out);
+            lle_pager_present(NULL, buf);
+            free(buf);
+        }
         return 0;
     }
 
@@ -85,7 +131,11 @@ int bin_readonly(int argc, char **argv) {
         char *equals = strchr(arg, '=');
 
         if (equals) {
-            /// Variable assignment: readonly var=value
+            /// Variable assignment: readonly var=value. Mark the
+            /// variable with SYMVAR_READONLY via the dedicated
+            /// symtable_set_readonly_global() entry so the flag
+            /// lookup in readonly_print_callback (and any future
+            /// readonly-enforcement check) sees the attribute.
             *equals = '\0';
             char *name = arg;
             char *value = equals + 1;
@@ -100,16 +150,16 @@ int bin_readonly(int argc, char **argv) {
                 return 1;
             }
 
-            /// Set the variable value
-            symtable_set_global(name, value);
-
-            /// Mark as readonly (note: this is a simplified implementation)
-            /// In a full implementation, we would need to track readonly status
-            /// and prevent future modifications
+            symtable_set_readonly_global(name, value);
 
             *equals = '='; /// Restore the string
         } else {
-            /// No assignment: readonly var (make existing variable readonly)
+            /// No assignment: readonly var (make existing variable
+            /// readonly). For a nonexistent variable we create it
+            /// with the readonly flag and an empty value; for an
+            /// existing one we preserve the current value and add
+            /// SYMVAR_READONLY through symtable_set_flags so the
+            /// flag stack carries the attribute forward.
             if (!is_valid_identifier(arg)) {
                 executor_error_report(current_executor,
                                       SHELL_ERR_INVALID_ARGUMENT,
@@ -118,16 +168,43 @@ int bin_readonly(int argc, char **argv) {
                 return 1;
             }
 
-            /// Check if variable exists
-            char *value = symtable_get_global(arg);
-            if (!value) {
-                /// Variable doesn't exist, create it with empty value
-                symtable_set_global(arg, "");
+            /// Reject arrays for the bare-name form: an array would
+            /// require the readonly attribute to live on the array
+            /// record (`array_value_t` carries no `flags` field today),
+            /// and setting a scalar via symtable_set_readonly_global
+            /// would silently clobber the array. Surface a structured
+            /// error rather than corrupting state; whole-array readonly
+            /// lands once array_value_t gains attribute tracking.
+            if (symtable_is_array(arg)) {
+                shell_error_t *err = shell_error_create(
+                    SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
+                    builtin_get_source_location(),
+                    "%s: readonly does not yet support arrays; use "
+                    "`declare -ar` for read-only array declarations once "
+                    "array attribute tracking lands",
+                    arg);
+                if (err) {
+                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
+                    shell_error_free(err);
+                } else {
+                    executor_error_report(current_executor,
+                                          SHELL_ERR_TYPE_MISMATCH,
+                                          builtin_get_source_location(),
+                                          "%s: readonly does not yet "
+                                          "support arrays",
+                                          arg);
+                }
+                return 1;
             }
 
-            /// Mark as readonly (simplified implementation)
-            /// Note: Full readonly implementation would require symbol table
-            /// modifications to track and enforce readonly status
+            symtable_manager_t *manager = symtable_get_global_manager();
+            char *current_value = symtable_get_global(arg);
+            if (!current_value) {
+                symtable_set_readonly_global(arg, "");
+            } else if (manager) {
+                symvar_flags_t cur = symtable_get_flags(manager, arg);
+                symtable_set_flags(manager, arg, cur | SYMVAR_READONLY);
+            }
         }
     }
 

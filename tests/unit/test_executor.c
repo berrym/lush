@@ -3048,6 +3048,90 @@ TEST(rt_typed_fn_lexical_scope) {
 extern void init_symtable(void);
 extern void free_global_symtable(void);
 
+/* ============================================================================
+ * Regression: readonly enforcement
+ *
+ * Covers the contract that SYMVAR_READONLY actually blocks subsequent
+ * writes: bare reassign, cross-function-scope reassign, declare -r and
+ * readonly keyword routes, array-element reassign, and the listing.
+ * ============================================================================
+ */
+
+/// Each test below uses a name unique to itself so the global
+/// symbol table (which persists across run_shell calls in the
+/// in-process harness) does not leak a readonly attribute from
+/// the previous case into the next case's preamble.
+
+TEST(rt_readonly_blocks_same_scope_reassign) {
+    run_result_t r = run_shell("readonly RO_REASSIGN=1\n"
+                               "RO_REASSIGN=2\n"
+                               "echo \"final $RO_REASSIGN\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final 1\n");
+}
+
+TEST(rt_readonly_blocks_via_readonly_keyword) {
+    /// `readonly NAME` without a value promotes an existing scalar
+    /// to readonly; later writes must be refused.
+    run_result_t r = run_shell("RO_PROMOTE=initial\n"
+                               "readonly RO_PROMOTE\n"
+                               "RO_PROMOTE=overwrite\n"
+                               "echo \"final $RO_PROMOTE\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final initial\n");
+}
+
+TEST(rt_readonly_blocks_across_function_scope) {
+    /// Cross-scope rule: an assignment inside a function body to a
+    /// name that is readonly at any enclosing scope is refused.
+    run_result_t r = run_shell("readonly RO_FUNC=outer\n"
+                               "ro_func_fixture() { RO_FUNC=inner; }\n"
+                               "ro_func_fixture\n"
+                               "echo \"final $RO_FUNC\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final outer\n");
+}
+
+TEST(rt_readonly_blocks_via_declare_r) {
+    /// declare -r sets SYMVAR_READONLY the same way the readonly
+    /// builtin does; enforcement applies through the same path.
+    run_result_t r = run_shell("declare -r RO_DECLARE=fixed\n"
+                               "RO_DECLARE=mutated\n"
+                               "echo \"final $RO_DECLARE\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "final fixed\n");
+}
+
+TEST(rt_readonly_rejects_arrays_with_diagnostic) {
+    /// Whole-array readonly is not yet supported (array_value_t has no
+    /// attribute storage). The bare-name path in bin_readonly detects
+    /// this and emits a structured TYPE_MISMATCH rather than silently
+    /// clobbering the array with a scalar. Locks the diagnostic in so
+    /// the contract is observable; once array attribute tracking
+    /// lands, this test flips to assert real enforcement.
+    run_result_t r = run_shell("declare -a RO_ARR=(a b c)\n"
+                               "readonly RO_ARR\n"
+                               "echo \"[0]=${RO_ARR[0]}\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly does not yet support arrays");
+    ASSERT_STDOUT_EQ(r, "[0]=a\n");
+}
+
+TEST(rt_readonly_listing_includes_marked) {
+    /// The no-arg `readonly` listing path now enumerates marked
+    /// variables; entries set via `readonly NAME=VALUE` appear.
+    run_result_t r = run_shell("readonly RO_LISTED=hello\nreadonly\n");
+    ASSERT_STDOUT_CONTAINS(r, "readonly RO_LISTED='hello'");
+}
+
+TEST(rt_readonly_promotes_existing_var) {
+    /// `readonly NAME` without `=` keeps the prior value and marks
+    /// the variable readonly without clobbering its content.
+    run_result_t r = run_shell("RO_KEEP=kept\n"
+                               "readonly RO_KEEP\n"
+                               "readonly | grep \"^readonly RO_KEEP=\"\n");
+    ASSERT_STDOUT_CONTAINS(r, "readonly RO_KEEP='kept'");
+}
+
 int main(void) {
     printf("Running executor integration tests...\n\n");
 
@@ -3342,6 +3426,15 @@ int main(void) {
     RUN_TEST(rt_char_class_negated);
     RUN_TEST(rt_char_class_digit);
     RUN_TEST(rt_char_class_upper);
+
+    printf("\nRegression: readonly enforcement:\n");
+    RUN_TEST(rt_readonly_blocks_same_scope_reassign);
+    RUN_TEST(rt_readonly_blocks_via_readonly_keyword);
+    RUN_TEST(rt_readonly_blocks_across_function_scope);
+    RUN_TEST(rt_readonly_blocks_via_declare_r);
+    RUN_TEST(rt_readonly_rejects_arrays_with_diagnostic);
+    RUN_TEST(rt_readonly_listing_includes_marked);
+    RUN_TEST(rt_readonly_promotes_existing_var);
 
     /// Cleanup global symbol table
     free_global_symtable();

@@ -127,6 +127,18 @@ typedef enum {
     SYMVAR_INTEGER_ATTR = (1 << 9)
 } symvar_flags_t;
 
+/**
+ * @brief Return code: write blocked by readonly attribute
+ *
+ * symtable_set_var / symtable_assign_var / symtable_set_array_element
+ * return this value (instead of -1) when the write target already
+ * carries SYMVAR_READONLY anywhere in the scope chain. Callers that
+ * want to surface a user-facing "readonly variable" diagnostic
+ * distinguish this from a generic failure; callers that just need
+ * success/failure can continue treating non-zero as failure.
+ */
+#define SYMTABLE_ERR_READONLY (-2)
+
 /// Scope types for different contexts
 typedef enum {
     SCOPE_GLOBAL,      ///< Global shell scope

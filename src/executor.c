@@ -3372,9 +3372,16 @@ static int execute_for(executor_t *executor, node_t *for_node) {
             /// a local of this name already exists (e.g. `local i` in the
             /// enclosing function), update that local instead of creating
             /// a parallel global. See issue #47.
-            if (symtable_assign_var(executor->symtable, var_name,
-                                    expanded_words[i]) != 0) {
-                set_executor_error(executor, "Failed to set loop variable");
+            int assign_rc = symtable_assign_var(executor->symtable, var_name,
+                                                expanded_words[i]);
+            if (assign_rc != 0) {
+                if (assign_rc == SYMTABLE_ERR_READONLY) {
+                    executor_error_report(executor, SHELL_ERR_READONLY_VAR,
+                                          SOURCE_LOC_UNKNOWN,
+                                          "%s: readonly variable", var_name);
+                } else {
+                    set_executor_error(executor, "Failed to set loop variable");
+                }
                 /// Cleanup expanded words
                 for (int j = 0; j < word_count; j++) {
                     free(expanded_words[j]);
@@ -9190,6 +9197,22 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     /// Free resolved nameref if it was allocated
     if (resolved_to_free) {
         free(resolved_to_free);
+    }
+
+    /// Readonly enforcement: symtable_assign_var / symtable_set_var
+    /// return SYMTABLE_ERR_READONLY when the target carries the
+    /// readonly attribute anywhere in the scope chain. Surface the
+    /// user-facing diagnostic through the structured-error system
+    /// before the generic failure return below.
+    if (result == SYMTABLE_ERR_READONLY) {
+        executor_error_report(executor, SHELL_ERR_READONLY_VAR, loc,
+                              "%s: readonly variable", var_name);
+        free(var_name);
+        free(value);
+        if (resolved_to_free) {
+            free(resolved_to_free);
+        }
+        return 1;
     }
 
     /// POSIX -a (allexport): automatically export assigned variables

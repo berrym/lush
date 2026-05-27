@@ -658,6 +658,26 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
+    /// Readonly enforcement (current scope). If an entry already lives
+    /// in this scope and carries SYMVAR_READONLY, refuse the write and
+    /// return SYMTABLE_ERR_READONLY so callers can surface a specific
+    /// error message. The check looks at the existing serialised entry
+    /// rather than the incoming `flags` argument so re-asserting the
+    /// readonly bit (`readonly X=1` twice) is correctly refused -- bash
+    /// matches this behaviour.
+    const char *existing_serialized =
+        ht_strstr_get(manager->current_scope->vars_ht, name);
+    if (existing_serialized) {
+        symvar_t *existing = deserialize_variable(name, existing_serialized);
+        if (existing) {
+            bool readonly_blocked = (existing->flags & SYMVAR_READONLY) != 0;
+            free_symvar(existing);
+            if (readonly_blocked) {
+                return SYMTABLE_ERR_READONLY;
+            }
+        }
+    }
+
     /// Serialize variable data
     char *serialized = serialize_variable(value, SYMVAR_STRING, flags,
                                           manager->current_scope->level);
@@ -730,6 +750,13 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
     /// Walk scope chain from current scope upward looking for the variable.
     /// If found, update that scope (preserves locality). If not, fall through
     /// to global write (POSIX default for unprefixed assignments).
+    ///
+    /// Readonly enforcement spans the chain: if the matching entry in
+    /// any scope carries SYMVAR_READONLY, the write is refused with
+    /// SYMTABLE_ERR_READONLY. This catches the canonical cross-scope
+    /// case (`readonly X=1` at global; `X=2` inside a function) -- bash
+    /// matches this behaviour, refusing the inner assignment rather
+    /// than silently shadowing.
     symtable_scope_t *scope = manager->current_scope;
     while (scope) {
         const char *serialized = ht_strstr_get(scope->vars_ht, name);
@@ -738,10 +765,15 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
             /// (export, readonly bookkeeping, etc.) survive the assignment.
             /// Mask out the unset sentinel since we are setting a value.
             symvar_flags_t flags = SYMVAR_NONE;
+            bool readonly_blocked = false;
             symvar_t *existing = deserialize_variable(name, serialized);
             if (existing) {
                 flags = existing->flags & ~SYMVAR_UNSET;
+                readonly_blocked = (existing->flags & SYMVAR_READONLY) != 0;
                 free_symvar(existing);
+            }
+            if (readonly_blocked) {
+                return SYMTABLE_ERR_READONLY;
             }
 
             /// Temporarily switch current_scope so symtable_set_var writes
@@ -3028,6 +3060,14 @@ int symtable_set_array_element(const char *name, const char *subscript,
     if (!name || !subscript) {
         return -1;
     }
+
+    /// NOTE: whole-array readonly is not yet enforced here. The
+    /// SYMVAR_READONLY flag lives on the scalar variable record;
+    /// array_value_t carries no flags field today, so an array marked
+    /// readonly via a future `declare -ar` or `readonly -a` cannot
+    /// reject element writes from this function. Enforcement lands
+    /// when array_value_t gains attribute tracking (see the trailing
+    /// note on bin_readonly's array-rejection branch).
 
     array_value_t *array = symtable_get_array(name);
     if (!array) {
