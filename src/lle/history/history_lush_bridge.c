@@ -21,6 +21,7 @@
 #include "lle/error_handling.h"
 #include "lle/history.h"
 #include "lle/memory_management.h"
+#include "lle/unicode_compare.h"
 #include "posix_history.h"
 
 #include <errno.h>
@@ -355,9 +356,12 @@ lle_result_t lle_history_bridge_export_to_readline(void) {
             continue;
         }
 
-        /// Check if already in readline (avoid duplicates)
+        /// Check if already in readline (avoid duplicates). NFC-
+        /// equivalent so the same command stored under different
+        /// normalisations does not push twice on the readline side.
         HIST_ENTRY *last = history_get(history_length);
-        if (last && strcmp(last->line, entry->command) == 0) {
+        if (last &&
+            lle_unicode_strings_equal(last->line, entry->command, NULL)) {
             continue;
         }
 

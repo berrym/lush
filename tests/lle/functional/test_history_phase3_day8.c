@@ -177,6 +177,40 @@ void test_exact_match_search(void) {
     TEST_PASS();
 }
 
+void test_exact_match_nfc_nfd_equivalence(void) {
+    TEST_START("Exact Match Search - NFC/NFD Equivalence");
+
+    lle_history_core_t *core = NULL;
+    lle_history_core_create(&core, NULL, NULL);
+
+    /// Entry stored in NFC form: "café" = caf + e-acute (U+00E9, bytes C3 A9)
+    lle_history_add_entry(core, "caf\xC3\xA9", 0, NULL);
+    /// Unrelated entry for noise.
+    lle_history_add_entry(core, "echo hello", 0, NULL);
+
+    /// Query in NFD form: "café" = caf + e + combining acute (U+0301, CC 81)
+    /// Must match the NFC-stored entry under NFC equivalence.
+    lle_history_search_results_t *results =
+        lle_history_search_exact(core, "cafe\xCC\x81", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "NFD query must find NFC-stored entry");
+
+    lle_history_search_results_destroy(results);
+
+    /// And the reverse direction: NFD-stored entry, NFC query.
+    lle_history_add_entry(core, "cafe\xCC\x81 deuxieme", 0, NULL);
+    results = lle_history_search_exact(core, "caf\xC3\xA9 deuxieme", 10);
+    ASSERT_NOT_NULL(results, "Search should return results");
+    ASSERT_EQ(lle_history_search_results_get_count(results), 1,
+              "NFC query must find NFD-stored entry");
+    lle_history_search_results_destroy(results);
+
+    lle_history_core_destroy(core);
+
+    TEST_PASS();
+}
+
 void test_exact_match_no_results(void) {
     TEST_START("Exact Match Search - No Results");
 
@@ -727,6 +761,7 @@ int main(void) {
 
     printf("\n--- EXACT MATCH SEARCH ---\n");
     test_exact_match_search();
+    test_exact_match_nfc_nfd_equivalence();
     test_exact_match_no_results();
     test_exact_match_case_sensitive();
 

@@ -29,6 +29,7 @@
 #include "lle/history.h"
 #include "lle/performance.h"
 #include "lle/unicode_case.h"
+#include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
 #include <ctype.h>
 #include <inttypes.h>
@@ -497,8 +498,11 @@ lle_history_search_exact(lle_history_core_t *history_core, const char *query,
             continue;
         }
 
-        /// Check for exact match
-        if (strcmp(entry->command, query) == 0) {
+        /// Check for exact match under NFC equivalence so a query
+        /// in one Unicode normalisation finds a history entry in the
+        /// other. ASCII queries / entries hit the primitive's fast
+        /// path with no cost beyond the byte scan.
+        if (lle_unicode_strings_equal(entry->command, query, NULL)) {
             int score = calculate_score(
                 entry->command, query, 0, /// Exact match = position 0
                 index, total_entries, LLE_SEARCH_TYPE_EXACT);
