@@ -300,10 +300,19 @@ Sorted by likelihood-of-impact (how often a real user hits this):
 
 ## High-priority B verdicts (NFC equivalence)
 
-- **`src/executor.c:8953,8958`** and **`src/builtins/bin_test.c:189,192`** — `[ a = b ]` / `[[ a == b ]]` compare user values bytewise. NFC `é` vs NFD `é` currently unequal. Pure POSIX defends this; lush-superset shouldn't.
+All four resolved in 2026-05-27 via the `lle_unicode_strings_equal`
+primitive (existing) plus a new `lle_unicode_normalize_nfc_alloc`
+heap wrapper (3e7c3acd) for the assoc-key path that needed
+canonical-form storage rather than just canonical-form comparison.
+
+- **`src/builtins/bin_test.c:189,192`** — `[ a = b ]` / `[[ a == b ]]` compare user values bytewise. NFC `é` vs NFD `é` currently unequal. Pure POSIX defends this; lush-superset shouldn't.
+  - **DONE** (83cc8e04): both branches use `lle_unicode_strings_equal(s1, s2, NULL)`. The executor.c:8953,8958 duplicate (a MAYBE_UNUSED dead-code copy of execute_test_builtin) was deleted in the same commit. Tests in `tests/unit/test_executor.c`: `rt_test_equality_under_nfc_equivalence`, `rt_test_inequality_under_nfc_when_actually_different`, `rt_test_ascii_paths_unchanged`.
 - **`src/symtable.c:2692`** — associative-array key lookup is bytewise. `arr[café]=1; echo "${arr[café]}"` with NFD-typed key creates two distinct entries displayed identically.
+  - **DONE** (423f4f36): introduced `assoc_key_nfc` static helper over the new `lle_unicode_normalize_nfc_alloc` primitive (3e7c3acd); `symtable_array_set_assoc`, `symtable_array_get_assoc`, and `symtable_array_unset_assoc` all NFC-normalise the key at the boundary so the hashtable stores canonical bytes and NFC/NFD pairs collapse. Tests: `rt_assoc_key_nfc_nfd_collapse`, `rt_assoc_key_distinct_when_actually_different`, `rt_assoc_key_ascii_paths_unchanged`.
 - **`src/executor.c:5160`** and **`src/redirection.c:1023`**, **`src/parser.c:2871`** — heredoc end-delimiter match is bytewise across user-chosen delimiter; rare in practice but a latent NFC bug.
+  - **DONE** (2818f1ae): all three layers (parse-time scan, runtime body-read, argv-time delimiter check) use `lle_unicode_strings_equal`. Tests: `rt_heredoc_delimiter_nfc_vs_nfd`, `rt_heredoc_delimiter_nfd_vs_nfc`, `rt_heredoc_delimiter_unequal_when_actually_different`.
 - **`src/autocorrect.c:237, 403`** — autocorrect dedup of suggestion candidates is bytewise across filesystem-sourced names.
+  - **DONE** (178ff0d9): both dedup loops (`autocorrect_aggregate_suggestions` and `autocorrect_learn_command`) use `lle_unicode_strings_equal`. Tests in `tests/unit/test_autocorrect.c`: `learn_command_nfc_nfd_dedup`, `learn_command_distinct_under_case`.
 
 ## Identifier-policy B cluster (cross-cutting)
 
