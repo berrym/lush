@@ -43,6 +43,17 @@ typedef enum {
 } pager_mode_t;
 
 /**
+ * @brief Direction stored on the pager so n/N can repeat or invert
+ *
+ * Set when the user presses `/` (forward) or `?` (backward); `n`
+ * repeats this direction, `N` reverses it.
+ */
+typedef enum {
+    PAGER_SEARCH_FORWARD = 0,
+    PAGER_SEARCH_BACKWARD,
+} pager_search_direction_t;
+
+/**
  * @brief Pager display layer
  *
  * Owned by the display controller while pagination is active. The
@@ -70,11 +81,12 @@ typedef struct pager_layer {
     pager_mode_t mode;
     bool active; ///< True between init and destroy
 
-    /// Search state (storage only; the search engine lands later)
-    char *search_pattern;      ///< NULL when no search active
+    /// Search state
+    char *search_pattern;      ///< Heap copy; NULL when no search committed
     size_t current_match_line; ///< Index into line_index.entries; SIZE_MAX = no
                                ///< match
     bool wrap_searches;        ///< Wrap to top on no-match (config)
+    pager_search_direction_t search_direction; ///< Last submitted direction
 } pager_layer_t;
 
 /**
@@ -221,6 +233,58 @@ int pager_layer_set_search(pager_layer_t *pager, const char *pattern);
  * @param pager Layer to mutate
  */
 void pager_layer_clear_search(pager_layer_t *pager);
+
+/**
+ * @brief Sentinel meaning "no match found / no current match"
+ */
+#define PAGER_SEARCH_NO_MATCH ((size_t)-1)
+
+/**
+ * @brief Append a single byte to the in-progress search pattern
+ *
+ * Used by the SEARCH-mode input handler while the user is typing
+ * the pattern at the search prompt. The byte is appended verbatim,
+ * so multi-byte UTF-8 sequences fed one byte at a time accumulate
+ * naturally. Returns -1 on allocation failure (the pattern is
+ * left at its previous value).
+ *
+ * @param pager Layer to mutate
+ * @param byte  Byte to append
+ * @return 0 on success, -1 on allocation failure
+ */
+int pager_layer_search_append_byte(pager_layer_t *pager, unsigned char byte);
+
+/**
+ * @brief Remove the last byte from the in-progress search pattern
+ *
+ * Used by the SEARCH-mode input handler when the user presses
+ * Backspace. No-op when the pattern is empty.
+ *
+ * @param pager Layer to mutate
+ */
+void pager_layer_search_backspace(pager_layer_t *pager);
+
+/**
+ * @brief Find the next line containing `search_pattern` in `direction`
+ *
+ * Searches starting from `from_line + 1` (forward) or `from_line - 1`
+ * (backward); wraps to the other end of the content when
+ * `wrap_searches` is true, returns PAGER_SEARCH_NO_MATCH otherwise.
+ * Byte-wise substring match (case-sensitive) -- matches less's
+ * default. Returns PAGER_SEARCH_NO_MATCH when the pattern is empty
+ * or unset.
+ *
+ * The function does not mutate top_line or current_match_line; the
+ * caller decides whether to commit (typically by setting both to
+ * the returned index and rendering).
+ *
+ * @param pager     Layer with a committed search pattern
+ * @param from_line Origin line (the search starts adjacent to this)
+ * @param direction PAGER_SEARCH_FORWARD or PAGER_SEARCH_BACKWARD
+ * @return Matching line index, or PAGER_SEARCH_NO_MATCH
+ */
+size_t pager_layer_search_advance(const pager_layer_t *pager, size_t from_line,
+                                  pager_search_direction_t direction);
 
 #ifdef __cplusplus
 }

@@ -109,19 +109,47 @@ bool pager_apply_action(pager_layer_t *pager, pager_action_t action) {
         pager_layer_scroll_bottom(pager);
         return false;
     case PAGER_ACTION_BEGIN_SEARCH:
-    case PAGER_ACTION_BEGIN_SEARCH_REVERSE:
-        /// The search engine itself lands separately. For now,
-        /// transition to SEARCH mode and clear any prior pattern;
-        /// the search-prompt input loop populates the pattern.
+        /// Transition to SEARCH mode and clear any prior pattern;
+        /// the SEARCH-mode keys append into search_pattern, and
+        /// Enter commits the search via pager_layer_search_advance.
         pager_layer_set_mode(pager, PAGER_MODE_SEARCH);
         pager_layer_clear_search(pager);
+        pager->search_direction = PAGER_SEARCH_FORWARD;
         return false;
-    case PAGER_ACTION_NEXT_MATCH:
-    case PAGER_ACTION_PREV_MATCH:
-        /// No-op until the search engine lands; the action exists
-        /// for the dispatch to recognise the key without dropping
-        /// the user into PAGER_ACTION_NONE confusion.
+    case PAGER_ACTION_BEGIN_SEARCH_REVERSE:
+        pager_layer_set_mode(pager, PAGER_MODE_SEARCH);
+        pager_layer_clear_search(pager);
+        pager->search_direction = PAGER_SEARCH_BACKWARD;
         return false;
+    case PAGER_ACTION_NEXT_MATCH: {
+        /// Repeat the last search in its original direction.
+        size_t origin = (pager->current_match_line != PAGER_SEARCH_NO_MATCH)
+                            ? pager->current_match_line
+                            : pager->top_line;
+        size_t hit =
+            pager_layer_search_advance(pager, origin, pager->search_direction);
+        if (hit != PAGER_SEARCH_NO_MATCH) {
+            pager->current_match_line = hit;
+            pager->top_line = hit;
+        }
+        return false;
+    }
+    case PAGER_ACTION_PREV_MATCH: {
+        /// Repeat the last search in the opposite direction.
+        pager_search_direction_t rev =
+            (pager->search_direction == PAGER_SEARCH_FORWARD)
+                ? PAGER_SEARCH_BACKWARD
+                : PAGER_SEARCH_FORWARD;
+        size_t origin = (pager->current_match_line != PAGER_SEARCH_NO_MATCH)
+                            ? pager->current_match_line
+                            : pager->top_line;
+        size_t hit = pager_layer_search_advance(pager, origin, rev);
+        if (hit != PAGER_SEARCH_NO_MATCH) {
+            pager->current_match_line = hit;
+            pager->top_line = hit;
+        }
+        return false;
+    }
     case PAGER_ACTION_HELP:
         pager_layer_set_mode(pager, PAGER_MODE_HELP);
         return false;
@@ -136,6 +164,60 @@ bool pager_apply_action(pager_layer_t *pager, pager_action_t action) {
     }
 }
 
+/**
+ * @brief Per-key handler for SEARCH mode
+ *
+ * Routes character keys into pager_layer_search_append_byte so the
+ * user can type the search pattern visibly at the search prompt
+ * (rendered by display_controller_render_pager's SEARCH-mode
+ * branch). Enter commits via pager_layer_search_advance and
+ * transitions back to VIEW; Esc / Ctrl-C / Ctrl-G cancel without
+ * committing. Returns true to terminate the outer loop entirely
+ * (only on EOF; the cancel paths just go back to VIEW).
+ */
+static bool pager_handle_search_key(pager_layer_t *pager, int key) {
+    /// Cancel / abort: Esc, Ctrl-C, single Ctrl-G all drop the
+    /// in-progress pattern and return to VIEW. The nuclear
+    /// Ctrl-G x3 quit is detected by the outer loop, not here.
+    if (key == KEY_ESC || key == KEY_CTRL_C || key == KEY_CTRL_G) {
+        pager_layer_clear_search(pager);
+        pager_layer_set_mode(pager, PAGER_MODE_VIEW);
+        return false;
+    }
+    /// Enter / Return: commit the pattern and execute the search.
+    /// An empty pattern at commit time leaves search_pattern empty
+    /// and current_match_line at NO_MATCH; future n / N press is a
+    /// no-op until the user runs another search.
+    if (key == '\r' || key == '\n') {
+        if (pager->search_pattern && pager->search_pattern[0] != '\0') {
+            size_t hit = pager_layer_search_advance(pager, pager->top_line,
+                                                    pager->search_direction);
+            if (hit != PAGER_SEARCH_NO_MATCH) {
+                pager->current_match_line = hit;
+                pager->top_line = hit;
+            }
+        }
+        pager_layer_set_mode(pager, PAGER_MODE_VIEW);
+        return false;
+    }
+    /// Backspace: shrink the pattern one byte. Both 0x7F (Delete in
+    /// most terminal mappings of Backspace) and 0x08 (literal BS)
+    /// are accepted.
+    if (key == 127 || key == 8) {
+        pager_layer_search_backspace(pager);
+        return false;
+    }
+    /// Printable ASCII and any byte in the UTF-8 continuation range
+    /// (>= 0x80, < 0xFF) appends to the pattern. The pattern is
+    /// stored as raw UTF-8; multi-byte sequences delivered as
+    /// successive bytes accumulate naturally.
+    if ((key >= 0x20 && key < 0x7F) || (key >= 0x80 && key < 0xFF)) {
+        (void)pager_layer_search_append_byte(pager, (unsigned char)key);
+    }
+    /// Unrecognised control sequence inside SEARCH mode -- ignore.
+    return false;
+}
+
 void pager_run_input_loop(pager_layer_t *pager, pager_key_source_fn src,
                           void *ud) {
     if (!pager || !src) {
@@ -147,6 +229,16 @@ void pager_run_input_loop(pager_layer_t *pager, pager_key_source_fn src,
         if (key < 0) {
             /// EOF / error from the source -- exit cleanly.
             break;
+        }
+        if (pager->mode == PAGER_MODE_SEARCH) {
+            /// In SEARCH mode, characters build the pending pattern
+            /// rather than dispatch through the VIEW-mode action
+            /// table. The mode itself transitions back to VIEW when
+            /// the user commits (Enter) or cancels (Esc).
+            if (pager_handle_search_key(pager, key)) {
+                break;
+            }
+            continue;
         }
         pager_action_t act = pager_key_to_action(key, pager->mode);
         bool should_exit = pager_apply_action(pager, act);

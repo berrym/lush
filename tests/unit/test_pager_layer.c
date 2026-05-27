@@ -381,6 +381,117 @@ TEST(clear_search_is_equivalent_to_null) {
 }
 
 /* ============================================================================
+ * SEARCH ENGINE (pager_layer_search_advance + buffer edits)
+ * ============================================================================
+ */
+
+#define SEARCH_CONTENT                                                         \
+    "alpha\nbravo\ncharlie\ndelta\necho\nfoxtrot\nalpha-too\n"
+/// Lines 0..6: alpha, bravo, charlie, delta, echo, foxtrot, alpha-too
+
+TEST(search_advance_finds_forward_match) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    pager_layer_set_search(&pager, "charlie");
+    size_t hit = pager_layer_search_advance(&pager, 0, PAGER_SEARCH_FORWARD);
+    ASSERT_EQ(hit, 2, "charlie is on line 2");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_advance_finds_backward_match) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    pager_layer_set_search(&pager, "bravo");
+    size_t hit = pager_layer_search_advance(&pager, 6, PAGER_SEARCH_BACKWARD);
+    ASSERT_EQ(hit, 1, "bravo is on line 1; backward from 6 finds it");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_advance_no_match_returns_sentinel) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    pager_layer_set_search(&pager, "zzz_not_present");
+    size_t hit = pager_layer_search_advance(&pager, 0, PAGER_SEARCH_FORWARD);
+    ASSERT_EQ(hit, PAGER_SEARCH_NO_MATCH, "missing pattern yields sentinel");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_advance_skips_origin) {
+    /// Origin line itself is excluded; advance lands on the next
+    /// match. Multiple matches: "alpha" hits line 0 AND line 6;
+    /// from origin 0 forward must land on 6, not 0.
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    pager_layer_set_search(&pager, "alpha");
+    size_t hit = pager_layer_search_advance(&pager, 0, PAGER_SEARCH_FORWARD);
+    ASSERT_EQ(hit, 6, "advance from 0 skips line 0; next alpha is at 6");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_advance_wraps_when_enabled) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    pager.wrap_searches = true;
+    pager_layer_set_search(&pager, "alpha");
+    /// Forward from line 6 (the last match): wrap to 0.
+    size_t hit = pager_layer_search_advance(&pager, 6, PAGER_SEARCH_FORWARD);
+    ASSERT_EQ(hit, 0, "wrap returns to alpha at line 0");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_advance_no_wrap_when_disabled) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    pager.wrap_searches = false;
+    pager_layer_set_search(&pager, "alpha");
+    size_t hit = pager_layer_search_advance(&pager, 6, PAGER_SEARCH_FORWARD);
+    ASSERT_EQ(hit, PAGER_SEARCH_NO_MATCH, "no wrap means no match past end");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_advance_empty_pattern_returns_sentinel) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    size_t hit = pager_layer_search_advance(&pager, 0, PAGER_SEARCH_FORWARD);
+    ASSERT_EQ(hit, PAGER_SEARCH_NO_MATCH,
+              "no committed pattern means no match");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_append_byte_grows_pattern) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    ASSERT_EQ(pager_layer_search_append_byte(&pager, 'a'), 0, "append 'a'");
+    ASSERT_EQ(pager_layer_search_append_byte(&pager, 'b'), 0, "append 'b'");
+    ASSERT_EQ(pager_layer_search_append_byte(&pager, 'c'), 0, "append 'c'");
+    ASSERT_STR_EQ(pager.search_pattern, "abc", "pattern accumulates");
+    pager_layer_destroy(&pager);
+}
+
+TEST(search_backspace_shrinks_pattern) {
+    pager_layer_t pager;
+    memset(&pager, 0, sizeof(pager));
+    pager_layer_init(&pager, SEARCH_CONTENT, strlen(SEARCH_CONTENT), 3, 80);
+    pager_layer_search_append_byte(&pager, 'a');
+    pager_layer_search_append_byte(&pager, 'b');
+    pager_layer_search_backspace(&pager);
+    ASSERT_STR_EQ(pager.search_pattern, "a", "backspace removes last byte");
+    pager_layer_search_backspace(&pager);
+    ASSERT_STR_EQ(pager.search_pattern, "", "second backspace empties");
+    pager_layer_search_backspace(&pager); /// no-op on empty
+    ASSERT_STR_EQ(pager.search_pattern, "", "backspace on empty is safe");
+    pager_layer_destroy(&pager);
+}
+
+/* ============================================================================
  * MAIN
  * ============================================================================
  */
@@ -428,6 +539,17 @@ int main(void) {
     RUN_TEST(set_search_stores_pattern_copy);
     RUN_TEST(set_search_null_clears);
     RUN_TEST(clear_search_is_equivalent_to_null);
+
+    printf("\nSearch engine:\n");
+    RUN_TEST(search_advance_finds_forward_match);
+    RUN_TEST(search_advance_finds_backward_match);
+    RUN_TEST(search_advance_no_match_returns_sentinel);
+    RUN_TEST(search_advance_skips_origin);
+    RUN_TEST(search_advance_wraps_when_enabled);
+    RUN_TEST(search_advance_no_wrap_when_disabled);
+    RUN_TEST(search_advance_empty_pattern_returns_sentinel);
+    RUN_TEST(search_append_byte_grows_pattern);
+    RUN_TEST(search_backspace_shrinks_pattern);
 
     return TEST_RESULT();
 }

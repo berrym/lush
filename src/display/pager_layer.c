@@ -232,3 +232,102 @@ int pager_layer_set_search(pager_layer_t *pager, const char *pattern) {
 void pager_layer_clear_search(pager_layer_t *pager) {
     (void)pager_layer_set_search(pager, NULL);
 }
+
+int pager_layer_search_append_byte(pager_layer_t *pager, unsigned char byte) {
+    if (!pager) {
+        return -1;
+    }
+    size_t cur_len = pager->search_pattern ? strlen(pager->search_pattern) : 0;
+    char *bigger = realloc(pager->search_pattern, cur_len + 2);
+    if (!bigger) {
+        return -1;
+    }
+    bigger[cur_len] = (char)byte;
+    bigger[cur_len + 1] = '\0';
+    pager->search_pattern = bigger;
+    return 0;
+}
+
+void pager_layer_search_backspace(pager_layer_t *pager) {
+    if (!pager || !pager->search_pattern) {
+        return;
+    }
+    size_t len = strlen(pager->search_pattern);
+    if (len == 0) {
+        return;
+    }
+    pager->search_pattern[len - 1] = '\0';
+}
+
+/**
+ * @brief Substring match within a content slice
+ *
+ * Byte-wise scan; the slice is not NUL-terminated and may contain
+ * embedded NULs (rare for shell output but possible). Equivalent to
+ * memmem() but spelled out so platforms without it (uncommon, but
+ * the rule for portable code in this project is "no GNU
+ * extensions") still build.
+ */
+static bool slice_contains(const char *hay, size_t hay_len, const char *needle,
+                           size_t needle_len) {
+    if (needle_len == 0 || needle_len > hay_len) {
+        return needle_len == 0;
+    }
+    size_t last_start = hay_len - needle_len;
+    for (size_t i = 0; i <= last_start; i++) {
+        if (memcmp(hay + i, needle, needle_len) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+size_t pager_layer_search_advance(const pager_layer_t *pager, size_t from_line,
+                                  pager_search_direction_t direction) {
+    if (!pager || !pager->search_pattern || pager->search_pattern[0] == '\0') {
+        return PAGER_SEARCH_NO_MATCH;
+    }
+    size_t n = pager->line_index.count;
+    if (n == 0) {
+        return PAGER_SEARCH_NO_MATCH;
+    }
+    size_t pat_len = strlen(pager->search_pattern);
+    bool forward = (direction == PAGER_SEARCH_FORWARD);
+    bool wrap = pager->wrap_searches;
+
+    /// Walk lines in the requested direction. The candidate set is
+    /// at most n lines and visits each at most once; wrap_searches
+    /// is the only knob that lets the scan cross the content
+    /// boundary.
+    size_t scanned = 0;
+    size_t idx = from_line;
+    while (scanned < n) {
+        if (forward) {
+            if (idx + 1 < n) {
+                idx++;
+            } else if (wrap) {
+                idx = 0;
+            } else {
+                break;
+            }
+        } else {
+            if (idx > 0) {
+                idx--;
+            } else if (wrap) {
+                idx = n - 1;
+            } else {
+                break;
+            }
+        }
+        const screen_line_index_entry_t *e = &pager->line_index.entries[idx];
+        if (slice_contains(pager->content + e->byte_offset, e->byte_length,
+                           pager->search_pattern, pat_len)) {
+            return idx;
+        }
+        scanned++;
+        if (idx == from_line) {
+            break; /// completed a full wrap without finding
+        }
+    }
+    return PAGER_SEARCH_NO_MATCH;
+}

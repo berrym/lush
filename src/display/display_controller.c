@@ -3674,11 +3674,20 @@ display_controller_render_pager(display_controller_t *controller, char *output,
         rows_emitted++;
     }
 
-    /// Status line. Format: "Lines X-Y of Z (NN%)" -- 1-based line
+    /// Status line. SEARCH mode shows the in-progress pattern with
+    /// a / or ? prefix matching the chosen direction. VIEW / HELP
+    /// modes show position info. Empty content always shows
+    /// "(empty)". Format: "Lines X-Y of Z (NN%)" -- 1-based line
     /// numbering, percentage rounded to nearest integer.
-    char status[128];
+    char status[256];
     int status_len = 0;
-    if (pager->line_index.count == 0) {
+    if (pager->mode == PAGER_MODE_SEARCH) {
+        const char *prompt =
+            (pager->search_direction == PAGER_SEARCH_BACKWARD) ? "?" : "/";
+        const char *pattern =
+            pager->search_pattern ? pager->search_pattern : "";
+        status_len = snprintf(status, sizeof(status), "%s%s", prompt, pattern);
+    } else if (pager->line_index.count == 0) {
         status_len = snprintf(status, sizeof(status), "(empty)");
     } else {
         size_t first_line = pager->top_line + 1; /// 1-based

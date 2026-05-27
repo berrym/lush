@@ -307,6 +307,78 @@ TEST(loop_search_then_cancel_then_quit) {
     pager_layer_destroy(&p);
 }
 
+TEST(loop_search_types_pattern_commits_and_jumps) {
+    /// Content set by mk_pager: alpha\nbeta\ngamma\ndelta\nepsilon
+    /// / enters SEARCH mode, type "gamm", Enter commits, q quits.
+    /// Expected: top_line lands on the gamma line (index 2).
+    pager_layer_t p;
+    mk_pager(&p);
+    int keys[] = {'/', 'g', 'a', 'm', 'm', '\r', 'q'};
+    scripted_source_t src = {keys, 7, 0};
+    pager_run_input_loop(&p, scripted_read, &src);
+    ASSERT_EQ(p.mode, PAGER_MODE_VIEW, "ended in VIEW");
+    ASSERT_EQ(p.top_line, (size_t)2, "view jumped to gamma");
+    ASSERT_EQ(p.current_match_line, (size_t)2, "current match recorded");
+    pager_layer_destroy(&p);
+}
+
+TEST(loop_search_reverse_finds_earlier_match) {
+    pager_layer_t p;
+    mk_pager(&p);
+    /// Scroll down first via 'j' three times, then ? for reverse,
+    /// type "beta", Enter commits, q quits. Expected: top_line on
+    /// beta (line 1).
+    int keys[] = {'j', 'j', 'j', '?', 'b', 'e', 't', 'a', '\r', 'q'};
+    scripted_source_t src = {keys, 10, 0};
+    pager_run_input_loop(&p, scripted_read, &src);
+    ASSERT_EQ(p.mode, PAGER_MODE_VIEW, "ended in VIEW");
+    ASSERT_EQ(p.top_line, (size_t)1, "reverse search jumped backward");
+    ASSERT_EQ(p.search_direction, PAGER_SEARCH_BACKWARD,
+              "direction recorded as backward");
+    pager_layer_destroy(&p);
+}
+
+TEST(loop_search_backspace_corrects_typed_pattern) {
+    pager_layer_t p;
+    mk_pager(&p);
+    /// Type "gaXm" then backspace twice and continue with "mm" so
+    /// the final pattern is "gamm"; expects gamma match at line 2.
+    int keys[] = {'/', 'g', 'a', 'X', 'm', 8, 8, 'm', 'm', '\r', 'q'};
+    scripted_source_t src = {keys, 11, 0};
+    pager_run_input_loop(&p, scripted_read, &src);
+    ASSERT_EQ(p.top_line, (size_t)2, "backspace-corrected pattern matched");
+    pager_layer_destroy(&p);
+}
+
+TEST(loop_search_n_repeats_in_direction) {
+    pager_layer_t p;
+    /// Three matches so n's stepping is visible without wrap
+    /// ambiguity. Lines 0, 2, 4 contain "alpha"; from origin 0 the
+    /// initial / search jumps to line 2, then n advances to line 4.
+    memset(&p, 0, sizeof(p));
+    const char *content = "alpha-1\nbeta\nalpha-2\ngamma\nalpha-3\ndelta\n";
+    pager_layer_init(&p, content, strlen(content), 3, 80);
+    int keys[] = {'/', 'a', 'l', 'p', 'h', 'a', '\r', 'n', 'q'};
+    scripted_source_t src = {keys, 9, 0};
+    pager_run_input_loop(&p, scripted_read, &src);
+    ASSERT_EQ(p.top_line, (size_t)4, "n advanced past the second match");
+    pager_layer_destroy(&p);
+}
+
+TEST(loop_search_capital_n_reverses_direction) {
+    pager_layer_t p;
+    memset(&p, 0, sizeof(p));
+    const char *content = "alpha\nbeta\ncharlie\nalpha-too\n";
+    pager_layer_init(&p, content, strlen(content), 3, 80);
+    /// / alpha Enter -> lands on alpha-too (line 3 from origin 0).
+    /// N reverses direction; from line 3 backward to line 0.
+    int keys[] = {'/', 'a', 'l', 'p', 'h', 'a', '\r', 'N', 'q'};
+    scripted_source_t src = {keys, 9, 0};
+    pager_run_input_loop(&p, scripted_read, &src);
+    ASSERT_EQ(p.top_line, (size_t)0, "N reversed back to first alpha");
+    pager_layer_destroy(&p);
+}
+
 TEST(loop_help_then_cancel_then_quit) {
     pager_layer_t p;
     mk_pager(&p);
@@ -385,6 +457,11 @@ int main(void) {
     RUN_TEST(loop_quit_via_esc_exits);
     RUN_TEST(loop_quit_via_ctrl_c_exits);
     RUN_TEST(loop_search_then_cancel_then_quit);
+    RUN_TEST(loop_search_types_pattern_commits_and_jumps);
+    RUN_TEST(loop_search_reverse_finds_earlier_match);
+    RUN_TEST(loop_search_backspace_corrects_typed_pattern);
+    RUN_TEST(loop_search_n_repeats_in_direction);
+    RUN_TEST(loop_search_capital_n_reverses_direction);
     RUN_TEST(loop_help_then_cancel_then_quit);
     RUN_TEST(loop_unbound_keys_dont_exit);
     RUN_TEST(loop_eof_exits_cleanly);
