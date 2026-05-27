@@ -145,6 +145,19 @@ typedef enum {
                                 ///< `@reboot`, `user@host`, and `make %.o:%.c`
                                 ///< keep their bare-word reading.
 
+    FEATURE_UNICODE_IDENTIFIERS, ///< Accept letter codepoints beyond ASCII as
+                                 ///< valid identifier characters (variables,
+                                 ///< functions, aliases). When off, identifiers
+                                 ///< follow the POSIX rule
+                                 ///< [A-Za-z_][A-Za-z0-9_]*. When on,
+                                 ///< identifier Start positions accept any
+                                 ///< codepoint LLE's Unicode-letter test
+                                 ///< recognises, and Continue positions also
+                                 ///< accept any codepoint LLE's Unicode-alnum
+                                 ///< test recognises; identifier names are NFC-
+                                 ///< normalised on ingest. Default true in
+                                 ///< lush mode, false elsewhere.
+
     /// Sentinel - must be last
     FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;

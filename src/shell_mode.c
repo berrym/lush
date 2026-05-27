@@ -122,6 +122,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PRINT_BUILTIN] = false,  /// Not a POSIX builtin
             [FEATURE_PLUGIN_SYSTEM] = false,
                             [FEATURE_KIND_SIGILS] = false,
+                            [FEATURE_UNICODE_IDENTIFIERS] = false,
                             },
 
     /// SHELL_MODE_BASH - Bash 5.x compatibility
@@ -209,6 +210,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PRINT_BUILTIN] = false, /// Bash has no `print` builtin
             [FEATURE_PLUGIN_SYSTEM] = false,     /// Not a Bash feature
             [FEATURE_KIND_SIGILS] = false, /// @/% remain word chars in bash
+            [FEATURE_UNICODE_IDENTIFIERS] = false, /// Bash ASCII-only ident
         },
 
     /// SHELL_MODE_ZSH - Zsh compatibility
@@ -295,6 +297,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
             [FEATURE_ZSH_PRINT_BUILTIN] = true,  /// Zsh native builtin
             [FEATURE_PLUGIN_SYSTEM] = false,     /// Not a Zsh feature
             [FEATURE_KIND_SIGILS] = false, /// @/% remain word chars in zsh
+            [FEATURE_UNICODE_IDENTIFIERS] = false, /// Zsh ASCII-only ident
         },
 
     /// SHELL_MODE_LUSH - Curated best of both (DEFAULT)
@@ -393,6 +396,7 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             uses lush template engine */
             [FEATURE_PLUGIN_SYSTEM] = true,     /// Lush extension
             [FEATURE_KIND_SIGILS] = true,       /// Curated: @/% sigils
+            [FEATURE_UNICODE_IDENTIFIERS] = true, /// Curated: lush default
         },
 };
 
@@ -490,6 +494,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_ZSH_PRINT_BUILTIN] = "zsh_print_builtin",
     [FEATURE_PLUGIN_SYSTEM] = "plugin_system",
     [FEATURE_KIND_SIGILS] = "kind_sigils",
+    [FEATURE_UNICODE_IDENTIFIERS] = "unicode_identifiers",
 };
 
 /* Feature short names and cross-shell aliases.
