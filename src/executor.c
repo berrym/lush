@@ -20,6 +20,7 @@
 #include "config.h"
 #include "debug.h"
 #include "ht.h"
+#include "identifier.h"
 #include "init.h"
 #include "lle/lle_pager.h"
 #include "lle/lle_shell_event_hub.h"
@@ -6097,13 +6098,22 @@ char *expand_if_needed(executor_t *executor, const char *text) {
         } else {
             /// $var format - check if there's more text after variable name
             const char *p = text + 1; /// Skip $
-            /// Find end of variable name
+            /// Find end of variable name. Uses the lush identifier
+            /// predicate so a non-ASCII name ($café, $Σ) extends to
+            /// its full Unicode extent when FEATURE_UNICODE_IDENTIFIERS
+            /// is on; ASCII names hit the fast path.
             if (*p == '?' || *p == '$' || *p == '#' || *p == '*' || *p == '@' ||
                 *p == '!' || *p == '-' || (*p >= '0' && *p <= '9')) {
                 p++; /// Single character special variable
             } else {
-                while (*p && (isalnum(*p) || *p == '_')) {
-                    p++;
+                size_t remaining = strlen(p);
+                while (*p) {
+                    size_t n = lush_ident_match_continue(p, remaining);
+                    if (n == 0) {
+                        break;
+                    }
+                    p += n;
+                    remaining -= n;
                 }
             }
             /// Trailing text after the variable; unquoted context.
@@ -14766,10 +14776,18 @@ static char *expand_variable(executor_t *executor, const char *var_text) {
             var_name[0] == '-' || (var_name[0] >= '0' && var_name[0] <= '9')) {
             name_len = 1;
         } else {
-            /// Regular variable names (alphanumeric + underscore)
-            while (var_name[name_len] &&
-                   (isalnum(var_name[name_len]) || var_name[name_len] == '_')) {
-                name_len++;
+            /// Regular variable names. lush_ident_match_continue
+            /// returns the byte length consumed (1 for ASCII, 2-4 for
+            /// multi-byte UTF-8 when FEATURE_UNICODE_IDENTIFIERS is on);
+            /// loop until it stops matching.
+            size_t total = strlen(var_name);
+            while (name_len < total) {
+                size_t n = lush_ident_match_continue(var_name + name_len,
+                                                     total - name_len);
+                if (n == 0) {
+                    break;
+                }
+                name_len += n;
             }
         }
 

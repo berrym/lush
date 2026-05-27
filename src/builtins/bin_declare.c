@@ -8,6 +8,7 @@
 
 #include "arithmetic.h"
 #include "builtins.h"
+#include "identifier.h"
 #include "lle/lle_pager.h"
 #include "shell_mode.h"
 #include "symtable.h"
@@ -338,23 +339,18 @@ int bin_declare(int argc, char **argv) {
             value = NULL;
         }
 
-        /// Validate variable name
-        if (!name[0] || (!isalpha(name[0]) && name[0] != '_')) {
+        /// Validate variable name via the central lush identifier
+        /// predicate (honours FEATURE_UNICODE_IDENTIFIERS). Replaces
+        /// the prior inline isalpha/isalnum byte tests so a non-ASCII
+        /// identifier is accepted under lush-mode default (or any
+        /// mode with the feature opt-in) and rejected under
+        /// POSIX/bash/zsh defaults.
+        if (!lush_is_valid_identifier(name)) {
             executor_error_report(current_executor, SHELL_ERR_INVALID_ARGUMENT,
                                   builtin_get_source_location(),
                                   "`%s': not a valid identifier", name);
             free(name);
             return 1;
-        }
-        for (size_t j = 1; name[j]; j++) {
-            if (!isalnum(name[j]) && name[j] != '_') {
-                executor_error_report(current_executor,
-                                      SHELL_ERR_INVALID_ARGUMENT,
-                                      builtin_get_source_location(),
-                                      "`%s': not a valid identifier", name);
-                free(name);
-                return 1;
-            }
         }
 
         /// Handle -p for specific variable

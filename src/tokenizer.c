@@ -10,6 +10,7 @@
  */
 
 #include "tokenizer.h"
+#include "identifier.h"
 #include "lle/utf8_support.h"
 #include "shell_mode.h"
 
@@ -1390,10 +1391,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 size_t length = tokenizer->position - start;
                 return token_new(TOK_VARIABLE, &tokenizer->input[start], length,
                                  start_line, start_column, start_pos);
-            } else if (isalnum(next) || next == '_' || next == '?' ||
-                       next == '$' || next == '!' || next == '@' ||
-                       next == '*' || next == '#' || next == '-') {
+            } else if (lush_ident_match_start(
+                           &tokenizer->input[tokenizer->position],
+                           tokenizer->input_length - tokenizer->position) > 0 ||
+                       next == '?' || next == '$' || next == '!' ||
+                       next == '@' || next == '*' || next == '#' ||
+                       next == '-') {
                 /// Simple variable $var, $?, $$, $!, $-, etc.
+                /// $var goes through the lush identifier predicate so a
+                /// non-ASCII identifier ($café, $Σ, $имя) is accepted
+                /// under FEATURE_UNICODE_IDENTIFIERS. Special-form
+                /// single-char variants ($?, $@, etc.) keep their
+                /// fast-path branch.
 
                 /// For special single-character variables, only advance by one
                 if (next == '?' || next == '$' || next == '!' || next == '@' ||
@@ -1403,15 +1412,18 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     tokenizer->column++;
                 } else {
                     /// For regular variables, continue until non-identifier
-                    /// character
+                    /// character. lush_ident_match_continue returns the
+                    /// byte length consumed (1 for ASCII, 2-4 for multi-
+                    /// byte UTF-8), so we advance by that count.
                     while (tokenizer->position < tokenizer->input_length) {
-                        char curr = tokenizer->input[tokenizer->position];
-                        if (isalnum(curr) || curr == '_') {
-                            tokenizer->position++;
-                            tokenizer->column++;
-                        } else {
+                        size_t n = lush_ident_match_continue(
+                            &tokenizer->input[tokenizer->position],
+                            tokenizer->input_length - tokenizer->position);
+                        if (n == 0) {
                             break;
                         }
+                        tokenizer->position += n;
+                        tokenizer->column += n;
                     }
 
                     /// Zsh bare-form subscript: $var[N] / $var[N,M] in

@@ -2269,6 +2269,79 @@ TEST(rt_assoc_key_ascii_paths_unchanged) {
     ASSERT_STDOUT_EQ(r, "one\ntwo\nthree\nlen=3\n");
 }
 
+TEST(rt_unicode_ident_declare_and_expand_latin) {
+    /// FEATURE_UNICODE_IDENTIFIERS is default-on in lush mode. A
+    /// non-ASCII identifier (precomposed café) round-trips through
+    /// declare's name validation, symtable storage, tokenizer
+    /// $var parsing, and the expand_variable name-extraction loop.
+    run_result_t r =
+        run_shell("declare caf\xc3\xa9=hello\necho $caf\xc3\xa9\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_unicode_ident_declare_and_expand_greek) {
+    run_result_t r = run_shell("declare \xce\xa3=sigma\necho $\xce\xa3\n");
+    ASSERT_STDOUT_EQ(r, "sigma\n");
+}
+
+TEST(rt_unicode_ident_declare_and_expand_cyrillic) {
+    /// Cyrillic "имя" (name) -- 3 codepoints, 6 UTF-8 bytes.
+    run_result_t r = run_shell("declare \xd0\xb8\xd0\xbc\xd1\x8f=name\n"
+                               "echo $\xd0\xb8\xd0\xbc\xd1\x8f\n");
+    ASSERT_STDOUT_EQ(r, "name\n");
+}
+
+TEST(rt_unicode_ident_rejected_in_bash_mode) {
+    /// `mode bash` flips FEATURE_UNICODE_IDENTIFIERS off; identifier
+    /// validation falls back to POSIX ASCII-only. declare rejects
+    /// the non-ASCII name.
+    run_result_t r = run_shell("mode bash\ndeclare caf\xc3\xa9=hello\n");
+    ASSERT_STDERR_CONTAINS(r, "not a valid identifier");
+    /// Restore lush mode so subsequent tests in this in-process suite
+    /// see the default feature matrix (shell_mode state is global).
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_opt_in_from_bash_mode) {
+    /// Feature matrix gate: the user can opt in via shopt from any
+    /// mode, including bash, without leaving the preset.
+    ///
+    /// The mode-change + opt-in is performed in a separate run_shell
+    /// call from the identifier-using script so the tokenizer sees
+    /// the feature flag already set. Within a single run_shell, the
+    /// tokenizer parses the entire input upfront before any
+    /// statement executes; if `shopt -s` and `$caf<UTF-8>` lived in
+    /// the same input, the tokenizer would still see the feature off
+    /// when scanning `$caf<UTF-8>` because shopt has not run yet.
+    /// Two separate run_shell calls share global shell_mode state,
+    /// so the second call's tokenizer sees the override.
+    run_result_t setup = run_shell("mode bash\nshopt -s unicode_identifiers\n");
+    ASSERT_EXIT_STATUS(setup, 0);
+    run_result_t r = run_shell("declare caf\xc3\xa9=hi\necho $caf\xc3\xa9\n");
+    ASSERT_STDOUT_EQ(r, "hi\n");
+    /// Restore lush-mode harness default for subsequent tests.
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_ascii_paths_unchanged) {
+    /// ASCII identifiers hit the fast path in both lush and bash
+    /// modes; behaviour must be byte-identical to the prior
+    /// isalpha/isalnum implementation.
+    run_result_t r = run_shell("X=hello\n"
+                               "_y=world\n"
+                               "Z9=ok\n"
+                               "echo $X $_y $Z9\n");
+    ASSERT_STDOUT_EQ(r, "hello world ok\n");
+}
+
+TEST(rt_unicode_ident_invalid_start_still_rejected) {
+    /// Numeric-leading names are still invalid in both modes;
+    /// FEATURE_UNICODE_IDENTIFIERS widens the LETTER set but does
+    /// not relax the Start-vs-Continue distinction.
+    run_result_t r = run_shell("declare 9bad=oops\n");
+    ASSERT_STDERR_CONTAINS(r, "not a valid identifier");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3523,6 +3596,16 @@ int main(void) {
     RUN_TEST(rt_assoc_key_nfc_nfd_collapse);
     RUN_TEST(rt_assoc_key_distinct_when_actually_different);
     RUN_TEST(rt_assoc_key_ascii_paths_unchanged);
+
+    printf(
+        "\nRegression: Unicode identifiers (FEATURE_UNICODE_IDENTIFIERS):\n");
+    RUN_TEST(rt_unicode_ident_declare_and_expand_latin);
+    RUN_TEST(rt_unicode_ident_declare_and_expand_greek);
+    RUN_TEST(rt_unicode_ident_declare_and_expand_cyrillic);
+    RUN_TEST(rt_unicode_ident_rejected_in_bash_mode);
+    RUN_TEST(rt_unicode_ident_opt_in_from_bash_mode);
+    RUN_TEST(rt_unicode_ident_ascii_paths_unchanged);
+    RUN_TEST(rt_unicode_ident_invalid_start_still_rejected);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
