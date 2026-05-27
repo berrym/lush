@@ -167,8 +167,11 @@ int bin_local(int argc, char **argv) {
             char *value = eq + 1;
 
             if (opt_nameref) {
-                /// Create local nameref: local -n ref=target
-                symvar_flags_t flags = SYMVAR_LOCAL | SYMVAR_NAMEREF_FLAG;
+                /// Create local nameref: local -n ref=target.
+                /// Locality is determined by the scope this write
+                /// targets (the function's current scope), not by a
+                /// flag bit; the prior SYMVAR_LOCAL is gone.
+                symvar_flags_t flags = SYMVAR_NAMEREF_FLAG;
                 if (symtable_set_nameref(manager, name, value, flags) != 0) {
                     executor_error_report(current_executor,
                                           SHELL_ERR_SCOPE_ERROR,

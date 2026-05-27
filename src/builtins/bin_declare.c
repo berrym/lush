@@ -550,10 +550,13 @@ int bin_declare(int argc, char **argv) {
                 free(name);
                 return 1;
             }
+            /// Locality is determined by which scope we write into,
+            /// not by a flag on the variable record. opt_global is
+            /// honoured via the scope choice at the actual write
+            /// (symtable_set_nameref dispatches into the correct
+            /// scope), so we no longer set a redundant SYMVAR_LOCAL
+            /// bit -- it was never read.
             symvar_flags_t flags = SYMVAR_NAMEREF_FLAG;
-            if (!opt_global) {
-                flags |= SYMVAR_LOCAL;
-            }
             if (symtable_set_nameref(manager, name, value, flags) != 0) {
                 executor_error_report(current_executor, SHELL_ERR_SCOPE_ERROR,
                                       builtin_get_source_location(),
@@ -601,7 +604,15 @@ int bin_declare(int argc, char **argv) {
                 }
             }
 
-            /// Build flags
+            /// Build flags.
+            /// declare -t on variables is a documented bash no-op
+            /// ("Has no effect on variables"); lush accepts the
+            /// option for script-portability but stores no
+            /// observable attribute. Locality is tracked by the
+            /// scope chain itself; opt_global selects the write
+            /// path below rather than encoding the choice as a flag
+            /// bit. opt_nameref / opt_integer are honoured by the
+            /// respective dedicated set functions called later.
             symvar_flags_t flags = SYMVAR_NONE;
             if (opt_readonly) {
                 flags |= SYMVAR_READONLY;
@@ -615,12 +626,7 @@ int bin_declare(int argc, char **argv) {
             if (opt_uppercase) {
                 flags |= SYMVAR_UPPERCASE;
             }
-            if (opt_trace) {
-                flags |= SYMVAR_TRACE;
-            }
-            if (!opt_global) {
-                flags |= SYMVAR_LOCAL;
-            }
+            (void)opt_trace; /// accepted-but-no-op; see comment above
 
             if (final_value) {
                 if (opt_global) {

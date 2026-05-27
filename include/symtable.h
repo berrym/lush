@@ -110,17 +110,23 @@ typedef struct lush_value_view {
 } lush_value_view_t;
 
 /// Variable flags
+///
+/// Bit values are kept stable across removals so callers that store
+/// the underlying mask see no shift if a value is later retired
+/// again. Bits (1 << 2), (1 << 3), and (1 << 8) are intentionally
+/// vacant -- the prior SYMVAR_LOCAL / SYMVAR_SPECIAL_VAR / SYMVAR_TRACE
+/// values were dead (set but never read; locality is tracked by the
+/// scope chain, special vars are dispatched by name, declare -t is a
+/// no-op on variables in bash itself) and were removed rather than
+/// kept as theatrical reservations. See the audit at 44e6970f.
 typedef enum {
     SYMVAR_NONE = 0,
     SYMVAR_EXPORTED = (1 << 0),     ///< Variable is exported to environment
     SYMVAR_READONLY = (1 << 1),     ///< Variable is read-only
-    SYMVAR_LOCAL = (1 << 2),        ///< Variable is local to current scope
-    SYMVAR_SPECIAL_VAR = (1 << 3),  ///< Special system variable
     SYMVAR_UNSET = (1 << 4),        ///< Variable is explicitly unset
     SYMVAR_NAMEREF_FLAG = (1 << 5), ///< Variable is a nameref (local -n)
     SYMVAR_LOWERCASE = (1 << 6),    ///< Convert value to lowercase (declare -l)
     SYMVAR_UPPERCASE = (1 << 7),    ///< Convert value to uppercase (declare -u)
-    SYMVAR_TRACE = (1 << 8),        ///< Trace attribute (declare -t)
     /**
      * Integer (declare -i): RHS of assignment is arith-evaluated
      */
@@ -478,7 +484,7 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name);
  * @param manager Manager instance
  * @param name Nameref variable name
  * @param target Name of the variable to reference
- * @param flags Additional flags (SYMVAR_LOCAL, etc.)
+ * @param flags Additional flags (SYMVAR_NAMEREF_FLAG, SYMVAR_EXPORTED, etc.)
  * @return 0 on success, -1 on error
  */
 int symtable_set_nameref(symtable_manager_t *manager, const char *name,

@@ -701,7 +701,12 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
 /**
  * @brief Set a local variable in the current scope
  *
- * Convenience wrapper that sets a variable with the SYMVAR_LOCAL flag.
+ * Writes to the current scope hash table. The "local" property is
+ * carried by the scope structure itself (current vs. parent scopes),
+ * not by a flag on the variable record. Equivalent in effect to
+ * symtable_set_var with SYMVAR_NONE; kept as a separate entry point
+ * so callers expressing "this is intentionally a local write" do not
+ * have to know the flag-vs-scope distinction.
  *
  * @param manager Symbol table manager
  * @param name Variable name
@@ -710,7 +715,7 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
  */
 int symtable_set_local_var(symtable_manager_t *manager, const char *name,
                            const char *value) {
-    return symtable_set_var(manager, name, value, SYMVAR_LOCAL);
+    return symtable_set_var(manager, name, value, SYMVAR_NONE);
 }
 
 /**
@@ -954,7 +959,7 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
  * @param manager Manager instance
  * @param name Nameref variable name
  * @param target Name of the variable to reference
- * @param flags Additional flags (SYMVAR_LOCAL, etc.)
+ * @param flags Additional flags (SYMVAR_NAMEREF_FLAG, SYMVAR_EXPORTED, etc.)
  * @return 0 on success, -1 on error
  */
 int symtable_set_nameref(symtable_manager_t *manager, const char *name,
@@ -1665,7 +1670,13 @@ int symtable_unexport_global(const char *name) {
 /**
  * @brief Set a special shell variable
  *
- * Special variables like $?, $!, $$ have the SYMVAR_SPECIAL_VAR flag.
+ * Special variables like $?, $!, $$ are dispatched by name (RANDOM,
+ * SECONDS, etc. have dedicated handling in symtable_get_var); the
+ * previous SYMVAR_SPECIAL_VAR flag carried no observable behaviour
+ * because no read path consulted it. This entry point remains as a
+ * documented intent-marker for callers that want to express "this is
+ * a shell-internal value" without expecting the flag system to do
+ * anything special.
  *
  * @param name Variable name
  * @param value Variable value
@@ -1675,7 +1686,7 @@ int symtable_set_special_global(const char *name, const char *value) {
     if (!global_manager) {
         return -1;
     }
-    return symtable_set_var(global_manager, name, value, SYMVAR_SPECIAL_VAR);
+    return symtable_set_var(global_manager, name, value, SYMVAR_NONE);
 }
 
 /**
