@@ -3102,18 +3102,35 @@ TEST(rt_readonly_blocks_via_declare_r) {
     ASSERT_STDOUT_EQ(r, "final fixed\n");
 }
 
-TEST(rt_readonly_rejects_arrays_with_diagnostic) {
-    /// Whole-array readonly is not yet supported (array_value_t has no
-    /// attribute storage). The bare-name path in bin_readonly detects
-    /// this and emits a structured TYPE_MISMATCH rather than silently
-    /// clobbering the array with a scalar. Locks the diagnostic in so
-    /// the contract is observable; once array attribute tracking
-    /// lands, this test flips to assert real enforcement.
-    run_result_t r = run_shell("declare -a RO_ARR=(a b c)\n"
-                               "readonly RO_ARR\n"
-                               "echo \"[0]=${RO_ARR[0]}\"\n");
-    ASSERT_STDERR_CONTAINS(r, "readonly does not yet support arrays");
+TEST(rt_readonly_blocks_array_element_via_readonly_keyword) {
+    /// `readonly NAME` against an existing array marks the array
+    /// readonly via its own flags field. Subsequent element writes
+    /// (NAME[idx]=value) are refused by symtable_set_array_element
+    /// with SYMTABLE_ERR_READONLY; the array's prior contents are
+    /// preserved.
+    run_result_t r = run_shell("declare -a ROA_KW=(a b c)\n"
+                               "readonly ROA_KW\n"
+                               "ROA_KW[0]=clobber\n"
+                               "echo \"[0]=${ROA_KW[0]}\"\n");
     ASSERT_STDOUT_EQ(r, "[0]=a\n");
+}
+
+TEST(rt_readonly_blocks_array_element_via_declare_ar) {
+    /// declare -ar threads SYMVAR_READONLY onto the array record at
+    /// declaration time; element writes are refused immediately.
+    run_result_t r = run_shell("declare -ar ROA_DECL=(x y z)\n"
+                               "ROA_DECL[1]=clobber\n"
+                               "echo \"[1]=${ROA_DECL[1]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[1]=y\n");
+}
+
+TEST(rt_readonly_blocks_associative_array_element) {
+    /// Associative arrays carry the same flags field; `declare -Ar`
+    /// rejects subsequent key writes just like indexed arrays.
+    run_result_t r = run_shell("declare -Ar ROA_ASSOC=([k]=v)\n"
+                               "ROA_ASSOC[k]=overwrite\n"
+                               "echo \"[k]=${ROA_ASSOC[k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "[k]=v\n");
 }
 
 TEST(rt_readonly_listing_includes_marked) {
@@ -3503,7 +3520,9 @@ int main(void) {
     RUN_TEST(rt_readonly_blocks_via_readonly_keyword);
     RUN_TEST(rt_readonly_blocks_across_function_scope);
     RUN_TEST(rt_readonly_blocks_via_declare_r);
-    RUN_TEST(rt_readonly_rejects_arrays_with_diagnostic);
+    RUN_TEST(rt_readonly_blocks_array_element_via_readonly_keyword);
+    RUN_TEST(rt_readonly_blocks_array_element_via_declare_ar);
+    RUN_TEST(rt_readonly_blocks_associative_array_element);
     RUN_TEST(rt_readonly_listing_includes_marked);
     RUN_TEST(rt_readonly_promotes_existing_var);
 

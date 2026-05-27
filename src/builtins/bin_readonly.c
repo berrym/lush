@@ -168,42 +168,23 @@ int bin_readonly(int argc, char **argv) {
                 return 1;
             }
 
-            /// Reject arrays for the bare-name form: an array would
-            /// require the readonly attribute to live on the array
-            /// record (`array_value_t` carries no `flags` field today),
-            /// and setting a scalar via symtable_set_readonly_global
-            /// would silently clobber the array. Surface a structured
-            /// error rather than corrupting state; whole-array readonly
-            /// lands once array_value_t gains attribute tracking.
+            /// Arrays carry their own flags field on array_value_t,
+            /// so promoting an array to readonly is a flag merge on
+            /// the array record -- routing through the scalar
+            /// symtable_set_flags would clobber the array with an
+            /// empty scalar. The element-write enforcement in
+            /// symtable_set_array_element reads this flag.
             if (symtable_is_array(arg)) {
-                shell_error_t *err = shell_error_create(
-                    SHELL_ERR_TYPE_MISMATCH, SHELL_SEVERITY_ERROR,
-                    builtin_get_source_location(),
-                    "%s: readonly does not yet support arrays; use "
-                    "`declare -ar` for read-only array declarations once "
-                    "array attribute tracking lands",
-                    arg);
-                if (err) {
-                    shell_error_display(err, stderr, isatty(STDERR_FILENO));
-                    shell_error_free(err);
-                } else {
-                    executor_error_report(current_executor,
-                                          SHELL_ERR_TYPE_MISMATCH,
-                                          builtin_get_source_location(),
-                                          "%s: readonly does not yet "
-                                          "support arrays",
-                                          arg);
+                symtable_array_add_flags(arg, SYMVAR_READONLY);
+            } else {
+                symtable_manager_t *manager = symtable_get_global_manager();
+                char *current_value = symtable_get_global(arg);
+                if (!current_value) {
+                    symtable_set_readonly_global(arg, "");
+                } else if (manager) {
+                    symvar_flags_t cur = symtable_get_flags(manager, arg);
+                    symtable_set_flags(manager, arg, cur | SYMVAR_READONLY);
                 }
-                return 1;
-            }
-
-            symtable_manager_t *manager = symtable_get_global_manager();
-            char *current_value = symtable_get_global(arg);
-            if (!current_value) {
-                symtable_set_readonly_global(arg, "");
-            } else if (manager) {
-                symvar_flags_t cur = symtable_get_flags(manager, arg);
-                symtable_set_flags(manager, arg, cur | SYMVAR_READONLY);
             }
         }
     }

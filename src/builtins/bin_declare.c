@@ -467,6 +467,25 @@ int bin_declare(int argc, char **argv) {
                 free(name);
                 return 1;
             }
+
+            /// declare -ar / -Ar / -ax / -Ax: thread the requested
+            /// attribute flags onto the array record so subsequent
+            /// element writes (arr[idx]=value) and bulk assignments
+            /// honour the attribute. The scalar branch builds `flags`
+            /// the same way; this branch routes them at the array
+            /// layer because the array record carries its own flags
+            /// field (the scalar SYMVAR_READONLY check at
+            /// symtable_set_var doesn't see element writes).
+            symvar_flags_t array_flags = SYMVAR_NONE;
+            if (opt_readonly) {
+                array_flags |= SYMVAR_READONLY;
+            }
+            if (opt_export) {
+                array_flags |= SYMVAR_EXPORTED;
+            }
+            if (array_flags != SYMVAR_NONE) {
+                symtable_array_add_flags(name, array_flags);
+            }
         }
         /// Handle integer declaration
         else if (opt_integer) {

@@ -17951,6 +17951,20 @@ static int execute_array_assignment(executor_t *executor, node_t *assign_node) {
         printf("DEBUG: Executing array assignment for: %s\n", var_name);
     }
 
+    /// Readonly enforcement: if the array name is bound to an existing
+    /// readonly array, refuse both element writes (arr[idx]=value) and
+    /// bulk-literal rebinds (arr=(...)). The bin_declare / readonly
+    /// paths set SYMVAR_READONLY on the array's own flags field;
+    /// element-level writes from this function bypass
+    /// symtable_set_array_element's enforcement, so the check has to
+    /// run here too. Match the scalar diagnostic for consistency.
+    if (symtable_array_get_flags(var_name) & SYMVAR_READONLY) {
+        executor_error_report(executor, SHELL_ERR_READONLY_VAR,
+                              assign_node->loc, "%s: readonly variable",
+                              var_name);
+        return 1;
+    }
+
     /// Check if this is an array literal assignment: arr=(a b c)
     if (first_child->type == NODE_ARRAY_LITERAL) {
         /// Check if variable was already declared as associative array

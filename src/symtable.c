@@ -3037,6 +3037,20 @@ array_value_t *symtable_get_array(const char *name) {
     return result;
 }
 
+symvar_flags_t symtable_array_get_flags(const char *name) {
+    array_value_t *arr = symtable_get_array(name);
+    return arr ? arr->flags : SYMVAR_NONE;
+}
+
+int symtable_array_add_flags(const char *name, symvar_flags_t add) {
+    array_value_t *arr = symtable_get_array(name);
+    if (!arr) {
+        return -1;
+    }
+    arr->flags |= add;
+    return 0;
+}
+
 /**
  * @brief Check if a variable is an array
  */
@@ -3104,15 +3118,15 @@ int symtable_set_array_element(const char *name, const char *subscript,
         return -1;
     }
 
-    /// NOTE: whole-array readonly is not yet enforced here. The
-    /// SYMVAR_READONLY flag lives on the scalar variable record;
-    /// array_value_t carries no flags field today, so an array marked
-    /// readonly via a future `declare -ar` or `readonly -a` cannot
-    /// reject element writes from this function. Enforcement lands
-    /// when array_value_t gains attribute tracking (see the trailing
-    /// note on bin_readonly's array-rejection branch).
-
+    /// Whole-array readonly enforcement: if the existing array
+    /// carries SYMVAR_READONLY (set by `declare -ar`, `declare -Ar`,
+    /// or `readonly NAME` against an existing array), refuse the
+    /// element write with the same sentinel the scalar paths use.
+    /// New-array creation falls through the NULL branch below.
     array_value_t *array = symtable_get_array(name);
+    if (array && (array->flags & SYMVAR_READONLY)) {
+        return SYMTABLE_ERR_READONLY;
+    }
     if (!array) {
         /// Create new indexed array
         array = symtable_array_create(false);

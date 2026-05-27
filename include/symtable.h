@@ -38,6 +38,30 @@ typedef enum {
  * ============================================================================
  */
 
+/// Variable flags
+///
+/// Bit values are kept stable across removals so callers that store
+/// the underlying mask see no shift if a value is later retired
+/// again. Bits (1 << 2), (1 << 3), and (1 << 8) are intentionally
+/// vacant -- the prior SYMVAR_LOCAL / SYMVAR_SPECIAL_VAR / SYMVAR_TRACE
+/// values were dead (set but never read; locality is tracked by the
+/// scope chain, special vars are dispatched by name, declare -t is a
+/// no-op on variables in bash itself) and were removed rather than
+/// kept as theatrical reservations. See the audit at 44e6970f.
+typedef enum {
+    SYMVAR_NONE = 0,
+    SYMVAR_EXPORTED = (1 << 0),     ///< Variable is exported to environment
+    SYMVAR_READONLY = (1 << 1),     ///< Variable is read-only
+    SYMVAR_UNSET = (1 << 4),        ///< Variable is explicitly unset
+    SYMVAR_NAMEREF_FLAG = (1 << 5), ///< Variable is a nameref (local -n)
+    SYMVAR_LOWERCASE = (1 << 6),    ///< Convert value to lowercase (declare -l)
+    SYMVAR_UPPERCASE = (1 << 7),    ///< Convert value to uppercase (declare -u)
+    /**
+     * Integer (declare -i): RHS of assignment is arith-evaluated
+     */
+    SYMVAR_INTEGER_ATTR = (1 << 9)
+} symvar_flags_t;
+
 /**
  * @brief Array value storage structure
  *
@@ -46,12 +70,21 @@ typedef enum {
  * Associative arrays use a hash table for key-value storage.
  */
 typedef struct array_value {
-    char **elements;        ///< Sparse array of element values (indexed)
-    int *indices;           ///< Parallel array of actual indices (for sparse)
-    size_t count;           ///< Number of elements currently stored
-    size_t capacity;        ///< Allocated capacity for elements/indices
-    size_t max_index;       ///< Highest index used (for ${#arr[@]})
-    bool is_associative;    ///< True if associative array (declare -A)
+    char **elements;     ///< Sparse array of element values (indexed)
+    int *indices;        ///< Parallel array of actual indices (for sparse)
+    size_t count;        ///< Number of elements currently stored
+    size_t capacity;     ///< Allocated capacity for elements/indices
+    size_t max_index;    ///< Highest index used (for ${#arr[@]})
+    bool is_associative; ///< True if associative array (declare -A)
+    /**
+     * Variable attributes carried by the array itself. Mirrors the
+     * symvar_flags_t set used for scalars but lives on the array
+     * record so element-level writes (arr[idx]=value) can consult
+     * SYMVAR_READONLY without going through the scalar symbol table.
+     * Set by declare -ar / -Ar and by readonly NAME on an existing
+     * array; read by symtable_set_array_element.
+     */
+    symvar_flags_t flags;
     ht_strstr_t *assoc_map; ///< Hash table for associative arrays
     /**
      * For associative arrays only: parallel ordered list of keys
@@ -108,30 +141,6 @@ typedef struct lush_value_view {
     char *scalar_value;   ///< Owned strdup; non-NULL iff kind==SCALAR
     array_value_t *array; ///< Borrowed; non-NULL iff kind==LIST or MAP
 } lush_value_view_t;
-
-/// Variable flags
-///
-/// Bit values are kept stable across removals so callers that store
-/// the underlying mask see no shift if a value is later retired
-/// again. Bits (1 << 2), (1 << 3), and (1 << 8) are intentionally
-/// vacant -- the prior SYMVAR_LOCAL / SYMVAR_SPECIAL_VAR / SYMVAR_TRACE
-/// values were dead (set but never read; locality is tracked by the
-/// scope chain, special vars are dispatched by name, declare -t is a
-/// no-op on variables in bash itself) and were removed rather than
-/// kept as theatrical reservations. See the audit at 44e6970f.
-typedef enum {
-    SYMVAR_NONE = 0,
-    SYMVAR_EXPORTED = (1 << 0),     ///< Variable is exported to environment
-    SYMVAR_READONLY = (1 << 1),     ///< Variable is read-only
-    SYMVAR_UNSET = (1 << 4),        ///< Variable is explicitly unset
-    SYMVAR_NAMEREF_FLAG = (1 << 5), ///< Variable is a nameref (local -n)
-    SYMVAR_LOWERCASE = (1 << 6),    ///< Convert value to lowercase (declare -l)
-    SYMVAR_UPPERCASE = (1 << 7),    ///< Convert value to uppercase (declare -u)
-    /**
-     * Integer (declare -i): RHS of assignment is arith-evaluated
-     */
-    SYMVAR_INTEGER_ATTR = (1 << 9)
-} symvar_flags_t;
 
 /**
  * @brief Return code: write blocked by readonly attribute
@@ -1335,6 +1344,31 @@ int symtable_set_array(const char *name, array_value_t *array);
  * @return Array value or NULL if not an array or not found
  */
 array_value_t *symtable_get_array(const char *name);
+
+/**
+ * @brief Read the attribute flags carried by an array
+ *
+ * Returns SYMVAR_NONE if the name is not bound to an array (or
+ * the array has no attributes set). Used by enforcement paths
+ * such as symtable_set_array_element (whole-array readonly).
+ *
+ * @param name Variable name
+ * @return Flags currently set on the array record
+ */
+symvar_flags_t symtable_array_get_flags(const char *name);
+
+/**
+ * @brief Add attribute flags to an array
+ *
+ * OR-merges @p add into the array's existing flags. No-op when the
+ * name is not bound to an array; returns -1 in that case so callers
+ * distinguish "applied" from "no array to apply to".
+ *
+ * @param name Variable name
+ * @param add  Flags to add (bitwise OR into existing)
+ * @return 0 on success, -1 if no array under @p name
+ */
+int symtable_array_add_flags(const char *name, symvar_flags_t add);
 
 /**
  * @brief Unified value lookup (SEMANTICS section 3 first-class values)
