@@ -13,6 +13,7 @@
 
 #include "debug.h"
 #include "executor.h"
+#include "lle/unicode_compare.h"
 #include "node.h"
 #include "shell_mode.h"
 #include "tokenizer.h"
@@ -2867,8 +2868,12 @@ static char *collect_one_heredoc_body(parser_t *parser, const char *delimiter,
             }
         }
 
-        /// Check if this line matches the delimiter
-        if (strcmp(line_content, match_delimiter) == 0) {
+        /// Check if this line matches the delimiter. NFC-equivalent
+        /// (see redirection.c::heredoc body-read for the same swap;
+        /// the parser-time delimiter scan needs the same Unicode
+        /// rule so on-script EOF\xc3\xa9 and on-stdin EOF\xcc\x81
+        /// terminate one heredoc identically).
+        if (lle_unicode_strings_equal(line_content, match_delimiter, NULL)) {
             /// Found the terminator. body_end is the byte just past the
             /// terminator line's newline -- the resume point for the
             /// tokenizer (or the start of the next heredoc's body, when

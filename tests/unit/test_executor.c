@@ -2195,6 +2195,36 @@ TEST(rt_heredoc_unterminated_error) {
     ASSERT_TRUE(r.exit_status != 0, "unterminated heredoc must fail");
 }
 
+TEST(rt_heredoc_delimiter_nfc_vs_nfd) {
+    /// NFC script delimiter "EOF_\xc3\xa9" (E O F _ + precomposed
+    /// e-acute U+00E9 = 5 bytes) is terminated by an NFD line
+    /// "EOF_e\xcc\x81" (E O F _ e + combining acute U+0301 = 6
+    /// bytes). The heredoc body should be exactly "body\n".
+    run_result_t r = run_shell("cat <<EOF_\xc3\xa9\n"
+                               "body\n"
+                               "EOF_e\xcc\x81\n");
+    ASSERT_STDOUT_EQ(r, "body\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
+TEST(rt_heredoc_delimiter_nfd_vs_nfc) {
+    /// Mirror: NFD script delimiter, NFC terminator. Same outcome.
+    run_result_t r = run_shell("cat <<EOF_e\xcc\x81\n"
+                               "body\n"
+                               "EOF_\xc3\xa9\n");
+    ASSERT_STDOUT_EQ(r, "body\n");
+    ASSERT_EXIT_STATUS(r, 0);
+}
+
+TEST(rt_heredoc_delimiter_unequal_when_actually_different) {
+    /// NFC normalisation does not paper over real differences.
+    /// "EOF" terminator does not close a "DONE"-delimited heredoc;
+    /// the script reaches EOF without finding the delimiter and
+    /// the parser reports an unterminated heredoc.
+    run_result_t r = run_shell("cat <<DONE\nEOF\n");
+    ASSERT_TRUE(r.exit_status != 0, "DONE delimiter is not terminated by EOF");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3443,6 +3473,9 @@ int main(void) {
     printf("\nRegression: deferred here-documents:\n");
     RUN_TEST(rt_heredoc_through_pipe);
     RUN_TEST(rt_heredoc_trailing_command);
+    RUN_TEST(rt_heredoc_delimiter_nfc_vs_nfd);
+    RUN_TEST(rt_heredoc_delimiter_nfd_vs_nfc);
+    RUN_TEST(rt_heredoc_delimiter_unequal_when_actually_different);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);

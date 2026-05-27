@@ -26,6 +26,7 @@
 #include "lle/lle_shell_integration.h"
 #include "lle/unicode_case.h"
 #include "lle/unicode_class.h"
+#include "lle/unicode_compare.h"
 #include "lle/unicode_grapheme.h"
 #include "lle/utf8_support.h"
 #include "lush.h"
@@ -5157,11 +5158,18 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
         /// not passed as argv words).
         if (!is_redirection_node(child) && child->type != NODE_ASSIGN) {
             if (child->val.str) {
-                /// Check if this is a here document delimiter
+                /// Check if this is a here document delimiter. NFC-
+                /// equivalent (see redirection.c / parser.c for the
+                /// same swap on the body-read / parse-time delimiter
+                /// scans; this argv-time check stays consistent so a
+                /// heredoc whose script delimiter and stdin
+                /// terminator differ only in Unicode normalisation
+                /// resolves uniformly across all three sites).
                 bool is_delimiter = false;
                 for (int i = 0; i < delimiter_count; i++) {
                     if (heredoc_delimiters[i] &&
-                        strcmp(child->val.str, heredoc_delimiters[i]) == 0) {
+                        lle_unicode_strings_equal(
+                            child->val.str, heredoc_delimiters[i], NULL)) {
                         is_delimiter = true;
                         break;
                     }

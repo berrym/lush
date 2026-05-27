@@ -20,6 +20,7 @@
 #include "redirection.h"
 
 #include "executor.h"
+#include "lle/unicode_compare.h"
 #include "lush.h"
 #include "lush_fork.h"
 #include "node.h"
@@ -1019,8 +1020,14 @@ static int setup_here_document(const char *delimiter, bool strip_tabs) {
                 }
             }
 
-            /// Check if this line matches the delimiter
-            if (strcmp(content, delimiter) == 0) {
+            /// Check if this line matches the delimiter.
+            /// Compare under NFC equivalence so a heredoc terminated
+            /// with a non-ASCII delimiter (e.g. EOFé) matches whether
+            /// the on-script delimiter and the on-stdin terminator
+            /// line are encoded as NFC, NFD, or one of each. The
+            /// underlying primitive's ASCII fast path means the
+            /// common EOF / END / EOT cases pay no extra cost.
+            if (lle_unicode_strings_equal(content, delimiter, NULL)) {
                 break; /// End of here document
             }
 
