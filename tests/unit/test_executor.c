@@ -2442,6 +2442,68 @@ TEST(rt_unicode_ident_alias_extension_chars_unchanged) {
     ASSERT_STDOUT_EQ(r, "dotted\n");
 }
 
+TEST(rt_unicode_ident_array_subscript) {
+    /// ${arr[N]} subscript lookup with a unicode array name. Before
+    /// the executor wave the name-prefix validator in
+    /// parse_parameter_expansion rejected the non-ASCII bytes and
+    /// silently fell through to the scalar branch, returning empty.
+    run_result_t r = run_shell("café=(alpha beta gamma)\n"
+                               "echo \"${café[0]}=${café[1]}=${café[2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "alpha=beta=gamma\n");
+}
+
+TEST(rt_unicode_ident_array_length) {
+    /// ${#arr[@]} on a unicode-named array.
+    run_result_t r = run_shell("café=(one two three four)\n"
+                               "echo \"${#café[@]}\"\n");
+    ASSERT_STDOUT_EQ(r, "4\n");
+}
+
+TEST(rt_unicode_ident_array_vector_in_for) {
+    /// "${arr[@]}" word-list expansion in a for-loop body. Before
+    /// the wave, try_expand_vector_arg's byte-test name extraction
+    /// declined the unicode name and the scalar-slot enforcement
+    /// raised SHELL_ERR_TYPE_MISMATCH ("list value in scalar position").
+    run_result_t r =
+        run_shell("café=(a b c)\n"
+                  "for x in \"${café[@]}\"; do echo \"[$x]\"; done\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
+}
+
+TEST(rt_unicode_ident_array_joined) {
+    /// ${arr[*]} space-joined form.
+    run_result_t r = run_shell("café=(one two three)\n"
+                               "echo \"[${café[*]}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[one two three]\n");
+}
+
+TEST(rt_unicode_ident_assoc_array_subscript) {
+    /// Associative array with a unicode name; key lookup honours the
+    /// predicate-driven name prefix detection too.
+    run_result_t r = run_shell("declare -A имя\n"
+                               "имя[k1]=v1\n"
+                               "имя[k2]=v2\n"
+                               "echo \"${имя[k1]}=${имя[k2]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v1=v2\n");
+}
+
+TEST(rt_unicode_ident_kind_sigil) {
+    /// `@café` kind sigil on a unicode-named array (lush default has
+    /// FEATURE_KIND_SIGILS on).
+    run_result_t r = run_shell("café=(a b c)\n"
+                               "echo \"@café\"\n");
+    ASSERT_STDOUT_EQ(r, "a b c\n");
+}
+
+TEST(rt_unicode_ident_bare_array_expands_zsh_lush) {
+    /// Bare $arr explodes to N words in zsh/lush mode -- now also
+    /// works for unicode names via the migrated try_expand_vector_arg
+    /// detection.
+    run_result_t r = run_shell("café=(a b c)\n"
+                               "for x in $café; do echo \"[$x]\"; done\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3717,6 +3779,13 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_alias_name_bash_rejected);
     RUN_TEST(rt_unicode_ident_alias_digit_leading_unchanged);
     RUN_TEST(rt_unicode_ident_alias_extension_chars_unchanged);
+    RUN_TEST(rt_unicode_ident_array_subscript);
+    RUN_TEST(rt_unicode_ident_array_length);
+    RUN_TEST(rt_unicode_ident_array_vector_in_for);
+    RUN_TEST(rt_unicode_ident_array_joined);
+    RUN_TEST(rt_unicode_ident_assoc_array_subscript);
+    RUN_TEST(rt_unicode_ident_kind_sigil);
+    RUN_TEST(rt_unicode_ident_bare_array_expands_zsh_lush);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);

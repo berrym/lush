@@ -4512,16 +4512,19 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
     /// build_argv_from_ast both honor it via the same helper.
     /// Issue #99.
     bool bare_array = false;
-    if (!positional_at && !braced && len >= 2 && s[0] == '$' &&
-        (isalpha((unsigned char)s[1]) || s[1] == '_')) {
-        bool name_only = true;
-        for (size_t k = 1; k < len; k++) {
-            if (!isalnum((unsigned char)s[k]) && s[k] != '_') {
-                name_only = false;
-                break;
+    if (!positional_at && !braced && len >= 2 && s[0] == '$') {
+        size_t walked = lush_ident_match_start(s + 1, len - 1);
+        if (walked > 0) {
+            while (walked + 1 < len) {
+                size_t n =
+                    lush_ident_match_continue(s + 1 + walked, len - 1 - walked);
+                if (n == 0) {
+                    break;
+                }
+                walked += n;
             }
         }
-        if (name_only) {
+        if (walked > 0 && walked + 1 == len) {
             char name_buf[256];
             size_t nlen = len - 1;
             if (nlen < sizeof(name_buf)) {
@@ -4627,9 +4630,13 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                 }
                 const char *np = flag_end + 1;
                 const char *nstart = np;
-                while (np < end &&
-                       (isalnum((unsigned char)*np) || *np == '_')) {
-                    np++;
+                while (np < end) {
+                    size_t n =
+                        lush_ident_match_continue(np, (size_t)(end - np));
+                    if (n == 0) {
+                        break;
+                    }
+                    np += n;
                 }
                 if (ok_flags && np == end && np > nstart) {
                     char nbuf[256];
@@ -4733,8 +4740,12 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         } else {
             /// Must be NAME[@] / NAME[*] optionally followed by :N or :N:M
             name_start = p;
-            while (p < end && (isalnum((unsigned char)*p) || *p == '_')) {
-                p++;
+            while (p < end) {
+                size_t n = lush_ident_match_continue(p, (size_t)(end - p));
+                if (n == 0) {
+                    break;
+                }
+                p += n;
             }
             name_len = (size_t)(p - name_start);
             if (name_len == 0) {
@@ -5707,7 +5718,7 @@ char *expand_if_needed(executor_t *executor, const char *text) {
     /// span is one token coming out of the tokenizer (see the $+IDENT
     /// handler in src/tokenizer.c), so the rewrite is just text-shape.
     if (text[0] == '$' && text[1] == '+' &&
-        (isalpha((unsigned char)text[2]) || text[2] == '_')) {
+        lush_ident_match_start(text + 2, strlen(text + 2)) > 0) {
         size_t orig_len = strlen(text);
         char *braced = malloc(orig_len + 3);
         if (braced) {
@@ -5728,10 +5739,16 @@ char *expand_if_needed(executor_t *executor, const char *text) {
     /// to verify the shape before routing to expand_kind_sigil.
     if ((text[0] == '@' || text[0] == '%') &&
         shell_mode_allows(FEATURE_KIND_SIGILS) &&
-        (isalpha((unsigned char)text[1]) || text[1] == '_')) {
+        lush_ident_match_start(text + 1, strlen(text + 1)) > 0) {
         const char *p = text + 1;
-        while (*p && (isalnum((unsigned char)*p) || *p == '_')) {
-            p++;
+        size_t rem = strlen(p);
+        while (rem > 0) {
+            size_t n = lush_ident_match_continue(p, rem);
+            if (n == 0) {
+                break;
+            }
+            p += n;
+            rem -= n;
         }
         if (*p == '\0') {
             return expand_kind_sigil(executor, text);
@@ -5920,8 +5937,12 @@ char *expand_if_needed(executor_t *executor, const char *text) {
                 } else {
                     /// $var format
                     i++;
-                    while (i < len && (isalnum(text[i]) || text[i] == '_')) {
-                        i++;
+                    while (i < len) {
+                        size_t n = lush_ident_match_continue(text + i, len - i);
+                        if (n == 0) {
+                            break;
+                        }
+                        i += n;
                     }
                     i--; /// Back up to last char of variable
                 }
@@ -8978,17 +8999,11 @@ static int execute_assignment(executor_t *executor, const char *assignment,
         return 1;
     }
 
-    /// Validate variable name
-    if (!var_name[0] || (!isalpha(var_name[0]) && var_name[0] != '_')) {
+    /// Validate variable name via the project-wide predicate so
+    /// FEATURE_UNICODE_IDENTIFIERS opt-ins reach this assignment path.
+    if (!lush_is_valid_identifier(var_name)) {
         free(var_name);
         return 1;
-    }
-
-    for (size_t i = 1; i < var_len; i++) {
-        if (!isalnum(var_name[i]) && var_name[i] != '_') {
-            free(var_name);
-            return 1;
-        }
     }
 
     /// Expand the value using modern expansion
@@ -11519,10 +11534,16 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                      (str[var_end] >= '0' && str[var_end] <= '9'))) {
                     var_end++; /// Single character special variable
                 } else {
-                    /// Regular variable names (alphanumeric + underscore)
-                    while (var_end < len &&
-                           (isalnum(str[var_end]) || str[var_end] == '_')) {
-                        var_end++;
+                    /// Regular variable names. lush_ident_match_continue
+                    /// honours FEATURE_UNICODE_IDENTIFIERS, so multibyte
+                    /// codepoints stay attached to the name in lush mode.
+                    while (var_end < len) {
+                        size_t n = lush_ident_match_continue(str + var_end,
+                                                             len - var_end);
+                        if (n == 0) {
+                            break;
+                        }
+                        var_end += n;
                     }
                     /// Zsh bare-subscript form: $var[N] / $var[N,M].
                     /// Consume the bracket span so var_expr becomes
@@ -12097,21 +12118,9 @@ static char *parse_parameter_expansion(executor_t *executor,
                         arr_name = strndup(rest, (size_t)(bracket - rest));
                         rest_is_simple_ref = (arr_name != NULL);
                     }
-                } else if (rest[0] && (isalpha((unsigned char)rest[0]) ||
-                                       rest[0] == '_')) {
-                    /// Bare name; validate it as a plain identifier.
-                    bool plain = true;
-                    for (size_t i = 1; rest[i]; i++) {
-                        if (!isalnum((unsigned char)rest[i]) &&
-                            rest[i] != '_') {
-                            plain = false;
-                            break;
-                        }
-                    }
-                    if (plain) {
-                        arr_name = strdup(rest);
-                        rest_is_simple_ref = (arr_name != NULL);
-                    }
+                } else if (rest[0] && lush_is_valid_identifier(rest)) {
+                    arr_name = strdup(rest);
+                    rest_is_simple_ref = (arr_name != NULL);
                 }
 
                 bool has_collection_only_flag = strchr(flags, 'j') != NULL ||
@@ -13078,17 +13087,18 @@ static char *parse_parameter_expansion(executor_t *executor,
     const char *bracket = strchr(expansion, '[');
     if (bracket && bracket > expansion) {
         size_t name_len = bracket - expansion;
-        bool valid_name = true;
-        if (!isalpha((unsigned char)expansion[0]) && expansion[0] != '_') {
-            valid_name = false;
-        } else {
-            for (size_t i = 1; i < name_len; i++) {
-                if (!isalnum((unsigned char)expansion[i]) &&
-                    expansion[i] != '_') {
-                    valid_name = false;
+        bool valid_name = false;
+        size_t walked = lush_ident_match_start(expansion, name_len);
+        if (walked > 0) {
+            while (walked < name_len) {
+                size_t n = lush_ident_match_continue(expansion + walked,
+                                                     name_len - walked);
+                if (n == 0) {
                     break;
                 }
+                walked += n;
             }
+            valid_name = (walked == name_len);
         }
         if (!valid_name) {
             bracket = NULL;
@@ -15871,11 +15881,15 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
         /// the result buffer and advance past the consumed span.
         if ((str[i] == '@' || str[i] == '%') && i + 1 < len &&
             shell_mode_allows(FEATURE_KIND_SIGILS) &&
-            (isalpha((unsigned char)str[i + 1]) || str[i + 1] == '_')) {
+            lush_ident_match_start(str + i + 1, len - i - 1) > 0) {
             size_t sigil_end = i + 1;
-            while (sigil_end < len && (isalnum((unsigned char)str[sigil_end]) ||
-                                       str[sigil_end] == '_')) {
-                sigil_end++;
+            while (sigil_end < len) {
+                size_t n =
+                    lush_ident_match_continue(str + sigil_end, len - sigil_end);
+                if (n == 0) {
+                    break;
+                }
+                sigil_end += n;
             }
             size_t span = sigil_end - i;
             char *sigil_buf = malloc(span + 1);
@@ -16129,11 +16143,17 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                     (str[var_start] >= '0' && str[var_start] <= '9')) {
                     var_name_len = 1;
                 } else {
-                    /// Regular variable names (alphanumeric + underscore)
-                    while (var_start + var_name_len < len &&
-                           (isalnum(str[var_start + var_name_len]) ||
-                            str[var_start + var_name_len] == '_')) {
-                        var_name_len++;
+                    /// Regular variable names; honour
+                    /// FEATURE_UNICODE_IDENTIFIERS via
+                    /// lush_ident_match_continue.
+                    while (var_start + var_name_len < len) {
+                        size_t n = lush_ident_match_continue(
+                            str + var_start + var_name_len,
+                            len - var_start - var_name_len);
+                        if (n == 0) {
+                            break;
+                        }
+                        var_name_len += n;
                     }
                     /// Zsh bare-subscript form: $var[N] / $var[N,M] inside
                     /// a double-quoted string. Extend var_name_len through
@@ -17020,7 +17040,7 @@ static int execute_arithmetic_command(executor_t *executor,
                 const char *p = expr;
                 while (*p) {
                     if (p[0] == '$' && p[1] == '+' &&
-                        (isalpha((unsigned char)p[2]) || p[2] == '_')) {
+                        lush_ident_match_start(p + 2, strlen(p + 2)) > 0) {
                         /// Emit `${+`
                         if (out_len + 4 >= out_cap) {
                             out_cap *= 2;
@@ -17037,8 +17057,36 @@ static int execute_arithmetic_command(executor_t *executor,
                         p += 2; /// consume $+
                         /// Copy the name and optional [subscript].
                         int bracket_depth = 0;
-                        while (*p && (isalnum((unsigned char)*p) || *p == '_' ||
-                                      (bracket_depth > 0) || *p == '[')) {
+                        while (*p) {
+                            bool advance = false;
+                            if (bracket_depth > 0 || *p == '[') {
+                                advance = true;
+                            } else {
+                                size_t n =
+                                    lush_ident_match_continue(p, strlen(p));
+                                if (n > 0) {
+                                    advance = true;
+                                    /// Copy n bytes for multi-byte codepoints
+                                    if (out_len + n + 1 >= out_cap) {
+                                        out_cap = (out_len + n + 1) * 2;
+                                        char *grown =
+                                            realloc(rewritten_expr, out_cap);
+                                        if (!grown) {
+                                            free(rewritten_expr);
+                                            rewritten_expr = NULL;
+                                            break;
+                                        }
+                                        rewritten_expr = grown;
+                                    }
+                                    memcpy(rewritten_expr + out_len, p, n);
+                                    out_len += n;
+                                    p += n;
+                                    continue;
+                                }
+                            }
+                            if (!advance) {
+                                break;
+                            }
                             if (*p == '[') {
                                 bracket_depth++;
                             } else if (*p == ']') {
