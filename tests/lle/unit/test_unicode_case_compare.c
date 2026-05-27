@@ -300,6 +300,94 @@ static void test_nfc_precomposed(void) {
 }
 
 /* ============================================================================
+ * NFC HEAP-ALLOC WRAPPER
+ * ============================================================================
+ */
+
+static void test_nfc_alloc_null_input(void) {
+    TEST("NFC alloc - NULL input returns NULL");
+    char *got = lle_unicode_normalize_nfc_alloc(NULL);
+    ASSERT_TRUE(got == NULL, "NULL in -> NULL out");
+    PASS();
+}
+
+static void test_nfc_alloc_empty_string(void) {
+    TEST("NFC alloc - empty string returns heap empty");
+    char *got = lle_unicode_normalize_nfc_alloc("");
+    ASSERT_TRUE(got != NULL, "empty in -> heap empty");
+    ASSERT_STR_EQ(got, "", "value is empty");
+    free(got);
+    PASS();
+}
+
+static void test_nfc_alloc_ascii_fast_path(void) {
+    TEST("NFC alloc - ASCII input is identity");
+    char *got = lle_unicode_normalize_nfc_alloc("hello-world");
+    ASSERT_TRUE(got != NULL, "alloc succeeded");
+    ASSERT_STR_EQ(got, "hello-world", "ASCII unchanged");
+    free(got);
+    PASS();
+}
+
+static void test_nfc_alloc_precomposed_unchanged(void) {
+    TEST("NFC alloc - precomposed e-acute round-trips");
+    /// "café" with precomposed e-acute (U+00E9 = 0xC3 0xA9).
+    const char *input = "caf\xC3\xA9";
+    char *got = lle_unicode_normalize_nfc_alloc(input);
+    ASSERT_TRUE(got != NULL, "alloc succeeded");
+    ASSERT_STR_EQ(got, input, "precomposed NFC is identity");
+    free(got);
+    PASS();
+}
+
+static void test_nfc_alloc_decomposed_to_precomposed(void) {
+    TEST("NFC alloc - decomposed e+acute folds to precomposed");
+    /// NFD form: 'e' (0x65) + combining acute (U+0301 = 0xCC 0x81).
+    const char *nfd_input = "cafe\xCC\x81";
+    const char *nfc_expected = "caf\xC3\xA9";
+    char *got = lle_unicode_normalize_nfc_alloc(nfd_input);
+    ASSERT_TRUE(got != NULL, "alloc succeeded");
+    ASSERT_STR_EQ(got, nfc_expected, "NFD folded to NFC");
+    free(got);
+    PASS();
+}
+
+static void test_nfc_alloc_invalid_utf8_fallback(void) {
+    TEST("NFC alloc - invalid UTF-8 falls back to strdup");
+    /// 0xC3 alone is the start of a 2-byte UTF-8 sequence but
+    /// has no continuation byte: malformed. The wrapper must
+    /// strdup the input so callers still get a usable string for
+    /// byte-level comparison rather than NULL.
+    const char *bad_input = "ab\xC3"
+                            "xy";
+    char *got = lle_unicode_normalize_nfc_alloc(bad_input);
+    ASSERT_TRUE(got != NULL, "fallback strdup succeeded");
+    ASSERT_TRUE(strcmp(got, bad_input) == 0, "invalid input passes through");
+    free(got);
+    PASS();
+}
+
+static void test_nfc_alloc_long_unicode_input(void) {
+    TEST("NFC alloc - long mixed input survives sizing");
+    /// Mix of ASCII + NFD repeats to exercise the heap size path
+    /// (the inline ASCII fast path takes a different branch).
+    char input[512];
+    size_t len = 0;
+    for (int i = 0; i < 40; i++) {
+        memcpy(input + len, "cafe\xCC\x81 ", 7);
+        len += 7;
+    }
+    input[len] = '\0';
+    char *got = lle_unicode_normalize_nfc_alloc(input);
+    ASSERT_TRUE(got != NULL, "alloc succeeded for long input");
+    /// Each "cafe<combining-acute> " (7 bytes) becomes "café " (6 bytes)
+    /// after NFC; expect a shorter result.
+    ASSERT_TRUE(strlen(got) < len, "NFC output is shorter than NFD input");
+    free(got);
+    PASS();
+}
+
+/* ============================================================================
  * COMBINING CHARACTER TESTS
  * ============================================================================
  */
@@ -363,6 +451,15 @@ int main(void) {
     printf("NFC Normalization:\n");
     RUN_TEST(nfc_ascii_passthrough);
     RUN_TEST(nfc_precomposed);
+
+    printf("NFC Heap-Alloc Wrapper:\n");
+    RUN_TEST(nfc_alloc_null_input);
+    RUN_TEST(nfc_alloc_empty_string);
+    RUN_TEST(nfc_alloc_ascii_fast_path);
+    RUN_TEST(nfc_alloc_precomposed_unchanged);
+    RUN_TEST(nfc_alloc_decomposed_to_precomposed);
+    RUN_TEST(nfc_alloc_invalid_utf8_fallback);
+    RUN_TEST(nfc_alloc_long_unicode_input);
 
     printf("Combining Characters:\n");
     RUN_TEST(combining_class);

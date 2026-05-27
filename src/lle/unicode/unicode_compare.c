@@ -16,6 +16,7 @@
 #include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 /// Default comparison options
@@ -612,6 +613,58 @@ int lle_unicode_normalize_nfc(const char *input, size_t input_len, char *output,
     }
 
     return 0;
+}
+
+/**
+ * @brief Inline ASCII-only check
+ *
+ * NFC is identity for pure-ASCII input (no combining characters,
+ * no precomposed Unicode), so we skip the normalisation scratch
+ * space allocation entirely and just strdup. Faster than running
+ * the full state machine for the common case (identifier names,
+ * EOF delimiters, builtin command names, etc.).
+ */
+static bool string_is_ascii(const char *s, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        if ((unsigned char)s[i] >= 0x80) {
+            return false;
+        }
+    }
+    return true;
+}
+
+char *lle_unicode_normalize_nfc_alloc(const char *input) {
+    if (!input) {
+        return NULL;
+    }
+    size_t in_len = strlen(input);
+
+    /// ASCII fast path: identity transform.
+    if (string_is_ascii(input, in_len)) {
+        return strdup(input);
+    }
+
+    /// NFC output is bounded above by ~3x input bytes in pathological
+    /// cases (decomposed forms expand). 4x + a small floor gives the
+    /// underlying primitive enough room without a second allocation.
+    size_t out_size = in_len * 4 + 8;
+    char *out = malloc(out_size);
+    if (!out) {
+        return NULL;
+    }
+    size_t actual = 0;
+    int rc = lle_unicode_normalize_nfc(input, in_len, out, out_size, &actual);
+    if (rc == 0) {
+        /// Trim to the actual size. realloc-shrink rarely moves the
+        /// pointer in practice but follow the contract anyway.
+        char *shrunk = realloc(out, actual + 1);
+        return shrunk ? shrunk : out;
+    }
+    /// Invalid UTF-8 (-3) or other failure: return a lossless strdup
+    /// so the caller still gets a usable string for byte-level
+    /// comparison rather than NULL.
+    free(out);
+    return strdup(input);
 }
 
 /**

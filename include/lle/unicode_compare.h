@@ -96,6 +96,38 @@ int lle_unicode_normalize_nfc(const char *input, size_t input_len, char *output,
                               size_t output_size, size_t *output_len);
 
 /**
+ * @brief Return a heap-allocated NFC-normalized copy of `input`
+ *
+ * Convenience wrapper around lle_unicode_normalize_nfc that handles
+ * the buffer-sizing dance: sizes a heap buffer based on the input
+ * byte length, calls the underlying primitive, and returns the
+ * result (caller frees with free()).
+ *
+ * Contract:
+ *   - input == NULL                -> returns NULL
+ *   - input == ""                  -> returns a heap "" (strdup of "")
+ *   - input is ASCII-only          -> returns strdup(input) without
+ *                                     allocating the normalisation
+ *                                     scratch space (fast path)
+ *   - valid UTF-8 with combining
+ *     characters                   -> returns canonical NFC bytes
+ *   - invalid UTF-8                -> returns strdup(input) (lossless
+ *                                     fallback; callers can still
+ *                                     compare byte-equal pairs)
+ *   - allocation failure           -> returns NULL
+ *
+ * Designed for canonical-form storage (e.g. associative-array keys
+ * where the hashtable hashes bytewise, so the key bytes must already
+ * be canonical for NFC vs NFD pairs to collapse to a single entry).
+ * Use lle_unicode_strings_equal when only equality is needed.
+ *
+ * @param input UTF-8 string (may be NULL)
+ * @return Heap-allocated NFC form (caller frees), NULL on NULL input
+ *         or allocation failure
+ */
+char *lle_unicode_normalize_nfc_alloc(const char *input);
+
+/**
  * @brief Check if a codepoint is a combining character
  * @param codepoint Unicode codepoint to check
  * @return true if the codepoint is a combining character (Mn, Mc, Me
