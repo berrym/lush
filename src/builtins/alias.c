@@ -15,6 +15,7 @@
 #include "errors.h"
 #include "executor.h"
 #include "ht.h"
+#include "identifier.h"
 #include "lle/lle_pager.h"
 #include "shell_error.h"
 #include "tokenizer.h"
@@ -217,11 +218,29 @@ bool valid_alias_name(const char *key) {
     /// the consensus: accept digit-first names too.
 
     const char *p = trimmed;
-    while (*p && !isspace((unsigned char)*p)) {
-        if (!valid_alias_name_char(*p)) {
-            return false;
+    size_t rem = strlen(p);
+    while (rem > 0 && !isspace((unsigned char)*p)) {
+        unsigned char b = (unsigned char)*p;
+        if (b < 0x80) {
+            /// ASCII fast path: alnum/_ plus the .-+ extensions.
+            if (!valid_alias_name_char((char)b)) {
+                return false;
+            }
+            p++;
+            rem--;
+        } else {
+            /// Non-ASCII: honour FEATURE_UNICODE_IDENTIFIERS via the
+            /// project-wide predicate. _continue accepts letter-or-digit
+            /// codepoints, which matches alias-name semantics (alias
+            /// permits digit-leading names, so _continue is correct here
+            /// rather than _start).
+            size_t n = lush_ident_match_continue(p, rem);
+            if (n == 0) {
+                return false;
+            }
+            p += n;
+            rem -= n;
         }
-        p++;
     }
 
     /// Make sure we processed at least one character

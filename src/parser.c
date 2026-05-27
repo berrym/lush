@@ -13,6 +13,7 @@
 
 #include "debug.h"
 #include "executor.h"
+#include "identifier.h"
 #include "lle/unicode_compare.h"
 #include "node.h"
 #include "shell_mode.h"
@@ -4869,32 +4870,20 @@ static bool is_function_definition(parser_t *parser) {
 }
 
 /**
- * @brief Validate function name for POSIX compliance
+ * @brief Validate function name in POSIX mode
  *
- * Function names must start with letter/underscore and contain
- * only alphanumeric characters and underscores.
+ * Delegates to lush_is_valid_identifier so the predicate is consistent
+ * with declare/$var/${var}/arithmetic. The result is byte-identical to
+ * the prior isalpha/isalnum check when FEATURE_UNICODE_IDENTIFIERS is
+ * off -- which is the default in POSIX mode. A user who explicitly
+ * opts in with `shopt -s unicode_identifiers` while in POSIX mode also
+ * gets unicode-aware function names here.
  *
  * @param name Function name to validate
- * @return true if name is valid POSIX function name
+ * @return true if name is a valid identifier under the current mode
  */
 static bool is_valid_posix_function_name(const char *name) {
-    if (!name || !*name) {
-        return false;
-    }
-
-    /// First character must be letter or underscore
-    if (!isalpha(*name) && *name != '_') {
-        return false;
-    }
-
-    /// Remaining characters must be alphanumeric or underscore
-    for (const char *p = name + 1; *p; p++) {
-        if (!isalnum(*p) && *p != '_') {
-            return false;
-        }
-    }
-
-    return true;
+    return lush_is_valid_identifier(name);
 }
 
 /**

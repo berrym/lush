@@ -9,6 +9,7 @@
  * @copyright Copyright (C) 2021-2026 Michael Berry
  */
 
+#include "alias.h"
 #include "executor.h"
 #include "lle/buffer_management.h"
 #include "lle/lle_editor.h"
@@ -2373,6 +2374,74 @@ TEST(rt_unicode_ident_arithmetic_positional_unchanged) {
     ASSERT_STDOUT_EQ(r, "15\n");
 }
 
+TEST(rt_unicode_ident_function_name_lush) {
+    /// Function definition with a non-ASCII name in lush mode.
+    /// Parser was already permissive here (POSIX-only validation),
+    /// but the lush_is_valid_identifier delegation must not regress
+    /// the lush case.
+    run_result_t r = run_shell("función() { echo from-función; }\n"
+                               "función\n");
+    ASSERT_STDOUT_EQ(r, "from-función\n");
+}
+
+TEST(rt_unicode_ident_function_name_posix_rejected) {
+    /// In POSIX mode (with the feature off by default), a function
+    /// name containing non-ASCII bytes must be rejected. Two separate
+    /// run_shell calls so the parser sees posix_mode = true.
+    (void)run_shell("set -o posix\n");
+    run_result_t r = run_shell("función() { :; }\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid function name in POSIX mode");
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_function_name_posix_opt_in) {
+    /// POSIX mode plus `shopt -s unicode_identifiers` must accept
+    /// the unicode name. Same multi-input pattern as the bash opt-in
+    /// test: parser sees posix_mode + feature override at parse time.
+    (void)run_shell("set -o posix\n"
+                    "shopt -s unicode_identifiers\n");
+    run_result_t r = run_shell("función() { echo posix-ok; }\n"
+                               "función\n");
+    ASSERT_STDOUT_EQ(r, "posix-ok\n");
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_alias_name_lush) {
+    /// Non-ASCII alias name accepted in lush mode (FEATURE_UNICODE_IDENTIFIERS
+    /// default on). init_aliases() seeds the global alias table the in-process
+    /// harness shares with set_alias; the real shell calls it during startup
+    /// via src/init.c but the harness has no equivalent entry point.
+    init_aliases();
+    run_result_t r = run_shell("alias café=\"echo from-café\"\n"
+                               "café\n");
+    ASSERT_STDOUT_EQ(r, "from-café\n");
+}
+
+TEST(rt_unicode_ident_alias_name_bash_rejected) {
+    /// In bash mode, the byte-level check rejects café.
+    (void)run_shell("mode bash\n");
+    run_result_t r = run_shell("alias café=\"echo nope\"\n");
+    ASSERT_STDERR_CONTAINS(r, "invalid alias name");
+    (void)run_shell("mode lush\n");
+}
+
+TEST(rt_unicode_ident_alias_digit_leading_unchanged) {
+    /// Alias accepts digit-leading names (bash+zsh consensus); the
+    /// migration must not regress this.
+    init_aliases();
+    run_result_t r = run_shell("alias 1=\"echo one\"\n"
+                               "1\n");
+    ASSERT_STDOUT_EQ(r, "one\n");
+}
+
+TEST(rt_unicode_ident_alias_extension_chars_unchanged) {
+    /// Alias accepts .-+ as name characters; preserve.
+    init_aliases();
+    run_result_t r = run_shell("alias my.cmd=\"echo dotted\"\n"
+                               "my.cmd\n");
+    ASSERT_STDOUT_EQ(r, "dotted\n");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3641,6 +3710,13 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_arithmetic_dollar);
     RUN_TEST(rt_unicode_ident_arithmetic_compound);
     RUN_TEST(rt_unicode_ident_arithmetic_positional_unchanged);
+    RUN_TEST(rt_unicode_ident_function_name_lush);
+    RUN_TEST(rt_unicode_ident_function_name_posix_rejected);
+    RUN_TEST(rt_unicode_ident_function_name_posix_opt_in);
+    RUN_TEST(rt_unicode_ident_alias_name_lush);
+    RUN_TEST(rt_unicode_ident_alias_name_bash_rejected);
+    RUN_TEST(rt_unicode_ident_alias_digit_leading_unchanged);
+    RUN_TEST(rt_unicode_ident_alias_extension_chars_unchanged);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
