@@ -26,6 +26,7 @@
 
 #include "ht.h"
 #include "init.h"
+#include "lle/unicode_case.h"
 #include "lush.h"
 #include "shell_mode.h"
 
@@ -1103,6 +1104,37 @@ int symtable_set_flags(symtable_manager_t *manager, const char *name,
     int result = symtable_set_var(manager, name, value, flags);
     free(value);
     return result;
+}
+
+char *symtable_apply_case_attr_alloc(const char *value, symvar_flags_t flags) {
+    if (!value || *value == '\0') {
+        return NULL;
+    }
+    bool lower = (flags & SYMVAR_LOWERCASE) != 0;
+    bool upper = (flags & SYMVAR_UPPERCASE) != 0;
+    if (!lower && !upper) {
+        return NULL;
+    }
+    /// Case folding can grow byte length on some codepoints (German
+    /// ß -> SS being the canonical example). 4x input length plus a
+    /// small floor covers the worst case for the project's case
+    /// table; values longer than the resulting buffer would have to
+    /// be implausibly fold-heavy, so a single allocation suffices.
+    size_t input_len = strlen(value);
+    size_t output_size = input_len * 4 + 8;
+    char *output = malloc(output_size);
+    if (!output) {
+        return NULL;
+    }
+    size_t written =
+        lower ? lle_utf8_tolower(value, input_len, output, output_size)
+              : lle_utf8_toupper(value, input_len, output, output_size);
+    if (written == (size_t)-1) {
+        free(output);
+        return NULL;
+    }
+    output[written] = '\0';
+    return output;
 }
 
 /**

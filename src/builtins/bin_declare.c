@@ -574,24 +574,29 @@ int bin_declare(int argc, char **argv) {
                 return 1;
             }
 
-            /// Apply case transformations if requested
+            /// Apply case transformations if requested. The earlier
+            /// implementation folded per-byte via toupper/tolower from
+            /// <ctype.h>, which only handles ASCII; non-ASCII codepoints
+            /// passed through unfolded. symtable_apply_case_attr_alloc
+            /// uses the project's Unicode case table via
+            /// lle_utf8_tolower / lle_utf8_toupper, so accented Latin,
+            /// Greek, Cyrillic, etc. fold correctly. The helper returns
+            /// NULL when the input does not need transformation (no
+            /// attribute, empty value); fall back to strdup in that case
+            /// so final_value is always heap-allocated when value is set.
             char *final_value = NULL;
             if (value) {
+                symvar_flags_t case_flags = SYMVAR_NONE;
                 if (opt_lowercase) {
-                    final_value = strdup(value);
-                    if (final_value) {
-                        for (char *p = final_value; *p; p++) {
-                            *p = tolower((unsigned char)*p);
-                        }
-                    }
+                    case_flags = SYMVAR_LOWERCASE;
                 } else if (opt_uppercase) {
-                    final_value = strdup(value);
-                    if (final_value) {
-                        for (char *p = final_value; *p; p++) {
-                            *p = toupper((unsigned char)*p);
-                        }
-                    }
-                } else {
+                    case_flags = SYMVAR_UPPERCASE;
+                }
+                if (case_flags != SYMVAR_NONE) {
+                    final_value =
+                        symtable_apply_case_attr_alloc(value, case_flags);
+                }
+                if (!final_value) {
                     final_value = strdup(value);
                 }
             }
@@ -626,12 +631,33 @@ int bin_declare(int argc, char **argv) {
                 }
                 free(final_value);
             } else {
-                /// Just declare without value
-                if (opt_global) {
-                    symtable_set_global_var(manager, name, "");
-                } else {
-                    symtable_set_var(manager, name, "", flags);
+                /// Declare without value. If the variable already
+                /// exists, preserve its current value and just update
+                /// the flags so attribute promotion (declare -l X
+                /// after X already had a value) does not clobber the
+                /// content. When SYMVAR_LOWERCASE / SYMVAR_UPPERCASE
+                /// is among the new flags, apply the fold retroactively
+                /// to the preserved value -- this matches bash, which
+                /// folds existing values when the attribute is added.
+                /// For nonexistent variables the historical empty-
+                /// string default still applies.
+                char *existing = symtable_get_var(manager, name);
+                const char *write_value = existing ? existing : "";
+                char *folded = NULL;
+                if (existing &&
+                    (flags & (SYMVAR_LOWERCASE | SYMVAR_UPPERCASE))) {
+                    folded = symtable_apply_case_attr_alloc(existing, flags);
+                    if (folded) {
+                        write_value = folded;
+                    }
                 }
+                if (opt_global) {
+                    symtable_set_global_var(manager, name, write_value);
+                } else {
+                    symtable_set_var(manager, name, write_value, flags);
+                }
+                free(folded);
+                free(existing);
             }
         }
 

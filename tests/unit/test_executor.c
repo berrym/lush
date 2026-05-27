@@ -3132,6 +3132,77 @@ TEST(rt_readonly_promotes_existing_var) {
     ASSERT_STDOUT_CONTAINS(r, "readonly RO_KEEP='kept'");
 }
 
+/* ============================================================================
+ * Regression: declare -l / declare -u case-attribute enforcement
+ *
+ * The SYMVAR_LOWERCASE / SYMVAR_UPPERCASE flags were previously set by
+ * bin_declare but never read by any write path; values assigned to a
+ * -l / -u variable were stored verbatim. Enforcement now lives in
+ * execute_assignment (via symtable_apply_case_attr_alloc), and the
+ * declare path itself folds the initial value at declaration time
+ * including retroactive folding when promoting an existing variable.
+ * ============================================================================
+ */
+
+TEST(rt_declare_l_initial_value_folded) {
+    /// declare -l NAME=VALUE folds VALUE to lowercase at declaration.
+    run_result_t r = run_shell("declare -l DL_INIT=HELLO\necho \"$DL_INIT\"\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_declare_l_subsequent_assignment_folded) {
+    /// Subsequent writes to a -l variable also fold to lowercase.
+    run_result_t r =
+        run_shell("declare -l DL_LATER\nDL_LATER=WORLD\necho \"$DL_LATER\"\n");
+    ASSERT_STDOUT_EQ(r, "world\n");
+}
+
+TEST(rt_declare_l_unicode_fold) {
+    /// Case fold goes through lle_utf8_tolower so non-ASCII codepoints
+    /// fold per the project's Unicode case table.
+    run_result_t r = run_shell("declare -l DL_UNI=CAFÉ\necho \"$DL_UNI\"\n");
+    ASSERT_STDOUT_EQ(r, "café\n");
+}
+
+TEST(rt_declare_l_promotes_existing) {
+    /// declare -l NAME (no value) on an existing variable folds the
+    /// current value retroactively and adds the attribute so future
+    /// assignments also fold.
+    run_result_t r = run_shell("DL_PROMOTE=Mixed\n"
+                               "declare -l DL_PROMOTE\n"
+                               "echo \"$DL_PROMOTE\"\n"
+                               "DL_PROMOTE=ANOTHER\n"
+                               "echo \"$DL_PROMOTE\"\n");
+    ASSERT_STDOUT_EQ(r, "mixed\nanother\n");
+}
+
+TEST(rt_declare_u_initial_value_folded) {
+    /// declare -u NAME=VALUE folds VALUE to uppercase at declaration.
+    run_result_t r = run_shell("declare -u DU_INIT=hello\necho \"$DU_INIT\"\n");
+    ASSERT_STDOUT_EQ(r, "HELLO\n");
+}
+
+TEST(rt_declare_u_subsequent_assignment_folded) {
+    /// Subsequent writes to a -u variable also fold to uppercase.
+    run_result_t r =
+        run_shell("declare -u DU_LATER\nDU_LATER=world\necho \"$DU_LATER\"\n");
+    ASSERT_STDOUT_EQ(r, "WORLD\n");
+}
+
+TEST(rt_declare_u_unicode_fold) {
+    /// Unicode fold via lle_utf8_toupper.
+    run_result_t r = run_shell("declare -u DU_UNI=café\necho \"$DU_UNI\"\n");
+    ASSERT_STDOUT_EQ(r, "CAFÉ\n");
+}
+
+TEST(rt_declare_no_value_preserves_existing) {
+    /// declare without an attribute or value on an existing variable
+    /// must not clobber the existing value.
+    run_result_t r = run_shell(
+        "DECL_KEEP=preserved\ndeclare DECL_KEEP\necho \"$DECL_KEEP\"\n");
+    ASSERT_STDOUT_EQ(r, "preserved\n");
+}
+
 int main(void) {
     printf("Running executor integration tests...\n\n");
 
@@ -3435,6 +3506,16 @@ int main(void) {
     RUN_TEST(rt_readonly_rejects_arrays_with_diagnostic);
     RUN_TEST(rt_readonly_listing_includes_marked);
     RUN_TEST(rt_readonly_promotes_existing_var);
+
+    printf("\nRegression: declare -l / declare -u case attribute:\n");
+    RUN_TEST(rt_declare_l_initial_value_folded);
+    RUN_TEST(rt_declare_l_subsequent_assignment_folded);
+    RUN_TEST(rt_declare_l_unicode_fold);
+    RUN_TEST(rt_declare_l_promotes_existing);
+    RUN_TEST(rt_declare_u_initial_value_folded);
+    RUN_TEST(rt_declare_u_subsequent_assignment_folded);
+    RUN_TEST(rt_declare_u_unicode_fold);
+    RUN_TEST(rt_declare_no_value_preserves_existing);
 
     /// Cleanup global symbol table
     free_global_symtable();

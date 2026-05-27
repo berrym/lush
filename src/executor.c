@@ -9123,13 +9123,29 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     /// string. `declare -i n; n=5+3` stores "8", not "5+3". Same for
     /// `n=other_var+1` -- the RHS is evaluated as an arithmetic
     /// expression which resolves identifiers as variables. Issue #102.
-    if (symtable_get_flags(executor->symtable, var_name) &
-        SYMVAR_INTEGER_ATTR) {
+    symvar_flags_t target_flags =
+        symtable_get_flags(executor->symtable, var_name);
+    if (target_flags & SYMVAR_INTEGER_ATTR) {
         char *evaluated =
             arithm_expand_with_executor(executor, value ? value : "");
         if (evaluated) {
             free(value);
             value = evaluated;
+        }
+    }
+
+    /// Case attribute (declare -l / declare -u): subsequent assignments
+    /// to the variable fold the RHS to lower- or upper-case before
+    /// storing. The fold goes through lle_utf8_tolower / lle_utf8_toupper
+    /// so non-ASCII codepoints fold per the project's Unicode case
+    /// table. Empty values and values with no case-mappable characters
+    /// pass through unchanged. Bash matches this behaviour: `declare -l
+    /// X; X=HELLO; echo $X` prints "hello".
+    if (value && (target_flags & (SYMVAR_LOWERCASE | SYMVAR_UPPERCASE))) {
+        char *cased = symtable_apply_case_attr_alloc(value, target_flags);
+        if (cased) {
+            free(value);
+            value = cased;
         }
     }
 

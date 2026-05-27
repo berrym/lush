@@ -139,6 +139,28 @@ typedef enum {
  */
 #define SYMTABLE_ERR_READONLY (-2)
 
+/**
+ * @brief Apply SYMVAR_LOWERCASE / SYMVAR_UPPERCASE to a value
+ *
+ * If `flags` carries SYMVAR_LOWERCASE, returns a malloc'd lowercased
+ * copy of `value`; if it carries SYMVAR_UPPERCASE, returns an
+ * uppercased copy. Conversion goes through lle_utf8_tolower /
+ * lle_utf8_toupper so non-ASCII codepoints fold according to the
+ * project's Unicode case table.
+ *
+ * Returns NULL when no transformation applies (neither bit set, or
+ * `value` is NULL / empty), letting callers cheaply skip the
+ * allocation when the attribute is absent. Returns NULL on allocation
+ * failure or invalid UTF-8 in `value` -- callers should fall back to
+ * the untransformed value in those cases rather than failing the
+ * surrounding write.
+ *
+ * @param value Source string (UTF-8). May be NULL.
+ * @param flags Variable flags carrying the case attribute.
+ * @return Heap-allocated transformed copy (caller frees), or NULL.
+ */
+char *symtable_apply_case_attr_alloc(const char *value, symvar_flags_t flags);
+
 /// Scope types for different contexts
 typedef enum {
     SCOPE_GLOBAL,      ///< Global shell scope

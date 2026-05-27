@@ -1450,7 +1450,8 @@ if fs.exists('tests/unit/test_symtable.c')
                              'src/libhashtable/ht_fnv1a.c',
                              'src/libhashtable/ht_strstr.c',
                              'tests/unit/test_symtable_stubs.c',
-                             include_directories: [inc, include_directories('tests')])
+                             include_directories: [inc, include_directories('tests')],
+                             dependencies: [lle_dep])
   test('Symbol Table', test_symtable,
        suite: 'unit',
        timeout: 30)
