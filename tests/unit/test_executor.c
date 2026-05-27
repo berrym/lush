@@ -2905,6 +2905,42 @@ TEST(rt_extended_test_single_equals_alias) {
     ASSERT_STDOUT_EQ(r, "eq\nne\n");
 }
 
+TEST(rt_test_equality_under_nfc_equivalence) {
+    /// `[ a = b ]` (and the `[`-builtin form) now compares under NFC
+    /// equivalence: precomposed "café" (e-acute U+00E9, bytes
+    /// C3 A9) equals decomposed "café" (e + combining acute,
+    /// bytes 65 CC 81) even though byte-level strcmp would diverge.
+    /// Lush-superset divergence from bash/zsh; justified by the
+    /// project's NFC-everywhere policy.
+    run_result_t r =
+        run_shell("nfc=$'caf\\xc3\\xa9'\n"
+                  "nfd=$'cafe\\xcc\\x81'\n"
+                  "[ \"$nfc\" = \"$nfd\" ] && echo eq || echo ne\n"
+                  "[ \"$nfc\" != \"$nfd\" ] && echo ne2 || echo eq2\n");
+    ASSERT_STDOUT_EQ(r, "eq\neq2\n");
+}
+
+TEST(rt_test_inequality_under_nfc_when_actually_different) {
+    /// NFC equivalence does not paper over actually-different
+    /// strings.  Lowercase café vs uppercase CAFÉ remain unequal
+    /// (case folding is a separate axis from NFC).
+    run_result_t r =
+        run_shell("[ \"café\" = \"CAFÉ\" ] && echo eq || echo ne\n");
+    ASSERT_STDOUT_EQ(r, "ne\n");
+}
+
+TEST(rt_test_ascii_paths_unchanged) {
+    /// ASCII inputs hit the NFC fast path (LLE_UNICODE_COMPARE_DEFAULT
+    /// detects ASCII-only and shortcircuits to byte compare); behaviour
+    /// must be byte-identical to the prior strcmp implementation.
+    run_result_t r = run_shell("[ \"hello\" = \"hello\" ] && echo eq\n"
+                               "[ \"hello\" = \"world\" ] && echo ouch || "
+                               "echo correct-ne\n"
+                               "[ \"\" = \"\" ] && echo empty-eq\n"
+                               "[ \"hi\" != \"bye\" ] && echo ne-ok\n");
+    ASSERT_STDOUT_EQ(r, "eq\ncorrect-ne\nempty-eq\nne-ok\n");
+}
+
 TEST(rt_dollar_plus_is_set_test) {
     /// zsh `${+NAME}` returns "1" if NAME is set, "0" otherwise. Both
     /// braced and unbraced (`$+NAME`) forms must work.
@@ -3487,6 +3523,9 @@ int main(void) {
     RUN_TEST(rt_pipe_at_eol_continues_statement);
     RUN_TEST(rt_extended_test_empty_lhs_inequality);
     RUN_TEST(rt_extended_test_single_equals_alias);
+    RUN_TEST(rt_test_equality_under_nfc_equivalence);
+    RUN_TEST(rt_test_inequality_under_nfc_when_actually_different);
+    RUN_TEST(rt_test_ascii_paths_unchanged);
     RUN_TEST(rt_dollar_plus_is_set_test);
     RUN_TEST(rt_dollar_plus_commands_path_lookup);
     RUN_TEST(rt_unfunction_removes_function);

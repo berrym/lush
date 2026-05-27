@@ -7,6 +7,7 @@
  */
 
 #include "builtins.h"
+#include "lle/unicode_compare.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -185,11 +186,22 @@ static int evaluate_single_test(char **argv, int start, int end) {
 
     if (argc == 3) {
         if (strcmp(argv[start + 1], "=") == 0) {
-            /// test STRING1 = STRING2
-            return (strcmp(argv[start], argv[start + 2]) == 0) ? 0 : 1;
+            /// test STRING1 = STRING2. Compare under NFC equivalence
+            /// via the LLE Unicode primitive so canonically-equivalent
+            /// inputs (precomposed é vs decomposed e + combining acute)
+            /// satisfy the user's "are these the same string?" intent.
+            /// Bash and zsh keep byte-level comparison; this is a
+            /// deliberate lush-superset divergence justified by the
+            /// project's NFC-everywhere policy.
+            return lle_unicode_strings_equal(argv[start], argv[start + 2], NULL)
+                       ? 0
+                       : 1;
         } else if (strcmp(argv[start + 1], "!=") == 0) {
-            /// test STRING1 != STRING2
-            return (strcmp(argv[start], argv[start + 2]) != 0) ? 0 : 1;
+            /// test STRING1 != STRING2 -- same NFC equivalence,
+            /// negated.
+            return lle_unicode_strings_equal(argv[start], argv[start + 2], NULL)
+                       ? 1
+                       : 0;
         } else if (strcmp(argv[start + 1], "-eq") == 0) {
             /// test NUM1 -eq NUM2
             int n1 = atoi(argv[start]);
