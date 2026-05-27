@@ -451,6 +451,10 @@ static config_option_t config_options[] = {
     {         "display.lle.pager.min_lines",    CONFIG_TYPE_INT,    CONFIG_SECTION_DISPLAY,
      &config.display_lle_pager_min_lines,
      "Pager threshold in visual rows (0 = use terminal rows)",          config_validate_int,                     NULL            },
+    {       "display.lle.pager.wrap_search",   CONFIG_TYPE_BOOL,    CONFIG_SECTION_DISPLAY,
+     &config.display_lle_pager_wrap_search,
+     "Wrap pager search to top on no-match (less-style)",         config_validate_bool,
+     NULL                                                                                                                        },
 
     /// v1.3.0: Legacy enhanced display mode option removed
     /// behavior.enhanced_display_mode option removed
@@ -824,6 +828,10 @@ static void display_sync_to_runtime(void) {
         CREG_SUCCESS) {
         config.display_lle_pager_min_lines = (int)ival;
     }
+    if (config_registry_get_boolean("display.lle.pager.wrap_search", &bval) ==
+        CREG_SUCCESS) {
+        config.display_lle_pager_wrap_search = bval;
+    }
 }
 
 /// @brief Sync display config from runtime to registry
@@ -842,6 +850,8 @@ static void display_sync_from_runtime(void) {
                                 config.display_lle_pager_enabled);
     config_registry_set_integer("display.lle.pager.min_lines",
                                 config.display_lle_pager_min_lines);
+    config_registry_set_boolean("display.lle.pager.wrap_search",
+                                config.display_lle_pager_wrap_search);
 }
 
 /// @brief Sync completion config from registry to runtime
@@ -1986,6 +1996,9 @@ const char *CONFIG_FILE_TEMPLATE =
     "# LLE pager: row threshold (0 = use terminal rows)\n"
     "display.lle.pager.min_lines = 0\n"
     "\n"
+    "# LLE pager: wrap search to top on no-match (less-style)\n"
+    "display.lle.pager.wrap_search = true\n"
+    "\n"
     "# "
     "=========================================================================="
     "==\n"
@@ -2292,6 +2305,7 @@ void config_set_defaults(void) {
     config.display_optimization_level = 0;
     config.display_lle_pager_enabled = true;
     config.display_lle_pager_min_lines = 0;
+    config.display_lle_pager_wrap_search = true;
 
     /// Script execution defaults
     config.script_execution = true;

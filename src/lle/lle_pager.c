@@ -310,6 +310,14 @@ int lle_pager_present(struct executor *executor, const char *content) {
         return direct_write(content);
     }
 
+    /// Thread the central-config wrap_search value into the pager
+    /// layer's runtime state. pager_layer_init defaults the field
+    /// to true; the explicit assignment lets the user flip it via
+    /// `display lle pager` or the lushrc.toml key without changing
+    /// the layer's default for callers that bypass this entry
+    /// point.
+    pager.wrap_searches = config.display_lle_pager_wrap_search;
+
     /// Fits-in-viewport fallback. total_visual_rows accounts for
     /// wrapped lines, so a single long unwrapped line that exceeds
     /// the view width correctly forces pagination.

@@ -254,8 +254,9 @@ typedef struct {
     bool enhanced_display_mode; ///< Legacy display setting (deprecated)
 
     /// LLE pager (lle_pager_present)
-    bool display_lle_pager_enabled;  ///< Master switch for pagination
-    int display_lle_pager_min_lines; ///< Threshold rows; 0 = terminal_rows
+    bool display_lle_pager_enabled;     ///< Master switch for pagination
+    int display_lle_pager_min_lines;    ///< Threshold rows; 0 = terminal_rows
+    bool display_lle_pager_wrap_search; ///< Wrap to top on search no-match
 
     /// Network settings
     bool ssh_completion_enabled;  ///< Enable SSH host completion
