@@ -1349,9 +1349,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                  start_line, start_column, start_pos);
             } else if (next == '+' &&
                        tokenizer->position + 1 < tokenizer->input_length &&
-                       (isalpha((unsigned char)tokenizer
-                                    ->input[tokenizer->position + 1]) ||
-                        tokenizer->input[tokenizer->position + 1] == '_')) {
+                       lush_ident_match_start(
+                           &tokenizer->input[tokenizer->position + 1],
+                           tokenizer->input_length - tokenizer->position - 1) >
+                           0) {
                 /// zsh `$+NAME` (and `$+NAME[SUBSCRIPT]`) is the unbraced
                 /// shorthand for `${+NAME}` is-set test. Consume `+`,
                 /// the identifier, and any `[...]` subscript so the
@@ -1360,13 +1361,14 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                 tokenizer->position++; /// consume +
                 tokenizer->column++;
                 while (tokenizer->position < tokenizer->input_length) {
-                    char curr = tokenizer->input[tokenizer->position];
-                    if (isalnum((unsigned char)curr) || curr == '_') {
-                        tokenizer->position++;
-                        tokenizer->column++;
-                    } else {
+                    size_t n = lush_ident_match_continue(
+                        &tokenizer->input[tokenizer->position],
+                        tokenizer->input_length - tokenizer->position);
+                    if (n == 0) {
                         break;
                     }
+                    tokenizer->position += n;
+                    tokenizer->column += n;
                 }
                 if (tokenizer->position < tokenizer->input_length &&
                     tokenizer->input[tokenizer->position] == '[') {
@@ -1957,15 +1959,21 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             /// Pattern: {identifier}> or {identifier}< for fd allocation
             if (tokenizer->position + 2 < tokenizer->input_length) {
                 size_t scan = tokenizer->position + 1; /// After '{'
-                /// Scan for valid identifier: [a-zA-Z_][a-zA-Z0-9_]*
-                if (scan < tokenizer->input_length &&
-                    (isalpha(tokenizer->input[scan]) ||
-                     tokenizer->input[scan] == '_')) {
-                    scan++;
-                    while (scan < tokenizer->input_length &&
-                           (isalnum(tokenizer->input[scan]) ||
-                            tokenizer->input[scan] == '_')) {
-                        scan++;
+                /// Scan for valid identifier; honours
+                /// FEATURE_UNICODE_IDENTIFIERS via lush_ident_match_start /
+                /// _continue.
+                size_t start_n = lush_ident_match_start(
+                    &tokenizer->input[scan], tokenizer->input_length - scan);
+                if (start_n > 0) {
+                    scan += start_n;
+                    while (scan < tokenizer->input_length) {
+                        size_t n = lush_ident_match_continue(
+                            &tokenizer->input[scan],
+                            tokenizer->input_length - scan);
+                        if (n == 0) {
+                            break;
+                        }
+                        scan += n;
                     }
                     /// Check for closing } followed by redirection operator
                     if (scan < tokenizer->input_length &&
@@ -2333,23 +2341,24 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
     /// the historical word-character reading of `@` and `%`.
     if ((c == '@' || c == '%') && shell_mode_allows(FEATURE_KIND_SIGILS) &&
         tokenizer->position + 1 < tokenizer->input_length) {
-        unsigned char nx =
-            (unsigned char)tokenizer->input[tokenizer->position + 1];
-        if (isalpha(nx) || nx == '_') {
+        size_t start_n = lush_ident_match_start(
+            &tokenizer->input[tokenizer->position + 1],
+            tokenizer->input_length - tokenizer->position - 1);
+        if (start_n > 0) {
             size_t sigil_start = tokenizer->position;
             size_t sigil_line = tokenizer->line;
             size_t sigil_col = tokenizer->column;
-            tokenizer->position += 2; /// consume sigil + first name char
-            tokenizer->column += 2;
+            tokenizer->position += 1 + start_n; /// sigil + first name codepoint
+            tokenizer->column += 1 + start_n;
             while (tokenizer->position < tokenizer->input_length) {
-                unsigned char ch =
-                    (unsigned char)tokenizer->input[tokenizer->position];
-                if (isalnum(ch) || ch == '_') {
-                    tokenizer->position++;
-                    tokenizer->column++;
-                } else {
+                size_t n = lush_ident_match_continue(
+                    &tokenizer->input[tokenizer->position],
+                    tokenizer->input_length - tokenizer->position);
+                if (n == 0) {
                     break;
                 }
+                tokenizer->position += n;
+                tokenizer->column += n;
             }
             size_t length = tokenizer->position - sigil_start;
             return token_new(TOK_VARIABLE, &tokenizer->input[sigil_start],
@@ -2658,20 +2667,27 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                                         paren_depth--;
                                     scan_pos++;
                                 }
-                            } else if (isalnum(nc) || nc == '_' || nc == '?' ||
-                                       nc == '$' || nc == '!' || nc == '@' ||
-                                       nc == '*' || nc == '#') {
+                            } else if (nc == '?' || nc == '$' || nc == '!' ||
+                                       nc == '@' || nc == '*' || nc == '#' ||
+                                       isdigit((unsigned char)nc) ||
+                                       lush_ident_match_start(
+                                           &tokenizer->input[scan_pos],
+                                           tokenizer->input_length - scan_pos) >
+                                           0) {
                                 /// Simple variable $var or special $?, $$, etc.
                                 if (nc == '?' || nc == '$' || nc == '!' ||
                                     nc == '@' || nc == '*' || nc == '#') {
                                     scan_pos++; /// Single char special var
                                 } else {
-                                    /// Regular var - scan alphanumeric and _
-                                    while (
-                                        scan_pos < tokenizer->input_length &&
-                                        (isalnum(tokenizer->input[scan_pos]) ||
-                                         tokenizer->input[scan_pos] == '_')) {
-                                        scan_pos++;
+                                    /// Regular var - scan identifier codepoints
+                                    while (scan_pos < tokenizer->input_length) {
+                                        size_t n = lush_ident_match_continue(
+                                            &tokenizer->input[scan_pos],
+                                            tokenizer->input_length - scan_pos);
+                                        if (n == 0) {
+                                            break;
+                                        }
+                                        scan_pos += n;
                                     }
                                 }
                             }

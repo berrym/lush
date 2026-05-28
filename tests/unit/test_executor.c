@@ -2504,6 +2504,42 @@ TEST(rt_unicode_ident_bare_array_expands_zsh_lush) {
     ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
 }
 
+TEST(rt_unicode_ident_indirect_expansion_target) {
+    /// ${!ptr} resolves the value of $ptr as a variable name. Both
+    /// the pointer and the target may now be unicode-named.
+    run_result_t r = run_shell("declare ptr=café\n"
+                               "declare café=hello\n"
+                               "echo \"${!ptr}\"\n");
+    ASSERT_STDOUT_EQ(r, "hello\n");
+}
+
+TEST(rt_unicode_ident_indirect_expansion_pointer) {
+    /// Pointer itself uses a unicode identifier name.
+    run_result_t r = run_shell("declare имя=café\n"
+                               "declare café=world\n"
+                               "echo \"${!имя}\"\n");
+    ASSERT_STDOUT_EQ(r, "world\n");
+}
+
+TEST(rt_unicode_ident_zsh_bare_subscript) {
+    /// $arr[0] (zsh bare subscript, no braces). The tokenizer's
+    /// quoted-string $NAME scanner used to byte-test the name;
+    /// now it walks lush_ident_match_continue.
+    run_result_t r = run_shell("café=(a b c)\n"
+                               "echo $café[0]\n");
+    ASSERT_STDOUT_EQ(r, "a\n");
+}
+
+TEST(rt_unicode_ident_fd_allocation_var) {
+    /// exec {varname}>FILE allocates a free fd into $varname.
+    /// The tokenizer's {NAME} fd-allocation scanner must accept
+    /// unicode names too.
+    run_result_t r = run_shell("exec {café}>/tmp/lush_ut_fd.out\n"
+                               "[ $café -ge 10 ] && echo high-fd\n");
+    ASSERT_STDOUT_EQ(r, "high-fd\n");
+    unlink("/tmp/lush_ut_fd.out");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3786,6 +3822,10 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_assoc_array_subscript);
     RUN_TEST(rt_unicode_ident_kind_sigil);
     RUN_TEST(rt_unicode_ident_bare_array_expands_zsh_lush);
+    RUN_TEST(rt_unicode_ident_indirect_expansion_target);
+    RUN_TEST(rt_unicode_ident_indirect_expansion_pointer);
+    RUN_TEST(rt_unicode_ident_zsh_bare_subscript);
+    RUN_TEST(rt_unicode_ident_fd_allocation_var);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
