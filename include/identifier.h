@@ -40,10 +40,38 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @brief Codepoint-level identifier-Start test
+ *
+ * Single source of truth for "may this codepoint begin an identifier?"
+ * lush_ident_match_start decodes a UTF-8 byte sequence and defers here;
+ * codepoint-oriented scanners (the completion word-context analyzer,
+ * which iterates decoded codepoints) call this directly. ASCII
+ * [_A-Za-z] always; any Unicode letter when FEATURE_UNICODE_IDENTIFIERS
+ * is on.
+ *
+ * @param cp Unicode codepoint
+ * @return true if @p cp may start an identifier under the active mode
+ */
+bool lush_ident_is_start_cp(uint32_t cp);
+
+/**
+ * @brief Codepoint-level identifier-Continue test
+ *
+ * Like lush_ident_is_start_cp but also accepts digits and, under
+ * FEATURE_UNICODE_IDENTIFIERS, the UAX #31 Continue combining marks
+ * (grapheme Extend / SpacingMark) so NFD sequences extend the name.
+ *
+ * @param cp Unicode codepoint
+ * @return true if @p cp may continue an identifier under the active mode
+ */
+bool lush_ident_is_continue_cp(uint32_t cp);
 
 /**
  * @brief Length in bytes of the identifier-Start codepoint at @p p, or 0

@@ -27,6 +27,7 @@
 /// Include lush headers for command/alias/builtin checks
 #include "alias.h"
 #include "builtins.h"
+#include "identifier.h"
 #include "lle/adaptive_terminal_integration.h"
 
 /// Weak symbol for function lookup - overridden in full shell build
@@ -400,18 +401,22 @@ static bool is_assignment(const char *word, size_t len) {
     if (name_len == 0)
         return false;
 
-    /// First char must be letter or underscore
-    if (!isalpha((unsigned char)word[0]) && word[0] != '_') {
+    /// Name extent must be a valid identifier under the active mode
+    /// (FEATURE_UNICODE_IDENTIFIERS widens the letter set in lush mode).
+    /// Walk the [0, name_len) span with the shared predicate so the
+    /// highlighter colors `café=1` as an assignment the same way the
+    /// executor accepts it.
+    size_t walked = lush_ident_match_start(word, name_len);
+    if (walked == 0) {
         return false;
     }
-
-    /// Rest must be alphanumeric or underscore
-    for (size_t i = 1; i < name_len; i++) {
-        if (!isalnum((unsigned char)word[i]) && word[i] != '_') {
+    while (walked < name_len) {
+        size_t n = lush_ident_match_continue(word + walked, name_len - walked);
+        if (n == 0) {
             return false;
         }
+        walked += n;
     }
-
     return true;
 }
 
@@ -556,9 +561,14 @@ lle_syntax_check_command(lle_syntax_highlighter_t *highlighter,
             }
         } else {
             /// $VAR format
-            while (*var_end &&
-                   (isalnum((unsigned char)*var_end) || *var_end == '_')) {
-                var_end++;
+            size_t rem = strlen(var_end);
+            while (rem > 0) {
+                size_t n = lush_ident_match_continue(var_end, rem);
+                if (n == 0) {
+                    break;
+                }
+                var_end += n;
+                rem -= n;
             }
             rest = var_end;
         }
@@ -1016,11 +1026,15 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
         /// uses of `@` and `%` (mid-word, extglob `@(...)`, git refs `@{-1}`,
         /// job specs `%1`) fail the identifier check and fall through.
         if ((c == '@' || c == '%') && pos + 1 < input_len &&
-            (isalpha((unsigned char)input[pos + 1]) || input[pos + 1] == '_')) {
+            lush_ident_match_start(input + pos + 1, input_len - pos - 1) > 0) {
             pos++;
-            while (pos < input_len &&
-                   (isalnum((unsigned char)input[pos]) || input[pos] == '_')) {
-                pos++;
+            while (pos < input_len) {
+                size_t n =
+                    lush_ident_match_continue(input + pos, input_len - pos);
+                if (n == 0) {
+                    break;
+                }
+                pos += n;
             }
             add_token(highlighter, LLE_TOKEN_VARIABLE, token_start, pos);
             expect_command = false;
@@ -1127,13 +1141,16 @@ int lle_syntax_highlight(lle_syntax_highlighter_t *highlighter,
                     }
                 }
                 /// Simple $VAR
-                else if (isalpha((unsigned char)next) || next == '_') {
+                else if (lush_ident_match_start(input + pos, input_len - pos) >
+                         0) {
                     size_t var_name_start = pos;
-                    pos++;
-                    while (pos < input_len &&
-                           (isalnum((unsigned char)input[pos]) ||
-                            input[pos] == '_')) {
-                        pos++;
+                    while (pos < input_len) {
+                        size_t n = lush_ident_match_continue(input + pos,
+                                                             input_len - pos);
+                        if (n == 0) {
+                            break;
+                        }
+                        pos += n;
                     }
                     /// Check if it's a hook array variable
                     size_t var_name_len = pos - var_name_start;

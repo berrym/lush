@@ -570,6 +570,41 @@ TEST(analyze_script_sigil_at_on_scalar_is_warning) {
     cleanup_test_dir();
 }
 
+TEST(analyze_script_sigil_unicode_name_full_extent) {
+    /// The predictive sigil analyzer must read the whole unicode name
+    /// on both the binding scan and the @-reference scan. `café` (with a
+    /// final multibyte é) is a scalar binding; `@café` widens it, so the
+    /// warning message must name the full `@café`. The byte-test this
+    /// replaced truncated the name at é, emitting `@caf` instead. This
+    /// binary links the strong feature-flag-aware predicate.
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/usr/bin/env lush\n"
+                         "caf\xC3\xA9=hello\n"
+                         "echo @caf\xC3\xA9\n";
+    char *path = create_test_script("sigil_unicode.lush", script);
+
+    debug_analyze_script(ctx, path);
+
+    bool found = false;
+    for (analysis_issue_t *issue = ctx->analysis_issues; issue;
+         issue = issue->next) {
+        if (strcmp(issue->category, "type") == 0 &&
+            strstr(issue->message, "@caf\xC3\xA9: vector sigil on scalar") !=
+                NULL) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found,
+                "@café names the full unicode identifier in the warning");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
 TEST(analyze_script_sigil_on_list_is_silent) {
     /// The analyzer must not flag `@arr` or `%arr` when `arr` is a list --
     /// those are the well-typed cases and a noisy warning would be wrong.
@@ -930,6 +965,7 @@ int main(void) {
     RUN_TEST(analyze_script_type_at_subscript_in_scalar_assignment);
     RUN_TEST(analyze_script_sigil_pct_on_scalar_is_error);
     RUN_TEST(analyze_script_sigil_at_on_scalar_is_warning);
+    RUN_TEST(analyze_script_sigil_unicode_name_full_extent);
     RUN_TEST(analyze_script_sigil_on_list_is_silent);
 
     printf("\nStyle Analysis:\n");

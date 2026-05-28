@@ -14,6 +14,7 @@
 #include "debug.h"
 #include "errors.h"
 #include "fixer.h"
+#include "identifier.h"
 #include "lle/unicode_compare.h"
 #include "node.h"
 #include "parser.h"
@@ -335,9 +336,16 @@ static void debug_analyze_security(debug_context_t *ctx, const char *file,
             const char *var_start = pos + 1;
             const char *var_end = var_start;
 
-            /// Find end of variable name
-            while (*var_end && (isalnum(*var_end) || *var_end == '_')) {
-                var_end++;
+            /// Find end of variable name (feature-aware: a unicode
+            /// identifier extends past its multibyte codepoints).
+            size_t vrem = strlen(var_end);
+            while (vrem > 0) {
+                size_t n = lush_ident_match_continue(var_end, vrem);
+                if (n == 0) {
+                    break;
+                }
+                var_end += n;
+                vrem -= n;
             }
 
             if (var_end > var_start) {
@@ -963,11 +971,24 @@ static void sigil_binding_free(sigil_binding_t *list) {
     }
 }
 
-/// True if `c` can begin a shell identifier (per POSIX: [_A-Za-z]).
-static bool sigil_id_start(unsigned char c) { return isalpha(c) || c == '_'; }
+/// True if the byte at `s` begins a shell identifier under the active
+/// mode (POSIX [_A-Za-z]; any Unicode letter when the feature is on).
+/// `remaining` bounds the multibyte decode.
+static bool sigil_id_start(const char *s, size_t remaining) {
+    return lush_ident_match_start(s, remaining) > 0;
+}
 
-/// True if `c` can continue a shell identifier (per POSIX: [_A-Za-z0-9]).
-static bool sigil_id_cont(unsigned char c) { return isalnum(c) || c == '_'; }
+/// Advance `*off` over one identifier-continue codepoint at `s + *off`
+/// (within `len`). Returns false when the codepoint does not continue an
+/// identifier, leaving `*off` unchanged.
+static bool sigil_id_advance(const char *s, size_t len, size_t *off) {
+    size_t n = lush_ident_match_continue(s + *off, len - *off);
+    if (n == 0) {
+        return false;
+    }
+    *off += n;
+    return true;
+}
 
 /// Scan a single source line for top-level bindings and record them.
 static void sigil_collect_bindings_from_line(const char *line, size_t len,
@@ -995,11 +1016,8 @@ static void sigil_collect_bindings_from_line(const char *line, size_t len,
             }
             size_t name_end = name_start;
             if (name_end < len &&
-                sigil_id_start((unsigned char)line[name_end])) {
-                name_end++;
-                while (name_end < len &&
-                       sigil_id_cont((unsigned char)line[name_end])) {
-                    name_end++;
+                sigil_id_start(line + name_end, len - name_end)) {
+                while (sigil_id_advance(line, len, &name_end)) {
                 }
                 if (name_end > name_start) {
                     sigil_binding_record(out, line + name_start,
@@ -1026,12 +1044,12 @@ static void sigil_collect_bindings_from_line(const char *line, size_t len,
     }
 
     size_t name_start = i;
-    if (name_start >= len || !sigil_id_start((unsigned char)line[name_start])) {
+    if (name_start >= len ||
+        !sigil_id_start(line + name_start, len - name_start)) {
         return;
     }
-    size_t name_end = name_start + 1;
-    while (name_end < len && sigil_id_cont((unsigned char)line[name_end])) {
-        name_end++;
+    size_t name_end = name_start;
+    while (sigil_id_advance(line, len, &name_end)) {
     }
     if (name_end >= len || line[name_end] != '=') {
         return;
@@ -1103,14 +1121,12 @@ static void debug_analyze_sigils(debug_context_t *ctx, const char *file,
         if (!at_token_start) {
             continue;
         }
-        if (i + 1 >= len || !sigil_id_start((unsigned char)content[i + 1])) {
+        if (i + 1 >= len || !sigil_id_start(content + i + 1, len - (i + 1))) {
             continue;
         }
         size_t name_start = i + 1;
-        size_t name_end = name_start + 1;
-        while (name_end < len &&
-               sigil_id_cont((unsigned char)content[name_end])) {
-            name_end++;
+        size_t name_end = name_start;
+        while (sigil_id_advance(content, len, &name_end)) {
         }
         size_t name_len = name_end - name_start;
         sigil_binding_t *binding =

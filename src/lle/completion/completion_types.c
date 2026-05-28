@@ -17,6 +17,7 @@
  */
 
 #include "lle/completion/completion_types.h"
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -774,4 +775,42 @@ __attribute__((weak)) bool lle_shell_is_builtin(const char *text) {
 __attribute__((weak)) bool lle_shell_is_alias(const char *text) {
     (void)text;
     return false;
+}
+
+/// Weak ASCII-only fallback for the shell identifier predicate used by
+/// the syntax highlighter (display/syntax_highlighting.c) and variable
+/// completion (completion/word_context.c). The strong, feature-flag-aware
+/// implementation lives in src/identifier.c and consults shell_mode_allows
+/// (FEATURE_UNICODE_IDENTIFIERS); it overrides these at the full-shell
+/// link. A standalone liblle.a build has no shell_mode, so the fallback
+/// matches POSIX ASCII identifier syntax: Start = [A-Za-z_], Continue =
+/// [A-Za-z0-9_]. Signatures must match include/identifier.h exactly so
+/// the strong definitions take precedence.
+__attribute__((weak)) size_t lush_ident_match_start(const char *p,
+                                                    size_t remaining) {
+    if (!p || remaining == 0) {
+        return 0;
+    }
+    unsigned char b = (unsigned char)p[0];
+    return (b == '_' || isalpha(b)) ? 1u : 0u;
+}
+
+__attribute__((weak)) size_t lush_ident_match_continue(const char *p,
+                                                       size_t remaining) {
+    if (!p || remaining == 0) {
+        return 0;
+    }
+    unsigned char b = (unsigned char)p[0];
+    return (b == '_' || isalnum(b)) ? 1u : 0u;
+}
+
+/// Codepoint-level counterparts, used by the completion word-context
+/// analyzer. Same weak-fallback contract: ASCII-only here, overridden
+/// by the feature-aware src/identifier.c at the full-shell link.
+__attribute__((weak)) bool lush_ident_is_start_cp(uint32_t cp) {
+    return cp == '_' || (cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z');
+}
+
+__attribute__((weak)) bool lush_ident_is_continue_cp(uint32_t cp) {
+    return lush_ident_is_start_cp(cp) || (cp >= '0' && cp <= '9');
 }

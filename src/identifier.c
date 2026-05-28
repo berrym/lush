@@ -42,25 +42,65 @@ static bool ascii_is_continue(unsigned char b) {
     return b == '_' || (isalnum((int)b) != 0);
 }
 
+bool lush_ident_is_start_cp(uint32_t cp) {
+    if (cp < 0x80) {
+        return ascii_is_start((unsigned char)cp);
+    }
+    /// Non-ASCII honored only when the feature is on; otherwise
+    /// identifier syntax stays POSIX ASCII-only. The codepoint test
+    /// goes through the LLE Unicode-alpha table (Latin Supplement,
+    /// Latin Extended-A/B, IPA, Greek, Cyrillic -- the scope the
+    /// project's case table also covers).
+    if (!shell_mode_allows(FEATURE_UNICODE_IDENTIFIERS)) {
+        return false;
+    }
+    return lle_unicode_is_alpha(cp);
+}
+
+bool lush_ident_is_continue_cp(uint32_t cp) {
+    if (cp < 0x80) {
+        return ascii_is_continue((unsigned char)cp);
+    }
+    if (!shell_mode_allows(FEATURE_UNICODE_IDENTIFIERS)) {
+        return false;
+    }
+    /// Continue accepts letters and digits via the Unicode-aware
+    /// category test...
+    if (lle_unicode_is_alnum(cp)) {
+        return true;
+    }
+    /// ...and, per UAX #31 Continue, also accepts combining marks that
+    /// extend a preceding base character. This is what lets an NFD-
+    /// encoded identifier (e.g. `cafe` + U+0301 combining acute)
+    /// tokenize as a single unit: the mark is pulled into the name,
+    /// then the NFC-canonicalization at the storage / lookup boundary
+    /// (lush_ident_canonicalize_alloc) collapses it to the same binding
+    /// as the precomposed NFC form. Without this the scan stopped at
+    /// the mark, truncating the name to "cafe" and missing the NFC
+    /// binding entirely.
+    ///
+    /// GB_EXTEND covers nonspacing combining marks (Mn) -- the class
+    /// NFD decomposition of Latin/Greek/Cyrillic produces -- and
+    /// GB_SPACING_MARK covers spacing combining marks (Mc) used by
+    /// Indic scripts. Marks are accepted only in Continue position;
+    /// lush_ident_is_start_cp returns false for a mark because
+    /// lle_unicode_is_alpha is false for the Mark category, so a bare
+    /// leading diacritic correctly fails to start an identifier.
+    grapheme_break_property_t gb = get_grapheme_break_property(cp);
+    return gb == GB_EXTEND || gb == GB_SPACING_MARK;
+}
+
 size_t lush_ident_match_start(const char *p, size_t remaining) {
     if (!p || remaining == 0) {
         return 0;
     }
     unsigned char b = (unsigned char)p[0];
 
-    /// ASCII fast path. One byte test, no UTF-8 decode, no feature-
-    /// flag lookup -- this is the common case and must not regress
-    /// in cost vs the previous inline isalpha checks.
+    /// ASCII fast path. One byte test, no UTF-8 decode -- the common
+    /// case must not regress in cost vs the previous inline checks.
     if (b < 0x80) {
-        return ascii_is_start(b) ? 1u : 0u;
+        return lush_ident_is_start_cp(b) ? 1u : 0u;
     }
-
-    /// Non-ASCII slow path. Only honored when the feature is on;
-    /// when off, identifier syntax remains POSIX ASCII-only and any
-    /// high byte terminates the identifier. The codepoint test goes
-    /// through the LLE Unicode-alpha table (Latin Supplement, Latin
-    /// Extended-A/B, IPA, Greek, Cyrillic, Cyrillic Supplement -- the
-    /// scope the project's existing case table also covers).
     if (!shell_mode_allows(FEATURE_UNICODE_IDENTIFIERS)) {
         return 0;
     }
@@ -69,7 +109,7 @@ size_t lush_ident_match_start(const char *p, size_t remaining) {
     if (n <= 0) {
         return 0;
     }
-    return lle_unicode_is_alpha(cp) ? (size_t)n : 0u;
+    return lush_ident_is_start_cp(cp) ? (size_t)n : 0u;
 }
 
 size_t lush_ident_match_continue(const char *p, size_t remaining) {
@@ -79,7 +119,7 @@ size_t lush_ident_match_continue(const char *p, size_t remaining) {
     unsigned char b = (unsigned char)p[0];
 
     if (b < 0x80) {
-        return ascii_is_continue(b) ? 1u : 0u;
+        return lush_ident_is_continue_cp(b) ? 1u : 0u;
     }
     if (!shell_mode_allows(FEATURE_UNICODE_IDENTIFIERS)) {
         return 0;
@@ -89,33 +129,7 @@ size_t lush_ident_match_continue(const char *p, size_t remaining) {
     if (n <= 0) {
         return 0;
     }
-    /// Continue accepts letters and digits via the Unicode-aware
-    /// category test...
-    if (lle_unicode_is_alnum(cp)) {
-        return (size_t)n;
-    }
-    /// ...and, per UAX #31 Continue, also accepts combining marks that
-    /// extend a preceding base character. This is what lets an NFD-
-    /// encoded identifier (e.g. `cafe` + U+0301 combining acute)
-    /// tokenise as a single unit: the mark is pulled into the name
-    /// token here, then the NFC-canonicalization at the storage /
-    /// lookup boundary (lush_ident_canonicalize_alloc) collapses it to
-    /// the same binding as the precomposed NFC form. Without this the
-    /// scan stopped at the mark, truncating the name to "cafe" and
-    /// missing the NFC binding entirely.
-    ///
-    /// GB_EXTEND covers nonspacing combining marks (Mn) -- the class
-    /// NFD decomposition of Latin/Greek/Cyrillic produces -- and
-    /// GB_SPACING_MARK covers spacing combining marks (Mc) used by
-    /// Indic scripts. Marks are accepted only in Continue position;
-    /// lush_ident_match_start never reaches this code for a mark
-    /// because lle_unicode_is_alpha is false for the Mark category, so
-    /// a bare leading diacritic correctly fails to start an identifier.
-    grapheme_break_property_t gb = get_grapheme_break_property(cp);
-    if (gb == GB_EXTEND || gb == GB_SPACING_MARK) {
-        return (size_t)n;
-    }
-    return 0;
+    return lush_ident_is_continue_cp(cp) ? (size_t)n : 0u;
 }
 
 char *lush_ident_canonicalize_alloc(const char *name) {

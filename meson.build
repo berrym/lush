@@ -1184,6 +1184,7 @@ endif
     test_word_context = executable('test_word_context',
                                    'tests/lle/unit/test_word_context.c',
                                    'tests/lle/functional/test_completion_mock.c',
+                                   'src/identifier.c',
                                    include_directories: [inc, include_directories('tests')],
                                    link_with: lle_lib,
                                    dependencies: [ncurses_link_dep])

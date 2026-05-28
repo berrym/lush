@@ -47,6 +47,7 @@
 #include "lle/completion/word_context.h"
 
 #include "executor.h"
+#include "identifier.h"
 #include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
 
@@ -207,14 +208,19 @@ static bool is_statement_terminator(uint32_t cp) {
  * a single < or > byte being present. */
 static bool is_redirect_char(uint32_t cp) { return cp == '>' || cp == '<'; }
 
-/// True if cp can begin a variable name (per POSIX: [_A-Za-z]).
+/// True if cp can begin a variable name. Delegates to the shared
+/// feature-flag-aware predicate: POSIX [_A-Za-z] always, any Unicode
+/// letter under FEATURE_UNICODE_IDENTIFIERS, so completion recognizes
+/// the same identifier set the tokenizer and executor accept.
 static bool is_var_name_start(uint32_t cp) {
-    return cp == '_' || (cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z');
+    return lush_ident_is_start_cp(cp);
 }
 
-/// True if cp can continue a variable name (per POSIX: [_A-Za-z0-9]).
+/// True if cp can continue a variable name. Adds digits and, under the
+/// feature, UAX #31 Continue combining marks so an NFD name extends
+/// through its diacritics.
 static bool is_var_name_cont(uint32_t cp) {
-    return is_var_name_start(cp) || (cp >= '0' && cp <= '9');
+    return lush_ident_is_continue_cp(cp);
 }
 
 /* Compare a buffer range against a literal keyword. Keywords in shell
@@ -1375,9 +1381,14 @@ static char *expand_variable_local(const char *path_prefix,
     } else {
         name_start = path_prefix + 1;
         name_end = name_start;
-        while (*name_end &&
-               (isalnum((unsigned char)*name_end) || *name_end == '_')) {
-            name_end++;
+        size_t rem = strlen(name_end);
+        while (rem > 0) {
+            size_t n = lush_ident_match_continue(name_end, rem);
+            if (n == 0) {
+                break;
+            }
+            name_end += n;
+            rem -= n;
         }
         if (name_end == name_start)
             return NULL; /// bare $

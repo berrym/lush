@@ -29,6 +29,17 @@
 #include <stdio.h>
 #include <string.h>
 
+/* The strong identifier predicate (src/identifier.c, linked into this
+ * target) is feature-flag-aware and calls shell_mode_allows. The full
+ * shell provides it via src/shell_mode.c; this unit target stubs it to
+ * report FEATURE_UNICODE_IDENTIFIERS on so the analyzer exercises the
+ * UAX #31 Continue path for the unicode variable-name case. The enum
+ * value is referenced by name from shell_mode.h. */
+#include "shell_mode.h"
+bool shell_mode_allows(shell_feature_t feature) {
+    return feature == FEATURE_UNICODE_IDENTIFIERS;
+}
+
 /* Mock controls defined in tests/lle/functional/test_completion_mock.c.
  * The analyzer's resolution helpers call expand_if_needed and
  * expand_brace_pattern; the mock returns programmed values controlled
@@ -285,6 +296,24 @@ TEST(expansion_kind_braced_variable_name) {
     ANALYZE(buf, strlen(buf), ctx);
     ASSERT(ctx->expansion_kind == LLE_EXPANSION_BRACED_VARIABLE_NAME);
     ASSERT(ctx->context_type == LLE_CONTEXT_VARIABLE_NAME);
+}
+
+TEST(expansion_kind_unicode_variable_name) {
+    /// echo $café|  -- cursor at end of a variable name whose final
+    /// codepoint is the multibyte é (U+00E9, bytes 0xC3 0xA9). The
+    /// analyzer must take all of café as the in-progress variable name
+    /// and report VARIABLE_NAME at the cursor. The byte-test this
+    /// replaced stopped the name at the é, leaving the cursor past a
+    /// truncated $caf and out of variable-name context. This binary
+    /// links the strong feature-flag-aware lush_ident_match_* with a
+    /// shell_mode_allows stub returning the feature on, so the unicode
+    /// Continue (UAX #31) path is exercised.
+    const char *buf = "echo $caf\xC3\xA9";
+    ANALYZE(buf, strlen(buf), ctx);
+    ASSERT(ctx->expansion_kind == LLE_EXPANSION_VARIABLE_NAME);
+    ASSERT(ctx->context_type == LLE_CONTEXT_VARIABLE_NAME);
+    /// The word being completed starts at the `$` (byte offset 5).
+    ASSERT(ctx->word_start == 5);
 }
 
 TEST(expansion_kind_at_sigil_variable_name) {
@@ -818,6 +847,7 @@ int main(void) {
     /// expansion_kind
     RUN_TEST(expansion_kind_variable_name);
     RUN_TEST(expansion_kind_braced_variable_name);
+    RUN_TEST(expansion_kind_unicode_variable_name);
     RUN_TEST(expansion_kind_at_sigil_variable_name);
     RUN_TEST(expansion_kind_pct_sigil_variable_name);
     RUN_TEST(expansion_kind_command_subst_open);

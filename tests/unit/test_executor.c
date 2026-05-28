@@ -13,6 +13,7 @@
 #include "executor.h"
 #include "lle/buffer_management.h"
 #include "lle/lle_editor.h"
+#include "lle/syntax_highlighting.h"
 #include "symtable.h"
 #include "test_shell_harness.h"
 
@@ -2617,6 +2618,39 @@ TEST(rt_unicode_ident_nfc_array_assoc_collision) {
     ASSERT_STDOUT_EQ(r, "v_nfc\n");
 }
 
+TEST(rt_unicode_ident_highlight_spans_full_name) {
+    /// Syntax highlighter must color the whole `$café` as one VARIABLE
+    /// token. The byte-test it replaced stopped at the multibyte `é`,
+    /// truncating the highlighted span to `$caf`. This binary links the
+    /// strong, feature-flag-aware lush_ident_match_* (src/identifier.c),
+    /// so it overrides the ASCII weak fallback in liblle and proves the
+    /// real product highlights unicode identifiers. `$café` is 6 bytes:
+    /// `$` + `caf` + `é` (0xC3 0xA9). FEATURE_UNICODE_IDENTIFIERS is the
+    /// lush-mode default the harness runs under.
+    (void)run_shell("mode lush\n");
+    lle_syntax_highlighter_t *h = NULL;
+    ASSERT_EQ(lle_syntax_highlighter_create(&h), 0, "create highlighter");
+    const char *input = "echo $caf\xC3\xA9";
+    lle_syntax_highlight(h, input, strlen(input));
+    size_t count = 0;
+    const lle_syntax_token_t *toks = lle_syntax_get_tokens(h, &count);
+    size_t var_start = 0, var_end = 0;
+    bool found = false;
+    for (size_t i = 0; i < count; i++) {
+        if (toks[i].type == LLE_TOKEN_VARIABLE) {
+            var_start = toks[i].start;
+            var_end = toks[i].end;
+            found = true;
+            break;
+        }
+    }
+    lle_syntax_highlighter_destroy(h);
+    ASSERT(found, "a VARIABLE token was produced for $café");
+    /// `$café` begins at offset 5 ("echo " is 5 bytes) and is 6 bytes.
+    ASSERT_EQ(var_start, (size_t)5, "variable token starts at $");
+    ASSERT_EQ(var_end - var_start, (size_t)6, "variable token spans $café");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3910,6 +3944,7 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_nfc_nfd_alias_collision);
     RUN_TEST(rt_unicode_ident_nfc_nfd_function_collision);
     RUN_TEST(rt_unicode_ident_nfc_array_assoc_collision);
+    RUN_TEST(rt_unicode_ident_highlight_spans_full_name);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
