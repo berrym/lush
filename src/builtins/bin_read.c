@@ -69,6 +69,14 @@ static char *read_line_from_fd(int fd) {
     return line;
 }
 
+/// True if c is an IFS *white space* character: a space, tab, or newline
+/// that is also present in the active IFS. POSIX read ignores leading and
+/// trailing IFS white space; non-whitespace IFS characters (e.g. ':') are
+/// field delimiters but are not trimmed from the ends of the value.
+static bool read_is_ifs_white(char c, const char *ifs) {
+    return (c == ' ' || c == '\t' || c == '\n') && strchr(ifs, c) != NULL;
+}
+
 int bin_read(int argc, char **argv) {
     /// Option flags
     char *prompt = NULL;
@@ -397,7 +405,31 @@ int bin_read(int argc, char **argv) {
     /// leading fields and assign the remainder (preserving internal
     /// IFS chars) to the last variable.
     if (n_varnames == 1) {
-        symtable_set_global(varname, line ? line : "");
+        /// POSIX: leading and trailing IFS white space is stripped even
+        /// for a single variable (the line otherwise assigned verbatim).
+        /// Non-whitespace IFS chars are not trimmed.
+        const char *src = line ? line : "";
+        char *ifs_val = symtable_get_var(current_executor->symtable, "IFS");
+        const char *ifs = ifs_val ? ifs_val : " \t\n";
+        while (*src && read_is_ifs_white(*src, ifs)) {
+            src++;
+        }
+        const char *end = src + strlen(src);
+        while (end > src && read_is_ifs_white(end[-1], ifs)) {
+            end--;
+        }
+        size_t vlen = (size_t)(end - src);
+        char *val = malloc(vlen + 1);
+        if (!val) {
+            free(ifs_val);
+            free(line);
+            return 1;
+        }
+        memcpy(val, src, vlen);
+        val[vlen] = '\0';
+        symtable_set_global(varname, val);
+        free(val);
+        free(ifs_val);
     } else {
         const char *src = line ? line : "";
         /// POSIX IFS default is space, tab, newline. Honor a user-set
@@ -431,13 +463,27 @@ int bin_read(int argc, char **argv) {
             symtable_set_global(argv[opt_index + i], field);
             free(field);
         }
-        /// Last variable: skip one leading IFS-whitespace run then
-        /// take everything else verbatim (including internal IFS
-        /// chars).
+        /// Last variable: skip the leading inter-field delimiter run,
+        /// keep internal IFS chars, but strip trailing IFS white space
+        /// (POSIX trims trailing IFS white space from the line).
         while (*src && strchr(ifs, *src)) {
             src++;
         }
-        symtable_set_global(argv[opt_index + n_varnames - 1], src);
+        const char *end = src + strlen(src);
+        while (end > src && read_is_ifs_white(end[-1], ifs)) {
+            end--;
+        }
+        size_t vlen = (size_t)(end - src);
+        char *val = malloc(vlen + 1);
+        if (!val) {
+            free(ifs_val);
+            free(line);
+            return 1;
+        }
+        memcpy(val, src, vlen);
+        val[vlen] = '\0';
+        symtable_set_global(argv[opt_index + n_varnames - 1], val);
+        free(val);
         free(ifs_val);
     }
 

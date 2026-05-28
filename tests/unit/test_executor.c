@@ -1544,6 +1544,38 @@ TEST(builtin_readonly) {
     executor_free(exec);
 }
 
+TEST(rt_read_strips_leading_trailing_ifs_whitespace) {
+    /// POSIX read trims leading and trailing IFS white space, even for a
+    /// single variable (the line is otherwise assigned verbatim). #129.
+    run_result_t r = run_shell("read -r x <<'EOF'\n"
+                               "  a b  \n"
+                               "EOF\n"
+                               "echo \"[$x]\"\n");
+    ASSERT_STDOUT_EQ(r, "[a b]\n");
+}
+
+TEST(rt_read_multi_var_trims_trailing_ws) {
+    /// The last variable keeps internal IFS chars but has trailing IFS
+    /// white space stripped.
+    run_result_t r = run_shell("read -r x y <<'EOF'\n"
+                               "  a b c  \n"
+                               "EOF\n"
+                               "echo \"x=[$x] y=[$y]\"\n");
+    ASSERT_STDOUT_EQ(r, "x=[a] y=[b c]\n");
+}
+
+TEST(rt_read_non_whitespace_ifs_not_trimmed) {
+    /// Non-whitespace IFS chars (here ':') delimit fields but are not
+    /// trimmed from the ends of a single-variable read.
+    run_result_t r = run_shell("IFS=:\n"
+                               "read -r x <<'EOF'\n"
+                               ":a:b:\n"
+                               "EOF\n"
+                               "echo \"[$x]\"\n"
+                               "unset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[:a:b:]\n");
+}
+
 TEST(builtin_eval) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4102,6 +4134,9 @@ int main(void) {
     RUN_TEST(builtin_export);
     RUN_TEST(builtin_unset);
     RUN_TEST(builtin_readonly);
+    RUN_TEST(rt_read_strips_leading_trailing_ifs_whitespace);
+    RUN_TEST(rt_read_multi_var_trims_trailing_ws);
+    RUN_TEST(rt_read_non_whitespace_ifs_not_trimmed);
     RUN_TEST(builtin_eval);
     RUN_TEST(builtin_shift);
     RUN_TEST(builtin_set_positional);
