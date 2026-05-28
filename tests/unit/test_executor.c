@@ -3707,6 +3707,89 @@ TEST(rt_readonly_blocks_same_scope_reassign) {
     ASSERT_STDOUT_EQ(r, "final 1\n");
 }
 
+TEST(rt_readonly_assign_aborts_or_list) {
+    /// A readonly assignment error must NOT feed `||`: bash, zsh, and
+    /// dash all decline to run the right operand (#120). In a non-posix
+    /// preset the script continues to the next statement with $?=1.
+    run_result_t r = run_shell("readonly RO_OR=1\n"
+                               "RO_OR=2 || echo SHOULD_NOT_RUN\n"
+                               "echo \"after $?\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "after 1\n");
+}
+
+TEST(rt_readonly_assign_aborts_and_list) {
+    /// Same for `&&`: the readonly error aborts the current AND-OR list,
+    /// the right operand is skipped, and the script continues.
+    run_result_t r = run_shell("readonly RO_AND=1\n"
+                               "RO_AND=2 && echo SHOULD_NOT_RUN\n"
+                               "echo \"after $?\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "after 1\n");
+}
+
+TEST(rt_readonly_assign_diag_bypasses_redirect) {
+    /// The readonly diagnostic is a shell-level message reported on the
+    /// real stderr after the command's transient redirection is torn
+    /// down, so a `2>/dev/null` on the assignment does not swallow it
+    /// (matching bash). The `||` right operand still does not run.
+    run_result_t r = run_shell("readonly RO_RED=1\n"
+                               "RO_RED=2 2>/dev/null || echo SHOULD_NOT_RUN\n"
+                               "echo \"after $?\"\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "after 1\n");
+}
+
+TEST(rt_readonly_normal_or_still_fires) {
+    /// Regression guard: an ordinary command failure must still feed
+    /// `||`. The abort signal is specific to assignment errors.
+    run_result_t r = run_shell("false || echo normal-or-ran\n");
+    ASSERT_STDOUT_EQ(r, "normal-or-ran\n");
+}
+
+TEST(rt_readonly_assign_posix_mode_exits) {
+    /// POSIX 2.8.1: a variable-assignment error exits a non-interactive
+    /// shell. In posix mode the statement after the readonly error must
+    /// not run.
+    run_result_t r = run_shell("mode posix\n"
+                               "readonly RO_PX=1\n"
+                               "RO_PX=2\n"
+                               "echo SHOULD_NOT_RUN\n");
+    /// `mode` mutates global shell state the harness does not reset
+    /// between tests; restore the native default before asserting (an
+    /// assertion failure longjmps out and would otherwise leave every
+    /// later test running under posix mode).
+    run_shell("mode lush\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "");
+}
+
+TEST(rt_readonly_assign_zsh_mode_exits) {
+    /// zsh exits a non-interactive shell on a readonly assignment error
+    /// (like dash); zsh mode matches it via FEATURE_ASSIGN_ERROR_EXITS.
+    run_result_t r = run_shell("mode zsh\n"
+                               "readonly RO_ZX=1\n"
+                               "RO_ZX=2\n"
+                               "echo SHOULD_NOT_RUN\n");
+    run_shell("mode lush\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "");
+}
+
+TEST(rt_readonly_assign_setopt_toggles_exit) {
+    /// The exit policy is a feature gate reachable from the central
+    /// config: enabling assign_error_exits in an otherwise-continue
+    /// preset (bash) makes the readonly error exit the shell.
+    run_result_t r = run_shell("mode bash\n"
+                               "setopt assign_error_exits\n"
+                               "readonly RO_TOG=1\n"
+                               "RO_TOG=2\n"
+                               "echo SHOULD_NOT_RUN\n");
+    run_shell("mode lush\nunsetopt assign_error_exits\n");
+    ASSERT_STDERR_CONTAINS(r, "readonly variable");
+    ASSERT_STDOUT_EQ(r, "");
+}
+
 TEST(rt_readonly_blocks_via_readonly_keyword) {
     /// `readonly NAME` without a value promotes an existing scalar
     /// to readonly; later writes must be refused.
@@ -4218,6 +4301,13 @@ int main(void) {
 
     printf("\nRegression: readonly enforcement:\n");
     RUN_TEST(rt_readonly_blocks_same_scope_reassign);
+    RUN_TEST(rt_readonly_assign_aborts_or_list);
+    RUN_TEST(rt_readonly_assign_aborts_and_list);
+    RUN_TEST(rt_readonly_assign_diag_bypasses_redirect);
+    RUN_TEST(rt_readonly_normal_or_still_fires);
+    RUN_TEST(rt_readonly_assign_posix_mode_exits);
+    RUN_TEST(rt_readonly_assign_zsh_mode_exits);
+    RUN_TEST(rt_readonly_assign_setopt_toggles_exit);
     RUN_TEST(rt_readonly_blocks_via_readonly_keyword);
     RUN_TEST(rt_readonly_blocks_across_function_scope);
     RUN_TEST(rt_readonly_blocks_via_declare_r);

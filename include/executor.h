@@ -108,6 +108,22 @@ typedef struct executor {
     bool shell_exit_requested;
     int shell_exit_status;
 
+    /* Variable-assignment error abort. A failed assignment to a readonly
+     * variable is not an ordinary command failure: per bash/zsh/dash it
+     * must abort the current AND-OR list WITHOUT feeding `||`/`&&`, and
+     * its diagnostic is a shell-level message reported on the real
+     * stderr after the command's transient redirections are torn down
+     * (so a `2>/dev/null` on the assignment does not swallow it). The
+     * detector (execute_assignment) sets command_abort and stashes the
+     * pending diagnostic; the execute_command chokepoint emits it after
+     * redirect restore and applies the mode policy (posix: exit a
+     * non-interactive shell; other modes: abort the list, continue the
+     * script). command_abort is reset per command in
+     * execute_command_inner; the AND-OR handlers consume it. */
+    bool command_abort;
+    char *pending_readonly_var;
+    source_location_t pending_readonly_loc;
+
     /// Error context stack (Phase 3: context-aware error management)
     char *context_stack[EXECUTOR_CONTEXT_STACK_MAX]; ///< "while executing X"
     source_location_t context_locations[EXECUTOR_CONTEXT_STACK_MAX];
