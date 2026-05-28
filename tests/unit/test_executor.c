@@ -1298,6 +1298,54 @@ TEST(arithmetic_increment) {
     executor_free(exec);
 }
 
+TEST(arithmetic_brace_param_echo) {
+    /// `${var}` parameter expansion inside arithmetic. The `$((`
+    /// disambiguation must skip the `${...}` braces rather than
+    /// mistaking them for an anonymous-function body (issue #118).
+    run_result_t r = run_shell("a=10\n"
+                               "echo $((${a}))\n");
+    ASSERT_STDOUT_EQ(r, "10\n");
+}
+
+TEST(arithmetic_brace_param_add) {
+    run_result_t r = run_shell("a=10\n"
+                               "echo $((${a}+1))\n");
+    ASSERT_STDOUT_EQ(r, "11\n");
+}
+
+TEST(arithmetic_brace_param_two_operands) {
+    run_result_t r = run_shell("a=10\n"
+                               "b=5\n"
+                               "echo $((${a}+${b}))\n");
+    ASSERT_STDOUT_EQ(r, "15\n");
+}
+
+TEST(arithmetic_brace_param_assignment) {
+    /// Assignment RHS routes through executor string expansion, a
+    /// different `$((` detection site than the echo argument path;
+    /// both share the disambiguation helper (issue #118).
+    run_result_t r = run_shell("a=10\n"
+                               "x=$((${a}+1))\n"
+                               "echo $x\n");
+    ASSERT_STDOUT_EQ(r, "11\n");
+}
+
+TEST(arithmetic_brace_param_nested_parens) {
+    run_result_t r = run_shell("a=10\n"
+                               "b=5\n"
+                               "echo $(( ${a} * (${b} + 2) ))\n");
+    ASSERT_STDOUT_EQ(r, "70\n");
+}
+
+TEST(anon_function_cmdsub_still_routes) {
+    /// Guard the other side of the disambiguation: `$(() {...})` is
+    /// command substitution of an anonymous function, not arithmetic.
+    /// The brace skip added for issue #118 must not swallow the
+    /// anonymous-function body braces (issue #99).
+    run_result_t r = run_shell("echo \"$( () { echo anonret; } )\"\n");
+    ASSERT_STDOUT_EQ(r, "anonret\n");
+}
+
 /* ============================================================================
  * SUBSHELL AND GROUPING TESTS
  * ============================================================================
@@ -3871,6 +3919,12 @@ int main(void) {
     RUN_TEST(arithmetic_multiply);
     RUN_TEST(arithmetic_variable);
     RUN_TEST(arithmetic_increment);
+    RUN_TEST(arithmetic_brace_param_echo);
+    RUN_TEST(arithmetic_brace_param_add);
+    RUN_TEST(arithmetic_brace_param_two_operands);
+    RUN_TEST(arithmetic_brace_param_assignment);
+    RUN_TEST(arithmetic_brace_param_nested_parens);
+    RUN_TEST(anon_function_cmdsub_still_routes);
 
     printf("\nSubshell and grouping tests:\n");
     RUN_TEST(subshell_isolation);

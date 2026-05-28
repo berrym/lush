@@ -336,4 +336,23 @@ void tokenizer_refresh_current_and_lookahead(tokenizer_t *tokenizer);
  */
 void tokenizer_refresh_from_position(tokenizer_t *tokenizer);
 
+/**
+ * @brief Disambiguate `$((` content: arithmetic vs anonymous-function cmdsub
+ *
+ * `$((` is ambiguous: arithmetic expansion `$((expr))` or command
+ * substitution of an anonymous function `$(() { body; })` (issue #99).
+ * This scans the content beginning immediately after `$((`, with the
+ * paren depth already at 2, and returns whether it looks like
+ * arithmetic. A bare `{` / `}` (function body), `;`, or newline before
+ * the matching `))` means command substitution; `${...}` parameter
+ * expansions are skipped (their braces are legal inside arithmetic and
+ * must not disqualify it). Shared by the tokenizer and the executor's
+ * two string-expansion `$((` sites so the rule lives in one place.
+ *
+ * @param content Pointer to the first byte after `$((`
+ * @param remaining Bytes available at @p content
+ * @return true if the span looks like arithmetic, false for command sub
+ */
+bool lush_dollar_paren_is_arithmetic(const char *content, size_t remaining);
+
 #endif /// TOKENIZER_H

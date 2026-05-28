@@ -19,6 +19,48 @@
 #include <stdlib.h>
 #include <string.h>
 
+bool lush_dollar_paren_is_arithmetic(const char *content, size_t remaining) {
+    if (!content) {
+        return true;
+    }
+    size_t s = 0;
+    int depth = 2; /// the two outer `(` of `$((`
+    while (s < remaining && depth > 0) {
+        char sc = content[s];
+        if (sc == '$' && s + 1 < remaining && content[s + 1] == '{') {
+            /// `${...}` parameter expansion is legal inside arithmetic
+            /// (`$((${a}+1))`). Its braces are not the anonymous-function
+            /// body braces this guard rejects, so skip the whole span.
+            /// Brace-balanced to tolerate nested `${...}` forms.
+            s += 2; /// past "${"
+            int bdepth = 1;
+            while (s < remaining && bdepth > 0) {
+                if (content[s] == '{') {
+                    bdepth++;
+                } else if (content[s] == '}') {
+                    bdepth--;
+                }
+                s++;
+            }
+            continue;
+        }
+        if (sc == '(') {
+            depth++;
+        } else if (sc == ')') {
+            depth--;
+            if (depth == 0) {
+                return true; /// matched `))` -- arithmetic
+            }
+        } else if (sc == '{' || sc == '}' || sc == ';' || sc == '\n') {
+            return false; /// bare brace / separator -- command substitution
+        }
+        s++;
+    }
+    /// Ran out of input without a disqualifier: treat as arithmetic; the
+    /// caller's extraction handles an unterminated `$((`.
+    return true;
+}
+
 /// Keyword lookup table
 static const struct {
     const char *text;
@@ -1191,31 +1233,10 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
                     /// the input is really `$(` followed by a `(` -- back
                     /// up the second `(` and reparse as command sub.
                     /// Issue #99.
-                    size_t scan = tokenizer->position + 1;
-                    int depth = 2; /// counting the two outer `(`
-                    bool looks_arith = true;
-                    while (scan < tokenizer->input_length && depth > 0) {
-                        char sc = tokenizer->input[scan];
-                        if (sc == '(') {
-                            depth++;
-                        } else if (sc == ')') {
-                            depth--;
-                            if (depth == 0) {
-                                /// Verify the closing is actually `))`
-                                /// by checking we came down from 2 with
-                                /// the immediately preceding char also
-                                /// being `)` (i.e. the inner closes
-                                /// before the outer). Walking the depth
-                                /// counter has already ensured this.
-                                break;
-                            }
-                        } else if (sc == '{' || sc == '}' || sc == ';' ||
-                                   sc == '\n') {
-                            looks_arith = false;
-                            break;
-                        }
-                        scan++;
-                    }
+                    /// position is at the second `(`; content begins after it.
+                    bool looks_arith = lush_dollar_paren_is_arithmetic(
+                        &tokenizer->input[tokenizer->position + 1],
+                        tokenizer->input_length - (tokenizer->position + 1));
 
                     if (looks_arith) {
                         /// Arithmetic expansion $((expr))
