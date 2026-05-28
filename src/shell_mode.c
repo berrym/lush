@@ -98,6 +98,8 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_CDABLE_VARS] = false,
                             [FEATURE_ERREXIT_IN_LOOPS] =
                 false, /// POSIX permits failing loop bodies; do not deviate
+            [FEATURE_ASSIGN_ERROR_EXITS] =
+                true, /// POSIX 2.8.1: assignment error exits non-interactive sh
             [FEATURE_XPG_ECHO] = true, /// POSIX XSI mandates escape interp
 
             /// History Behavior
@@ -184,6 +186,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_CDABLE_VARS] = false,
                             [FEATURE_ERREXIT_IN_LOOPS] =
                 false, /// bash permits failing loop bodies; preserve parity
+            [FEATURE_ASSIGN_ERROR_EXITS] =
+                false, /// bash continues after a readonly assignment error,
+                       /// aborting only the current AND-OR list
             [FEATURE_XPG_ECHO] = false, /// shopt xpg_echo, off by default
 
             /// History Behavior
@@ -273,6 +278,9 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             [FEATURE_CDABLE_VARS] = false,
                             [FEATURE_ERREXIT_IN_LOOPS] =
                 false, /// zsh permits failing loop bodies; preserve parity
+            [FEATURE_ASSIGN_ERROR_EXITS] =
+                true, /// zsh exits a non-interactive shell on a readonly
+                      /// assignment error, like dash; match it in zsh mode
             [FEATURE_XPG_ECHO] = true, /* zsh: BSD_ECHO off → escapes interp'd
                             by default in zsh's echo builtin */
 
@@ -367,6 +375,15 @@ static const bool feature_matrix[SHELL_MODE_COUNT][FEATURE_COUNT] = {
                             5+ seconds. Off in POSIX/bash/zsh modes for
                             polyglot parity. Toggle per-script via
                             `unsetopt errexit_in_loops`. */
+            [FEATURE_ASSIGN_ERROR_EXITS] =
+                false, /* Curated lush default: a readonly assignment error
+                            aborts the current AND-OR list and is reported on
+                            stderr, but does not tear down the whole session.
+                            Exiting the shell on one bad assignment is hostile
+                            in an interactive-first shell; the abort already
+                            stops the dangerous `||` fallthrough. Opt into the
+                            strict posix/zsh behavior with
+                            `setopt assign_error_exits`. */
             [FEATURE_XPG_ECHO] =
                 true, /* Curated zsh-style: echo interprets escapes by
                             default. More predictable and modern than bash's
@@ -478,6 +495,7 @@ static const char *feature_names[FEATURE_COUNT] = {
     [FEATURE_AUTO_PUSHD] = "auto_pushd",
     [FEATURE_CDABLE_VARS] = "cdable_vars",
     [FEATURE_ERREXIT_IN_LOOPS] = "errexit_in_loops",
+    [FEATURE_ASSIGN_ERROR_EXITS] = "assign_error_exits",
     [FEATURE_XPG_ECHO] = "xpg_echo",
 
     /// History Behavior

@@ -351,6 +351,8 @@ executor_t *executor_new(void) {
     executor->expansion_exit_status = 0;
     executor->shell_exit_requested = false;
     executor->shell_exit_status = 0;
+    executor->command_abort = false;
+    executor->pending_readonly_var = NULL;
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
@@ -418,6 +420,8 @@ executor_t *executor_new_with_symtable(symtable_manager_t *symtable) {
     executor->expansion_exit_status = 0;
     executor->shell_exit_requested = false;
     executor->shell_exit_status = 0;
+    executor->command_abort = false;
+    executor->pending_readonly_var = NULL;
     executor->loop_control = LOOP_NORMAL;
     executor->loop_depth = 0;
     executor->source_depth = 0;
@@ -490,6 +494,11 @@ void executor_free(executor_t *executor) {
 
         /// Free script context
         free(executor->current_script_file);
+
+        /// Free any unconsumed readonly-abort diagnostic (defensive;
+        /// the execute_command chokepoint clears it under normal flow).
+        free(executor->pending_readonly_var);
+        executor->pending_readonly_var = NULL;
 
         /// Free error context stack
         executor_clear_context(executor);
@@ -1607,6 +1616,31 @@ static int execute_command(executor_t *executor, node_t *command) {
     source_location_t saved_active_loc = executor->active_loc;
     executor->active_loc = command->loc;
     int result = execute_command_inner(executor, command);
+
+    /// A readonly variable-assignment error was detected inside this
+    /// command. Emit it now -- redirections set up by the assignment-only
+    /// path have already been restored, so the shell-level diagnostic
+    /// reaches the real stderr rather than a `2>/dev/null` the command
+    /// requested (matching bash). command_abort stays set for the
+    /// enclosing AND-OR handler to consume.
+    if (executor->pending_readonly_var) {
+        executor_error_report(
+            executor, SHELL_ERR_READONLY_VAR, executor->pending_readonly_loc,
+            "%s: readonly variable", executor->pending_readonly_var);
+        free(executor->pending_readonly_var);
+        executor->pending_readonly_var = NULL;
+        set_exit_status(1);
+        result = 1;
+        /// POSIX 2.8.1: a variable-assignment error causes a
+        /// non-interactive shell to exit. dash and zsh do this; bash
+        /// continues, aborting only the current AND-OR list. Gated by
+        /// FEATURE_ASSIGN_ERROR_EXITS (on in posix/zsh, off in
+        /// bash/lush; per-script via `setopt assign_error_exits`).
+        if (shell_mode_allows(FEATURE_ASSIGN_ERROR_EXITS)) {
+            executor_request_posix_exit(executor, 1);
+        }
+    }
+
     executor->active_loc = saved_active_loc;
     return result;
 }
@@ -1617,6 +1651,10 @@ static int execute_command_inner(executor_t *executor, node_t *command) {
     /// Reset expansion error flags for this command
     executor->expansion_error = false;
     executor->expansion_exit_status = 0;
+    /// Clear the per-command assignment-abort signal. A prior command's
+    /// readonly abort has already been consumed by the enclosing AND-OR
+    /// handler; the next command starts clean.
+    executor->command_abort = false;
 
     /// Check for assignment (legacy lone-assignment shape: val.str is
     /// "var=value" with no NODE_ASSIGN children).
@@ -4273,6 +4311,14 @@ static int execute_logical_and(executor_t *executor, node_t *and_node) {
     /// Execute left command
     int left_result = execute_node(executor, left);
 
+    /// A variable-assignment error (readonly) on the left aborts the
+    /// whole AND-OR list -- it is not an ordinary failure that the
+    /// operator gets to react to. Skip the right operand regardless of
+    /// the && / || sense.
+    if (executor->command_abort) {
+        return left_result;
+    }
+
     /// Only execute right command if left succeeded (exit code 0)
     if (left_result == 0) {
         return execute_node(executor, right);
@@ -4307,6 +4353,13 @@ static int execute_logical_or(executor_t *executor, node_t *or_node) {
 
     /// Execute left command
     int left_result = execute_node(executor, left);
+
+    /// A variable-assignment error (readonly) on the left aborts the
+    /// whole AND-OR list -- the `||` must not treat it as an ordinary
+    /// failure and run the right operand. Skip the right operand.
+    if (executor->command_abort) {
+        return left_result;
+    }
 
     /// Only execute right command if left failed (non-zero exit code)
     if (left_result != 0) {
@@ -9142,12 +9195,22 @@ static int execute_assignment(executor_t *executor, const char *assignment,
 
     /// Readonly enforcement: symtable_assign_var / symtable_set_var
     /// return SYMTABLE_ERR_READONLY when the target carries the
-    /// readonly attribute anywhere in the scope chain. Surface the
-    /// user-facing diagnostic through the structured-error system
-    /// before the generic failure return below.
+    /// readonly attribute anywhere in the scope chain.
+    ///
+    /// This is a variable-assignment error, not an ordinary command
+    /// failure: bash, zsh, and dash all decline to feed it into a
+    /// following `||`/`&&`. Signal command_abort so the enclosing
+    /// AND-OR handler skips its right operand, and stash the diagnostic
+    /// rather than emitting it here -- the assignment may be running
+    /// under a transient redirection (`ro=x 2>/dev/null`), and the
+    /// shell-level diagnostic must reach the real stderr after that
+    /// redirection is torn down. The execute_command chokepoint emits it
+    /// and applies the mode-exit policy.
     if (result == SYMTABLE_ERR_READONLY) {
-        executor_error_report(executor, SHELL_ERR_READONLY_VAR, loc,
-                              "%s: readonly variable", var_name);
+        executor->command_abort = true;
+        free(executor->pending_readonly_var);
+        executor->pending_readonly_var = strdup(var_name);
+        executor->pending_readonly_loc = loc;
         free(var_name);
         free(value);
         if (resolved_to_free) {

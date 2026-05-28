@@ -724,6 +724,12 @@ generate_alias_completions(lle_memory_pool_t *pool,
  * Static list of shell feature names matching shell_mode.h.
  * This avoids linking dependency on shell_mode for test binaries.
  */
+/// setopt/unsetopt feature names offered by completion. Hand-maintained
+/// here rather than read from shell_mode.c's feature matrix because this
+/// module lives in liblle, which links standalone and must not depend on
+/// the main shell's symbols (see the lle_shell_* weak-symbol bridge). The
+/// list has drifted from the matrix over time; converting it to a
+/// weak-symbol bridge is tracked separately.
 static const char *shell_feature_names[] = {
     /// Arrays
     "indexed_arrays", "associative_arrays", "array_zero_indexed",
@@ -745,6 +751,7 @@ static const char *shell_feature_names[] = {
     "case_fallthrough", "select_loop", "time_keyword",
     /// Behavior
     "word_split_default", "auto_cd", "auto_pushd", "cdable_vars",
+    "assign_error_exits",
     /// Advanced
     "nameref", "anonymous_functions", "return_anywhere",
     /// Zsh-specific

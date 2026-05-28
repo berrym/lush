@@ -175,6 +175,17 @@ typedef enum {
                                         ///< inherited names are external bytes,
                                         ///< not lush-authored identifiers.
 
+    FEATURE_ASSIGN_ERROR_EXITS, ///< A variable-assignment error (e.g. a
+                                ///< write to a readonly variable) exits a
+                                ///< non-interactive shell, per POSIX 2.8.1.
+                                ///< On in posix and zsh modes (dash and zsh
+                                ///< both exit); off in bash and lush modes
+                                ///< (bash continues -- aborting only the
+                                ///< current AND-OR list). Independent of the
+                                ///< AND-OR abort itself, which is uniform
+                                ///< across modes. Toggleable per-script via
+                                ///< setopt/unsetopt.
+
     /// Sentinel - must be last
     FEATURE_COUNT ///< Number of features (for array sizing)
 } shell_feature_t;
