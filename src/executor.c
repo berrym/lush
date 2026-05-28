@@ -3359,47 +3359,56 @@ static int execute_for(executor_t *executor, node_t *for_node) {
                                 }
                             }
                         } else {
-                            /// No brace expansion needed - check if IFS
-                            /// splitting is enabled
-                            if (shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT)) {
-                                /// IFS splitting enabled - split the expanded
-                                /// string
+                            /// Field splitting follows the same rule as
+                            /// command argv (build_argv_from_ast): command
+                            /// substitution always splits; an unquoted
+                            /// parameter expansion splits only when
+                            /// FEATURE_WORD_SPLIT_DEFAULT is on; quoted strings
+                            /// (NODE_STRING_LITERAL / NODE_STRING_EXPANDABLE)
+                            /// never split. This keeps a quoted empty "" as one
+                            /// empty iteration word and "$x" as a single word,
+                            /// unlike the old strtok path that dropped empty
+                            /// fields and split quoted strings. Issue #127.
+                            bool should_word_split =
+                                (word->type == NODE_COMMAND_SUB) ||
+                                (word->type == NODE_VAR &&
+                                 shell_mode_allows(FEATURE_WORD_SPLIT_DEFAULT));
+
+                            if (should_word_split) {
                                 const char *ifs =
                                     symtable_get(executor->symtable, "IFS");
                                 if (!ifs) {
                                     ifs = " \t\n"; /// Default IFS
                                 }
-
-                                /// Split the expanded string into individual
-                                /// words
-                                char *expanded_copy = strdup(expanded);
-                                char *token = strtok(expanded_copy, ifs);
-
-                                while (token) {
-                                    /// Resize array if needed
-                                    expanded_words = realloc(
-                                        expanded_words,
-                                        (word_count + 1) * sizeof(char *));
-                                    if (!expanded_words) {
+                                int field_count = 0;
+                                char **fields = ifs_field_split(expanded, ifs,
+                                                                &field_count);
+                                for (int fi = 0; fi < field_count; fi++) {
+                                    char **grown = realloc(expanded_words,
+                                                           (word_count + 1) *
+                                                               sizeof(char *));
+                                    if (!grown) {
+                                        for (int k = fi; k < field_count; k++) {
+                                            free(fields[k]);
+                                        }
+                                        free(fields);
+                                        free(expanded);
                                         set_executor_error(
                                             executor, "Memory allocation "
                                                       "failed in for loop");
-                                        free(expanded);
-                                        free(expanded_copy);
                                         symtable_pop_scope(executor->symtable);
                                         return 1;
                                     }
-
-                                    expanded_words[word_count] = strdup(token);
-                                    word_count++;
-                                    token = strtok(NULL, ifs);
+                                    expanded_words = grown;
+                                    expanded_words[word_count++] = fields[fi];
                                 }
-
-                                free(expanded_copy);
+                                free(
+                                    fields); /// strings moved to expanded_words
                                 free(expanded);
                             } else {
-                                /// Word splitting disabled (zsh-style) - keep
-                                /// as single word
+                                /// Not split: keep the whole expansion as a
+                                /// single field, so a quoted empty "" yields
+                                /// one empty iteration word.
                                 expanded_words =
                                     realloc(expanded_words,
                                             (word_count + 1) * sizeof(char *));
