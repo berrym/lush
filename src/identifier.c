@@ -200,3 +200,55 @@ bool lush_is_valid_identifier(const char *name) {
     free(canon);
     return ok;
 }
+
+bool lush_ident_mixes_scripts(const char *name, const char **script_a,
+                              const char **script_b) {
+    if (!name) {
+        return false;
+    }
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return false;
+    }
+
+    /// Walk codepoints, tracking the first real (non-COMMON, non-
+    /// INHERITED) script seen. A second distinct real script is a
+    /// mixed-script identifier.
+    lle_unicode_script_t seen = LLE_SCRIPT_COMMON;
+    bool mixed = false;
+    lle_unicode_script_t s_first = LLE_SCRIPT_COMMON;
+    lle_unicode_script_t s_second = LLE_SCRIPT_COMMON;
+    size_t total = strlen(canon);
+    size_t pos = 0;
+    while (pos < total) {
+        uint32_t cp;
+        int adv = lle_utf8_decode_codepoint(canon + pos, total - pos, &cp);
+        if (adv <= 0) {
+            break;
+        }
+        pos += (size_t)adv;
+        lle_unicode_script_t sc = lle_unicode_script_of(cp);
+        if (sc == LLE_SCRIPT_COMMON || sc == LLE_SCRIPT_INHERITED) {
+            continue;
+        }
+        if (seen == LLE_SCRIPT_COMMON) {
+            seen = sc;
+            s_first = sc;
+        } else if (sc != seen) {
+            mixed = true;
+            s_second = sc;
+            break;
+        }
+    }
+    free(canon);
+
+    if (mixed) {
+        if (script_a) {
+            *script_a = lle_unicode_script_name(s_first);
+        }
+        if (script_b) {
+            *script_b = lle_unicode_script_name(s_second);
+        }
+    }
+    return mixed;
+}

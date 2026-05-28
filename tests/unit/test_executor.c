@@ -11,6 +11,7 @@
 
 #include "alias.h"
 #include "executor.h"
+#include "identifier.h"
 #include "lle/buffer_management.h"
 #include "lle/lle_editor.h"
 #include "lle/syntax_highlighting.h"
@@ -2651,6 +2652,34 @@ TEST(rt_unicode_ident_highlight_spans_full_name) {
     ASSERT_EQ(var_end - var_start, (size_t)6, "variable token spans $café");
 }
 
+TEST(rt_unicode_ident_mixed_script_detected) {
+    /// `pаsswd` -- Latin p, then Cyrillic а (U+0430), then Latin sswd --
+    /// is the classic homograph: visually `passwd`. lush_ident_mixes_scripts
+    /// reports the crossing and names both scripts.
+    const char *a = NULL, *b = NULL;
+    bool mixed = lush_ident_mixes_scripts("p\xD0\xB0sswd", &a, &b);
+    ASSERT(mixed, "Latin+Cyrillic name flagged as mixed-script");
+    ASSERT_NOT_NULL(a, "first script name set");
+    ASSERT_NOT_NULL(b, "second script name set");
+    ASSERT(strcmp(a, "latin") == 0, "first script is latin");
+    ASSERT(strcmp(b, "cyrillic") == 0, "crossing script is cyrillic");
+}
+
+TEST(rt_unicode_ident_single_script_not_flagged) {
+    /// Single-script names -- including ones with digits, underscores,
+    /// and combining marks -- are not mixed-script.
+    ASSERT(!lush_ident_mixes_scripts("café", NULL, NULL), "all-Latin café");
+    ASSERT(!lush_ident_mixes_scripts("\xCE\xA3", NULL, NULL), "all-Greek Σ");
+    ASSERT(!lush_ident_mixes_scripts("\xD0\xB8\xD0\xBC\xD1\x8F", NULL, NULL),
+           "all-Cyrillic имя");
+    ASSERT(!lush_ident_mixes_scripts("x1_y2", NULL, NULL),
+           "ASCII with digits/underscore");
+    /// NFD café (cafe + combining acute): the mark is inherited, not a
+    /// second script.
+    ASSERT(!lush_ident_mixes_scripts("cafe\xCC\x81", NULL, NULL),
+           "NFD café -- combining mark is inherited, not mixed");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3945,6 +3974,8 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_nfc_nfd_function_collision);
     RUN_TEST(rt_unicode_ident_nfc_array_assoc_collision);
     RUN_TEST(rt_unicode_ident_highlight_spans_full_name);
+    RUN_TEST(rt_unicode_ident_mixed_script_detected);
+    RUN_TEST(rt_unicode_ident_single_script_not_flagged);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);

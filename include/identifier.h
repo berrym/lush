@@ -149,6 +149,34 @@ bool lush_is_valid_identifier(const char *name);
  */
 char *lush_ident_canonicalize_alloc(const char *name);
 
+/**
+ * @brief Detect whether an identifier mixes Unicode scripts
+ *
+ * A single identifier that draws letters from more than one script --
+ * Latin `p` next to Cyrillic `а` in `pаsswd` -- is the classic
+ * homograph vector: visually indistinguishable from a single-script
+ * name to a human reading the source. This walks @p name's codepoints
+ * (after NFC canonicalization) and reports whether two distinct scripts
+ * appear. Script-neutral codepoints (ASCII digits, `_`) and combining
+ * marks do not count as a script, so `café`, `Σ`, `имя`, and `x1_y`
+ * are all single-script.
+ *
+ * Detection only; it never rejects. Callers decide the posture: the
+ * predictive analyzer surfaces it as an advisory, and a feature-matrix
+ * flag can turn it into a definition-time rejection. The environment-
+ * import path must NOT call this -- inherited names are external bytes,
+ * not lush-authored identifiers.
+ *
+ * @param name NUL-terminated identifier (may be NULL -> returns false)
+ * @param script_a If non-NULL and the name mixes scripts, set to the
+ *                 first script's name (a stable string; do not free)
+ * @param script_b If non-NULL and the name mixes scripts, set to the
+ *                 conflicting script's name (stable string; do not free)
+ * @return true if @p name mixes two or more scripts
+ */
+bool lush_ident_mixes_scripts(const char *name, const char **script_a,
+                              const char **script_b);
+
 #ifdef __cplusplus
 }
 #endif

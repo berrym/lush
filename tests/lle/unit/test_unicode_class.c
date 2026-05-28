@@ -14,6 +14,7 @@
 #include "lle/unicode_class.h"
 #include "test_framework.h"
 #include <stdio.h>
+#include <string.h>
 
 #undef ASSERT
 #define ASSERT(cond, msg) ASSERT_TRUE(cond, msg)
@@ -238,6 +239,46 @@ TEST(xdigit_ascii_only) {
  * ============================================================================
  */
 
+/* ============================================================================
+ * Script classification (UAX #24 subset)
+ * ============================================================================
+ */
+
+TEST(script_of_latin) {
+    ASSERT(lle_unicode_script_of('a') == LLE_SCRIPT_LATIN, "ascii a");
+    ASSERT(lle_unicode_script_of('Z') == LLE_SCRIPT_LATIN, "ascii Z");
+    ASSERT(lle_unicode_script_of(0x00E9) == LLE_SCRIPT_LATIN, "é Latin-1");
+    ASSERT(lle_unicode_script_of(0x0151) == LLE_SCRIPT_LATIN, "ő Latin Ext-A");
+    ASSERT(lle_unicode_script_of(0x0250) == LLE_SCRIPT_LATIN, "ɐ IPA");
+}
+
+TEST(script_of_greek_and_cyrillic) {
+    ASSERT(lle_unicode_script_of(0x03A3) == LLE_SCRIPT_GREEK, "Σ greek");
+    ASSERT(lle_unicode_script_of(0x03B1) == LLE_SCRIPT_GREEK, "α greek");
+    ASSERT(lle_unicode_script_of(0x0430) == LLE_SCRIPT_CYRILLIC, "а cyrillic");
+    ASSERT(lle_unicode_script_of(0x0521) == LLE_SCRIPT_CYRILLIC,
+           "ԡ cyrillic supplement");
+}
+
+TEST(script_of_common_and_inherited) {
+    ASSERT(lle_unicode_script_of('0') == LLE_SCRIPT_COMMON, "ascii digit");
+    ASSERT(lle_unicode_script_of('_') == LLE_SCRIPT_COMMON, "underscore");
+    ASSERT(lle_unicode_script_of(0x00D7) == LLE_SCRIPT_COMMON,
+           "× multiplication sign is not a Latin letter");
+    ASSERT(lle_unicode_script_of(0x0301) == LLE_SCRIPT_INHERITED,
+           "combining acute is inherited");
+}
+
+TEST(script_name_strings) {
+    ASSERT(strcmp(lle_unicode_script_name(LLE_SCRIPT_LATIN), "latin") == 0,
+           "latin name");
+    ASSERT(strcmp(lle_unicode_script_name(LLE_SCRIPT_CYRILLIC), "cyrillic") ==
+               0,
+           "cyrillic name");
+    ASSERT(strcmp(lle_unicode_script_name(LLE_SCRIPT_GREEK), "greek") == 0,
+           "greek name");
+}
+
 int main(void) {
     printf("Running unicode_class tests...\n\n");
 
@@ -278,6 +319,12 @@ int main(void) {
 
     printf("\nXdigit:\n");
     RUN_TEST(xdigit_ascii_only);
+
+    printf("\nScript:\n");
+    RUN_TEST(script_of_latin);
+    RUN_TEST(script_of_greek_and_cyrillic);
+    RUN_TEST(script_of_common_and_inherited);
+    RUN_TEST(script_name_strings);
 
     return TEST_RESULT();
 }

@@ -79,6 +79,58 @@ bool lle_unicode_is_alpha(uint32_t cp) {
     return false;
 }
 
+lle_unicode_script_t lle_unicode_script_of(uint32_t cp) {
+    /// ASCII: letters are Latin, everything else (digits, `_`,
+    /// punctuation) is script-neutral.
+    if (cp < 0x80) {
+        return isalpha((int)(unsigned char)cp) ? LLE_SCRIPT_LATIN
+                                               : LLE_SCRIPT_COMMON;
+    }
+    /// Combining Diacritical Marks (U+0300-U+036F): Inherited -- take
+    /// the preceding base character's script, so they never count as a
+    /// distinct script of their own.
+    if (cp >= 0x0300 && cp <= 0x036F) {
+        return LLE_SCRIPT_INHERITED;
+    }
+    /// U+00D7 multiplication sign and U+00F7 division sign are math
+    /// symbols (category Sm, script Common), not Latin letters.
+    if (cp == 0x00D7 || cp == 0x00F7) {
+        return LLE_SCRIPT_COMMON;
+    }
+    /// Latin: Latin-1 Supplement letters through IPA Extensions. Every
+    /// other codepoint in this span is a letter.
+    if (cp >= 0x00C0 && cp <= 0x02AF) {
+        return LLE_SCRIPT_LATIN;
+    }
+    /// Greek and Coptic.
+    if (cp >= 0x0370 && cp <= 0x03FF) {
+        return LLE_SCRIPT_GREEK;
+    }
+    /// Cyrillic and Cyrillic Supplement.
+    if (cp >= 0x0400 && cp <= 0x052F) {
+        return LLE_SCRIPT_CYRILLIC;
+    }
+    return LLE_SCRIPT_OTHER;
+}
+
+const char *lle_unicode_script_name(lle_unicode_script_t script) {
+    switch (script) {
+    case LLE_SCRIPT_COMMON:
+        return "common";
+    case LLE_SCRIPT_INHERITED:
+        return "inherited";
+    case LLE_SCRIPT_LATIN:
+        return "latin";
+    case LLE_SCRIPT_GREEK:
+        return "greek";
+    case LLE_SCRIPT_CYRILLIC:
+        return "cyrillic";
+    case LLE_SCRIPT_OTHER:
+    default:
+        return "other";
+    }
+}
+
 bool lle_unicode_is_digit(uint32_t cp) {
     /// ASCII fast path
     if (cp >= '0' && cp <= '9') {

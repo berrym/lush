@@ -147,6 +147,49 @@ bool lle_unicode_is_punct(uint32_t cp);
  */
 bool lle_unicode_is_xdigit(uint32_t cp);
 
+/**
+ * @brief Script identity of a codepoint (UAX #24 subset)
+ *
+ * Distinguishes the scripts within lush's identifier letter scope
+ * (the same Latin / Greek / Cyrillic the alpha predicate accepts) so
+ * callers can detect when one identifier mixes scripts -- the common
+ * homograph vector (Latin `p` + Cyrillic `a` in `passwd`). COMMON
+ * covers script-neutral characters (ASCII digits, `_`, anything not
+ * carrying a script); INHERITED covers combining marks, which take the
+ * script of the preceding base and so never introduce a script of
+ * their own. Codepoints outside the current letter scope return OTHER.
+ *
+ * This is intentionally narrow: it is not the full Unicode Script
+ * property database. The scope tracks lle_unicode_is_alpha; when that
+ * grows (e.g. CJK), this and its callers extend together, at which
+ * point Script_Extensions and the UAX #39 augmented-set rules become
+ * relevant.
+ */
+typedef enum {
+    LLE_SCRIPT_COMMON = 0, ///< Script-neutral (digits, `_`, punctuation)
+    LLE_SCRIPT_INHERITED,  ///< Combining marks (take the base's script)
+    LLE_SCRIPT_LATIN,      ///< Latin (incl. Latin-1/Ext-A/Ext-B, IPA)
+    LLE_SCRIPT_GREEK,      ///< Greek and Coptic
+    LLE_SCRIPT_CYRILLIC,   ///< Cyrillic and Cyrillic Supplement
+    LLE_SCRIPT_OTHER       ///< Carries a script outside the current scope
+} lle_unicode_script_t;
+
+/**
+ * @brief Classify a codepoint's script (UAX #24 subset)
+ * @param cp Codepoint to classify
+ * @return The codepoint's script, or COMMON / INHERITED for
+ *         script-neutral and combining codepoints
+ */
+lle_unicode_script_t lle_unicode_script_of(uint32_t cp);
+
+/**
+ * @brief Human-readable name for a script enum (for diagnostics)
+ * @param script Script value
+ * @return Stable lowercase string ("latin", "greek", "cyrillic",
+ *         "common", "inherited", "other"); never NULL
+ */
+const char *lle_unicode_script_name(lle_unicode_script_t script);
+
 #ifdef __cplusplus
 }
 #endif
