@@ -2058,6 +2058,15 @@ if fuzzing_enabled
     # comes along for the ride; both are hermetic.
     'src/lle/unicode/utf8_support.c',
     'src/lle/unicode/unicode_grapheme.c',
+    # identifier.c (in this list) drives the Unicode identifier predicate:
+    # unicode_class.c provides lle_unicode_is_alpha/_alnum and unicode_case.c
+    # provides the is_lower/is_upper/tolower/toupper case primitives it (and
+    # symtable.c) consume. unicode_compare.c provides
+    # lle_unicode_normalize_nfc_alloc (symtable.c's NFC history work) and
+    # lle_unicode_strings_equal (parser.c). All hermetic; no liblle.a needed.
+    'src/lle/unicode/unicode_class.c',
+    'src/lle/unicode/unicode_case.c',
+    'src/lle/unicode/unicode_compare.c',
     'tests/fuzz/fuzz_stubs.c',
   ]
 
