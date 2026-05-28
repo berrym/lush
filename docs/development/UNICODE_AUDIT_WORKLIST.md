@@ -1,6 +1,6 @@
 # Unicode Audit Worklist
 
-**Status**: Catalogue-only. No code changes made.
+**Status**: Catalog-only. No code changes made.
 **Audit date**: 2026-05-25
 **Scope**: `src/**/*.c` (excluding `src/lle/unicode/*`, `src/strings.c`, `src/libhashtable`, `src/libfuzzy`).
 **Rule of record**: memory `feedback-unicode-mandatory` — byte-oriented APIs (strcmp, strncmp, strcasecmp, strncasecmp, strchr, strrchr, strstr, strspn, strcspn, strpbrk, strtok, strdup, strlen, memcmp, ctype.h) are permitted only when there is *zero possibility* of non-ASCII input. Anything else must go through `src/lle/unicode/*` helpers.
@@ -363,7 +363,7 @@ If a user pastes text from a webpage containing NBSP, Ctrl-W / IFS word-splittin
 | src/lle/display/ | 18 | 14 | ~90 | ~10 | 0 | mirrors tokenizer identifier B-cluster |
 | src/lle/buffer/ | 0 | 0 | n/a | n/a | n/a | all calls go through Unicode helpers already — exemplary |
 
-**Total catalogued**: ≈2500 byte-oriented call sites across ≈140 files.
+**Total catalogd**: ≈2500 byte-oriented call sites across ≈140 files.
 
 **Distribution estimate**: A ≈ 88%, B ≈ 11%, C ≈ 1%.
 

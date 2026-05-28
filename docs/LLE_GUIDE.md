@@ -499,7 +499,7 @@ display lle hook list
 display lle hook remove precmd my_precmd_widget
 ```
 
-The full hook-type catalogue covers ten LLE-internal events; the
+The full hook-type catalog covers ten LLE-internal events; the
 shell-event hub bridges to PRE_COMMAND / POST_COMMAND at editor
 init.
 

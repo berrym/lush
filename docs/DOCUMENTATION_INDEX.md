@@ -44,7 +44,7 @@ Curated defaults / Gotchas*.
 | Sigil conventions (`$`, `@`, `%` presentation contexts) | [sigil-conventions.md](features/sigil-conventions.md) |
 | Pipeline status reporting (`PIPESTATUS`, `pipeline-diagnostic`) | [pipeline-status.md](features/pipeline-status.md) |
 | Value inspector (`inspect-variable-at-cursor` widget) | [value-inspector.md](features/value-inspector.md) |
-| Parameter-expansion error catalogue + per-element semantics | [parameter-expansion-catalogue.md](features/parameter-expansion-catalogue.md) |
+| Parameter-expansion error catalog + per-element semantics | [parameter-expansion-catalog.md](features/parameter-expansion-catalog.md) |
 
 ---
 
@@ -205,10 +205,10 @@ The 1.5.0 cycle has shipped, among other things:
 - **Value inspector** -- `inspect-variable-at-cursor` widget for
   live variable inspection during line editing. See
   [value-inspector.md](features/value-inspector.md).
-- **Parameter-expansion error catalogue + per-element semantics**
+- **Parameter-expansion error catalog + per-element semantics**
   -- loud type mismatches at silent-no-op sites; element-wise
   `${arr[@]op}` and `${(flag)arr}` semantics. See
-  [parameter-expansion-catalogue.md](features/parameter-expansion-catalogue.md).
+  [parameter-expansion-catalog.md](features/parameter-expansion-catalog.md).
 - **`debug analyze`** static checks for typed-fn return-kind
   mismatches, sigil-kind misuse, and other edit-time diagnostics.
 
@@ -273,7 +273,7 @@ debug analyze SCRIPT    # Static analysis of a script
 | `sigil-conventions.md` | `$`/`@`/`%` presentation sigils |
 | `pipeline-status.md` | PIPESTATUS + pipeline-diagnostic mode |
 | `value-inspector.md` | inspect-variable-at-cursor widget |
-| `parameter-expansion-catalogue.md` | Type-mismatch catalogue + per-element semantics |
+| `parameter-expansion-catalog.md` | Type-mismatch catalog + per-element semantics |
 
 ### docs/development/
 

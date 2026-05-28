@@ -520,7 +520,7 @@ echo "${(k)m}"          # keys   (same as ${!m[@]})
 ```
 
 See [EXTENDED_SYNTAX.md](EXTENDED_SYNTAX.md) for the full flag
-catalogue.
+catalog.
 
 ### Extended Globbing
 

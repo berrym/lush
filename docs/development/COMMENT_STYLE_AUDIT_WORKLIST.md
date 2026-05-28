@@ -1,6 +1,6 @@
 # Comment-Style Audit Worklist
 
-This is a **catalogue-only** worklist for the comment-style unification across the lush codebase. No code changes are made by this audit — the file lists violations so the user can pick subdirectories for wave-based commits.
+This is a **catalog-only** worklist for the comment-style unification across the lush codebase. No code changes are made by this audit — the file lists violations so the user can pick subdirectories for wave-based commits.
 
 ## The unified ruleset (the bar for "violation")
 
@@ -23,7 +23,7 @@ This is a **catalogue-only** worklist for the comment-style unification across t
 - Skipped `tests/real_world/corpus/*` data fixtures; included `tests/fuzz/*.c` test source.
 - **Total files audited: 529.**
 
-## Catalogue method
+## Catalog method
 
 This audit is **count-driven** rather than line-by-line itemized, for the simple reason that the codebase contains ~22 000 `//` comments and ~3 800 `/**< */` trailing comments. Line-itemizing every site would balloon the worklist past 100 000 lines and obscure rather than clarify the work. Instead, each per-file row carries a count for each violation category — enough to gauge effort and to drive `sed`-style mechanical sweeps for the bulk categories.
 
@@ -275,11 +275,11 @@ These files conform to the unified ruleset. **Do not re-edit.**
 
 ---
 
-## Per-file catalogue
+## Per-file catalog
 
 Each directory below lists every audited file with violation counts.
 - `//` and `/**<` columns are exact violation counts.
-- `/**` blocks column is informational (not all `/** */` blocks are violations — see "Catalogue method" above).
+- `/**` blocks column is informational (not all `/** */` blocks are violations — see "Catalog method" above).
 - `static-fn /**` is a judgment-required violation (collapse to `///` brief).
 - `in-fn /* */` is a judgment-required violation (convert to `///` run).
 - `no @file` = YES means add a `@file` block.

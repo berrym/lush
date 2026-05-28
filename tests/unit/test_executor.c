@@ -2934,13 +2934,13 @@ TEST(rt_typed_fn_void_no_return) {
     (void)r;
 }
 
-/// --- parameter-expansion catalogue --------------------------------------
+/// --- parameter-expansion catalog --------------------------------------
 /// Operators have a defined input-kind to output-kind contract. When the
 /// kinds disagree the engine raises a structured runtime type-mismatch
 /// rather than silently no-op'ing or producing wrong output. These tests
-/// pin the cells of that catalogue.
+/// pin the cells of that catalog.
 
-TEST(rt_pe_catalogue_join_flag_on_list) {
+TEST(rt_pe_catalog_join_flag_on_list) {
     /// Explicit list-to-scalar join with custom separator. Previously
     /// over-rejected by the bare-${arr[@]} list-in-scalar-slot check;
     /// (j:X:) IS the explicit join, so the runtime allows it.
@@ -2950,7 +2950,7 @@ TEST(rt_pe_catalogue_join_flag_on_list) {
     ASSERT_STDOUT_EQ(r, "[alpha+beta+gamma]\n[alpha+beta+gamma]\n");
 }
 
-TEST(rt_pe_catalogue_case_mod_flag_per_element) {
+TEST(rt_pe_catalog_case_mod_flag_per_element) {
     /// (U) flag on a list per-elements; the result is the elements
     /// uppercased and space-joined.
     run_result_t r = run_shell("arr=(alpha beta)\n"
@@ -2958,32 +2958,32 @@ TEST(rt_pe_catalogue_case_mod_flag_per_element) {
     ASSERT_STDOUT_EQ(r, "[ALPHA BETA]\n");
 }
 
-TEST(rt_pe_catalogue_sort_flag_on_list) {
+TEST(rt_pe_catalog_sort_flag_on_list) {
     run_result_t r = run_shell("arr=(c a b)\n"
                                "echo \"[${(o)arr}]\"\n");
     ASSERT_STDOUT_EQ(r, "[a b c]\n");
 }
 
-TEST(rt_pe_catalogue_keys_flag_on_scalar) {
+TEST(rt_pe_catalog_keys_flag_on_scalar) {
     /// Collection-only flag (k) applied to a scalar -> type mismatch.
     run_result_t r = run_shell("s=hello\n"
                                "echo \"[${(k)s}]\"\n");
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_values_flag_on_scalar) {
+TEST(rt_pe_catalog_values_flag_on_scalar) {
     run_result_t r = run_shell("s=hello\n"
                                "echo \"[${(v)s}]\"\n");
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_kv_flag_on_scalar) {
+TEST(rt_pe_catalog_kv_flag_on_scalar) {
     run_result_t r = run_shell("s=hello\n"
                                "echo \"[${(kv)s}]\"\n");
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_join_flag_on_scalar) {
+TEST(rt_pe_catalog_join_flag_on_scalar) {
     /// (j:X:) on a non-collection is meaningless: there is nothing to
     /// join. Type mismatch.
     run_result_t r = run_shell("s=hello\n"
@@ -2991,7 +2991,7 @@ TEST(rt_pe_catalogue_join_flag_on_scalar) {
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_conditional_on_bare_list) {
+TEST(rt_pe_catalog_conditional_on_bare_list) {
     /// ${list:-default} silently collapses to the first-element-default
     /// form in legacy shells. lush rejects it; the user picks slice for
     /// a scalar element fallback, or assigns a list literal for a
@@ -3001,7 +3001,7 @@ TEST(rt_pe_catalogue_conditional_on_bare_list) {
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_case_mod_on_bare_list) {
+TEST(rt_pe_catalog_case_mod_on_bare_list) {
     /// ${arr^^} on a bare list name -- scalar operator on collection.
     /// The user must vectorize explicitly via ${arr[@]^^}.
     run_result_t r = run_shell("arr=(hello world)\n"
@@ -3009,19 +3009,19 @@ TEST(rt_pe_catalogue_case_mod_on_bare_list) {
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_pattern_strip_on_bare_list) {
+TEST(rt_pe_catalog_pattern_strip_on_bare_list) {
     run_result_t r = run_shell("arr=(file.txt other.log)\n"
                                "echo \"[${arr##*.}]\"\n");
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_substring_on_bare_list) {
+TEST(rt_pe_catalog_substring_on_bare_list) {
     run_result_t r = run_shell("arr=(alpha beta)\n"
                                "echo \"[${arr:0:2}]\"\n");
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_at_transform_on_bare_list) {
+TEST(rt_pe_catalog_at_transform_on_bare_list) {
     /// ${arr@Q} on bare list -- the @-transform is scalar-shaped on a
     /// bare name. Vectorize via ${arr[@]@Q}.
     run_result_t r = run_shell("arr=(a b c)\n"
@@ -3029,13 +3029,13 @@ TEST(rt_pe_catalogue_at_transform_on_bare_list) {
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_conditional_on_map) {
+TEST(rt_pe_catalog_conditional_on_map) {
     run_result_t r = run_shell("declare -A m=([a]=1 [b]=2)\n"
                                "echo \"[${m:-default}]\"\n");
     ASSERT_EXIT_STATUS(r, 1);
 }
 
-TEST(rt_pe_catalogue_scalar_slice_still_works) {
+TEST(rt_pe_catalog_scalar_slice_still_works) {
     /// Regression: ${arr[0]:-default} is the scalar-element form and
     /// remains valid -- the slice produces a scalar and the
     /// conditional operates on that scalar.
@@ -3044,37 +3044,37 @@ TEST(rt_pe_catalogue_scalar_slice_still_works) {
     ASSERT_STDOUT_EQ(r, "[a]\n");
 }
 
-TEST(rt_pe_catalogue_per_element_case_mod_via_slice) {
+TEST(rt_pe_catalog_per_element_case_mod_via_slice) {
     run_result_t r = run_shell("arr=(hello world)\n"
                                "echo \"[${arr[@]^^}]\"\n");
     ASSERT_STDOUT_EQ(r, "[HELLO WORLD]\n");
 }
 
-TEST(rt_pe_catalogue_per_element_prefix_strip_via_slice) {
+TEST(rt_pe_catalog_per_element_prefix_strip_via_slice) {
     run_result_t r = run_shell("arr=(file.txt other.log)\n"
                                "echo \"[${arr[@]##*.}]\"\n");
     ASSERT_STDOUT_EQ(r, "[txt log]\n");
 }
 
-TEST(rt_pe_catalogue_per_element_suffix_strip_via_slice) {
+TEST(rt_pe_catalog_per_element_suffix_strip_via_slice) {
     run_result_t r = run_shell("arr=(file.txt other.log)\n"
                                "echo \"[${arr[@]%%.*}]\"\n");
     ASSERT_STDOUT_EQ(r, "[file other]\n");
 }
 
-TEST(rt_pe_catalogue_per_element_replace_first_via_slice) {
+TEST(rt_pe_catalog_per_element_replace_first_via_slice) {
     run_result_t r = run_shell("arr=(hello world)\n"
                                "echo \"[${arr[@]/l/L}]\"\n");
     ASSERT_STDOUT_EQ(r, "[heLlo worLd]\n");
 }
 
-TEST(rt_pe_catalogue_per_element_replace_all_via_slice) {
+TEST(rt_pe_catalog_per_element_replace_all_via_slice) {
     run_result_t r = run_shell("arr=(hello world)\n"
                                "echo \"[${arr[@]//l/L}]\"\n");
     ASSERT_STDOUT_EQ(r, "[heLLo worLd]\n");
 }
 
-TEST(rt_pe_catalogue_per_element_at_q_via_slice) {
+TEST(rt_pe_catalog_per_element_at_q_via_slice) {
     run_result_t r = run_shell("arr=(hello world)\n"
                                "echo \"[${arr[@]@Q}]\"\n");
     ASSERT_STDOUT_EQ(r, "['hello' 'world']\n");
@@ -3143,7 +3143,7 @@ TEST(rt_pipeline_diagnostic_silent_on_success) {
     ASSERT_STDOUT_EQ(r, "exit=0\n");
 }
 
-TEST(rt_pe_catalogue_scalar_conditional_still_works) {
+TEST(rt_pe_catalog_scalar_conditional_still_works) {
     run_result_t r = run_shell("s=hello\n"
                                "echo \"[${s:-default}]\"\n"
                                "unset s\n"
@@ -4026,26 +4026,26 @@ int main(void) {
     RUN_TEST(rt_typed_fn_kind_mismatch_arg);
     RUN_TEST(rt_typed_fn_void_called_via_let);
     RUN_TEST(rt_typed_fn_void_no_return);
-    RUN_TEST(rt_pe_catalogue_join_flag_on_list);
-    RUN_TEST(rt_pe_catalogue_case_mod_flag_per_element);
-    RUN_TEST(rt_pe_catalogue_sort_flag_on_list);
-    RUN_TEST(rt_pe_catalogue_keys_flag_on_scalar);
-    RUN_TEST(rt_pe_catalogue_values_flag_on_scalar);
-    RUN_TEST(rt_pe_catalogue_kv_flag_on_scalar);
-    RUN_TEST(rt_pe_catalogue_join_flag_on_scalar);
-    RUN_TEST(rt_pe_catalogue_conditional_on_bare_list);
-    RUN_TEST(rt_pe_catalogue_case_mod_on_bare_list);
-    RUN_TEST(rt_pe_catalogue_pattern_strip_on_bare_list);
-    RUN_TEST(rt_pe_catalogue_substring_on_bare_list);
-    RUN_TEST(rt_pe_catalogue_at_transform_on_bare_list);
-    RUN_TEST(rt_pe_catalogue_conditional_on_map);
-    RUN_TEST(rt_pe_catalogue_scalar_slice_still_works);
-    RUN_TEST(rt_pe_catalogue_per_element_case_mod_via_slice);
-    RUN_TEST(rt_pe_catalogue_per_element_prefix_strip_via_slice);
-    RUN_TEST(rt_pe_catalogue_per_element_suffix_strip_via_slice);
-    RUN_TEST(rt_pe_catalogue_per_element_replace_first_via_slice);
-    RUN_TEST(rt_pe_catalogue_per_element_replace_all_via_slice);
-    RUN_TEST(rt_pe_catalogue_per_element_at_q_via_slice);
+    RUN_TEST(rt_pe_catalog_join_flag_on_list);
+    RUN_TEST(rt_pe_catalog_case_mod_flag_per_element);
+    RUN_TEST(rt_pe_catalog_sort_flag_on_list);
+    RUN_TEST(rt_pe_catalog_keys_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_values_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_kv_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_join_flag_on_scalar);
+    RUN_TEST(rt_pe_catalog_conditional_on_bare_list);
+    RUN_TEST(rt_pe_catalog_case_mod_on_bare_list);
+    RUN_TEST(rt_pe_catalog_pattern_strip_on_bare_list);
+    RUN_TEST(rt_pe_catalog_substring_on_bare_list);
+    RUN_TEST(rt_pe_catalog_at_transform_on_bare_list);
+    RUN_TEST(rt_pe_catalog_conditional_on_map);
+    RUN_TEST(rt_pe_catalog_scalar_slice_still_works);
+    RUN_TEST(rt_pe_catalog_per_element_case_mod_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_prefix_strip_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_suffix_strip_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_replace_first_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_replace_all_via_slice);
+    RUN_TEST(rt_pe_catalog_per_element_at_q_via_slice);
     RUN_TEST(rt_pipeline_three_stages);
     RUN_TEST(rt_pipeline_four_stages);
     RUN_TEST(rt_pipeline_pipestatus_three_stages);
@@ -4054,7 +4054,7 @@ int main(void) {
     RUN_TEST(rt_pipeline_pipefail_all_succeed);
     RUN_TEST(rt_pipeline_diagnostic_per_stage_errors);
     RUN_TEST(rt_pipeline_diagnostic_silent_on_success);
-    RUN_TEST(rt_pe_catalogue_scalar_conditional_still_works);
+    RUN_TEST(rt_pe_catalog_scalar_conditional_still_works);
     RUN_TEST(rt_inspect_scalar_at_cursor);
     RUN_TEST(rt_inspect_braced_name);
     RUN_TEST(rt_inspect_strict_past_closing_brace);

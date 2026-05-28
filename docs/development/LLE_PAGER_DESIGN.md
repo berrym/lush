@@ -528,7 +528,7 @@ its own tests and commit.
 |---|---|
 | Pager state interferes with LLE buffer on activate/deactivate | LLE buffer is single source of truth and is not touched during pager mode. Pager has its own state struct; display controller has a render-mode flag only. |
 | screen_buffer assumes prompt+command shape | We feed pager content as the "command text" argument and "" as prompt; screen_buffer_render is shape-agnostic. Line prefixes handle the status line. |
-| Builtins forget to call pager and bypass it | Catalogue the producer list (table in section 8); add a one-off lint / grep test that catches new builtins emitting >N lines without pager. |
+| Builtins forget to call pager and bypass it | Catalog the producer list (table in section 8); add a one-off lint / grep test that catches new builtins emitting >N lines without pager. |
 | User wants to disable pager globally | `display.lle.pager.enabled = false`; falls back to direct print. |
 | Tests can't simulate tty | `lle_pager_present` non-tty path is the bypass; tests cover both branches. |
 | Pager + debugger reentrancy | Both modes use the LLE-reentrant pattern (the debug prompt has this working); document the layering. |

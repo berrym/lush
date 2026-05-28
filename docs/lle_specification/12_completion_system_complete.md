@@ -23,7 +23,7 @@
 >
 > **[`docs/development/COMPLETION_ARCHITECTURE.md`](../development/COMPLETION_ARCHITECTURE.md)**
 >
-> That document's §12 catalogues which spec components are implemented,
+> That document's §12 catalogs which spec components are implemented,
 > which are replaced by simpler equivalents that fit the new
 > architecture, and which remain future work. Use it as the source of
 > truth for current behavior; use this spec as the design target.

@@ -1,4 +1,4 @@
-# Parameter-Expansion Error Catalogue
+# Parameter-Expansion Error Catalog
 
 **Misapplied parameter-expansion operators raise structured type
 mismatches at the exact site; well-typed per-element operations on
@@ -8,7 +8,7 @@ joined scalar.**
 **Status**: shipped.
 **Spec lineage**: `docs/SEMANTICS.md` §3.5 (transformation always
 fires), §3.9 (no implicit list-to-string), §8 (formerly deferred
-line "Error catalogue for misapplied transformations").
+line "Error catalog for misapplied transformations").
 
 ---
 
@@ -163,7 +163,7 @@ one engine.
 
 ## Curated defaults
 
-The catalogue is **engine-level**, not mode-gated. Every shell mode
+The catalog is **engine-level**, not mode-gated. Every shell mode
 gets the type-mismatch diagnostics and per-element semantics. This
 is deliberate: the previous silent-no-op behavior was a bug
 masquerading as a feature, not a compatibility surface. Scripts that
@@ -176,7 +176,7 @@ asterisk, not at-sign), which is the documented joined-form.
 
 ## Diagnostics
 
-All catalogue errors share error code `E1133`
+All catalog errors share error code `E1133`
 (`SHELL_ERR_TYPE_MISMATCH`). The message format is:
 
 ```
@@ -229,5 +229,5 @@ The help line names the correct form for the operator. Examples:
 - `docs/features/sigil-conventions.md` -- the `@x` lush-mode
   shorthand for the `${x[@]}` form covered here.
 - `docs/EXTENDED_SYNTAX.md` -- the full parameter-expansion
-  operator reference. The catalogue described here applies on top
+  operator reference. The catalog described here applies on top
   of the operator set documented there.

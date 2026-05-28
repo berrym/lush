@@ -18,7 +18,7 @@ analyzers, the unclear source/engine boundary, the bugs that came from
 sources owning escape policy — and put the foundation in place. The
 remaining spec components are future work on top of that foundation, not
 dropped scope. [§12 Spec divergences](#12-spec-divergences) and
-[§14 Known gaps](#14-known-gaps-and-open-work) catalogue what's missing
+[§14 Known gaps](#14-known-gaps-and-open-work) catalog what's missing
 and where it is on the path forward.
 
 ---
