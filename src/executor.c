@@ -158,6 +158,11 @@ static void cleanup_procsub_fds(executor_t *executor);
 bool is_posix_mode_enabled(void);
 bool is_pipefail_enabled(void);
 bool is_pipeline_diagnostic_enabled(void);
+
+/// `$((` arithmetic-vs-command-sub disambiguation, shared with the
+/// tokenizer (defined in tokenizer.c, declared in tokenizer.h which the
+/// executor does not include).
+bool lush_dollar_paren_is_arithmetic(const char *content, size_t remaining);
 static int execute_external_command_with_setup(executor_t *executor,
                                                char **argv,
                                                bool redirect_stderr,
@@ -6099,34 +6104,12 @@ char *expand_if_needed(executor_t *executor, const char *text) {
             }
             return strdup(text);
         } else if (strncmp(text, "$((", 3) == 0) {
-            /// Disambiguate `$((` between arithmetic and command-sub
-            /// of an anonymous function `$(() {...})`. Same shape as
-            /// the tokenizer and expand_variables_in_string detectors
-            /// (issue #99): if the lookahead from after $(( finds {,
-            /// }, ;, or \n before matched )), route to command-sub.
-            bool looks_arith = true;
-            {
-                size_t tlen = strlen(text);
-                size_t s = 3;
-                int d = 2;
-                while (s < tlen && d > 0) {
-                    char sc = text[s];
-                    if (sc == '(') {
-                        d++;
-                    } else if (sc == ')') {
-                        d--;
-                        if (d == 0) {
-                            break;
-                        }
-                    } else if (sc == '{' || sc == '}' || sc == ';' ||
-                               sc == '\n') {
-                        looks_arith = false;
-                        break;
-                    }
-                    s++;
-                }
-            }
-            if (looks_arith) {
+            /// Disambiguate `$((` between arithmetic and command-sub of an
+            /// anonymous function `$(() {...})` (issue #99). Shared helper
+            /// with the tokenizer; `${...}` parameter expansions inside the
+            /// arithmetic are handled there (issue #118).
+            size_t tlen = strlen(text);
+            if (lush_dollar_paren_is_arithmetic(text + 3, tlen - 3)) {
                 return expand_arithmetic(executor, text);
             }
             return expand_command_substitution(executor, text);
@@ -11411,27 +11394,8 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                 /// branch's $(...) handler instead. Walk the lookahead;
                 /// if it doesn't pass the arithmetic shape check, fall
                 /// through to the $(...) handler below.
-                bool looks_arith = true;
-                {
-                    size_t s = i + 3;
-                    int d = 2;
-                    while (s < len && d > 0) {
-                        char sc = str[s];
-                        if (sc == '(') {
-                            d++;
-                        } else if (sc == ')') {
-                            d--;
-                            if (d == 0) {
-                                break;
-                            }
-                        } else if (sc == '{' || sc == '}' || sc == ';' ||
-                                   sc == '\n') {
-                            looks_arith = false;
-                            break;
-                        }
-                        s++;
-                    }
-                }
+                bool looks_arith =
+                    lush_dollar_paren_is_arithmetic(str + i + 3, len - (i + 3));
                 if (!looks_arith) {
                     /// Re-route into the $(...) command-sub handler at
                     /// the next branch (else-if on str[i + 1] == '('),
@@ -15989,27 +15953,8 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                 /// anonymous function. Same shape as tokenizer +
                 /// expand_variables_in_string + expand_if_needed
                 /// (issue #99).
-                bool qs_looks_arith = true;
-                {
-                    size_t s = i + 3;
-                    int d = 2;
-                    while (s < len && d > 0) {
-                        char sc = str[s];
-                        if (sc == '(') {
-                            d++;
-                        } else if (sc == ')') {
-                            d--;
-                            if (d == 0) {
-                                break;
-                            }
-                        } else if (sc == '{' || sc == '}' || sc == ';' ||
-                                   sc == '\n') {
-                            qs_looks_arith = false;
-                            break;
-                        }
-                        s++;
-                    }
-                }
+                bool qs_looks_arith =
+                    lush_dollar_paren_is_arithmetic(str + i + 3, len - (i + 3));
                 if (!qs_looks_arith) {
                     /// Fall through to the $(...) command-sub handler
                     /// later in this function -- which is exactly the
