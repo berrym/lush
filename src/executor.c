@@ -4579,7 +4579,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
         if (p == end) {
             return false;
         }
-        /// ${(FLAGS)NAME} -- zsh parameter-flag vector form. Recognised
+        /// ${(FLAGS)NAME} -- zsh parameter-flag vector form. Recognized
         /// flag chars: k (keys), v (values, default), o (sort ascending),
         /// O (sort descending), a (array-order, no sort), u (unique).
         /// Builds the vector directly and short-circuits the rest of
@@ -4819,7 +4819,7 @@ static bool try_expand_vector_arg(executor_t *executor, node_t *node,
                     return false;
                 }
             } else if (p != end) {
-                /// Junk between `]` and `}`. Not a recognised vector form.
+                /// Junk between `]` and `}`. Not a recognized vector form.
                 return false;
             }
         }
@@ -5175,7 +5175,7 @@ static char **build_argv_from_ast(executor_t *executor, node_t *command,
                 /// same swap on the body-read / parse-time delimiter
                 /// scans; this argv-time check stays consistent so a
                 /// heredoc whose script delimiter and stdin
-                /// terminator differ only in Unicode normalisation
+                /// terminator differ only in Unicode normalization
                 /// resolves uniformly across all three sites).
                 bool is_delimiter = false;
                 for (int i = 0; i < delimiter_count; i++) {
@@ -8172,7 +8172,7 @@ static char **expand_brace_range(const char *prefix, const char *content,
         /// limit-exceeded distinctly from malloc/parse failure so the
         /// top-level caller can produce a real diagnostic. The cap path
         /// relies on the sentinel; the count<=0 path keeps prior
-        /// "fall back to original pattern" behaviour by returning NULL
+        /// "fall back to original pattern" behavior by returning NULL
         /// with *expanded_count = 0 unchanged.
         if (cap > 0 && count > cap) {
             *expanded_count = BRACE_EXPANSION_LIMIT_SENTINEL;
@@ -9049,7 +9049,7 @@ static int execute_assignment(executor_t *executor, const char *assignment,
     /// storing. The fold goes through lle_utf8_tolower / lle_utf8_toupper
     /// so non-ASCII codepoints fold per the project's Unicode case
     /// table. Empty values and values with no case-mappable characters
-    /// pass through unchanged. Bash matches this behaviour: `declare -l
+    /// pass through unchanged. Bash matches this behavior: `declare -l
     /// X; X=HELLO; echo $X` prints "hello".
     if (value && (target_flags & (SYMVAR_LOWERCASE | SYMVAR_UPPERCASE))) {
         char *cased = symtable_apply_case_attr_alloc(value, target_flags);
@@ -11556,7 +11556,7 @@ static char *expand_variables_in_string(executor_t *executor, const char *str) {
                     var_end++; /// Single character special variable
                 } else {
                     /// Regular variable names. lush_ident_match_continue
-                    /// honours FEATURE_UNICODE_IDENTIFIERS, so multibyte
+                    /// honors FEATURE_UNICODE_IDENTIFIERS, so multibyte
                     /// codepoints stay attached to the name in lush mode.
                     while (var_end < len) {
                         size_t n = lush_ident_match_continue(str + var_end,
@@ -16164,7 +16164,7 @@ static char *expand_quoted_string(executor_t *executor, const char *str,
                     (str[var_start] >= '0' && str[var_start] <= '9')) {
                     var_name_len = 1;
                 } else {
-                    /// Regular variable names; honour
+                    /// Regular variable names; honor
                     /// FEATURE_UNICODE_IDENTIFIERS via
                     /// lush_ident_match_continue.
                     while (var_start + var_name_len < len) {
@@ -16718,7 +16718,7 @@ int executor_builtin_jobs(executor_t *executor, char **argv) {
     /// Buffer the listing through open_memstream and hand it to
     /// lle_pager_present so long job tables paginate in interactive
     /// shells. On memstream allocation failure the per-iteration
-    /// writes target stdout directly, preserving prior behaviour.
+    /// writes target stdout directly, preserving prior behavior.
     char *buf = NULL;
     size_t buf_len = 0;
     FILE *out = open_memstream(&buf, &buf_len);

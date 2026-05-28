@@ -107,7 +107,7 @@ int lle_unicode_normalize_nfc(const char *input, size_t input_len, char *output,
  *   - input == NULL                -> returns NULL
  *   - input == ""                  -> returns a heap "" (strdup of "")
  *   - input is ASCII-only          -> returns strdup(input) without
- *                                     allocating the normalisation
+ *                                     allocating the normalization
  *                                     scratch space (fast path)
  *   - valid UTF-8 with combining
  *     characters                   -> returns canonical NFC bytes

@@ -21,7 +21,7 @@
  * three is "the" reference shell. Mode-tagged inputs are checked
  * against the oracle that matches their declared mode. Inputs in the
  * lush/ subdir have no oracle; they are run through lush only and
- * checked for crash/timeout, not for behavioural agreement.
+ * checked for crash/timeout, not for behavioral agreement.
  *
  * Oracle binary paths are runtime-overridable via env vars
  * (LUSH_ORACLE_POSIX / LUSH_ORACLE_BASH / LUSH_ORACLE_ZSH) so the

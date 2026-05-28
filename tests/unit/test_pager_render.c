@@ -6,7 +6,7 @@
  * display_controller_render_pager. Tests the rendered output shape
  * (visible lines + padding + status line) without spinning up a
  * full compositor; the controller is allocated with calloc so the
- * pager branch is reachable on a zero-initialised struct.
+ * pager branch is reachable on a zero-initialized struct.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry

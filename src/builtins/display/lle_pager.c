@@ -14,7 +14,7 @@
  *                                  terminal-rows default
  *   display lle pager wrap-search on|off
  *                               -- toggle the less-style "wrap to
- *                                  top on no-match" search behaviour
+ *                                  top on no-match" search behavior
  *
  * All operations route through the central config registry so the
  * same setting can be flipped via setopt or by editing lushrc.toml.

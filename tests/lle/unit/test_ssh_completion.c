@@ -12,7 +12,7 @@
  *
  * Licensed under the MIT License. See LICENSE file for details.
  *
- * Behaviour tests for the SSH host completion source. The source is
+ * Behavior tests for the SSH host completion source. The source is
  * exercised through its public entry point lle_completion_source_ssh_hosts
  * with a real ssh_hosts cache populated from a fixture ~/.ssh/config in
  * a temporary HOME, mirroring how it is invoked at runtime by the
@@ -151,7 +151,7 @@ TEST(ssh_source_emits_configured_host) {
     bool found = false;
     for (size_t i = 0; i < result->count; i++) {
         const lle_completion_item_t *item = &result->items[i];
-        /// Default user from the stanza should be honoured when the
+        /// Default user from the stanza should be honored when the
         /// user typed no `@` segment.
         if (item->text && strcmp(item->text, "alice@example.com") == 0) {
             found = true;

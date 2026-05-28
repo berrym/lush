@@ -84,7 +84,7 @@ typedef struct parser {
     /**
      * Depth counter for typed-function (`fn`) body parsing. Incremented
      * on entry to a NODE_FN_DECL body, decremented on exit. While > 0,
-     * `return expression` is recognised as the typed-function return
+     * `return expression` is recognized as the typed-function return
      * statement (NODE_FN_RETURN). Outside fn bodies it remains a POSIX
      * `return` command setting the exit status.
      */

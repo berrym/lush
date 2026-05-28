@@ -9,7 +9,7 @@
  * activates the pager view with its own input loop.
  *
  * Non-tty stdout, content shorter than one screen, or any failure to
- * initialise the pager all fall back to a direct write to stdout, so
+ * initialize the pager all fall back to a direct write to stdout, so
  * the function is safe to call unconditionally.
  *
  * Wires together the four pieces shipped in earlier work:
@@ -65,7 +65,7 @@ struct executor;
  *                 must remain valid (and unchanged) until this call
  *                 returns. A NULL or empty string is a no-op success.
  * @return 0 on success (including the direct-write fallbacks),
- *         non-zero only if the pager path could not initialise its
+ *         non-zero only if the pager path could not initialize its
  *         own state -- in which case stdout is left untouched.
  */
 int lle_pager_present(struct executor *executor, const char *content);

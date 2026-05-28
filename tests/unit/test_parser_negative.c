@@ -602,7 +602,7 @@ TEST(coproc_no_command) { ASSERT_PARSE_FAILS("coproc"); }
  * tolerate slow CI machines. If the loop regression returns this
  * test will time out at the meson default and fail loudly.
  *
- * The behavioural assertion is that the parse fails with an
+ * The behavioral assertion is that the parse fails with an
  * unterminated-heredoc error (the second `c << 'END'` has no body or
  * terminator after it). */
 TEST(heredoc_repeated_delimiter_no_loop) {

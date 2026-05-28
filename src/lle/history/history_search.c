@@ -499,7 +499,7 @@ lle_history_search_exact(lle_history_core_t *history_core, const char *query,
         }
 
         /// Check for exact match under NFC equivalence so a query
-        /// in one Unicode normalisation finds a history entry in the
+        /// in one Unicode normalization finds a history entry in the
         /// other. ASCII queries / entries hit the primitive's fast
         /// path with no cost beyond the byte scan.
         if (lle_unicode_strings_equal(entry->command, query, NULL)) {

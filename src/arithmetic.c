@@ -166,7 +166,7 @@ static char *get_var_name(const char *expr, int *nchars);
 
 /* Signed-overflow-safe primitives. Bash and zsh both rely on signed
  * wraparound for +, -, *, unary -, <<; in standard C that is undefined
- * behaviour, but performing the operation in unsigned space and casting
+ * behavior, but performing the operation in unsigned space and casting
  * back is well-defined and produces the same two's-complement bit
  * pattern on every platform lush targets. Right shift is left as a
  * signed shift (impl-defined, arithmetic on lush platforms — matches
@@ -1544,7 +1544,7 @@ static char *arithm_expand_internal(void *executor, const char *orig_expr) {
                 /// More complex forms like ${var:-default} would need executor
 
                 /// Find the end of the variable name (before any operator).
-                /// lush_ident_match_continue honours
+                /// lush_ident_match_continue honors
                 /// FEATURE_UNICODE_IDENTIFIERS so multibyte codepoints inside
                 /// ${...} extend the name.
                 const char *name_end = start;

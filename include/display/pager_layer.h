@@ -90,7 +90,7 @@ typedef struct pager_layer {
 } pager_layer_t;
 
 /**
- * @brief Initialise a pager layer over `content`
+ * @brief Initialize a pager layer over `content`
  *
  * Builds the line index from `content` (length `content_len`) for the
  * given terminal width, sets view_rows for the visible-content area,
@@ -98,7 +98,7 @@ typedef struct pager_layer {
  * The layer borrows `content`; the caller must keep it alive until
  * pager_layer_destroy returns.
  *
- * @param pager        Layer to initialise (must point to writable memory)
+ * @param pager        Layer to initialize (must point to writable memory)
  * @param content      Content blob (caller owns; must outlive layer)
  * @param content_len  Length of content in bytes
  * @param view_rows    Rows available for content (typically terminal_rows - 1)
@@ -113,7 +113,7 @@ int pager_layer_init(pager_layer_t *pager, const char *content,
  *
  * Frees the owned line index and search pattern; clears the struct
  * to a safe-zero state. Does not free the content blob (borrowed).
- * Safe on already-destroyed / zero-initialised structs.
+ * Safe on already-destroyed / zero-initialized structs.
  *
  * @param pager Layer to destroy
  */

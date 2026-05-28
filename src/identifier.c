@@ -55,7 +55,7 @@ size_t lush_ident_match_start(const char *p, size_t remaining) {
         return ascii_is_start(b) ? 1u : 0u;
     }
 
-    /// Non-ASCII slow path. Only honoured when the feature is on;
+    /// Non-ASCII slow path. Only honored when the feature is on;
     /// when off, identifier syntax remains POSIX ASCII-only and any
     /// high byte terminates the identifier. The codepoint test goes
     /// through the LLE Unicode-alpha table (Latin Supplement, Latin

@@ -29,7 +29,7 @@ extern "C" {
  * @brief Is a pager-mode input loop currently active?
  *
  * Set to true between pager_run_input_loop entry and its return.
- * Consumers read this flag to switch behaviour (e.g. LLE input
+ * Consumers read this flag to switch behavior (e.g. LLE input
  * routing, completion availability) for the duration.
  */
 bool lle_in_pager(void);

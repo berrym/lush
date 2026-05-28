@@ -134,7 +134,7 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
     /// regardless of whether we found suggestions, ran at all, or
     /// bailed because autocorrect is disabled. The previous code
     /// exited on the !enabled check before the memset, leaving the
-    /// caller with an uninitialised stack struct that free_results
+    /// caller with an uninitialized stack struct that free_results
     /// then passed to free() on the next "command not found" event
     /// (issue #60: bad-free in autocorrect_free_results).
     memset(results, 0, sizeof(correction_results_t));
@@ -236,7 +236,7 @@ int autocorrect_find_suggestions(executor_t *executor, const char *command,
             /// Check for duplicates (same command from different
             /// sources). Compare under NFC equivalence so a PATH-
             /// supplied name and a builtin / alias / function name
-            /// that differ only in Unicode normalisation collapse
+            /// that differ only in Unicode normalization collapse
             /// to a single suggestion. ASCII names (the common case
             /// for shell commands) hit the primitive's fast path.
             bool is_duplicate = false;
@@ -408,7 +408,7 @@ void autocorrect_learn_command(const char *command) {
 
     /// Check if command already exists. NFC-equivalent so the
     /// learning store does not grow a second entry for a command
-    /// the user typed once in one normalisation form and once in
+    /// the user typed once in one normalization form and once in
     /// the other (rare in interactive practice but observable when
     /// command names come from heterogeneous sources -- e.g. PATH
     /// scan on macOS NFD + history line on NFC).
@@ -616,7 +616,7 @@ static int fast_edit_distance(const char *s1, const char *s2, int max_dist) {
 
     /// Bound the matrix allocation against pathological dirents.
     /// fuzzy_string_length counts codepoints (after optional NFC
-    /// normalisation per opts), so a 33-codepoint Cyrillic name and
+    /// normalization per opts), so a 33-codepoint Cyrillic name and
     /// a 33-character ASCII name are treated identically -- unlike
     /// the prior byte cap which would reject the Cyrillic name at
     /// roughly half the visible length.

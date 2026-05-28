@@ -25,10 +25,10 @@
  *
  * Identifier names that come back from these predicates as a whole
  * string (e.g. assignment targets, function names) should be
- * NFC-normalised on ingest via lle_unicode_normalize_nfc_alloc, so
+ * NFC-normalized on ingest via lle_unicode_normalize_nfc_alloc, so
  * different Unicode encodings of the same user-visible identifier
  * collapse to one binding. The predicates themselves do not
- * normalise -- they only classify -- but they accept both NFC and
+ * normalize -- they only classify -- but they accept both NFC and
  * NFD forms.
  *
  * @author Michael Berry <trismegustis@gmail.com>

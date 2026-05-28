@@ -525,7 +525,7 @@ typedef struct {
  * least one row).
  *
  * Empty content (`len == 0`) yields a zero-entry index; the function
- * still initialises the struct to a safe state and returns 0.
+ * still initializes the struct to a safe state and returns 0.
  *
  * On success, returns 0; the caller releases the entries array with
  * screen_line_index_free. On OOM, returns -1 and the struct is

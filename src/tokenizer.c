@@ -1959,7 +1959,7 @@ static token_t *tokenize_next_inner(tokenizer_t *tokenizer) {
             /// Pattern: {identifier}> or {identifier}< for fd allocation
             if (tokenizer->position + 2 < tokenizer->input_length) {
                 size_t scan = tokenizer->position + 1; /// After '{'
-                /// Scan for valid identifier; honours
+                /// Scan for valid identifier; honors
                 /// FEATURE_UNICODE_IDENTIFIERS via lush_ident_match_start /
                 /// _continue.
                 size_t start_n = lush_ident_match_start(

@@ -214,7 +214,7 @@ static bool pager_handle_search_key(pager_layer_t *pager, int key) {
     if ((key >= 0x20 && key < 0x7F) || (key >= 0x80 && key < 0xFF)) {
         (void)pager_layer_search_append_byte(pager, (unsigned char)key);
     }
-    /// Unrecognised control sequence inside SEARCH mode -- ignore.
+    /// Unrecognized control sequence inside SEARCH mode -- ignore.
     return false;
 }
 

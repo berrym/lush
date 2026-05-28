@@ -477,7 +477,7 @@ int init(int argc, char **argv, FILE **in) {
         if (IS_INTERACTIVE_SHELL) {
             shell_error_t *err = shell_error_create(
                 SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
-                SOURCE_LOC_UNKNOWN, "failed to initialise SSH host cache");
+                SOURCE_LOC_UNKNOWN, "failed to initialize SSH host cache");
             if (err) {
                 shell_error_set_suggestion(
                     err, "SSH host completion will fall back to typed input "
@@ -730,7 +730,7 @@ int init(int argc, char **argv, FILE **in) {
         if (lle_result != LLE_SUCCESS) {
             shell_error_t *err = shell_error_create(
                 SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_WARNING,
-                SOURCE_LOC_UNKNOWN, "failed to initialise the LLE (code %d)",
+                SOURCE_LOC_UNKNOWN, "failed to initialize the LLE (code %d)",
                 (int)lle_result);
             if (err) {
                 shell_error_set_suggestion(

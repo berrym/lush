@@ -50,7 +50,7 @@ TEST(init_builds_line_index) {
 TEST(destroy_safe_on_zeroed_struct) {
     pager_layer_t pager;
     memset(&pager, 0, sizeof(pager));
-    pager_layer_destroy(&pager); /// must not crash on never-initialised
+    pager_layer_destroy(&pager); /// must not crash on never-initialized
 }
 
 TEST(destroy_safe_on_double_call) {

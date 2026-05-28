@@ -263,7 +263,7 @@ bool valid_alias_name(const char *key) {
             p++;
             rem--;
         } else {
-            /// Non-ASCII: honour FEATURE_UNICODE_IDENTIFIERS via the
+            /// Non-ASCII: honor FEATURE_UNICODE_IDENTIFIERS via the
             /// project-wide predicate. _continue accepts letter-or-digit
             /// codepoints, which matches alias-name semantics (alias
             /// permits digit-leading names, so _continue is correct here

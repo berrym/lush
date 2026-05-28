@@ -18,7 +18,7 @@
  *
  *   1. A side table records every (keymap, key_sequence, action_name)
  *      triple the user has bound. The query and listing forms read
- *      from this table; round-trip behaviour is preserved.
+ *      from this table; round-trip behavior is preserved.
  *
  *   2. When the action name exists in lush's action registry
  *      (lle_action_registry_lookup), the bind is ALSO forwarded to
@@ -37,7 +37,7 @@
  *      `bindkey "KEY" action` form zsh produces.
  *
  *   5. Keymap-management flags (-A alias, -D delete, -N create, -d
- *      reset) are recognised and operate on the side-table view.
+ *      reset) are recognized and operate on the side-table view.
  *
  * @author Michael Berry <trismegustis@gmail.com>
  * @copyright Copyright (C) 2021-2026 Michael Berry
@@ -245,7 +245,7 @@ int bin_bindkey(int argc, char **argv) {
         } else if (strcmp(a, "-A") == 0 || strcmp(a, "-N") == 0 ||
                    strcmp(a, "-d") == 0 || strcmp(a, "-s") == 0) {
             /// Keymap aliasing / creation / reset / string-binding:
-            /// recognise the flag and let the remaining args fall
+            /// recognize the flag and let the remaining args fall
             /// through; the side-table records whatever is provided.
         } else if (a[0] == '-') {
             /// Unknown flag -- skip and continue.

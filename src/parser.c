@@ -1445,7 +1445,7 @@ static node_t *parse_simple_command(parser_t *parser) {
         return parse_fn_return_statement(parser);
     }
 
-    /// Typed `let name = call(args)` capture. Recognised only when the
+    /// Typed `let name = call(args)` capture. Recognized only when the
     /// `let` is followed by IDENT '=' IDENT '(' with the IDENT and '('
     /// adjacent (no whitespace between them). Anything else with `let`
     /// falls through to the existing arithmetic-let builtin path below.
@@ -6246,7 +6246,7 @@ static node_t *parse_fn_declaration(parser_t *parser) {
     }
 
     /// Track fn-body depth so `return expression` inside the body is
-    /// recognised as the typed return statement.
+    /// recognized as the typed return statement.
     parser->fn_body_depth++;
     node_t *body = parse_brace_group(parser);
     parser->fn_body_depth--;
@@ -6299,7 +6299,7 @@ static node_t *parse_fn_declaration(parser_t *parser) {
 }
 
 /**
- * @brief Recognise the let-fn-call form by peek-ahead.
+ * @brief Recognize the let-fn-call form by peek-ahead.
  *
  * Returns true iff the token stream beginning at the current `let`
  * matches `let IDENT = IDENT (` with the IDENT and the `(` adjacent
@@ -6481,7 +6481,7 @@ static node_t *parse_fn_call_expression(parser_t *parser) {
 /**
  * @brief Parse `let NAME = callee(args)` capture form.
  *
- * Recognised only when `is_let_fn_call_form` returned true. Builds a
+ * Recognized only when `is_let_fn_call_form` returned true. Builds a
  * NODE_LET_FN whose val.str is the LHS variable name, with a single
  * child NODE_FN_CALL carrying the call expression. Existing
  * arithmetic-let forms (`let x=5+3`, `let "x += 1"`) take a different
@@ -6642,7 +6642,7 @@ static node_t *parse_fn_return_statement(parser_t *parser) {
 }
 
 /**
- * @brief Recognise a statement-position typed-fn call.
+ * @brief Recognize a statement-position typed-fn call.
  *
  * Both POSIX function definition and typed-fn call begin with
  * `IDENT(`; the discriminator must work even when the recognizer
@@ -6676,7 +6676,7 @@ static bool is_typed_fn_call_statement(parser_t *parser) {
     }
     if (next->position != current->end_position) {
         /// `name (` with whitespace -- existing POSIX-form path
-        /// recognises it as a function header; keep that behaviour.
+        /// recognizes it as a function header; keep that behavior.
         return false;
     }
 

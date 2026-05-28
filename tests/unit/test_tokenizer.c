@@ -744,7 +744,7 @@ TEST(tokenize_line_position_tracking) {
  * a partial sequence at end-of-input caused token_new's memcpy to read
  * past the buffer (heap-buffer-overflow under ASan). The minimal trigger
  * is "{x}" + a 4-byte UTF-8 lead byte (0xF0) with zero continuations.
- * Behavioural assertion: parses successfully without crashing.
+ * Behavioral assertion: parses successfully without crashing.
  * ============================================================================
  */
 

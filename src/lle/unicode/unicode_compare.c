@@ -619,7 +619,7 @@ int lle_unicode_normalize_nfc(const char *input, size_t input_len, char *output,
  * @brief Inline ASCII-only check
  *
  * NFC is identity for pure-ASCII input (no combining characters,
- * no precomposed Unicode), so we skip the normalisation scratch
+ * no precomposed Unicode), so we skip the normalization scratch
  * space allocation entirely and just strdup. Faster than running
  * the full state machine for the common case (identifier names,
  * EOF delimiters, builtin command names, etc.).

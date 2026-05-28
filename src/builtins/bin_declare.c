@@ -171,7 +171,7 @@ int bin_declare(int argc, char **argv) {
                 /// zsh: hide variable from `typeset -p` listing. Pure
                 /// display attribute; lush's typeset listing path
                 /// doesn't enumerate variables anyway, so the no-op
-                /// accept produces observably-identical behaviour.
+                /// accept produces observably-identical behavior.
                 break;
             case 'U':
                 /// zsh: unique-element array attribute. Per-array
@@ -340,7 +340,7 @@ int bin_declare(int argc, char **argv) {
         }
 
         /// Validate variable name via the central lush identifier
-        /// predicate (honours FEATURE_UNICODE_IDENTIFIERS). Replaces
+        /// predicate (honors FEATURE_UNICODE_IDENTIFIERS). Replaces
         /// the prior inline isalpha/isalnum byte tests so a non-ASCII
         /// identifier is accepted under lush-mode default (or any
         /// mode with the feature opt-in) and rejected under
@@ -467,7 +467,7 @@ int bin_declare(int argc, char **argv) {
             /// declare -ar / -Ar / -ax / -Ax: thread the requested
             /// attribute flags onto the array record so subsequent
             /// element writes (arr[idx]=value) and bulk assignments
-            /// honour the attribute. The scalar branch builds `flags`
+            /// honor the attribute. The scalar branch builds `flags`
             /// the same way; this branch routes them at the array
             /// layer because the array record carries its own flags
             /// field (the scalar SYMVAR_READONLY check at
@@ -567,7 +567,7 @@ int bin_declare(int argc, char **argv) {
             }
             /// Locality is determined by which scope we write into,
             /// not by a flag on the variable record. opt_global is
-            /// honoured via the scope choice at the actual write
+            /// honored via the scope choice at the actual write
             /// (symtable_set_nameref dispatches into the correct
             /// scope), so we no longer set a redundant SYMVAR_LOCAL
             /// bit -- it was never read.
@@ -626,7 +626,7 @@ int bin_declare(int argc, char **argv) {
             /// observable attribute. Locality is tracked by the
             /// scope chain itself; opt_global selects the write
             /// path below rather than encoding the choice as a flag
-            /// bit. opt_nameref / opt_integer are honoured by the
+            /// bit. opt_nameref / opt_integer are honored by the
             /// respective dedicated set functions called later.
             symvar_flags_t flags = SYMVAR_NONE;
             if (opt_readonly) {

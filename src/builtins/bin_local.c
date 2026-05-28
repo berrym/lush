@@ -43,7 +43,7 @@ int bin_local(int argc, char **argv) {
     /// calls (treats them as declaring a global). Delegate to bin_declare
     /// for the whole package when running under zsh mode. Bash and POSIX
     /// modes keep the strict bin_local semantics: top-level call errors,
-    /// and the only recognised option is -n (nameref).
+    /// and the only recognized option is -n (nameref).
     if (shell_mode_get() == SHELL_MODE_ZSH) {
         return bin_declare(argc, argv);
     }

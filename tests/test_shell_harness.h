@@ -11,7 +11,7 @@
  *   1. Output-capturing executor invocation. run_shell() runs a shell
  *      string through an in-process executor with stdout and stderr
  *      redirected to temp files, then returns exit status plus
- *      captured streams in a single struct. This unlocks behavioural
+ *      captured streams in a single struct. This unlocks behavioral
  *      assertions like ASSERT_STDOUT_EQ(result, "hello\n") that the
  *      pre-existing tests could not express.
  *
@@ -170,7 +170,7 @@ static inline run_result_t run_shell(const char *src) {
 /**
  * @brief Locate the lush binary for subprocess execution
  *
- * Honours the LUSH_TEST_BINARY environment variable so meson and CI
+ * Honors the LUSH_TEST_BINARY environment variable so meson and CI
  * can point at an out-of-tree build. Falls back to ./build/lush which
  * matches the project's documented build directory layout.
  *

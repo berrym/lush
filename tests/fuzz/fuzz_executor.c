@@ -141,7 +141,7 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
     shell_mode_init();
 
     /// The global symbol table manager must exist before
-    /// executor_new() will succeed; it normally gets initialised
+    /// executor_new() will succeed; it normally gets initialized
     /// during shell startup in src/init.c (which we exclude).
     init_symtable(); /// idempotent
 

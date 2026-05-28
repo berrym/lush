@@ -152,10 +152,10 @@ typedef enum {
                                  ///< [A-Za-z_][A-Za-z0-9_]*. When on,
                                  ///< identifier Start positions accept any
                                  ///< codepoint LLE's Unicode-letter test
-                                 ///< recognises, and Continue positions also
+                                 ///< recognizes, and Continue positions also
                                  ///< accept any codepoint LLE's Unicode-alnum
-                                 ///< test recognises; identifier names are NFC-
-                                 ///< normalised on ingest. Default true in
+                                 ///< test recognizes; identifier names are NFC-
+                                 ///< normalized on ingest. Default true in
                                  ///< lush mode, false elsewhere.
 
     /// Sentinel - must be last
@@ -379,7 +379,7 @@ bool shell_feature_is_noop_alias(const char *name);
 /**
  * @brief Record a setopt / unsetopt call for a noop alias.
  *
- * The behaviour the alias would toggle is already always-on in lush;
+ * The behavior the alias would toggle is already always-on in lush;
  * recording the user's set/unset call lets `[[ -o name ]]` and
  * `setopt | grep name` return the right answer.
  *
@@ -392,7 +392,7 @@ void shell_feature_record_noop_alias_state(const char *name, bool enabled);
  * @brief Query the recorded state of a noop-alias option.
  *
  * Returns false if @p name is not a noop alias. Defaults to true for any
- * alias that hasn't been explicitly unset (the underlying behaviour is
+ * alias that hasn't been explicitly unset (the underlying behavior is
  * always-on; the implicit answer matches that).
  */
 bool shell_feature_noop_alias_is_enabled(const char *name);

@@ -138,7 +138,7 @@ static int stdin_has_data(int usec) {
  *   - 27 (Esc) for a bare Esc (no following bytes within the peek window)
  *   - PAGER_KEY_UP / DOWN / LEFT / RIGHT / HOME / END / PAGE_UP / PAGE_DOWN
  *     for arrows / navigation
- *   - 0 for an unrecognised escape sequence (key source contract: any
+ *   - 0 for an unrecognized escape sequence (key source contract: any
  *     non-negative value is a key; the dispatch table treats 0 as
  *     unbound, which becomes PAGER_ACTION_NONE)
  *   - -1 for EOF / read error, which terminates the input loop

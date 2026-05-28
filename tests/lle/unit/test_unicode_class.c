@@ -3,7 +3,7 @@
  * @brief Unit tests for Unicode general-category classifiers
  *
  * Verifies the predicates declared in lle/unicode_class.h. Every test
- * targets a behaviour whose regression would be user-visible: pattern
+ * targets a behavior whose regression would be user-visible: pattern
  * char-class matching across non-ASCII letters, decimal-digit blocks
  * beyond ASCII, Unicode whitespace, control / printable boundaries.
  *

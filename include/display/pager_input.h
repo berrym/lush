@@ -58,7 +58,7 @@ typedef enum {
  *
  * Output of pager_key_to_action; consumed by pager_apply_action.
  * The action set is intentionally small -- navigation + search
- * triggers + modal exits. Mode-specific behaviours (e.g. the search
+ * triggers + modal exits. Mode-specific behaviors (e.g. the search
  * prompt's character-by-character pattern buildup) are not
  * actions; the search prompt has its own input handling once
  * BEGIN_SEARCH activates SEARCH mode.
@@ -128,7 +128,7 @@ typedef int (*pager_key_source_fn)(void *userdata);
  * updates layer state. The integration layer (lle_pager_present)
  * arranges for the loop and the render cycle to take turns.
  *
- * @param pager  Pager layer (must be initialised and active)
+ * @param pager  Pager layer (must be initialized and active)
  * @param src    Key source callback
  * @param ud     Opaque userdata passed to each src() call
  */

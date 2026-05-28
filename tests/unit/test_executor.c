@@ -2126,9 +2126,9 @@ TEST(local_variable_in_function) {
 /* ============================================================================
  * REGRESSION TESTS -- 2026-05 real-world hardening wave (PR #113)
  *
- * Behavioural coverage for the defects the real-world script corpus
+ * Behavioral coverage for the defects the real-world script corpus
  * surfaced. Every test runs a shell snippet in-process and asserts on
- * observable behaviour; each names the fix it guards.
+ * observable behavior; each names the fix it guards.
  * ============================================================================
  */
 
@@ -2218,7 +2218,7 @@ TEST(rt_heredoc_delimiter_nfd_vs_nfc) {
 }
 
 TEST(rt_heredoc_delimiter_unequal_when_actually_different) {
-    /// NFC normalisation does not paper over real differences.
+    /// NFC normalization does not paper over real differences.
     /// "EOF" terminator does not close a "DONE"-delimited heredoc;
     /// the script reaches EOF without finding the delimiter and
     /// the parser reports an unterminated heredoc.
@@ -2244,9 +2244,9 @@ TEST(rt_assoc_key_nfc_nfd_collapse) {
 }
 
 TEST(rt_assoc_key_distinct_when_actually_different) {
-    /// NFC normalisation does not paper over real key differences.
+    /// NFC normalization does not paper over real key differences.
     /// "café" and "CAFÉ" hash to separate entries (case folding is
-    /// a separate axis from NFC normalisation).
+    /// a separate axis from NFC normalization).
     run_result_t r = run_shell("declare -A m\n"
                                "m[café]=lower\n"
                                "m[CAFÉ]=upper\n"
@@ -2257,7 +2257,7 @@ TEST(rt_assoc_key_distinct_when_actually_different) {
 }
 
 TEST(rt_assoc_key_ascii_paths_unchanged) {
-    /// ASCII keys hit the primitive's strdup fast path -- behaviour
+    /// ASCII keys hit the primitive's strdup fast path -- behavior
     /// must be byte-identical to the prior implementation.
     run_result_t r = run_shell("declare -A m\n"
                                "m[foo]=one\n"
@@ -2326,7 +2326,7 @@ TEST(rt_unicode_ident_opt_in_from_bash_mode) {
 
 TEST(rt_unicode_ident_ascii_paths_unchanged) {
     /// ASCII identifiers hit the fast path in both lush and bash
-    /// modes; behaviour must be byte-identical to the prior
+    /// modes; behavior must be byte-identical to the prior
     /// isalpha/isalnum implementation.
     run_result_t r = run_shell("X=hello\n"
                                "_y=world\n"
@@ -2478,7 +2478,7 @@ TEST(rt_unicode_ident_array_joined) {
 }
 
 TEST(rt_unicode_ident_assoc_array_subscript) {
-    /// Associative array with a unicode name; key lookup honours the
+    /// Associative array with a unicode name; key lookup honors the
     /// predicate-driven name prefix detection too.
     run_result_t r = run_shell("declare -A имя\n"
                                "имя[k1]=v1\n"
@@ -3226,7 +3226,7 @@ TEST(rt_test_o_errexit_reflects_set_e) {
 
 TEST(rt_test_o_noop_alias_records_state) {
     /// setopt on a noop-alias (prompt_subst etc.) must record state so
-    /// `[[ -o name ]]` reports the right answer. The underlying behaviour
+    /// `[[ -o name ]]` reports the right answer. The underlying behavior
     /// is always-on; this is purely about introspection-matching zsh.
     run_result_t r = run_shell("[[ -o prompt_subst ]] && echo default-on || "
                                "echo default-off\n"
@@ -3353,7 +3353,7 @@ TEST(rt_test_inequality_under_nfc_when_actually_different) {
 
 TEST(rt_test_ascii_paths_unchanged) {
     /// ASCII inputs hit the NFC fast path (LLE_UNICODE_COMPARE_DEFAULT
-    /// detects ASCII-only and shortcircuits to byte compare); behaviour
+    /// detects ASCII-only and shortcircuits to byte compare); behavior
     /// must be byte-identical to the prior strcmp implementation.
     run_result_t r = run_shell("[ \"hello\" = \"hello\" ] && echo eq\n"
                                "[ \"hello\" = \"world\" ] && echo ouch || "
@@ -3383,7 +3383,7 @@ TEST(rt_dollar_plus_commands_path_lookup) {
 
 TEST(rt_unfunction_removes_function) {
     /// `unfunction NAME` removes a defined function. Subsequent call
-    /// produces command-not-found behaviour (caught by the test
+    /// produces command-not-found behavior (caught by the test
     /// framework's exit-code check via the conditional).
     run_result_t r = run_shell("greet() { echo hello; }\n"
                                "greet\n"

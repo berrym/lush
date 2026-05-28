@@ -675,10 +675,10 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
     /// Readonly enforcement (current scope). If an entry already lives
     /// in this scope and carries SYMVAR_READONLY, refuse the write and
     /// return SYMTABLE_ERR_READONLY so callers can surface a specific
-    /// error message. The check looks at the existing serialised entry
+    /// error message. The check looks at the existing serialized entry
     /// rather than the incoming `flags` argument so re-asserting the
     /// readonly bit (`readonly X=1` twice) is correctly refused -- bash
-    /// matches this behaviour.
+    /// matches this behavior.
     const char *existing_serialized =
         ht_strstr_get(manager->current_scope->vars_ht, name);
     if (existing_serialized) {
@@ -787,7 +787,7 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
     /// any scope carries SYMVAR_READONLY, the write is refused with
     /// SYMTABLE_ERR_READONLY. This catches the canonical cross-scope
     /// case (`readonly X=1` at global; `X=2` inside a function) -- bash
-    /// matches this behaviour, refusing the inner assignment rather
+    /// matches this behavior, refusing the inner assignment rather
     /// than silently shadowing.
     symtable_scope_t *scope = manager->current_scope;
     while (scope) {
@@ -1732,7 +1732,7 @@ int symtable_unexport_global(const char *name) {
  *
  * Special variables like $?, $!, $$ are dispatched by name (RANDOM,
  * SECONDS, etc. have dedicated handling in symtable_get_var); the
- * previous SYMVAR_SPECIAL_VAR flag carried no observable behaviour
+ * previous SYMVAR_SPECIAL_VAR flag carried no observable behavior
  * because no read path consulted it. This entry point remains as a
  * documented intent-marker for callers that want to express "this is
  * a shell-internal value" without expecting the flag system to do
@@ -2676,14 +2676,14 @@ const char *symtable_array_get_index(array_value_t *array, int index) {
 }
 
 /**
- * @brief Normalise an associative-array key to NFC for hash lookup
+ * @brief Normalize an associative-array key to NFC for hash lookup
  *
  * Wraps lle_unicode_normalize_nfc_alloc so callers can hand off the
  * NULL-input check / fallback policy in one line. The hashtable
  * hashes its keys bytewise; storing NFC bytes (and looking them up
  * by NFC bytes) lets NFC vs NFD pairs of the same user-visible
  * string collapse to a single entry. ASCII inputs hit the primitive
- * fast path and round-trip via strdup with no normalisation
+ * fast path and round-trip via strdup with no normalization
  * machinery exercised.
  *
  * Returns a heap-allocated NFC copy (caller frees) or NULL if the
@@ -2751,7 +2751,7 @@ int symtable_array_set_assoc(array_value_t *array, const char *key,
 /**
  * @brief Get an element from an associative array
  *
- * Lookup key is NFC-normalised so callers passing either NFC or NFD
+ * Lookup key is NFC-normalized so callers passing either NFC or NFD
  * encodings of the same user-visible string find the same entry.
  */
 const char *symtable_array_get_assoc(array_value_t *array, const char *key) {

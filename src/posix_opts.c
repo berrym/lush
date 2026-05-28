@@ -332,7 +332,7 @@ static option_mapping_t *find_option_by_name(const char *name) {
  *   3. The feature-matrix names + aliases (FEATURE_INDEXED_ARRAYS etc.,
  *      and short aliases like `extglob`, `nullglob`).
  *   4. The noop-alias recorded-state table (prompt_subst, menu_complete,
- *      etc. -- behaviour is always-on but introspection sees what the
+ *      etc. -- behavior is always-on but introspection sees what the
  *      user set/unset).
  *
  * Returns false for any name not matched by any of the four sources.

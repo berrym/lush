@@ -285,7 +285,7 @@ bool display_integration_init(const display_integration_config_t *init_config) {
             shell_error_t *err = shell_error_create(
                 SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_ERROR,
                 SOURCE_LOC_UNKNOWN,
-                "display_integration: failed to initialise display controller "
+                "display_integration: failed to initialize display controller "
                 "(code %d)",
                 error);
             if (err) {
@@ -354,7 +354,7 @@ bool display_integration_init(const display_integration_config_t *init_config) {
             if (err) {
                 shell_error_set_suggestion(
                     err,
-                    "controller initialised but rejected its configuration; "
+                    "controller initialized but rejected its configuration; "
                     "session falls back to the legacy renderer");
                 shell_error_display(err, stderr, isatty(STDERR_FILENO));
                 shell_error_free(err);
@@ -491,7 +491,7 @@ bool display_integration_set_config(
                     shell_error_t *err = shell_error_create(
                         SHELL_ERR_SUBSYSTEM_INIT_FAILED, SHELL_SEVERITY_ERROR,
                         SOURCE_LOC_UNKNOWN,
-                        "display_integration: failed to initialise event "
+                        "display_integration: failed to initialize event "
                         "system during reconfigure (code %d)",
                         event_init_error);
                     if (err) {

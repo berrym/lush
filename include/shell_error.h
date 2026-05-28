@@ -164,7 +164,7 @@ typedef enum shell_error_code {
     SHELL_ERR_NOT_IMPLEMENTED,       ///< Feature not implemented
     SHELL_ERR_SUBSYSTEM_INIT_FAILED, ///< A startup-time subsystem (display,
                                      ///< history, completion, etc.) failed to
-                                     ///< initialise. The message identifies the
+                                     ///< initialize. The message identifies the
                                      ///< subsystem and any inner error code
                                      ///< returned by it.
     SHELL_ERR_INTERNAL_MAX = 1599,

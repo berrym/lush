@@ -358,7 +358,7 @@ lle_result_t lle_history_bridge_export_to_readline(void) {
 
         /// Check if already in readline (avoid duplicates). NFC-
         /// equivalent so the same command stored under different
-        /// normalisations does not push twice on the readline side.
+        /// normalizations does not push twice on the readline side.
         HIST_ENTRY *last = history_get(history_length);
         if (last &&
             lle_unicode_strings_equal(last->line, entry->command, NULL)) {

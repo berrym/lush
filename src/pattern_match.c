@@ -3,7 +3,7 @@
  * @brief Shell pattern matcher with bash extglob and zsh bare-alternation
  *
  * Hand-rolled recursive matcher. The standard glob subset (`*`, `?`,
- * `[...]`, `\`) is recognised inline rather than delegated to fnmatch so
+ * `[...]`, `\`) is recognized inline rather than delegated to fnmatch so
  * the extended-pattern operators can recurse into arbitrary subpatterns
  * without round-tripping through a portable-but-feature-limited libc
  * implementation. Alternative-pattern matching is done by composing a
@@ -32,7 +32,7 @@
  * @brief Find the closing paren for an extglob/zsh-alt group
  *
  * Walks `p` (which must point to the first character INSIDE the open
- * paren) until the matching `)` at depth zero. Honours `\`-escapes and
+ * paren) until the matching `)` at depth zero. Honors `\`-escapes and
  * skips nested parens and bracket character classes. Returns NULL on an
  * unbalanced group (the caller falls back to literal matching).
  */

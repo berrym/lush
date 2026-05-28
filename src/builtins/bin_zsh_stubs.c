@@ -21,7 +21,7 @@
  * modules) is invisible from a non-interactive script's stdout/
  * stderr/exit signal -- the divergence the corpus is measuring.
  *
- * Users who need the underlying behaviour reach for lush's own
+ * Users who need the underlying behavior reach for lush's own
  * surfaces: `display lle bind` for keybindings, `source` for
  * function loading, and the built-in equivalents for what zsh
  * modules provide.
@@ -72,7 +72,7 @@ int bin_zmodload(int argc __attribute__((unused)),
 
 int bin_emulate(int argc, char **argv) {
     /// `emulate [-LR] [shell]` switches the shell's emulation context.
-    /// Real zsh recognises `zsh`, `sh`, `csh`, `ksh` and -L (local to
+    /// Real zsh recognizes `zsh`, `sh`, `csh`, `ksh` and -L (local to
     /// the enclosing function) / -R (reset options first) / -c <cmd>.
     ///
     /// Lush's `mode` builtin already does mode switching, but function-
@@ -83,10 +83,10 @@ int bin_emulate(int argc, char **argv) {
     /// current mode (or when no target is given). Any mismatch is
     /// silently accepted: autoloaded zsh functions calling
     /// `emulate -L zsh` while lush is already in zsh mode -- the
-    /// actual corpus shape -- get the correct behaviour.
+    /// actual corpus shape -- get the correct behavior.
     ///
     /// When the underlying function-scoped option stash lands, this
-    /// stub will be retired in favour of the real switch.
+    /// stub will be retired in favor of the real switch.
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
         if (!arg || !*arg) {
@@ -100,7 +100,7 @@ int bin_emulate(int argc, char **argv) {
             }
             continue;
         }
-        /// shell-name operand. Recognised names: zsh / sh / csh / ksh.
+        /// shell-name operand. Recognized names: zsh / sh / csh / ksh.
         /// Anything else is an error in real zsh; we return 0 to keep
         /// corpus scripts running even if their author wrote a typo.
     }
@@ -132,7 +132,7 @@ int bin_compopt(int argc __attribute__((unused)),
                 char **argv __attribute__((unused))) {
     /// bash's per-completion option mutator. Used inside completer
     /// bodies to set/clear options like `nospace` on a specific
-    /// completion. No-op stub; the underlying completion behaviour
+    /// completion. No-op stub; the underlying completion behavior
     /// is supplied by lush's own completion engine.
     return 0;
 }

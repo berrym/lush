@@ -246,7 +246,7 @@ int bin_display(int argc, char **argv) {
                 executor_error_report(
                     current_executor, SHELL_ERR_SUBSYSTEM_INIT_FAILED,
                     builtin_get_source_location(),
-                    "display: failed to initialise performance monitoring");
+                    "display: failed to initialize performance monitoring");
                 return 1;
             }
 

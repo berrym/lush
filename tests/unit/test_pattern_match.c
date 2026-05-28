@@ -4,7 +4,7 @@
  *
  * Covers POSIX glob, bash extglob (?(...), *(...), +(...), @(...), !(...))
  * and zsh's bare-alternation form (...). Each test corresponds to a
- * concrete behavioural promise of the matcher; this is not coverage
+ * concrete behavioral promise of the matcher; this is not coverage
  * theatre.
  *
  * @author Michael Berry <trismegustis@gmail.com>

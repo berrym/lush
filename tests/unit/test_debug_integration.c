@@ -11,7 +11,7 @@
  * tests here answer a different question: when a real script runs
  * through the real executor, does the debugger still see it? This file
  * drives executor_execute_command_line with a live debug context and
- * asserts that breakpoints fire, stay silent when they should, honour
+ * asserts that breakpoints fire, stay silent when they should, honor
  * the script-execution gate, accumulate hits, and that execution
  * degrades cleanly when no terminal is present.
  *

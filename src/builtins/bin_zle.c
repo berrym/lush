@@ -26,7 +26,7 @@
  *      `zle WIDGET` invocation calls it directly. (Today's lush
  *      doesn't ship a zle-style "fire by name" surface for non-
  *      interactive contexts; the registration record covers the
- *      observable corpus behaviour.)
+ *      observable corpus behavior.)
  *
  *   3. Interactive widget invocation routes through lush's own
  *      `display lle widget invoke NAME` mechanism. The zsh shape
@@ -113,7 +113,7 @@ void zle_widget_table_reset(void) {
 }
 
 int bin_zle(int argc, char **argv) {
-    /// Walk args for a recognised mode flag; lush handles one mode at a
+    /// Walk args for a recognized mode flag; lush handles one mode at a
     /// time (no flag stacking) which matches zsh's zle.
     char mode = 0;
     int positional_start = argc;
@@ -130,7 +130,7 @@ int bin_zle(int argc, char **argv) {
             break;
         }
         /// Longer dash-prefixed args (e.g., `-N` followed by a string
-        /// starting with `-`): treat as unrecognised, skip.
+        /// starting with `-`): treat as unrecognized, skip.
     }
 
     int positional_count = argc - positional_start;

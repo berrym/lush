@@ -570,7 +570,7 @@ static const struct {
     {      "correct_all",        "lush has no spelling-correction prompt to toggle"},
     {       "correctall",                                   "alias for correct_all"},
     {"pushd_ignore_dups",
-     "lush dirstack dedup behaviour is benign and introspection-invisible"         },
+     "lush dirstack dedup behavior is benign and introspection-invisible"          },
     {  "pushdignoredups",                             "alias for pushd_ignore_dups"},
     {     "pushd_silent",       "lush pushd/popd never prints the stack; always-on"},
     {      "pushdsilent",                                  "alias for pushd_silent"},
@@ -583,8 +583,8 @@ static const struct {
      "zsh positive CLOBBER (inverse of POSIX noclobber); accepted "
      "as alias since unsetopt CLOBBER and set -o noclobber express the same "
      "intent. Full inversion wiring is a future refinement"                        },
-    {             "beep",    "zsh line-editor terminal-bell-on-error; LLE has its own bell "
-    "behaviour and never gates on this option"            },
+    {             "beep",     "zsh line-editor terminal-bell-on-error; LLE has its own bell "
+     "behavior and never gates on this option"            },
     {               NULL,                                                      NULL}
 };
 
@@ -604,14 +604,14 @@ bool shell_feature_is_noop_alias(const char *name) {
  * Noop-alias state recording
  * ============================================================================
  *
- * shell_feature_is_noop_alias names refer to behaviour lush already provides
- * (or has supplanted); the underlying behaviour is always-on, but real-world
+ * shell_feature_is_noop_alias names refer to behavior lush already provides
+ * (or has supplanted); the underlying behavior is always-on, but real-world
  * scripts introspect option state via `[[ -o name ]]` and `setopt | grep
  * name`. Without recording the user's set/unset call, the introspection
  * returns the wrong answer (verified divergence vs zsh, 2026-05-25).
  *
  * The table below records the user-set state per alias name.  The "default"
- * for every alias is "set" because the underlying behaviour is always-on; an
+ * for every alias is "set" because the underlying behavior is always-on; an
  * explicit `unsetopt name` flips it to false so introspection matches.
  * Names not in the alias list return false from the query.
  */
@@ -658,9 +658,9 @@ bool shell_feature_noop_alias_is_enabled(const char *name) {
     }
     size_t idx = find_recorded_alias(name);
     if (idx == noop_alias_recorded_count) {
-        /// Default for a noop alias is "on" -- the underlying behaviour is
+        /// Default for a noop alias is "on" -- the underlying behavior is
         /// always provided, so a query before any setopt/unsetopt should
-        /// return true (matches zsh's behaviour for these always-on options).
+        /// return true (matches zsh's behavior for these always-on options).
         return true;
     }
     return noop_alias_recorded_state[idx];
