@@ -247,6 +247,38 @@ TEST(analyze_script_security_eval) {
     cleanup_test_dir();
 }
 
+TEST(analyze_script_security_mixed_script_identifier) {
+    /// `$pаsswd` references a name whose `а` is Cyrillic (U+0430), not
+    /// Latin -- a homograph of `passwd`. The analyzer flags it as a
+    /// security advisory naming both scripts. Always on, independent of
+    /// the reject_mixed_script_idents runtime flag.
+    setup_test_dir();
+    debug_context_t *ctx = debug_init();
+    ASSERT_NOT_NULL(ctx, "debug_init should succeed");
+
+    const char *script = "#!/usr/bin/env lush\necho $p\xD0\xB0sswd\n";
+    char *path = create_test_script("homograph.lush", script);
+
+    debug_analyze_script(ctx, path);
+
+    bool found = false;
+    for (analysis_issue_t *issue = ctx->analysis_issues; issue;
+         issue = issue->next) {
+        if (strcmp(issue->category, "security") == 0 &&
+            strstr(issue->message, "Mixed-script") != NULL &&
+            strstr(issue->message, "latin") != NULL &&
+            strstr(issue->message, "cyrillic") != NULL) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found,
+                "mixed-script identifier flagged as a security advisory");
+
+    debug_cleanup(ctx);
+    cleanup_test_dir();
+}
+
 TEST(analyze_script_security_rm_rf) {
     setup_test_dir();
     debug_context_t *ctx = debug_init();
@@ -949,6 +981,7 @@ int main(void) {
 
     printf("\nSecurity Analysis:\n");
     RUN_TEST(analyze_script_security_eval);
+    RUN_TEST(analyze_script_security_mixed_script_identifier);
     RUN_TEST(analyze_script_security_rm_rf);
     RUN_TEST(analyze_script_chmod_777);
 

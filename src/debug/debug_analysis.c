@@ -353,6 +353,32 @@ static void debug_analyze_security(debug_context_t *ctx, const char *file,
                     ctx, file, line_number, "warning", "security",
                     "Unquoted variable",
                     "Quote variables to prevent word splitting");
+
+                /// Mixed-script reference: a name drawing letters from
+                /// more than one script (Latin p + Cyrillic а in pаsswd)
+                /// is visually indistinguishable from a single-script
+                /// name. Always-on advisory -- independent of
+                /// FEATURE_REJECT_MIXED_SCRIPT_IDENTS, which is the
+                /// runtime hard-stop; this is the audit-time visibility.
+                char namebuf[256];
+                size_t nlen = (size_t)(var_end - var_start);
+                if (nlen < sizeof(namebuf)) {
+                    memcpy(namebuf, var_start, nlen);
+                    namebuf[nlen] = '\0';
+                    const char *sa = NULL;
+                    const char *sb = NULL;
+                    if (lush_ident_mixes_scripts(namebuf, &sa, &sb)) {
+                        char msg[384];
+                        snprintf(msg, sizeof(msg),
+                                 "Mixed-script identifier `%s' (%s + %s) -- "
+                                 "homograph risk",
+                                 namebuf, sa, sb);
+                        debug_add_analysis_issue(
+                            ctx, file, line_number, "warning", "security", msg,
+                            "Rename to a single script, or enable "
+                            "reject_mixed_script_idents to fail hard");
+                    }
+                }
             }
         }
 
