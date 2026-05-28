@@ -13832,7 +13832,17 @@ static char *parse_parameter_expansion(executor_t *executor,
         /// single-element. The bare-name check fires only when the
         /// operator's left operand is a complete collection
         /// identifier with no subscript.
-        if (var_len > 0) {
+        ///
+        /// Exception: the @a attribute query is metadata-only and
+        /// kind-agnostic. It reports the declared-attribute letters
+        /// (a / A for indexed / associative arrays, plus i/r/x/...)
+        /// and must work on a collection, unlike the value-shaped @
+        /// transforms (@Q/@E/@U/...) which do need an explicit [@] to
+        /// vectorize. Let @a fall through to the case 17 dispatch,
+        /// where get_variable_attributes handles every kind even when
+        /// the scalar value lookup misses (arrays have a NULL scalar).
+        bool attr_query = (op_type == 17 && op_pos[1] == 'a');
+        if (var_len > 0 && !attr_query) {
             array_value_t *bare_array = symtable_get_array(var_name);
             if (bare_array) {
                 const char *op_str = operators[op_type];

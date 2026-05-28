@@ -3077,6 +3077,38 @@ TEST(rt_pe_catalog_at_transform_on_bare_list) {
     ASSERT_EXIT_STATUS(r, 1);
 }
 
+TEST(rt_pe_at_attr_query_on_map) {
+    /// ${map@a} is the kind-agnostic attribute query: it reports the
+    /// declared-attribute letters and must work on a collection, unlike
+    /// the value-shaped @ transforms above which require [@] (#121).
+    run_result_t r = run_shell("declare -A m=([x]=1)\n"
+                               "echo \"[${m@a}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[A]\n");
+}
+
+TEST(rt_pe_at_attr_query_on_list) {
+    run_result_t r = run_shell("declare -a idx=(a b c)\n"
+                               "echo \"[${idx@a}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n");
+}
+
+TEST(rt_pe_at_attr_query_scalar_unaffected) {
+    /// The bare-name guard exception is limited to @a; the scalar
+    /// attribute paths are unchanged.
+    run_result_t r = run_shell("declare -i n=5\n"
+                               "declare -r ro=locked\n"
+                               "echo \"[${n@a}][${ro@a}]\"\n");
+    ASSERT_STDOUT_EQ(r, "[i][r]\n");
+}
+
+TEST(rt_pe_at_value_transform_on_map_still_errors) {
+    /// Only @a bypasses the guard; a value-shaped @ transform on a bare
+    /// collection remains a type error (needs [@] to vectorize).
+    run_result_t r = run_shell("declare -A m=([x]=1)\n"
+                               "echo \"[${m@U}]\"\n");
+    ASSERT_EXIT_STATUS(r, 1);
+}
+
 TEST(rt_pe_catalog_conditional_on_map) {
     run_result_t r = run_shell("declare -A m=([a]=1 [b]=2)\n"
                                "echo \"[${m:-default}]\"\n");
@@ -4092,6 +4124,10 @@ int main(void) {
     RUN_TEST(rt_pe_catalog_pattern_strip_on_bare_list);
     RUN_TEST(rt_pe_catalog_substring_on_bare_list);
     RUN_TEST(rt_pe_catalog_at_transform_on_bare_list);
+    RUN_TEST(rt_pe_at_attr_query_on_map);
+    RUN_TEST(rt_pe_at_attr_query_on_list);
+    RUN_TEST(rt_pe_at_attr_query_scalar_unaffected);
+    RUN_TEST(rt_pe_at_value_transform_on_map_still_errors);
     RUN_TEST(rt_pe_catalog_conditional_on_map);
     RUN_TEST(rt_pe_catalog_scalar_slice_still_works);
     RUN_TEST(rt_pe_catalog_per_element_case_mod_via_slice);
