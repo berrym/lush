@@ -243,6 +243,49 @@ TEST(for_loop_no_in) {
     executor_free(exec);
 }
 
+TEST(for_loop_quoted_empty_word_posix) {
+    /// A quoted empty "" is a real empty field and must be iterated, not
+    /// dropped during for-list word splitting (posix mode). Issue #127.
+    run_result_t r = run_shell("mode posix\n"
+                               "for w in a \"\" b; do echo \"[$w]\"; done\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n[]\n[b]\n");
+}
+
+TEST(for_loop_quoted_string_not_split_posix) {
+    /// A quoted "$x" stays one word even when it holds IFS characters;
+    /// word splitting applies only to unquoted expansions. Issue #127.
+    run_result_t r = run_shell("mode posix\n"
+                               "x=\"a b c\"\n"
+                               "for w in \"$x\"; do echo \"[$w]\"; done\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "[a b c]\n");
+}
+
+TEST(for_loop_unquoted_var_splits_posix) {
+    /// Regression guard: an unquoted $x still field-splits on IFS.
+    run_result_t r = run_shell("mode posix\n"
+                               "IFS=:\n"
+                               "x=a:b:c\n"
+                               "for w in $x; do echo \"[$w]\"; done\n");
+    /// run_shell shares global shell state; restore the mode and the
+    /// default IFS so this test does not leak `:` splitting into later
+    /// tests.
+    run_shell("mode lush\nunset IFS\n");
+    ASSERT_STDOUT_EQ(r, "[a]\n[b]\n[c]\n");
+}
+
+TEST(for_loop_unquoted_empty_no_iteration_posix) {
+    /// Regression guard: an unquoted empty expansion produces zero
+    /// fields (zero iterations), not one empty word.
+    run_result_t r = run_shell("mode posix\n"
+                               "x=\n"
+                               "for w in $x; do echo iter; done\n"
+                               "echo done\n");
+    run_shell("mode lush\n");
+    ASSERT_STDOUT_EQ(r, "done\n");
+}
+
 TEST(while_loop) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -3966,6 +4009,10 @@ int main(void) {
     RUN_TEST(if_false_branch);
     RUN_TEST(for_loop_basic);
     RUN_TEST(for_loop_no_in);
+    RUN_TEST(for_loop_quoted_empty_word_posix);
+    RUN_TEST(for_loop_quoted_string_not_split_posix);
+    RUN_TEST(for_loop_unquoted_var_splits_posix);
+    RUN_TEST(for_loop_unquoted_empty_no_iteration_posix);
     RUN_TEST(while_loop);
     RUN_TEST(until_loop);
     RUN_TEST(case_statement);
