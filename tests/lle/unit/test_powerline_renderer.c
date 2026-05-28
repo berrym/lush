@@ -434,6 +434,16 @@ TEST(composer_powerline_context_affects_output) {
     setup();
 
     lle_composer_set_theme(&g_composer, "powerline");
+
+    /// The status segment is disabled by default (starship parity), so opt
+    /// it in here to exercise the exit-code-affects-output path: with status
+    /// enabled, a non-zero exit adds the segment and changes the prompt.
+    lle_theme_t *theme = lle_theme_registry_find(&g_themes, "powerline");
+    ASSERT_NOT_NULL(theme);
+    snprintf(theme->enabled_segments[theme->enabled_segment_count], 32,
+             "status");
+    theme->enabled_segment_count++;
+
     lle_composer_refresh_directory(&g_composer);
 
     /// Render with exit code 0 (status segment hidden)
@@ -478,12 +488,14 @@ TEST(powerline_theme_has_correct_segments) {
     lle_theme_t *theme = lle_theme_create_powerline();
     ASSERT_NOT_NULL(theme);
 
-    /// Built-in powerline theme should have 4 segments
-    ASSERT_EQ(theme->enabled_segment_count, 4);
+    /// Built-in powerline theme enables three segments by default. The
+    /// exit-status segment is configured (see segment_configs) but NOT
+    /// enabled by default -- starship parity, so a routine non-zero exit
+    /// (e.g. SIGPIPE -> 141 from quitting a pager) draws no segment.
+    ASSERT_EQ(theme->enabled_segment_count, 3);
     ASSERT_STR_EQ(theme->enabled_segments[0], "user");
     ASSERT_STR_EQ(theme->enabled_segments[1], "directory");
     ASSERT_STR_EQ(theme->enabled_segments[2], "git");
-    ASSERT_STR_EQ(theme->enabled_segments[3], "status");
 
     free(theme);
 }
