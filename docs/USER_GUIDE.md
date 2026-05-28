@@ -227,7 +227,7 @@ LLE highlights your input in real-time:
   `/...`, relative `./...`, home `~/...`) and *kind* (regular file vs.
   directory vs. missing). Defaults: directories underlined green,
   missing paths red, regular files unhighlighted (let the line itself
-  speak). Themes can colour every shape × kind slot independently or
+  speak). Themes can color every shape × kind slot independently or
   override the kind-only `path_file` / `path_dir` fallbacks. See the
   `[syntax]` section in `examples/theme.toml`.
 - **Errors**: Syntax errors indicated before execution

@@ -821,7 +821,7 @@ Two things to notice:
    wanted to be sure `words` was a List, not a Scalar that happens to
    contain spaces.
 2. **`next` halts at the *same source line*** -- the for-loop body --
-   because depth-aware stepping recognises that the loop iteration is
+   because depth-aware stepping recognizes that the loop iteration is
    at the same executor frame depth, not a deeper call.
 
 ### Performance Analysis Example

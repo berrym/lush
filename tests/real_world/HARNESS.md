@@ -156,5 +156,5 @@ class:
 
 Each upstream set has its own `SOURCES.md` under
 `corpus/<bucket>/<set>/`. A top-level
-`corpus/MANIFEST.md` summarising every set is **maintained by hand**
+`corpus/MANIFEST.md` summarizing every set is **maintained by hand**
 when a new set lands -- the harness does not regenerate it.

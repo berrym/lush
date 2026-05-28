@@ -448,7 +448,7 @@ operator (`${config[key]}`, `${!config[@]}`, `${config[@]}`,
 Lush accepts bash-style and zsh-style parameter expansion as
 spellings of the same canonical operations (PHILOSOPHY section 2).
 The pairs below all route to one implementation; choose by
-readability. Flags are recognised in all modes -- lush does not
+readability. Flags are recognized in all modes -- lush does not
 gate them behind `mode zsh`.
 
 | Operation | Bash spelling | Zsh spelling |
@@ -463,7 +463,7 @@ gate them behind `mode zsh`.
 Notes on composability:
 
 - Single-flag forms above are stable and tested.
-- Multi-flag composition (`${(Uo)arr}`) is recognised at the parser
+- Multi-flag composition (`${(Uo)arr}`) is recognized at the parser
   level but a small set of combinations still interacts awkwardly
   with `[@]` presentation; if you hit a `SHELL_ERR_TYPE_MISMATCH`
   from a composed flag, file an issue with the exact expression --
@@ -934,7 +934,7 @@ You are in lush, not `dash`.
 What POSIX mode does change is the *defaults*: word-splitting, glob
 handling, `echo` semantics, alias expansion, and so on, all
 configure to POSIX-conforming values. The polyglot translation layer
-also narrows -- `set -o pipefail` is still recognised because POSIX
+also narrows -- `set -o pipefail` is still recognized because POSIX
 spells options the same way, but the bash-only `set -o privileged`
 or zsh-only `setopt extended_glob` will not be silently translated.
 

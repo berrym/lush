@@ -221,7 +221,7 @@ src/builtins/bin_declare.c now accepts two zsh-only typeset flags:
   -H   Hide from `typeset -p` listing. Pure display attribute; lush's
        typeset listing path doesn't enumerate variables the way zsh's
        does, so the no-op accept produces observably-identical
-       behaviour.
+       behavior.
   -U   Unique-element array attribute. Accepted but not enforced --
        per-array dedup needs an attribute on the array storage that
        lush doesn't have yet. Documented limitation: scripts that

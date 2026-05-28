@@ -157,9 +157,9 @@ typedef struct lle_pager_layer {
 ```
 
 **OPEN QUESTION 1**: should the pager support styled content
-(syntax highlighting / coloured spans from the source content)?
+(syntax highlighting / colored spans from the source content)?
 For the debugger's variable inspector this matters a lot — typed
-values should retain their kind colour. If yes, `content` becomes
+values should retain their kind color. If yes, `content` becomes
 "raw text + spans" similar to command_layer's highlighted_text.
 If no, the pager is plain-text-only and styled producers (debugger,
 syntax-highlighted help) strip ANSI before paging.
@@ -212,7 +212,7 @@ call; everything else is internal.
 ///
 /// @param executor Executor context (for shell options & config)
 /// @param content  Text to display; pager owns a copy
-/// @return 0 on success, non-zero if pager couldn't initialise
+/// @return 0 on success, non-zero if pager couldn't initialize
 int lle_pager_present(struct executor *executor, const char *content);
 ```
 
@@ -265,7 +265,7 @@ The status line is rendered using the existing screen_buffer
 use). Line `view_rows` gets prefixed with the status string;
 screen_buffer_render handles the column-accounting.
 
-**OPEN QUESTION 3**: status line behaviour during fast scroll —
+**OPEN QUESTION 3**: status line behavior during fast scroll —
 flush on every scroll, or rate-limit at, say, 60Hz? screen_buffer
 + clear-and-redraw is fast enough on modern terminals that flushing
 every keystroke shouldn't visibly tear, but on slow tmux-over-ssh
@@ -282,7 +282,7 @@ Following the `(lush-debug)` precedent: pager activates a
 mode-specific keybinding map that overrides the default editing
 bindings for the duration.
 
-Default bindings (`display lle pager bindings` to inspect / customise):
+Default bindings (`display lle pager bindings` to inspect / customize):
 
 | Key | Action |
 |---|---|
@@ -340,7 +340,7 @@ minimal.
 
 **OPEN QUESTION 5**: signal handling — Ctrl-C inside pager. Less
 treats it as "interrupt search, return to view"; more treats it
-as "quit". I'd default to less's behaviour (interrupt-then-quit
+as "quit". I'd default to less's behavior (interrupt-then-quit
 on second Ctrl-C).
 
 ---
@@ -387,9 +387,9 @@ overflows the screen):
 - `unset` — no (output is empty or trivial)
 - Debugger `bt`, `vars`, `inspect`, `breakpoints`
 
-**OPEN QUESTION 6**: should `lle_pager_present` honour
+**OPEN QUESTION 6**: should `lle_pager_present` honor
 `set -o pager off` / a `display lle pager off` config flag that
-disables pagination project-wide? Yes — pagination is a behaviour
+disables pagination project-wide? Yes — pagination is a behavior
 the user must be able to turn off, especially for scripts that
 were designed against the old printf path. Default: on when
 stdout is a tty.
@@ -397,7 +397,7 @@ stdout is a tty.
 **OPEN QUESTION 7**: when pager is disabled (config OFF) but
 content overflows, do we still write everything to stdout (let
 the user scroll the terminal)? Yes — that's the bash/zsh
-behaviour and breaking it would be a worse surprise than missing
+behavior and breaking it would be a worse surprise than missing
 pagination.
 
 ---
@@ -421,9 +421,9 @@ its own input loop until quit, returns to debugger which renders
 pattern; no conflict.
 
 **OPEN QUESTION 8**: should the debugger's `inspect` output retain
-kind colouring inside the pager? See OPEN QUESTION 1 — answering
+kind coloring inside the pager? See OPEN QUESTION 1 — answering
 yes there answers yes here. (My recommendation: yes; the kind
-colours are exactly the information density a paginated inspect
+colors are exactly the information density a paginated inspect
 view needs to keep.)
 
 ---
@@ -545,7 +545,7 @@ for fuller reasoning.
 
 The pager preserves ANSI escape sequences in `content`. No
 separate spans data structure; `content` is a `const char *` that
-may contain colour/style escapes, and screen_buffer's existing
+may contain color/style escapes, and screen_buffer's existing
 ANSI-skip pass keeps cursor math correct (the command_layer's
 `highlighted_text` already exercises this path daily).
 
@@ -612,12 +612,12 @@ bypasses regardless of the config setting.
 
 When `display.lle.pager.enabled = false` and content exceeds the
 viewport, write everything directly to stdout. Matches bash/zsh
-behaviour; breaking it would be a worse surprise than missing
+behavior; breaking it would be a worse surprise than missing
 pagination.
 
-### Q8 — Debugger inspect kind colours through pager: RESOLVED YES.
+### Q8 — Debugger inspect kind colors through pager: RESOLVED YES.
 
-Follows from Q1. Kind colours are exactly the information density
+Follows from Q1. Kind colors are exactly the information density
 a paginated inspect view needs to keep; stripping them defeats
 the feature precisely when output is large enough to need pagination.
 
@@ -625,7 +625,7 @@ the feature precisely when output is large enough to need pagination.
 
 ## Additional design constraints (added 2026-05-25)
 
-Three behaviours not surfaced explicitly in the first draft:
+Three behaviors not surfaced explicitly in the first draft:
 
 ### Re-entrancy: refuse with error.
 

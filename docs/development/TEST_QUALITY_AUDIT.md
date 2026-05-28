@@ -62,7 +62,7 @@ in a file that defines the parameters as `(a, b, msg)` is silently fine
 "Expected X, got Y" with X and Y swapped — making debugging confusing.
 That confusion has cost real time.
 
-The shared framework standardises on `(actual, expected, msg)` with
+The shared framework standardizes on `(actual, expected, msg)` with
 consistent failure messages and refuses to be mistaken for any other
 order.
 
