@@ -97,6 +97,30 @@ size_t lush_ident_match_continue(const char *p, size_t remaining);
  */
 bool lush_is_valid_identifier(const char *name);
 
+/**
+ * @brief Canonicalize @p name to NFC for storage and lookup
+ *
+ * Lush stores identifier names in NFC form so that NFC-encoded `café`
+ * and NFD-encoded `cafe + combining-acute` collapse to one binding
+ * (project-wide NFC-everywhere policy). This helper returns a malloc'd
+ * NFC normalization of @p name; the caller frees.
+ *
+ * On any failure (NULL input, allocation failure, normalization
+ * failure for malformed UTF-8), returns strdup(name) -- the original
+ * bytes -- so the call site can continue without special-casing.
+ * Returns NULL only if both normalization and the strdup fallback
+ * fail to allocate.
+ *
+ * Pure ASCII inputs round-trip unchanged via NFC (every ASCII
+ * codepoint is its own canonical form), so the helper is safe to
+ * apply unconditionally without an ASCII fast path.
+ *
+ * @param name NUL-terminated identifier to canonicalize (may be NULL)
+ * @return Newly-allocated NFC form (or strdup(name) fallback) or NULL
+ *         only on total allocation failure
+ */
+char *lush_ident_canonicalize_alloc(const char *name);
+
 #ifdef __cplusplus
 }
 #endif

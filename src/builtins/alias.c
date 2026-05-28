@@ -75,7 +75,17 @@ char *lookup_alias(const char *key) {
     if (!aliases || !key) {
         return NULL;
     }
-    const char *val = ht_strstr_get(aliases, key);
+    /// NFC-normalize the key so a lookup with NFD bytes matches the
+    /// canonical form set_alias stored. ASCII keys (the overwhelming
+    /// common case for aliases) round-trip unchanged through the
+    /// canonicalizer's any-high-byte fast path. The returned pointer
+    /// is owned by the hash table; the caller must not free it.
+    char *canon = lush_ident_canonicalize_alloc(key);
+    if (!canon) {
+        return NULL;
+    }
+    const char *val = ht_strstr_get(aliases, canon);
+    free(canon);
     return (char *)val;
 }
 
@@ -130,8 +140,15 @@ bool set_alias(const char *key, const char *val) {
         return false;
     }
 
-    ht_strstr_insert(aliases, key, val);
-    char *alias = lookup_alias(key);
+    /// NFC-normalize the key on ingest so alias bindings collapse to
+    /// one canonical entry regardless of how the user typed the name.
+    char *canon = lush_ident_canonicalize_alloc(key);
+    if (!canon) {
+        return false;
+    }
+    ht_strstr_insert(aliases, canon, val);
+    char *alias = lookup_alias(canon);
+    free(canon);
     return (alias != NULL);
 }
 
@@ -144,7 +161,12 @@ bool set_alias(const char *key, const char *val) {
  */
 void unset_alias(const char *key) {
     if (aliases && key) {
-        ht_strstr_remove(aliases, key);
+        char *canon = lush_ident_canonicalize_alloc(key);
+        if (!canon) {
+            return;
+        }
+        ht_strstr_remove(aliases, canon);
+        free(canon);
     }
 }
 
@@ -213,18 +235,30 @@ bool valid_alias_name(const char *key) {
         return false;
     }
 
+    /// NFC-canonicalize so an NFD-encoded identifier (letter +
+    /// combining mark) validates on equal terms with the NFC form.
+    /// The canonical form is also what set_alias stores, so this
+    /// keeps validate / store / lookup in agreement.
+    char *canon = lush_ident_canonicalize_alloc(trimmed);
+    if (!canon) {
+        return false;
+    }
+
     /// POSIX bans digit-first alias names but both bash and zsh permit them
     /// (e.g. zsh's directory aliases `alias 1='cd +1' ... 9='cd +9'`). Match
     /// the consensus: accept digit-first names too.
 
-    const char *p = trimmed;
+    const char *start = canon;
+    const char *p = canon;
     size_t rem = strlen(p);
+    bool ok = true;
     while (rem > 0 && !isspace((unsigned char)*p)) {
         unsigned char b = (unsigned char)*p;
         if (b < 0x80) {
             /// ASCII fast path: alnum/_ plus the .-+ extensions.
             if (!valid_alias_name_char((char)b)) {
-                return false;
+                ok = false;
+                break;
             }
             p++;
             rem--;
@@ -236,7 +270,8 @@ bool valid_alias_name(const char *key) {
             /// rather than _start).
             size_t n = lush_ident_match_continue(p, rem);
             if (n == 0) {
-                return false;
+                ok = false;
+                break;
             }
             p += n;
             rem -= n;
@@ -244,7 +279,11 @@ bool valid_alias_name(const char *key) {
     }
 
     /// Make sure we processed at least one character
-    return (p > trimmed);
+    if (ok && p == start) {
+        ok = false;
+    }
+    free(canon);
+    return ok;
 }
 
 /**

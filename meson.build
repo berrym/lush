@@ -342,6 +342,7 @@ if lle_sources.length() > 0
                               ['tests/lle/functional/multiline_manager_test.c',
                                'tests/lle/functional/test_memory_mock.c',
                                'src/input_continuation.c',
+                               'src/identifier.c',
                                'src/symtable.c',
                                'src/shell_mode.c',
                                'src/libhashtable/ht.c',
@@ -961,6 +962,7 @@ endif
                                               ['tests/lle/functional/test_history_phase4_complete.c',
                                                'tests/lle/functional/test_memory_mock.c',
                                                'src/input_continuation.c',
+                                               'src/identifier.c',
                                                'src/symtable.c',
                                                'src/shell_mode.c',
                                                'src/libhashtable/ht.c',
@@ -1452,6 +1454,7 @@ endif
 if fs.exists('tests/unit/test_symtable.c')
   test_symtable = executable('test_symtable',
                              'tests/unit/test_symtable.c',
+                             'src/identifier.c',
                              'src/symtable.c',
                              'src/libhashtable/ht.c',
                              'src/libhashtable/ht_fnv1a.c',
@@ -2063,10 +2066,14 @@ if fuzzing_enabled
     # provides the is_lower/is_upper/tolower/toupper case primitives it (and
     # symtable.c) consume. unicode_compare.c provides
     # lle_unicode_normalize_nfc_alloc (symtable.c's NFC history work) and
-    # lle_unicode_strings_equal (parser.c). All hermetic; no liblle.a needed.
+    # lle_unicode_strings_equal (parser.c). grapheme_detector.c provides
+    # get_grapheme_break_property, which lush_ident_match_continue consults
+    # to accept UAX #31 Continue combining marks (NFD identifiers). All
+    # hermetic; no liblle.a needed.
     'src/lle/unicode/unicode_class.c',
     'src/lle/unicode/unicode_case.c',
     'src/lle/unicode/unicode_compare.c',
+    'src/lle/unicode/grapheme_detector.c',
     'tests/fuzz/fuzz_stubs.c',
   ]
 

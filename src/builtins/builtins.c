@@ -318,10 +318,11 @@ source_location_t builtin_get_source_location(void) {
 int is_valid_identifier(const char *name) {
     /// Single source of truth for "is this a valid identifier?" is
     /// lush_is_valid_identifier in src/identifier.c, which honours
-    /// FEATURE_UNICODE_IDENTIFIERS (POSIX ASCII rule when off; the
-    /// LLE Unicode-letter table when on). This wrapper keeps the
-    /// int-returning C-API the existing callers (declare, local,
-    /// export, readonly, unset) already use.
+    /// FEATURE_UNICODE_IDENTIFIERS and NFC-canonicalizes the input
+    /// internally so NFD-encoded names validate on equal terms with
+    /// the NFC equivalent. This wrapper keeps the int-returning C
+    /// API the existing callers (declare, local, export, readonly,
+    /// unset) already use.
     return lush_is_valid_identifier(name) ? 1 : 0;
 }
 

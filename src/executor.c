@@ -9776,13 +9776,22 @@ static function_def_t *find_function(executor_t *executor,
         return NULL;
     }
 
+    /// NFC-normalize the lookup name so it matches whatever store_function
+    /// canonicalized on the write side.
+    char *canon = lush_ident_canonicalize_alloc(function_name);
+    if (!canon) {
+        return NULL;
+    }
+
     function_def_t *func = executor->functions;
     while (func) {
-        if (strcmp(func->name, function_name) == 0) {
+        if (strcmp(func->name, canon) == 0) {
+            free(canon);
             return func;
         }
         func = func->next;
     }
+    free(canon);
     return NULL;
 }
 
@@ -9807,6 +9816,14 @@ static int store_function(executor_t *executor, const char *function_name,
         return 1;
     }
 
+    /// NFC-normalize on the write side so the function table is keyed
+    /// by canonical form, matching find_function's lookup behavior.
+    char *canon = lush_ident_canonicalize_alloc(function_name);
+    if (!canon) {
+        return 1;
+    }
+    function_name = canon;
+
     /// Check if function already exists and remove it
     function_def_t **current = &executor->functions;
     while (*current) {
@@ -9825,12 +9842,14 @@ static int store_function(executor_t *executor, const char *function_name,
     /// Create new function definition
     function_def_t *new_func = malloc(sizeof(function_def_t));
     if (!new_func) {
+        free(canon);
         return 1;
     }
 
     new_func->name = strdup(function_name);
     if (!new_func->name) {
         free(new_func);
+        free(canon);
         return 1;
     }
 
@@ -9841,6 +9860,7 @@ static int store_function(executor_t *executor, const char *function_name,
         /// Only fail if body was non-NULL but copy failed
         free(new_func->name);
         free(new_func);
+        free(canon);
         return 1;
     }
 
@@ -9852,6 +9872,7 @@ static int store_function(executor_t *executor, const char *function_name,
     new_func->next = executor->functions;
     executor->functions = new_func;
 
+    free(canon);
     return 0;
 }
 

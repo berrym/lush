@@ -25,6 +25,7 @@
 #include "symtable.h"
 
 #include "ht.h"
+#include "identifier.h"
 #include "init.h"
 #include "lle/unicode_case.h"
 #include "lle/unicode_compare.h"
@@ -660,6 +661,17 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
+    /// NFC-normalize the name on ingest so NFC and NFD encodings of
+    /// the same user-visible identifier collide as one binding (the
+    /// project-wide NFC-everywhere policy). Pure-ASCII names round-trip
+    /// unchanged. The canonical form is used for the readonly probe,
+    /// the hashtable insert, and any debug output.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+    name = canon;
+
     /// Readonly enforcement (current scope). If an entry already lives
     /// in this scope and carries SYMVAR_READONLY, refuse the write and
     /// return SYMTABLE_ERR_READONLY so callers can surface a specific
@@ -675,6 +687,7 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
             bool readonly_blocked = (existing->flags & SYMVAR_READONLY) != 0;
             free_symvar(existing);
             if (readonly_blocked) {
+                free(canon);
                 return SYMTABLE_ERR_READONLY;
             }
         }
@@ -684,6 +697,7 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
     char *serialized = serialize_variable(value, SYMVAR_STRING, flags,
                                           manager->current_scope->level);
     if (!serialized) {
+        free(canon);
         return -1;
     }
 
@@ -696,6 +710,7 @@ int symtable_set_var(symtable_manager_t *manager, const char *name,
         printf("DEBUG: Set variable '%s'='%s'\n", name, value ? value : "");
     }
 
+    free(canon);
     return 0;
 }
 
@@ -754,6 +769,16 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
         return -1;
     }
 
+    /// NFC-normalize so the scope-walk probe matches the canonical form
+    /// stored by symtable_set_var. Without this, an `=` assignment from
+    /// an NFD-encoded reference would miss the existing NFC binding and
+    /// drop the new value into the global scope.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+    name = canon;
+
     /// Walk scope chain from current scope upward looking for the variable.
     /// If found, update that scope (preserves locality). If not, fall through
     /// to global write (POSIX default for unprefixed assignments).
@@ -780,6 +805,7 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
                 free_symvar(existing);
             }
             if (readonly_blocked) {
+                free(canon);
                 return SYMTABLE_ERR_READONLY;
             }
 
@@ -790,13 +816,16 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
             manager->current_scope = scope;
             int result = symtable_set_var(manager, name, value, flags);
             manager->current_scope = old_scope;
+            free(canon);
             return result;
         }
         scope = scope->parent;
     }
 
     /// Variable does not exist in any scope — create it globally per POSIX.
-    return symtable_set_global_var(manager, name, value);
+    int result = symtable_set_global_var(manager, name, value);
+    free(canon);
+    return result;
 }
 
 /**
@@ -809,11 +838,30 @@ int symtable_assign_var(symtable_manager_t *manager, const char *name,
  * @param name Variable name to look up
  * @return Allocated copy of value, or NULL if not found
  */
+static char *symtable_get_var_impl(symtable_manager_t *manager,
+                                   const char *name);
+
 char *symtable_get_var(symtable_manager_t *manager, const char *name) {
     if (!manager || !name) {
         return NULL;
     }
+    /// NFC-normalize on the read side so a lookup with NFD bytes
+    /// resolves the same binding stored under the NFC form. ASCII
+    /// names round-trip unchanged. The thin wrapper keeps the
+    /// existing function body intact -- the impl runs against the
+    /// canonical name, then the wrapper frees the buffer once
+    /// regardless of which return path the impl took.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return NULL;
+    }
+    char *result = symtable_get_var_impl(manager, canon);
+    free(canon);
+    return result;
+}
 
+static char *symtable_get_var_impl(symtable_manager_t *manager,
+                                   const char *name) {
     /// Handle special dynamic variables
     if (strcmp(name, "RANDOM") == 0) {
         /// Initialize random seed on first use
@@ -930,6 +978,15 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
         return -1;
     }
 
+    /// NFC-normalize so unset by either encoding hits the canonical
+    /// binding. set_var below also normalizes; doing it here too keeps
+    /// the find_var probe consistent.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+    name = canon;
+
     /// For array bindings: free the underlying array_value_t. Read
     /// the binding via find_var so we honor the scope chain (locals
     /// shadow globals) and so we can drop the array's backing memory
@@ -943,7 +1000,9 @@ int symtable_unset_var(symtable_manager_t *manager, const char *name) {
     }
 
     /// Mark as unset rather than removing
-    return symtable_set_var(manager, name, "", SYMVAR_UNSET);
+    int rc = symtable_set_var(manager, name, "", SYMVAR_UNSET);
+    free(canon);
+    return rc;
 }
 
 /* ============================================================================
@@ -3026,6 +3085,14 @@ int symtable_set_array(const char *name, array_value_t *array) {
         return -1;
     }
 
+    /// NFC-normalize the name so NFC- and NFD-encoded references to the
+    /// same identifier write the same binding (project NFC-everywhere).
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return -1;
+    }
+    name = canon;
+
     /// Free any existing array bound to this name -- assignment to an
     /// already-array variable replaces the underlying array_value_t.
     /// symtable_get_array walks the scope chain; if it finds an old
@@ -3043,10 +3110,12 @@ int symtable_set_array(const char *name, array_value_t *array) {
     char *serialized = serialize_variable(ptr_str, SYMVAR_ARRAY, SYMVAR_NONE,
                                           global_manager->current_scope->level);
     if (!serialized) {
+        free(canon);
         return -1;
     }
     ht_strstr_insert(global_manager->current_scope->vars_ht, name, serialized);
     free(serialized);
+    free(canon);
     return 0;
 }
 
@@ -3055,6 +3124,16 @@ int symtable_set_array(const char *name, array_value_t *array) {
  */
 array_value_t *symtable_get_array(const char *name) {
     if (!name) {
+        return NULL;
+    }
+    if (!global_manager || !global_manager->current_scope) {
+        return NULL;
+    }
+
+    /// NFC-normalize on the read side too -- a lookup with NFD bytes
+    /// must resolve the same binding stored under the NFC form.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
         return NULL;
     }
 
@@ -3067,10 +3146,8 @@ array_value_t *symtable_get_array(const char *name) {
     /// and the shutdown cleanup that frees array_value_t backing
     /// memory) but is no longer consulted as a get fallback: that
     /// fallback was leaking local arrays out of their function scope.
-    if (!global_manager || !global_manager->current_scope) {
-        return NULL;
-    }
-    symvar_t *var = find_var(global_manager->current_scope, name);
+    symvar_t *var = find_var(global_manager->current_scope, canon);
+    free(canon);
     if (!var) {
         return NULL;
     }

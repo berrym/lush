@@ -11,11 +11,15 @@
 
 #include "identifier.h"
 
+#include "lle/grapheme_detector.h"
 #include "lle/unicode_class.h"
+#include "lle/unicode_compare.h"
 #include "lle/utf8_support.h"
 #include "shell_mode.h"
 
 #include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * @brief Test whether an ASCII byte is a valid identifier-Start byte
@@ -85,31 +89,100 @@ size_t lush_ident_match_continue(const char *p, size_t remaining) {
     if (n <= 0) {
         return 0;
     }
-    /// Continue accepts letters and digits; lle_unicode_is_alnum
-    /// covers both via the same Unicode-aware category test.
-    return lle_unicode_is_alnum(cp) ? (size_t)n : 0u;
+    /// Continue accepts letters and digits via the Unicode-aware
+    /// category test...
+    if (lle_unicode_is_alnum(cp)) {
+        return (size_t)n;
+    }
+    /// ...and, per UAX #31 Continue, also accepts combining marks that
+    /// extend a preceding base character. This is what lets an NFD-
+    /// encoded identifier (e.g. `cafe` + U+0301 combining acute)
+    /// tokenise as a single unit: the mark is pulled into the name
+    /// token here, then the NFC-canonicalization at the storage /
+    /// lookup boundary (lush_ident_canonicalize_alloc) collapses it to
+    /// the same binding as the precomposed NFC form. Without this the
+    /// scan stopped at the mark, truncating the name to "cafe" and
+    /// missing the NFC binding entirely.
+    ///
+    /// GB_EXTEND covers nonspacing combining marks (Mn) -- the class
+    /// NFD decomposition of Latin/Greek/Cyrillic produces -- and
+    /// GB_SPACING_MARK covers spacing combining marks (Mc) used by
+    /// Indic scripts. Marks are accepted only in Continue position;
+    /// lush_ident_match_start never reaches this code for a mark
+    /// because lle_unicode_is_alpha is false for the Mark category, so
+    /// a bare leading diacritic correctly fails to start an identifier.
+    grapheme_break_property_t gb = get_grapheme_break_property(cp);
+    if (gb == GB_EXTEND || gb == GB_SPACING_MARK) {
+        return (size_t)n;
+    }
+    return 0;
+}
+
+char *lush_ident_canonicalize_alloc(const char *name) {
+    if (!name) {
+        return NULL;
+    }
+    /// Pure ASCII inputs are NFC by construction, so the strdup
+    /// fallback is the canonical form for them. The unicode normalizer
+    /// also passes ASCII through unchanged, but the fallback keeps the
+    /// fast path obvious and lets us skip the allocator dance when
+    /// nothing could possibly need normalizing.
+    bool any_high = false;
+    for (const char *p = name; *p; p++) {
+        if ((unsigned char)*p >= 0x80) {
+            any_high = true;
+            break;
+        }
+    }
+    if (!any_high) {
+        return strdup(name);
+    }
+    char *norm = lle_unicode_normalize_nfc_alloc(name);
+    if (norm) {
+        return norm;
+    }
+    /// Normalization failed (malformed UTF-8, alloc failure inside the
+    /// normalizer). Fall back to the raw bytes so the caller can
+    /// continue; downstream validation will still reject malformed
+    /// sequences via the predicate.
+    return strdup(name);
 }
 
 bool lush_is_valid_identifier(const char *name) {
     if (!name || !*name) {
         return false;
     }
+    /// NFC-canonicalize before validating so an NFD-encoded name
+    /// (letter + combining mark) is accepted on equal terms with the
+    /// NFC-encoded equivalent (precomposed letter). The combining
+    /// marks themselves are not in the project's Unicode-letter
+    /// table -- they are Mark category, not Letter -- so without
+    /// canonicalization NFD input would always fail the per-codepoint
+    /// _continue test. Pure-ASCII names round-trip unchanged through
+    /// the helper's any-high-byte fast path.
+    char *canon = lush_ident_canonicalize_alloc(name);
+    if (!canon) {
+        return false;
+    }
     size_t total = 0;
-    while (name[total] != '\0') {
+    while (canon[total] != '\0') {
         total++;
     }
 
-    size_t n = lush_ident_match_start(name, total);
-    if (n == 0) {
-        return false;
-    }
-    size_t pos = n;
-    while (pos < total) {
-        n = lush_ident_match_continue(name + pos, total - pos);
-        if (n == 0) {
-            return false;
+    bool ok = false;
+    size_t n = lush_ident_match_start(canon, total);
+    if (n > 0) {
+        size_t pos = n;
+        ok = true;
+        while (pos < total) {
+            n = lush_ident_match_continue(canon + pos, total - pos);
+            if (n == 0) {
+                ok = false;
+                break;
+            }
+            pos += n;
         }
-        pos += n;
     }
-    return true;
+    free(canon);
+    return ok;
 }

@@ -2540,6 +2540,83 @@ TEST(rt_unicode_ident_fd_allocation_var) {
     unlink("/tmp/lush_ut_fd.out");
 }
 
+TEST(rt_unicode_ident_nfd_passes_validation) {
+    /// NFD-encoded "cafe + combining-acute" (U+0301) validates as a
+    /// single canonicalized identifier "café" after the validator's
+    /// NFC normalization. Before this wave, declare rejected NFD with
+    /// "not a valid identifier". Lookup uses the precomposed NFC name
+    /// "caf<é>" (4 codepoints) -- the canonical storage form.
+    run_result_t r = run_shell("declare cafe\xCC\x81=NFD_FORM\n"
+                               "echo \"$caf\xC3\xA9\"\n");
+    ASSERT_STDOUT_EQ(r, "NFD_FORM\n");
+}
+
+TEST(rt_unicode_ident_nfd_reference_resolves) {
+    /// The bidirectional lookup: store the binding under the NFC form,
+    /// then reference it with NFD bytes (cafe + U+0301). The tokenizer
+    /// now pulls the combining mark into the identifier token (UAX #31
+    /// Continue accepts GB_EXTEND), so expand_variable receives the
+    /// full NFD name, canonicalizes it to NFC, and resolves the binding.
+    /// Regression guard for the showstopper where the name scan stopped
+    /// at the mark and truncated to "cafe".
+    run_result_t r = run_shell("declare caf\xC3\xA9=NFC_STORED\n"
+                               "echo \"$cafe\xCC\x81\"\n");
+    ASSERT_STDOUT_EQ(r, "NFC_STORED\n");
+}
+
+TEST(rt_unicode_ident_leading_mark_not_identifier) {
+    /// A bare leading combining mark must NOT start an identifier
+    /// (lush_ident_match_start rejects marks). `$<U+0301>x` therefore
+    /// does not form a variable reference; the `$` and the mark fall
+    /// through to literal text. Asserts the Start position stays
+    /// mark-rejecting after the Continue-position relaxation.
+    run_result_t r = run_shell("echo \"[\xCC\x81x]\"\n");
+    ASSERT_STDOUT_EQ(r, "[\xCC\x81x]\n");
+}
+
+TEST(rt_unicode_ident_nfc_nfd_storage_collision) {
+    /// NFC-encoded `café` and NFD-encoded `cafe + U+0301` MUST
+    /// collide as one binding in the symtable. Set via NFC, overwrite
+    /// via NFD, read via NFC: the NFC read sees the NFD-side write.
+    run_result_t r = run_shell("declare caf\xC3\xA9=NFC_FIRST\n"
+                               "declare cafe\xCC\x81=NFD_OVERWRITE\n"
+                               "echo \"$caf\xC3\xA9\"\n");
+    ASSERT_STDOUT_EQ(r, "NFD_OVERWRITE\n");
+}
+
+TEST(rt_unicode_ident_nfc_nfd_alias_collision) {
+    /// Same NFC/NFD collision for aliases. valid_alias_name and
+    /// set_alias both canonicalize.
+    init_aliases();
+    run_result_t r = run_shell("alias caf\xC3\xA9=\"echo NFC_DEF\"\n"
+                               "alias cafe\xCC\x81=\"echo NFD_DEF\"\n"
+                               "caf\xC3\xA9\n");
+    ASSERT_STDOUT_EQ(r, "NFD_DEF\n");
+}
+
+TEST(rt_unicode_ident_nfc_nfd_function_collision) {
+    /// Functions also collide on NFC. store_function and find_function
+    /// share the canonicalizer. The unalias up front avoids name-
+    /// resolution shadowing from the prior alias-collision test, which
+    /// leaves a global alias of the same name behind (aliases beat
+    /// functions in the dispatch order).
+    init_aliases();
+    (void)run_shell("unalias caf\xC3\xA9 2>/dev/null || true\n");
+    run_result_t r = run_shell("caf\xC3\xA9() { echo NFC_BODY; }\n"
+                               "cafe\xCC\x81() { echo NFD_BODY; }\n"
+                               "caf\xC3\xA9\n");
+    ASSERT_STDOUT_EQ(r, "NFD_BODY\n");
+}
+
+TEST(rt_unicode_ident_nfc_array_assoc_collision) {
+    /// Same canonicalization for arrays via symtable_set_array /
+    /// symtable_get_array.
+    run_result_t r = run_shell("declare -A caf\xC3\xA9\n"
+                               "caf\xC3\xA9[k]=v_nfc\n"
+                               "echo \"${caf\xC3\xA9[k]}\"\n");
+    ASSERT_STDOUT_EQ(r, "v_nfc\n");
+}
+
 /// --- Glob expansion in for-loops, arrays, and zsh qualifiers ----------
 
 TEST(rt_glob_for_array_qualifiers) {
@@ -3826,6 +3903,13 @@ int main(void) {
     RUN_TEST(rt_unicode_ident_indirect_expansion_pointer);
     RUN_TEST(rt_unicode_ident_zsh_bare_subscript);
     RUN_TEST(rt_unicode_ident_fd_allocation_var);
+    RUN_TEST(rt_unicode_ident_nfd_passes_validation);
+    RUN_TEST(rt_unicode_ident_nfd_reference_resolves);
+    RUN_TEST(rt_unicode_ident_leading_mark_not_identifier);
+    RUN_TEST(rt_unicode_ident_nfc_nfd_storage_collision);
+    RUN_TEST(rt_unicode_ident_nfc_nfd_alias_collision);
+    RUN_TEST(rt_unicode_ident_nfc_nfd_function_collision);
+    RUN_TEST(rt_unicode_ident_nfc_array_assoc_collision);
     RUN_TEST(rt_heredoc_in_if_body);
     RUN_TEST(rt_heredoc_loop_redirection);
     RUN_TEST(rt_heredoc_strip_tabs);
