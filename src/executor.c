@@ -10070,9 +10070,11 @@ static bool is_empty_or_null(const char *str) { return !str || str[0] == '\0'; }
  *
  * Implements ${var:offset:length} substring expansion. Offsets and
  * lengths are measured in Unicode grapheme clusters (TR#29), not bytes,
- * so multi-byte UTF-8 sequences are never split mid-character. Negative
- * offsets count from the end of the string in graphemes; length of -1
- * means "to end".
+ * so multi-byte UTF-8 sequences are never split mid-character. A
+ * negative offset counts from the end of the string in graphemes. A
+ * negative length is an offset from the end: the substring ends
+ * |length| graphemes before the string's end (bash semantics). When no
+ * length is given (@p has_length false), the substring runs to the end.
  *
  * Uses the project's TR#29 primitives (lle_utf8_count_graphemes +
  * slice_string_graphemes) so user content with combining marks, emoji
@@ -10081,10 +10083,12 @@ static bool is_empty_or_null(const char *str) { return !str || str[0] == '\0'; }
  *
  * @param str Source string (UTF-8)
  * @param offset Starting grapheme position (negative for from-end)
- * @param length Number of graphemes to extract (-1 for rest of string)
+ * @param length Grapheme count; negative = from-end (see above)
+ * @param has_length false when ${var:offset} was written with no length
  * @return Newly malloc'd substring (caller must free)
  */
-static char *extract_substring(const char *str, int offset, int length) {
+static char *extract_substring(const char *str, int offset, int length,
+                               bool has_length) {
     if (!str) {
         return strdup("");
     }
@@ -10102,10 +10106,25 @@ static char *extract_substring(const char *str, int offset, int length) {
         return strdup("");
     }
     int remaining = total - offset;
-    if (length < 0 || length > remaining) {
-        length = remaining;
+    int final_len;
+    if (!has_length) {
+        /// ${var:offset} -- to end.
+        final_len = remaining;
+    } else if (length < 0) {
+        /// Negative length: end |length| graphemes before the string
+        /// end, i.e. keep (remaining - |length|) graphemes. An end that
+        /// falls at or before the offset yields the empty string.
+        final_len = remaining + length;
+        if (final_len < 0) {
+            final_len = 0;
+        }
+    } else {
+        final_len = (length > remaining) ? remaining : length;
     }
-    char *result = slice_string_graphemes(str, byte_len, offset, length);
+    if (final_len <= 0) {
+        return strdup("");
+    }
+    char *result = slice_string_graphemes(str, byte_len, offset, final_len);
     return result ? result : strdup("");
 }
 
@@ -14448,13 +14467,16 @@ static char *parse_parameter_expansion(executor_t *executor,
                     expand_variables_in_string(executor, expanded_default);
                 char *endptr;
                 int offset = strtol(expanded_offset_str, &endptr, 10);
-                int length = -1;
+                int length = 0;
+                bool has_length = false;
 
                 if (*endptr == ':') {
                     length = strtol(endptr + 1, NULL, 10);
+                    has_length = true;
                 }
 
-                result = extract_substring(var_value, offset, length);
+                result =
+                    extract_substring(var_value, offset, length, has_length);
                 free(expanded_offset_str);
             } else {
                 result = strdup("");

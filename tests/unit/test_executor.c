@@ -1884,6 +1884,27 @@ TEST(param_substring_removal_suffix) {
     executor_free(exec);
 }
 
+TEST(param_substring_offset_length) {
+    /// ${var:offset:length} including a negative length, which is an
+    /// offset from the end (bash semantics): the result ends |length|
+    /// graphemes before the string end. Issue #131.
+    run_result_t r = run_shell("s=abcdefgh\n"
+                               "echo \"${s:2}\"\n"
+                               "echo \"${s:2:3}\"\n"
+                               "echo \"${s: -3}\"\n"
+                               "echo \"${s:1:-2}\"\n"
+                               "echo \"${s:1:-1}\"\n"
+                               "echo \"${s: -4:-1}\"\n"
+                               "echo \"[${s:2:0}]\"\n");
+    ASSERT_STDOUT_EQ(r, "cdefgh\n"
+                        "cde\n"
+                        "fgh\n"
+                        "bcdef\n"
+                        "bcdefg\n"
+                        "efg\n"
+                        "[]\n");
+}
+
 TEST(param_pattern_substitution) {
     executor_t *exec = executor_new();
     ASSERT_NOT_NULL(exec, "executor_new failed");
@@ -4167,6 +4188,7 @@ int main(void) {
     RUN_TEST(param_string_length);
     RUN_TEST(param_substring_removal_prefix);
     RUN_TEST(param_substring_removal_suffix);
+    RUN_TEST(param_substring_offset_length);
     RUN_TEST(param_pattern_substitution);
     RUN_TEST(param_global_substitution);
 
