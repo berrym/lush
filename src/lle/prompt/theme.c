@@ -1019,12 +1019,17 @@ lle_theme_t *lle_theme_create_powerline(void) {
     /// Powerline rendering mode — composer routes to lle_powerline_render()
     theme->layout.style = LLE_PROMPT_STYLE_POWERLINE;
 
-    /// Segment order for powerline rendering
+    /// Segment order for powerline rendering. The exit-status segment is
+    /// configured below (see segment_configs) but deliberately NOT enabled
+    /// by default -- starship parity: its `status` module is off out of the
+    /// box, so a routine non-zero exit (e.g. SIGPIPE -> 141 from quitting a
+    /// pager) does not paint an alarming segment. Users opt in by adding
+    /// "status" to enabled_segments in their theme config, at which point
+    /// the configured styling below applies.
     snprintf(theme->enabled_segments[0], 32, "user");
     snprintf(theme->enabled_segments[1], 32, "directory");
     snprintf(theme->enabled_segments[2], 32, "git");
-    snprintf(theme->enabled_segments[3], 32, "status");
-    theme->enabled_segment_count = 4;
+    theme->enabled_segment_count = 3;
 
     /// Per-segment powerline colors: bold white text on colored backgrounds.
     /// Use true color #ffffff for fg (palette index 255 gets remapped by
